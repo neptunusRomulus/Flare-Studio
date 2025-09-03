@@ -25,6 +25,7 @@
   const clearMapBtn = document.getElementById('clearMapBtn');
   const exportTMXBtn = document.getElementById('exportTMXBtn');
   const exportTSXBtn = document.getElementById('exportTSXBtn');
+  const exportFlareTXTBtn = document.getElementById('exportFlareTXTBtn');
   const undoBtn = document.getElementById('undoBtn');
   const redoBtn = document.getElementById('redoBtn');
   const importTMXFile = document.getElementById('importTMXFile');
@@ -51,10 +52,11 @@
   let mapHeight = parseInt(mapHeightInput.value, 10); // tiles
   let tileSizeX = parseInt(tileSizeXSelect.value, 10);
   let tileSizeY = parseInt(tileSizeYSelect.value, 10);
-  let orientation = 'isometric';
+  let orientation = 'orthogonal'; // Start with orthogonal as default
   // Multiple tilesets support: each entry { name, image, columns, rows, tileCount, firstgid }
   let tilesets = [];
   let tilesetImage = null; // primary tileset reference for backwards compatibility
+  let tilesetFileName = null; // track original filename for TSX export
   let tilesetColumns = 0;  // primary columns
   let tilesetRows = 0;     // primary rows
   let tileCount = 0;       // primary tile count
@@ -156,6 +158,7 @@
     mapWidth = newW; mapHeight = newH;
     resizeMapCanvas();
     draw();
+    updateExportButtonStates(); // Update export button states when map dimensions change
   }
 
   // Draw grid and tiles
@@ -163,7 +166,7 @@
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, mapCanvas.width, mapCanvas.height);
 
-    // Draw layers using isometric renderer only
+    // Draw layers using the selected rendering mode
     tileLayers.forEach(layer => {
       if (!layer.visible) return;
       const data = layer.data;
@@ -171,8 +174,16 @@
         for (let x = 0; x < mapWidth; x++) {
           const gid = data[y * mapWidth + x];
           if (gid > 0) {
-            let dx = (x - y) * tileSizeX / 2 + (mapHeight * tileSizeX / 2);
-            let dy = (x + y) * tileSizeY / 2;
+            let dx, dy;
+            if (orientation === 'isometric') {
+              // Isometric rendering: screenX = (x - y) * (tileWidth / 2), screenY = (x + y) * (tileHeight / 2)
+              dx = (x - y) * tileSizeX / 2 + (mapHeight * tileSizeX / 2);
+              dy = (x + y) * tileSizeY / 2;
+            } else {
+              // Orthogonal rendering: tiles at (x*tileWidth, y*tileHeight)
+              dx = x * tileSizeX;
+              dy = y * tileSizeY;
+            }
             drawGID(gid, dx, dy);
           }
         }
@@ -185,51 +196,82 @@
       for (let y = 0; y < mapHeight; y++) {
         for (let x = 0; x < mapWidth; x++) {
           if (collisionData[y * mapWidth + x]) {
-            let dx = (x - y) * tileSizeX / 2 + (mapHeight * tileSizeX / 2);
-            let dy = (x + y) * tileSizeY / 2;
+            let dx, dy;
+            if (orientation === 'isometric') {
+              dx = (x - y) * tileSizeX / 2 + (mapHeight * tileSizeX / 2);
+              dy = (x + y) * tileSizeY / 2;
+            } else {
+              dx = x * tileSizeX;
+              dy = y * tileSizeY;
+            }
             ctx.fillRect(dx, dy, tileSizeX, tileSizeY);
           }
         }
       }
     }
 
-    // Draw only diamond (isometric) grid lines
+    // Draw grid lines based on orientation
     ctx.strokeStyle = 'rgba(255,255,255,0.15)';
-    // Draw diamond grid by drawing each tile's four edges, centered around tile position
-    for (let y = 0; y < mapHeight; y++) {
-      for (let x = 0; x < mapWidth; x++) {
-        let cx = (x - y) * tileSizeX / 2 + (mapHeight * tileSizeX / 2) + tileSizeX / 2;
-        let cy = (x + y) * tileSizeY / 2 + tileSizeY / 2;
-        // Four corners of the diamond centered around the tile
-        let top = { x: cx, y: cy - tileSizeY / 2 };
-        let right = { x: cx + tileSizeX / 2, y: cy };
-        let bottom = { x: cx, y: cy + tileSizeY / 2 };
-        let left = { x: cx - tileSizeX / 2, y: cy };
-        // Draw the complete diamond
+    if (orientation === 'isometric') {
+      // Draw diamond grid by drawing each tile's four edges, centered around tile position
+      for (let y = 0; y < mapHeight; y++) {
+        for (let x = 0; x < mapWidth; x++) {
+          let cx = (x - y) * tileSizeX / 2 + (mapHeight * tileSizeX / 2) + tileSizeX / 2;
+          let cy = (x + y) * tileSizeY / 2 + tileSizeY / 2;
+          // Four corners of the diamond centered around the tile
+          let top = { x: cx, y: cy - tileSizeY / 2 };
+          let right = { x: cx + tileSizeX / 2, y: cy };
+          let bottom = { x: cx, y: cy + tileSizeY / 2 };
+          let left = { x: cx - tileSizeX / 2, y: cy };
+          // Draw the complete diamond
+          ctx.beginPath();
+          ctx.moveTo(top.x, top.y);
+          ctx.lineTo(right.x, right.y);
+          ctx.lineTo(bottom.x, bottom.y);
+          ctx.lineTo(left.x, left.y);
+          ctx.closePath();
+          ctx.stroke();
+        }
+      }
+    } else {
+      // Draw orthogonal grid lines (horizontal and vertical)
+      for (let x = 0; x <= mapWidth; x++) {
         ctx.beginPath();
-        ctx.moveTo(top.x, top.y);
-        ctx.lineTo(right.x, right.y);
-        ctx.lineTo(bottom.x, bottom.y);
-        ctx.lineTo(left.x, left.y);
-        ctx.closePath();
+        ctx.moveTo(x * tileSizeX + 0.5, 0);
+        ctx.lineTo(x * tileSizeX + 0.5, mapHeight * tileSizeY);
+        ctx.stroke();
+      }
+      for (let y = 0; y <= mapHeight; y++) {
+        ctx.beginPath();
+        ctx.moveTo(0, y * tileSizeY + 0.5);
+        ctx.lineTo(mapWidth * tileSizeX, y * tileSizeY + 0.5);
         ctx.stroke();
       }
     }
 
     // Draw hover effect for painting preview
     if (hoverTileX >= 0 && hoverTileY >= 0 && hoverTileX < mapWidth && hoverTileY < mapHeight && (activeTool === 'tiles' || activeTool === 'collision')) {
-      let hx = (hoverTileX - hoverTileY) * tileSizeX / 2 + (mapHeight * tileSizeX / 2) + tileSizeX / 2;
-      let hy = (hoverTileX + hoverTileY) * tileSizeY / 2 + tileSizeY / 2;
-      
-      // Draw diamond-shaped hover effect with 50% transparent white fill
+      let hx, hy;
       ctx.fillStyle = 'rgba(255,255,255,0.5)';
-      ctx.beginPath();
-      ctx.moveTo(hx, hy - tileSizeY / 2); // top
-      ctx.lineTo(hx + tileSizeX / 2, hy); // right
-      ctx.lineTo(hx, hy + tileSizeY / 2); // bottom
-      ctx.lineTo(hx - tileSizeX / 2, hy); // left
-      ctx.closePath();
-      ctx.fill();
+      
+      if (orientation === 'isometric') {
+        hx = (hoverTileX - hoverTileY) * tileSizeX / 2 + (mapHeight * tileSizeX / 2) + tileSizeX / 2;
+        hy = (hoverTileX + hoverTileY) * tileSizeY / 2 + tileSizeY / 2;
+        
+        // Draw diamond-shaped hover effect
+        ctx.beginPath();
+        ctx.moveTo(hx, hy - tileSizeY / 2); // top
+        ctx.lineTo(hx + tileSizeX / 2, hy); // right
+        ctx.lineTo(hx, hy + tileSizeY / 2); // bottom
+        ctx.lineTo(hx - tileSizeX / 2, hy); // left
+        ctx.closePath();
+        ctx.fill();
+      } else {
+        // Draw rectangular hover effect for orthogonal mode
+        hx = hoverTileX * tileSizeX;
+        hy = hoverTileY * tileSizeY;
+        ctx.fillRect(hx, hy, tileSizeX, tileSizeY);
+      }
     }
 
     // Objects (rectangles)
@@ -324,6 +366,314 @@
     return out;
   }
 
+  // Robust TMX export for Flare-compatible maps
+  // Always exports as orthogonal regardless of visual rendering mode
+  // Now supports multiple layers: Ground, Wall, Decor
+  function exportAsTMX({ mapWidth, mapHeight, tileWidth, tileHeight, layers, tilesetRef }) {
+    const header = `<?xml version="1.0" encoding="UTF-8"?>`;
+    const mapOpen = `<map version="1.0" orientation="orthogonal" renderorder="right-down" width="${mapWidth}" height="${mapHeight}" tilewidth="${tileWidth}" tileheight="${tileHeight}" infinite="0">`;
+    
+    // Use external tileset reference instead of inline definition
+    const tilesetTag = `  <tileset firstgid="1" source="tileset.tsx"/>`;
+    
+    // Convert layer data to CSV format with GID mapping (0-based index -> GID)
+    function layerToCSV(layerData) {
+      let csvData = '';
+      for (let y = 0; y < mapHeight; y++) {
+        let row = '';
+        for (let x = 0; x < mapWidth; x++) {
+          const index = y * mapWidth + x;
+          const tileIndex = Array.isArray(layerData[0]) ? layerData[y][x] : layerData[index];
+          // Convert 0-based tile index to GID (0 = empty, index+1 = GID)
+          const gid = tileIndex === 0 ? 0 : tileIndex;  // Use the GID as is since data is already in GID format
+          row += gid;
+          if (x < mapWidth - 1) row += ',';
+        }
+        csvData += row;
+        if (y < mapHeight - 1) csvData += '\n';
+      }
+      return csvData;
+    }
+    
+    // Generate layer XML for each provided layer
+    let layersXML = '';
+    layers.forEach(layer => {
+      const csvData = layerToCSV(layer.data);
+      layersXML += `  <layer name="${layer.name}" width="${mapWidth}" height="${mapHeight}">
+    <data encoding="csv">
+${csvData}
+    </data>
+  </layer>
+`;
+    });
+    
+    // Add objectgroup after layers (only if objects exist)
+    const objectsXML = buildObjectsXML();
+    
+    const mapClose = `</map>`;
+    
+    const parts = [header, mapOpen, tilesetTag, layersXML.trim()];
+    if (objectsXML) parts.push(objectsXML);
+    parts.push(mapClose);
+    
+    return parts.join('\n');
+  }
+
+  // Helper function to get the three built-in layers in the correct order
+  function getBuiltInLayers() {
+    const layerNames = ['Ground', 'Wall', 'Decor'];
+    const orderedLayers = [];
+    
+    layerNames.forEach(name => {
+      let layer = tileLayers.find(l => l.name === name);
+      if (!layer) {
+        // Create missing built-in layer
+        layer = {
+          id: nextLayerId++,
+          name: name,
+          data: new Array(mapWidth * mapHeight).fill(0),
+          visible: true
+        };
+        tileLayers.push(layer);
+      }
+      orderedLayers.push(layer);
+    });
+    
+    return orderedLayers;
+  }
+
+  /*
+  Example Multi-Layer TMX output with Objects:
+  <?xml version="1.0" encoding="UTF-8"?>
+  <map version="1.0" orientation="orthogonal" renderorder="right-down" width="10" height="8" tilewidth="32" tileheight="32" infinite="0">
+    <tileset firstgid="1" source="tileset.tsx"/>
+    <layer name="Ground" width="10" height="8">
+      <data encoding="csv">
+  0,0,0,0,0,0,0,0,0,0,
+  0,1,2,3,0,0,0,0,0,0,
+  0,4,5,6,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0
+      </data>
+    </layer>
+    <layer name="Wall" width="10" height="8">
+      <data encoding="csv">
+  7,7,7,7,7,7,7,7,7,7,
+  7,0,0,0,0,0,0,0,0,7,
+  7,0,0,0,0,0,0,0,0,7,
+  7,0,0,0,0,0,0,0,0,7,
+  7,0,0,0,0,0,0,0,0,7,
+  7,0,0,0,0,0,0,0,0,7,
+  7,0,0,0,0,0,0,0,0,7,
+  7,7,7,7,7,7,7,7,7,7
+      </data>
+    </layer>
+    <layer name="Decor" width="10" height="8">
+      <data encoding="csv">
+  0,0,0,0,0,0,0,0,0,0,
+  0,0,8,0,0,0,0,9,0,0,
+  0,10,0,0,0,0,0,0,11,0,
+  0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,0,0,0,0,0,0
+      </data>
+    </layer>
+    <objectgroup name="Objects">
+      <object id="1" name="main_door" type="event" x="128" y="32" width="32" height="32">
+        <properties>
+          <property name="map" value="town.tmx"/>
+        </properties>
+      </object>
+      <object id="2" name="guard" type="npc" x="96" y="96" width="32" height="32">
+        <properties>
+          <property name="dialog" value="Welcome to our town!"/>
+        </properties>
+      </object>
+      <object id="3" name="spawn_point" type="spawn" x="64" y="192" width="32" height="32"/>
+      <object id="4" name="wall" type="obstacle" x="0" y="0" width="32" height="256"/>
+    </objectgroup>
+  </map>
+  */
+
+  // Export TSX tileset definition file
+  function exportAsTSX({ tileWidth, tileHeight, imageWidth, imageHeight, tilesetPngName }) {
+    // Compute tileset properties
+    const columns = Math.floor(imageWidth / tileWidth);
+    const rows = Math.floor(imageHeight / tileHeight);
+    const tileCount = columns * rows;
+    
+    const header = `<?xml version="1.0" encoding="UTF-8"?>`;
+    const tilesetTag = `<tileset name="main" tilewidth="${tileWidth}" tileheight="${tileHeight}" tilecount="${tileCount}" columns="${columns}">`;
+    const imageTag = `  <image source="${tilesetPngName}" width="${imageWidth}" height="${imageHeight}"/>`;
+    const tilesetClose = `</tileset>`;
+    
+    return [header, tilesetTag, imageTag, tilesetClose].join('\n');
+  }
+
+  /*
+  Example TSX output:
+  <?xml version="1.0" encoding="UTF-8"?>
+  <tileset name="main" tilewidth="32" tileheight="32" tilecount="256" columns="16">
+    <image source="tileset.png" width="512" height="512"/>
+  </tileset>
+  */
+
+  // Export Flare TXT format - native Flare map format, not TMX
+  function exportAsFlareTXT({ mapWidth, mapHeight, tileWidth, tileHeight, layers, collisionLayer, tilesets, events, npcs, heroPos, music, title }) {
+    let output = '';
+    
+    // [header] section
+    output += '[header]\n';
+    output += `width=${mapWidth}\n`;
+    output += `height=${mapHeight}\n`;
+    output += `tilewidth=${tileWidth}\n`;
+    output += `tileheight=${tileHeight}\n`;
+    output += 'orientation=isometric\n'; // Flare expects isometric, even if editor stores orthogonal
+    output += 'background_color=0,0,0,255\n';
+    output += `hero_pos=${heroPos || '1,1'}\n`; // default (1,1)
+    output += `music=${music || 'none'}\n`; // placeholder
+    
+    // Tileset reference - use tilesetdefs format or direct PNG reference
+    const primaryTileset = tilesets && tilesets.length > 0 ? tilesets[0] : null;
+    if (primaryTileset && tilesetFileName) {
+      output += `tileset=tilesetdefs/tileset.txt\n`; // Standard Flare tileset reference
+    }
+    
+    output += `title=${title || 'GeneratedMap'}\n`;
+    output += '\n';
+    
+    // [tilesets] section
+    if (tilesets && tilesets.length > 0) {
+      output += '[tilesets]\n';
+      tilesets.forEach(tileset => {
+        const filename = tileset.name === 'main' ? (tilesetFileName || 'tileset.png') : `${tileset.name}.png`;
+        output += `tileset=${filename},${tileWidth},${tileHeight},0,0\n`;
+      });
+      output += '\n';
+    }
+    
+    // [layer] sections - one for each tile layer
+    if (layers && layers.length > 0) {
+      layers.forEach(layer => {
+        output += '[layer]\n';
+        output += `type=${layer.name.toLowerCase()}\n`;
+        output += 'data=\n';
+        
+        // Convert layer data to CSV format (Flare TXT format)
+        for (let y = 0; y < mapHeight; y++) {
+          let row = '';
+          for (let x = 0; x < mapWidth; x++) {
+            const index = y * mapWidth + x;
+            const tileId = Array.isArray(layer.data[0]) ? layer.data[y][x] : layer.data[index];
+            row += tileId || 0; // 0 for empty
+            if (x < mapWidth - 1) row += ',';
+          }
+          row += ','; // Each row ends with a comma in Flare format
+          output += row + '\n';
+        }
+        output += '\n';
+      });
+    }
+    
+    // [layer] section for collision if exists
+    if (collisionLayer && collisionLayer.some(val => val !== 0)) {
+      output += '[layer]\n';
+      output += 'type=collision\n';
+      output += 'data=\n';
+      
+      for (let y = 0; y < mapHeight; y++) {
+        let row = '';
+        for (let x = 0; x < mapWidth; x++) {
+          const index = y * mapWidth + x;
+          const collisionValue = Array.isArray(collisionLayer[0]) ? collisionLayer[y][x] : collisionLayer[index];
+          row += collisionValue || 0;
+          if (x < mapWidth - 1) row += ',';
+        }
+        row += ','; // Each row ends with a comma
+        output += row + '\n';
+      }
+      output += '\n';
+    }
+    
+    // [event] sections if events exist
+    if (events && events.length > 0) {
+      events.forEach(event => {
+        output += '[event]\n';
+        output += 'type=event\n';
+        output += `location=${event.x},${event.y},${event.width},${event.height}\n`;
+        output += 'activate=on_trigger\n';
+        output += `map=${event.targetMap || 'othermap.txt'}\n`;
+        output += '\n';
+      });
+    }
+    
+    // [npc] sections if NPCs exist
+    if (npcs && npcs.length > 0) {
+      npcs.forEach(npc => {
+        output += '[npc]\n';
+        output += 'type=npc\n';
+        output += `location=${npc.x},${npc.y},${npc.width},${npc.height}\n`;
+        output += `filename=${npc.filename || 'npcs/name.txt'}\n`;
+        output += '\n';
+      });
+    }
+    
+    return output;
+  }
+
+  /*
+  Example Flare TXT output:
+  [header]
+  width=10
+  height=8
+  tilewidth=32
+  tileheight=32
+  orientation=isometric
+  background_color=0,0,0,255
+  hero_pos=1,1
+  music=none
+  tileset=tilesetdefs/tileset.txt
+  title=GeneratedMap
+  
+  [tilesets]
+  tileset=tileset.png,32,32,0,0
+  
+  [layer]
+  type=ground
+  data=
+  0,0,0,0,0,0,0,0,0,0,
+  0,1,2,3,0,0,0,0,0,0,
+  0,4,5,6,0,0,0,0,0,0,
+  
+  [layer]
+  type=wall
+  data=
+  0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,7,8,0,0,0,0,
+  
+  [layer]
+  type=collision
+  data=
+  0,0,0,0,0,0,0,0,0,0,
+  0,0,0,0,1,1,0,0,0,0,
+  
+  [event]
+  type=event
+  location=64,96,32,32
+  activate=on_trigger
+  map=othermap.txt
+  
+  [npc]
+  type=npc
+  location=128,64,32,32
+  filename=npcs/guard.txt
+  */
+
   // Construct TMX XML string (single layer). Points to external tileset.tsx (commonly used by Flare).
   function buildTMXXML() {
   const gidTileWidth = tileSizeX;
@@ -343,7 +693,7 @@
   }
 
   function buildObjectsXML() {
-    if (!objects.length) return '  <objectgroup name="Objects"/>';
+    if (!objects.length) return '';  // Return empty string if no objects
     const lines = ['  <objectgroup name="Objects">'];
     objects.forEach(o => {
       let objLine = `    <object id="${o.id}" name="${escapeXML(o.name || '')}" type="${escapeXML(o.type || '')}" x="${o.x}" y="${o.y}" width="${o.width}" height="${o.height}"`;
@@ -372,17 +722,184 @@
   // (legacy single tileset build removed in multi-tileset version)
 
   function downloadFile(filename, text) {
-    const blob = new Blob([text], { type: 'application/xml' });
+    // Determine MIME type based on file extension
+    let mimeType = 'text/plain';
+    if (filename.endsWith('.tmx') || filename.endsWith('.tsx')) {
+      mimeType = 'application/xml';
+    }
+    
+    const blob = new Blob([text], { type: mimeType });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = filename;
     document.body.appendChild(a);
     a.click();
-    setTimeout(() => {
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }, 0);
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  // Utility function alias for downloadFile (as requested in requirements)
+  function downloadStringAsFile(filename, text) {
+    // Creates a Blob, objectURL, triggers download, then revokes URL
+    const blob = new Blob([text], { 
+      type: filename.endsWith('.tmx') || filename.endsWith('.tsx') ? 'application/xml' : 'text/plain' 
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  // Validation and export button state management
+  function updateExportButtonStates() {
+    // TSX export validation: requires tileset image
+    if (!tilesetImage || !tilesetFileName) {
+      exportTSXBtn.disabled = true;
+      exportTSXBtn.title = 'Load a tileset PNG first';
+    } else {
+      exportTSXBtn.disabled = false;
+      exportTSXBtn.title = 'Export tileset.tsx';
+    }
+    
+    // TMX export validation: requires valid map size and at least one layer with data
+    const hasValidMapSize = mapWidth > 0 && mapHeight > 0;
+    const hasLayers = tileLayers && tileLayers.length > 0;
+    
+    if (!hasValidMapSize || !hasLayers) {
+      exportTMXBtn.disabled = true;
+      exportTMXBtn.title = 'Map must have valid size and at least one layer';
+    } else {
+      exportTMXBtn.disabled = false;
+      exportTMXBtn.title = 'Export map.tmx';
+    }
+    
+    // Flare TXT export validation: requires valid map size and at least one layer
+    if (!hasValidMapSize || !hasLayers) {
+      exportFlareTXTBtn.disabled = true;
+      exportFlareTXTBtn.title = 'Map must have valid size and at least one layer';
+    } else {
+      exportFlareTXTBtn.disabled = false;
+      exportFlareTXTBtn.title = 'Export map.txt in Flare format';
+    }
+  }
+
+  // Test function to verify multi-layer TMX export functionality
+  function testTMXExport() {
+    const testLayers = [
+      {
+        name: 'Ground',
+        data: [
+          0,0,0,0,0,
+          0,1,2,3,0,
+          0,4,5,6,0,
+          0,0,0,0,0
+        ]
+      },
+      {
+        name: 'Wall',
+        data: [
+          7,7,7,7,7,
+          7,0,0,0,7,
+          7,0,0,0,7,
+          7,7,7,7,7
+        ]
+      },
+      {
+        name: 'Decor',
+        data: [
+          0,0,0,0,0,
+          0,0,8,0,0,
+          0,9,0,10,0,
+          0,0,0,0,0
+        ]
+      }
+    ];
+    
+    const result = exportAsTMX({
+      mapWidth: 5,
+      mapHeight: 4,
+      tileWidth: 32,
+      tileHeight: 32,
+      layers: testLayers,
+      tilesetRef: null
+    });
+    
+    console.log('Test Multi-Layer TMX Export Result:');
+    console.log(result);
+    return result;
+  }
+
+  // Test function to verify TSX export functionality
+  function testTSXExport() {
+    const result = exportAsTSX({
+      tileWidth: 32,
+      tileHeight: 32,
+      imageWidth: 512,
+      imageHeight: 512,
+      tilesetPngName: 'tileset.png'
+    });
+    
+    console.log('Test TSX Export Result:');
+    console.log(result);
+    return result;
+  }
+
+  // Test function to verify Object system functionality
+  function testObjectExport() {
+    // Create test objects to demonstrate the system
+    const testObjects = [
+      {
+        id: 1,
+        name: 'main_door',
+        type: 'event',
+        x: 128,
+        y: 32,
+        width: 32,
+        height: 32,
+        properties: { map: 'town.tmx' }
+      },
+      {
+        id: 2,
+        name: 'guard',
+        type: 'npc', 
+        x: 96,
+        y: 96,
+        width: 32,
+        height: 32,
+        properties: { dialog: 'Welcome to our town!' }
+      },
+      {
+        id: 3,
+        name: 'spawn_point',
+        type: 'spawn',
+        x: 64,
+        y: 192,
+        width: 32,
+        height: 32,
+        properties: {}
+      }
+    ];
+    
+    // Temporarily set objects for testing
+    const originalObjects = objects;
+    objects.length = 0;
+    objects.push(...testObjects);
+    
+    const result = buildObjectsXML();
+    
+    // Restore original objects
+    objects.length = 0;
+    objects.push(...originalObjects);
+    
+    console.log('Test Object Export Result:');
+    console.log(result);
+    return result;
   }
 
   // Painting logic
@@ -607,7 +1124,7 @@
         }
       } else {
         // Create new object with default size = 1 tile
-        addObject(tx * tileSize, ty * tileSize, tileSize, tileSize, objectTypeSelect.value);
+        addObject(tx * tileSizeX, ty * tileSizeY, tileSizeX, tileSizeY, objectTypeSelect.value);
         const newObj = objects[objects.length - 1];
         draggingObject = { id: newObj.id, mode: 'resize', startW: newObj.width, startH: newObj.height, originX: newObj.x, originY: newObj.y, startX: mx, startY: my, prev: { x: newObj.x, y: newObj.y, width: newObj.width, height: newObj.height } };
       }
@@ -714,34 +1231,19 @@
     resizeMapCanvas();
   });
   orientationSelect.addEventListener('change', () => {
-    if (confirm('Changing orientation will reset the map. Continue?')) {
-      orientation = orientationSelect.value;
-      // Reset map
-      tileLayers = [];
-      activeLayerId = null;
-      nextLayerId = 1;
-      collisionData = new Array(mapWidth * mapHeight).fill(0);
-      objects = [];
-      nextObjectId = 1;
-      selectedObjectId = null;
-      draggingObject = null;
-      createLayer('Ground');
-      createLayer('Wall');
-      createLayer('Decor');
-      activeLayerId = tileLayers[0].id;
-      refreshLayersUI();
-      resizeMapCanvas();
-      setActiveGid(0);
-      updateUndoUI();
-      draw();
-    } else {
-      orientationSelect.value = orientation;
-    }
+    // For visual orientation changes, no need to reset - just update rendering
+    orientation = orientationSelect.value;
+    resizeMapCanvas();
+    draw();
   });
 
   tilesetFileInput.addEventListener('change', (e) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
+    
+    // Track the original filename for TSX export
+    tilesetFileName = file.name;
+    
     const img = new Image();
     img.onload = () => {
       tilesetImage = img;
@@ -754,6 +1256,9 @@
   extras.forEach(ex => { ex.firstgid = firstgidCursor; firstgidCursor += ex.tileCount; });
   tilesets = [{ name: 'main', image: img, columns: tilesetColumns, rows: tilesetRows, tileCount, firstgid: 1 }, ...extras];
   buildTilesetButtons(); draw();
+  
+  // Update export button states
+  updateExportButtonStates();
     };
     img.onerror = () => alert('Failed to load image. Ensure it is a valid PNG.');
     img.src = URL.createObjectURL(file);
@@ -784,24 +1289,121 @@
     if (confirm('Clear active layer / collision?')) clearActiveLayer();
   });
   exportTMXBtn.addEventListener('click', () => {
-    const xml = buildTMXXML();
-    downloadFile('map.tmx', xml);
+    // Validation: ensure map has valid dimensions and layers
+    if (mapWidth <= 0 || mapHeight <= 0) {
+      alert('Map must have valid width and height');
+      return;
+    }
+    
+    if (!tileLayers || tileLayers.length === 0) {
+      alert('Map must have at least one layer');
+      return;
+    }
+    
+    // Get the three built-in layers in order: Ground, Wall, Decor
+    const builtInLayers = getBuiltInLayers();
+    
+    const xml = exportAsTMX({
+      mapWidth: mapWidth,
+      mapHeight: mapHeight,
+      tileWidth: tileSizeX,
+      tileHeight: tileSizeY,
+      layers: builtInLayers,
+      tilesetRef: null // Placeholder for now
+    });
+    
+    downloadStringAsFile('map.tmx', xml);
   });
   exportTSXBtn.addEventListener('click', () => {
-    if (!tilesets.length) return alert('Load a tileset first.');
-    tilesets.forEach(ts => {
-      const headerCanvas = document.createElement('canvas');
-      headerCanvas.width = ts.image.width; headerCanvas.height = ts.image.height;
-      headerCanvas.getContext('2d').drawImage(ts.image,0,0);
-      const dataURI = headerCanvas.toDataURL('image/png');
-      const xml = [
-        '<?xml version="1.0" encoding="UTF-8"?>',
-        `<tileset version="1.10" tiledversion="1.10.0" name="${ts.name}" tilewidth="${tileSize}" tileheight="${tileSize}" tilecount="${ts.tileCount}" columns="${ts.columns}">`,
-        `  <image source="${dataURI}" width="${ts.image.width}" height="${ts.image.height}"/>`,
-        '</tileset>'
-      ].join('\n');
-      downloadFile(`${ts.name}.tsx`, xml);
+    // Validation: ensure tileset image is loaded
+    if (!tilesetImage) {
+      alert('Load a tileset first.');
+      return;
+    }
+    
+    if (!tilesetFileName) {
+      alert('No tileset filename available.');
+      return;
+    }
+    
+    // Use the original uploaded filename, ensuring it has .png extension
+    let imageSourceName = tilesetFileName;
+    if (!imageSourceName.toLowerCase().endsWith('.png')) {
+      imageSourceName = imageSourceName.replace(/\.[^.]*$/, '') + '.png';
+    }
+    
+    // Use the primary tileset image for export
+    const tsx = exportAsTSX({
+      tileWidth: tileSizeX,
+      tileHeight: tileSizeY,
+      imageWidth: tilesetImage.width,
+      imageHeight: tilesetImage.height,
+      tilesetPngName: imageSourceName
     });
+    
+    downloadStringAsFile('tileset.tsx', tsx);
+  });
+
+  exportFlareTXTBtn.addEventListener('click', () => {
+    // Validation: ensure map has valid dimensions and layers
+    if (mapWidth <= 0 || mapHeight <= 0) {
+      alert('Map must have valid width and height');
+      return;
+    }
+    
+    if (!tileLayers || tileLayers.length === 0) {
+      alert('Map must have at least one layer');
+      return;
+    }
+    
+    // Get the three built-in layers in order: Ground, Wall, Decor
+    const builtInLayers = getBuiltInLayers();
+    
+    // Check if collision data exists and has non-zero values
+    const hasCollisionData = collisionData && collisionData.some(val => val !== 0);
+    
+    // Prepare events and NPCs from objects if they exist
+    const events = [];
+    const npcs = [];
+    
+    if (objects && objects.length > 0) {
+      objects.forEach(obj => {
+        if (obj.type === 'event' || (obj.properties && obj.properties.type === 'event')) {
+          events.push({
+            x: obj.x,
+            y: obj.y,
+            width: obj.width,
+            height: obj.height,
+            targetMap: (obj.properties && obj.properties.map) || 'othermap.txt'
+          });
+        } else if (obj.type === 'npc' || (obj.properties && obj.properties.type === 'npc')) {
+          npcs.push({
+            x: obj.x,
+            y: obj.y,
+            width: obj.width,
+            height: obj.height,
+            filename: (obj.properties && obj.properties.filename) || 'npcs/name.txt'
+          });
+        }
+      });
+    }
+    
+    const flareTXT = exportAsFlareTXT({
+      mapWidth: mapWidth,
+      mapHeight: mapHeight,
+      tileWidth: tileSizeX,
+      tileHeight: tileSizeY,
+      layers: builtInLayers,
+      collisionLayer: hasCollisionData ? collisionData : null,
+      tilesets: tilesets && tilesets.length > 0 ? tilesets : null,
+      events: events.length > 0 ? events : null,
+      npcs: npcs.length > 0 ? npcs : null,
+      heroPos: '1,1', // default hero position
+      music: 'none', // default music
+      title: 'GeneratedMap' // default title
+    });
+    
+    downloadStringAsFile('map.txt', flareTXT);
   });
 
   importTMXFile.addEventListener('change', (e) => {
@@ -955,6 +1557,7 @@
   resizeMapCanvas();
   setActiveGid(0);
   updateUndoUI();
+  updateExportButtonStates(); // Initialize export button states
 
   // ====== Extension Ideas (brief) ======
   // 1. Multiple Layers: store array of layerData arrays; add UI to switch active layer; export multiple <layer> tags.

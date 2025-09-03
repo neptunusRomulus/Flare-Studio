@@ -12,8 +12,9 @@
   <p class="hint" style="color:#888;margin:0 0 8px 0;">Only <b>Orthogonal</b> maps are supported.</p>
     <div class="controls-row">
       <label>Orientation:
-        <select id="orientationSelect" disabled>
-          <option value="isometric" selected>Isometric</option>
+        <select id="orientationSelect">
+          <option value="orthogonal" selected>Orthogonal (default)</option>
+          <option value="isometric">Isometric (visual-only)</option>
         </select>
       </label>
       <label>Tile Size X:
@@ -38,6 +39,7 @@
       <button id="clearMapBtn" title="Clear all tile data on active layer / collision when selected">Clear Layer</button>
       <button id="exportTMXBtn">Export TMX</button>
       <button id="exportTSXBtn" title="Export tileset.tsx (Base64)">Export TSX</button>
+      <button id="exportFlareTXTBtn" title="Export map.txt in Flare format">Export Flare TXT</button>
   <button id="undoBtn" title="Undo (Ctrl+Z)">Undo</button>
   <button id="redoBtn" title="Redo (Ctrl+Y)">Redo</button>
   <label>Import TMX: <input type="file" id="importTMXFile" accept="text/xml,.tmx" /></label>
@@ -50,10 +52,10 @@
       <label><input type="radio" name="tool" value="objects"> Objects</label>
       <label>Object Type:
         <select id="objectTypeSelect">
-          <option value="door">door</option>
+          <option value="event">event (door)</option>
           <option value="npc">npc</option>
           <option value="spawn">spawn</option>
-          <option value="event">event</option>
+          <option value="obstacle">obstacle</option>
         </select>
       </label>
     </div>

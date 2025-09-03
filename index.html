@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Minimal Tilemap Editor (Flare TMX)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+  <h1>Advanced Flare Map Editor</h1>
+  <p class="hint" style="color:#888;margin:0 0 8px 0;">Only <b>Orthogonal</b> maps are supported.</p>
+    <div class="controls-row">
+      <label>Orientation:
+        <select id="orientationSelect" disabled>
+          <option value="isometric" selected>Isometric</option>
+        </select>
+      </label>
+      <label>Tile Size X:
+        <select id="tileSizeXSelect">
+          <option value="16">16</option>
+          <option value="32" selected>32</option>
+          <option value="64">64</option>
+        </select>
+      </label>
+      <label>Tile Size Y:
+        <select id="tileSizeYSelect">
+          <option value="16">16</option>
+          <option value="32" selected>32</option>
+          <option value="64">64</option>
+        </select>
+      </label>
+      <label>Tileset PNG: <input type="file" id="tilesetFile" accept="image/png" /></label>
+  <label>Extra Tileset: <input type="file" id="extraTilesetFile" accept="image/png" /></label>
+      <label>Width: <input type="number" id="mapWidthInput" value="20" min="1" /></label>
+      <label>Height: <input type="number" id="mapHeightInput" value="15" min="1" /></label>
+      <button id="resizeMapBtn" title="Resize map (keeps existing data within bounds)">Resize</button>
+      <button id="clearMapBtn" title="Clear all tile data on active layer / collision when selected">Clear Layer</button>
+      <button id="exportTMXBtn">Export TMX</button>
+      <button id="exportTSXBtn" title="Export tileset.tsx (Base64)">Export TSX</button>
+  <button id="undoBtn" title="Undo (Ctrl+Z)">Undo</button>
+  <button id="redoBtn" title="Redo (Ctrl+Y)">Redo</button>
+  <label>Import TMX: <input type="file" id="importTMXFile" accept="text/xml,.tmx" /></label>
+  <label>Import TSX: <input type="file" id="importTSXFile" accept="text/xml,.tsx" /></label>
+    </div>
+    <div class="controls-row" id="toolBar">
+      <span>Tool:</span>
+      <label><input type="radio" name="tool" value="tiles" checked> Tiles</label>
+      <label><input type="radio" name="tool" value="collision"> Collision</label>
+      <label><input type="radio" name="tool" value="objects"> Objects</label>
+      <label>Object Type:
+        <select id="objectTypeSelect">
+          <option value="door">door</option>
+          <option value="npc">npc</option>
+          <option value="spawn">spawn</option>
+          <option value="event">event</option>
+        </select>
+      </label>
+    </div>
+  </header>
+  <main>
+    <aside id="leftSidebar">
+      <section class="panel" id="tilesetSection">
+        <h2>Tileset</h2>
+        <div id="tilesetMeta" class="meta"></div>
+        <div id="tilesContainer" class="tiles"></div>
+        <p class="hint">Click tile to select brush. Right click canvas = erase.</p>
+        <p class="hint">Active GID: <span id="activeGid">(none)</span></p>
+      </section>
+      <section class="panel" id="layersSection">
+        <h2>Layers</h2>
+        <div id="layersList" class="layersList"></div>
+        <div class="layerButtons">
+          <button id="addLayerBtn" title="Add new tile layer">+ Layer</button>
+          <button id="layerUpBtn" title="Move layer up">▲</button>
+          <button id="layerDownBtn" title="Move layer down">▼</button>
+          <button id="delLayerBtn" title="Delete layer">✕</button>
+        </div>
+        <div class="hint">Collision & Objects managed separately.</div>
+      </section>
+    </aside>
+    <section id="centerArea">
+      <div class="canvasWrap">
+        <canvas id="mapCanvas" width="640" height="480"></canvas>
+      </div>
+      <div class="meta" id="hoverInfo">Hover: -</div>
+    </section>
+    <aside id="rightSidebar">
+      <section class="panel" id="objectInspector">
+        <h2>Object Inspector</h2>
+        <div id="objectList" class="objectList"></div>
+        <div id="selectedObjectInfo" class="meta">No object selected.</div>
+        <h3>Properties</h3>
+        <form id="propertiesForm"></form>
+        <button id="addPropertyBtn" type="button">Add Property</button>
+      </section>
+      <section class="panel" id="miniMapSection">
+        <h2>Mini Map</h2>
+        <canvas id="miniMapCanvas" width="200" height="200"></canvas>
+      </section>
+    </aside>
+  </main>
+  <footer>
+    <small>Generated TMX targets Flare-compatible orthogonal maps. Pure client-side. Extend as needed.</small>
+  </footer>
+  <script src="script.js"></script>
+</body>
+</html>

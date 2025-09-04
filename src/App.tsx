@@ -52,6 +52,11 @@ function App() {
     return savedTheme ? JSON.parse(savedTheme) : false;
   });
   
+  // Auto-save states
+  const [saveStatus, setSaveStatus] = useState<'saving' | 'saved' | 'error' | 'unsaved'>('saved');
+  const [autoSaveEnabled, setAutoSaveEnabledState] = useState(true);
+  const [lastSaveTime, setLastSaveTime] = useState<number>(0);
+  
   // Custom tooltip states
   const [tooltip, setTooltip] = useState<{
     text: string;
@@ -87,12 +92,29 @@ function App() {
     localStorage.setItem('isDarkMode', JSON.stringify(isDarkMode));
   }, [isDarkMode]);
 
+  // Helper function to set up auto-save for an editor instance
+  const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
+    editorInstance.setAutoSaveCallback(async () => {
+      if (editorInstance) {
+        editorInstance.exportFlareMap();
+        setLastSaveTime(Date.now());
+      }
+    });
+
+    editorInstance.setSaveStatusCallback((status) => {
+      setSaveStatus(status);
+    });
+
+    editorInstance.setAutoSaveEnabled(autoSaveEnabled);
+  }, [autoSaveEnabled]);
+
   useEffect(() => {
     if (canvasRef.current && !showWelcome && !editor) {
       const tileEditor = new TileMapEditor(canvasRef.current);
+      setupAutoSave(tileEditor);
       setEditor(tileEditor);
     }
-  }, [showWelcome, editor]);
+  }, [showWelcome, editor, setupAutoSave]);
 
   // Track hover coordinates
   useEffect(() => {
@@ -531,6 +553,7 @@ function App() {
     if (canvasRef.current) {
       const newEditor = new TileMapEditor(canvasRef.current);
       newEditor.setMapSize(config.width, config.height);
+      setupAutoSave(newEditor);
       setEditor(newEditor);
       updateLayersList();
     }
@@ -549,6 +572,7 @@ function App() {
           if (canvasRef.current) {
             const newEditor = new TileMapEditor(canvasRef.current);
             newEditor.setMapSize(mapConfig.width, mapConfig.height);
+            setupAutoSave(newEditor);
             setEditor(newEditor);
             updateLayersList();
           }
@@ -613,7 +637,36 @@ function App() {
         <div className="h-screen bg-background text-foreground flex flex-col overflow-hidden">
       {/* Custom Title Bar */}
       <div className="bg-gray-100 text-orange-600 flex justify-between items-center px-4 py-1 select-none drag-region border-b border-gray-200">
-        <div className="text-sm font-medium">Flare Map Editor</div>
+        <div className="flex items-center gap-3">
+          <div className="text-sm font-medium">Flare Map Editor</div>
+          {/* Save Status Indicator */}
+          <div className="flex items-center gap-1 text-xs">
+            {saveStatus === 'saving' && (
+              <>
+                <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
+                <span className="text-orange-600">Saving...</span>
+              </>
+            )}
+            {saveStatus === 'saved' && lastSaveTime > 0 && (
+              <>
+                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                <span className="text-green-600">Saved</span>
+              </>
+            )}
+            {saveStatus === 'error' && (
+              <>
+                <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                <span className="text-red-600">Save Error</span>
+              </>
+            )}
+            {saveStatus === 'unsaved' && (
+              <>
+                <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                <span className="text-yellow-600">Unsaved</span>
+              </>
+            )}
+          </div>
+        </div>
         <div className="flex no-drag">
           <button 
             onClick={handleMinimize}
@@ -948,6 +1001,38 @@ function App() {
                       Dark Mode
                     </span>
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">Auto-Save</label>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">Disabled</span>
+                    <button
+                      onClick={() => {
+                        const newEnabled = !autoSaveEnabled;
+                        setAutoSaveEnabledState(newEnabled);
+                        if (editor) {
+                          editor.setAutoSaveEnabled(newEnabled);
+                        }
+                      }}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        autoSaveEnabled ? 'bg-orange-600' : 'bg-gray-200'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          autoSaveEnabled ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                      <span className="sr-only">Toggle auto-save</span>
+                    </button>
+                    <span className="text-sm">
+                      Enabled
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Automatically saves your work every 8 seconds
+                  </p>
                 </div>
               </div>
               

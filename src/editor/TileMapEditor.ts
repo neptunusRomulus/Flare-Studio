@@ -906,6 +906,32 @@ export class TileMapEditor {
     console.log('Flare map and tileset definition exported successfully!');
   }
 
+  // Silent auto-save export (no alerts, no downloads)
+  public autoSaveExport(): boolean {
+    // Don't auto-save if there's no tileset or no meaningful data
+    if (!this.tilesetImage || !this.tilesetFileName) {
+      return false; // Nothing to save yet
+    }
+
+    // Check if there's any actual tile data to save
+    const hasData = this.tileLayers.some(layer => 
+      layer.data.some(tile => tile !== 0)
+    );
+
+    if (!hasData) {
+      return false; // No meaningful data to save
+    }
+
+    try {
+      // Save to localStorage only for auto-save
+      this.saveToLocalStorage();
+      return true;
+    } catch (error) {
+      console.warn('Auto-save failed:', error);
+      return false;
+    }
+  }
+
   private generateFlareMapTxt(): string {
     const lines: string[] = [];
     
@@ -1089,20 +1115,27 @@ export class TileMapEditor {
   }
 
   private async performAutoSave(): Promise<void> {
-    if (!this.hasUnsavedChanges || !this.autoSaveCallback) return;
+    if (!this.hasUnsavedChanges) return;
 
     try {
       this.updateSaveStatus('saving');
       
-      // Save to localStorage as backup
-      this.saveToLocalStorage();
+      // Perform silent auto-save
+      const success = this.autoSaveExport();
       
-      // Call the main save callback
-      await this.autoSaveCallback();
-      
-      this.hasUnsavedChanges = false;
-      this.lastSaveTimestamp = Date.now();
-      this.updateSaveStatus('saved');
+      if (success) {
+        // Call external save callback if provided (for additional saving)
+        if (this.autoSaveCallback) {
+          await this.autoSaveCallback();
+        }
+        
+        this.hasUnsavedChanges = false;
+        this.lastSaveTimestamp = Date.now();
+        this.updateSaveStatus('saved');
+      } else {
+        // No meaningful data to save yet, but don't show error
+        this.updateSaveStatus('saved');
+      }
       
       // Clear the timeout
       this.autoSaveTimeout = null;

@@ -94,11 +94,11 @@ function App() {
 
   // Helper function to set up auto-save for an editor instance
   const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
+    // Set up optional callback for additional auto-save actions
     editorInstance.setAutoSaveCallback(async () => {
-      if (editorInstance) {
-        editorInstance.exportFlareMap();
-        setLastSaveTime(Date.now());
-      }
+      // Optional: Add any additional save operations here
+      // The main auto-save is handled internally by TileMapEditor
+      setLastSaveTime(Date.now());
     });
 
     editorInstance.setSaveStatusCallback((status) => {

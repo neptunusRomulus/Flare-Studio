@@ -7,6 +7,24 @@ import {
 } from '../types';
 
 export class TileMapEditor {
+  public getTileCount(): number {
+    return this.tileCount;
+  }
+  // ...existing code...
+    constructor(mapCanvas: HTMLCanvasElement) {
+      this.mapCanvas = mapCanvas;
+      this.initializeCanvas();
+      this.initializeState();
+      this.bindEvents();
+      this.createDefaultLayers();
+      // Save initial state for undo/redo
+      this.saveState();
+      this.draw();
+    }
+
+  public getTileCount(): number {
+    return this.tileCount;
+  }
   private ctx!: CanvasRenderingContext2D;
   private mapCanvas: HTMLCanvasElement;
   private showMinimap: boolean = true;
@@ -1205,6 +1223,13 @@ export class TileMapEditor {
         const img = new Image();
         img.onload = () => {
           this.tilesetImage = img;
+          // Reconstruct tileset metadata and palette so tile brushes appear after reload
+          this.tilesetColumns = Math.floor(img.width / this.tileSizeX);
+          this.tilesetRows = Math.floor(img.height / this.tileSizeY);
+          this.tileCount = this.tilesetColumns * this.tilesetRows;
+          this.createTilePalette();
+          // Restore previously selected tile highlight if any
+          this.updateActiveTile();
           this.draw();
         };
         img.src = data.tilesetImage;
@@ -1225,11 +1250,21 @@ export class TileMapEditor {
   // Save complete project data
   public async saveProjectData(projectPath: string): Promise<boolean> {
     try {
+      console.log('=== SAVE PROJECT DATA DEBUG ===');
+      console.log('Project path:', projectPath);
+      console.log('Has tilesetImage:', !!this.tilesetImage);
+      console.log('Tileset filename:', this.tilesetFileName);
+      
       const tilesetImages: { [key: string]: string } = {};
       
       // Add tileset image data if available
       if (this.tilesetImage && this.tilesetFileName) {
-        tilesetImages[this.tilesetFileName] = this.canvasToDataURL(this.tilesetImage);
+        const dataURL = this.canvasToDataURL(this.tilesetImage);
+        tilesetImages[this.tilesetFileName] = dataURL;
+        console.log('Tileset image converted to dataURL, length:', dataURL.length);
+        console.log('DataURL preview:', dataURL.substring(0, 100) + '...');
+      } else {
+        console.log('No tileset image to save');
       }
 
       const projectData = {
@@ -1247,11 +1282,20 @@ export class TileMapEditor {
         version: "1.0"
       };
 
+      console.log('Project data prepared:', {
+        name: projectData.name,
+        tilesetCount: Object.keys(projectData.tilesetImages).length,
+        layerCount: projectData.layers.length
+      });
+
       // Save using Electron API if available
       if (window.electronAPI?.saveMapProject) {
+        console.log('Saving via Electron API...');
         const success = await window.electronAPI.saveMapProject(projectPath, projectData);
+        console.log('Electron save result:', success);
         return success;
       } else {
+        console.log('Falling back to localStorage save...');
         // Fallback for web - just save to localStorage
         this.saveToLocalStorage();
         return true;
@@ -1311,14 +1355,35 @@ export class TileMapEditor {
   // Load tileset from data URL
   public async loadTilesetFromDataURL(dataURL: string, fileName: string): Promise<void> {
     return new Promise((resolve, reject) => {
+      console.log('Loading tileset from dataURL:', fileName, 'Length:', dataURL.length);
       const img = new Image();
       img.onload = () => {
+        console.log('Tileset image loaded successfully:', img.width, 'x', img.height);
         this.tilesetImage = img;
         this.tilesetFileName = fileName;
+        
+        // Calculate tileset properties and create palette (same as in handleFileUpload)
+        this.tilesetColumns = Math.floor(img.width / this.tileSizeX);
+        this.tilesetRows = Math.floor(img.height / this.tileSizeY);
+        this.tileCount = this.tilesetColumns * this.tilesetRows;
+        
+        console.log('Tileset properties:', {
+          columns: this.tilesetColumns,
+          rows: this.tilesetRows,
+          tileCount: this.tileCount
+        });
+        
+        // Create the tile palette
+        this.createTilePalette();
+        
         this.draw();
+        console.log('Tileset loaded and palette created');
         resolve();
       };
-      img.onerror = () => reject(new Error('Failed to load tileset from data URL'));
+      img.onerror = (e) => {
+        console.error('Failed to load tileset image:', e);
+        reject(new Error('Failed to load tileset from data URL'));
+      };
       img.src = dataURL;
     });
   }

@@ -553,34 +553,16 @@ function App() {
 
   const handleManualSave = async () => {
     if (!editor) return;
-
     setIsManuallySaving(true);
     try {
-      let success = false;
-      
-      if (currentProjectPath) {
-        // Save to existing project
-        success = await editor.saveProjectData(currentProjectPath);
-      } else {
-        // No project path - just save to localStorage
-        editor.forceSave();
-        success = true;
-      }
-      
+      editor.forceSave();
       // Add a small delay to show the loading animation
       await new Promise(resolve => setTimeout(resolve, 500));
-      
-      if (success) {
-        toast({
-          title: "Saved",
-          description: currentProjectPath 
-            ? "Your map project has been saved successfully."
-            : "Your map has been saved to browser storage.",
-          variant: "default",
-        });
-      } else {
-        throw new Error("Save operation failed");
-      }
+      toast({
+        title: "Saved",
+        description: "Your map has been saved (autosave logic triggered).",
+        variant: "default",
+      });
     } catch (error) {
       console.error('Save error:', error);
       toast({
@@ -668,18 +650,37 @@ function App() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const loadProjectData = async (newEditor: TileMapEditor, mapConfig: any) => {
     try {
+      console.log('=== LOAD PROJECT DATA DEBUG ===');
+      console.log('Map config received:', {
+        name: mapConfig.name,
+        tilesets: mapConfig.tilesets ? mapConfig.tilesets.length : 0,
+        tilesetImages: mapConfig.tilesetImages ? Object.keys(mapConfig.tilesetImages).length : 0,
+        layers: mapConfig.layers ? mapConfig.layers.length : 0
+      });
+      
       // Load basic project data (layers, objects, dimensions)
       newEditor.loadProjectData(mapConfig);
       
       // If there are tileset images, load them
       if (mapConfig.tilesets && mapConfig.tilesets.length > 0) {
         const tileset = mapConfig.tilesets[0];
+        console.log('First tileset:', tileset);
+        
         if (tileset.fileName && mapConfig.tilesetImages && mapConfig.tilesetImages[tileset.fileName]) {
+          console.log('Loading tileset image:', tileset.fileName);
+          console.log('Image data length:', mapConfig.tilesetImages[tileset.fileName].length);
           await newEditor.loadTilesetFromDataURL(mapConfig.tilesetImages[tileset.fileName], tileset.fileName);
+          console.log('Tileset loaded successfully');
+        } else {
+          console.log('No tileset image data found for:', tileset.fileName);
+          console.log('Available tileset images:', Object.keys(mapConfig.tilesetImages || {}));
         }
+      } else {
+        console.log('No tilesets found in map config');
       }
       
       newEditor.redraw();
+      console.log('Project data loading completed');
     } catch (error) {
       console.error('Error loading project data:', error);
     }

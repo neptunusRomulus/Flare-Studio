@@ -25,7 +25,7 @@ function createWindow() {
 
   // Load the app
   if (isDev) {
-    mainWindow.loadURL('http://localhost:5183');
+  mainWindow.loadURL('http://localhost:5180');
     mainWindow.webContents.openDevTools();
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
@@ -115,16 +115,39 @@ ipcMain.handle('create-map-project', async (event, config) => {
 
 ipcMain.handle('open-map-project', async (event, projectPath) => {
   try {
+    console.log('=== ELECTRON LOAD DEBUG ===');
+    console.log('Loading project from:', projectPath);
+    
     // Look for map configuration file
     const files = fs.readdirSync(projectPath);
     const mapFile = files.find(file => file.endsWith('.json'));
     
     if (mapFile) {
       const mapConfigPath = path.join(projectPath, mapFile);
+      console.log('Loading map file:', mapConfigPath);
+      
       const mapData = JSON.parse(fs.readFileSync(mapConfigPath, 'utf8'));
+      console.log('Loaded map data:', {
+        name: mapData.name,
+        tilesetImages: mapData.tilesetImages ? Object.keys(mapData.tilesetImages).length : 0,
+        tilesets: mapData.tilesets ? mapData.tilesets.length : 0,
+        layers: mapData.layers ? mapData.layers.length : 0
+      });
+      
+      if (mapData.tilesetImages) {
+        console.log('Tileset image files found:', Object.keys(mapData.tilesetImages));
+        // Show first few characters of each image data
+        for (const [filename, imageData] of Object.entries(mapData.tilesetImages)) {
+          if (typeof imageData === 'string') {
+            console.log(`${filename}: ${imageData.length} chars, starts with: ${imageData.substring(0, 50)}...`);
+          }
+        }
+      }
+      
       return mapData;
     }
     
+    console.log('No map file found in project');
     return null;
   } catch (error) {
     console.error('Error opening map project:', error);
@@ -135,6 +158,10 @@ ipcMain.handle('open-map-project', async (event, projectPath) => {
 // Save map project data
 ipcMain.handle('save-map-project', async (event, projectPath, mapData) => {
   try {
+    console.log('=== ELECTRON SAVE DEBUG ===');
+    console.log('Project path:', projectPath);
+    console.log('Map data received:', !!mapData);
+    
     if (!projectPath || !mapData) {
       console.error('Invalid save parameters:', { projectPath, hasMapData: !!mapData });
       return false;
@@ -148,9 +175,11 @@ ipcMain.handle('save-map-project', async (event, projectPath, mapData) => {
     if (!mapFile) {
       const projectName = path.basename(projectPath);
       mapFile = `${projectName}.json`;
+      console.log('Creating new map file:', mapFile);
     }
     
     const mapConfigPath = path.join(projectPath, mapFile);
+    console.log('Saving to:', mapConfigPath);
     
     // Ensure the map data has the required structure
     const completeMapData = {
@@ -166,24 +195,37 @@ ipcMain.handle('save-map-project', async (event, projectPath, mapData) => {
       ...mapData
     };
     
+    console.log('Complete map data structure:', {
+      name: completeMapData.name,
+      tilesetImages: Object.keys(completeMapData.tilesetImages || {}).length,
+      layers: completeMapData.layers.length
+    });
+    
     // Write the map data
     fs.writeFileSync(mapConfigPath, JSON.stringify(completeMapData, null, 2));
+    console.log('Map configuration saved successfully');
     
     // Save tileset images to assets folder if they exist
     if (mapData.tilesetImages) {
+      console.log('Processing tileset images:', Object.keys(mapData.tilesetImages));
       const assetsPath = path.join(projectPath, 'assets');
       if (!fs.existsSync(assetsPath)) {
         fs.mkdirSync(assetsPath, { recursive: true });
+        console.log('Created assets directory');
       }
       
       for (const [filename, imageData] of Object.entries(mapData.tilesetImages)) {
         if (imageData && typeof imageData === 'string') {
+          console.log('Saving image:', filename, 'Data length:', imageData.length);
           // Handle base64 image data
           const base64Data = imageData.replace(/^data:image\/[a-z]+;base64,/, '');
           const imagePath = path.join(assetsPath, filename);
           fs.writeFileSync(imagePath, base64Data, 'base64');
+          console.log('Image saved to:', imagePath);
         }
       }
+    } else {
+      console.log('No tileset images to save');
     }
     
     console.log('Map project saved successfully:', mapConfigPath);

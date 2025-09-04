@@ -2,72 +2,135 @@ import React, { useRef, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, Download, Undo2, Redo2, Plus, ChevronUp, ChevronDown, X } from 'lucide-react';
+import { Upload, Download, Undo2, Redo2, Plus, ChevronUp, ChevronDown, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square } from 'lucide-react';
 import { Tool } from './types';
-// Temporary - commenting out TileMapEditor until we fix it
-// import { TileMapEditor } from './editor/TileMapEditor';
-
-// Temporary interface for editor methods (will be replaced with actual TileMapEditor)
-interface TemporaryEditor {
-  handleFileUpload?: (file: File, type: string) => void;
-  setTool?: (tool: string) => void;
-  resizeMap?: (width: number, height: number) => void;
-  clearLayer?: () => void;
-  exportTMX?: () => void;
-  exportTSX?: () => void;
-  exportFlareTXT?: () => void;
-  undo?: () => void;
-  redo?: () => void;
-}
+import { TileMapEditor } from './editor/TileMapEditor';
 
 function App() {
-  // const [editor, setEditor] = useState<TileMapEditor | null>(null);
-  const [_editor] = useState<TemporaryEditor | null>(null); // TODO: Re-enable TileMapEditor
+  const [editor, setEditor] = useState<TileMapEditor | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const miniMapRef = useRef<HTMLCanvasElement>(null);
   const [mapWidth, setMapWidth] = useState(20);
   const [mapHeight, setMapHeight] = useState(15);
   const [tool, setTool] = useState<Tool>('tiles');
   const [objectType, setObjectType] = useState('event');
   const [activeGid] = useState('(none)'); // Removed unused setter
   const [hoverInfo] = useState('Hover: -'); // Removed unused setter
+  const [showMinimap, setShowMinimap] = useState(true);
 
   useEffect(() => {
-    if (canvasRef.current && miniMapRef.current) {
-      // Temporary placeholder - we'll uncomment when TileMapEditor is fixed
-      // const tileEditor = new TileMapEditor(canvasRef.current, miniMapRef.current);
-      // setEditor(tileEditor);
-      console.log('Canvas elements ready');
+    if (canvasRef.current) {
+      const tileEditor = new TileMapEditor(canvasRef.current);
+      setEditor(tileEditor);
     }
   }, []);
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>, type: 'tileset' | 'extraTileset' | 'importTMX' | 'importTSX') => {
     const file = event.target.files?.[0];
-    if (file && _editor?.handleFileUpload) {
-      _editor.handleFileUpload(file, type);
+    if (file && editor?.handleFileUpload) {
+      editor.handleFileUpload(file, type);
     }
   };
 
   const handleToolChange = (newTool: string) => {
     setTool(newTool as Tool);
-    if (_editor?.setTool) {
-      _editor.setTool(newTool);
+    if (editor?.setTool) {
+      editor.setTool(newTool as Tool);
     }
   };
 
   const handleMapResize = () => {
-    if (_editor?.resizeMap) {
-      _editor.resizeMap(mapWidth, mapHeight);
+    if (editor?.resizeMap) {
+      editor.resizeMap(mapWidth, mapHeight);
+    }
+  };
+
+  const handleZoomIn = () => {
+    if (editor?.zoomIn) {
+      editor.zoomIn();
+    }
+  };
+
+  const handleZoomOut = () => {
+    if (editor?.zoomOut) {
+      editor.zoomOut();
+    }
+  };
+
+  const handleResetZoom = () => {
+    if (editor?.resetZoom) {
+      editor.resetZoom();
+    }
+  };
+
+  const handleExportMap = () => {
+    if (editor?.exportFlareMap) {
+      editor.exportFlareMap();
+    }
+  };
+
+  const handleToggleMinimap = () => {
+    if (editor?.toggleMinimap) {
+      editor.toggleMinimap();
+    }
+    setShowMinimap(!showMinimap);
+  };
+
+  const handleMinimize = () => {
+    if (window.electronAPI?.minimize) {
+      window.electronAPI.minimize();
+    } else {
+      console.log('Minimize clicked - Electron API not available');
+    }
+  };
+
+  const handleMaximize = () => {
+    if (window.electronAPI?.maximize) {
+      window.electronAPI.maximize();
+    } else {
+      console.log('Maximize clicked - Electron API not available');
+    }
+  };
+
+  const handleClose = () => {
+    if (window.electronAPI?.close) {
+      window.electronAPI.close();
+    } else {
+      console.log('Close clicked - Electron API not available');
     }
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground flex flex-col">
+      {/* Custom Title Bar */}
+      <div className="bg-gray-800 text-white flex justify-between items-center px-4 py-1 select-none drag-region">
+        <div className="text-sm font-medium">Flare Map Editor</div>
+        <div className="flex no-drag">
+          <button 
+            onClick={handleMinimize}
+            className="hover:bg-gray-600 p-1 rounded transition-colors"
+            title="Minimize"
+          >
+            <Minus className="w-4 h-4" />
+          </button>
+          <button 
+            onClick={handleMaximize}
+            className="hover:bg-gray-600 p-1 rounded transition-colors"
+            title="Maximize"
+          >
+            <Square className="w-4 h-4" />
+          </button>
+          <button 
+            onClick={handleClose}
+            className="hover:bg-red-600 p-1 rounded transition-colors"
+            title="Close"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
       {/* Header */}
-      <header className="border-b p-4">
-        <h1 className="text-2xl font-bold mb-2">Advanced Flare Map Editor</h1>
-        <p className="text-muted-foreground mb-4">Isometric tile editor with 64x32 tiles.</p>
-        
+      <header className="border-b p-4 flex-shrink-0">
         {/* Controls Row 1 */}
         <div className="flex flex-wrap gap-2 mb-4">
           <div className="flex items-center gap-2">
@@ -124,36 +187,20 @@ function App() {
 
           <Button 
             variant="destructive" 
-            onClick={() => _editor?.clearLayer?.()}
+            onClick={() => editor?.clearLayer?.()}
             title="Clear all tile data on active layer / collision when selected"
           >
             Clear Layer
           </Button>
 
-          <Button onClick={() => _editor?.exportTMX?.()}>
+          <Button onClick={handleExportMap} title="Export Flare map.txt and tileset definition">
             <Download className="w-4 h-4 mr-2" />
-            Export TMX
+            Export Map
           </Button>
 
           <Button 
             variant="outline" 
-            onClick={() => _editor?.exportTSX?.()}
-            title="Export tileset.tsx (Base64)"
-          >
-            Export TSX
-          </Button>
-
-          <Button 
-            variant="outline" 
-            onClick={() => _editor?.exportFlareTXT?.()}
-            title="Export map.txt in Flare format"
-          >
-            Export Flare TXT
-          </Button>
-
-          <Button 
-            variant="outline" 
-            onClick={() => _editor?.undo?.()}
+            onClick={() => editor?.undo?.()}
             title="Undo (Ctrl+Z)"
           >
             <Undo2 className="w-4 h-4 mr-2" />
@@ -162,7 +209,7 @@ function App() {
 
           <Button 
             variant="outline" 
-            onClick={() => _editor?.redo?.()}
+            onClick={() => editor?.redo?.()}
             title="Redo (Ctrl+Y)"
           >
             <Redo2 className="w-4 h-4 mr-2" />
@@ -256,9 +303,9 @@ function App() {
       </header>
 
       {/* Main Content */}
-      <main className="flex flex-1">
+      <main className="flex flex-1 min-h-0">
         {/* Left Sidebar */}
-        <aside className="w-80 border-r bg-muted/30 p-4">
+        <aside className="w-80 border-r bg-muted/30 p-4 overflow-y-auto">
           {/* Tileset Section */}
           <section className="mb-6">
             <h2 className="text-lg font-semibold mb-3">Tileset</h2>
@@ -292,53 +339,57 @@ function App() {
         </aside>
 
         {/* Center Area */}
-        <section className="flex-1 p-4">
-          <div className="border rounded-lg bg-gray-100 inline-block">
+        <section className="flex-1 min-w-0 flex flex-col relative">
+          {/* Zoom Controls */}
+          <div className="absolute top-2 right-2 z-10 flex flex-col gap-1">
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="w-8 h-8 p-0"
+              onClick={handleZoomIn}
+              title="Zoom In"
+            >
+              <ZoomIn className="w-4 h-4" />
+            </Button>
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="w-8 h-8 p-0"
+              onClick={handleZoomOut}
+              title="Zoom Out"
+            >
+              <ZoomOut className="w-4 h-4" />
+            </Button>
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="w-8 h-8 p-0"
+              onClick={handleResetZoom}
+              title="Reset Zoom & Pan"
+            >
+              <RotateCcw className="w-4 h-4" />
+            </Button>
+            <Button 
+              size="sm" 
+              variant={showMinimap ? "default" : "outline"}
+              className="w-8 h-8 p-0"
+              onClick={handleToggleMinimap}
+              title="Toggle Minimap"
+            >
+              <Map className="w-4 h-4" />
+            </Button>
+          </div>
+          
+          <div className="bg-gray-100 flex-1 flex items-center justify-center">
             <canvas
               ref={canvasRef}
               id="mapCanvas"
-              width="640"
-              height="480"
-              className="tile-canvas"
+              className="tile-canvas w-full h-full"
             />
           </div>
-          <div className="text-sm text-muted-foreground mt-2" id="hoverInfo">{hoverInfo}</div>
+          <div className="text-sm text-muted-foreground p-2 flex-shrink-0" id="hoverInfo">{hoverInfo}</div>
         </section>
-
-        {/* Right Sidebar */}
-        <aside className="w-80 border-l bg-muted/30 p-4">
-          {/* Object Inspector */}
-          <section className="mb-6">
-            <h2 className="text-lg font-semibold mb-3">Object Inspector</h2>
-            <div id="objectList" className="mb-3"></div>
-            <div id="selectedObjectInfo" className="text-sm text-muted-foreground mb-4">No object selected.</div>
-            <h3 className="text-md font-medium mb-2">Properties</h3>
-            <form id="propertiesForm" className="mb-2"></form>
-            <Button size="sm" type="button">Add Property</Button>
-          </section>
-
-          {/* Mini Map */}
-          <section>
-            <h2 className="text-lg font-semibold mb-3">Mini Map</h2>
-            <div className="border rounded bg-white">
-              <canvas
-                ref={miniMapRef}
-                id="miniMapCanvas"
-                width="200"
-                height="200"
-                className="block"
-              />
-            </div>
-          </section>
-        </aside>
       </main>
-
-      {/* Footer */}
-      <footer className="border-t p-4 text-center">
-        <small className="text-muted-foreground">
-          Generated TMX targets Flare-compatible orthogonal maps. TypeScript + Vite + Electron.
-        </small>
-      </footer>
     </div>
   );
 }

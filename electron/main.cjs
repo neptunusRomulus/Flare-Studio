@@ -10,15 +10,17 @@ function createWindow() {
     height: 900,
     minWidth: 1200,
     minHeight: 800,
+    frame: false, // Remove the default window frame
+    titleBarStyle: 'hidden', // Hide the title bar
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
       enableRemoteModule: false,
-      webSecurity: true,
-      allowRunningInsecureContent: false
+      webSecurity: false,
+      preload: path.join(__dirname, 'preload.js')
     },
     icon: path.join(__dirname, '../assets/icon.png'), // Add icon if available
-    title: 'Advanced Flare Map Editor'
+    title: 'Isometric Tile Map Editor'
   });
 
   // Load the app
@@ -36,6 +38,29 @@ function createWindow() {
   // Create application menu
   createMenu();
 }
+
+const { ipcMain } = require('electron');
+ipcMain.on('window-minimize', () => {
+  if (mainWindow) {
+    mainWindow.minimize();
+  }
+});
+
+ipcMain.on('window-maximize', () => {
+  if (mainWindow) {
+    if (mainWindow.isMaximized()) {
+      mainWindow.unmaximize();
+    } else {
+      mainWindow.maximize();
+    }
+  }
+});
+
+ipcMain.on('window-close', () => {
+  if (mainWindow) {
+    mainWindow.close();
+  }
+});
 
 function createMenu() {
   const template = [

@@ -60,9 +60,11 @@
 
 /* Keep existing tile editor specific styles */
 .tile-canvas {
-    border: 2px solid #333;
     background: #f0f0f0;
     cursor: crosshair;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
 }
 
 .tile-palette {
@@ -95,4 +97,13 @@
 .tool-active {
     background: #007acc !important;
     color: white !important;
+}
+
+/* Electron window drag regions */
+.drag-region {
+    -webkit-app-region: drag;
+}
+
+.no-drag {
+    -webkit-app-region: no-drag;
 }

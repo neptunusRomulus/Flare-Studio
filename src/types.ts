@@ -3,6 +3,7 @@
 export interface TileLayer {
   id: number;
   name: string;
+  type: 'background' | 'object' | 'collision' | 'event' | 'enemy' | 'npc';
   data: number[];
   visible: boolean;
 }
@@ -83,7 +84,7 @@ export interface UndoRedoState {
   timestamp: number;
 }
 
-export type Tool = 'tiles' | 'collision' | 'objects';
+export type Tool = 'tiles';
 
 export type Orientation = 'isometric';
 

@@ -122,19 +122,15 @@ export class TileMapEditor {
     this.tileLayers = [
       {
         id: 1,
-        name: 'Base',
-        data: new Array(this.mapWidth * this.mapHeight).fill(0),
-        visible: true
-      },
-      {
-        id: 2,
-        name: 'Objects',
+        name: 'background',
+        type: 'background',
         data: new Array(this.mapWidth * this.mapHeight).fill(0),
         visible: true
       }
     ];
     this.activeLayerId = 1;
-    this.nextLayerId = 3;
+    this.nextLayerId = 2;
+    this.sortLayersByPriority();
   }
 
   private handleMouseDown(event: MouseEvent): void {
@@ -226,7 +222,7 @@ export class TileMapEditor {
   }
 
   private handleTileClick(x: number, y: number, isRightClick: boolean): void {
-    if (this.tool === 'tiles' && this.activeLayerId !== null) {
+    if (this.activeLayerId !== null) {
       const layer = this.tileLayers.find(l => l.id === this.activeLayerId);
       if (layer) {
         const index = y * this.mapWidth + x;
@@ -422,56 +418,56 @@ export class TileMapEditor {
 
   private drawMiniMap(): void {
     if (!this.showMinimap) return;
-    
+
     // Minimap dimensions and position (bottom-right corner)
     const minimapWidth = 150;
     const minimapHeight = 120;
     const padding = 10;
     const x = this.mapCanvas.width - minimapWidth - padding;
     const y = this.mapCanvas.height - minimapHeight - padding;
-    
+
     // Save current context state
     this.ctx.save();
-    
+
     // Draw minimap background
     this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
     this.ctx.fillRect(x - 5, y - 5, minimapWidth + 10, minimapHeight + 10);
-    
+
     this.ctx.fillStyle = '#f0f0f0';
     this.ctx.fillRect(x, y, minimapWidth, minimapHeight);
-    
+
     // Draw border
     this.ctx.strokeStyle = '#333';
     this.ctx.lineWidth = 1;
     this.ctx.strokeRect(x, y, minimapWidth, minimapHeight);
-    
+
     // Calculate orthogonal scale for minimap (not isometric)
     const orthogonalTileWidth = 8; // Small tile size for minimap
     const orthogonalTileHeight = 8;
     const scaleX = minimapWidth / (this.mapWidth * orthogonalTileWidth);
     const scaleY = minimapHeight / (this.mapHeight * orthogonalTileHeight);
     const scale = Math.min(scaleX, scaleY);
-    
+
     // Center the map within the minimap
     const mapPixelWidth = this.mapWidth * orthogonalTileWidth * scale;
     const mapPixelHeight = this.mapHeight * orthogonalTileHeight * scale;
     const offsetX = x + (minimapWidth - mapPixelWidth) / 2;
     const offsetY = y + (minimapHeight - mapPixelHeight) / 2;
-    
+
     // Draw tiles in orthogonal view
     for (let layerIndex = 0; layerIndex < this.tileLayers.length; layerIndex++) {
       const layer = this.tileLayers[layerIndex];
       if (!layer.visible) continue;
-      
+
       for (let tileY = 0; tileY < this.mapHeight; tileY++) {
         for (let tileX = 0; tileX < this.mapWidth; tileX++) {
           const index = tileY * this.mapWidth + tileX;
           const gid = layer.data[index];
-          
+
           if (gid > 0) {
             const pixelX = offsetX + tileX * orthogonalTileWidth * scale;
             const pixelY = offsetY + tileY * orthogonalTileHeight * scale;
-            
+
             // Draw a simple colored rectangle for each tile
             this.ctx.fillStyle = `hsl(${(gid * 137.5) % 360}, 50%, 50%)`;
             this.ctx.fillRect(pixelX, pixelY, orthogonalTileWidth * scale, orthogonalTileHeight * scale);
@@ -479,25 +475,7 @@ export class TileMapEditor {
         }
       }
     }
-    
-    // Draw viewport indicator (current view area)
-    this.ctx.strokeStyle = '#ff0000';
-    this.ctx.lineWidth = 2;
-    
-    // Calculate current viewport in map coordinates
-    const viewLeft = -this.panX / this.zoom;
-    const viewTop = -this.panY / this.zoom;
-    const viewWidth = this.mapCanvas.width / this.zoom;
-    const viewHeight = this.mapCanvas.height / this.zoom;
-    
-    // Convert to minimap coordinates
-    const viewX = offsetX + (viewLeft / (this.mapWidth * orthogonalTileWidth)) * mapPixelWidth;
-    const viewY = offsetY + (viewTop / (this.mapHeight * orthogonalTileHeight)) * mapPixelHeight;
-    const viewW = (viewWidth / (this.mapWidth * orthogonalTileWidth)) * mapPixelWidth;
-    const viewH = (viewHeight / (this.mapHeight * orthogonalTileHeight)) * mapPixelHeight;
-    
-    this.ctx.strokeRect(viewX, viewY, viewW, viewH);
-    
+
     // Restore context state
     this.ctx.restore();
   }
@@ -573,16 +551,9 @@ export class TileMapEditor {
     }
   }
 
-  public setTool(tool: Tool): void {
-    this.tool = tool;
-  }
-
   public resizeMap(width: number, height: number): void {
     this.mapWidth = width;
     this.mapHeight = height;
-    
-    // Resize collision data
-    this.collisionData = new Array(width * height).fill(0);
     
     // Resize layer data
     for (const layer of this.tileLayers) {
@@ -602,14 +573,105 @@ export class TileMapEditor {
     this.draw();
   }
 
+  public addLayer(name: string, type: 'background' | 'object' | 'collision' | 'event' | 'enemy' | 'npc'): boolean {
+    // Check if layer type already exists
+    const existingLayer = this.tileLayers.find(layer => layer.type === type);
+    if (existingLayer) {
+      return false; // Layer type already exists
+    }
+
+    const newLayer = {
+      id: this.nextLayerId++,
+      name: name,
+      type: type,
+      data: new Array(this.mapWidth * this.mapHeight).fill(0),
+      visible: true
+    };
+    
+    // Add layer and sort by type priority
+    this.tileLayers.push(newLayer);
+    this.sortLayersByPriority();
+    this.activeLayerId = newLayer.id;
+    this.draw();
+    return true; // Successfully added
+  }
+
+  private sortLayersByPriority(): void {
+    const typePriority: Record<string, number> = {
+      'npc': 1,
+      'enemy': 2,
+      'event': 3,
+      'collision': 4,
+      'object': 5,
+      'background': 6
+    };
+
+    this.tileLayers.sort((a, b) => {
+      return typePriority[a.type] - typePriority[b.type];
+    });
+  }
+
+  public deleteLayer(layerId: number): boolean {
+    if (this.tileLayers.length <= 1) {
+      return false; // Cannot delete the last layer
+    }
+    
+    const layerIndex = this.tileLayers.findIndex(l => l.id === layerId);
+    if (layerIndex !== -1) {
+      this.tileLayers.splice(layerIndex, 1);
+      
+      // Set active layer to the first available layer
+      if (this.activeLayerId === layerId) {
+        this.activeLayerId = this.tileLayers.length > 0 ? this.tileLayers[0].id : null;
+      }
+      this.draw();
+      return true; // Successfully deleted
+    }
+    return false; // Layer not found
+  }
+
+  public setActiveLayer(layerId: number): void {
+    this.activeLayerId = layerId;
+    this.draw();
+  }
+
+  public toggleLayerVisibility(layerId: number): void {
+    const layer = this.tileLayers.find(l => l.id === layerId);
+    if (layer) {
+      layer.visible = !layer.visible;
+      this.draw();
+    }
+  }
+
+  public renameLayer(layerId: number, newName: string): void {
+    const layer = this.tileLayers.find(l => l.id === layerId);
+    if (layer) {
+      layer.name = newName;
+    }
+  }
+
+  public setLayerType(layerId: number, newType: 'background' | 'object' | 'collision' | 'event' | 'enemy' | 'npc'): void {
+    const layer = this.tileLayers.find(l => l.id === layerId);
+    if (layer) {
+      layer.type = newType;
+      this.sortLayersByPriority();
+    }
+  }
+
+  public getLayers(): TileLayer[] {
+    return this.tileLayers;
+  }
+
+  public getActiveLayerId(): number | null {
+    return this.activeLayerId;
+  }
+
   public clearLayer(): void {
-    if (this.tool === 'tiles' && this.activeLayerId !== null) {
+    if (this.activeLayerId !== null) {
       const layer = this.tileLayers.find(l => l.id === this.activeLayerId);
       if (layer) {
         layer.data.fill(0);
       }
-    } else if (this.tool === 'collision') {
-      this.collisionData.fill(0);
     }
     this.draw();
   }
@@ -637,12 +699,13 @@ export class TileMapEditor {
   private generateFlareMapTxt(): string {
     const lines: string[] = [];
     
-    // Header information
-    lines.push(`# Flare Map`);
+    // Header information with [header] section
+    lines.push(`[header]`);
     lines.push(`width=${this.mapWidth}`);
     lines.push(`height=${this.mapHeight}`);
     lines.push(`tilewidth=${this.tileSizeX}`);
     lines.push(`tileheight=${this.tileSizeY}`);
+    lines.push(`orientation=isometric`);
     lines.push(`tileset=tileset.txt`);
     lines.push('');
     
@@ -651,7 +714,7 @@ export class TileMapEditor {
       if (!layer.visible) continue;
       
       lines.push(`[layer]`);
-      lines.push(`type=background`);
+      lines.push(`type=${layer.type}`);
       lines.push(`data=`);
       
       // Export tile data in comma-separated format
@@ -664,23 +727,6 @@ export class TileMapEditor {
         lines.push(row.join(','));
       }
       lines.push('');
-    }
-    
-    // Export collision layer if it has data
-    const hasCollision = this.collisionData.some(cell => cell !== 0);
-    if (hasCollision) {
-      lines.push(`[layer]`);
-      lines.push(`type=collision`);
-      lines.push(`data=`);
-      
-      for (let y = 0; y < this.mapHeight; y++) {
-        const row: string[] = [];
-        for (let x = 0; x < this.mapWidth; x++) {
-          const index = y * this.mapWidth + x;
-          row.push(this.collisionData[index].toString());
-        }
-        lines.push(row.join(','));
-      }
     }
     
     return lines.join('\n');

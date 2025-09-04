@@ -3,20 +3,34 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Upload, Download, Undo2, Redo2, Plus, ChevronUp, ChevronDown, X } from 'lucide-react';
+import { Tool } from './types';
 // Temporary - commenting out TileMapEditor until we fix it
 // import { TileMapEditor } from './editor/TileMapEditor';
 
+// Temporary interface for editor methods (will be replaced with actual TileMapEditor)
+interface TemporaryEditor {
+  handleFileUpload?: (file: File, type: string) => void;
+  setTool?: (tool: string) => void;
+  resizeMap?: (width: number, height: number) => void;
+  clearLayer?: () => void;
+  exportTMX?: () => void;
+  exportTSX?: () => void;
+  exportFlareTXT?: () => void;
+  undo?: () => void;
+  redo?: () => void;
+}
+
 function App() {
   // const [editor, setEditor] = useState<TileMapEditor | null>(null);
-  const [editor, setEditor] = useState<any>(null);
+  const [_editor] = useState<TemporaryEditor | null>(null); // TODO: Re-enable TileMapEditor
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const miniMapRef = useRef<HTMLCanvasElement>(null);
   const [mapWidth, setMapWidth] = useState(20);
   const [mapHeight, setMapHeight] = useState(15);
-  const [tool, setTool] = useState('tiles');
+  const [tool, setTool] = useState<Tool>('tiles');
   const [objectType, setObjectType] = useState('event');
-  const [activeGid, setActiveGid] = useState('(none)');
-  const [hoverInfo, setHoverInfo] = useState('Hover: -');
+  const [activeGid] = useState('(none)'); // Removed unused setter
+  const [hoverInfo] = useState('Hover: -'); // Removed unused setter
 
   useEffect(() => {
     if (canvasRef.current && miniMapRef.current) {
@@ -29,21 +43,21 @@ function App() {
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>, type: 'tileset' | 'extraTileset' | 'importTMX' | 'importTSX') => {
     const file = event.target.files?.[0];
-    if (file && editor) {
-      editor.handleFileUpload(file, type);
+    if (file && _editor?.handleFileUpload) {
+      _editor.handleFileUpload(file, type);
     }
   };
 
   const handleToolChange = (newTool: string) => {
-    setTool(newTool);
-    if (editor) {
-      editor.setTool(newTool as any);
+    setTool(newTool as Tool);
+    if (_editor?.setTool) {
+      _editor.setTool(newTool);
     }
   };
 
   const handleMapResize = () => {
-    if (editor) {
-      editor.resizeMap(mapWidth, mapHeight);
+    if (_editor?.resizeMap) {
+      _editor.resizeMap(mapWidth, mapHeight);
     }
   };
 
@@ -110,20 +124,20 @@ function App() {
 
           <Button 
             variant="destructive" 
-            onClick={() => editor?.clearLayer()}
+            onClick={() => _editor?.clearLayer?.()}
             title="Clear all tile data on active layer / collision when selected"
           >
             Clear Layer
           </Button>
 
-          <Button onClick={() => editor?.exportTMX()}>
+          <Button onClick={() => _editor?.exportTMX?.()}>
             <Download className="w-4 h-4 mr-2" />
             Export TMX
           </Button>
 
           <Button 
             variant="outline" 
-            onClick={() => editor?.exportTSX()}
+            onClick={() => _editor?.exportTSX?.()}
             title="Export tileset.tsx (Base64)"
           >
             Export TSX
@@ -131,7 +145,7 @@ function App() {
 
           <Button 
             variant="outline" 
-            onClick={() => editor?.exportFlareTXT()}
+            onClick={() => _editor?.exportFlareTXT?.()}
             title="Export map.txt in Flare format"
           >
             Export Flare TXT
@@ -139,7 +153,7 @@ function App() {
 
           <Button 
             variant="outline" 
-            onClick={() => editor?.undo()}
+            onClick={() => _editor?.undo?.()}
             title="Undo (Ctrl+Z)"
           >
             <Undo2 className="w-4 h-4 mr-2" />
@@ -148,7 +162,7 @@ function App() {
 
           <Button 
             variant="outline" 
-            onClick={() => editor?.redo()}
+            onClick={() => _editor?.redo?.()}
             title="Redo (Ctrl+Y)"
           >
             <Redo2 className="w-4 h-4 mr-2" />

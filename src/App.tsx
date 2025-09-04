@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, Download, Undo2, Redo2, Plus, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Layers, Sliders, MapPin } from 'lucide-react';
+import { Upload, Download, Undo2, Redo2, Plus, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Sliders, MapPin } from 'lucide-react';
 import { TileMapEditor } from './editor/TileMapEditor';
 import { TileLayer } from './types';
 import { useToast } from '@/hooks/use-toast';
@@ -27,9 +27,6 @@ function App() {
   const [showMinimap, setShowMinimap] = useState(true);
   const [layers, setLayers] = useState<TileLayer[]>([]);
   const [activeLayerId, setActiveLayerId] = useState<number | null>(null);
-  const [editingLayerId, setEditingLayerId] = useState<number | null>(null);
-  const [editingLayerName, setEditingLayerName] = useState('');
-  const [editingLayerType, setEditingLayerType] = useState<'background' | 'object' | 'collision' | 'event' | 'enemy' | 'npc'>('background');
   const [showAddLayerDropdown, setShowAddLayerDropdown] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showTooltip, setShowTooltip] = useState(true);
@@ -49,6 +46,16 @@ function App() {
     const savedTheme = localStorage.getItem('isDarkMode');
     return savedTheme ? JSON.parse(savedTheme) : false;
   });
+  
+  // Custom tooltip states
+  const [tooltip, setTooltip] = useState<{
+    text: string;
+    x: number;
+    y: number;
+    visible: boolean;
+    fadeOut: boolean;
+  } | null>(null);
+  const tooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Transparency states
   const [showTransparencySlider, setShowTransparencySlider] = useState<number | null>(null);
@@ -154,6 +161,52 @@ function App() {
     };
   }, [showAddLayerDropdown]);
 
+  // Custom tooltip handlers
+  const showTooltipWithDelay = useCallback((text: string, element: HTMLElement) => {
+    const rect = element.getBoundingClientRect();
+    const x = rect.left + rect.width / 2;
+    const y = rect.top - 10;
+    
+    setTooltip({
+      text,
+      x,
+      y,
+      visible: true,
+      fadeOut: false
+    });
+
+    // Clear any existing timeout
+    if (tooltipTimeoutRef.current) {
+      clearTimeout(tooltipTimeoutRef.current);
+    }
+
+    // Set timeout to start fade out after 1 second
+    tooltipTimeoutRef.current = setTimeout(() => {
+      setTooltip(prev => prev ? { ...prev, fadeOut: true } : null);
+      
+      // Remove tooltip completely after fade animation
+      setTimeout(() => {
+        setTooltip(null);
+      }, 300); // Match CSS transition duration
+    }, 1000);
+  }, []);
+
+  const hideTooltip = useCallback(() => {
+    if (tooltipTimeoutRef.current) {
+      clearTimeout(tooltipTimeoutRef.current);
+    }
+    setTooltip(null);
+  }, []);
+
+  // Cleanup tooltip timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (tooltipTimeoutRef.current) {
+        clearTimeout(tooltipTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>, type: 'tileset' | 'layerTileset') => {
     const file = event.target.files?.[0];
     if (file && editor?.handleFileUpload) {
@@ -179,59 +232,26 @@ function App() {
         return;
       }
 
-      // Generate appropriate default name for the layer type
+      // Generate appropriate default name for the layer type with "Layer" suffix
       const defaultNames = {
-        'npc': 'NPCs',
-        'enemy': 'Enemies', 
-        'event': 'Events',
-        'collision': 'Collision',
-        'object': 'Objects',
-        'background': 'Background'
+        'npc': 'NPC Layer',
+        'enemy': 'Enemy Layer', 
+        'event': 'Event Layer',
+        'collision': 'Collision Layer',
+        'object': 'Object Layer',
+        'background': 'Background Layer'
       };
 
       const success = editor.addLayer(defaultNames[type], type);
       if (success) {
         updateLayersList();
-        // Set the new layer for editing
-        const newLayers = editor.getLayers();
-        const newLayer = newLayers.find(layer => layer.name === defaultNames[type] && layer.type === type);
-        if (newLayer) {
-          setEditingLayerId(newLayer.id);
-          setEditingLayerName(newLayer.name);
-          setEditingLayerType(newLayer.type);
-        }
+        toast({
+          title: "Layer created",
+          description: `${defaultNames[type]} has been created successfully.`,
+        });
       }
       setShowAddLayerDropdown(false);
     }
-  };
-
-  const handleSaveLayerEdit = () => {
-    if (editor && editingLayerId !== null && editingLayerName.trim()) {
-      // Check if changing to a type that already exists (except for the current layer)
-      const existingLayer = layers.find(layer => 
-        layer.type === editingLayerType && layer.id !== editingLayerId
-      );
-      
-      if (existingLayer) {
-        toast({
-          variant: "destructive",
-          title: "Cannot change layer type",
-          description: `A ${editingLayerType} layer already exists. Only one layer per type is allowed.`,
-        });
-        return;
-      }
-
-      editor.renameLayer(editingLayerId, editingLayerName.trim());
-      editor.setLayerType(editingLayerId, editingLayerType);
-      updateLayersList();
-      setEditingLayerId(null);
-    }
-  };
-
-  const handleCancelLayerEdit = () => {
-    setEditingLayerId(null);
-    setEditingLayerName('');
-    setEditingLayerType('background');
   };
 
   const handleDeleteLayer = (layerId: number) => {
@@ -285,6 +305,41 @@ function App() {
 
   const handleToggleTransparencySlider = (layerId: number) => {
     setShowTransparencySlider(prev => prev === layerId ? null : layerId);
+  };
+
+  const handleLayerTypeChange = (layerId: number, newType: 'npc' | 'enemy' | 'event' | 'collision' | 'object' | 'background') => {
+    if (!editor) return;
+
+    // Check if this type already exists in another layer
+    const existingLayer = layers.find(layer => layer.type === newType && layer.id !== layerId);
+    if (existingLayer) {
+      toast({
+        variant: "destructive",
+        title: "Cannot change layer type",
+        description: `A ${newType} layer already exists. Only one layer per type is allowed.`,
+      });
+      return;
+    }
+
+    // Generate appropriate name for the new type
+    const typeNames = {
+      'npc': 'NPC Layer',
+      'enemy': 'Enemy Layer', 
+      'event': 'Event Layer',
+      'collision': 'Collision Layer',
+      'object': 'Object Layer',
+      'background': 'Background Layer'
+    };
+
+    // Update the layer type and name
+    const success = editor.changeLayerType(layerId, newType, typeNames[newType]);
+    if (success) {
+      updateLayersList();
+      toast({
+        title: "Layer type changed",
+        description: `Layer has been changed to ${typeNames[newType]}.`,
+      });
+    }
   };
 
   const handleMapResize = () => {
@@ -527,95 +582,82 @@ function App() {
                     activeLayerId === layer.id ? 'border-blue-500 bg-blue-50' : 'hover:bg-gray-50'
                   }`}
                 >
-                  {editingLayerId === layer.id ? (
-                    // Editing mode
-                    <div className="space-y-2">
-                      <Input
-                        value={editingLayerName}
-                        onChange={(e) => setEditingLayerName(e.target.value)}
-                        className="text-sm h-6"
-                        autoFocus
-                      />
-                      <Select 
-                        value={editingLayerType} 
-                        onValueChange={(value) => setEditingLayerType(value as 'background' | 'object' | 'collision' | 'event' | 'enemy' | 'npc')}
-                      >
-                        <SelectTrigger className="h-6 text-xs">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="background">Background</SelectItem>
-                          <SelectItem value="object">Object</SelectItem>
-                          <SelectItem value="collision">Collision</SelectItem>
-                          <SelectItem value="event">Event</SelectItem>
-                          <SelectItem value="enemy">Enemy</SelectItem>
-                          <SelectItem value="npc">NPC</SelectItem>
-                        </SelectContent>
-                      </Select>
+                  <div 
+                    className="cursor-pointer"
+                    onClick={() => handleSetActiveLayer(layer.id)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleLayerVisibility(layer.id);
+                          }}
+                          className="w-6 h-6 p-0 hover:bg-gray-200"
+                          title={layer.visible ? "Hide layer" : "Show layer"}
+                        >
+                          {layer.visible ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3 text-gray-400" />}
+                        </Button>
+                        
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleTransparencySlider(layer.id);
+                          }}
+                          className="w-6 h-6 p-0 hover:bg-gray-200"
+                          title="Adjust layer transparency"
+                        >
+                          <Sliders className="w-3 h-3" />
+                        </Button>
+                        
+                        <span className="text-sm font-medium">{layer.name}</span>
+                        <span className="text-xs text-gray-500">({layer.type})</span>
+                      </div>
                       <div className="flex gap-1">
-                        <Button size="sm" onClick={handleSaveLayerEdit} className="h-6 text-xs px-2">
-                          Save
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={handleCancelLayerEdit} className="h-6 text-xs px-2">
-                          Cancel
-                        </Button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteLayer(layer.id);
+                          }}
+                          className="text-xs hover:bg-red-200 p-1 rounded text-red-600"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
                       </div>
                     </div>
-                  ) : (
-                    // Normal display mode
-                    <div 
-                      className="cursor-pointer"
-                      onClick={() => handleSetActiveLayer(layer.id)}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleToggleLayerVisibility(layer.id);
-                            }}
-                            className="w-6 h-6 p-0 hover:bg-gray-200"
-                            title={layer.visible ? "Hide layer" : "Show layer"}
-                          >
-                            {layer.visible ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3 text-gray-400" />}
-                          </Button>
-                          
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleToggleTransparencySlider(layer.id);
-                            }}
-                            className="w-6 h-6 p-0 hover:bg-gray-200"
-                            title="Adjust layer transparency"
-                          >
-                            <Sliders className="w-3 h-3" />
-                          </Button>
-                          
-                          <span className="text-sm font-medium">{layer.name}</span>
-                          <span className="text-xs text-gray-500">({layer.type})</span>
-                        </div>
-                        <div className="flex gap-1">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteLayer(layer.id);
-                            }}
-                            className="text-xs hover:bg-red-200 p-1 rounded text-red-600"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                  </div>
                   
                   {/* Transparency Slider */}
                   {showTransparencySlider === layer.id && (
                     <div className="mt-2 p-3 bg-gray-50 rounded border">
+                      {/* Layer Type Selector */}
+                      <div className="mb-3">
+                        <label className="text-xs font-medium mb-1 block">Layer Type:</label>
+                        <Select
+                          value={layer.type}
+                          onValueChange={(newType: 'npc' | 'enemy' | 'event' | 'collision' | 'object' | 'background') => 
+                            handleLayerTypeChange(layer.id, newType)
+                          }
+                        >
+                          <SelectTrigger className="h-8 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="background">Background</SelectItem>
+                            <SelectItem value="object">Object</SelectItem>
+                            <SelectItem value="collision">Collision</SelectItem>
+                            <SelectItem value="event">Event</SelectItem>
+                            <SelectItem value="enemy">Enemy</SelectItem>
+                            <SelectItem value="npc">NPC</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      
+                      {/* Transparency Control */}
                       <div className="flex items-center gap-2 mb-2">
                         <span className="text-xs font-medium">Transparency:</span>
                         <span className="text-xs text-gray-600">
@@ -925,22 +967,45 @@ function App() {
                   size="sm"
                   className="w-8 h-8 p-0"
                   onClick={() => setSelectedTool('brush')}
-                  onMouseEnter={() => setShowBrushOptions(true)}
-                  onMouseLeave={() => setShowBrushOptions(false)}
-                  title="Brush Tool"
+                  onMouseEnter={(e) => {
+                    setShowBrushOptions(true);
+                    showTooltipWithDelay('Brush Tool', e.currentTarget);
+                  }}
+                  onMouseLeave={() => {
+                    setShowBrushOptions(false);
+                    hideTooltip();
+                  }}
                 >
                   <Paintbrush2 className="w-4 h-4" />
                 </Button>
                 
                 {showBrushOptions && (
                   <div className="absolute bottom-full left-0 mb-1 bg-white border rounded shadow-lg p-1 flex gap-1 min-w-max z-50">
-                    <Button variant="ghost" size="sm" className="w-8 h-8 p-0" title="Brush Tool">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="w-8 h-8 p-0"
+                      onMouseEnter={(e) => showTooltipWithDelay('Brush Tool', e.currentTarget)}
+                      onMouseLeave={hideTooltip}
+                    >
                       <Paintbrush2 className="w-4 h-4" />
                     </Button>
-                    <Button variant="ghost" size="sm" className="w-8 h-8 p-0" title="Bucket Fill">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="w-8 h-8 p-0"
+                      onMouseEnter={(e) => showTooltipWithDelay('Bucket Fill', e.currentTarget)}
+                      onMouseLeave={hideTooltip}
+                    >
                       <PaintBucket className="w-4 h-4" />
                     </Button>
-                    <Button variant="ghost" size="sm" className="w-8 h-8 p-0" title="Eraser">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="w-8 h-8 p-0"
+                      onMouseEnter={(e) => showTooltipWithDelay('Eraser', e.currentTarget)}
+                      onMouseLeave={hideTooltip}
+                    >
                       <Eraser className="w-4 h-4" />
                     </Button>
                   </div>
@@ -954,25 +1019,54 @@ function App() {
                   size="sm"
                   className="w-8 h-8 p-0"
                   onClick={() => setSelectedTool('selection')}
-                  onMouseEnter={() => setShowSelectionOptions(true)}
-                  onMouseLeave={() => setShowSelectionOptions(false)}
-                  title="Selection Tool"
+                  onMouseEnter={(e) => {
+                    setShowSelectionOptions(true);
+                    showTooltipWithDelay('Selection Tool', e.currentTarget);
+                  }}
+                  onMouseLeave={() => {
+                    setShowSelectionOptions(false);
+                    hideTooltip();
+                  }}
                 >
                   <MousePointer className="w-4 h-4" />
                 </Button>
                 
                 {showSelectionOptions && (
                   <div className="absolute bottom-full left-0 mb-1 bg-white border rounded shadow-lg p-1 flex gap-1 min-w-max z-50">
-                    <Button variant="ghost" size="sm" className="w-8 h-8 p-0" title="Rectangular Selection">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="w-8 h-8 p-0"
+                      onMouseEnter={(e) => showTooltipWithDelay('Rectangular Selection', e.currentTarget)}
+                      onMouseLeave={hideTooltip}
+                    >
                       <Square className="w-4 h-4" />
                     </Button>
-                    <Button variant="ghost" size="sm" className="w-8 h-8 p-0" title="Magic Wand">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="w-8 h-8 p-0"
+                      onMouseEnter={(e) => showTooltipWithDelay('Magic Wand', e.currentTarget)}
+                      onMouseLeave={hideTooltip}
+                    >
                       <Wand2 className="w-4 h-4" />
                     </Button>
-                    <Button variant="ghost" size="sm" className="w-8 h-8 p-0" title="Select Same Tile">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="w-8 h-8 p-0"
+                      onMouseEnter={(e) => showTooltipWithDelay('Select Same Tile', e.currentTarget)}
+                      onMouseLeave={hideTooltip}
+                    >
                       <Target className="w-4 h-4" />
                     </Button>
-                    <Button variant="ghost" size="sm" className="w-8 h-8 p-0" title="Circular Select">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="w-8 h-8 p-0"
+                      onMouseEnter={(e) => showTooltipWithDelay('Circular Select', e.currentTarget)}
+                      onMouseLeave={hideTooltip}
+                    >
                       <Circle className="w-4 h-4" />
                     </Button>
                   </div>
@@ -1060,6 +1154,19 @@ function App() {
       </div>
       
       <Toaster />
+      
+      {/* Custom Tooltip */}
+      {tooltip && (
+        <div
+          className={`custom-tooltip ${tooltip.visible ? 'visible' : ''} ${tooltip.fadeOut ? 'fade-out' : ''}`}
+          style={{
+            left: tooltip.x,
+            top: tooltip.y,
+          }}
+        >
+          {tooltip.text}
+        </div>
+      )}
         </div>
       )}
     </>

@@ -57,6 +57,28 @@
     -ms-user-select: none;
     user-select: none;
   }
+  
+  /* Remove focus outlines that cause orange-yellow strokes */
+  *:focus {
+    outline: none !important;
+  }
+  
+  *:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+  }
+  
+  /* Remove focus states on buttons and interactive elements */
+  button:focus,
+  button:focus-visible,
+  input:focus,
+  input:focus-visible,
+  select:focus,
+  select:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+  }
+  
   body {
     @apply bg-background text-foreground;
   }
@@ -111,4 +133,28 @@
 
 .no-drag {
     -webkit-app-region: no-drag;
+}
+
+/* Custom tooltip styles */
+.custom-tooltip {
+    position: absolute;
+    z-index: 1000;
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+    transform: translateX(-50%);
+}
+
+.custom-tooltip.visible {
+    opacity: 1;
+}
+
+.custom-tooltip.fade-out {
+    opacity: 0;
 }

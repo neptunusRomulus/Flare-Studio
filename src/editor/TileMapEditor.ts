@@ -100,17 +100,35 @@ export class TileMapEditor {
     
     // Listen for window resize to adjust canvas size
     window.addEventListener('resize', () => this.resizeCanvas());
+    
+    // Use ResizeObserver for more accurate container size tracking
+    if (window.ResizeObserver) {
+      const resizeObserver = new ResizeObserver(() => this.resizeCanvas());
+      if (this.mapCanvas.parentElement) {
+        resizeObserver.observe(this.mapCanvas.parentElement);
+      }
+    }
   }
 
   private resizeCanvas(): void {
     const container = this.mapCanvas.parentElement;
     if (container) {
-      const rect = container.getBoundingClientRect();
-      this.mapCanvas.width = rect.width;
-      this.mapCanvas.height = rect.height;
-      
-      // Redraw after resize
-      this.draw();
+      // Use requestAnimationFrame to ensure proper sizing after layout changes
+      requestAnimationFrame(() => {
+        const rect = container.getBoundingClientRect();
+        // Ensure we don't exceed container bounds
+        const width = Math.max(1, Math.floor(rect.width));
+        const height = Math.max(1, Math.floor(rect.height));
+        
+        // Only update if dimensions actually changed to avoid unnecessary redraws
+        if (this.mapCanvas.width !== width || this.mapCanvas.height !== height) {
+          this.mapCanvas.width = width;
+          this.mapCanvas.height = height;
+          
+          // Redraw after resize
+          this.draw();
+        }
+      });
     }
   }
 
@@ -362,8 +380,9 @@ export class TileMapEditor {
   }
 
   private drawGrid(): void {
-    this.ctx.strokeStyle = '#ccc';
-    this.ctx.lineWidth = 1 / this.zoom; // Scale line width inversely with zoom
+    this.ctx.strokeStyle = '#999'; // Make grid more visible with darker color
+    this.ctx.lineWidth = Math.max(1, Math.min(3, 2 / this.zoom)); // Make lines more visible
+    this.ctx.globalAlpha = 0.8; // Slightly transparent
     
     // Draw diamond-shaped grid cells for isometric view
     for (let mapY = 0; mapY < this.mapHeight; mapY++) {
@@ -382,6 +401,8 @@ export class TileMapEditor {
         this.ctx.stroke();
       }
     }
+    
+    this.ctx.globalAlpha = 1; // Reset alpha
   }
 
   private drawTiles(): void {

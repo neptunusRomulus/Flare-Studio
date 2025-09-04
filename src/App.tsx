@@ -322,7 +322,7 @@ function App() {
           onOpenMap={handleOpenMap}
         />
       ) : (
-        <div className="min-h-screen bg-background text-foreground flex flex-col">
+        <div className="h-screen bg-background text-foreground flex flex-col overflow-hidden">
       {/* Custom Title Bar */}
       <div className="bg-gray-800 text-white flex justify-between items-center px-4 py-1 select-none drag-region">
         <div className="text-sm font-medium">Flare Map Editor</div>
@@ -350,14 +350,6 @@ function App() {
           </button>
         </div>
       </div>
-
-      {/* Header */}
-      <header className="border-b p-4 flex-shrink-0">
-        {/* Controls Row 1 */}
-        <div className="flex flex-wrap gap-2 mb-4">
-          {/* Header content can be added here if needed */}
-        </div>
-      </header>
 
       {/* Main Content */}
       <main className="flex flex-1 min-h-0">
@@ -656,11 +648,11 @@ function App() {
             </Button>
           </div>
           
-          <div className="bg-gray-100 flex-1 flex items-center justify-center">
+          <div className="bg-gray-100 flex-1 min-h-0 flex items-center justify-center overflow-hidden">
             <canvas
               ref={canvasRef}
               id="mapCanvas"
-              className="tile-canvas w-full h-full"
+              className="tile-canvas w-full h-full max-w-full max-h-full"
             />
           </div>
           <div className="text-sm text-muted-foreground p-2 flex-shrink-0" id="hoverInfo">{hoverInfo}</div>

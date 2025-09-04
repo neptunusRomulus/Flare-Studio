@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, FolderOpen, Map, Grid3X3, Folder, Minus, Square, X } from 'lucide-react';
+import { Plus, FolderOpen, Grid3X3, Folder, Minus, Square, X } from 'lucide-react';
 
 interface WelcomeScreenProps {
-  onCreateNewMap: (config: MapConfig) => void;
+  onCreateNewMap: (config: MapConfig, projectPath?: string) => void;
   onOpenMap: (projectPath: string) => void;
 }
 
@@ -96,7 +96,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
           const updatedRecents = [newRecentMap, ...recentMaps.slice(0, 9)]; // Keep only 10 recent
           saveRecentMaps(updatedRecents);
           
-          onCreateNewMap(mapConfig);
+          onCreateNewMap(mapConfig, projectPath);
         }
       } else {
         // Fallback for web - just proceed without actual file creation
@@ -188,7 +188,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
           <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
           <div className="text-center mb-6">
             <div className="inline-flex items-center justify-center w-16 h-16 bg-orange-100 rounded-full mb-4">
-              <Map className="w-8 h-8 text-orange-600" />
+              <img src="/flare-logo.png" alt="Flare Logo" className="w-10 h-10 object-contain" />
             </div>
             <h2 className="text-2xl font-bold text-gray-900">Create New Map</h2>
             <p className="text-gray-600 mt-2">Configure your new tile map project</p>
@@ -347,10 +347,10 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
             {/* Logo */}
             <div className="mb-8">
               <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl mb-4 shadow-lg">
-                <Map className="w-12 h-12 text-white" />
+                <img src="/flare-logo.png" alt="Flare Logo" className="w-16 h-16 object-contain" />
               </div>
-              <h1 className="text-4xl font-bold text-gray-900 mb-2">Tile Map Editor</h1>
-              <p className="text-gray-600 text-lg">Create stunning isometric tile maps for your games</p>
+              <h1 className="text-4xl font-bold text-gray-900 mb-2">Flarism</h1>
+              <p className="text-gray-600 text-lg">Map creator for Flare</p>
             </div>
 
             {/* Action Buttons */}

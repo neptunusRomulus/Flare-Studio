@@ -1158,13 +1158,29 @@ export class TileMapEditor {
         mapHeight: this.mapHeight,
         layers: this.tileLayers,
         objects: this.objects,
-        tilesetFileName: this.tilesetFileName
+        tilesetFileName: this.tilesetFileName,
+        tilesetImage: this.tilesetImage ? this.canvasToDataURL(this.tilesetImage) : null,
+        tileSizeX: this.tileSizeX,
+        tileSizeY: this.tileSizeY
       };
       
       localStorage.setItem('tilemap_autosave_backup', JSON.stringify(backupData));
     } catch (error) {
       console.warn('Failed to save to localStorage:', error);
     }
+  }
+  
+  // Helper method to convert image to data URL
+  private canvasToDataURL(img: HTMLImageElement): string {
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.drawImage(img, 0, 0);
+      return canvas.toDataURL('image/png');
+    }
+    return '';
   }
 
   public loadFromLocalStorage(): boolean {
@@ -1184,6 +1200,16 @@ export class TileMapEditor {
       this.objects = data.objects;
       this.tilesetFileName = data.tilesetFileName;
 
+      // Restore tileset image if available
+      if (data.tilesetImage) {
+        const img = new Image();
+        img.onload = () => {
+          this.tilesetImage = img;
+          this.draw();
+        };
+        img.src = data.tilesetImage;
+      }
+
       this.draw();
       return true;
     } catch (error) {
@@ -1194,6 +1220,46 @@ export class TileMapEditor {
 
   public clearLocalStorageBackup(): void {
     localStorage.removeItem('tilemap_autosave_backup');
+  }
+
+  // Save complete project data
+  public async saveProjectData(projectPath: string): Promise<boolean> {
+    try {
+      const tilesetImages: { [key: string]: string } = {};
+      
+      // Add tileset image data if available
+      if (this.tilesetImage && this.tilesetFileName) {
+        tilesetImages[this.tilesetFileName] = this.canvasToDataURL(this.tilesetImage);
+      }
+
+      const projectData = {
+        name: this.tilesetFileName?.replace(/\.[^/.]+$/, '') || 'Untitled Map',
+        width: this.mapWidth,
+        height: this.mapHeight,
+        tileSize: 64,
+        layers: this.tileLayers,
+        objects: this.objects,
+        tilesets: [{
+          name: this.tilesetFileName || 'tileset.png',
+          fileName: this.tilesetFileName
+        }],
+        tilesetImages,
+        version: "1.0"
+      };
+
+      // Save using Electron API if available
+      if (window.electronAPI?.saveMapProject) {
+        const success = await window.electronAPI.saveMapProject(projectPath, projectData);
+        return success;
+      } else {
+        // Fallback for web - just save to localStorage
+        this.saveToLocalStorage();
+        return true;
+      }
+    } catch (error) {
+      console.error('Error saving project data:', error);
+      return false;
+    }
   }
 
   private updateSaveStatus(status: 'saving' | 'saved' | 'error' | 'unsaved'): void {
@@ -1216,5 +1282,58 @@ export class TileMapEditor {
       clearTimeout(this.autoSaveTimeout);
     }
     this.performAutoSave();
+  }
+
+  // Load project data from saved configuration
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  public loadProjectData(projectData: any): void {
+    try {
+      if (projectData.layers && projectData.layers.length > 0) {
+        this.tileLayers = projectData.layers;
+      }
+      
+      if (projectData.objects) {
+        this.objects = projectData.objects;
+      }
+      
+      // Set dimensions if provided
+      if (projectData.width && projectData.height) {
+        this.mapWidth = projectData.width;
+        this.mapHeight = projectData.height;
+      }
+      
+      this.draw();
+    } catch (error) {
+      console.error('Error loading project data:', error);
+    }
+  }
+
+  // Load tileset from data URL
+  public async loadTilesetFromDataURL(dataURL: string, fileName: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        this.tilesetImage = img;
+        this.tilesetFileName = fileName;
+        this.draw();
+        resolve();
+      };
+      img.onerror = () => reject(new Error('Failed to load tileset from data URL'));
+      img.src = dataURL;
+    });
+  }
+
+  // Public method to redraw canvas
+  public redraw(): void {
+    this.draw();
+  }
+
+  // Getter methods for map dimensions
+  public getMapWidth(): number {
+    return this.mapWidth;
+  }
+
+  public getMapHeight(): number {
+    return this.mapHeight;
   }
 }

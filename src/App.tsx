@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, Download, Undo2, Redo2, Plus, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Sliders, MapPin } from 'lucide-react';
+import { Upload, Download, Undo2, Redo2, Plus, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Sliders, MapPin, Save } from 'lucide-react';
 import { TileMapEditor } from './editor/TileMapEditor';
 import { TileLayer } from './types';
 import { useToast } from '@/hooks/use-toast';
@@ -56,6 +56,9 @@ function App() {
   const [saveStatus, setSaveStatus] = useState<'saving' | 'saved' | 'error' | 'unsaved'>('saved');
   const [autoSaveEnabled, setAutoSaveEnabledState] = useState(true);
   const [lastSaveTime, setLastSaveTime] = useState<number>(0);
+  const [isManuallySaving, setIsManuallySaving] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [currentProjectPath, setCurrentProjectPath] = useState<string | null>(null);
   
   // Custom tooltip states
   const [tooltip, setTooltip] = useState<{
@@ -103,6 +106,7 @@ function App() {
 
     editorInstance.setSaveStatusCallback((status) => {
       setSaveStatus(status);
+      setHasUnsavedChanges(status === 'unsaved' || status === 'error');
     });
 
     editorInstance.setAutoSaveEnabled(autoSaveEnabled);
@@ -111,6 +115,16 @@ function App() {
   useEffect(() => {
     if (canvasRef.current && !showWelcome && !editor) {
       const tileEditor = new TileMapEditor(canvasRef.current);
+      
+      // Try to load from localStorage backup first
+      const hasBackup = tileEditor.loadFromLocalStorage();
+      if (hasBackup) {
+        console.log('Loaded from localStorage backup');
+        // Update UI to reflect loaded data
+        setMapWidth(tileEditor.getMapWidth());
+        setMapHeight(tileEditor.getMapHeight());
+      }
+      
       setupAutoSave(tileEditor);
       setEditor(tileEditor);
     }
@@ -537,6 +551,48 @@ function App() {
     }
   };
 
+  const handleManualSave = async () => {
+    if (!editor) return;
+
+    setIsManuallySaving(true);
+    try {
+      let success = false;
+      
+      if (currentProjectPath) {
+        // Save to existing project
+        success = await editor.saveProjectData(currentProjectPath);
+      } else {
+        // No project path - just save to localStorage
+        editor.forceSave();
+        success = true;
+      }
+      
+      // Add a small delay to show the loading animation
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      if (success) {
+        toast({
+          title: "Saved",
+          description: currentProjectPath 
+            ? "Your map project has been saved successfully."
+            : "Your map has been saved to browser storage.",
+          variant: "default",
+        });
+      } else {
+        throw new Error("Save operation failed");
+      }
+    } catch (error) {
+      console.error('Save error:', error);
+      toast({
+        title: "Save Error",
+        description: "Failed to save your map. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsManuallySaving(false);
+    }
+  };
+
   const handleToggleMinimap = () => {
     if (editor?.toggleMinimap) {
       editor.toggleMinimap();
@@ -544,9 +600,10 @@ function App() {
     setShowMinimap(!showMinimap);
   };
 
-  const handleCreateNewMap = (config: MapConfig) => {
+  const handleCreateNewMap = (config: MapConfig, projectPath?: string) => {
     setMapWidth(config.width);
     setMapHeight(config.height);
+    setCurrentProjectPath(projectPath || null); // Track project path
     setShowWelcome(false);
     
     // Initialize editor with new configuration
@@ -566,12 +623,17 @@ function App() {
         if (mapConfig) {
           setMapWidth(mapConfig.width);
           setMapHeight(mapConfig.height);
+          setCurrentProjectPath(projectPath); // Track project path
           setShowWelcome(false);
           
           // Initialize editor with loaded configuration
           if (canvasRef.current) {
             const newEditor = new TileMapEditor(canvasRef.current);
             newEditor.setMapSize(mapConfig.width, mapConfig.height);
+            
+            // Try to load project data including tileset images
+            await loadProjectData(newEditor, mapConfig);
+            
             setupAutoSave(newEditor);
             setEditor(newEditor);
             updateLayersList();
@@ -599,6 +661,27 @@ function App() {
         description: "Failed to open map project. Please try again.",
         variant: "destructive",
       });
+    }
+  };
+
+  // Helper function to load project data into editor
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const loadProjectData = async (newEditor: TileMapEditor, mapConfig: any) => {
+    try {
+      // Load basic project data (layers, objects, dimensions)
+      newEditor.loadProjectData(mapConfig);
+      
+      // If there are tileset images, load them
+      if (mapConfig.tilesets && mapConfig.tilesets.length > 0) {
+        const tileset = mapConfig.tilesets[0];
+        if (tileset.fileName && mapConfig.tilesetImages && mapConfig.tilesetImages[tileset.fileName]) {
+          await newEditor.loadTilesetFromDataURL(mapConfig.tilesetImages[tileset.fileName], tileset.fileName);
+        }
+      }
+      
+      newEditor.redraw();
+    } catch (error) {
+      console.error('Error loading project data:', error);
     }
   };
 
@@ -1391,6 +1474,25 @@ function App() {
           >
             <Download className="w-4 h-4" />
             <span>Export Map</span>
+          </Button>
+          <Button 
+            onClick={handleManualSave}
+            title={hasUnsavedChanges ? "Save changes" : "All changes saved"}
+            className={`w-10 h-10 p-0 shadow-lg transition-colors ${
+              isManuallySaving 
+                ? 'bg-blue-500 hover:bg-blue-600' 
+                : hasUnsavedChanges 
+                  ? 'bg-orange-500 hover:bg-orange-600 text-white' 
+                  : 'bg-green-500 hover:bg-green-600 text-white'
+            }`}
+            disabled={isManuallySaving}
+            size="sm"
+          >
+            {isManuallySaving ? (
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+            ) : (
+              <Save className="w-4 h-4" />
+            )}
           </Button>
           <Button 
             onClick={() => setShowSettings(true)} 

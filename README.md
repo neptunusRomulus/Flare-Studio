@@ -1,73 +1,172 @@
-# Advanced Flare Map Editor (TMX Compatible)
+# Advanced Flare Map Editor (TypeScript + React + Electron)
 
-Browser-only, dependency-free HTML+JS **map editor** for generating **Flare / Tiled TMX** maps. Supports 32x32 and 64x64 tile sizes, multiple layers, collision, objects, and properties.
+**Professional isometric tile map editor** built with modern web technologies for generating **Flare / Tiled TMX** compatible maps. Features a modern UI with TypeScript safety, React components, Tailwind CSS styling, and Electron desktop app integration.
 
-## Features
-Core Tile Editing:
-- PNG tileset loading & slicing (32 or 64 tile size selectable)
+## 🚀 Tech Stack
+
+- **TypeScript** - Type safety and enhanced developer experience
+- **React** - Component-based UI architecture  
+- **Tailwind CSS** - Modern utility-first styling
+- **shadcn/ui** - Beautiful, accessible UI components
+- **Vite** - Fast development server and build tool
+- **Electron** - Cross-platform desktop application
+- **ESLint** - Code quality and consistency
+
+## ✨ Features
+
+### Core Tile Editing:
+- PNG tileset loading & slicing (fixed 64x32 isometric tiles)
 - Multiple tile layers (create, reorder, rename, toggle visibility)
-- Default layers: Ground, Wall, Decor
+- Professional layer management system
 - Left click paint, right click erase (tile tool)
+- Real-time preview with isometric rendering
 
-Collision Layer:
-- Toggle to collision tool and paint passability (red overlay)
-- Exported as `<layer name="Collision">`
+### Collision System:
+- Collision tool with visual overlay
+- Exported as `<layer name="Collision">` in TMX
 
-Objects:
-- Object tool: click to create rectangle (defaults to 1 tile size)
-- Drag to move; drag corner (bottom-right) to resize
-- Types: door, npc, spawn, event (customizable)
-- Properties editor (add/remove arbitrary key/value)
-- Exported in `<objectgroup name="Objects">` with `<properties>` blocks
+### Object Management:
+- Object placement tool for doors, NPCs, events, obstacles
+- Drag to move, resize with handles
+- Properties editor with key/value pairs
+- Type-safe object system
+- Exported in `<objectgroup name="Objects">`
 
-Mini Map:
-- Scaled preview rendering in real-time (approximate color sampling)
+### Modern UI:
+- Professional dark theme interface
+- Responsive layout with sidebar panels
+- Beautiful icons from Lucide React
+- Modern buttons, inputs, and dropdowns
+- Mini-map preview with real-time updates
 
-Export:
-- TMX (`map.tmx`) with all tile layers + collision + objects
-- TSX (`tileset.tsx`) embedding tileset PNG as Base64 (can change to file reference)
+### Export System:
+- TMX (`map.tmx`) with all layers, collision, and objects
+- TSX (`tileset.tsx`) with Base64 embedded tilesets
+- Flare-compatible TXT format
+- Undo/Redo system with state management
 
-## File Structure
+## 📁 Project Structure
 ```
-index.html  # UI layout & controls
-style.css   # Basic styling
-script.js   # Core logic: loading, painting, exporting
+src/
+├── components/ui/          # shadcn/ui component library
+│   ├── button.tsx         # Button component
+│   ├── input.tsx          # Input component  
+│   └── select.tsx         # Select component
+├── editor/                # Core editor logic
+│   └── TileMapEditor.ts   # Main editor class
+├── lib/
+│   └── utils.ts           # Utility functions
+├── App.tsx                # Main React application
+├── main.tsx               # React entry point
+├── index.css              # Tailwind CSS + custom styles
+└── types.ts               # TypeScript type definitions
+
+electron/
+└── main.cjs               # Electron main process
+
+index.html                 # HTML entry point
+vite.config.js            # Vite configuration
+tailwind.config.js        # Tailwind CSS configuration
+tsconfig.json             # TypeScript configuration
 ```
 
-## How To Use
-1. Open `index.html` in a modern browser.
-2. Select tile size (32/64) and load a PNG tileset.
-3. Use Tiles tool: pick a tile, paint with left click, erase with right click.
-4. Use Layers panel to add/reorder/hide tile layers.
-5. Switch to Collision tool to paint blocking cells.
-6. Switch to Objects tool to place objects; drag to move; corner to resize.
-7. Select an object to edit its name & properties; add new properties with the button.
-8. Resize map dimensions as needed.
-9. Export TMX + TSX; place both into your Flare project (or adjust tileset source path).
+## 🛠️ Development Setup
 
-## TMX Output (Example Snippet)
+### Prerequisites
+- Node.js (v16 or higher)
+- npm or yarn
+
+### Installation & Running
+```bash
+# Install dependencies
+npm install
+
+# Start development server with Electron
+npm run go
+
+# Build for production  
+npm run build
+
+# Run linting
+npm run lint
+```
+
+### Windows Quick Start
+```bash
+# Use provided batch file
+start.bat
+```
+
+## 🎮 How To Use
+
+1. **Launch Application**: Run `npm run go` or use `start.bat`
+2. **Load Tileset**: Click "Tileset PNG" to load your tileset image
+3. **Create Layers**: Use the layer panel to manage tile layers
+4. **Paint Tiles**: Select tiles from palette, paint with left click
+5. **Add Collision**: Switch to collision tool to mark blocking areas
+6. **Place Objects**: Use object tool to add interactive elements
+7. **Configure Properties**: Select objects to edit their properties
+8. **Adjust Map Size**: Use width/height inputs to resize canvas
+9. **Export Files**: Generate TMX, TSX, or Flare TXT formats
+
+## 📤 Export Formats
+
+### TMX Format (Tiled Compatible)
 ```xml
-<map orientation="orthogonal" tilewidth="32" tileheight="32" width="20" height="15">
-  <tileset firstgid="1" name="main" tilewidth="32" tileheight="32" tilecount="X" columns="Y" source="tileset.tsx"/>
-  <layer name="Ground">
-    <data encoding="csv">...</data>
+<map orientation="orthogonal" tilewidth="64" tileheight="32" width="20" height="15">
+  <tileset firstgid="1" name="main" tilewidth="64" tileheight="32" source="tileset.tsx"/>
+  <layer name="Base">
+    <data encoding="csv">1,2,3,...</data>
   </layer>
+  <layer name="Collision">
+    <data encoding="csv">0,1,0,...</data>  
+  </layer>
+  <objectgroup name="Objects">
+    <object id="1" type="door" x="128" y="64" width="64" height="32">
+      <properties>
+        <property name="target" value="next_map"/>
+      </properties>
+    </object>
+  </objectgroup>
 </map>
 ```
 
-## Extending
-See comments in `script.js`. Potential enhancements:
-- Undo/redo command stack
-- Import existing TMX (parse XML; populate layers/objects)
-- Advanced object shapes (polygons, ellipses)
-- Autotiling rules
-- Brush patterns / rectangle fill / flood fill
-- Camera & pan for huge maps
-- Multiple tilesets (manage firstgid offsets)
-- Export different property types (int, bool, etc.)
+## 🔧 Development Features
 
-## Notes
-- GIDs start at 1 for the first tileset.
+- **Hot Reload**: Instant updates during development
+- **Type Safety**: Full TypeScript coverage with strict mode
+- **Code Quality**: ESLint rules for consistent code style
+- **Modern Build**: Optimized production builds with Vite
+- **Cross Platform**: Runs on Windows, macOS, and Linux via Electron
+
+## 🚀 Future Enhancements
+
+- Advanced autotiling systems
+- Multiple tileset support
+- TMX import functionality  
+- Advanced object shapes (polygons, circles)
+- Brush patterns and flood fill
+- Camera panning for large maps
+- Plugin system for extensibility
+- Collaborative editing features
+
+## 🤝 Contributing
+
+This project uses modern development practices:
+- TypeScript for type safety
+- ESLint for code quality
+- React for UI components
+- Tailwind for styling
+
+All contributions should maintain these standards and include proper type definitions.
+
+## 📜 License
+
+Open source project - check license file for details.
+
+---
+
+**Built with modern web technologies for professional game development workflows.**
 - Empty tile = 0 in CSV data.
 - Collision layer uses 0/1 values (0 passable, 1 blocked).
 - Mini map is approximate (samples each tile's center pixel).

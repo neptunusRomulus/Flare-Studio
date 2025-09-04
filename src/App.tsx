@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, Download, Undo2, Redo2, Plus, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon } from 'lucide-react';
+import { Upload, Download, Undo2, Redo2, Plus, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Layers, Sliders, MapPin } from 'lucide-react';
 import { TileMapEditor } from './editor/TileMapEditor';
 import { TileLayer } from './types';
 import { useToast } from '@/hooks/use-toast';
@@ -50,6 +50,13 @@ function App() {
     return savedTheme ? JSON.parse(savedTheme) : false;
   });
   
+  // Transparency states
+  const [showTransparencySlider, setShowTransparencySlider] = useState<number | null>(null);
+  const [layerTransparencies, setLayerTransparencies] = useState<{[key: number]: number}>({});
+  
+  // Hover coordinates state
+  const [hoverCoords, setHoverCoords] = useState<{ x: number; y: number } | null>(null);
+  
   const { toast } = useToast();
 
   // Handle dark mode toggle
@@ -70,6 +77,31 @@ function App() {
     }
   }, [showWelcome, editor]);
 
+  // Track hover coordinates
+  useEffect(() => {
+    if (!editor) return;
+
+    const updateHoverCoords = () => {
+      const coords = editor.getHoverCoordinates();
+      setHoverCoords(coords);
+    };
+
+    // Update hover coordinates on animation frame for smooth updates
+    let animationFrameId: number;
+    const pollHoverCoords = () => {
+      updateHoverCoords();
+      animationFrameId = requestAnimationFrame(pollHoverCoords);
+    };
+
+    pollHoverCoords();
+
+    return () => {
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
+    };
+  }, [editor]);
+
   // Layer management functions
   const updateLayersList = useCallback(() => {
     if (editor) {
@@ -77,6 +109,17 @@ function App() {
       setLayers([...currentLayers]); // Create a new array to ensure React detects changes
       const activeId = editor.getActiveLayerId();
       setActiveLayerId(activeId);
+      
+      // Initialize transparency values for new layers
+      setLayerTransparencies(prev => {
+        const newTransparencies = { ...prev };
+        currentLayers.forEach(layer => {
+          if (!(layer.id in newTransparencies)) {
+            newTransparencies[layer.id] = Math.round((layer.transparency || 1.0) * 100);
+          }
+        });
+        return newTransparencies;
+      });
       
       // Check if active layer has a tileset
       const activeLayer = currentLayers.find(layer => layer.id === activeId);
@@ -227,6 +270,21 @@ function App() {
         setHasTileset(editor.hasLayerTileset(activeLayer.type));
       }
     }
+  };
+
+  const handleTransparencyChange = (layerId: number, transparency: number) => {
+    setLayerTransparencies(prev => ({
+      ...prev,
+      [layerId]: transparency
+    }));
+    
+    if (editor) {
+      editor.setLayerTransparency(layerId, transparency / 100);
+    }
+  };
+
+  const handleToggleTransparencySlider = (layerId: number) => {
+    setShowTransparencySlider(prev => prev === layerId ? null : layerId);
   };
 
   const handleMapResize = () => {
@@ -523,6 +581,20 @@ function App() {
                           >
                             {layer.visible ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3 text-gray-400" />}
                           </Button>
+                          
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleTransparencySlider(layer.id);
+                            }}
+                            className="w-6 h-6 p-0 hover:bg-gray-200"
+                            title="Adjust layer transparency"
+                          >
+                            <Sliders className="w-3 h-3" />
+                          </Button>
+                          
                           <span className="text-sm font-medium">{layer.name}</span>
                           <span className="text-xs text-gray-500">({layer.type})</span>
                         </div>
@@ -537,6 +609,33 @@ function App() {
                             <X className="w-3 h-3" />
                           </button>
                         </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Transparency Slider */}
+                  {showTransparencySlider === layer.id && (
+                    <div className="mt-2 p-3 bg-gray-50 rounded border">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-xs font-medium">Transparency:</span>
+                        <span className="text-xs text-gray-600">
+                          {Math.round((layerTransparencies[layer.id] || 100))}%
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={layerTransparencies[layer.id] || 100}
+                        onChange={(e) => handleTransparencyChange(layer.id, Number(e.target.value))}
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                        style={{
+                          background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${layerTransparencies[layer.id] || 100}%, #e5e7eb ${layerTransparencies[layer.id] || 100}%, #e5e7eb 100%)`
+                        }}
+                      />
+                      <div className="flex justify-between text-xs text-gray-500 mt-1">
+                        <span>Transparent</span>
+                        <span>Opaque</span>
                       </div>
                     </div>
                   )}
@@ -805,6 +904,14 @@ function App() {
               id="mapCanvas"
               className="tile-canvas w-full h-full max-w-full max-h-full"
             />
+            
+            {/* Hover Coordinates Display */}
+            {hoverCoords && (
+              <div className="absolute bottom-4 left-4 z-10 p-2 bg-gray-800/90 backdrop-blur-sm rounded-md border border-gray-600 text-white text-xs font-mono flex items-center gap-2">
+                <MapPin className="w-4 h-4 text-gray-300" />
+                <span>{hoverCoords.x}, {hoverCoords.y}</span>
+              </div>
+            )}
           </div>
           
           {/* Toolbar */}

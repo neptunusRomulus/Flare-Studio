@@ -7,20 +7,6 @@ import {
 } from '../types';
 
 export class TileMapEditor {
-  public getTileCount(): number {
-    return this.tileCount;
-  }
-  // ...existing code...
-    constructor(mapCanvas: HTMLCanvasElement) {
-      this.mapCanvas = mapCanvas;
-      this.initializeCanvas();
-      this.initializeState();
-      this.bindEvents();
-      this.createDefaultLayers();
-      // Save initial state for undo/redo
-      this.saveState();
-      this.draw();
-    }
 
   public getTileCount(): number {
     return this.tileCount;

@@ -18,6 +18,7 @@ interface MapConfig {
 }
 
 function App() {
+  const [tileCount, setTileCount] = useState(0);
   const [showWelcome, setShowWelcome] = useState(true);
   const [editor, setEditor] = useState<TileMapEditor | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -58,7 +59,6 @@ function App() {
   const [lastSaveTime, setLastSaveTime] = useState<number>(0);
   const [isManuallySaving, setIsManuallySaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [currentProjectPath, setCurrentProjectPath] = useState<string | null>(null);
   
   // Custom tooltip states
   const [tooltip, setTooltip] = useState<{
@@ -115,20 +115,25 @@ function App() {
   useEffect(() => {
     if (canvasRef.current && !showWelcome && !editor) {
       const tileEditor = new TileMapEditor(canvasRef.current);
-      
       // Try to load from localStorage backup first
       const hasBackup = tileEditor.loadFromLocalStorage();
       if (hasBackup) {
         console.log('Loaded from localStorage backup');
-        // Update UI to reflect loaded data
         setMapWidth(tileEditor.getMapWidth());
         setMapHeight(tileEditor.getMapHeight());
       }
-      
       setupAutoSave(tileEditor);
       setEditor(tileEditor);
+      setTileCount(tileEditor.getTileCount());
     }
   }, [showWelcome, editor, setupAutoSave]);
+
+  // Update tileCount when tileset changes
+  useEffect(() => {
+    if (editor) {
+      setTileCount(editor.getTileCount());
+    }
+  }, [editor, hasTileset, layers]);
 
   // Track hover coordinates
   useEffect(() => {
@@ -582,10 +587,9 @@ function App() {
     setShowMinimap(!showMinimap);
   };
 
-  const handleCreateNewMap = (config: MapConfig, projectPath?: string) => {
+  const handleCreateNewMap = (config: MapConfig) => {
     setMapWidth(config.width);
     setMapHeight(config.height);
-    setCurrentProjectPath(projectPath || null); // Track project path
     setShowWelcome(false);
     
     // Initialize editor with new configuration
@@ -605,7 +609,6 @@ function App() {
         if (mapConfig) {
           setMapWidth(mapConfig.width);
           setMapHeight(mapConfig.height);
-          setCurrentProjectPath(projectPath); // Track project path
           setShowWelcome(false);
           
           // Initialize editor with loaded configuration
@@ -804,7 +807,7 @@ function App() {
             <div className="relative">
               <div id="tilesContainer" className="tile-palette"></div>
               
-              {!hasTileset && showEmptyTilesetTooltip && (
+              {tileCount === 0 && showEmptyTilesetTooltip && (
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="bg-gray-100 rounded-lg shadow-lg border p-6 mx-4 my-4 relative max-w-sm">
                     {/* Close button */}

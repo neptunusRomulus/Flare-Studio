@@ -39,6 +39,11 @@ function App() {
   const [showSelectionOptions, setShowSelectionOptions] = useState(false);
   const [showShapeOptions, setShowShapeOptions] = useState(false);
   
+  // Sub-tool states
+  const [selectedBrushTool, setSelectedBrushTool] = useState('brush');
+  const [selectedSelectionTool, setSelectedSelectionTool] = useState('rectangular');
+  const [selectedShapeTool, setSelectedShapeTool] = useState('rectangle');
+  
   // Settings states
   const [mapName, setMapName] = useState('Untitled Map');
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -56,6 +61,11 @@ function App() {
     fadeOut: boolean;
   } | null>(null);
   const tooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Tool dropdown timeout refs
+  const brushOptionsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const selectionOptionsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const shapeOptionsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   // Transparency states
   const [showTransparencySlider, setShowTransparencySlider] = useState<number | null>(null);
@@ -204,8 +214,127 @@ function App() {
       if (tooltipTimeoutRef.current) {
         clearTimeout(tooltipTimeoutRef.current);
       }
+      // Cleanup dropdown timeouts
+      if (brushOptionsTimeoutRef.current) {
+        clearTimeout(brushOptionsTimeoutRef.current);
+      }
+      if (selectionOptionsTimeoutRef.current) {
+        clearTimeout(selectionOptionsTimeoutRef.current);
+      }
+      if (shapeOptionsTimeoutRef.current) {
+        clearTimeout(shapeOptionsTimeoutRef.current);
+      }
     };
   }, []);
+
+  // Tool dropdown handlers
+  const handleShowBrushOptions = useCallback(() => {
+    // Clear all dropdown timeouts
+    if (brushOptionsTimeoutRef.current) {
+      clearTimeout(brushOptionsTimeoutRef.current);
+    }
+    if (selectionOptionsTimeoutRef.current) {
+      clearTimeout(selectionOptionsTimeoutRef.current);
+    }
+    if (shapeOptionsTimeoutRef.current) {
+      clearTimeout(shapeOptionsTimeoutRef.current);
+    }
+    
+    // Close other dropdowns and show brush options
+    setShowSelectionOptions(false);
+    setShowShapeOptions(false);
+    setShowBrushOptions(true);
+  }, []);
+
+  const handleHideBrushOptions = useCallback(() => {
+    brushOptionsTimeoutRef.current = setTimeout(() => {
+      setShowBrushOptions(false);
+    }, 1000);
+  }, []);
+
+  const handleShowSelectionOptions = useCallback(() => {
+    // Clear all dropdown timeouts
+    if (brushOptionsTimeoutRef.current) {
+      clearTimeout(brushOptionsTimeoutRef.current);
+    }
+    if (selectionOptionsTimeoutRef.current) {
+      clearTimeout(selectionOptionsTimeoutRef.current);
+    }
+    if (shapeOptionsTimeoutRef.current) {
+      clearTimeout(shapeOptionsTimeoutRef.current);
+    }
+    
+    // Close other dropdowns and show selection options
+    setShowBrushOptions(false);
+    setShowShapeOptions(false);
+    setShowSelectionOptions(true);
+  }, []);
+
+  const handleHideSelectionOptions = useCallback(() => {
+    selectionOptionsTimeoutRef.current = setTimeout(() => {
+      setShowSelectionOptions(false);
+    }, 1000);
+  }, []);
+
+  const handleShowShapeOptions = useCallback(() => {
+    // Clear all dropdown timeouts
+    if (brushOptionsTimeoutRef.current) {
+      clearTimeout(brushOptionsTimeoutRef.current);
+    }
+    if (selectionOptionsTimeoutRef.current) {
+      clearTimeout(selectionOptionsTimeoutRef.current);
+    }
+    if (shapeOptionsTimeoutRef.current) {
+      clearTimeout(shapeOptionsTimeoutRef.current);
+    }
+    
+    // Close other dropdowns and show shape options
+    setShowBrushOptions(false);
+    setShowSelectionOptions(false);
+    setShowShapeOptions(true);
+  }, []);
+
+  const handleHideShapeOptions = useCallback(() => {
+    shapeOptionsTimeoutRef.current = setTimeout(() => {
+      setShowShapeOptions(false);
+    }, 1000);
+  }, []);
+
+  // Icon helper functions
+  const getBrushIcon = () => {
+    switch (selectedBrushTool) {
+      case 'bucket':
+        return <PaintBucket className="w-4 h-4" />;
+      case 'eraser':
+        return <Eraser className="w-4 h-4" />;
+      default:
+        return <Paintbrush2 className="w-4 h-4" />;
+    }
+  };
+
+  const getSelectionIcon = () => {
+    switch (selectedSelectionTool) {
+      case 'magic-wand':
+        return <Wand2 className="w-4 h-4" />;
+      case 'same-tile':
+        return <Target className="w-4 h-4" />;
+      case 'circular':
+        return <Circle className="w-4 h-4" />;
+      default:
+        return <MousePointer className="w-4 h-4" />;
+    }
+  };
+
+  const getShapeIcon = () => {
+    switch (selectedShapeTool) {
+      case 'circle':
+        return <Circle className="w-4 h-4" />;
+      case 'line':
+        return <Pen className="w-4 h-4" />;
+      default:
+        return <Shapes className="w-4 h-4" />;
+    }
+  };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>, type: 'tileset' | 'layerTileset') => {
     const file = event.target.files?.[0];
@@ -483,26 +612,26 @@ function App() {
       ) : (
         <div className="h-screen bg-background text-foreground flex flex-col overflow-hidden">
       {/* Custom Title Bar */}
-      <div className="bg-gray-800 text-white flex justify-between items-center px-4 py-1 select-none drag-region">
+      <div className="bg-gray-100 text-orange-600 flex justify-between items-center px-4 py-1 select-none drag-region border-b border-gray-200">
         <div className="text-sm font-medium">Flare Map Editor</div>
         <div className="flex no-drag">
           <button 
             onClick={handleMinimize}
-            className="hover:bg-gray-600 p-1 rounded transition-colors"
+            className="text-gray-500 hover:text-gray-700 hover:bg-gray-200 p-1 rounded transition-colors"
             title="Minimize"
           >
             <Minus className="w-4 h-4" />
           </button>
           <button 
             onClick={handleMaximize}
-            className="hover:bg-gray-600 p-1 rounded transition-colors"
+            className="text-gray-500 hover:text-gray-700 hover:bg-gray-200 p-1 rounded transition-colors"
             title="Maximize"
           >
             <Square className="w-4 h-4" />
           </button>
           <button 
             onClick={handleClose}
-            className="hover:bg-red-600 p-1 rounded transition-colors"
+            className="text-gray-500 hover:text-red-600 hover:bg-gray-200 p-1 rounded transition-colors"
             title="Close"
           >
             <X className="w-4 h-4" />
@@ -579,7 +708,7 @@ function App() {
                 <div
                   key={layer.id}
                   className={`p-2 border rounded transition-colors text-sm ${
-                    activeLayerId === layer.id ? 'border-blue-500 bg-blue-50' : 'hover:bg-gray-50'
+                    activeLayerId === layer.id ? 'border-orange-500 bg-orange-50' : 'hover:bg-gray-50'
                   }`}
                 >
                   <div 
@@ -672,7 +801,7 @@ function App() {
                         onChange={(e) => handleTransparencyChange(layer.id, Number(e.target.value))}
                         className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
                         style={{
-                          background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${layerTransparencies[layer.id] || 100}%, #e5e7eb ${layerTransparencies[layer.id] || 100}%, #e5e7eb 100%)`
+                          background: `linear-gradient(to right, #ea580c 0%, #ea580c ${layerTransparencies[layer.id] || 100}%, #e5e7eb ${layerTransparencies[layer.id] || 100}%, #e5e7eb 100%)`
                         }}
                       />
                       <div className="flex justify-between text-xs text-gray-500 mt-1">
@@ -804,7 +933,7 @@ function App() {
                     <button
                       onClick={() => setIsDarkMode(!isDarkMode)}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        isDarkMode ? 'bg-blue-600' : 'bg-gray-200'
+                        isDarkMode ? 'bg-orange-600' : 'bg-gray-200'
                       }`}
                     >
                       <span
@@ -965,26 +1094,31 @@ function App() {
                 <Button
                   variant={selectedTool === 'brush' ? 'default' : 'ghost'}
                   size="sm"
-                  className="w-8 h-8 p-0"
+                  className="w-8 h-8 p-0 tool-button"
                   onClick={() => setSelectedTool('brush')}
                   onMouseEnter={(e) => {
-                    setShowBrushOptions(true);
+                    handleShowBrushOptions();
                     showTooltipWithDelay('Brush Tool', e.currentTarget);
                   }}
                   onMouseLeave={() => {
-                    setShowBrushOptions(false);
+                    handleHideBrushOptions();
                     hideTooltip();
                   }}
                 >
-                  <Paintbrush2 className="w-4 h-4" />
+                  {getBrushIcon()}
                 </Button>
                 
                 {showBrushOptions && (
-                  <div className="absolute bottom-full left-0 mb-1 bg-white border rounded shadow-lg p-1 flex gap-1 min-w-max z-50">
+                  <div 
+                    className="absolute bottom-full left-0 mb-1 bg-white border rounded shadow-lg p-1 flex gap-1 min-w-max z-50"
+                    onMouseEnter={handleShowBrushOptions}
+                    onMouseLeave={handleHideBrushOptions}
+                  >
                     <Button 
                       variant="ghost" 
                       size="sm" 
-                      className="w-8 h-8 p-0"
+                      className="w-8 h-8 p-0 sub-tool-button"
+                      onClick={() => setSelectedBrushTool('brush')}
                       onMouseEnter={(e) => showTooltipWithDelay('Brush Tool', e.currentTarget)}
                       onMouseLeave={hideTooltip}
                     >
@@ -993,7 +1127,8 @@ function App() {
                     <Button 
                       variant="ghost" 
                       size="sm" 
-                      className="w-8 h-8 p-0"
+                      className="w-8 h-8 p-0 sub-tool-button"
+                      onClick={() => setSelectedBrushTool('bucket')}
                       onMouseEnter={(e) => showTooltipWithDelay('Bucket Fill', e.currentTarget)}
                       onMouseLeave={hideTooltip}
                     >
@@ -1002,7 +1137,8 @@ function App() {
                     <Button 
                       variant="ghost" 
                       size="sm" 
-                      className="w-8 h-8 p-0"
+                      className="w-8 h-8 p-0 sub-tool-button"
+                      onClick={() => setSelectedBrushTool('eraser')}
                       onMouseEnter={(e) => showTooltipWithDelay('Eraser', e.currentTarget)}
                       onMouseLeave={hideTooltip}
                     >
@@ -1017,26 +1153,31 @@ function App() {
                 <Button
                   variant={selectedTool === 'selection' ? 'default' : 'ghost'}
                   size="sm"
-                  className="w-8 h-8 p-0"
+                  className="w-8 h-8 p-0 tool-button"
                   onClick={() => setSelectedTool('selection')}
                   onMouseEnter={(e) => {
-                    setShowSelectionOptions(true);
+                    handleShowSelectionOptions();
                     showTooltipWithDelay('Selection Tool', e.currentTarget);
                   }}
                   onMouseLeave={() => {
-                    setShowSelectionOptions(false);
+                    handleHideSelectionOptions();
                     hideTooltip();
                   }}
                 >
-                  <MousePointer className="w-4 h-4" />
+                  {getSelectionIcon()}
                 </Button>
                 
                 {showSelectionOptions && (
-                  <div className="absolute bottom-full left-0 mb-1 bg-white border rounded shadow-lg p-1 flex gap-1 min-w-max z-50">
+                  <div 
+                    className="absolute bottom-full left-0 mb-1 bg-white border rounded shadow-lg p-1 flex gap-1 min-w-max z-50"
+                    onMouseEnter={handleShowSelectionOptions}
+                    onMouseLeave={handleHideSelectionOptions}
+                  >
                     <Button 
                       variant="ghost" 
                       size="sm" 
-                      className="w-8 h-8 p-0"
+                      className="w-8 h-8 p-0 sub-tool-button"
+                      onClick={() => setSelectedSelectionTool('rectangular')}
                       onMouseEnter={(e) => showTooltipWithDelay('Rectangular Selection', e.currentTarget)}
                       onMouseLeave={hideTooltip}
                     >
@@ -1045,7 +1186,8 @@ function App() {
                     <Button 
                       variant="ghost" 
                       size="sm" 
-                      className="w-8 h-8 p-0"
+                      className="w-8 h-8 p-0 sub-tool-button"
+                      onClick={() => setSelectedSelectionTool('magic-wand')}
                       onMouseEnter={(e) => showTooltipWithDelay('Magic Wand', e.currentTarget)}
                       onMouseLeave={hideTooltip}
                     >
@@ -1054,7 +1196,8 @@ function App() {
                     <Button 
                       variant="ghost" 
                       size="sm" 
-                      className="w-8 h-8 p-0"
+                      className="w-8 h-8 p-0 sub-tool-button"
+                      onClick={() => setSelectedSelectionTool('same-tile')}
                       onMouseEnter={(e) => showTooltipWithDelay('Select Same Tile', e.currentTarget)}
                       onMouseLeave={hideTooltip}
                     >
@@ -1063,7 +1206,8 @@ function App() {
                     <Button 
                       variant="ghost" 
                       size="sm" 
-                      className="w-8 h-8 p-0"
+                      className="w-8 h-8 p-0 sub-tool-button"
+                      onClick={() => setSelectedSelectionTool('circular')}
                       onMouseEnter={(e) => showTooltipWithDelay('Circular Select', e.currentTarget)}
                       onMouseLeave={hideTooltip}
                     >
@@ -1078,24 +1222,46 @@ function App() {
                 <Button
                   variant={selectedTool === 'shape' ? 'default' : 'ghost'}
                   size="sm"
-                  className="w-8 h-8 p-0"
+                  className="w-8 h-8 p-0 tool-button"
                   onClick={() => setSelectedTool('shape')}
-                  onMouseEnter={() => setShowShapeOptions(true)}
-                  onMouseLeave={() => setShowShapeOptions(false)}
+                  onMouseEnter={() => handleShowShapeOptions()}
+                  onMouseLeave={() => handleHideShapeOptions()}
                   title="Shape Tool"
                 >
-                  <Shapes className="w-4 h-4" />
+                  {getShapeIcon()}
                 </Button>
                 
                 {showShapeOptions && (
-                  <div className="absolute bottom-full left-0 mb-1 bg-white border rounded shadow-lg p-1 flex gap-1 min-w-max z-50">
-                    <Button variant="ghost" size="sm" className="w-8 h-8 p-0" title="Rectangle Shape">
+                  <div 
+                    className="absolute bottom-full left-0 mb-1 bg-white border rounded shadow-lg p-1 flex gap-1 min-w-max z-50"
+                    onMouseEnter={handleShowShapeOptions}
+                    onMouseLeave={handleHideShapeOptions}
+                  >
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="w-8 h-8 p-0 sub-tool-button"
+                      onClick={() => setSelectedShapeTool('rectangle')}
+                      title="Rectangle Shape"
+                    >
                       <Square className="w-4 h-4" />
                     </Button>
-                    <Button variant="ghost" size="sm" className="w-8 h-8 p-0" title="Circle Shape">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="w-8 h-8 p-0 sub-tool-button"
+                      onClick={() => setSelectedShapeTool('circle')}
+                      title="Circle Shape"
+                    >
                       <Circle className="w-4 h-4" />
                     </Button>
-                    <Button variant="ghost" size="sm" className="w-8 h-8 p-0" title="Line Shape">
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="w-8 h-8 p-0 sub-tool-button"
+                      onClick={() => setSelectedShapeTool('line')}
+                      title="Line Shape"
+                    >
                       <Pen className="w-4 h-4" />
                     </Button>
                   </div>
@@ -1106,7 +1272,7 @@ function App() {
               <Button
                 variant={selectedTool === 'stamp' ? 'default' : 'ghost'}
                 size="sm"
-                className="w-8 h-8 p-0"
+                className="w-8 h-8 p-0 tool-button"
                 onClick={() => setSelectedTool('stamp')}
                 title="Stamp Tool - Group tiles into a stamp and place them together"
               >
@@ -1117,7 +1283,7 @@ function App() {
               <Button
                 variant={selectedTool === 'eyedropper' ? 'default' : 'ghost'}
                 size="sm"
-                className="w-8 h-8 p-0"
+                className="w-8 h-8 p-0 tool-button"
                 onClick={() => setSelectedTool('eyedropper')}
                 title="Eyedropper Tool - Pick a tile from the map to reuse"
               >

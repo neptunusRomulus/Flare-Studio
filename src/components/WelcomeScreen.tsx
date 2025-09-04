@@ -157,26 +157,26 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col">
         {/* Custom Title Bar */}
-        <div className="bg-gray-800 text-white flex justify-between items-center px-4 py-1 select-none drag-region">
+        <div className="bg-gray-100 text-orange-600 flex justify-between items-center px-4 py-1 select-none drag-region border-b border-gray-200">
           <div className="text-sm font-medium">Tile Map Editor</div>
           <div className="flex no-drag">
             <button 
               onClick={handleMinimize}
-              className="hover:bg-gray-700 px-3 py-1 text-sm"
+              className="text-gray-500 hover:text-gray-700 hover:bg-gray-200 px-3 py-1 text-sm rounded transition-colors"
               title="Minimize"
             >
               <Minus className="w-4 h-4" />
             </button>
             <button 
               onClick={handleMaximize}
-              className="hover:bg-gray-700 px-3 py-1 text-sm"
+              className="text-gray-500 hover:text-gray-700 hover:bg-gray-200 px-3 py-1 text-sm rounded transition-colors"
               title="Maximize"
             >
               <Square className="w-4 h-4" />
             </button>
             <button 
               onClick={handleClose}
-              className="hover:bg-red-600 px-3 py-1 text-sm"
+              className="text-gray-500 hover:text-red-600 hover:bg-gray-200 px-3 py-1 text-sm rounded transition-colors"
               title="Close"
             >
               <X className="w-4 h-4" />
@@ -187,8 +187,8 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
         <div className="flex-1 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
           <div className="text-center mb-6">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-full mb-4">
-              <Map className="w-8 h-8 text-blue-600" />
+            <div className="inline-flex items-center justify-center w-16 h-16 bg-orange-100 rounded-full mb-4">
+              <Map className="w-8 h-8 text-orange-600" />
             </div>
             <h2 className="text-2xl font-bold text-gray-900">Create New Map</h2>
             <p className="text-gray-600 mt-2">Configure your new tile map project</p>
@@ -279,26 +279,26 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col">
       {/* Custom Title Bar */}
-      <div className="bg-gray-800 text-white flex justify-between items-center px-4 py-1 select-none drag-region">
+      <div className="bg-gray-100 text-orange-600 flex justify-between items-center px-4 py-1 select-none drag-region border-b border-gray-200">
         <div className="text-sm font-medium">Tile Map Editor</div>
         <div className="flex no-drag">
           <button 
             onClick={handleMinimize}
-            className="hover:bg-gray-700 px-3 py-1 text-sm"
+            className="text-gray-500 hover:text-gray-700 hover:bg-gray-200 px-3 py-1 text-sm rounded transition-colors"
             title="Minimize"
           >
             <Minus className="w-4 h-4" />
           </button>
           <button 
             onClick={handleMaximize}
-            className="hover:bg-gray-700 px-3 py-1 text-sm"
+            className="text-gray-500 hover:text-gray-700 hover:bg-gray-200 px-3 py-1 text-sm rounded transition-colors"
             title="Maximize"
           >
             <Square className="w-4 h-4" />
           </button>
           <button 
             onClick={handleClose}
-            className="hover:bg-red-600 px-3 py-1 text-sm"
+            className="text-gray-500 hover:text-red-600 hover:bg-gray-200 px-3 py-1 text-sm rounded transition-colors"
             title="Close"
           >
             <X className="w-4 h-4" />
@@ -319,8 +319,8 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
                   onClick={() => handleOpenRecentMap(map)}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-blue-100 rounded flex items-center justify-center">
-                      <Grid3X3 className="w-4 h-4 text-blue-600" />
+                    <div className="w-8 h-8 bg-orange-100 rounded flex items-center justify-center">
+                      <Grid3X3 className="w-4 h-4 text-orange-600" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-gray-900 truncate">{map.name}</p>
@@ -346,7 +346,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
           <div className="text-center max-w-md">
             {/* Logo */}
             <div className="mb-8">
-              <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl mb-4 shadow-lg">
+              <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl mb-4 shadow-lg">
                 <Map className="w-12 h-12 text-white" />
               </div>
               <h1 className="text-4xl font-bold text-gray-900 mb-2">Tile Map Editor</h1>

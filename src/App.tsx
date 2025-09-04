@@ -7,8 +7,18 @@ import { TileMapEditor } from './editor/TileMapEditor';
 import { TileLayer } from './types';
 import { useToast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/toaster';
+import WelcomeScreen from './components/WelcomeScreen';
+
+interface MapConfig {
+  name: string;
+  width: number;
+  height: number;
+  tileSize: number;
+  location: string;
+}
 
 function App() {
+  const [showWelcome, setShowWelcome] = useState(true);
   const [editor, setEditor] = useState<TileMapEditor | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [mapWidth, setMapWidth] = useState(20);
@@ -25,11 +35,11 @@ function App() {
   const { toast } = useToast();
 
   useEffect(() => {
-    if (canvasRef.current) {
+    if (canvasRef.current && !showWelcome && !editor) {
       const tileEditor = new TileMapEditor(canvasRef.current);
       setEditor(tileEditor);
     }
-  }, []);
+  }, [showWelcome, editor]);
 
   // Layer management functions
   const updateLayersList = useCallback(() => {
@@ -223,6 +233,62 @@ function App() {
     setShowMinimap(!showMinimap);
   };
 
+  const handleCreateNewMap = (config: MapConfig) => {
+    setMapWidth(config.width);
+    setMapHeight(config.height);
+    setShowWelcome(false);
+    
+    // Initialize editor with new configuration
+    if (canvasRef.current) {
+      const newEditor = new TileMapEditor(canvasRef.current);
+      newEditor.setMapSize(config.width, config.height);
+      setEditor(newEditor);
+      updateLayersList();
+    }
+  };
+
+  const handleOpenMap = async (projectPath: string) => {
+    try {
+      if (window.electronAPI?.openMapProject) {
+        const mapConfig = await window.electronAPI.openMapProject(projectPath);
+        if (mapConfig) {
+          setMapWidth(mapConfig.width);
+          setMapHeight(mapConfig.height);
+          setShowWelcome(false);
+          
+          // Initialize editor with loaded configuration
+          if (canvasRef.current) {
+            const newEditor = new TileMapEditor(canvasRef.current);
+            newEditor.setMapSize(mapConfig.width, mapConfig.height);
+            setEditor(newEditor);
+            updateLayersList();
+          }
+          
+          toast({
+            title: "Map Loaded",
+            description: `Successfully loaded ${mapConfig.name}`,
+            variant: "default",
+          });
+        }
+      } else {
+        // Fallback for web
+        console.log('Opening map project:', projectPath);
+        toast({
+          title: "Feature Unavailable",
+          description: "Map loading requires the desktop app.",
+          variant: "default",
+        });
+      }
+    } catch (error) {
+      console.error('Error opening map project:', error);
+      toast({
+        title: "Error",
+        description: "Failed to open map project. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleMinimize = () => {
     if (window.electronAPI?.minimize) {
       window.electronAPI.minimize();
@@ -248,7 +314,14 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col">
+    <>
+      {showWelcome ? (
+        <WelcomeScreen 
+          onCreateNewMap={handleCreateNewMap}
+          onOpenMap={handleOpenMap}
+        />
+      ) : (
+        <div className="min-h-screen bg-background text-foreground flex flex-col">
       {/* Custom Title Bar */}
       <div className="bg-gray-800 text-white flex justify-between items-center px-4 py-1 select-none drag-region">
         <div className="text-sm font-medium">Flare Map Editor</div>
@@ -566,7 +639,9 @@ function App() {
         </section>
       </main>
       <Toaster />
-    </div>
+        </div>
+      )}
+    </>
   );
 }
 

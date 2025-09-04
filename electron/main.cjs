@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu } = require('electron');
+const { app, BrowserWindow, Menu, dialog } = require('electron');
 const path = require('path');
 const isDev = !app.isPackaged;
 
@@ -25,7 +25,7 @@ function createWindow() {
 
   // Load the app
   if (isDev) {
-    mainWindow.loadURL('http://localhost:5175');
+    mainWindow.loadURL('http://localhost:5182');
     mainWindow.webContents.openDevTools();
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
@@ -59,6 +59,76 @@ ipcMain.on('window-maximize', () => {
 ipcMain.on('window-close', () => {
   if (mainWindow) {
     mainWindow.close();
+  }
+});
+
+// Handle file system operations
+const fs = require('fs');
+
+ipcMain.handle('select-directory', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openDirectory']
+  });
+  
+  if (!result.canceled && result.filePaths.length > 0) {
+    return result.filePaths[0];
+  }
+  return null;
+});
+
+ipcMain.handle('create-map-project', async (event, config) => {
+  try {
+    const projectPath = path.join(config.location, config.name);
+    
+    // Create project directory
+    if (!fs.existsSync(projectPath)) {
+      fs.mkdirSync(projectPath, { recursive: true });
+    }
+    
+    // Create basic project structure
+    const mapData = {
+      name: config.name,
+      width: config.width,
+      height: config.height,
+      tileSize: config.tileSize,
+      layers: [],
+      tilesets: [],
+      version: "1.0"
+    };
+    
+    // Save map configuration
+    const mapConfigPath = path.join(projectPath, `${config.name}.json`);
+    fs.writeFileSync(mapConfigPath, JSON.stringify(mapData, null, 2));
+    
+    // Create assets folder
+    const assetsPath = path.join(projectPath, 'assets');
+    if (!fs.existsSync(assetsPath)) {
+      fs.mkdirSync(assetsPath);
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Error creating map project:', error);
+    return false;
+  }
+});
+
+ipcMain.handle('open-map-project', async (event, projectPath) => {
+  try {
+    // Look for map configuration file
+    const files = fs.readdirSync(projectPath);
+    const mapFile = files.find(file => file.endsWith('.json'));
+    
+    if (mapFile) {
+      const mapConfigPath = path.join(projectPath, mapFile);
+      const mapData = JSON.parse(fs.readFileSync(mapConfigPath, 'utf8'));
+      return mapData;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error opening map project:', error);
+    return null;
   }
 });
 

@@ -5,5 +5,8 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('electronAPI', {
   minimize: () => ipcRenderer.send('window-minimize'),
   maximize: () => ipcRenderer.send('window-maximize'),
-  close: () => ipcRenderer.send('window-close')
+  close: () => ipcRenderer.send('window-close'),
+  selectDirectory: () => ipcRenderer.invoke('select-directory'),
+  createMapProject: (config) => ipcRenderer.invoke('create-map-project', config),
+  openMapProject: (projectPath) => ipcRenderer.invoke('open-map-project', projectPath)
 });

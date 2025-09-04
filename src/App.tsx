@@ -63,7 +63,7 @@ function App() {
     };
   }, [showAddLayerDropdown]);
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>, type: 'tileset' | 'extraTileset' | 'importTMX' | 'importTSX') => {
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>, type: 'tileset' | 'layerTileset' | 'importTMX' | 'importTSX') => {
     const file = event.target.files?.[0];
     if (file && editor?.handleFileUpload) {
       editor.handleFileUpload(file, type);
@@ -268,32 +268,6 @@ function App() {
         {/* Controls Row 1 */}
         <div className="flex flex-wrap gap-2 mb-4">
           <div className="flex items-center gap-2">
-            <Button variant="outline" className="relative">
-              <Upload className="w-4 h-4 mr-2" />
-              Tileset PNG
-              <input
-                type="file"
-                accept="image/png"
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                onChange={(e) => handleFileUpload(e, 'tileset')}
-              />
-            </Button>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <Button variant="outline" className="relative">
-              <Upload className="w-4 h-4 mr-2" />
-              Extra Tileset
-              <input
-                type="file"
-                accept="image/png"
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                onChange={(e) => handleFileUpload(e, 'extraTileset')}
-              />
-            </Button>
-          </div>
-
-          <div className="flex items-center gap-2">
             <label className="text-sm">Width:</label>
             <Input
               type="number"
@@ -384,7 +358,22 @@ function App() {
         <aside className="w-80 border-r bg-muted/30 p-4 overflow-y-auto">
           {/* Tileset Section */}
           <section className="mb-6">
-            <h2 className="text-lg font-semibold mb-3">Tileset</h2>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-semibold">Tileset</h2>
+              <Button variant="outline" size="sm" className="relative">
+                <Upload className="w-4 h-4 mr-2" />
+                PNG
+                <input
+                  type="file"
+                  accept="image/png"
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  onChange={(e) => handleFileUpload(e, 'layerTileset')}
+                />
+              </Button>
+            </div>
+            <div className="text-sm text-muted-foreground mb-2">
+              <div>Layer Type: <span className="font-medium">{activeLayerId ? layers.find(l => l.id === activeLayerId)?.type || 'None' : 'None'}</span></div>
+            </div>
             <div id="tilesetMeta" className="text-sm text-muted-foreground mb-2"></div>
             <div id="tilesContainer" className="tile-palette"></div>
             <p className="text-xs text-muted-foreground mt-2">Click tile to select brush. Right click canvas = erase.</p>

@@ -18,7 +18,16 @@ export class TileMapEditor {
   private readonly tileSizeY: number = 32;
   private readonly orientation: Orientation = 'isometric';
 
-  // Tileset management
+  // Layer-specific tileset management
+  private layerTilesets: Map<string, {
+    image: HTMLImageElement | null;
+    fileName: string | null;
+    columns: number;
+    rows: number;
+    count: number;
+  }> = new Map();
+  
+  // Legacy tileset management (for backward compatibility)
   private tilesets: TilesetInfo[] = [];
   private tilesetImage: HTMLImageElement | null = null;
   private tilesetFileName: string | null = null;
@@ -481,8 +490,9 @@ export class TileMapEditor {
   }
 
   // Public methods for React to interact with
-  public handleFileUpload(file: File, type: 'tileset' | 'extraTileset' | 'importTMX' | 'importTSX'): void {
-    if (type === 'tileset' || type === 'extraTileset') {
+  public handleFileUpload(file: File, type: 'tileset' | 'layerTileset' | 'importTMX' | 'importTSX'): void {
+    if (type === 'tileset') {
+      // Legacy tileset upload
       const reader = new FileReader();
       reader.onload = (e) => {
         const img = new Image();
@@ -498,6 +508,12 @@ export class TileMapEditor {
         img.src = e.target?.result as string;
       };
       reader.readAsDataURL(file);
+    } else if (type === 'layerTileset') {
+      // Layer-specific tileset upload
+      const activeLayer = this.tileLayers.find(l => l.id === this.activeLayerId);
+      if (activeLayer) {
+        this.setLayerTileset(activeLayer.type, file);
+      }
     }
   }
 
@@ -632,6 +648,13 @@ export class TileMapEditor {
 
   public setActiveLayer(layerId: number): void {
     this.activeLayerId = layerId;
+    
+    // Update tileset for the new active layer
+    const activeLayer = this.tileLayers.find(l => l.id === layerId);
+    if (activeLayer) {
+      this.updateCurrentTileset(activeLayer.type);
+    }
+    
     this.draw();
   }
 
@@ -664,6 +687,67 @@ export class TileMapEditor {
 
   public getActiveLayerId(): number | null {
     return this.activeLayerId;
+  }
+
+  // Layer-specific tileset management
+  public setLayerTileset(layerType: string, file: File): void {
+    const image = new Image();
+    image.onload = () => {
+      const columns = Math.floor(image.width / this.tileSizeX);
+      const rows = Math.floor(image.height / this.tileSizeY);
+      const count = columns * rows;
+
+      this.layerTilesets.set(layerType, {
+        image: image,
+        fileName: file.name,
+        columns: columns,
+        rows: rows,
+        count: count
+      });
+
+      // Update current tileset if this is the active layer
+      const activeLayer = this.tileLayers.find(l => l.id === this.activeLayerId);
+      if (activeLayer && activeLayer.type === layerType) {
+        this.updateCurrentTileset(layerType);
+      }
+    };
+    image.src = URL.createObjectURL(file);
+  }
+
+  public getCurrentLayerType(): string | null {
+    const activeLayer = this.tileLayers.find(l => l.id === this.activeLayerId);
+    return activeLayer ? activeLayer.type : null;
+  }
+
+  public hasLayerTileset(layerType: string): boolean {
+    return this.layerTilesets.has(layerType);
+  }
+
+  public updateCurrentTileset(layerType: string): void {
+    const tileset = this.layerTilesets.get(layerType);
+    if (tileset) {
+      this.tilesetImage = tileset.image;
+      this.tilesetFileName = tileset.fileName;
+      this.tilesetColumns = tileset.columns;
+      this.tilesetRows = tileset.rows;
+      this.tileCount = tileset.count;
+      this.createTilePalette();
+    } else {
+      // Clear current tileset if no tileset for this layer type
+      this.tilesetImage = null;
+      this.tilesetFileName = null;
+      this.tilesetColumns = 0;
+      this.tilesetRows = 0;
+      this.tileCount = 0;
+      this.clearTilePalette();
+    }
+  }
+
+  private clearTilePalette(): void {
+    const container = document.getElementById('tilesContainer');
+    if (container) {
+      container.innerHTML = '<p class="text-sm text-gray-500">No tileset loaded for this layer type</p>';
+    }
   }
 
   public clearLayer(): void {

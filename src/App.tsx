@@ -63,7 +63,7 @@ function App() {
     };
   }, [showAddLayerDropdown]);
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>, type: 'tileset' | 'layerTileset' | 'importTMX' | 'importTSX') => {
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>, type: 'tileset' | 'layerTileset') => {
     const file = event.target.files?.[0];
     if (file && editor?.handleFileUpload) {
       editor.handleFileUpload(file, type);
@@ -196,6 +196,20 @@ function App() {
     }
   };
 
+  const handleUndo = () => {
+    if (editor?.undo) {
+      editor.undo();
+      updateLayersList(); // Update UI after undo
+    }
+  };
+
+  const handleRedo = () => {
+    if (editor?.redo) {
+      editor.redo();
+      updateLayersList(); // Update UI after redo
+    }
+  };
+
   const handleExportMap = () => {
     if (editor?.exportFlareMap) {
       editor.exportFlareMap();
@@ -305,50 +319,6 @@ function App() {
             <Download className="w-4 h-4 mr-2" />
             Export Map
           </Button>
-
-          <Button 
-            variant="outline" 
-            onClick={() => editor?.undo?.()}
-            title="Undo (Ctrl+Z)"
-          >
-            <Undo2 className="w-4 h-4 mr-2" />
-            Undo
-          </Button>
-
-          <Button 
-            variant="outline" 
-            onClick={() => editor?.redo?.()}
-            title="Redo (Ctrl+Y)"
-          >
-            <Redo2 className="w-4 h-4 mr-2" />
-            Redo
-          </Button>
-
-          <div className="flex items-center gap-2">
-            <Button variant="outline" className="relative">
-              <Upload className="w-4 h-4 mr-2" />
-              Import TMX
-              <input
-                type="file"
-                accept="text/xml,.tmx"
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                onChange={(e) => handleFileUpload(e, 'importTMX')}
-              />
-            </Button>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Button variant="outline" className="relative">
-              <Upload className="w-4 h-4 mr-2" />
-              Import TSX
-              <input
-                type="file"
-                accept="text/xml,.tsx"
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                onChange={(e) => handleFileUpload(e, 'importTSX')}
-              />
-            </Button>
-          </div>
         </div>
       </header>
 
@@ -527,8 +497,26 @@ function App() {
 
         {/* Center Area */}
         <section className="flex-1 min-w-0 flex flex-col relative">
-          {/* Zoom Controls */}
-          <div className="absolute top-2 right-2 z-10 flex flex-col gap-1">
+          {/* Zoom Controls & Undo/Redo */}
+          <div className="absolute top-2 right-2 z-10 flex gap-1">
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="w-8 h-8 p-0"
+              onClick={handleUndo}
+              title="Undo (Ctrl+Z)"
+            >
+              <Undo2 className="w-4 h-4" />
+            </Button>
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="w-8 h-8 p-0"
+              onClick={handleRedo}
+              title="Redo (Ctrl+Y)"
+            >
+              <Redo2 className="w-4 h-4" />
+            </Button>
             <Button 
               size="sm" 
               variant="outline" 

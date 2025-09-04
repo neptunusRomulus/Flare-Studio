@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, Download, Undo2, Redo2, Plus, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle } from 'lucide-react';
+import { Upload, Download, Undo2, Redo2, Plus, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon } from 'lucide-react';
 import { TileMapEditor } from './editor/TileMapEditor';
 import { TileLayer } from './types';
 import { useToast } from '@/hooks/use-toast';
@@ -24,7 +24,6 @@ function App() {
   const [mapWidth, setMapWidth] = useState(20);
   const [mapHeight, setMapHeight] = useState(15);
   const [activeGid] = useState('(none)'); // Removed unused setter
-  const [hoverInfo] = useState('Hover: -'); // Removed unused setter
   const [showMinimap, setShowMinimap] = useState(true);
   const [layers, setLayers] = useState<TileLayer[]>([]);
   const [activeLayerId, setActiveLayerId] = useState<number | null>(null);
@@ -36,7 +35,33 @@ function App() {
   const [showTooltip, setShowTooltip] = useState(true);
   const [hasTileset, setHasTileset] = useState(false);
   const [showEmptyTilesetTooltip, setShowEmptyTilesetTooltip] = useState(true);
+  
+  // Toolbar states
+  const [selectedTool, setSelectedTool] = useState('brush');
+  const [showBrushOptions, setShowBrushOptions] = useState(false);
+  const [showSelectionOptions, setShowSelectionOptions] = useState(false);
+  const [showShapeOptions, setShowShapeOptions] = useState(false);
+  
+  // Settings states
+  const [mapName, setMapName] = useState('Untitled Map');
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    // Initialize from localStorage or default to false
+    const savedTheme = localStorage.getItem('isDarkMode');
+    return savedTheme ? JSON.parse(savedTheme) : false;
+  });
+  
   const { toast } = useToast();
+
+  // Handle dark mode toggle
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    // Save to localStorage
+    localStorage.setItem('isDarkMode', JSON.stringify(isDarkMode));
+  }, [isDarkMode]);
 
   useEffect(() => {
     if (canvasRef.current && !showWelcome && !editor) {
@@ -597,6 +622,17 @@ function App() {
               
               <div className="space-y-4">
                 <div>
+                  <label className="block text-sm font-medium mb-2">Map Name</label>
+                  <Input
+                    type="text"
+                    value={mapName}
+                    onChange={(e) => setMapName(e.target.value)}
+                    placeholder="Enter map name"
+                    className="w-full"
+                  />
+                </div>
+                
+                <div>
                   <label className="block text-sm font-medium mb-2">Map Width</label>
                   <Input
                     type="number"
@@ -618,6 +654,30 @@ function App() {
                     max="100"
                     className="w-full"
                   />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-2">Theme</label>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">Light Mode</span>
+                    <button
+                      onClick={() => setIsDarkMode(!isDarkMode)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        isDarkMode ? 'bg-blue-600' : 'bg-gray-200'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          isDarkMode ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                      <span className="sr-only">Toggle dark mode</span>
+                    </button>
+                    <span className="text-sm flex items-center gap-1">
+                      {isDarkMode ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+                      Dark Mode
+                    </span>
+                  </div>
                 </div>
               </div>
               
@@ -746,20 +806,139 @@ function App() {
               className="tile-canvas w-full h-full max-w-full max-h-full"
             />
           </div>
-          <div className="text-sm text-muted-foreground p-2 flex-shrink-0" id="hoverInfo">{hoverInfo}</div>
+          
+          {/* Toolbar */}
+          <div className="flex-shrink-0 bg-gray-50 border-t p-2">
+            <div className="flex gap-1 justify-center">
+              
+              {/* Brush Tool */}
+              <div className="relative">
+                <Button
+                  variant={selectedTool === 'brush' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="w-8 h-8 p-0"
+                  onClick={() => setSelectedTool('brush')}
+                  onMouseEnter={() => setShowBrushOptions(true)}
+                  onMouseLeave={() => setShowBrushOptions(false)}
+                  title="Brush Tool"
+                >
+                  <Paintbrush2 className="w-4 h-4" />
+                </Button>
+                
+                {showBrushOptions && (
+                  <div className="absolute bottom-full left-0 mb-1 bg-white border rounded shadow-lg p-1 flex gap-1 min-w-max z-50">
+                    <Button variant="ghost" size="sm" className="w-8 h-8 p-0" title="Brush Tool">
+                      <Paintbrush2 className="w-4 h-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm" className="w-8 h-8 p-0" title="Bucket Fill">
+                      <PaintBucket className="w-4 h-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm" className="w-8 h-8 p-0" title="Eraser">
+                      <Eraser className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {/* Selection Tool */}
+              <div className="relative">
+                <Button
+                  variant={selectedTool === 'selection' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="w-8 h-8 p-0"
+                  onClick={() => setSelectedTool('selection')}
+                  onMouseEnter={() => setShowSelectionOptions(true)}
+                  onMouseLeave={() => setShowSelectionOptions(false)}
+                  title="Selection Tool"
+                >
+                  <MousePointer className="w-4 h-4" />
+                </Button>
+                
+                {showSelectionOptions && (
+                  <div className="absolute bottom-full left-0 mb-1 bg-white border rounded shadow-lg p-1 flex gap-1 min-w-max z-50">
+                    <Button variant="ghost" size="sm" className="w-8 h-8 p-0" title="Rectangular Selection">
+                      <Square className="w-4 h-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm" className="w-8 h-8 p-0" title="Magic Wand">
+                      <Wand2 className="w-4 h-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm" className="w-8 h-8 p-0" title="Select Same Tile">
+                      <Target className="w-4 h-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm" className="w-8 h-8 p-0" title="Circular Select">
+                      <Circle className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {/* Shape Tool */}
+              <div className="relative">
+                <Button
+                  variant={selectedTool === 'shape' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="w-8 h-8 p-0"
+                  onClick={() => setSelectedTool('shape')}
+                  onMouseEnter={() => setShowShapeOptions(true)}
+                  onMouseLeave={() => setShowShapeOptions(false)}
+                  title="Shape Tool"
+                >
+                  <Shapes className="w-4 h-4" />
+                </Button>
+                
+                {showShapeOptions && (
+                  <div className="absolute bottom-full left-0 mb-1 bg-white border rounded shadow-lg p-1 flex gap-1 min-w-max z-50">
+                    <Button variant="ghost" size="sm" className="w-8 h-8 p-0" title="Rectangle Shape">
+                      <Square className="w-4 h-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm" className="w-8 h-8 p-0" title="Circle Shape">
+                      <Circle className="w-4 h-4" />
+                    </Button>
+                    <Button variant="ghost" size="sm" className="w-8 h-8 p-0" title="Line Shape">
+                      <Pen className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {/* Stamp Tool */}
+              <Button
+                variant={selectedTool === 'stamp' ? 'default' : 'ghost'}
+                size="sm"
+                className="w-8 h-8 p-0"
+                onClick={() => setSelectedTool('stamp')}
+                title="Stamp Tool - Group tiles into a stamp and place them together"
+              >
+                <Stamp className="w-4 h-4" />
+              </Button>
+
+              {/* Eyedropper Tool */}
+              <Button
+                variant={selectedTool === 'eyedropper' ? 'default' : 'ghost'}
+                size="sm"
+                className="w-8 h-8 p-0"
+                onClick={() => setSelectedTool('eyedropper')}
+                title="Eyedropper Tool - Pick a tile from the map to reuse"
+              >
+                <Pipette className="w-4 h-4" />
+              </Button>
+
+            </div>
+          </div>
         </section>
       </main>
       
       {/* Fixed Export and Settings Buttons at Bottom of Screen */}
-      <div className="fixed bottom-4 left-4 z-40">
-        <div className="flex gap-2">
+      <div className="fixed bottom-4 left-0 w-80 z-40">
+        <div className="flex gap-2 justify-center px-4">
           <Button 
             onClick={handleExportMap} 
             title="Export Flare map.txt and tileset definition"
-            className="w-10 h-10 p-0 shadow-lg"
+            className="shadow-lg flex items-center gap-2 px-4 py-2"
             size="sm"
           >
             <Download className="w-4 h-4" />
+            <span>Export Map</span>
           </Button>
           <Button 
             onClick={() => setShowSettings(true)} 

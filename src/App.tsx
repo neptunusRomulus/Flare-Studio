@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, Download, Undo2, Redo2, Plus, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square } from 'lucide-react';
+import { Upload, Download, Undo2, Redo2, Plus, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings } from 'lucide-react';
 import { TileMapEditor } from './editor/TileMapEditor';
 import { TileLayer } from './types';
 import { useToast } from '@/hooks/use-toast';
@@ -32,6 +32,7 @@ function App() {
   const [editingLayerName, setEditingLayerName] = useState('');
   const [editingLayerType, setEditingLayerType] = useState<'background' | 'object' | 'collision' | 'event' | 'enemy' | 'npc'>('background');
   const [showAddLayerDropdown, setShowAddLayerDropdown] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -354,44 +355,7 @@ function App() {
       <header className="border-b p-4 flex-shrink-0">
         {/* Controls Row 1 */}
         <div className="flex flex-wrap gap-2 mb-4">
-          <div className="flex items-center gap-2">
-            <label className="text-sm">Width:</label>
-            <Input
-              type="number"
-              value={mapWidth}
-              onChange={(e) => setMapWidth(Number(e.target.value))}
-              min="1"
-              className="w-16"
-            />
-          </div>
-
-          <div className="flex items-center gap-2">
-            <label className="text-sm">Height:</label>
-            <Input
-              type="number"
-              value={mapHeight}
-              onChange={(e) => setMapHeight(Number(e.target.value))}
-              min="1"
-              className="w-16"
-            />
-          </div>
-
-          <Button onClick={handleMapResize} title="Resize map (keeps existing data within bounds)">
-            Resize
-          </Button>
-
-          <Button 
-            variant="destructive" 
-            onClick={() => editor?.clearLayer?.()}
-            title="Clear all tile data on active layer / collision when selected"
-          >
-            Clear Layer
-          </Button>
-
-          <Button onClick={handleExportMap} title="Export Flare map.txt and tileset definition">
-            <Download className="w-4 h-4 mr-2" />
-            Export Map
-          </Button>
+          {/* Header content can be added here if needed */}
         </div>
       </header>
 
@@ -568,6 +532,70 @@ function App() {
           </section>
         </aside>
 
+        {/* Settings Modal */}
+        {showSettings && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-96">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold">Map Settings</h3>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setShowSettings(false)}
+                  className="w-8 h-8 p-0"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Map Width</label>
+                  <Input
+                    type="number"
+                    value={mapWidth}
+                    onChange={(e) => setMapWidth(Number(e.target.value))}
+                    min="1"
+                    max="100"
+                    className="w-full"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-2">Map Height</label>
+                  <Input
+                    type="number"
+                    value={mapHeight}
+                    onChange={(e) => setMapHeight(Number(e.target.value))}
+                    min="1"
+                    max="100"
+                    className="w-full"
+                  />
+                </div>
+              </div>
+              
+              <div className="flex gap-2 mt-6">
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowSettings(false)}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={() => {
+                    handleMapResize();
+                    setShowSettings(false);
+                  }}
+                  className="flex-1"
+                >
+                  Apply Changes
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Center Area */}
         <section className="flex-1 min-w-0 flex flex-col relative">
           {/* Zoom Controls & Undo/Redo */}
@@ -638,6 +666,30 @@ function App() {
           <div className="text-sm text-muted-foreground p-2 flex-shrink-0" id="hoverInfo">{hoverInfo}</div>
         </section>
       </main>
+      
+      {/* Fixed Export and Settings Buttons at Bottom of Screen */}
+      <div className="fixed bottom-4 left-4 z-40">
+        <div className="flex gap-2">
+          <Button 
+            onClick={handleExportMap} 
+            title="Export Flare map.txt and tileset definition"
+            className="w-10 h-10 p-0 shadow-lg"
+            size="sm"
+          >
+            <Download className="w-4 h-4" />
+          </Button>
+          <Button 
+            onClick={() => setShowSettings(true)} 
+            title="Map Settings"
+            className="w-10 h-10 p-0 shadow-lg"
+            variant="outline"
+            size="sm"
+          >
+            <Settings className="w-4 h-4" />
+          </Button>
+        </div>
+      </div>
+      
       <Toaster />
         </div>
       )}

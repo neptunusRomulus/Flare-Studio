@@ -2,7 +2,7 @@
   "name": "ism-tile-editor",
   "version": "1.0.0",
   "description": "Isometric Tile Map Editor with TypeScript, React, Tailwind, shadcn/ui, and Electron",
-  "main": "electron/main.js",
+  "main": "electron/main.cjs",
   "homepage": "./",
   "type": "module",
   "scripts": {
@@ -12,7 +12,7 @@
     "electron": "electron .",
     "electron-dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
     "electron-build": "npm run build && electron-builder",
-    "go": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
+    "go": "concurrently \"vite --port 5175\" \"wait-on http://localhost:5175 && electron .\"",
     "pack": "electron-builder --dir",
     "dist": "electron-builder",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"

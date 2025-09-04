@@ -162,7 +162,8 @@ export class TileMapEditor {
         name: 'background',
         type: 'background',
         data: new Array(this.mapWidth * this.mapHeight).fill(0),
-        visible: true
+        visible: true,
+        transparency: 1.0 // Default to fully opaque
       }
     ];
     this.activeLayerId = 1;
@@ -411,6 +412,9 @@ export class TileMapEditor {
     for (const layer of this.tileLayers) {
       if (!layer.visible) continue;
       
+      // Set layer transparency
+      this.ctx.globalAlpha = layer.transparency || 1.0;
+      
       for (let y = 0; y < this.mapHeight; y++) {
         for (let x = 0; x < this.mapWidth; x++) {
           const index = y * this.mapWidth + x;
@@ -422,6 +426,9 @@ export class TileMapEditor {
         }
       }
     }
+    
+    // Reset alpha for other drawing operations
+    this.ctx.globalAlpha = 1.0;
   }
 
   private drawTile(x: number, y: number, gid: number): void {
@@ -642,7 +649,8 @@ export class TileMapEditor {
       name: name,
       type: type,
       data: new Array(this.mapWidth * this.mapHeight).fill(0),
-      visible: true
+      visible: true,
+      transparency: 1.0 // Default to fully opaque
     };
     
     // Add layer and sort by type priority
@@ -710,6 +718,14 @@ export class TileMapEditor {
     }
   }
 
+  public setLayerTransparency(layerId: number, transparency: number): void {
+    const layer = this.tileLayers.find(l => l.id === layerId);
+    if (layer) {
+      layer.transparency = Math.max(0, Math.min(1, transparency)); // Clamp between 0 and 1
+      this.draw();
+    }
+  }
+
   public setMapSize(width: number, height: number): void {
     this.mapWidth = width;
     this.mapHeight = height;
@@ -758,6 +774,13 @@ export class TileMapEditor {
 
   public getActiveLayerId(): number | null {
     return this.activeLayerId;
+  }
+
+  public getHoverCoordinates(): { x: number; y: number } | null {
+    if (this.hoverX >= 0 && this.hoverY >= 0) {
+      return { x: this.hoverX, y: this.hoverY };
+    }
+    return null;
   }
 
   // Layer-specific tileset management

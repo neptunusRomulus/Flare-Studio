@@ -6,6 +6,7 @@ export interface TileLayer {
   type: 'background' | 'object' | 'collision' | 'event' | 'enemy' | 'npc';
   data: number[];
   visible: boolean;
+  transparency?: number; // 0-1, where 1 is fully opaque
 }
 
 export interface TilesetInfo {

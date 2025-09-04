@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, Download, Undo2, Redo2, Plus, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings } from 'lucide-react';
+import { Upload, Download, Undo2, Redo2, Plus, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle } from 'lucide-react';
 import { TileMapEditor } from './editor/TileMapEditor';
 import { TileLayer } from './types';
 import { useToast } from '@/hooks/use-toast';
@@ -33,6 +33,9 @@ function App() {
   const [editingLayerType, setEditingLayerType] = useState<'background' | 'object' | 'collision' | 'event' | 'enemy' | 'npc'>('background');
   const [showAddLayerDropdown, setShowAddLayerDropdown] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showTooltip, setShowTooltip] = useState(true);
+  const [hasTileset, setHasTileset] = useState(false);
+  const [showEmptyTilesetTooltip, setShowEmptyTilesetTooltip] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -46,8 +49,17 @@ function App() {
   const updateLayersList = useCallback(() => {
     if (editor) {
       const currentLayers = editor.getLayers();
-      setLayers(currentLayers);
-      setActiveLayerId(editor.getActiveLayerId());
+      setLayers([...currentLayers]); // Create a new array to ensure React detects changes
+      const activeId = editor.getActiveLayerId();
+      setActiveLayerId(activeId);
+      
+      // Check if active layer has a tileset
+      const activeLayer = currentLayers.find(layer => layer.id === activeId);
+      if (activeLayer) {
+        setHasTileset(editor.hasLayerTileset(activeLayer.type));
+      } else {
+        setHasTileset(false);
+      }
     }
   }, [editor]);
 
@@ -179,7 +191,16 @@ function App() {
   const handleToggleLayerVisibility = (layerId: number) => {
     if (editor) {
       editor.toggleLayerVisibility(layerId);
-      updateLayersList();
+      // Force a fresh state update by creating a new array
+      const currentLayers = editor.getLayers();
+      setLayers([...currentLayers]); // Create a new array to trigger re-render
+      
+      // Also update tileset status for the active layer
+      const activeId = editor.getActiveLayerId();
+      const activeLayer = currentLayers.find(layer => layer.id === activeId);
+      if (activeLayer) {
+        setHasTileset(editor.hasLayerTileset(activeLayer.type));
+      }
     }
   };
 
@@ -371,12 +392,43 @@ function App() {
               </Button>
             </div>
             <div className="text-sm text-muted-foreground mb-2">
-              <div>Layer Type: <span className="font-medium">{activeLayerId ? layers.find(l => l.id === activeLayerId)?.type || 'None' : 'None'}</span></div>
+              <div><span className="font-medium">{activeLayerId ? `${layers.find(l => l.id === activeLayerId)?.type || 'none'} tileset` : 'none tileset'}</span></div>
             </div>
             <div id="tilesetMeta" className="text-sm text-muted-foreground mb-2"></div>
-            <div id="tilesContainer" className="tile-palette"></div>
-            <p className="text-xs text-muted-foreground mt-2">Click tile to select brush. Right click canvas = erase.</p>
-            <p className="text-xs text-muted-foreground">Active GID: <span id="activeGid">{activeGid}</span></p>
+            
+            {/* Tiles Container with conditional tooltip */}
+            <div className="relative">
+              <div id="tilesContainer" className="tile-palette"></div>
+              
+              {!hasTileset && showEmptyTilesetTooltip && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="bg-gray-100 rounded-lg shadow-lg border p-6 mx-4 my-4 relative max-w-sm">
+                    {/* Close button */}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="absolute top-2 right-2 w-6 h-6 p-0 hover:bg-gray-200"
+                      onClick={() => setShowEmptyTilesetTooltip(false)}
+                    >
+                      <X className="w-3 h-3" />
+                    </Button>
+                    
+                    {/* Content */}
+                    <div className="text-center pt-4">
+                      <div className="flex items-center justify-center mb-3">
+                        <Upload className="w-10 h-10 text-gray-500" />
+                      </div>
+                      <h3 className="text-sm font-semibold text-gray-800 mb-2">No Tileset Imported</h3>
+                      <p className="text-xs text-gray-600 leading-relaxed">
+                        Import your tileset and start to paint map in the selected layer.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <p className="text-xs text-muted-foreground mt-2">Active GID: <span id="activeGid">{activeGid}</span></p>
           </section>
 
           {/* Layers Section */}
@@ -434,15 +486,18 @@ function App() {
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <button
+                          <Button
+                            variant="ghost"
+                            size="sm"
                             onClick={(e) => {
                               e.stopPropagation();
                               handleToggleLayerVisibility(layer.id);
                             }}
-                            className="text-xs"
+                            className="w-6 h-6 p-0 hover:bg-gray-200"
+                            title={layer.visible ? "Hide layer" : "Show layer"}
                           >
-                            {layer.visible ? '👁️' : '🚫'}
-                          </button>
+                            {layer.visible ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3 text-gray-400" />}
+                          </Button>
                           <span className="text-sm font-medium">{layer.name}</span>
                           <span className="text-xs text-gray-500">({layer.type})</span>
                         </div>
@@ -648,7 +703,43 @@ function App() {
             </Button>
           </div>
           
-          <div className="bg-gray-100 flex-1 min-h-0 flex items-center justify-center overflow-hidden">
+          <div className="bg-gray-100 flex-1 min-h-0 flex items-center justify-center overflow-hidden relative">
+            {/* Canvas Tooltip Panel */}
+            {showTooltip && (
+              <div className="absolute top-4 left-4 z-20 p-3 bg-white/90 backdrop-blur-sm rounded-lg border shadow-lg">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute top-1 right-1 w-6 h-6 p-0"
+                  onClick={() => setShowTooltip(false)}
+                >
+                  <X className="w-3 h-3" />
+                </Button>
+                
+                <div className="space-y-2 pr-6">
+                  <div className="flex items-center gap-2 text-xs text-gray-700">
+                    <MousePointer2 className="w-4 h-4" />
+                    <span>Left Click to Paint</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-gray-700">
+                    <Mouse className="w-4 h-4" />
+                    <span>Right Click to Delete</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-gray-700">
+                    <Move className="w-4 h-4" />
+                    <span>Spacebar + Mouse to Pan</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-gray-700">
+                    <div className="relative">
+                      <Mouse className="w-4 h-4" />
+                      <Circle className="w-2 h-2 absolute top-1 left-1.5 opacity-60" />
+                    </div>
+                    <span>Mouse Wheel to Zoom In-Out</span>
+                  </div>
+                </div>
+              </div>
+            )}
+            
             <canvas
               ref={canvasRef}
               id="mapCanvas"

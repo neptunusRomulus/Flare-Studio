@@ -74,7 +74,8 @@
     padding: 8px;
     background: #fff;
     border: 1px solid #ccc;
-    max-height: 200px;
+    min-height: 300px;
+    max-height: 300px;
     overflow-y: auto;
 }
 

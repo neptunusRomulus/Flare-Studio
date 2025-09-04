@@ -70,6 +70,16 @@ export class TileMapEditor {
   private maxHistorySize: number = 50;
   private isApplyingHistory: boolean = false;
 
+  // Auto-save system
+  private hasUnsavedChanges: boolean = false;
+  private autoSaveTimeout: number | null = null;
+  private lastSaveTimestamp: number = 0;
+  private autoSaveCallback: (() => void) | null = null;
+  private saveStatusCallback: ((status: 'saving' | 'saved' | 'error' | 'unsaved') => void) | null = null;
+  private readonly AUTO_SAVE_DELAY = 8000; // 8 seconds for tile changes
+  private readonly IMMEDIATE_SAVE_DELAY = 2000; // 2 seconds for critical changes
+  private autoSaveEnabled: boolean = true;
+
   constructor(mapCanvas: HTMLCanvasElement) {
     this.mapCanvas = mapCanvas;
     this.initializeCanvas();
@@ -632,6 +642,9 @@ export class TileMapEditor {
     }
     
     this.draw();
+
+    // Trigger immediate auto-save for critical changes
+    this.markAsChanged(true);
   }
 
   public addLayer(name: string, type: 'background' | 'object' | 'collision' | 'event' | 'enemy' | 'npc'): boolean {
@@ -658,6 +671,10 @@ export class TileMapEditor {
     this.sortLayersByPriority();
     this.activeLayerId = newLayer.id;
     this.draw();
+
+    // Trigger immediate auto-save for critical changes
+    this.markAsChanged(true);
+
     return true; // Successfully added
   }
 
@@ -693,6 +710,10 @@ export class TileMapEditor {
         this.activeLayerId = this.tileLayers.length > 0 ? this.tileLayers[0].id : null;
       }
       this.draw();
+
+      // Trigger immediate auto-save for critical changes
+      this.markAsChanged(true);
+
       return true; // Successfully deleted
     }
     return false; // Layer not found
@@ -983,6 +1004,9 @@ export class TileMapEditor {
       this.history.shift();
       this.historyIndex--;
     }
+
+    // Mark as changed for auto-save (normal delay for undo/redo states)
+    this.markAsChanged(false);
   }
 
   private deepCopyLayers(layers: TileLayer[]): TileLayer[] {
@@ -1027,5 +1051,137 @@ export class TileMapEditor {
       
       this.isApplyingHistory = false;
     }
+  }
+
+  // Auto-save system methods
+  public setAutoSaveCallback(callback: (() => void) | null): void {
+    this.autoSaveCallback = callback;
+  }
+
+  public setSaveStatusCallback(callback: ((status: 'saving' | 'saved' | 'error' | 'unsaved') => void) | null): void {
+    this.saveStatusCallback = callback;
+  }
+
+  public setAutoSaveEnabled(enabled: boolean): void {
+    this.autoSaveEnabled = enabled;
+    if (!enabled && this.autoSaveTimeout) {
+      clearTimeout(this.autoSaveTimeout);
+      this.autoSaveTimeout = null;
+    }
+  }
+
+  private markAsChanged(immediate: boolean = false): void {
+    if (!this.autoSaveEnabled) return;
+
+    this.hasUnsavedChanges = true;
+    this.updateSaveStatus('unsaved');
+
+    // Clear existing timeout
+    if (this.autoSaveTimeout) {
+      clearTimeout(this.autoSaveTimeout);
+    }
+
+    // Schedule auto-save with appropriate delay
+    const delay = immediate ? this.IMMEDIATE_SAVE_DELAY : this.AUTO_SAVE_DELAY;
+    this.autoSaveTimeout = window.setTimeout(() => {
+      this.performAutoSave();
+    }, delay);
+  }
+
+  private async performAutoSave(): Promise<void> {
+    if (!this.hasUnsavedChanges || !this.autoSaveCallback) return;
+
+    try {
+      this.updateSaveStatus('saving');
+      
+      // Save to localStorage as backup
+      this.saveToLocalStorage();
+      
+      // Call the main save callback
+      await this.autoSaveCallback();
+      
+      this.hasUnsavedChanges = false;
+      this.lastSaveTimestamp = Date.now();
+      this.updateSaveStatus('saved');
+      
+      // Clear the timeout
+      this.autoSaveTimeout = null;
+    } catch (error) {
+      console.error('Auto-save failed:', error);
+      this.updateSaveStatus('error');
+      
+      // Retry after a longer delay
+      this.autoSaveTimeout = window.setTimeout(() => {
+        this.performAutoSave();
+      }, 15000); // 15 seconds retry delay
+    }
+  }
+
+  private saveToLocalStorage(): void {
+    try {
+      const backupData = {
+        timestamp: Date.now(),
+        mapWidth: this.mapWidth,
+        mapHeight: this.mapHeight,
+        layers: this.tileLayers,
+        objects: this.objects,
+        tilesetFileName: this.tilesetFileName
+      };
+      
+      localStorage.setItem('tilemap_autosave_backup', JSON.stringify(backupData));
+    } catch (error) {
+      console.warn('Failed to save to localStorage:', error);
+    }
+  }
+
+  public loadFromLocalStorage(): boolean {
+    try {
+      const backupData = localStorage.getItem('tilemap_autosave_backup');
+      if (!backupData) return false;
+
+      const data = JSON.parse(backupData);
+      
+      // Check if backup is recent (within last 24 hours)
+      const age = Date.now() - data.timestamp;
+      if (age > 24 * 60 * 60 * 1000) return false;
+
+      this.mapWidth = data.mapWidth;
+      this.mapHeight = data.mapHeight;
+      this.tileLayers = data.layers;
+      this.objects = data.objects;
+      this.tilesetFileName = data.tilesetFileName;
+
+      this.draw();
+      return true;
+    } catch (error) {
+      console.error('Failed to load from localStorage:', error);
+      return false;
+    }
+  }
+
+  public clearLocalStorageBackup(): void {
+    localStorage.removeItem('tilemap_autosave_backup');
+  }
+
+  private updateSaveStatus(status: 'saving' | 'saved' | 'error' | 'unsaved'): void {
+    if (this.saveStatusCallback) {
+      this.saveStatusCallback(status);
+    }
+  }
+
+  public getUnsavedChanges(): boolean {
+    return this.hasUnsavedChanges;
+  }
+
+  public getLastSaveTime(): number {
+    return this.lastSaveTimestamp;
+  }
+
+  // Force immediate save
+  public forceSave(): void {
+    if (this.autoSaveTimeout) {
+      clearTimeout(this.autoSaveTimeout);
+    }
+    this.performAutoSave();
   }
 }

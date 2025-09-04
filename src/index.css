@@ -10,7 +10,7 @@
     --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
+    --primary: 25 95% 53%;
     --primary-foreground: 210 40% 98%;
     --secondary: 210 40% 96%;
     --secondary-foreground: 222.2 84% 4.9%;
@@ -22,7 +22,7 @@
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
+    --ring: 25 95% 53%;
     --radius: 0.5rem;
   }
 
@@ -33,7 +33,7 @@
     --card-foreground: 210 40% 98%;
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
+    --primary: 30 90% 55%;
     --primary-foreground: 222.2 84% 4.9%;
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
@@ -45,7 +45,7 @@
     --destructive-foreground: 210 40% 98%;
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 94.1%;
+    --ring: 30 90% 55%;
   }
 }
 
@@ -157,4 +157,46 @@
 
 .custom-tooltip.fade-out {
     opacity: 0;
+}
+
+/* Tool button click effects */
+.tool-button {
+    transition: all 0.1s ease-in-out;
+    transform-origin: center;
+}
+
+.tool-button:active {
+    transform: scale(0.95);
+    background-color: hsl(var(--primary) / 0.9) !important;
+}
+
+.tool-button:active * {
+    color: hsl(222.2 84% 4.9%) !important;
+}
+
+/* Sub-tool button click effects */
+.sub-tool-button {
+    transition: all 0.1s ease-in-out;
+    transform-origin: center;
+}
+
+.sub-tool-button:active {
+    transform: scale(0.9);
+    background-color: hsl(var(--primary) / 0.8) !important;
+}
+
+.sub-tool-button:active * {
+    color: hsl(222.2 84% 4.9%) !important;
+}
+
+/* Ensure SVG icons maintain proper colors during click */
+.tool-button:active svg,
+.sub-tool-button:active svg {
+    color: hsl(222.2 84% 4.9%) !important;
+}
+
+/* General button click effect for better feedback */
+button:active:not(.no-click-effect) {
+    transform: scale(0.98);
+    transition: transform 0.1s ease-in-out;
 }

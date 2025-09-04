@@ -760,6 +760,17 @@ export class TileMapEditor {
     }
   }
 
+  public changeLayerType(layerId: number, newType: 'background' | 'object' | 'collision' | 'event' | 'enemy' | 'npc', newName: string): boolean {
+    const layer = this.tileLayers.find(l => l.id === layerId);
+    if (layer) {
+      layer.type = newType;
+      layer.name = newName;
+      this.sortLayersByPriority();
+      return true;
+    }
+    return false;
+  }
+
   public setLayerType(layerId: number, newType: 'background' | 'object' | 'collision' | 'event' | 'enemy' | 'npc'): void {
     const layer = this.tileLayers.find(l => l.id === layerId);
     if (layer) {

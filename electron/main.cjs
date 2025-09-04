@@ -132,6 +132,68 @@ ipcMain.handle('open-map-project', async (event, projectPath) => {
   }
 });
 
+// Save map project data
+ipcMain.handle('save-map-project', async (event, projectPath, mapData) => {
+  try {
+    if (!projectPath || !mapData) {
+      console.error('Invalid save parameters:', { projectPath, hasMapData: !!mapData });
+      return false;
+    }
+
+    // Find existing map file
+    const files = fs.readdirSync(projectPath);
+    let mapFile = files.find(file => file.endsWith('.json'));
+    
+    // If no map file exists, create one based on project folder name
+    if (!mapFile) {
+      const projectName = path.basename(projectPath);
+      mapFile = `${projectName}.json`;
+    }
+    
+    const mapConfigPath = path.join(projectPath, mapFile);
+    
+    // Ensure the map data has the required structure
+    const completeMapData = {
+      name: mapData.name || path.basename(projectPath),
+      width: mapData.width || 20,
+      height: mapData.height || 15,
+      tileSize: mapData.tileSize || 64,
+      layers: mapData.layers || [],
+      tilesets: mapData.tilesets || [],
+      objects: mapData.objects || [],
+      version: "1.0",
+      lastSaved: new Date().toISOString(),
+      ...mapData
+    };
+    
+    // Write the map data
+    fs.writeFileSync(mapConfigPath, JSON.stringify(completeMapData, null, 2));
+    
+    // Save tileset images to assets folder if they exist
+    if (mapData.tilesetImages) {
+      const assetsPath = path.join(projectPath, 'assets');
+      if (!fs.existsSync(assetsPath)) {
+        fs.mkdirSync(assetsPath, { recursive: true });
+      }
+      
+      for (const [filename, imageData] of Object.entries(mapData.tilesetImages)) {
+        if (imageData && typeof imageData === 'string') {
+          // Handle base64 image data
+          const base64Data = imageData.replace(/^data:image\/[a-z]+;base64,/, '');
+          const imagePath = path.join(assetsPath, filename);
+          fs.writeFileSync(imagePath, base64Data, 'base64');
+        }
+      }
+    }
+    
+    console.log('Map project saved successfully:', mapConfigPath);
+    return true;
+  } catch (error) {
+    console.error('Error saving map project:', error);
+    return false;
+  }
+});
+
 function createMenu() {
   const template = [
     {

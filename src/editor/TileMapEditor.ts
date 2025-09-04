@@ -64,12 +64,22 @@ export class TileMapEditor {
   private lastPanY: number = 0;
   private spacePressed: boolean = false;
 
+  // History system for undo/redo
+  private history: Array<{ layers: TileLayer[], objects: MapObject[] }> = [];
+  private historyIndex: number = -1;
+  private maxHistorySize: number = 50;
+  private isApplyingHistory: boolean = false;
+
   constructor(mapCanvas: HTMLCanvasElement) {
     this.mapCanvas = mapCanvas;
     this.initializeCanvas();
     this.initializeState();
     this.bindEvents();
     this.createDefaultLayers();
+    
+    // Save initial state for undo/redo
+    this.saveState();
+    
     this.draw();
   }
 
@@ -235,7 +245,14 @@ export class TileMapEditor {
       const layer = this.tileLayers.find(l => l.id === this.activeLayerId);
       if (layer) {
         const index = y * this.mapWidth + x;
-        layer.data[index] = isRightClick ? 0 : this.activeGid;
+        const currentValue = layer.data[index];
+        const newValue = isRightClick ? 0 : this.activeGid;
+        
+        // Only save state if the value is actually changing
+        if (currentValue !== newValue) {
+          this.saveState();
+          layer.data[index] = newValue;
+        }
       }
     }
   }
@@ -490,7 +507,7 @@ export class TileMapEditor {
   }
 
   // Public methods for React to interact with
-  public handleFileUpload(file: File, type: 'tileset' | 'layerTileset' | 'importTMX' | 'importTSX'): void {
+  public handleFileUpload(file: File, type: 'tileset' | 'layerTileset'): void {
     if (type === 'tileset') {
       // Legacy tileset upload
       const reader = new FileReader();
@@ -596,6 +613,9 @@ export class TileMapEditor {
       return false; // Layer type already exists
     }
 
+    // Save state before adding layer
+    this.saveState();
+
     const newLayer = {
       id: this.nextLayerId++,
       name: name,
@@ -634,6 +654,9 @@ export class TileMapEditor {
     
     const layerIndex = this.tileLayers.findIndex(l => l.id === layerId);
     if (layerIndex !== -1) {
+      // Save state before deleting layer
+      this.saveState();
+      
       this.tileLayers.splice(layerIndex, 1);
       
       // Set active layer to the first available layer
@@ -853,13 +876,74 @@ export class TileMapEditor {
     URL.revokeObjectURL(url);
   }
 
+  // History management methods
+  private saveState(): void {
+    if (this.isApplyingHistory) return;
+
+    // Deep copy current state
+    const stateCopy = {
+      layers: this.tileLayers.map(layer => ({
+        ...layer,
+        data: [...layer.data]
+      })),
+      objects: this.objects.map(obj => ({ ...obj }))
+    };
+
+    // Remove any history beyond current index
+    this.history = this.history.slice(0, this.historyIndex + 1);
+    
+    // Add new state
+    this.history.push(stateCopy);
+    this.historyIndex = this.history.length - 1;
+
+    // Limit history size
+    if (this.history.length > this.maxHistorySize) {
+      this.history.shift();
+      this.historyIndex--;
+    }
+  }
+
+  private deepCopyLayers(layers: TileLayer[]): TileLayer[] {
+    return layers.map(layer => ({
+      ...layer,
+      data: [...layer.data]
+    }));
+  }
+
+  private deepCopyObjects(objects: MapObject[]): MapObject[] {
+    return objects.map(obj => ({ ...obj }));
+  }
+
   public undo(): void {
-    // Placeholder implementation
-    console.log('Undo functionality to be implemented');
+    if (this.historyIndex > 0) {
+      this.historyIndex--;
+      this.applyHistoryState();
+    }
   }
 
   public redo(): void {
-    // Placeholder implementation
-    console.log('Redo functionality to be implemented');
+    if (this.historyIndex < this.history.length - 1) {
+      this.historyIndex++;
+      this.applyHistoryState();
+    }
+  }
+
+  private applyHistoryState(): void {
+    if (this.historyIndex >= 0 && this.historyIndex < this.history.length) {
+      this.isApplyingHistory = true;
+      
+      const state = this.history[this.historyIndex];
+      
+      // Restore layers
+      this.tileLayers = this.deepCopyLayers(state.layers);
+      
+      // Restore objects
+      this.objects = this.deepCopyObjects(state.objects);
+      
+      // Redraw
+      this.draw();
+      
+      this.isApplyingHistory = false;
+    }
   }
 }

@@ -10,9 +10,7 @@
 // Still plain JS, no frameworks.
 
 (function() {
-  const orientationSelect = document.getElementById('orientationSelect');
-  const tileSizeXSelect = document.getElementById('tileSizeXSelect');
-  const tileSizeYSelect = document.getElementById('tileSizeYSelect');
+  // Remove orientation and tile size selections - fixed to isometric with 64x32 tiles
   const tilesetFileInput = document.getElementById('tilesetFile');
   const extraTilesetFileInput = document.getElementById('extraTilesetFile');
   const tilesContainer = document.getElementById('tilesContainer');
@@ -50,9 +48,9 @@
   // State
   let mapWidth = parseInt(mapWidthInput.value, 10); // tiles
   let mapHeight = parseInt(mapHeightInput.value, 10); // tiles
-  let tileSizeX = parseInt(tileSizeXSelect.value, 10);
-  let tileSizeY = parseInt(tileSizeYSelect.value, 10);
-  let orientation = 'orthogonal'; // Start with orthogonal as default
+  let tileSizeX = 64; // Fixed tile width for isometric
+  let tileSizeY = 32; // Fixed tile height for isometric
+  let orientation = 'isometric'; // Fixed to isometric view
   // Multiple tilesets support: each entry { name, image, columns, rows, tileCount, firstgid }
   let tilesets = [];
   let tilesetImage = null; // primary tileset reference for backwards compatibility
@@ -1219,23 +1217,7 @@ ${csvData}
   mapCanvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
   // UI events
-  // tileSizeSelect removed (replaced by tileSizeXSelect and tileSizeYSelect)
-  tileSizeXSelect.addEventListener('change', () => {
-    tileSizeX = parseInt(tileSizeXSelect.value, 10);
-    if (tilesetImage) buildTilesetButtons();
-    resizeMapCanvas();
-  });
-  tileSizeYSelect.addEventListener('change', () => {
-    tileSizeY = parseInt(tileSizeYSelect.value, 10);
-    if (tilesetImage) buildTilesetButtons();
-    resizeMapCanvas();
-  });
-  orientationSelect.addEventListener('change', () => {
-    // For visual orientation changes, no need to reset - just update rendering
-    orientation = orientationSelect.value;
-    resizeMapCanvas();
-    draw();
-  });
+  // Tile size and orientation are now fixed - no event listeners needed
 
   tilesetFileInput.addEventListener('change', (e) => {
     const file = e.target.files && e.target.files[0];

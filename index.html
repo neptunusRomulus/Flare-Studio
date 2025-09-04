@@ -9,28 +9,8 @@
 <body>
   <header>
   <h1>Advanced Flare Map Editor</h1>
-  <p class="hint" style="color:#888;margin:0 0 8px 0;">Only <b>Orthogonal</b> maps are supported.</p>
+  <p class="hint" style="color:#888;margin:0 0 8px 0;">Isometric tile editor with 64x32 tiles.</p>
     <div class="controls-row">
-      <label>Orientation:
-        <select id="orientationSelect">
-          <option value="orthogonal" selected>Orthogonal (default)</option>
-          <option value="isometric">Isometric (visual-only)</option>
-        </select>
-      </label>
-      <label>Tile Size X:
-        <select id="tileSizeXSelect">
-          <option value="16">16</option>
-          <option value="32" selected>32</option>
-          <option value="64">64</option>
-        </select>
-      </label>
-      <label>Tile Size Y:
-        <select id="tileSizeYSelect">
-          <option value="16">16</option>
-          <option value="32" selected>32</option>
-          <option value="64">64</option>
-        </select>
-      </label>
       <label>Tileset PNG: <input type="file" id="tilesetFile" accept="image/png" /></label>
   <label>Extra Tileset: <input type="file" id="extraTilesetFile" accept="image/png" /></label>
       <label>Width: <input type="number" id="mapWidthInput" value="20" min="1" /></label>
@@ -103,8 +83,8 @@
     </aside>
   </main>
   <footer>
-    <small>Generated TMX targets Flare-compatible orthogonal maps. Pure client-side. Extend as needed.</small>
+    <small>Generated TMX targets Flare-compatible orthogonal maps. TypeScript + Vite + Electron.</small>
   </footer>
-  <script src="script.js"></script>
+  <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

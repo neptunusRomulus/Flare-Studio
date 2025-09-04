@@ -689,6 +689,33 @@ export class TileMapEditor {
     }
   }
 
+  public setMapSize(width: number, height: number): void {
+    this.mapWidth = width;
+    this.mapHeight = height;
+    
+    // Reinitialize collision data
+    this.collisionData = new Array(width * height).fill(0);
+    
+    // Resize all existing layers
+    this.tileLayers.forEach(layer => {
+      const oldData = layer.data;
+      layer.data = new Array(width * height).fill(0);
+      
+      // Copy existing data if possible
+      for (let y = 0; y < Math.min(height, 15); y++) { // 15 was the old default height
+        for (let x = 0; x < Math.min(width, 20); x++) { // 20 was the old default width
+          const oldIndex = y * 20 + x; // Old width
+          const newIndex = y * width + x; // New width
+          if (oldIndex < oldData.length) {
+            layer.data[newIndex] = oldData[oldIndex];
+          }
+        }
+      }
+    });
+    
+    this.draw();
+  }
+
   public renameLayer(layerId: number, newName: string): void {
     const layer = this.tileLayers.find(l => l.id === layerId);
     if (layer) {

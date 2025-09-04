@@ -447,7 +447,7 @@ export class TileMapEditor {
 
   private drawHover(): void {
     this.ctx.strokeStyle = '#007acc';
-    this.ctx.lineWidth = 2 / this.zoom; // Scale line width inversely with zoom
+    this.ctx.lineWidth = Math.max(1, Math.min(3, 2 / this.zoom)); // Scale line width inversely with zoom, but constrain to 1-3px
     
     // Draw isometric diamond outline for hover - same as grid cell
     const screenPos = this.mapToScreen(this.hoverX, this.hoverY);

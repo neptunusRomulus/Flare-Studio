@@ -72,8 +72,8 @@
     flex-wrap: wrap;
     gap: 2px;
     padding: 8px;
-    background: #fff;
-    border: 1px solid #ccc;
+    background: hsl(var(--background));
+    border: 1px solid hsl(var(--border));
     min-height: 300px;
     max-height: 300px;
     overflow-y: auto;
@@ -82,22 +82,22 @@
 .palette-tile {
     width: 32px;
     height: 32px;
-    border: 1px solid #999;
+    border: 1px solid hsl(var(--border));
     cursor: pointer;
     image-rendering: pixelated;
 }
 
 .palette-tile:hover {
-    border-color: #333;
+    border-color: hsl(var(--foreground));
 }
 
 .palette-tile.selected {
-    border: 2px solid #007acc;
+    border: 2px solid hsl(var(--primary));
 }
 
 .tool-active {
-    background: #007acc !important;
-    color: white !important;
+    background: hsl(var(--primary)) !important;
+    color: hsl(var(--primary-foreground)) !important;
 }
 
 /* Electron window drag regions */

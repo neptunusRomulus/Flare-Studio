@@ -1,21 +1,28 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, Download, Undo2, Redo2, Plus, ChevronUp, ChevronDown, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square } from 'lucide-react';
-import { Tool } from './types';
+import { Upload, Download, Undo2, Redo2, Plus, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square } from 'lucide-react';
 import { TileMapEditor } from './editor/TileMapEditor';
+import { TileLayer } from './types';
+import { useToast } from '@/hooks/use-toast';
+import { Toaster } from '@/components/ui/toaster';
 
 function App() {
   const [editor, setEditor] = useState<TileMapEditor | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [mapWidth, setMapWidth] = useState(20);
   const [mapHeight, setMapHeight] = useState(15);
-  const [tool, setTool] = useState<Tool>('tiles');
-  const [objectType, setObjectType] = useState('event');
   const [activeGid] = useState('(none)'); // Removed unused setter
   const [hoverInfo] = useState('Hover: -'); // Removed unused setter
   const [showMinimap, setShowMinimap] = useState(true);
+  const [layers, setLayers] = useState<TileLayer[]>([]);
+  const [activeLayerId, setActiveLayerId] = useState<number | null>(null);
+  const [editingLayerId, setEditingLayerId] = useState<number | null>(null);
+  const [editingLayerName, setEditingLayerName] = useState('');
+  const [editingLayerType, setEditingLayerType] = useState<'background' | 'object' | 'collision' | 'event' | 'enemy' | 'npc'>('background');
+  const [showAddLayerDropdown, setShowAddLayerDropdown] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (canvasRef.current) {
@@ -24,6 +31,38 @@ function App() {
     }
   }, []);
 
+  // Layer management functions
+  const updateLayersList = useCallback(() => {
+    if (editor) {
+      const currentLayers = editor.getLayers();
+      setLayers(currentLayers);
+      setActiveLayerId(editor.getActiveLayerId());
+    }
+  }, [editor]);
+
+  useEffect(() => {
+    if (editor) {
+      updateLayersList();
+    }
+  }, [editor, updateLayersList]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (_event: MouseEvent) => {
+      if (showAddLayerDropdown) {
+        setShowAddLayerDropdown(false);
+      }
+    };
+
+    if (showAddLayerDropdown) {
+      document.addEventListener('click', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, [showAddLayerDropdown]);
+
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>, type: 'tileset' | 'extraTileset' | 'importTMX' | 'importTSX') => {
     const file = event.target.files?.[0];
     if (file && editor?.handleFileUpload) {
@@ -31,10 +70,105 @@ function App() {
     }
   };
 
-  const handleToolChange = (newTool: string) => {
-    setTool(newTool as Tool);
-    if (editor?.setTool) {
-      editor.setTool(newTool as Tool);
+  const handleAddLayer = () => {
+    setShowAddLayerDropdown(!showAddLayerDropdown);
+  };
+
+  const handleCreateLayer = (type: 'npc' | 'enemy' | 'event' | 'collision' | 'object' | 'background') => {
+    if (editor) {
+      // Check if this type already exists
+      const existingLayer = layers.find(layer => layer.type === type);
+      if (existingLayer) {
+        toast({
+          variant: "destructive",
+          title: "Cannot add layer",
+          description: `A ${type} layer already exists. Only one layer per type is allowed.`,
+        });
+        setShowAddLayerDropdown(false);
+        return;
+      }
+
+      // Generate appropriate default name for the layer type
+      const defaultNames = {
+        'npc': 'NPCs',
+        'enemy': 'Enemies', 
+        'event': 'Events',
+        'collision': 'Collision',
+        'object': 'Objects',
+        'background': 'Background'
+      };
+
+      const success = editor.addLayer(defaultNames[type], type);
+      if (success) {
+        updateLayersList();
+        // Set the new layer for editing
+        const newLayers = editor.getLayers();
+        const newLayer = newLayers.find(layer => layer.name === defaultNames[type] && layer.type === type);
+        if (newLayer) {
+          setEditingLayerId(newLayer.id);
+          setEditingLayerName(newLayer.name);
+          setEditingLayerType(newLayer.type);
+        }
+      }
+      setShowAddLayerDropdown(false);
+    }
+  };
+
+  const handleSaveLayerEdit = () => {
+    if (editor && editingLayerId !== null && editingLayerName.trim()) {
+      // Check if changing to a type that already exists (except for the current layer)
+      const existingLayer = layers.find(layer => 
+        layer.type === editingLayerType && layer.id !== editingLayerId
+      );
+      
+      if (existingLayer) {
+        toast({
+          variant: "destructive",
+          title: "Cannot change layer type",
+          description: `A ${editingLayerType} layer already exists. Only one layer per type is allowed.`,
+        });
+        return;
+      }
+
+      editor.renameLayer(editingLayerId, editingLayerName.trim());
+      editor.setLayerType(editingLayerId, editingLayerType);
+      updateLayersList();
+      setEditingLayerId(null);
+    }
+  };
+
+  const handleCancelLayerEdit = () => {
+    setEditingLayerId(null);
+    setEditingLayerName('');
+    setEditingLayerType('background');
+  };
+
+  const handleDeleteLayer = (layerId: number) => {
+    if (editor) {
+      const success = editor.deleteLayer(layerId);
+      if (success) {
+        updateLayersList();
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Cannot delete layer",
+          description: "There must be at least one layer.",
+        });
+      }
+    }
+  };
+
+  const handleSetActiveLayer = (layerId: number) => {
+    if (editor) {
+      editor.setActiveLayer(layerId);
+      setActiveLayerId(layerId);
+    }
+  };
+
+  const handleToggleLayerVisibility = (layerId: number) => {
+    if (editor) {
+      editor.toggleLayerVisibility(layerId);
+      updateLayersList();
     }
   };
 
@@ -242,64 +376,6 @@ function App() {
             </Button>
           </div>
         </div>
-
-        {/* Controls Row 2 - Tools */}
-        <div className="flex flex-wrap items-center gap-4">
-          <span className="text-sm font-medium">Tool:</span>
-          
-          <div className="flex gap-2">
-            <label className="flex items-center gap-1">
-              <input
-                type="radio"
-                name="tool"
-                value="tiles"
-                checked={tool === 'tiles'}
-                onChange={(e) => handleToolChange(e.target.value)}
-                className="w-4 h-4"
-              />
-              <span className="text-sm">Tiles</span>
-            </label>
-
-            <label className="flex items-center gap-1">
-              <input
-                type="radio"
-                name="tool"
-                value="collision"
-                checked={tool === 'collision'}
-                onChange={(e) => handleToolChange(e.target.value)}
-                className="w-4 h-4"
-              />
-              <span className="text-sm">Collision</span>
-            </label>
-
-            <label className="flex items-center gap-1">
-              <input
-                type="radio"
-                name="tool"
-                value="objects"
-                checked={tool === 'objects'}
-                onChange={(e) => handleToolChange(e.target.value)}
-                className="w-4 h-4"
-              />
-              <span className="text-sm">Objects</span>
-            </label>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <label className="text-sm">Object Type:</label>
-            <Select value={objectType} onValueChange={setObjectType}>
-              <SelectTrigger className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="event">event (door)</SelectItem>
-                <SelectItem value="npc">npc</SelectItem>
-                <SelectItem value="spawn">spawn</SelectItem>
-                <SelectItem value="obstacle">obstacle</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
       </header>
 
       {/* Main Content */}
@@ -317,24 +393,146 @@ function App() {
 
           {/* Layers Section */}
           <section>
-            <h2 className="text-lg font-semibold mb-3">Layers</h2>
-            <div id="layersList" className="mb-3"></div>
-            <div className="flex gap-2 mb-2">
-              <Button size="sm" title="Add new tile layer">
-                <Plus className="w-4 h-4 mr-1" />
-                Layer
-              </Button>
-              <Button size="sm" variant="outline" title="Move layer up">
-                <ChevronUp className="w-4 h-4" />
-              </Button>
-              <Button size="sm" variant="outline" title="Move layer down">
-                <ChevronDown className="w-4 h-4" />
-              </Button>
-              <Button size="sm" variant="destructive" title="Delete layer">
-                <X className="w-4 h-4" />
-              </Button>
+            <h2 className="text-sm font-semibold mb-2">Layers</h2>
+            
+            {/* Layers List */}
+            <div className="mb-2 space-y-1">
+              {layers.map((layer) => (
+                <div
+                  key={layer.id}
+                  className={`p-2 border rounded transition-colors text-sm ${
+                    activeLayerId === layer.id ? 'border-blue-500 bg-blue-50' : 'hover:bg-gray-50'
+                  }`}
+                >
+                  {editingLayerId === layer.id ? (
+                    // Editing mode
+                    <div className="space-y-2">
+                      <Input
+                        value={editingLayerName}
+                        onChange={(e) => setEditingLayerName(e.target.value)}
+                        className="text-sm h-6"
+                        autoFocus
+                      />
+                      <Select 
+                        value={editingLayerType} 
+                        onValueChange={(value) => setEditingLayerType(value as 'background' | 'object' | 'collision' | 'event' | 'enemy' | 'npc')}
+                      >
+                        <SelectTrigger className="h-6 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="background">Background</SelectItem>
+                          <SelectItem value="object">Object</SelectItem>
+                          <SelectItem value="collision">Collision</SelectItem>
+                          <SelectItem value="event">Event</SelectItem>
+                          <SelectItem value="enemy">Enemy</SelectItem>
+                          <SelectItem value="npc">NPC</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <div className="flex gap-1">
+                        <Button size="sm" onClick={handleSaveLayerEdit} className="h-6 text-xs px-2">
+                          Save
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={handleCancelLayerEdit} className="h-6 text-xs px-2">
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    // Normal display mode
+                    <div 
+                      className="cursor-pointer"
+                      onClick={() => handleSetActiveLayer(layer.id)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleLayerVisibility(layer.id);
+                            }}
+                            className="text-xs"
+                          >
+                            {layer.visible ? '👁️' : '🚫'}
+                          </button>
+                          <span className="text-sm font-medium">{layer.name}</span>
+                          <span className="text-xs text-gray-500">({layer.type})</span>
+                        </div>
+                        <div className="flex gap-1">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteLayer(layer.id);
+                            }}
+                            className="text-xs hover:bg-red-200 p-1 rounded text-red-600"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+              
+              {/* Add Layer Dropdown */}
+              <div className="relative">
+                <div
+                  className="p-2 border rounded cursor-pointer transition-colors text-sm border-dashed border-gray-300 hover:bg-gray-50 hover:border-gray-400"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleAddLayer();
+                  }}
+                >
+                  <div className="flex items-center justify-center gap-2 text-gray-600">
+                    <Plus className="w-4 h-4" />
+                    <span className="text-sm font-medium">Add Layer</span>
+                  </div>
+                </div>
+                
+                {/* Dropdown Menu */}
+                {showAddLayerDropdown && (
+                  <div 
+                    className="absolute top-full left-0 right-0 mt-1 bg-white border rounded shadow-lg z-50"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {(() => {
+                      const allTypes: ('npc' | 'enemy' | 'event' | 'collision' | 'object' | 'background')[] = 
+                        ['npc', 'enemy', 'event', 'collision', 'object', 'background'];
+                      const existingTypes = layers.map(layer => layer.type);
+                      const availableTypes = allTypes.filter(type => !existingTypes.includes(type));
+                      
+                      const typeLabels = {
+                        'npc': 'NPC Layer',
+                        'enemy': 'Enemy Layer',
+                        'event': 'Event Layer',
+                        'collision': 'Collision Layer',
+                        'object': 'Object Layer',
+                        'background': 'Background Layer'
+                      };
+
+                      if (availableTypes.length === 0) {
+                        return (
+                          <div className="p-2 text-xs text-gray-500 text-center">
+                            All layer types already exist
+                          </div>
+                        );
+                      }
+
+                      return availableTypes.map(type => (
+                        <div
+                          key={type}
+                          className="p-2 text-sm hover:bg-gray-100 cursor-pointer transition-colors"
+                          onClick={() => handleCreateLayer(type)}
+                        >
+                          {typeLabels[type]}
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="text-xs text-muted-foreground">Collision & Objects managed separately.</div>
           </section>
         </aside>
 
@@ -390,6 +588,7 @@ function App() {
           <div className="text-sm text-muted-foreground p-2 flex-shrink-0" id="hoverInfo">{hoverInfo}</div>
         </section>
       </main>
+      <Toaster />
     </div>
   );
 }

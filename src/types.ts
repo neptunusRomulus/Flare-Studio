@@ -85,7 +85,7 @@ export interface UndoRedoState {
   timestamp: number;
 }
 
-export type Tool = 'tiles' | 'brush' | 'eraser' | 'bucket' | 'selection';
+export type Tool = 'tiles' | 'brush' | 'eraser' | 'bucket' | 'selection' | 'shape' | 'eyedropper' | 'stamp';
 
 export type Orientation = 'isometric';
 
@@ -117,3 +117,22 @@ export interface EditorElements {
   addPropertyBtn: HTMLButtonElement;
   miniMapCanvas: HTMLCanvasElement;
 }
+
+// Stamp-related types
+export interface StampTile {
+  tileId: number;
+  layerId: number;
+  x: number;
+  y: number;
+}
+
+export interface Stamp {
+  id: string;
+  name: string;
+  width: number;
+  height: number;
+  tiles: StampTile[];
+  thumbnail?: string; // Base64 encoded image for preview
+}
+
+export type StampMode = 'select' | 'create' | 'place';

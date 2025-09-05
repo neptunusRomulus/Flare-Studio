@@ -187,17 +187,17 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
         <div className="flex-1 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
           <div className="text-center mb-6">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-orange-100 rounded-full mb-4">
-              <img src="/flare-logo.png" alt="Flare Logo" className="w-10 h-10 object-contain" />
+            <div className="inline-flex items-center justify-center">
+              <img src="/flare-logo.png" alt="Flare Logo" className="w-40 h-40 object-contain" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900">Create New Map</h2>
-            <p className="text-gray-600 mt-2">Configure your new tile map project</p>
+            <h2 className="text-2xl font-bold text-gray-900">Create a New Flare Project</h2>
+            <p className="text-gray-600 mt-2">Configure your new project</p>
           </div>
 
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Map Name
+                Project Name
               </label>
               <Input
                 value={mapConfig.name}
@@ -280,7 +280,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col">
       {/* Custom Title Bar */}
       <div className="bg-gray-100 text-orange-600 flex justify-between items-center px-4 py-1 select-none drag-region border-b border-gray-200">
-        <div className="text-sm font-medium">Tile Map Editor</div>
+        <div className="text-sm font-medium">Flarism</div> {/* TODO: ADD A SMALL ICON BEFORE THIS TEXT */}
         <div className="flex no-drag">
           <button 
             onClick={handleMinimize}
@@ -310,7 +310,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
         {/* Left Sidebar - Recent Maps */}
         <div className="w-80 bg-white border-r border-slate-200 p-6">
           <div className="mb-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Maps</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Projects</h3>
             <div className="space-y-2">
               {recentMaps.map((map) => (
                 <div
@@ -335,8 +335,8 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
           {recentMaps.length === 0 && (
             <div className="text-center text-gray-500 py-8">
               <Grid3X3 className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-              <p>No recent maps</p>
-              <p className="text-sm">Create your first map to get started</p>
+              <p>No recent project</p>
+              <p className="text-sm">Create your first projet to get started</p>
             </div>
           )}
         </div>
@@ -345,12 +345,11 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
         <div className="flex-1 flex items-center justify-center p-8">
           <div className="text-center max-w-md">
             {/* Logo */}
-            <div className="mb-8">
-              <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl mb-4 shadow-lg">
-                <img src="/flare-logo.png" alt="Flare Logo" className="w-16 h-16 object-contain" />
+            <div className="mb-3">
+              <div className="inline-flex items-center justify-center w-50 h-20">
+                <img src="/flare-logo.png" alt="Flare Logo" className="w-100 h-100 object-contain"/>
               </div>
-              <h1 className="text-4xl font-bold text-gray-900 mb-2">Flarism</h1>
-              <p className="text-gray-600 text-lg">Map creator for Flare</p>
+              <p className="text-gray-600 text-lg">Modern & Simple GUI for Flare</p>
             </div>
 
             {/* Action Buttons */}
@@ -361,7 +360,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
                 size="lg"
               >
                 <Plus className="w-5 h-5 mr-2" />
-                Create New Map
+                Create New Projet
               </Button>
 
               <Button 
@@ -371,7 +370,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
                 size="lg"
               >
                 <FolderOpen className="w-5 h-5 mr-2" />
-                Open Map Project
+                Open Existing Project
               </Button>
             </div>
           </div>

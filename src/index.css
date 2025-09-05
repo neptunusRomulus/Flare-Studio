@@ -106,11 +106,17 @@
 }
 
 .palette-tile {
-    width: 32px;
-    height: 32px;
+    min-width: 32px;
+    min-height: 32px;
+    max-width: 128px;
+    max-height: 128px;
     border: 1px solid hsl(var(--border));
     cursor: pointer;
     image-rendering: pixelated;
+    display: inline-block;
+    margin: 2px;
+    vertical-align: top;
+    object-fit: contain;
 }
 
 .palette-tile:hover {

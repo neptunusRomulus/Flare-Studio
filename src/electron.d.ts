@@ -19,6 +19,11 @@ interface ProjectMapData {
   tilesets: any[];
   tilesetImages: { [key: string]: string };
   version: string;
+  // Optional editor-specific fields to preserve brush mapping and settings
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  detectedTileData?: Array<[number, any]>;
+  tileContentThreshold?: number;
+  objectSeparationSensitivity?: number;
 }
 
 declare global {
@@ -31,7 +36,11 @@ declare global {
       createMapProject: (config: MapConfig) => Promise<boolean>;
       openMapProject: (projectPath: string) => Promise<MapConfig | null>;
       saveMapProject: (projectPath: string, mapData: ProjectMapData) => Promise<boolean>;
-  discoverTilesetImages: (projectPath: string) => Promise<{ tilesetImages: { [key: string]: string }; tilesets: { name: string; fileName: string }[] }>;
+      discoverTilesetImages: (projectPath: string) => Promise<{ tilesetImages: { [key: string]: string }; tilesets: { name: string; fileName: string }[] }>;
+      // Menu event listeners
+      onMenuNewMap: (callback: () => void) => void;
+      onMenuOpenMap: (callback: () => void) => void;
+      onMenuSaveMap: (callback: () => void) => void;
     };
   }
 }

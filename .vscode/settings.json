@@ -17,5 +17,6 @@
     "javascript": "javascript",
     "css": "css"
   },
-  "tailwindCSS.emmetCompletions": true
+  "tailwindCSS.emmetCompletions": true,
+  "chatgpt.openOnStartup": false
 }

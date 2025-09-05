@@ -3564,12 +3564,16 @@ export class TileMapEditor {
         tileSize: 64,
         layers: this.tileLayers,
         objects: this.objects,
-        tilesets: [{
+        tilesets: this.tilesetFileName ? [{
           name: this.tilesetFileName || 'tileset.png',
           fileName: this.tilesetFileName
-        }],
+        }] : [],
         tilesetImages,
-        version: "1.0"
+        version: "1.0",
+        // Persist brush detection mapping and settings so GIDs remain stable across sessions
+        detectedTileData: Array.from(this.detectedTileData.entries()),
+        tileContentThreshold: this.tileContentThreshold,
+        objectSeparationSensitivity: this.objectSeparationSensitivity
       };
 
       console.log('Project data prepared:', {
@@ -3704,20 +3708,63 @@ export class TileMapEditor {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   public loadProjectData(projectData: any): void {
     try {
-      if (projectData.layers && projectData.layers.length > 0) {
-        this.tileLayers = projectData.layers;
+      console.log('=== LOADING PROJECT DATA IN EDITOR ===');
+      console.log('Project data:', {
+        hasLayers: !!(projectData.layers && projectData.layers.length > 0),
+        layerCount: projectData.layers ? projectData.layers.length : 0,
+        hasObjects: !!(projectData.objects && projectData.objects.length > 0),
+        objectCount: projectData.objects ? projectData.objects.length : 0,
+        width: projectData.width,
+        height: projectData.height
+      });
+      
+      // Restore brush-related settings and mapping if available
+      if (projectData.tileContentThreshold !== undefined) {
+        this.tileContentThreshold = projectData.tileContentThreshold;
+      }
+      if (projectData.objectSeparationSensitivity !== undefined) {
+        this.objectSeparationSensitivity = projectData.objectSeparationSensitivity;
+      }
+
+      if (projectData.detectedTileData && Array.isArray(projectData.detectedTileData)) {
+        this.detectedTileData.clear();
+        for (const [gid, data] of projectData.detectedTileData) {
+          this.detectedTileData.set(gid, data);
+        }
       }
       
-      if (projectData.objects) {
-        this.objects = projectData.objects;
+      // Load layer data if available
+      if (projectData.layers && projectData.layers.length > 0) {
+        console.log('Loading layers:', projectData.layers.length);
+        this.tileLayers = [...projectData.layers]; // Create new array
+        
+        // Ensure we have a valid active layer
+        if (this.tileLayers.length > 0) {
+          // Set the first layer as active if no active layer is set
+          if (!this.activeLayerId || !this.tileLayers.find(l => l.id === this.activeLayerId)) {
+            this.activeLayerId = this.tileLayers[0].id;
+            console.log('Set active layer to:', this.activeLayerId);
+          }
+        }
+      } else {
+        console.log('No layers found in project data, creating default layers');
+        this.createDefaultLayers();
+      }
+      
+      // Load object data if available
+      if (projectData.objects && projectData.objects.length > 0) {
+        console.log('Loading objects:', projectData.objects.length);
+        this.objects = [...projectData.objects]; // Create new array
       }
       
       // Set dimensions if provided
       if (projectData.width && projectData.height) {
+        console.log('Setting map dimensions:', projectData.width, 'x', projectData.height);
         this.mapWidth = projectData.width;
         this.mapHeight = projectData.height;
       }
       
+      console.log('Project data loaded successfully');
       this.draw();
     } catch (error) {
       console.error('Error loading project data:', error);
@@ -3731,10 +3778,12 @@ export class TileMapEditor {
       const img = new Image();
       img.onload = () => {
         console.log('Tileset image loaded successfully:', img.width, 'x', img.height);
+        
+        // Store the tileset image and properties
         this.tilesetImage = img;
         this.tilesetFileName = fileName;
         
-        // Calculate tileset properties and create palette (same as in handleFileUpload)
+        // Calculate tileset properties
         this.tilesetColumns = Math.floor(img.width / this.tileSizeX);
         this.tilesetRows = Math.floor(img.height / this.tileSizeY);
         this.tileCount = this.tilesetColumns * this.tilesetRows;
@@ -3745,8 +3794,33 @@ export class TileMapEditor {
           tileCount: this.tileCount
         });
         
-        // Create the tile palette
-        this.createTilePalette();
+        // Get the current active layer type
+        const activeLayer = this.tileLayers.find(l => l.id === this.activeLayerId);
+        if (activeLayer) {
+          console.log('Setting tileset for active layer type:', activeLayer.type);
+          
+          // Store the tileset for the current layer type
+          this.layerTilesets.set(activeLayer.type, {
+            image: img,
+            fileName: fileName,
+            columns: this.tilesetColumns,
+            rows: this.tilesetRows,
+            count: this.tileCount
+          });
+        } else {
+          console.log('No active layer found, storing as global tileset');
+        }
+        
+        // Preserve existing detected tile mapping if it was loaded from project data
+        const hasSavedBrushMapping = this.detectedTileData.size > 0;
+        if (!hasSavedBrushMapping) {
+          // Clear previous detection data only when we don't have a saved mapping
+          this.detectedTileData.clear();
+        }
+        // Create the tile palette (preserve order if mapping exists)
+        this.createTilePalette(hasSavedBrushMapping);
+        
+        console.log('Tile detection completed, detected tiles:', this.detectedTileData.size);
         
         this.draw();
         console.log('Tileset loaded and palette created');

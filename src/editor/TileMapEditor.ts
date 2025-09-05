@@ -22,9 +22,9 @@ export class TileMapEditor {
   }
 
   // Force regeneration of tile palette with current settings
-  public refreshTilePalette(): void {
+  public refreshTilePalette(preserveOrder: boolean = false): void {
     if (this.tilesetImage) {
-      this.createTilePalette();
+      this.createTilePalette(preserveOrder);
     }
   }
 
@@ -166,11 +166,15 @@ export class TileMapEditor {
     const [movedBrush] = brushArray.splice(fromIndex, 1);
     brushArray.splice(toIndex, 0, movedBrush);
     
-    // Rebuild the map with new order
+    // Rebuild the map with new order and reassign IDs sequentially
     this.detectedTileData.clear();
-    brushArray.forEach(([id, data]) => {
-      this.detectedTileData.set(id, data);
+    brushArray.forEach(([oldId, data], newIndex) => {
+      // Use newIndex as the new ID to maintain sequential order
+      this.detectedTileData.set(newIndex, data);
     });
+    
+    // Rebuild the tile palette to reflect the new order
+    this.createTilePalette(true);
     
     console.log(`Reordered brush from index ${fromIndex} to ${toIndex}`);
   }
@@ -1318,30 +1322,48 @@ export class TileMapEditor {
     }
   }
 
-  private createTilePalette(): void {
+  private createTilePalette(preserveOrder: boolean = false): void {
     const container = document.getElementById('tilesContainer');
     if (!container || !this.tilesetImage) return;
     
     container.innerHTML = '';
     
-    // Clear previous tile data
-    this.detectedTileData.clear();
+    let tilesToRender: Array<{index: number, sourceX: number, sourceY: number, width: number, height: number}>;
     
-    // Detect tiles with variable sizes
-    const detectedTiles = this.detectVariableSizedTiles();
+    if (preserveOrder && this.detectedTileData.size > 0) {
+      // Use existing ordered data
+      tilesToRender = Array.from(this.detectedTileData.entries()).map(([index, data]) => ({
+        index,
+        sourceX: data.sourceX,
+        sourceY: data.sourceY,
+        width: data.width,
+        height: data.height
+      }));
+    } else {
+      // Clear previous tile data and detect new tiles
+      this.detectedTileData.clear();
+      
+      // Detect tiles with variable sizes
+      const detectedTiles = this.detectVariableSizedTiles();
+      
+      tilesToRender = detectedTiles.map(tile => {
+        // Store tile data for later use in drawing
+        this.detectedTileData.set(tile.index, {
+          sourceX: tile.sourceX,
+          sourceY: tile.sourceY,
+          width: tile.width,
+          height: tile.height
+        });
+        return tile;
+      });
+    }
     
     let validTileIndex = 0;
     
-    for (const tile of detectedTiles) {
-      // Store tile data for later use in drawing
-      this.detectedTileData.set(tile.index, {
-        sourceX: tile.sourceX,
-        sourceY: tile.sourceY,
-        width: tile.width,
-        height: tile.height
-      });
-      
+    for (const tile of tilesToRender) {
       const canvas = document.createElement('canvas');
+      canvas.width = tile.width;
+      canvas.height = tile.height;
       canvas.width = tile.width;
       canvas.height = tile.height;
       canvas.className = 'palette-tile';
@@ -1425,6 +1447,88 @@ export class TileMapEditor {
         }
       });
       
+      // Add drag and drop functionality for move tool
+      wrapper.draggable = false; // Will be set to true when move tool is active
+      
+      wrapper.addEventListener('dragstart', (e) => {
+        const brushToolElement = document.querySelector('[data-brush-tool]');
+        const currentBrushTool = brushToolElement?.getAttribute('data-brush-tool') || 'none';
+        
+        if (currentBrushTool === 'move') {
+          wrapper.style.opacity = '0.5';
+          e.dataTransfer!.effectAllowed = 'move';
+          e.dataTransfer!.setData('text/plain', tile.index.toString());
+          this.dispatchBrushEvent('dragstart', tile.index);
+        } else {
+          e.preventDefault();
+        }
+      });
+      
+      wrapper.addEventListener('dragend', (e) => {
+        wrapper.style.opacity = '1';
+        this.dispatchBrushEvent('dragend', tile.index);
+      });
+      
+      wrapper.addEventListener('dragover', (e) => {
+        const brushToolElement = document.querySelector('[data-brush-tool]');
+        const currentBrushTool = brushToolElement?.getAttribute('data-brush-tool') || 'none';
+        
+        if (currentBrushTool === 'move') {
+          e.preventDefault();
+          e.dataTransfer!.dropEffect = 'move';
+          wrapper.style.borderTop = '3px solid #007acc';
+        }
+      });
+      
+      wrapper.addEventListener('dragleave', (e) => {
+        wrapper.style.borderTop = '';
+      });
+      
+      wrapper.addEventListener('drop', (e) => {
+        e.preventDefault();
+        wrapper.style.borderTop = '';
+        
+        const brushToolElement = document.querySelector('[data-brush-tool]');
+        const currentBrushTool = brushToolElement?.getAttribute('data-brush-tool') || 'none';
+        
+        if (currentBrushTool === 'move') {
+          const draggedTileIndex = parseInt(e.dataTransfer!.getData('text/plain'));
+          const targetTileIndex = tile.index;
+          
+          if (draggedTileIndex !== targetTileIndex) {
+            this.dispatchBrushEvent('drop', { from: draggedTileIndex, to: targetTileIndex });
+          }
+        }
+      });
+      
+      // Update draggable property when brush tool changes
+      const updateDraggable = () => {
+        const brushToolElement = document.querySelector('[data-brush-tool]');
+        const currentBrushTool = brushToolElement?.getAttribute('data-brush-tool') || 'none';
+        wrapper.draggable = currentBrushTool === 'move';
+        
+        if (currentBrushTool === 'move') {
+          wrapper.style.cursor = 'move';
+          wrapper.title = 'Drag to reorder';
+        } else {
+          wrapper.style.cursor = '';
+          wrapper.title = '';
+        }
+      };
+      
+      // Initial setup
+      updateDraggable();
+      
+      // Listen for brush tool changes
+      const observer = new MutationObserver(() => {
+        updateDraggable();
+      });
+      
+      const brushToolElement = document.querySelector('[data-brush-tool]');
+      if (brushToolElement) {
+        observer.observe(brushToolElement, { attributes: true, attributeFilter: ['data-brush-tool'] });
+      }
+      
       // Add hover effects for remove tool
       wrapper.addEventListener('mouseenter', () => {
         const brushToolElement = document.querySelector('[data-brush-tool]');
@@ -1486,9 +1590,9 @@ export class TileMapEditor {
     this.dispatchBrushEvent('remove', tileIndex);
   }
 
-  private dispatchBrushEvent(action: string, tileIndex: number): void {
+  private dispatchBrushEvent(action: string, data: number | { from: number; to: number }): void {
     const event = new CustomEvent('brushAction', {
-      detail: { action, tileIndex }
+      detail: typeof data === 'number' ? { action, tileIndex: data } : { action, ...data }
     });
     document.dispatchEvent(event);
   }

@@ -178,6 +178,25 @@
     background: rgba(255, 0, 0, 0.9);
 }
 
+/* Drag and drop styles for move tool */
+.brush-wrapper[draggable="true"] {
+    cursor: move !important;
+}
+
+.brush-wrapper[draggable="true"]:hover {
+    transform: scale(1.05);
+    transition: transform 0.2s ease;
+}
+
+.brush-wrapper[draggable="true"] .palette-tile {
+    border: 2px dashed #007acc;
+}
+
+.brush-wrapper.drag-over {
+    border-top: 3px solid #007acc !important;
+    background: rgba(0, 122, 204, 0.1);
+}
+
 .tool-active {
     background: hsl(var(--primary)) !important;
     color: hsl(var(--primary-foreground)) !important;

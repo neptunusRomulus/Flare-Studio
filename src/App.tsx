@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, Download, Undo2, Redo2, Plus, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Sliders, MapPin, Save } from 'lucide-react';
+import { Upload, Download, Undo2, Redo2, Plus, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Sliders, MapPin, Save, ArrowUpDown, Link2, Scissors, Trash2, Check } from 'lucide-react';
 import { TileMapEditor } from './editor/TileMapEditor';
 import { TileLayer } from './types';
 import { useToast } from '@/hooks/use-toast';
@@ -504,8 +504,6 @@ function App() {
       editor.mergeBrushes(selectedBrushes);
       setSelectedBrushes([]);
       setBrushTool('none');
-      // Force refresh of tile palette
-      editor.refreshTilePalette();
     } catch (error) {
       console.error('Failed to merge brushes:', error);
     }
@@ -521,8 +519,6 @@ function App() {
     
     try {
       editor.separateBrush(brushId);
-      // Force refresh of tile palette
-      editor.refreshTilePalette();
     } catch (error) {
       console.error('Failed to separate brush:', error);
     }
@@ -531,15 +527,16 @@ function App() {
   const handleRemoveBrush = useCallback((brushId: number) => {
     if (!editor) return;
     
+    console.log(`handleRemoveBrush called with brushId: ${brushId}`);
     const confirmed = window.confirm('Are you sure you want to remove this brush?');
     if (confirmed) {
       try {
         editor.removeBrush(brushId);
-        // Force refresh of tile palette
-        editor.refreshTilePalette();
       } catch (error) {
         console.error('Failed to remove brush:', error);
       }
+    } else {
+      console.log('Brush removal cancelled by user');
     }
   }, [editor]);
 
@@ -579,15 +576,18 @@ function App() {
 
   // Effect to handle brush tool state changes
   useEffect(() => {
+    console.log(`Brush tool changed to: ${brushTool}`);
     const brushToolElement = document.querySelector('[data-brush-tool]');
     if (brushToolElement) {
       brushToolElement.setAttribute('data-brush-tool', brushTool);
+      console.log(`Updated existing data-brush-tool attribute to: ${brushTool}`);
     } else {
       // Create the brush tool state element if it doesn't exist
       const stateElement = document.createElement('div');
       stateElement.setAttribute('data-brush-tool', brushTool);
       stateElement.style.display = 'none';
       document.body.appendChild(stateElement);
+      console.log(`Created new data-brush-tool element with value: ${brushTool}`);
     }
   }, [brushTool]);
 
@@ -1109,7 +1109,7 @@ function App() {
                     onClick={() => setBrushTool(brushTool === 'move' ? 'none' : 'move')}
                     title="Move/Reorder brushes"
                   >
-                    ↕️
+                    <ArrowUpDown className="w-3 h-3" />
                   </Button>
                   <Button
                     variant={brushTool === 'merge' ? 'default' : 'outline'}
@@ -1118,7 +1118,7 @@ function App() {
                     onClick={() => setBrushTool(brushTool === 'merge' ? 'none' : 'merge')}
                     title="Merge brushes"
                   >
-                    🔗
+                    <Link2 className="w-3 h-3" />
                   </Button>
                   <Button
                     variant={brushTool === 'separate' ? 'default' : 'outline'}
@@ -1127,7 +1127,7 @@ function App() {
                     onClick={() => setBrushTool(brushTool === 'separate' ? 'none' : 'separate')}
                     title="Separate brushes"
                   >
-                    ✂️
+                    <Scissors className="w-3 h-3" />
                   </Button>
                   <Button
                     variant={brushTool === 'remove' ? 'default' : 'outline'}
@@ -1136,7 +1136,7 @@ function App() {
                     onClick={() => setBrushTool(brushTool === 'remove' ? 'none' : 'remove')}
                     title="Remove brushes"
                   >
-                    🗑️
+                    <Trash2 className="w-3 h-3" />
                   </Button>
                 </div>
                 
@@ -1154,7 +1154,7 @@ function App() {
                       disabled={selectedBrushes.length < 2}
                       title="Approve merge"
                     >
-                      ✓
+                      <Check className="w-3 h-3" />
                     </Button>
                     <Button
                       variant="outline"
@@ -1163,7 +1163,7 @@ function App() {
                       onClick={handleCancelMerge}
                       title="Cancel merge"
                     >
-                      ✕
+                      <X className="w-3 h-3" />
                     </Button>
                   </div>
                 )}

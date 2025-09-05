@@ -69,21 +69,36 @@ export class TileMapEditor {
       maxY = Math.max(maxY, brush.sourceY + brush.height);
     }
     
-    // Create a new merged brush
-    const newBrushId = Math.max(...Array.from(this.detectedTileData.keys())) + 1;
-    this.detectedTileData.set(newBrushId, {
+    // Create merged brush data
+    const mergedBrushData = {
       sourceX: minX,
       sourceY: minY,
       width: maxX - minX,
       height: maxY - minY
+    };
+    
+    // Convert Map to array to work with positions
+    const brushArray = Array.from(this.detectedTileData.entries());
+    
+    // Find the position of the first selected brush (this will be where the merged brush goes)
+    const firstBrushIndex = brushArray.findIndex(([id]) => brushIds.includes(id));
+    
+    // Remove all selected brushes from the array
+    const filteredArray = brushArray.filter(([id]) => !brushIds.includes(id));
+    
+    // Insert the merged brush at the position of the first selected brush
+    filteredArray.splice(firstBrushIndex, 0, [brushIds[0], mergedBrushData]);
+    
+    // Rebuild the map with sequential IDs
+    this.detectedTileData.clear();
+    filteredArray.forEach(([_, data], index) => {
+      this.detectedTileData.set(index, data);
     });
     
-    // Remove the original brushes
-    for (const brushId of brushIds) {
-      this.detectedTileData.delete(brushId);
-    }
+    // Rebuild the tile palette to show the changes
+    this.createTilePalette(true);
     
-    console.log(`Merged ${brushIds.length} brushes into new brush ${newBrushId}`);
+    console.log(`Merged ${brushIds.length} brushes into new brush at position ${firstBrushIndex}`);
   }
 
   public separateBrush(brushId: number): void {
@@ -92,10 +107,18 @@ export class TileMapEditor {
       throw new Error(`Brush ${brushId} not found`);
     }
     
-    // Remove the original brush
-    this.detectedTileData.delete(brushId);
+    // Convert Map to array to work with positions
+    const brushArray = Array.from(this.detectedTileData.entries());
+    
+    // Find the position of the brush to separate
+    const brushIndex = brushArray.findIndex(([id]) => id === brushId);
+    
+    // Remove the original brush from the array
+    const filteredArray = brushArray.filter(([id]) => id !== brushId);
     
     // Try to re-detect individual objects within this brush area
+    const newBrushes: Array<{sourceX: number, sourceY: number, width: number, height: number}> = [];
+    
     if (this.tilesetImage) {
       const tempCanvas = document.createElement('canvas');
       tempCanvas.width = brushData.width;
@@ -114,8 +137,6 @@ export class TileMapEditor {
         const data = imageData.data;
         const visited = new Array(brushData.width * brushData.height).fill(false);
         
-        let newBrushId = Math.max(...Array.from(this.detectedTileData.keys()), 0) + 1;
-        
         // Find connected components within this area
         for (let y = 0; y < brushData.height; y++) {
           for (let x = 0; x < brushData.width; x++) {
@@ -131,7 +152,7 @@ export class TileMapEditor {
             
             if (objectData && this.isValidObjectSize(objectData.bounds)) {
               // Adjust coordinates back to original image space
-              this.detectedTileData.set(newBrushId++, {
+              newBrushes.push({
                 sourceX: brushData.sourceX + objectData.bounds.x,
                 sourceY: brushData.sourceY + objectData.bounds.y,
                 width: objectData.bounds.width,
@@ -140,18 +161,54 @@ export class TileMapEditor {
             }
           }
         }
-        
-        console.log(`Separated brush ${brushId} into ${newBrushId - (Math.max(...Array.from(this.detectedTileData.keys())) + 1)} new brushes`);
       }
     }
+    
+    // Insert the new brushes at the position where the original brush was
+    newBrushes.forEach((brushData, index) => {
+      filteredArray.splice(brushIndex + index, 0, [brushIndex + index, brushData]);
+    });
+    
+    // Rebuild the map with sequential IDs
+    this.detectedTileData.clear();
+    filteredArray.forEach(([_, data], index) => {
+      this.detectedTileData.set(index, data);
+    });
+    
+    // Rebuild the tile palette to show the changes
+    this.createTilePalette(true);
+    
+    console.log(`Separated brush ${brushId} into ${newBrushes.length} new brushes`);
   }
 
   public removeBrush(brushId: number): void {
+    console.log(`removeBrush called with brushId: ${brushId}`);
+    console.log(`detectedTileData keys before removal:`, Array.from(this.detectedTileData.keys()));
+    
     if (!this.detectedTileData.has(brushId)) {
+      console.error(`Brush ${brushId} not found in detectedTileData`);
       throw new Error(`Brush ${brushId} not found`);
     }
     
-    this.detectedTileData.delete(brushId);
+    // Convert Map to array to work with positions
+    const brushArray = Array.from(this.detectedTileData.entries());
+    console.log(`brushArray before filtering:`, brushArray.map(([id, _]) => id));
+    
+    // Remove the brush with the specified ID
+    const filteredArray = brushArray.filter(([id]) => id !== brushId);
+    console.log(`filteredArray after filtering:`, filteredArray.map(([id, _]) => id));
+    
+    // Rebuild the map with sequential IDs
+    this.detectedTileData.clear();
+    filteredArray.forEach(([_, data], index) => {
+      this.detectedTileData.set(index, data);
+    });
+    
+    console.log(`detectedTileData keys after rebuild:`, Array.from(this.detectedTileData.keys()));
+    
+    // Rebuild the tile palette to show the changes
+    this.createTilePalette(true);
+    
     console.log(`Removed brush ${brushId}`);
   }
 
@@ -1333,7 +1390,7 @@ export class TileMapEditor {
     if (preserveOrder && this.detectedTileData.size > 0) {
       // Use existing ordered data
       tilesToRender = Array.from(this.detectedTileData.entries()).map(([index, data]) => ({
-        index,
+        index, // This is now the current Map key (sequential)
         sourceX: data.sourceX,
         sourceY: data.sourceY,
         width: data.width,
@@ -1424,6 +1481,14 @@ export class TileMapEditor {
       removeOverlay.style.zIndex = '10';
       removeOverlay.textContent = '✕';
       
+      // Add click handler to the remove overlay
+      removeOverlay.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log(`Remove overlay clicked for tile index: ${tile.index}`);
+        this.handleBrushRemove(tile.index);
+      });
+      
       canvas.addEventListener('click', (e) => {
         e.preventDefault();
         
@@ -1431,17 +1496,23 @@ export class TileMapEditor {
         const brushToolElement = document.querySelector('[data-brush-tool]');
         const currentBrushTool = brushToolElement?.getAttribute('data-brush-tool') || 'none';
         
+        console.log(`Tile clicked! Index: ${tile.index}, Current brush tool: ${currentBrushTool}`);
+        
         if (currentBrushTool === 'merge') {
           // Handle merge tool selection
+          console.log('Handling merge tool selection');
           this.handleBrushSelection(tile.index, wrapper, selectionNumber);
         } else if (currentBrushTool === 'separate') {
           // Handle separate tool
+          console.log('Handling separate tool');
           this.handleBrushSeparate(tile.index);
         } else if (currentBrushTool === 'remove') {
           // Handle remove tool  
+          console.log('Handling remove tool');
           this.handleBrushRemove(tile.index);
         } else {
           // Normal tile selection
+          console.log('Normal tile selection');
           this.activeGid = tile.index;
           this.updateActiveTile();
         }
@@ -1587,6 +1658,7 @@ export class TileMapEditor {
   }
 
   private handleBrushRemove(tileIndex: number): void {
+    console.log(`handleBrushRemove called with tileIndex: ${tileIndex}`);
     this.dispatchBrushEvent('remove', tileIndex);
   }
 

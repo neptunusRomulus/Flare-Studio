@@ -42,6 +42,197 @@ export class TileMapEditor {
     });
     return tileInfo.sort((a, b) => a.gid - b.gid);
   }
+
+  // Brush management methods
+  public mergeBrushes(brushIds: number[]): void {
+    if (brushIds.length < 2) return;
+    
+    // Get the tile data for all selected brushes
+    const brushesToMerge = brushIds
+      .map(id => this.detectedTileData.get(id))
+      .filter((brush): brush is NonNullable<typeof brush> => brush !== undefined);
+      
+    if (brushesToMerge.length !== brushIds.length) {
+      throw new Error('Some selected brushes not found');
+    }
+    
+    // Calculate the bounding box that encompasses all selected brushes
+    let minX = Number.MAX_SAFE_INTEGER;
+    let minY = Number.MAX_SAFE_INTEGER;
+    let maxX = Number.MIN_SAFE_INTEGER;
+    let maxY = Number.MIN_SAFE_INTEGER;
+    
+    for (const brush of brushesToMerge) {
+      minX = Math.min(minX, brush.sourceX);
+      minY = Math.min(minY, brush.sourceY);
+      maxX = Math.max(maxX, brush.sourceX + brush.width);
+      maxY = Math.max(maxY, brush.sourceY + brush.height);
+    }
+    
+    // Create a new merged brush
+    const newBrushId = Math.max(...Array.from(this.detectedTileData.keys())) + 1;
+    this.detectedTileData.set(newBrushId, {
+      sourceX: minX,
+      sourceY: minY,
+      width: maxX - minX,
+      height: maxY - minY
+    });
+    
+    // Remove the original brushes
+    for (const brushId of brushIds) {
+      this.detectedTileData.delete(brushId);
+    }
+    
+    console.log(`Merged ${brushIds.length} brushes into new brush ${newBrushId}`);
+  }
+
+  public separateBrush(brushId: number): void {
+    const brushData = this.detectedTileData.get(brushId);
+    if (!brushData) {
+      throw new Error(`Brush ${brushId} not found`);
+    }
+    
+    // Remove the original brush
+    this.detectedTileData.delete(brushId);
+    
+    // Try to re-detect individual objects within this brush area
+    if (this.tilesetImage) {
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = brushData.width;
+      tempCanvas.height = brushData.height;
+      const tempCtx = tempCanvas.getContext('2d');
+      
+      if (tempCtx) {
+        // Draw the brush area to analyze
+        tempCtx.drawImage(
+          this.tilesetImage,
+          brushData.sourceX, brushData.sourceY, brushData.width, brushData.height,
+          0, 0, brushData.width, brushData.height
+        );
+        
+        const imageData = tempCtx.getImageData(0, 0, brushData.width, brushData.height);
+        const data = imageData.data;
+        const visited = new Array(brushData.width * brushData.height).fill(false);
+        
+        let newBrushId = Math.max(...Array.from(this.detectedTileData.keys()), 0) + 1;
+        
+        // Find connected components within this area
+        for (let y = 0; y < brushData.height; y++) {
+          for (let x = 0; x < brushData.width; x++) {
+            const pixelIndex = y * brushData.width + x;
+            
+            if (visited[pixelIndex] || this.isPixelTransparent(data, x, y, brushData.width)) {
+              continue;
+            }
+            
+            const objectData = this.floodFillObjectDataInRegion(
+              data, brushData.width, brushData.height, x, y, visited
+            );
+            
+            if (objectData && this.isValidObjectSize(objectData.bounds)) {
+              // Adjust coordinates back to original image space
+              this.detectedTileData.set(newBrushId++, {
+                sourceX: brushData.sourceX + objectData.bounds.x,
+                sourceY: brushData.sourceY + objectData.bounds.y,
+                width: objectData.bounds.width,
+                height: objectData.bounds.height
+              });
+            }
+          }
+        }
+        
+        console.log(`Separated brush ${brushId} into ${newBrushId - (Math.max(...Array.from(this.detectedTileData.keys())) + 1)} new brushes`);
+      }
+    }
+  }
+
+  public removeBrush(brushId: number): void {
+    if (!this.detectedTileData.has(brushId)) {
+      throw new Error(`Brush ${brushId} not found`);
+    }
+    
+    this.detectedTileData.delete(brushId);
+    console.log(`Removed brush ${brushId}`);
+  }
+
+  public reorderBrush(fromIndex: number, toIndex: number): void {
+    // Convert Map to array, reorder, and convert back
+    const brushArray = Array.from(this.detectedTileData.entries());
+    
+    if (fromIndex < 0 || fromIndex >= brushArray.length || toIndex < 0 || toIndex >= brushArray.length) {
+      throw new Error('Invalid brush indices for reordering');
+    }
+    
+    const [movedBrush] = brushArray.splice(fromIndex, 1);
+    brushArray.splice(toIndex, 0, movedBrush);
+    
+    // Rebuild the map with new order
+    this.detectedTileData.clear();
+    brushArray.forEach(([id, data]) => {
+      this.detectedTileData.set(id, data);
+    });
+    
+    console.log(`Reordered brush from index ${fromIndex} to ${toIndex}`);
+  }
+
+  private floodFillObjectDataInRegion(
+    data: Uint8ClampedArray,
+    regionWidth: number,
+    regionHeight: number,
+    startX: number,
+    startY: number,
+    visited: boolean[]
+  ): { bounds: { x: number; y: number; width: number; height: number }; pixels: Array<{x: number, y: number}> } | null {
+    const stack: Array<{x: number, y: number}> = [{x: startX, y: startY}];
+    let minX = startX, maxX = startX, minY = startY, maxY = startY;
+    let pixelCount = 0;
+    const objectPixels: Array<{x: number, y: number}> = [];
+    
+    while (stack.length > 0) {
+      const current = stack.pop()!;
+      const {x, y} = current;
+      
+      if (x < 0 || x >= regionWidth || y < 0 || y >= regionHeight) continue;
+      
+      const pixelIndex = y * regionWidth + x;
+      
+      if (visited[pixelIndex] || this.isPixelTransparent(data, x, y, regionWidth)) {
+        continue;
+      }
+      
+      visited[pixelIndex] = true;
+      pixelCount++;
+      objectPixels.push({x, y});
+      
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y);
+      maxY = Math.max(maxY, y);
+      
+      stack.push({x: x + 1, y: y});
+      stack.push({x: x - 1, y: y});
+      stack.push({x: x, y: y + 1});
+      stack.push({x: x, y: y - 1});
+    }
+    
+    if (pixelCount === 0) return null;
+    
+    const padding = 1;
+    const finalX = Math.max(0, minX - padding);
+    const finalY = Math.max(0, minY - padding);
+    const finalMaxX = Math.min(regionWidth - 1, maxX + padding);
+    const finalMaxY = Math.min(regionHeight - 1, maxY + padding);
+    
+    return {
+      bounds: {
+        x: finalX,
+        y: finalY,
+        width: finalMaxX - finalX + 1,
+        height: finalMaxY - finalY + 1
+      },
+      pixels: objectPixels
+    };
+  }
   private ctx!: CanvasRenderingContext2D;
   private mapCanvas: HTMLCanvasElement;
   private showMinimap: boolean = true;
@@ -1168,9 +1359,84 @@ export class TileMapEditor {
         );
       }
       
-      canvas.addEventListener('click', () => {
-        this.activeGid = tile.index;
-        this.updateActiveTile();
+      // Create a wrapper div for brush management features
+      const wrapper = document.createElement('div');
+      wrapper.className = 'brush-wrapper';
+      wrapper.style.position = 'relative';
+      wrapper.style.display = 'inline-block';
+      wrapper.style.margin = '2px';
+      
+      // Add selection number overlay for merge tool
+      const selectionNumber = document.createElement('div');
+      selectionNumber.className = 'selection-number';
+      selectionNumber.style.position = 'absolute';
+      selectionNumber.style.top = '2px';
+      selectionNumber.style.left = '2px';
+      selectionNumber.style.background = 'red';
+      selectionNumber.style.color = 'white';
+      selectionNumber.style.borderRadius = '50%';
+      selectionNumber.style.width = '16px';
+      selectionNumber.style.height = '16px';
+      selectionNumber.style.fontSize = '10px';
+      selectionNumber.style.display = 'none';
+      selectionNumber.style.alignItems = 'center';
+      selectionNumber.style.justifyContent = 'center';
+      selectionNumber.style.fontWeight = 'bold';
+      selectionNumber.style.zIndex = '10';
+      
+      // Add remove overlay for remove tool
+      const removeOverlay = document.createElement('div');
+      removeOverlay.className = 'remove-overlay';
+      removeOverlay.style.position = 'absolute';
+      removeOverlay.style.top = '0';
+      removeOverlay.style.left = '0';
+      removeOverlay.style.right = '0';
+      removeOverlay.style.bottom = '0';
+      removeOverlay.style.background = 'rgba(255, 0, 0, 0.7)';
+      removeOverlay.style.display = 'none';
+      removeOverlay.style.alignItems = 'center';
+      removeOverlay.style.justifyContent = 'center';
+      removeOverlay.style.fontSize = '24px';
+      removeOverlay.style.color = 'white';
+      removeOverlay.style.cursor = 'pointer';
+      removeOverlay.style.zIndex = '10';
+      removeOverlay.textContent = '✕';
+      
+      canvas.addEventListener('click', (e) => {
+        e.preventDefault();
+        
+        // Get the current brush tool state from the DOM or global state
+        const brushToolElement = document.querySelector('[data-brush-tool]');
+        const currentBrushTool = brushToolElement?.getAttribute('data-brush-tool') || 'none';
+        
+        if (currentBrushTool === 'merge') {
+          // Handle merge tool selection
+          this.handleBrushSelection(tile.index, wrapper, selectionNumber);
+        } else if (currentBrushTool === 'separate') {
+          // Handle separate tool
+          this.handleBrushSeparate(tile.index);
+        } else if (currentBrushTool === 'remove') {
+          // Handle remove tool  
+          this.handleBrushRemove(tile.index);
+        } else {
+          // Normal tile selection
+          this.activeGid = tile.index;
+          this.updateActiveTile();
+        }
+      });
+      
+      // Add hover effects for remove tool
+      wrapper.addEventListener('mouseenter', () => {
+        const brushToolElement = document.querySelector('[data-brush-tool]');
+        const currentBrushTool = brushToolElement?.getAttribute('data-brush-tool') || 'none';
+        
+        if (currentBrushTool === 'remove') {
+          removeOverlay.style.display = 'flex';
+        }
+      });
+      
+      wrapper.addEventListener('mouseleave', () => {
+        removeOverlay.style.display = 'none';
       });
       
       // Add data attributes to track tile properties
@@ -1180,11 +1446,51 @@ export class TileMapEditor {
       canvas.setAttribute('data-source-x', tile.sourceX.toString());
       canvas.setAttribute('data-source-y', tile.sourceY.toString());
       
-      container.appendChild(canvas);
+      wrapper.appendChild(canvas);
+      wrapper.appendChild(selectionNumber);
+      wrapper.appendChild(removeOverlay);
+      container.appendChild(wrapper);
       validTileIndex++;
     }
     
     console.log(`Created ${validTileIndex} variable-sized tiles from tileset`);
+  }
+
+  // Brush management interaction handlers
+  private handleBrushSelection(tileIndex: number, wrapper: HTMLElement, selectionNumber: HTMLElement): void {
+    const isSelected = wrapper.classList.contains('brush-selected');
+    
+    if (isSelected) {
+      // Deselect
+      wrapper.classList.remove('brush-selected');
+      selectionNumber.style.display = 'none';
+      this.dispatchBrushEvent('deselect', tileIndex);
+    } else {
+      // Select
+      wrapper.classList.add('brush-selected');
+      selectionNumber.style.display = 'flex';
+      
+      // Get current selection count to display number
+      const selectedBrushes = document.querySelectorAll('.brush-selected').length;
+      selectionNumber.textContent = selectedBrushes.toString();
+      
+      this.dispatchBrushEvent('select', tileIndex);
+    }
+  }
+
+  private handleBrushSeparate(tileIndex: number): void {
+    this.dispatchBrushEvent('separate', tileIndex);
+  }
+
+  private handleBrushRemove(tileIndex: number): void {
+    this.dispatchBrushEvent('remove', tileIndex);
+  }
+
+  private dispatchBrushEvent(action: string, tileIndex: number): void {
+    const event = new CustomEvent('brushAction', {
+      detail: { action, tileIndex }
+    });
+    document.dispatchEvent(event);
   }
 
   private detectVariableSizedTiles(): Array<{

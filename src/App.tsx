@@ -82,6 +82,10 @@ function App() {
   // Hover coordinates state
   const [hoverCoords, setHoverCoords] = useState<{ x: number; y: number } | null>(null);
   
+  // Selection state
+  const [selectionCount, setSelectionCount] = useState(0);
+  const [hasSelection, setHasSelection] = useState(false);
+  
   const { toast } = useToast();
 
   // Handle dark mode toggle
@@ -158,6 +162,47 @@ function App() {
         cancelAnimationFrame(animationFrameId);
       }
     };
+  }, [editor]);
+
+  // Sync tool selection with editor
+  useEffect(() => {
+    if (editor && selectedTool === 'brush') {
+      // Map selectedBrushTool to editor tool types
+      const toolMap: {[key: string]: 'brush' | 'eraser' | 'bucket'} = {
+        'brush': 'brush',
+        'bucket': 'bucket',
+        'eraser': 'eraser'
+      };
+      const editorTool = toolMap[selectedBrushTool] || 'brush';
+      editor.setCurrentTool(editorTool);
+    } else if (editor && selectedTool === 'selection') {
+      // Set the editor to selection mode and update selection tool
+      const selectionToolMap: {[key: string]: 'rectangular' | 'magic-wand' | 'same-tile' | 'circular'} = {
+        'rectangular': 'rectangular',
+        'magic-wand': 'magic-wand',
+        'same-tile': 'same-tile',
+        'circular': 'circular'
+      };
+      const editorSelectionTool = selectionToolMap[selectedSelectionTool] || 'rectangular';
+      editor.setCurrentSelectionTool(editorSelectionTool);
+    }
+  }, [editor, selectedTool, selectedBrushTool, selectedSelectionTool]);
+
+  // Track selection state
+  useEffect(() => {
+    if (!editor) return;
+
+    const updateSelection = () => {
+      const selection = editor.getSelection();
+      const hasActiveSelection = editor.hasActiveSelection();
+      setSelectionCount(selection.length);
+      setHasSelection(hasActiveSelection);
+    };
+
+    // Poll selection state (could be optimized with callbacks)
+    const intervalId = setInterval(updateSelection, 100);
+
+    return () => clearInterval(intervalId);
   }, [editor]);
 
   // Layer management functions
@@ -713,6 +758,24 @@ function App() {
     }
   };
 
+  const handleFillSelection = () => {
+    if (editor) {
+      editor.fillSelection();
+    }
+  };
+
+  const handleClearSelection = () => {
+    if (editor) {
+      editor.clearSelection();
+    }
+  };
+
+  const handleDeleteSelection = () => {
+    if (editor) {
+      editor.deleteSelection();
+    }
+  };
+
   return (
     <>
       {showWelcome ? (
@@ -1255,6 +1318,45 @@ function App() {
                 <span>{hoverCoords.x}, {hoverCoords.y}</span>
               </div>
             )}
+            
+            {/* Selection Info Display */}
+            {hasSelection && (
+              <div className="absolute bottom-4 left-32 z-10 p-2 bg-orange-600/90 backdrop-blur-sm rounded-md border border-orange-500 text-white text-xs flex items-center gap-3">
+                <div className="flex items-center gap-2 font-mono">
+                  <Square className="w-4 h-4 text-orange-200" />
+                  <span>{selectionCount} tiles selected</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    className="h-6 px-2 text-xs text-white hover:bg-orange-500/50"
+                    onClick={handleFillSelection}
+                    title="Fill selection with active tile"
+                  >
+                    Fill
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    className="h-6 px-2 text-xs text-white hover:bg-orange-500/50"
+                    onClick={handleDeleteSelection}
+                    title="Delete selected tiles (DEL)"
+                  >
+                    Delete
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    className="h-6 px-2 text-xs text-white hover:bg-orange-500/50"
+                    onClick={handleClearSelection}
+                    title="Clear selection (ESC)"
+                  >
+                    Clear
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
           
           {/* Toolbar */}
@@ -1287,7 +1389,7 @@ function App() {
                     onMouseLeave={handleHideBrushOptions}
                   >
                     <Button 
-                      variant="ghost" 
+                      variant={selectedBrushTool === 'brush' ? 'default' : 'ghost'} 
                       size="sm" 
                       className="w-8 h-8 p-0 sub-tool-button"
                       onClick={() => setSelectedBrushTool('brush')}
@@ -1297,7 +1399,7 @@ function App() {
                       <Paintbrush2 className="w-4 h-4" />
                     </Button>
                     <Button 
-                      variant="ghost" 
+                      variant={selectedBrushTool === 'bucket' ? 'default' : 'ghost'} 
                       size="sm" 
                       className="w-8 h-8 p-0 sub-tool-button"
                       onClick={() => setSelectedBrushTool('bucket')}
@@ -1307,7 +1409,7 @@ function App() {
                       <PaintBucket className="w-4 h-4" />
                     </Button>
                     <Button 
-                      variant="ghost" 
+                      variant={selectedBrushTool === 'eraser' ? 'default' : 'ghost'} 
                       size="sm" 
                       className="w-8 h-8 p-0 sub-tool-button"
                       onClick={() => setSelectedBrushTool('eraser')}
@@ -1346,7 +1448,7 @@ function App() {
                     onMouseLeave={handleHideSelectionOptions}
                   >
                     <Button 
-                      variant="ghost" 
+                      variant={selectedSelectionTool === 'rectangular' ? 'default' : 'ghost'} 
                       size="sm" 
                       className="w-8 h-8 p-0 sub-tool-button"
                       onClick={() => setSelectedSelectionTool('rectangular')}
@@ -1356,7 +1458,7 @@ function App() {
                       <Square className="w-4 h-4" />
                     </Button>
                     <Button 
-                      variant="ghost" 
+                      variant={selectedSelectionTool === 'magic-wand' ? 'default' : 'ghost'} 
                       size="sm" 
                       className="w-8 h-8 p-0 sub-tool-button"
                       onClick={() => setSelectedSelectionTool('magic-wand')}
@@ -1366,7 +1468,7 @@ function App() {
                       <Wand2 className="w-4 h-4" />
                     </Button>
                     <Button 
-                      variant="ghost" 
+                      variant={selectedSelectionTool === 'same-tile' ? 'default' : 'ghost'} 
                       size="sm" 
                       className="w-8 h-8 p-0 sub-tool-button"
                       onClick={() => setSelectedSelectionTool('same-tile')}
@@ -1376,7 +1478,7 @@ function App() {
                       <Target className="w-4 h-4" />
                     </Button>
                     <Button 
-                      variant="ghost" 
+                      variant={selectedSelectionTool === 'circular' ? 'default' : 'ghost'} 
                       size="sm" 
                       className="w-8 h-8 p-0 sub-tool-button"
                       onClick={() => setSelectedSelectionTool('circular')}

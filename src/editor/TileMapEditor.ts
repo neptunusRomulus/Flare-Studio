@@ -52,8 +52,28 @@ export class TileMapEditor {
 
   // Tool and interaction state
   private tool: Tool = 'tiles';
+  private currentTool: 'brush' | 'eraser' | 'bucket' = 'brush';
+  private currentSelectionTool: 'rectangular' | 'magic-wand' | 'same-tile' | 'circular' = 'rectangular';
   private activeGid: number = 0;
   private isMouseDown: boolean = false;
+
+  // Selection state
+  private selection: {
+    active: boolean;
+    startX: number;
+    startY: number;
+    endX: number;
+    endY: number;
+    tiles: Array<{x: number, y: number, gid: number}>;
+  } = {
+    active: false,
+    startX: -1,
+    startY: -1,
+    endX: -1,
+    endY: -1,
+    tiles: []
+  };
+  private isSelecting: boolean = false;
 
   // Hover state
   private hoverX: number = -1;
@@ -197,11 +217,15 @@ export class TileMapEditor {
       this.lastPanY = y;
       this.mapCanvas.style.cursor = 'grabbing';
     } else {
-      // Normal tile editing
+      // Normal tile editing or selection
       this.isMouseDown = true;
       const tileCoords = this.screenToTile(x, y);
       if (tileCoords) {
-        this.handleTileClick(tileCoords.x, tileCoords.y, event.button === 2);
+        if (this.tool === 'tiles') {
+          this.handleTileClick(tileCoords.x, tileCoords.y, event.button === 2);
+        } else {
+          this.handleSelectionStart(tileCoords.x, tileCoords.y, event.button === 2);
+        }
       }
     }
   }
@@ -226,7 +250,11 @@ export class TileMapEditor {
         this.hoverY = tileCoords.y;
         
         if (this.isMouseDown && !this.spacePressed) {
-          this.handleTileClick(tileCoords.x, tileCoords.y, false);
+          if (this.tool === 'tiles') {
+            this.handleTileClick(tileCoords.x, tileCoords.y, false);
+          } else if (this.isSelecting) {
+            this.handleSelectionDrag(tileCoords.x, tileCoords.y);
+          }
         }
       }
     }
@@ -235,6 +263,9 @@ export class TileMapEditor {
   }
 
   private handleMouseUp(): void {
+    if (this.isSelecting) {
+      this.handleSelectionEnd();
+    }
     this.isMouseDown = false;
     this.isPanning = false;
   }
@@ -251,6 +282,29 @@ export class TileMapEditor {
       event.preventDefault();
       this.spacePressed = true;
       this.mapCanvas.style.cursor = 'grab';
+    }
+    
+    // Selection shortcuts
+    if (event.ctrlKey || event.metaKey) {
+      switch (event.code) {
+        case 'KeyA':
+          event.preventDefault();
+          this.selectAll();
+          break;
+      }
+    }
+    
+    // Other shortcuts
+    switch (event.code) {
+      case 'Delete':
+      case 'Backspace':
+        event.preventDefault();
+        this.deleteSelection();
+        break;
+      case 'Escape':
+        event.preventDefault();
+        this.clearSelection();
+        break;
     }
   }
 
@@ -279,15 +333,99 @@ export class TileMapEditor {
       if (layer) {
         const index = y * this.mapWidth + x;
         const currentValue = layer.data[index];
-        const newValue = isRightClick ? 0 : this.activeGid;
+        let newValue: number;
+
+        // Determine the action based on right-click or current tool
+        if (isRightClick) {
+          // Right-click always acts as eraser
+          newValue = 0;
+        } else {
+          // Left-click behavior depends on current tool
+          switch (this.currentTool) {
+            case 'brush':
+              newValue = this.activeGid;
+              break;
+            case 'eraser':
+              newValue = 0;
+              break;
+            case 'bucket':
+              // Bucket fill uses a different approach
+              if (currentValue !== this.activeGid) {
+                this.saveState();
+                this.bucketFill(layer, x, y, this.activeGid);
+                this.markAsChanged();
+                this.draw(); // Immediately reflect changes
+              }
+              return; // Exit early for bucket fill
+            default:
+              newValue = this.activeGid;
+              break;
+          }
+        }
         
-        // Only save state if the value is actually changing
+        // Only save state and apply change if the value is actually changing
         if (currentValue !== newValue) {
           this.saveState();
           layer.data[index] = newValue;
+          this.markAsChanged();
+          this.draw(); // Immediately reflect changes
         }
       }
     }
+  }
+
+  // Selection event handlers
+  private handleSelectionStart(x: number, y: number, isRightClick: boolean): void {
+    if (isRightClick) {
+      // Right-click clears selection
+      this.clearSelection();
+      return;
+    }
+
+    const layer = this.tileLayers.find(l => l.id === this.activeLayerId);
+    if (!layer) return;
+
+    this.selection.startX = x;
+    this.selection.startY = y;
+    this.selection.endX = x;
+    this.selection.endY = y;
+
+    // For instant selection tools (magic wand, same tile), execute immediately
+    if (this.currentSelectionTool === 'magic-wand') {
+      this.selectMagicWand(layer, x, y);
+      this.draw();
+    } else if (this.currentSelectionTool === 'same-tile') {
+      this.selectSameTile(layer, x, y);
+      this.draw();
+    } else {
+      // For drag-based tools (rectangular, circular), start selection
+      this.isSelecting = true;
+    }
+  }
+
+  private handleSelectionDrag(x: number, y: number): void {
+    if (!this.isSelecting) return;
+
+    this.selection.endX = x;
+    this.selection.endY = y;
+    this.draw(); // Update preview
+  }
+
+  private handleSelectionEnd(): void {
+    if (!this.isSelecting) return;
+
+    const layer = this.tileLayers.find(l => l.id === this.activeLayerId);
+    if (!layer) return;
+
+    // Execute the selection based on tool type
+    if (this.currentSelectionTool === 'rectangular') {
+      this.selectRectangular(layer, this.selection.startX, this.selection.startY, this.selection.endX, this.selection.endY);
+    } else if (this.currentSelectionTool === 'circular') {
+      this.selectCircular(layer, this.selection.startX, this.selection.startY, this.selection.endX, this.selection.endY);
+    }
+
+    this.isSelecting = false;
+    this.draw();
   }
 
   private draw(): void {
@@ -310,6 +448,9 @@ export class TileMapEditor {
     if (this.hoverX >= 0 && this.hoverY >= 0) {
       this.drawHover();
     }
+    
+    // Draw selection
+    this.drawSelection();
     
     // Restore context state
     this.ctx.restore();
@@ -482,6 +623,92 @@ export class TileMapEditor {
     this.ctx.lineTo(screenPos.x - halfTileX, screenPos.y); // Left
     this.ctx.closePath();
     this.ctx.stroke();
+  }
+
+  private drawSelection(): void {
+    // Draw selection preview for drag-based tools
+    if (this.isSelecting && (this.currentSelectionTool === 'rectangular' || this.currentSelectionTool === 'circular')) {
+      this.ctx.strokeStyle = '#ff6b00';
+      this.ctx.lineWidth = Math.max(1, Math.min(2, 2 / this.zoom));
+      this.ctx.setLineDash([5, 5]);
+
+      if (this.currentSelectionTool === 'rectangular') {
+        this.drawRectangularSelectionPreview();
+      } else if (this.currentSelectionTool === 'circular') {
+        this.drawCircularSelectionPreview();
+      }
+
+      this.ctx.setLineDash([]); // Reset line dash
+    }
+
+    // Draw active selection
+    if (this.selection.active && this.selection.tiles.length > 0) {
+      this.ctx.strokeStyle = '#00ff00';
+      this.ctx.lineWidth = Math.max(1, Math.min(2, 2 / this.zoom));
+      
+      // Draw outline around each selected tile
+      this.selection.tiles.forEach(tile => {
+        const screenPos = this.mapToScreen(tile.x, tile.y);
+        const halfTileX = (this.tileSizeX / 2) * this.zoom;
+        const halfTileY = (this.tileSizeY / 2) * this.zoom;
+        
+        this.ctx.beginPath();
+        this.ctx.moveTo(screenPos.x, screenPos.y - halfTileY); // Top
+        this.ctx.lineTo(screenPos.x + halfTileX, screenPos.y); // Right
+        this.ctx.lineTo(screenPos.x, screenPos.y + halfTileY); // Bottom
+        this.ctx.lineTo(screenPos.x - halfTileX, screenPos.y); // Left
+        this.ctx.closePath();
+        this.ctx.stroke();
+      });
+    }
+  }
+
+  private drawRectangularSelectionPreview(): void {
+    const minX = Math.min(this.selection.startX, this.selection.endX);
+    const maxX = Math.max(this.selection.startX, this.selection.endX);
+    const minY = Math.min(this.selection.startY, this.selection.endY);
+    const maxY = Math.max(this.selection.startY, this.selection.endY);
+
+    for (let y = minY; y <= maxY; y++) {
+      for (let x = minX; x <= maxX; x++) {
+        if (x >= 0 && x < this.mapWidth && y >= 0 && y < this.mapHeight) {
+          const screenPos = this.mapToScreen(x, y);
+          const halfTileX = (this.tileSizeX / 2) * this.zoom;
+          const halfTileY = (this.tileSizeY / 2) * this.zoom;
+          
+          this.ctx.beginPath();
+          this.ctx.moveTo(screenPos.x, screenPos.y - halfTileY); // Top
+          this.ctx.lineTo(screenPos.x + halfTileX, screenPos.y); // Right
+          this.ctx.lineTo(screenPos.x, screenPos.y + halfTileY); // Bottom
+          this.ctx.lineTo(screenPos.x - halfTileX, screenPos.y); // Left
+          this.ctx.closePath();
+          this.ctx.stroke();
+        }
+      }
+    }
+  }
+
+  private drawCircularSelectionPreview(): void {
+    const radius = Math.sqrt(Math.pow(this.selection.endX - this.selection.startX, 2) + Math.pow(this.selection.endY - this.selection.startY, 2));
+
+    for (let y = 0; y < this.mapHeight; y++) {
+      for (let x = 0; x < this.mapWidth; x++) {
+        const distance = Math.sqrt(Math.pow(x - this.selection.startX, 2) + Math.pow(y - this.selection.startY, 2));
+        if (distance <= radius) {
+          const screenPos = this.mapToScreen(x, y);
+          const halfTileX = (this.tileSizeX / 2) * this.zoom;
+          const halfTileY = (this.tileSizeY / 2) * this.zoom;
+          
+          this.ctx.beginPath();
+          this.ctx.moveTo(screenPos.x, screenPos.y - halfTileY); // Top
+          this.ctx.lineTo(screenPos.x + halfTileX, screenPos.y); // Right
+          this.ctx.lineTo(screenPos.x, screenPos.y + halfTileY); // Bottom
+          this.ctx.lineTo(screenPos.x - halfTileX, screenPos.y); // Left
+          this.ctx.closePath();
+          this.ctx.stroke();
+        }
+      }
+    }
   }
 
   private drawMiniMap(): void {
@@ -817,6 +1044,220 @@ export class TileMapEditor {
       return { x: this.hoverX, y: this.hoverY };
     }
     return null;
+  }
+
+  // Tool management methods
+  public setCurrentTool(tool: 'brush' | 'eraser' | 'bucket'): void {
+    this.currentTool = tool;
+    this.tool = 'tiles'; // Set main tool mode to tiles for brush tools
+  }
+
+  public getCurrentTool(): 'brush' | 'eraser' | 'bucket' {
+    return this.currentTool;
+  }
+
+  // Selection tool management methods
+  public setCurrentSelectionTool(tool: 'rectangular' | 'magic-wand' | 'same-tile' | 'circular'): void {
+    this.currentSelectionTool = tool;
+    this.tool = 'selection'; // Set main tool mode to selection
+  }
+
+  public getCurrentSelectionTool(): 'rectangular' | 'magic-wand' | 'same-tile' | 'circular' {
+    return this.currentSelectionTool;
+  }
+
+  public clearSelection(): void {
+    this.selection.active = false;
+    this.selection.tiles = [];
+    this.draw();
+  }
+
+  public hasActiveSelection(): boolean {
+    return this.selection.active && this.selection.tiles.length > 0;
+  }
+
+  public getSelection(): Array<{x: number, y: number, gid: number}> {
+    return [...this.selection.tiles];
+  }
+
+  // Selection operations
+  public selectAll(): void {
+    const layer = this.tileLayers.find(l => l.id === this.activeLayerId);
+    if (!layer) return;
+
+    this.selection.tiles = [];
+    for (let y = 0; y < this.mapHeight; y++) {
+      for (let x = 0; x < this.mapWidth; x++) {
+        const index = y * this.mapWidth + x;
+        const gid = layer.data[index];
+        this.selection.tiles.push({x, y, gid});
+      }
+    }
+    this.selection.active = true;
+    this.draw();
+  }
+
+  public deleteSelection(): void {
+    if (!this.selection.active || this.selection.tiles.length === 0) return;
+
+    const layer = this.tileLayers.find(l => l.id === this.activeLayerId);
+    if (!layer) return;
+
+    this.saveState();
+    
+    // Clear all selected tiles
+    this.selection.tiles.forEach(tile => {
+      const index = tile.y * this.mapWidth + tile.x;
+      layer.data[index] = 0;
+    });
+
+    this.clearSelection();
+    this.markAsChanged();
+    this.draw();
+  }
+
+  public fillSelection(): void {
+    if (!this.selection.active || this.selection.tiles.length === 0 || this.activeGid === 0) return;
+
+    const layer = this.tileLayers.find(l => l.id === this.activeLayerId);
+    if (!layer) return;
+
+    this.saveState();
+    
+    // Fill all selected tiles with active GID
+    this.selection.tiles.forEach(tile => {
+      const index = tile.y * this.mapWidth + tile.x;
+      layer.data[index] = this.activeGid;
+    });
+
+    this.markAsChanged();
+    this.draw();
+  }
+
+  // Bucket fill implementation using flood fill algorithm
+  private bucketFill(layer: TileLayer, startX: number, startY: number, newValue: number): void {
+    const targetValue = layer.data[startY * this.mapWidth + startX];
+    
+    // If the target value is the same as new value, no need to fill
+    if (targetValue === newValue) {
+      return;
+    }
+
+    const stack: Array<{x: number, y: number}> = [{x: startX, y: startY}];
+    const visited = new Set<number>();
+
+    while (stack.length > 0) {
+      const {x, y} = stack.pop()!;
+      const index = y * this.mapWidth + x;
+
+      // Check bounds and if already visited
+      if (x < 0 || x >= this.mapWidth || y < 0 || y >= this.mapHeight || visited.has(index)) {
+        continue;
+      }
+
+      // Check if this tile matches the target value
+      if (layer.data[index] !== targetValue) {
+        continue;
+      }
+
+      // Mark as visited and fill
+      visited.add(index);
+      layer.data[index] = newValue;
+
+      // Add neighboring tiles to stack
+      stack.push({x: x + 1, y: y});
+      stack.push({x: x - 1, y: y});
+      stack.push({x: x, y: y + 1});
+      stack.push({x: x, y: y - 1});
+    }
+  }
+
+  // Selection algorithms
+  private selectRectangular(layer: TileLayer, startX: number, startY: number, endX: number, endY: number): void {
+    this.selection.tiles = [];
+    
+    const minX = Math.min(startX, endX);
+    const maxX = Math.max(startX, endX);
+    const minY = Math.min(startY, endY);
+    const maxY = Math.max(startY, endY);
+
+    for (let y = minY; y <= maxY; y++) {
+      for (let x = minX; x <= maxX; x++) {
+        if (x >= 0 && x < this.mapWidth && y >= 0 && y < this.mapHeight) {
+          const index = y * this.mapWidth + x;
+          const gid = layer.data[index];
+          this.selection.tiles.push({x, y, gid});
+        }
+      }
+    }
+    
+    this.selection.active = true;
+  }
+
+  private selectMagicWand(layer: TileLayer, startX: number, startY: number): void {
+    const targetGid = layer.data[startY * this.mapWidth + startX];
+    this.selection.tiles = [];
+    
+    const stack: Array<{x: number, y: number}> = [{x: startX, y: startY}];
+    const visited = new Set<number>();
+
+    while (stack.length > 0) {
+      const {x, y} = stack.pop()!;
+      const index = y * this.mapWidth + x;
+
+      if (x < 0 || x >= this.mapWidth || y < 0 || y >= this.mapHeight || visited.has(index)) {
+        continue;
+      }
+
+      if (layer.data[index] !== targetGid) {
+        continue;
+      }
+
+      visited.add(index);
+      this.selection.tiles.push({x, y, gid: targetGid});
+
+      stack.push({x: x + 1, y: y});
+      stack.push({x: x - 1, y: y});
+      stack.push({x: x, y: y + 1});
+      stack.push({x: x, y: y - 1});
+    }
+    
+    this.selection.active = true;
+  }
+
+  private selectSameTile(layer: TileLayer, startX: number, startY: number): void {
+    const targetGid = layer.data[startY * this.mapWidth + startX];
+    this.selection.tiles = [];
+
+    for (let y = 0; y < this.mapHeight; y++) {
+      for (let x = 0; x < this.mapWidth; x++) {
+        const index = y * this.mapWidth + x;
+        if (layer.data[index] === targetGid) {
+          this.selection.tiles.push({x, y, gid: targetGid});
+        }
+      }
+    }
+    
+    this.selection.active = true;
+  }
+
+  private selectCircular(layer: TileLayer, centerX: number, centerY: number, endX: number, endY: number): void {
+    this.selection.tiles = [];
+    
+    const radius = Math.sqrt(Math.pow(endX - centerX, 2) + Math.pow(endY - centerY, 2));
+
+    for (let y = 0; y < this.mapHeight; y++) {
+      for (let x = 0; x < this.mapWidth; x++) {
+        const distance = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2));
+        if (distance <= radius) {
+          const index = y * this.mapWidth + x;
+          const gid = layer.data[index];
+          this.selection.tiles.push({x, y, gid});
+        }
+      }
+    }
+    
+    this.selection.active = true;
   }
 
   // Layer-specific tileset management

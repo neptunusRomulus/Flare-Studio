@@ -16,7 +16,8 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: true,
       enableRemoteModule: false,
-      webSecurity: false,
+      webSecurity: true, // Enable web security
+      allowRunningInsecureContent: false, // Disable insecure content
       preload: path.join(__dirname, 'preload.js')
     },
     icon: path.join(__dirname, '../assets/icon.png'), // Add icon if available

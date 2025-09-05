@@ -815,7 +815,7 @@ function App() {
     if (!editor) return;
     setIsManuallySaving(true);
     try {
-      if (window.electronAPI?.saveMapProject && projectPath) {
+      if (window.electronAPI && projectPath) {
         const success = await editor.saveProjectData(projectPath);
         await new Promise(resolve => setTimeout(resolve, 300));
         if (success) {

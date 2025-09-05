@@ -45,6 +45,11 @@ function App() {
   const [selectedSelectionTool, setSelectedSelectionTool] = useState('rectangular');
   const [selectedShapeTool, setSelectedShapeTool] = useState('rectangle');
   
+  // Brush management states
+  const [brushTool, setBrushTool] = useState<'none' | 'move' | 'merge' | 'separate' | 'remove'>('none');
+  const [selectedBrushes, setSelectedBrushes] = useState<number[]>([]);
+  const [draggedBrush, setDraggedBrush] = useState<number | null>(null);
+  
   // Stamp states
   const [stamps, setStamps] = useState<import('./types').Stamp[]>([]);
   const [selectedStamp, setSelectedStamp] = useState<string | null>(null);
@@ -490,6 +495,111 @@ function App() {
         return <Shapes className="w-4 h-4" />;
     }
   };
+
+  // Brush management handlers
+  const handleMergeBrushes = useCallback(() => {
+    if (!editor || selectedBrushes.length < 2) return;
+    
+    try {
+      editor.mergeBrushes(selectedBrushes);
+      setSelectedBrushes([]);
+      setBrushTool('none');
+      // Force refresh of tile palette
+      editor.refreshTilePalette();
+    } catch (error) {
+      console.error('Failed to merge brushes:', error);
+    }
+  }, [editor, selectedBrushes]);
+
+  const handleCancelMerge = useCallback(() => {
+    setSelectedBrushes([]);
+    setBrushTool('none');
+  }, []);
+
+  const handleSeparateBrush = useCallback((brushId: number) => {
+    if (!editor) return;
+    
+    try {
+      editor.separateBrush(brushId);
+      // Force refresh of tile palette
+      editor.refreshTilePalette();
+    } catch (error) {
+      console.error('Failed to separate brush:', error);
+    }
+  }, [editor]);
+
+  const handleRemoveBrush = useCallback((brushId: number) => {
+    if (!editor) return;
+    
+    const confirmed = window.confirm('Are you sure you want to remove this brush?');
+    if (confirmed) {
+      try {
+        editor.removeBrush(brushId);
+        // Force refresh of tile palette
+        editor.refreshTilePalette();
+      } catch (error) {
+        console.error('Failed to remove brush:', error);
+      }
+    }
+  }, [editor]);
+
+  const handleBrushClick = useCallback((brushId: number) => {
+    if (brushTool === 'merge') {
+      setSelectedBrushes(prev => {
+        if (prev.includes(brushId)) {
+          return prev.filter(id => id !== brushId);
+        } else {
+          return [...prev, brushId];
+        }
+      });
+    } else if (brushTool === 'separate') {
+      handleSeparateBrush(brushId);
+    } else if (brushTool === 'remove') {
+      handleRemoveBrush(brushId);
+    }
+  }, [brushTool, handleSeparateBrush, handleRemoveBrush]);
+
+  // Effect to handle brush tool state changes
+  useEffect(() => {
+    const brushToolElement = document.querySelector('[data-brush-tool]');
+    if (brushToolElement) {
+      brushToolElement.setAttribute('data-brush-tool', brushTool);
+    } else {
+      // Create the brush tool state element if it doesn't exist
+      const stateElement = document.createElement('div');
+      stateElement.setAttribute('data-brush-tool', brushTool);
+      stateElement.style.display = 'none';
+      document.body.appendChild(stateElement);
+    }
+  }, [brushTool]);
+
+  // Effect to listen for brush events from the editor
+  useEffect(() => {
+    const handleBrushAction = (event: CustomEvent) => {
+      const { action, tileIndex } = event.detail;
+      
+      switch (action) {
+        case 'select':
+          setSelectedBrushes(prev => [...prev, tileIndex]);
+          break;
+        case 'deselect':
+          setSelectedBrushes(prev => prev.filter(id => id !== tileIndex));
+          break;
+        case 'separate':
+          handleSeparateBrush(tileIndex);
+          break;
+        case 'remove':
+          handleRemoveBrush(tileIndex);
+          break;
+      }
+    };
+
+    document.addEventListener('brushAction', handleBrushAction as EventListener);
+    
+    return () => {
+      document.removeEventListener('brushAction', handleBrushAction as EventListener);
+    };
+  }, [handleSeparateBrush, handleRemoveBrush]);
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>, type: 'tileset' | 'layerTileset') => {
     const file = event.target.files?.[0];
@@ -958,6 +1068,87 @@ function App() {
             {/* Tiles Container with conditional tooltip */}
             <div className="relative">
               <div id="tilesContainer" className="tile-palette"></div>
+              
+              {/* Brush Management Tools */}
+              <div className="mt-2 border-t pt-2">
+                <div className="text-xs text-muted-foreground mb-2">Brush Tools</div>
+                <div className="flex gap-1 flex-wrap">
+                  <Button
+                    variant={brushTool === 'move' ? 'default' : 'outline'}
+                    size="sm"
+                    className="text-xs px-2 py-1 h-7"
+                    onClick={() => setBrushTool(brushTool === 'move' ? 'none' : 'move')}
+                    title="Move/Reorder brushes"
+                  >
+                    ↕️
+                  </Button>
+                  <Button
+                    variant={brushTool === 'merge' ? 'default' : 'outline'}
+                    size="sm"
+                    className="text-xs px-2 py-1 h-7"
+                    onClick={() => setBrushTool(brushTool === 'merge' ? 'none' : 'merge')}
+                    title="Merge brushes"
+                  >
+                    🔗
+                  </Button>
+                  <Button
+                    variant={brushTool === 'separate' ? 'default' : 'outline'}
+                    size="sm"
+                    className="text-xs px-2 py-1 h-7"
+                    onClick={() => setBrushTool(brushTool === 'separate' ? 'none' : 'separate')}
+                    title="Separate brushes"
+                  >
+                    ✂️
+                  </Button>
+                  <Button
+                    variant={brushTool === 'remove' ? 'default' : 'outline'}
+                    size="sm"
+                    className="text-xs px-2 py-1 h-7"
+                    onClick={() => setBrushTool(brushTool === 'remove' ? 'none' : 'remove')}
+                    title="Remove brushes"
+                  >
+                    🗑️
+                  </Button>
+                </div>
+                
+                {/* Merge Tool Controls */}
+                {brushTool === 'merge' && (
+                  <div className="mt-2 flex gap-2 items-center">
+                    <div className="text-xs text-muted-foreground">
+                      Selected: {selectedBrushes.length}
+                    </div>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      className="text-xs px-2 py-1 h-6"
+                      onClick={handleMergeBrushes}
+                      disabled={selectedBrushes.length < 2}
+                      title="Approve merge"
+                    >
+                      ✓
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs px-2 py-1 h-6"
+                      onClick={handleCancelMerge}
+                      title="Cancel merge"
+                    >
+                      ✕
+                    </Button>
+                  </div>
+                )}
+                
+                {/* Tool Instructions */}
+                {brushTool !== 'none' && (
+                  <div className="mt-2 text-xs text-muted-foreground bg-gray-50 p-2 rounded">
+                    {brushTool === 'move' && 'Drag brushes to reorder them'}
+                    {brushTool === 'merge' && 'Click brushes to select them, then approve to merge'}
+                    {brushTool === 'separate' && 'Click on merged brushes to separate them'}
+                    {brushTool === 'remove' && 'Click on brushes to remove them (with confirmation)'}
+                  </div>
+                )}
+              </div>
               
               {tileCount === 0 && showEmptyTilesetTooltip && (
                 <div className="absolute inset-0 flex items-center justify-center">

@@ -98,6 +98,9 @@ export class TileMapEditor {
     // Rebuild the tile palette to show the changes
     this.createTilePalette(true);
     
+    // Mark as changed to trigger autosave
+    this.markAsChanged(true);
+    
     console.log(`Merged ${brushIds.length} brushes into new brush at position ${firstBrushIndex}`);
   }
 
@@ -178,6 +181,9 @@ export class TileMapEditor {
     // Rebuild the tile palette to show the changes
     this.createTilePalette(true);
     
+    // Mark as changed to trigger autosave
+    this.markAsChanged(true);
+    
     console.log(`Separated brush ${brushId} into ${newBrushes.length} new brushes`);
   }
 
@@ -209,6 +215,9 @@ export class TileMapEditor {
     // Rebuild the tile palette to show the changes
     this.createTilePalette(true);
     
+    // Mark as changed to trigger autosave
+    this.markAsChanged(true);
+    
     console.log(`Removed brush ${brushId}`);
   }
 
@@ -232,6 +241,9 @@ export class TileMapEditor {
     
     // Rebuild the tile palette to reflect the new order
     this.createTilePalette(true);
+    
+    // Mark as changed to trigger autosave
+    this.markAsChanged(true);
     
     console.log(`Reordered brush from index ${fromIndex} to ${toIndex}`);
   }
@@ -3428,7 +3440,11 @@ export class TileMapEditor {
         tilesetFileName: this.tilesetFileName,
         tilesetImage: this.tilesetImage ? this.canvasToDataURL(this.tilesetImage) : null,
         tileSizeX: this.tileSizeX,
-        tileSizeY: this.tileSizeY
+        tileSizeY: this.tileSizeY,
+        // Save brush data for proper restoration
+        detectedTileData: Array.from(this.detectedTileData.entries()),
+        tileContentThreshold: this.tileContentThreshold,
+        objectSeparationSensitivity: this.objectSeparationSensitivity
       };
       
       localStorage.setItem('tilemap_autosave_backup', JSON.stringify(backupData));
@@ -3467,16 +3483,41 @@ export class TileMapEditor {
       this.objects = data.objects;
       this.tilesetFileName = data.tilesetFileName;
 
+      // Restore brush-related settings if available
+      if (data.tileContentThreshold !== undefined) {
+        this.tileContentThreshold = data.tileContentThreshold;
+      }
+      if (data.objectSeparationSensitivity !== undefined) {
+        this.objectSeparationSensitivity = data.objectSeparationSensitivity;
+      }
+
+      // Restore detectedTileData if available
+      if (data.detectedTileData) {
+        this.detectedTileData.clear();
+        for (const [key, value] of data.detectedTileData) {
+          this.detectedTileData.set(key, value);
+        }
+      }
+
       // Restore tileset image if available
       if (data.tilesetImage) {
         const img = new Image();
         img.onload = () => {
           this.tilesetImage = img;
-          // Reconstruct tileset metadata and palette so tile brushes appear after reload
+          // Reconstruct tileset metadata
           this.tilesetColumns = Math.floor(img.width / this.tileSizeX);
           this.tilesetRows = Math.floor(img.height / this.tileSizeY);
           this.tileCount = this.tilesetColumns * this.tilesetRows;
-          this.createTilePalette();
+          
+          // Create tile palette using preserved brush data if available
+          if (data.detectedTileData && data.detectedTileData.length > 0) {
+            // Use preserved brush data - don't regenerate
+            this.createTilePalette(true);
+          } else {
+            // Generate new brush data from tileset
+            this.createTilePalette();
+          }
+          
           // Restore previously selected tile highlight if any
           this.updateActiveTile();
           this.draw();

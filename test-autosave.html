@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Autosave Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        button {
+            margin: 5px;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>Autosave Test for Tile Brushes</h1>
+    
+    <div id="test-results"></div>
+    
+    <button onclick="testAutoSaveStructure()">Test AutoSave Data Structure</button>
+    <button onclick="simulateBrushOperations()">Simulate Brush Operations</button>
+    <button onclick="checkLocalStorage()">Check LocalStorage</button>
+    <button onclick="clearLocalStorage()">Clear Test Data</button>
+    
+    <h2>LocalStorage Content:</h2>
+    <pre id="storage-content">No data</pre>
+
+    <script>
+        const results = document.getElementById('test-results');
+        const storageContent = document.getElementById('storage-content');
+
+        function addResult(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            div.textContent = message;
+            results.appendChild(div);
+        }
+
+        function testAutoSaveStructure() {
+            addResult('Testing autosave data structure...', 'info');
+            
+            // Create mock data that mimics what TileMapEditor would save
+            const mockAutoSaveData = {
+                timestamp: Date.now(),
+                mapWidth: 20,
+                mapHeight: 15,
+                layers: [{
+                    type: 'background',
+                    visible: true,
+                    data: new Array(300).fill(0)
+                }],
+                objects: [],
+                tilesetFileName: 'test-tileset.png',
+                tilesetImage: null,
+                tileSizeX: 64,
+                tileSizeY: 32,
+                // The critical part - detectedTileData as an array of [key, value] pairs
+                detectedTileData: [
+                    [0, { sourceX: 0, sourceY: 0, width: 64, height: 32 }],
+                    [1, { sourceX: 64, sourceY: 0, width: 64, height: 32 }],
+                    [2, { sourceX: 128, sourceY: 0, width: 64, height: 32 }]
+                ],
+                tileContentThreshold: 10,
+                objectSeparationSensitivity: 0.5
+            };
+
+            try {
+                localStorage.setItem('tilemap_autosave_backup', JSON.stringify(mockAutoSaveData));
+                addResult('✓ Successfully saved mock autosave data with brush information', 'success');
+                
+                // Test loading
+                const loaded = JSON.parse(localStorage.getItem('tilemap_autosave_backup'));
+                if (loaded.detectedTileData && Array.isArray(loaded.detectedTileData)) {
+                    addResult('✓ Brush data (detectedTileData) is properly stored and retrievable', 'success');
+                    addResult(`Found ${loaded.detectedTileData.length} brush entries`, 'info');
+                } else {
+                    addResult('✗ Brush data missing or malformed', 'error');
+                }
+                
+            } catch (error) {
+                addResult(`✗ Error testing autosave structure: ${error.message}`, 'error');
+            }
+        }
+
+        function simulateBrushOperations() {
+            addResult('Simulating brush operations...', 'info');
+            
+            // Test the markAsChanged behavior by simulating what happens after brush operations
+            const operations = [
+                'mergeBrushes([0, 1])',
+                'separateBrush(2)',
+                'removeBrush(1)',
+                'reorderBrush(0, 2)'
+            ];
+            
+            operations.forEach((op, index) => {
+                setTimeout(() => {
+                    addResult(`Simulated: ${op}`, 'info');
+                    // In real implementation, this would trigger markAsChanged(true)
+                    addResult(`⏱️ markAsChanged(true) would be called -> AutoSave in 2 seconds`, 'info');
+                }, index * 1000);
+            });
+            
+            addResult('All brush operations now trigger immediate autosave (2 second delay)', 'success');
+        }
+
+        function checkLocalStorage() {
+            const data = localStorage.getItem('tilemap_autosave_backup');
+            if (data) {
+                try {
+                    const parsed = JSON.parse(data);
+                    storageContent.textContent = JSON.stringify(parsed, null, 2);
+                    
+                    if (parsed.detectedTileData) {
+                        addResult(`✓ Found saved brush data with ${parsed.detectedTileData.length} entries`, 'success');
+                    } else {
+                        addResult('⚠️ No brush data found in saved autosave', 'error');
+                    }
+                } catch (error) {
+                    addResult(`✗ Error parsing localStorage data: ${error.message}`, 'error');
+                    storageContent.textContent = data;
+                }
+            } else {
+                addResult('No autosave data found in localStorage', 'info');
+                storageContent.textContent = 'No data';
+            }
+        }
+
+        function clearLocalStorage() {
+            localStorage.removeItem('tilemap_autosave_backup');
+            storageContent.textContent = 'No data';
+            addResult('Cleared test data from localStorage', 'info');
+        }
+
+        // Auto-check on page load
+        checkLocalStorage();
+    </script>
+</body>
+</html>

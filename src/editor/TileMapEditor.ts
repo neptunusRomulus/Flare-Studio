@@ -1356,32 +1356,347 @@ export class TileMapEditor {
     const shouldSplitHorizontally = this.shouldSplitDirection(pixels, bounds, 'horizontal', gridSize);
     const shouldSplitVertically = this.shouldSplitDirection(pixels, bounds, 'vertical', gridSize);
     
-    // Case 1: Long horizontal objects (walls) - keep as single object if uniform
-    if (width > height * 2 && density > 0.7 && !shouldSplitHorizontally) {
-      console.log('Detected long horizontal object (wall) - keeping as single tile');
+    // Check for specific object types
+    const isFloorPattern = this.isFloorPattern(bounds, pixels);
+    const isVerticalWall = this.isVerticalWall(bounds, pixels);
+    const isHorizontalWall = this.isHorizontalWall(bounds, pixels);
+    
+    console.log(`Object analysis: ${width}x${height}, density: ${density.toFixed(2)}, floor: ${isFloorPattern}, vWall: ${isVerticalWall}, hWall: ${isHorizontalWall}`);
+    
+    // Case 1: Floor/ground patterns - always split into individual tiles
+    if (isFloorPattern) {
+      console.log('Detected floor/ground pattern - splitting into individual tiles');
+      return this.splitObjectByGrid(objectData, 'horizontal');
+    }
+    
+    // Case 2: Vertical walls or tall structures - keep as single object
+    if (isVerticalWall) {
+      console.log('Detected vertical wall/structure - keeping as single tile');
       return [bounds];
     }
     
-    // Case 2: Multiple similar objects arranged horizontally
+    // Case 3: Horizontal walls - keep as single object  
+    if (isHorizontalWall) {
+      console.log('Detected horizontal wall - keeping as single tile');
+      return [bounds];
+    }
+    
+    // Case 4: Multiple similar objects arranged horizontally
     if (shouldSplitHorizontally && width > this.tileSizeX * 1.5) {
       console.log('Splitting horizontal arrangement into individual objects');
       return this.splitObjectByGrid(objectData, 'horizontal');
     }
     
-    // Case 3: Multiple similar objects arranged vertically
-    if (shouldSplitVertically && height > this.tileSizeY * 1.5) {
+    // Case 5: Multiple similar objects arranged vertically (but not walls)
+    if (shouldSplitVertically && height > this.tileSizeY * 1.5 && !this.isLikelySingleVerticalObject(bounds, pixels)) {
       console.log('Splitting vertical arrangement into individual objects');
       return this.splitObjectByGrid(objectData, 'vertical');
     }
     
-    // Case 4: Large sparse objects - likely multiple separate items
+    // Case 6: Large sparse objects - likely multiple separate items
     if (density < 0.4 && boundingArea > gridSize * gridSize * 2) {
       console.log('Splitting sparse large object');
       return this.splitObjectByDensity(objectData);
     }
     
+    // Case 7: Objects that span multiple tile-sized regions but aren't walls
+    if ((width > this.tileSizeX * 1.8 || height > this.tileSizeY * 1.8) && 
+        !isVerticalWall && !isHorizontalWall && density < 0.8) {
+      console.log('Splitting large non-wall object into tile-sized pieces');
+      return this.splitObjectByGrid(objectData, width > height ? 'horizontal' : 'vertical');
+    }
+    
     // Default: keep as single object
+    console.log('Keeping as single object');
     return [bounds];
+  }
+
+  private isVerticalWall(bounds: { x: number; y: number; width: number; height: number }, pixels: Array<{x: number, y: number}>): boolean {
+    const { width, height } = bounds;
+    
+    // Vertical walls are typically:
+    // 1. Taller than they are wide (aspect ratio > 1.5)
+    // 2. Have good density (substantial object)
+    // 3. Don't have clear horizontal separation patterns
+    // 4. Have consistent width throughout their height
+    
+    const aspectRatio = height / width;
+    const density = pixels.length / (width * height);
+    
+    // Must be significantly taller than wide
+    if (aspectRatio < 1.5) return false;
+    
+    // Must have substantial content
+    if (density < 0.5) return false;
+    
+    // Check for consistent width (vertical walls don't vary much in width)
+    const hasConsistentWidth = this.hasConsistentVerticalWidth(pixels, bounds);
+    
+    // Check if it's NOT a stack of separate objects
+    const hasVerticalContinuity = this.hasVerticalContinuity(pixels, bounds);
+    
+    // Additional check: tall and relatively narrow objects are likely walls
+    const isTallAndNarrow = height > this.tileSizeY * 1.5 && width <= this.tileSizeX * 1.2;
+    
+    return (hasConsistentWidth && hasVerticalContinuity) || 
+           (isTallAndNarrow && density > 0.6);
+  }
+
+  private isHorizontalWall(bounds: { x: number; y: number; width: number; height: number }, pixels: Array<{x: number, y: number}>): boolean {
+    const { width, height } = bounds;
+    
+    // Horizontal walls are typically:
+    // 1. Wider than they are tall (aspect ratio > 2)
+    // 2. Have good density
+    // 3. Have consistent height throughout their width
+    // 4. Don't show clear repeating patterns
+    
+    const aspectRatio = width / height;
+    const density = pixels.length / (width * height);
+    
+    // Must be significantly wider than tall
+    if (aspectRatio < 2) return false;
+    
+    // Must have substantial content and be tall enough to be a wall
+    if (density < 0.6 || height < this.tileSizeY * 0.7) return false;
+    
+    // Check for consistent height
+    const hasConsistentHeight = this.hasConsistentHorizontalHeight(pixels, bounds);
+    
+    // Check if it's NOT a series of separate objects
+    const hasHorizontalContinuity = this.hasHorizontalContinuity(pixels, bounds);
+    
+    return hasConsistentHeight && hasHorizontalContinuity;
+  }
+
+  private isLikelySingleVerticalObject(bounds: { x: number; y: number; width: number; height: number }, pixels: Array<{x: number, y: number}>): boolean {
+    // Check if this is likely a single tall object rather than stacked objects
+    const { width, height } = bounds;
+    const density = pixels.length / (width * height);
+    
+    // High density objects are likely single objects
+    if (density > 0.7) return true;
+    
+    // Check for vertical continuity
+    return this.hasVerticalContinuity(pixels, bounds);
+  }
+
+  private hasConsistentVerticalWidth(pixels: Array<{x: number, y: number}>, bounds: { x: number; y: number; width: number; height: number }): boolean {
+    const { x: minX, y: minY, height } = bounds;
+    const segmentHeight = Math.max(1, Math.floor(height / 5)); // Divide into 5 segments
+    
+    const widths: number[] = [];
+    
+    for (let i = 0; i < 5; i++) {
+      const segmentY = minY + (i * segmentHeight);
+      const segmentEndY = Math.min(segmentY + segmentHeight, minY + height);
+      
+      let leftMost = Number.MAX_SAFE_INTEGER;
+      let rightMost = Number.MIN_SAFE_INTEGER;
+      let hasPixels = false;
+      
+      for (const pixel of pixels) {
+        if (pixel.y >= segmentY && pixel.y < segmentEndY) {
+          leftMost = Math.min(leftMost, pixel.x);
+          rightMost = Math.max(rightMost, pixel.x);
+          hasPixels = true;
+        }
+      }
+      
+      if (hasPixels) {
+        widths.push(rightMost - leftMost + 1);
+      }
+    }
+    
+    if (widths.length < 2) return false;
+    
+    // Check if widths are consistent (low variance)
+    const avgWidth = widths.reduce((a, b) => a + b, 0) / widths.length;
+    const variance = widths.reduce((sum, w) => sum + Math.pow(w - avgWidth, 2), 0) / widths.length;
+    const stdDev = Math.sqrt(variance);
+    
+    return avgWidth > 0 && (stdDev / avgWidth) < 0.3; // Less than 30% variation
+  }
+
+  private hasConsistentHorizontalHeight(pixels: Array<{x: number, y: number}>, bounds: { x: number; y: number; width: number; height: number }): boolean {
+    const { x: minX, y: minY, width } = bounds;
+    const segmentWidth = Math.max(1, Math.floor(width / 5)); // Divide into 5 segments
+    
+    const heights: number[] = [];
+    
+    for (let i = 0; i < 5; i++) {
+      const segmentX = minX + (i * segmentWidth);
+      const segmentEndX = Math.min(segmentX + segmentWidth, minX + width);
+      
+      let topMost = Number.MAX_SAFE_INTEGER;
+      let bottomMost = Number.MIN_SAFE_INTEGER;
+      let hasPixels = false;
+      
+      for (const pixel of pixels) {
+        if (pixel.x >= segmentX && pixel.x < segmentEndX) {
+          topMost = Math.min(topMost, pixel.y);
+          bottomMost = Math.max(bottomMost, pixel.y);
+          hasPixels = true;
+        }
+      }
+      
+      if (hasPixels) {
+        heights.push(bottomMost - topMost + 1);
+      }
+    }
+    
+    if (heights.length < 2) return false;
+    
+    // Check if heights are consistent
+    const avgHeight = heights.reduce((a, b) => a + b, 0) / heights.length;
+    const variance = heights.reduce((sum, h) => sum + Math.pow(h - avgHeight, 2), 0) / heights.length;
+    const stdDev = Math.sqrt(variance);
+    
+    return avgHeight > 0 && (stdDev / avgHeight) < 0.3;
+  }
+
+  private hasVerticalContinuity(pixels: Array<{x: number, y: number}>, bounds: { x: number; y: number; width: number; height: number }): boolean {
+    const { y: minY, height } = bounds;
+    const segmentHeight = Math.max(1, Math.floor(height / 10));
+    
+    let continuousSegments = 0;
+    let totalSegments = 0;
+    
+    for (let y = minY; y < minY + height; y += segmentHeight) {
+      const segmentEndY = Math.min(y + segmentHeight, minY + height);
+      let hasPixelsInSegment = false;
+      
+      for (const pixel of pixels) {
+        if (pixel.y >= y && pixel.y < segmentEndY) {
+          hasPixelsInSegment = true;
+          break;
+        }
+      }
+      
+      if (hasPixelsInSegment) {
+        continuousSegments++;
+      }
+      totalSegments++;
+    }
+    
+    // At least 70% of vertical segments should have content for good continuity
+    return totalSegments > 0 && (continuousSegments / totalSegments) >= 0.7;
+  }
+
+  private hasHorizontalContinuity(pixels: Array<{x: number, y: number}>, bounds: { x: number; y: number; width: number; height: number }): boolean {
+    const { x: minX, width } = bounds;
+    const segmentWidth = Math.max(1, Math.floor(width / 10));
+    
+    let continuousSegments = 0;
+    let totalSegments = 0;
+    
+    for (let x = minX; x < minX + width; x += segmentWidth) {
+      const segmentEndX = Math.min(x + segmentWidth, minX + width);
+      let hasPixelsInSegment = false;
+      
+      for (const pixel of pixels) {
+        if (pixel.x >= x && pixel.x < segmentEndX) {
+          hasPixelsInSegment = true;
+          break;
+        }
+      }
+      
+      if (hasPixelsInSegment) {
+        continuousSegments++;
+      }
+      totalSegments++;
+    }
+    
+    // At least 70% of horizontal segments should have content for good continuity
+    return totalSegments > 0 && (continuousSegments / totalSegments) >= 0.7;
+  }
+
+  private isFloorPattern(bounds: { x: number; y: number; width: number; height: number }, pixels: Array<{x: number, y: number}>): boolean {
+    const { width, height } = bounds;
+    
+    // Floor patterns are typically:
+    // 1. Relatively thin (height much less than a full tile)
+    // 2. Horizontal and repeating
+    // 3. Have a specific density pattern
+    
+    // Check if height suggests a floor tile (thin horizontal element)
+    const isFloorHeight = height <= this.tileSizeY * 0.6; // Less than 60% of tile height
+    
+    // Check if width suggests multiple tiles
+    const isMultipleTileWidth = width > this.tileSizeX * 1.3;
+    
+    // Check density pattern - floor tiles often have gaps between repetitions
+    const hasRepeatingPattern = this.hasRepeatingHorizontalPattern(pixels, bounds);
+    
+    // Additional check: look for diamond-like shapes (isometric floor tiles)
+    const isDiamondLike = this.hasDiamondLikeShape(pixels, bounds);
+    
+    return (isFloorHeight && isMultipleTileWidth) || 
+           (hasRepeatingPattern && isMultipleTileWidth) ||
+           (isDiamondLike && isMultipleTileWidth);
+  }
+
+  private hasRepeatingHorizontalPattern(pixels: Array<{x: number, y: number}>, bounds: { x: number; y: number; width: number; height: number }): boolean {
+    const { x: minX, width } = bounds;
+    const segmentWidth = this.tileSizeX;
+    const segments = Math.floor(width / segmentWidth);
+    
+    if (segments < 2) return false;
+    
+    // Analyze density in each segment
+    const segmentDensities: number[] = [];
+    
+    for (let i = 0; i < segments; i++) {
+      const segmentStart = minX + (i * segmentWidth);
+      const segmentEnd = segmentStart + segmentWidth;
+      
+      let segmentPixels = 0;
+      for (const pixel of pixels) {
+        if (pixel.x >= segmentStart && pixel.x < segmentEnd) {
+          segmentPixels++;
+        }
+      }
+      segmentDensities.push(segmentPixels);
+    }
+    
+    // Check if densities are similar (indicating repeating pattern)
+    const avgDensity = segmentDensities.reduce((a, b) => a + b, 0) / segmentDensities.length;
+    const variance = segmentDensities.reduce((sum, density) => sum + Math.pow(density - avgDensity, 2), 0) / segmentDensities.length;
+    const standardDeviation = Math.sqrt(variance);
+    
+    // Low standard deviation relative to average suggests repeating pattern
+    return avgDensity > 0 && (standardDeviation / avgDensity) < 0.5;
+  }
+
+  private hasDiamondLikeShape(pixels: Array<{x: number, y: number}>, bounds: { x: number; y: number; width: number; height: number }): boolean {
+    const { x: minX, y: minY, width, height } = bounds;
+    
+    // For diamond shapes, expect more pixels in the middle rows than at the edges
+    const rowDensities: number[] = [];
+    
+    for (let y = 0; y < height; y++) {
+      let rowPixels = 0;
+      for (const pixel of pixels) {
+        if (pixel.y === minY + y) {
+          rowPixels++;
+        }
+      }
+      rowDensities.push(rowPixels);
+    }
+    
+    if (rowDensities.length < 3) return false;
+    
+    // Check if middle rows have more pixels than edge rows (diamond characteristic)
+    const edgeRows = Math.floor(rowDensities.length * 0.2);
+    const middleStart = Math.floor(rowDensities.length * 0.3);
+    const middleEnd = Math.floor(rowDensities.length * 0.7);
+    
+    const edgeDensity = (rowDensities.slice(0, edgeRows).reduce((a, b) => a + b, 0) + 
+                        rowDensities.slice(-edgeRows).reduce((a, b) => a + b, 0)) / (edgeRows * 2 || 1);
+    
+    const middleDensity = rowDensities.slice(middleStart, middleEnd).reduce((a, b) => a + b, 0) / (middleEnd - middleStart || 1);
+    
+    return middleDensity > edgeDensity * 1.2; // Middle should be at least 20% denser
   }
 
   private shouldSplitDirection(

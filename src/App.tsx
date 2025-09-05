@@ -559,6 +559,24 @@ function App() {
     }
   }, [brushTool, handleSeparateBrush, handleRemoveBrush]);
 
+  const handleBrushReorder = useCallback((fromTileIndex: number, toTileIndex: number) => {
+    if (!editor) return;
+    
+    try {
+      // Get the current brush order to find array indices
+      const tileInfo = editor.getDetectedTileInfo();
+      const fromIndex = tileInfo.findIndex(tile => tile.gid === fromTileIndex);
+      const toIndex = tileInfo.findIndex(tile => tile.gid === toTileIndex);
+      
+      if (fromIndex !== -1 && toIndex !== -1) {
+        editor.reorderBrush(fromIndex, toIndex);
+        console.log(`Reordered brush ${fromTileIndex} to position of ${toTileIndex}`);
+      }
+    } catch (error) {
+      console.error('Failed to reorder brush:', error);
+    }
+  }, [editor]);
+
   // Effect to handle brush tool state changes
   useEffect(() => {
     const brushToolElement = document.querySelector('[data-brush-tool]');
@@ -591,6 +609,17 @@ function App() {
         case 'remove':
           handleRemoveBrush(tileIndex);
           break;
+        case 'dragstart':
+          setDraggedBrush(tileIndex);
+          break;
+        case 'dragend':
+          setDraggedBrush(null);
+          break;
+        case 'drop':
+          if (event.detail.from && event.detail.to) {
+            handleBrushReorder(event.detail.from, event.detail.to);
+          }
+          break;
       }
     };
 
@@ -599,7 +628,7 @@ function App() {
     return () => {
       document.removeEventListener('brushAction', handleBrushAction as EventListener);
     };
-  }, [handleSeparateBrush, handleRemoveBrush]);
+  }, [handleSeparateBrush, handleRemoveBrush, handleBrushReorder]);
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>, type: 'tileset' | 'layerTileset') => {
     const file = event.target.files?.[0];

@@ -54,6 +54,8 @@ export class TileMapEditor {
   private tool: Tool = 'tiles';
   private currentTool: 'brush' | 'eraser' | 'bucket' = 'brush';
   private currentSelectionTool: 'rectangular' | 'magic-wand' | 'same-tile' | 'circular' = 'rectangular';
+  private currentShapeTool: 'rectangle' | 'circle' | 'line' = 'rectangle';
+  private currentStampMode: 'select' | 'create' | 'place' = 'select';
   private activeGid: number = 0;
   private isMouseDown: boolean = false;
 
@@ -74,6 +76,24 @@ export class TileMapEditor {
     tiles: []
   };
   private isSelecting: boolean = false;
+
+  // Shape drawing state
+  private shapeDrawing: {
+    active: boolean;
+    startX: number;
+    startY: number;
+    endX: number;
+    endY: number;
+    preview: Array<{x: number, y: number}>;
+  } = {
+    active: false,
+    startX: -1,
+    startY: -1,
+    endX: -1,
+    endY: -1,
+    preview: []
+  };
+  private isDrawingShape: boolean = false;
 
   // Hover state
   private hoverX: number = -1;
@@ -223,8 +243,18 @@ export class TileMapEditor {
       if (tileCoords) {
         if (this.tool === 'tiles') {
           this.handleTileClick(tileCoords.x, tileCoords.y, event.button === 2);
-        } else {
+        } else if (this.tool === 'selection') {
           this.handleSelectionStart(tileCoords.x, tileCoords.y, event.button === 2);
+        } else if (this.tool === 'shape') {
+          this.handleShapeStart(tileCoords.x, tileCoords.y, event.button === 2);
+        } else if (this.tool === 'eyedropper') {
+          const sampledGid = this.handleEyedropper(tileCoords.x, tileCoords.y);
+          if (sampledGid) {
+            // Eyedropper was successful, no need to continue with mouse down
+            this.isMouseDown = false;
+          }
+        } else if (this.tool === 'stamp') {
+          this.handleStampClick(tileCoords.x, tileCoords.y, event.button === 2);
         }
       }
     }
@@ -249,11 +279,20 @@ export class TileMapEditor {
         this.hoverX = tileCoords.x;
         this.hoverY = tileCoords.y;
         
+        // Update stamp preview position
+        if (this.tool === 'stamp' && this.currentStampMode === 'place' && this.activeStamp) {
+          this.stampPreview.x = tileCoords.x;
+          this.stampPreview.y = tileCoords.y;
+          this.stampPreview.visible = true;
+        }
+        
         if (this.isMouseDown && !this.spacePressed) {
           if (this.tool === 'tiles') {
             this.handleTileClick(tileCoords.x, tileCoords.y, false);
           } else if (this.isSelecting) {
             this.handleSelectionDrag(tileCoords.x, tileCoords.y);
+          } else if (this.isDrawingShape) {
+            this.handleShapeDrag(tileCoords.x, tileCoords.y);
           }
         }
       }
@@ -265,6 +304,8 @@ export class TileMapEditor {
   private handleMouseUp(): void {
     if (this.isSelecting) {
       this.handleSelectionEnd();
+    } else if (this.isDrawingShape) {
+      this.handleShapeEnd();
     }
     this.isMouseDown = false;
     this.isPanning = false;
@@ -304,6 +345,13 @@ export class TileMapEditor {
       case 'Escape':
         event.preventDefault();
         this.clearSelection();
+        // Also cancel shape drawing if in progress
+        if (this.isDrawingShape) {
+          this.shapeDrawing.active = false;
+          this.isDrawingShape = false;
+          this.shapeDrawing.preview = [];
+          this.draw();
+        }
         break;
     }
   }
@@ -325,6 +373,23 @@ export class TileMapEditor {
     }
     
     return null;
+  }
+
+  private handleStampClick(x: number, y: number, isRightClick: boolean): void {
+    if (isRightClick) {
+      // Right-click clears stamp preview
+      this.stampPreview.visible = false;
+      this.draw();
+      return;
+    }
+
+    if (this.currentStampMode === 'create') {
+      // Start selection for creating a stamp
+      this.handleSelectionStart(x, y, isRightClick);
+    } else if (this.currentStampMode === 'place' && this.activeStamp) {
+      // Place the active stamp
+      this.placeStamp(x, y);
+    }
   }
 
   private handleTileClick(x: number, y: number, isRightClick: boolean): void {
@@ -428,6 +493,131 @@ export class TileMapEditor {
     this.draw();
   }
 
+  // Shape event handlers
+  private handleShapeStart(x: number, y: number, isRightClick: boolean): void {
+    if (isRightClick) {
+      // Right-click cancels shape drawing
+      this.shapeDrawing.active = false;
+      this.isDrawingShape = false;
+      this.draw();
+      return;
+    }
+
+    this.shapeDrawing.active = true;
+    this.shapeDrawing.startX = x;
+    this.shapeDrawing.startY = y;
+    this.shapeDrawing.endX = x;
+    this.shapeDrawing.endY = y;
+    this.shapeDrawing.preview = [];
+    this.isDrawingShape = true;
+  }
+
+  private handleShapeDrag(x: number, y: number): void {
+    if (!this.isDrawingShape) return;
+
+    this.shapeDrawing.endX = x;
+    this.shapeDrawing.endY = y;
+
+    // Update preview based on shape type
+    switch (this.currentShapeTool) {
+      case 'rectangle':
+        this.shapeDrawing.preview = this.drawRectangleShape(
+          this.shapeDrawing.startX, this.shapeDrawing.startY,
+          this.shapeDrawing.endX, this.shapeDrawing.endY
+        );
+        break;
+      case 'circle':
+        this.shapeDrawing.preview = this.drawCircleShape(
+          this.shapeDrawing.startX, this.shapeDrawing.startY,
+          this.shapeDrawing.endX, this.shapeDrawing.endY
+        );
+        break;
+      case 'line':
+        this.shapeDrawing.preview = this.drawLineShape(
+          this.shapeDrawing.startX, this.shapeDrawing.startY,
+          this.shapeDrawing.endX, this.shapeDrawing.endY
+        );
+        break;
+    }
+
+    this.draw(); // Update preview
+  }
+
+  private handleShapeEnd(): void {
+    if (!this.isDrawingShape) return;
+
+    const layer = this.tileLayers.find(l => l.id === this.activeLayerId);
+    if (!layer) return;
+
+    // Apply the shape to the layer
+    if (this.shapeDrawing.preview.length > 0 && this.activeGid > 0) {
+      this.saveState();
+      
+      this.shapeDrawing.preview.forEach(point => {
+        const index = point.y * this.mapWidth + point.x;
+        layer.data[index] = this.activeGid;
+      });
+
+      this.markAsChanged();
+    }
+
+    this.shapeDrawing.active = false;
+    this.isDrawingShape = false;
+    this.shapeDrawing.preview = [];
+    this.draw();
+  }
+
+  // Eyedropper functionality
+  private handleEyedropper(x: number, y: number): number | null {
+    const layer = this.tileLayers.find(l => l.id === this.activeLayerId);
+    if (!layer) return null;
+
+    if (x >= 0 && x < this.mapWidth && y >= 0 && y < this.mapHeight) {
+      const index = y * this.mapWidth + x;
+      const gid = layer.data[index];
+      
+      if (gid > 0) {
+        // Set the active GID and update tile palette selection
+        this.activeGid = gid;
+        this.updateTilePaletteSelection();
+        
+        // Switch back to brush tool automatically
+        this.tool = 'tiles';
+        this.currentTool = 'brush';
+        this.mapCanvas.style.cursor = 'crosshair';
+        
+        // Notify the UI that we switched back to brush
+        if (this.eyedropperCallback) {
+          this.eyedropperCallback();
+        }
+        
+        return gid;
+      }
+    }
+    
+    return null;
+  }
+
+  private updateTilePaletteSelection(): void {
+    // Update the active GID display
+    const activeGidSpan = document.getElementById('activeGid');
+    if (activeGidSpan) {
+      activeGidSpan.textContent = this.activeGid.toString();
+    }
+
+    // Update tile palette visual selection
+    const tiles = document.querySelectorAll('.tile-palette .tile');
+    tiles.forEach((tile, index) => {
+      const tileElement = tile as HTMLElement;
+      if (index === this.activeGid - 1) {
+        tileElement.classList.add('selected');
+        tileElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      } else {
+        tileElement.classList.remove('selected');
+      }
+    });
+  }
+
   private draw(): void {
     // Clear canvas
     this.ctx.clearRect(0, 0, this.mapCanvas.width, this.mapCanvas.height);
@@ -452,11 +642,17 @@ export class TileMapEditor {
     // Draw selection
     this.drawSelection();
     
+    // Draw shape preview
+    this.drawShapePreview();
+    
     // Restore context state
     this.ctx.restore();
     
     // Update mini map (not affected by zoom/pan)
     this.drawMiniMap();
+    
+    // Draw stamp preview
+    this.drawStampPreview();
   }
 
   // Coordinate transformation methods for isometric rendering with zoom and pan
@@ -709,6 +905,66 @@ export class TileMapEditor {
         }
       }
     }
+  }
+
+  private drawShapePreview(): void {
+    if (!this.isDrawingShape || this.shapeDrawing.preview.length === 0) return;
+
+    this.ctx.strokeStyle = '#0099ff';
+    this.ctx.lineWidth = Math.max(1, Math.min(2, 2 / this.zoom));
+    this.ctx.setLineDash([3, 3]);
+
+    // Draw preview outline around each tile in the shape
+    this.shapeDrawing.preview.forEach(point => {
+      const screenPos = this.mapToScreen(point.x, point.y);
+      const halfTileX = (this.tileSizeX / 2) * this.zoom;
+      const halfTileY = (this.tileSizeY / 2) * this.zoom;
+      
+      this.ctx.beginPath();
+      this.ctx.moveTo(screenPos.x, screenPos.y - halfTileY); // Top
+      this.ctx.lineTo(screenPos.x + halfTileX, screenPos.y); // Right
+      this.ctx.lineTo(screenPos.x, screenPos.y + halfTileY); // Bottom
+      this.ctx.lineTo(screenPos.x - halfTileX, screenPos.y); // Left
+      this.ctx.closePath();
+      this.ctx.stroke();
+    });
+
+    this.ctx.setLineDash([]); // Reset line dash
+  }
+
+  private drawStampPreview(): void {
+    if (!this.stampPreview.visible || !this.activeStamp) return;
+
+    this.ctx.strokeStyle = '#00ff00';
+    this.ctx.fillStyle = 'rgba(0, 255, 0, 0.2)';
+    this.ctx.lineWidth = Math.max(1, Math.min(2, 2 / this.zoom));
+    this.ctx.setLineDash([3, 3]);
+
+    // Draw preview outline for the stamp area
+    for (let dy = 0; dy < this.activeStamp.height; dy++) {
+      for (let dx = 0; dx < this.activeStamp.width; dx++) {
+        const x = this.stampPreview.x + dx;
+        const y = this.stampPreview.y + dy;
+        
+        if (x >= 0 && x < this.mapWidth && y >= 0 && y < this.mapHeight) {
+          const screenPos = this.mapToScreen(x, y);
+          const halfTileX = (this.tileSizeX / 2) * this.zoom;
+          const halfTileY = (this.tileSizeY / 2) * this.zoom;
+          
+          // Draw diamond shape for preview
+          this.ctx.beginPath();
+          this.ctx.moveTo(screenPos.x, screenPos.y - halfTileY); // Top
+          this.ctx.lineTo(screenPos.x + halfTileX, screenPos.y); // Right
+          this.ctx.lineTo(screenPos.x, screenPos.y + halfTileY); // Bottom
+          this.ctx.lineTo(screenPos.x - halfTileX, screenPos.y); // Left
+          this.ctx.closePath();
+          this.ctx.fill();
+          this.ctx.stroke();
+        }
+      }
+    }
+
+    this.ctx.setLineDash([]); // Reset line dash
   }
 
   private drawMiniMap(): void {
@@ -1066,6 +1322,185 @@ export class TileMapEditor {
     return this.currentSelectionTool;
   }
 
+  // Shape tool management methods
+  public setCurrentShapeTool(tool: 'rectangle' | 'circle' | 'line'): void {
+    this.currentShapeTool = tool;
+    this.tool = 'shape'; // Set main tool mode to shape
+  }
+
+  public getCurrentShapeTool(): 'rectangle' | 'circle' | 'line' {
+    return this.currentShapeTool;
+  }
+
+  // Eyedropper tool management methods
+  public setEyedropperTool(): void {
+    this.tool = 'eyedropper';
+    this.mapCanvas.style.cursor = 'crosshair'; // Will be updated to eyedropper cursor
+  }
+
+  public isEyedropperActive(): boolean {
+    return this.tool === 'eyedropper';
+  }
+
+  // Callback for when eyedropper switches back to brush tool
+  private eyedropperCallback: (() => void) | null = null;
+
+  // Stamp tool state
+  private stamps: Map<string, import('../types').Stamp> = new Map();
+  private activeStamp: import('../types').Stamp | null = null;
+  private stampPreview: { x: number; y: number; visible: boolean } = { x: 0, y: 0, visible: false };
+  private stampCallback: ((stamps: import('../types').Stamp[]) => void) | null = null;
+
+  public setEyedropperCallback(callback: (() => void) | null): void {
+    this.eyedropperCallback = callback;
+  }
+
+  // Stamp tool management methods
+  public setStampTool(): void {
+    this.tool = 'stamp';
+    this.mapCanvas.style.cursor = 'crosshair';
+    this.stampPreview.visible = false;
+  }
+
+  public isStampActive(): boolean {
+    return this.tool === 'stamp';
+  }
+
+  public setCurrentStampMode(mode: 'select' | 'create' | 'place'): void {
+    this.currentStampMode = mode;
+    this.stampPreview.visible = mode === 'place' && this.activeStamp !== null;
+    this.draw();
+  }
+
+  public getCurrentStampMode(): 'select' | 'create' | 'place' {
+    return this.currentStampMode;
+  }
+
+  public createStampFromSelection(name: string): boolean {
+    if (!this.selection.active || this.selection.tiles.length === 0) {
+      return false;
+    }
+
+    // Calculate bounds
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const tile of this.selection.tiles) {
+      minX = Math.min(minX, tile.x);
+      minY = Math.min(minY, tile.y);
+      maxX = Math.max(maxX, tile.x);
+      maxY = Math.max(maxY, tile.y);
+    }
+
+    const width = maxX - minX + 1;
+    const height = maxY - minY + 1;
+
+    // Create stamp tiles with relative positions
+    const stampTiles: import('../types').StampTile[] = [];
+    
+    // Use current active layer for stamps
+    const currentLayerId = this.activeLayerId || 0;
+    
+    for (const tile of this.selection.tiles) {
+      if (tile.gid > 0) {
+        stampTiles.push({
+          tileId: tile.gid,
+          layerId: currentLayerId,
+          x: tile.x - minX,
+          y: tile.y - minY
+        });
+      }
+    }
+
+    const stamp: import('../types').Stamp = {
+      id: Date.now().toString(),
+      name,
+      width,
+      height,
+      tiles: stampTiles
+    };
+
+    this.stamps.set(stamp.id, stamp);
+    this.clearSelection();
+    
+    // Notify callback about stamp changes
+    if (this.stampCallback) {
+      this.stampCallback(Array.from(this.stamps.values()));
+    }
+
+    return true;
+  }
+
+  public setActiveStamp(stampId: string | null): void {
+    if (stampId && this.stamps.has(stampId)) {
+      this.activeStamp = this.stamps.get(stampId)!;
+      this.currentStampMode = 'place';
+      this.stampPreview.visible = true;
+    } else {
+      this.activeStamp = null;
+      this.stampPreview.visible = false;
+    }
+    this.draw();
+  }
+
+  public getStamps(): import('../types').Stamp[] {
+    return Array.from(this.stamps.values());
+  }
+
+  public deleteStamp(stampId: string): boolean {
+    if (this.stamps.has(stampId)) {
+      this.stamps.delete(stampId);
+      if (this.activeStamp && this.activeStamp.id === stampId) {
+        this.activeStamp = null;
+        this.stampPreview.visible = false;
+      }
+      
+      // Notify callback about stamp changes
+      if (this.stampCallback) {
+        this.stampCallback(Array.from(this.stamps.values()));
+      }
+      
+      this.draw();
+      return true;
+    }
+    return false;
+  }
+
+  public setStampCallback(callback: ((stamps: import('../types').Stamp[]) => void) | null): void {
+    this.stampCallback = callback;
+  }
+
+  private placeStamp(gridX: number, gridY: number): void {
+    if (!this.activeStamp) return;
+
+    // Check if placement is within bounds
+    if (gridX < 0 || gridY < 0 || 
+        gridX + this.activeStamp.width > this.mapWidth || 
+        gridY + this.activeStamp.height > this.mapHeight) {
+      return;
+    }
+
+    // Place each tile from the stamp
+    for (const stampTile of this.activeStamp.tiles) {
+      const targetX = gridX + stampTile.x;
+      const targetY = gridY + stampTile.y;
+      const targetIndex = targetY * this.mapWidth + targetX;
+
+      // Find the target layer by ID, or use current active layer
+      let targetLayer = this.tileLayers.find(l => l.id === stampTile.layerId);
+      
+      if (!targetLayer && this.activeLayerId !== null) {
+        // If layer doesn't exist, use the active layer
+        targetLayer = this.tileLayers.find(l => l.id === this.activeLayerId);
+      }
+
+      if (targetLayer) {
+        targetLayer.data[targetIndex] = stampTile.tileId;
+      }
+    }
+
+    this.saveState();
+    this.draw();
+  }
+
   public clearSelection(): void {
     this.selection.active = false;
     this.selection.tiles = [];
@@ -1258,6 +1693,89 @@ export class TileMapEditor {
     }
     
     this.selection.active = true;
+  }
+
+  // Shape drawing algorithms
+  private drawRectangleShape(startX: number, startY: number, endX: number, endY: number): Array<{x: number, y: number}> {
+    const points: Array<{x: number, y: number}> = [];
+    
+    const minX = Math.min(startX, endX);
+    const maxX = Math.max(startX, endX);
+    const minY = Math.min(startY, endY);
+    const maxY = Math.max(startY, endY);
+
+    // Draw rectangle outline
+    for (let x = minX; x <= maxX; x++) {
+      for (let y = minY; y <= maxY; y++) {
+        // Only draw the border of the rectangle
+        if (x === minX || x === maxX || y === minY || y === maxY) {
+          if (x >= 0 && x < this.mapWidth && y >= 0 && y < this.mapHeight) {
+            points.push({x, y});
+          }
+        }
+      }
+    }
+    
+    return points;
+  }
+
+  private drawCircleShape(centerX: number, centerY: number, endX: number, endY: number): Array<{x: number, y: number}> {
+    const points: Array<{x: number, y: number}> = [];
+    const radius = Math.sqrt(Math.pow(endX - centerX, 2) + Math.pow(endY - centerY, 2));
+
+    // Bresenham's circle algorithm adapted for outline
+    for (let angle = 0; angle < 360; angle += 1) {
+      const radians = (angle * Math.PI) / 180;
+      const x = Math.round(centerX + radius * Math.cos(radians));
+      const y = Math.round(centerY + radius * Math.sin(radians));
+      
+      if (x >= 0 && x < this.mapWidth && y >= 0 && y < this.mapHeight) {
+        // Avoid duplicate points
+        if (!points.some(p => p.x === x && p.y === y)) {
+          points.push({x, y});
+        }
+      }
+    }
+    
+    return points;
+  }
+
+  private drawLineShape(startX: number, startY: number, endX: number, endY: number): Array<{x: number, y: number}> {
+    const points: Array<{x: number, y: number}> = [];
+
+    // Bresenham's line algorithm
+    const dx = Math.abs(endX - startX);
+    const dy = Math.abs(endY - startY);
+    const sx = startX < endX ? 1 : -1;
+    const sy = startY < endY ? 1 : -1;
+    let err = dx - dy;
+
+    let x = startX;
+    let y = startY;
+
+    let finished = false;
+    while (!finished) {
+      if (x >= 0 && x < this.mapWidth && y >= 0 && y < this.mapHeight) {
+        points.push({x, y});
+      }
+
+      if (x === endX && y === endY) {
+        finished = true;
+        continue;
+      }
+
+      const e2 = 2 * err;
+      if (e2 > -dy) {
+        err -= dy;
+        x += sx;
+      }
+      if (e2 < dx) {
+        err += dx;
+        y += sy;
+      }
+    }
+
+    return points;
   }
 
   // Layer-specific tileset management

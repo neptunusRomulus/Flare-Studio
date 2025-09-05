@@ -45,6 +45,13 @@ function App() {
   const [selectedSelectionTool, setSelectedSelectionTool] = useState('rectangular');
   const [selectedShapeTool, setSelectedShapeTool] = useState('rectangle');
   
+  // Stamp states
+  const [stamps, setStamps] = useState<import('./types').Stamp[]>([]);
+  const [selectedStamp, setSelectedStamp] = useState<string | null>(null);
+  const [stampMode, setStampMode] = useState<'select' | 'create' | 'place'>('select');
+  const [showStampDialog, setShowStampDialog] = useState(false);
+  const [newStampName, setNewStampName] = useState('');
+  
   // Settings states
   const [mapName, setMapName] = useState('Untitled Map');
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -114,6 +121,17 @@ function App() {
     });
 
     editorInstance.setAutoSaveEnabled(autoSaveEnabled);
+    
+    // Set up eyedropper callback to switch back to brush tool
+    editorInstance.setEyedropperCallback(() => {
+      setSelectedTool('brush');
+      setSelectedBrushTool('brush');
+    });
+    
+    // Set up stamp callback to update stamps list
+    editorInstance.setStampCallback((stampsList) => {
+      setStamps(stampsList);
+    });
   }, [autoSaveEnabled]);
 
   useEffect(() => {
@@ -185,8 +203,35 @@ function App() {
       };
       const editorSelectionTool = selectionToolMap[selectedSelectionTool] || 'rectangular';
       editor.setCurrentSelectionTool(editorSelectionTool);
+    } else if (editor && selectedTool === 'shape') {
+      // Set the editor to shape mode and update shape tool
+      const shapeToolMap: {[key: string]: 'rectangle' | 'circle' | 'line'} = {
+        'rectangle': 'rectangle',
+        'circle': 'circle',
+        'line': 'line'
+      };
+      const editorShapeTool = shapeToolMap[selectedShapeTool] || 'rectangle';
+      editor.setCurrentShapeTool(editorShapeTool);
+    } else if (editor && selectedTool === 'eyedropper') {
+      // Set the editor to eyedropper mode
+      editor.setEyedropperTool();
+    } else if (editor && selectedTool === 'stamp') {
+      // Set the editor to stamp mode
+      editor.setStampTool();
     }
-  }, [editor, selectedTool, selectedBrushTool, selectedSelectionTool]);
+  }, [editor, selectedTool, selectedBrushTool, selectedSelectionTool, selectedShapeTool]);
+
+  // Stamp mode synchronization
+  useEffect(() => {
+    if (!editor || selectedTool !== 'stamp') return;
+    editor.setCurrentStampMode(stampMode);
+  }, [editor, selectedTool, stampMode]);
+
+  // Stamp selection synchronization
+  useEffect(() => {
+    if (!editor || selectedTool !== 'stamp') return;
+    editor.setActiveStamp(selectedStamp);
+  }, [editor, selectedTool, selectedStamp]);
 
   // Track selection state
   useEffect(() => {
@@ -329,6 +374,7 @@ function App() {
     // Close other dropdowns and show brush options
     setShowSelectionOptions(false);
     setShowShapeOptions(false);
+    setShowStampDialog(false);
     setShowBrushOptions(true);
   }, []);
 
@@ -353,6 +399,7 @@ function App() {
     // Close other dropdowns and show selection options
     setShowBrushOptions(false);
     setShowShapeOptions(false);
+    setShowStampDialog(false);
     setShowSelectionOptions(true);
   }, []);
 
@@ -385,6 +432,32 @@ function App() {
       setShowShapeOptions(false);
     }, 1000);
   }, []);
+
+  // Stamp handlers
+  const handleCreateStamp = useCallback(() => {
+    if (!editor || !newStampName.trim()) return;
+    
+    const success = editor.createStampFromSelection(newStampName.trim());
+    if (success) {
+      setNewStampName('');
+      setShowStampDialog(false);
+      setStampMode('select');
+    }
+  }, [editor, newStampName]);
+
+  const handleStampSelect = useCallback((stampId: string) => {
+    setSelectedStamp(stampId);
+    setStampMode('place');
+  }, []);
+
+  const handleDeleteStamp = useCallback((stampId: string) => {
+    if (!editor) return;
+    editor.deleteStamp(stampId);
+    if (selectedStamp === stampId) {
+      setSelectedStamp(null);
+      setStampMode('select');
+    }
+  }, [editor, selectedStamp]);
 
   // Icon helper functions
   const getBrushIcon = () => {
@@ -1512,7 +1585,7 @@ function App() {
                     onMouseLeave={handleHideShapeOptions}
                   >
                     <Button 
-                      variant="ghost" 
+                      variant={selectedShapeTool === 'rectangle' ? 'default' : 'ghost'} 
                       size="sm" 
                       className="w-8 h-8 p-0 sub-tool-button"
                       onClick={() => setSelectedShapeTool('rectangle')}
@@ -1521,7 +1594,7 @@ function App() {
                       <Square className="w-4 h-4" />
                     </Button>
                     <Button 
-                      variant="ghost" 
+                      variant={selectedShapeTool === 'circle' ? 'default' : 'ghost'} 
                       size="sm" 
                       className="w-8 h-8 p-0 sub-tool-button"
                       onClick={() => setSelectedShapeTool('circle')}
@@ -1530,7 +1603,7 @@ function App() {
                       <Circle className="w-4 h-4" />
                     </Button>
                     <Button 
-                      variant="ghost" 
+                      variant={selectedShapeTool === 'line' ? 'default' : 'ghost'} 
                       size="sm" 
                       className="w-8 h-8 p-0 sub-tool-button"
                       onClick={() => setSelectedShapeTool('line')}
@@ -1543,15 +1616,112 @@ function App() {
               </div>
 
               {/* Stamp Tool */}
-              <Button
-                variant={selectedTool === 'stamp' ? 'default' : 'ghost'}
-                size="sm"
-                className="w-8 h-8 p-0 tool-button"
-                onClick={() => setSelectedTool('stamp')}
-                title="Stamp Tool - Group tiles into a stamp and place them together"
-              >
-                <Stamp className="w-4 h-4" />
-              </Button>
+              <div className="relative">
+                <Button
+                  variant={selectedTool === 'stamp' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="w-8 h-8 p-0 tool-button"
+                  onClick={() => setSelectedTool('stamp')}
+                  title="Stamp Tool - Group tiles into a stamp and place them together"
+                >
+                  <Stamp className="w-4 h-4" />
+                </Button>
+
+                {selectedTool === 'stamp' && (
+                  <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-2 min-w-[200px] z-10">
+                    <div className="flex flex-col gap-2">
+                      {/* Stamp Mode Controls */}
+                      <div className="flex gap-1">
+                        <Button
+                          variant={stampMode === 'select' ? 'default' : 'ghost'}
+                          size="sm"
+                          className="flex-1 text-xs"
+                          onClick={() => setStampMode('select')}
+                          title="Select and place existing stamps"
+                        >
+                          Select
+                        </Button>
+                        <Button
+                          variant={stampMode === 'create' ? 'default' : 'ghost'}
+                          size="sm"
+                          className="flex-1 text-xs"
+                          onClick={() => setStampMode('create')}
+                          title="Create stamp from selection"
+                        >
+                          Create
+                        </Button>
+                      </div>
+
+                      {/* Create Stamp Section */}
+                      {stampMode === 'create' && (
+                        <div className="border-t pt-2">
+                          <div className="text-xs font-medium mb-1">Create New Stamp</div>
+                          <div className="flex gap-1">
+                            <input
+                              type="text"
+                              placeholder="Stamp name"
+                              value={newStampName}
+                              onChange={(e) => setNewStampName(e.target.value)}
+                              className="flex-1 text-xs px-2 py-1 border rounded"
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  handleCreateStamp();
+                                }
+                              }}
+                            />
+                            <Button
+                              size="sm"
+                              className="text-xs"
+                              onClick={handleCreateStamp}
+                              disabled={!newStampName.trim()}
+                            >
+                              Create
+                            </Button>
+                          </div>
+                          <div className="text-xs text-gray-500 mt-1">
+                            First select tiles, then create stamp
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Stamps List */}
+                      {stampMode === 'select' && (
+                        <div className="border-t pt-2 max-h-32 overflow-y-auto">
+                          <div className="text-xs font-medium mb-1">Available Stamps</div>
+                          {stamps.length === 0 ? (
+                            <div className="text-xs text-gray-500">No stamps created yet</div>
+                          ) : (
+                            <div className="flex flex-col gap-1">
+                              {stamps.map((stamp) => (
+                                <div key={stamp.id} className="flex items-center gap-1">
+                                  <Button
+                                    variant={selectedStamp === stamp.id ? 'default' : 'ghost'}
+                                    size="sm"
+                                    className="flex-1 text-xs justify-start"
+                                    onClick={() => handleStampSelect(stamp.id)}
+                                    title={`${stamp.name} (${stamp.width}x${stamp.height})`}
+                                  >
+                                    {stamp.name}
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="w-6 h-6 p-0 text-red-500"
+                                    onClick={() => handleDeleteStamp(stamp.id)}
+                                    title="Delete stamp"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {/* Eyedropper Tool */}
               <Button

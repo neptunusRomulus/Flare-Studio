@@ -21,6 +21,7 @@ function App() {
   const [tileCount, setTileCount] = useState(0);
   const [showWelcome, setShowWelcome] = useState(true);
   const [editor, setEditor] = useState<TileMapEditor | null>(null);
+  const [isCreatingNewProject, setIsCreatingNewProject] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [mapWidth, setMapWidth] = useState(20);
   const [mapHeight, setMapHeight] = useState(15);
@@ -135,7 +136,11 @@ function App() {
   }, [autoSaveEnabled]);
 
   useEffect(() => {
-    if (canvasRef.current && !showWelcome && !editor) {
+    // Only create a default editor if:
+    // 1. We're not showing welcome screen
+    // 2. We don't have an editor yet  
+    // 3. We're not currently creating a new project (to avoid race conditions)
+    if (canvasRef.current && !showWelcome && !editor && !isCreatingNewProject) {
       const tileEditor = new TileMapEditor(canvasRef.current);
       // Try to load from localStorage backup first
       const hasBackup = tileEditor.loadFromLocalStorage();
@@ -148,7 +153,7 @@ function App() {
       setEditor(tileEditor);
       setTileCount(tileEditor.getTileCount());
     }
-  }, [showWelcome, editor, setupAutoSave]);
+  }, [showWelcome, editor, isCreatingNewProject, setupAutoSave]);
 
   // Update tileCount when tileset changes
   useEffect(() => {
@@ -706,32 +711,55 @@ function App() {
   };
 
   const handleCreateNewMap = (config: MapConfig) => {
+    setIsCreatingNewProject(true); // Prevent useEffect from creating editor
+    
     setMapWidth(config.width);
     setMapHeight(config.height);
+    setMapName(config.name);
     setShowWelcome(false);
+    
+    // Clear existing editor state first
+    if (editor) {
+      setEditor(null);
+    }
     
     // Initialize editor with new configuration
     if (canvasRef.current) {
       const newEditor = new TileMapEditor(canvasRef.current);
+      // Reset all data to ensure clean state
+      newEditor.resetForNewProject();
       newEditor.setMapSize(config.width, config.height);
       setupAutoSave(newEditor);
       setEditor(newEditor);
       updateLayersList();
+      setTileCount(0); // Reset tile count for new project
+      setHasTileset(false); // Reset tileset state
     }
+    
+    setIsCreatingNewProject(false); // Allow normal editor creation again
   };
 
   const handleOpenMap = async (projectPath: string) => {
     try {
       if (window.electronAPI?.openMapProject) {
+        setIsCreatingNewProject(true); // Prevent useEffect from creating editor
+        
         const mapConfig = await window.electronAPI.openMapProject(projectPath);
         if (mapConfig) {
           setMapWidth(mapConfig.width);
           setMapHeight(mapConfig.height);
           setShowWelcome(false);
           
+          // Clear existing editor state first
+          if (editor) {
+            setEditor(null);
+          }
+          
           // Initialize editor with loaded configuration
           if (canvasRef.current) {
             const newEditor = new TileMapEditor(canvasRef.current);
+            // Clear auto-save backup to prevent old data from loading
+            newEditor.clearLocalStorageBackup();
             newEditor.setMapSize(mapConfig.width, mapConfig.height);
             
             // Try to load project data including tileset images
@@ -748,6 +776,7 @@ function App() {
             variant: "default",
           });
         }
+        setIsCreatingNewProject(false); // Allow normal editor creation again
       } else {
         // Fallback for web
         console.log('Opening map project:', projectPath);
@@ -756,6 +785,7 @@ function App() {
           description: "Map loading requires the desktop app.",
           variant: "default",
         });
+        setIsCreatingNewProject(false);
       }
     } catch (error) {
       console.error('Error opening map project:', error);
@@ -764,6 +794,7 @@ function App() {
         description: "Failed to open map project. Please try again.",
         variant: "destructive",
       });
+      setIsCreatingNewProject(false);
     }
   };
 

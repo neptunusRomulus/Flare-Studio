@@ -2780,6 +2780,84 @@ export class TileMapEditor {
     this.performAutoSave();
   }
 
+  // Reset editor for a new project - clears all data and localStorage
+  public resetForNewProject(): void {
+    // Clear localStorage backup to prevent loading old data
+    this.clearLocalStorageBackup();
+    
+    // Reset all tile data
+    this.tilesetImage = null;
+    this.tilesetFileName = null;
+    this.tilesetColumns = 0;
+    this.tilesetRows = 0;
+    this.tileCount = 0;
+    this.detectedTileData.clear();
+    
+    // Reset layer data
+    this.tileLayers = [];
+    this.activeLayerId = null;
+    this.nextLayerId = 1;
+    
+    // Reset objects
+    this.objects = [];
+    this.nextObjectId = 1;
+    this.selectedObjectId = null;
+    
+    // Reset layer-specific tilesets
+    this.layerTilesets.clear();
+    
+    // Reset legacy tileset data
+    this.tilesets = [];
+    
+    // Reset collision data
+    this.collisionData = [];
+    
+    // Reset selection and drawing state
+    this.selection = {
+      active: false,
+      startX: -1,
+      startY: -1,
+      endX: -1,
+      endY: -1,
+      tiles: []
+    };
+    this.isSelecting = false;
+    
+    this.shapeDrawing = {
+      active: false,
+      startX: -1,
+      startY: -1,
+      endX: -1,
+      endY: -1,
+      preview: []
+    };
+    this.isDrawingShape = false;
+    
+    // Reset stamp data
+    this.stamps.clear();
+    this.activeStamp = null;
+    this.stampPreview = { x: 0, y: 0, visible: false };
+    
+    // Reset auto-save state
+    this.hasUnsavedChanges = false;
+    this.lastSaveTimestamp = 0;
+    if (this.autoSaveTimeout) {
+      clearTimeout(this.autoSaveTimeout);
+      this.autoSaveTimeout = null;
+    }
+    
+    // Create default layers for new project
+    this.createDefaultLayers();
+    
+    // Clear undo/redo history and save initial state
+    this.history = [];
+    this.historyIndex = -1;
+    this.saveState();
+    
+    // Redraw canvas
+    this.draw();
+  }
+
   // Load project data from saved configuration
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   public loadProjectData(projectData: any): void {

@@ -2793,6 +2793,9 @@ export class TileMapEditor {
     this.tileCount = 0;
     this.detectedTileData.clear();
     
+    // Clear tile palette
+    this.clearTilePalette();
+    
     // Reset layer data
     this.tileLayers = [];
     this.activeLayerId = null;
@@ -2854,7 +2857,8 @@ export class TileMapEditor {
     this.historyIndex = -1;
     this.saveState();
     
-    // Redraw canvas
+    // Clear canvas explicitly and redraw
+    this.ctx.clearRect(0, 0, this.mapCanvas.width, this.mapCanvas.height);
     this.draw();
   }
 

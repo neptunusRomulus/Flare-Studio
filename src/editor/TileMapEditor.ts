@@ -11,6 +11,37 @@ export class TileMapEditor {
   public getTileCount(): number {
     return this.tileCount;
   }
+
+  // Tile content detection settings
+  public setTileContentThreshold(threshold: number): void {
+    this.tileContentThreshold = Math.max(0, Math.min(255, threshold));
+  }
+
+  public getTileContentThreshold(): number {
+    return this.tileContentThreshold;
+  }
+
+  // Force regeneration of tile palette with current settings
+  public refreshTilePalette(): void {
+    if (this.tilesetImage) {
+      this.createTilePalette();
+    }
+  }
+
+  // Get information about detected tiles for debugging
+  public getDetectedTileInfo(): Array<{gid: number, width: number, height: number, sourceX: number, sourceY: number}> {
+    const tileInfo: Array<{gid: number, width: number, height: number, sourceX: number, sourceY: number}> = [];
+    this.detectedTileData.forEach((data, gid) => {
+      tileInfo.push({
+        gid,
+        width: data.width,
+        height: data.height,
+        sourceX: data.sourceX,
+        sourceY: data.sourceY
+      });
+    });
+    return tileInfo.sort((a, b) => a.gid - b.gid);
+  }
   private ctx!: CanvasRenderingContext2D;
   private mapCanvas: HTMLCanvasElement;
   private showMinimap: boolean = true;
@@ -21,6 +52,18 @@ export class TileMapEditor {
   private readonly tileSizeX: number = 64;
   private readonly tileSizeY: number = 32;
   private readonly orientation: Orientation = 'isometric';
+  
+  // Tile detection settings
+  private tileContentThreshold: number = 10; // Minimum alpha value to consider as content
+  private objectSeparationSensitivity: number = 0.5; // 0 = merge everything, 1 = separate aggressively
+  
+  // Variable-sized tile information
+  private detectedTileData: Map<number, {
+    sourceX: number;
+    sourceY: number;
+    width: number;
+    height: number;
+  }> = new Map();
 
   // Layer-specific tileset management
   private layerTilesets: Map<string, {
@@ -785,20 +828,45 @@ export class TileMapEditor {
   private drawTile(x: number, y: number, gid: number): void {
     if (!this.tilesetImage || gid <= 0) return;
     
-    const tileIndex = gid - 1;
-    const sourceX = (tileIndex % this.tilesetColumns) * this.tileSizeX;
-    const sourceY = Math.floor(tileIndex / this.tilesetColumns) * this.tileSizeY;
+    // Check if we have variable-sized tile data for this gid
+    const tileData = this.detectedTileData.get(gid);
+    
+    let sourceX: number, sourceY: number, tileWidth: number, tileHeight: number;
+    
+    if (tileData) {
+      // Use variable-sized tile data
+      sourceX = tileData.sourceX;
+      sourceY = tileData.sourceY;
+      tileWidth = tileData.width;
+      tileHeight = tileData.height;
+    } else {
+      // Fallback to fixed grid layout
+      const tileIndex = gid - 1;
+      sourceX = (tileIndex % this.tilesetColumns) * this.tileSizeX;
+      sourceY = Math.floor(tileIndex / this.tilesetColumns) * this.tileSizeY;
+      tileWidth = this.tileSizeX;
+      tileHeight = this.tileSizeY;
+    }
     
     // Use isometric screen coordinates with zoom applied
     const screenPos = this.mapToScreen(x, y);
-    const scaledTileX = this.tileSizeX * this.zoom;
-    const scaledTileY = this.tileSizeY * this.zoom;
-    const destX = screenPos.x - scaledTileX / 2;
-    const destY = screenPos.y - scaledTileY / 2;
+    const scaledTileX = tileWidth * this.zoom;
+    const scaledTileY = tileHeight * this.zoom;
+    
+    // For isometric tiles, adjust positioning based on tile height
+    // Taller tiles (like walls) need to be positioned higher to align with the base
+    const baseOffsetX = scaledTileX / 2;
+    const baseOffsetY = scaledTileY / 2;
+    
+    // Additional offset for tall tiles to align their base with the tile position
+    const heightAdjustment = tileData ? (tileHeight - this.tileSizeY) * this.zoom : 0;
+    
+    const destX = screenPos.x - baseOffsetX;
+    const destY = screenPos.y - baseOffsetY - heightAdjustment;
     
     this.ctx.drawImage(
       this.tilesetImage,
-      sourceX, sourceY, this.tileSizeX, this.tileSizeY,
+      sourceX, sourceY, tileWidth, tileHeight,
       destX, destY, scaledTileX, scaledTileY
     );
   }
@@ -1065,30 +1133,467 @@ export class TileMapEditor {
     
     container.innerHTML = '';
     
-    for (let i = 0; i < this.tileCount; i++) {
+    // Clear previous tile data
+    this.detectedTileData.clear();
+    
+    // Detect tiles with variable sizes
+    const detectedTiles = this.detectVariableSizedTiles();
+    
+    let validTileIndex = 0;
+    
+    for (const tile of detectedTiles) {
+      // Store tile data for later use in drawing
+      this.detectedTileData.set(tile.index, {
+        sourceX: tile.sourceX,
+        sourceY: tile.sourceY,
+        width: tile.width,
+        height: tile.height
+      });
+      
       const canvas = document.createElement('canvas');
-      canvas.width = this.tileSizeX;
-      canvas.height = this.tileSizeY;
+      canvas.width = tile.width;
+      canvas.height = tile.height;
       canvas.className = 'palette-tile';
+      
+      // Add size information as CSS custom properties for consistent display
+      canvas.style.setProperty('--tile-width', `${tile.width}px`);
+      canvas.style.setProperty('--tile-height', `${tile.height}px`);
       
       const ctx = canvas.getContext('2d');
       if (ctx) {
-        const sourceX = (i % this.tilesetColumns) * this.tileSizeX;
-        const sourceY = Math.floor(i / this.tilesetColumns) * this.tileSizeY;
-        
         ctx.drawImage(
           this.tilesetImage,
-          sourceX, sourceY, this.tileSizeX, this.tileSizeY,
-          0, 0, this.tileSizeX, this.tileSizeY
+          tile.sourceX, tile.sourceY, tile.width, tile.height,
+          0, 0, tile.width, tile.height
         );
       }
       
       canvas.addEventListener('click', () => {
-        this.activeGid = i + 1;
+        this.activeGid = tile.index;
         this.updateActiveTile();
       });
       
+      // Add data attributes to track tile properties
+      canvas.setAttribute('data-tile-index', tile.index.toString());
+      canvas.setAttribute('data-tile-width', tile.width.toString());
+      canvas.setAttribute('data-tile-height', tile.height.toString());
+      canvas.setAttribute('data-source-x', tile.sourceX.toString());
+      canvas.setAttribute('data-source-y', tile.sourceY.toString());
+      
       container.appendChild(canvas);
+      validTileIndex++;
+    }
+    
+    console.log(`Created ${validTileIndex} variable-sized tiles from tileset`);
+  }
+
+  private detectVariableSizedTiles(): Array<{
+    index: number;
+    sourceX: number;
+    sourceY: number;
+    width: number;
+    height: number;
+  }> {
+    if (!this.tilesetImage) return [];
+    
+    const detectedTiles: Array<{
+      index: number;
+      sourceX: number;
+      sourceY: number;
+      width: number;
+      height: number;
+    }> = [];
+    
+    // Create a temporary canvas for analysis
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = this.tilesetImage.width;
+    tempCanvas.height = this.tilesetImage.height;
+    const tempCtx = tempCanvas.getContext('2d');
+    
+    if (!tempCtx) return [];
+    
+    // Draw the entire tileset to analyze
+    tempCtx.drawImage(this.tilesetImage, 0, 0);
+    
+    // Get image data for analysis
+    const imageData = tempCtx.getImageData(0, 0, this.tilesetImage.width, this.tilesetImage.height);
+    const data = imageData.data;
+    
+    // Create a visited mask to track processed pixels
+    const visited = new Array(this.tilesetImage.width * this.tilesetImage.height).fill(false);
+    
+    let tileIndex = 1;
+    
+    // First pass: detect all connected components
+    const allObjects: Array<{
+      bounds: { x: number; y: number; width: number; height: number };
+      pixels: Array<{x: number, y: number}>;
+    }> = [];
+    
+    for (let y = 0; y < this.tilesetImage.height; y++) {
+      for (let x = 0; x < this.tilesetImage.width; x++) {
+        const pixelIndex = y * this.tilesetImage.width + x;
+        
+        if (visited[pixelIndex] || this.isPixelTransparent(data, x, y, this.tilesetImage.width)) {
+          continue;
+        }
+        
+        const objectData = this.floodFillObjectData(data, this.tilesetImage.width, this.tilesetImage.height, x, y, visited);
+        
+        if (objectData && this.isValidObjectSize(objectData.bounds)) {
+          allObjects.push(objectData);
+        }
+      }
+    }
+    
+    // Second pass: intelligently split objects that should be separate
+    for (const obj of allObjects) {
+      const splitObjects = this.intelligentObjectSplit(obj);
+      
+      for (const splitObj of splitObjects) {
+        detectedTiles.push({
+          index: tileIndex++,
+          sourceX: splitObj.x,
+          sourceY: splitObj.y,
+          width: splitObj.width,
+          height: splitObj.height
+        });
+      }
+    }
+    
+    return detectedTiles;
+  }
+
+  private isPixelTransparent(data: Uint8ClampedArray, x: number, y: number, width: number): boolean {
+    const index = (y * width + x) * 4 + 3; // Alpha channel
+    return data[index] <= this.tileContentThreshold;
+  }
+
+  private floodFillObjectData(
+    data: Uint8ClampedArray,
+    imageWidth: number,
+    imageHeight: number,
+    startX: number,
+    startY: number,
+    visited: boolean[]
+  ): { bounds: { x: number; y: number; width: number; height: number }; pixels: Array<{x: number, y: number}> } | null {
+    const stack: Array<{x: number, y: number}> = [{x: startX, y: startY}];
+    let minX = startX, maxX = startX, minY = startY, maxY = startY;
+    let pixelCount = 0;
+    const objectPixels: Array<{x: number, y: number}> = [];
+    
+    while (stack.length > 0) {
+      const current = stack.pop()!;
+      const {x, y} = current;
+      
+      // Check bounds
+      if (x < 0 || x >= imageWidth || y < 0 || y >= imageHeight) continue;
+      
+      const pixelIndex = y * imageWidth + x;
+      
+      // Skip if already visited or transparent
+      if (visited[pixelIndex] || this.isPixelTransparent(data, x, y, imageWidth)) {
+        continue;
+      }
+      
+      // Mark as visited
+      visited[pixelIndex] = true;
+      pixelCount++;
+      objectPixels.push({x, y});
+      
+      // Update bounds
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y);
+      maxY = Math.max(maxY, y);
+      
+      // Add neighboring pixels to stack (8-connectivity for initial detection)
+      stack.push({x: x + 1, y: y});
+      stack.push({x: x - 1, y: y});
+      stack.push({x: x, y: y + 1});
+      stack.push({x: x, y: y - 1});
+      stack.push({x: x + 1, y: y + 1});
+      stack.push({x: x + 1, y: y - 1});
+      stack.push({x: x - 1, y: y + 1});
+      stack.push({x: x - 1, y: y - 1});
+    }
+    
+    if (pixelCount === 0) return null;
+    
+    // Add small padding around the object
+    const padding = 1;
+    const finalX = Math.max(0, minX - padding);
+    const finalY = Math.max(0, minY - padding);
+    const finalMaxX = Math.min(imageWidth - 1, maxX + padding);
+    const finalMaxY = Math.min(imageHeight - 1, maxY + padding);
+    
+    return {
+      bounds: {
+        x: finalX,
+        y: finalY,
+        width: finalMaxX - finalX + 1,
+        height: finalMaxY - finalY + 1
+      },
+      pixels: objectPixels
+    };
+  }
+
+  private intelligentObjectSplit(objectData: {
+    bounds: { x: number; y: number; width: number; height: number };
+    pixels: Array<{x: number, y: number}>;
+  }): Array<{ x: number; y: number; width: number; height: number }> {
+    const { bounds, pixels } = objectData;
+    const { width, height } = bounds;
+    
+    // Calculate object characteristics
+    const area = pixels.length;
+    const boundingArea = width * height;
+    const density = area / boundingArea;
+    const aspectRatio = Math.max(width / height, height / width);
+    
+    // Determine if this looks like a repeating pattern (multiple similar objects)
+    const gridSize = Math.max(this.tileSizeX, this.tileSizeY);
+    const shouldSplitHorizontally = this.shouldSplitDirection(pixels, bounds, 'horizontal', gridSize);
+    const shouldSplitVertically = this.shouldSplitDirection(pixels, bounds, 'vertical', gridSize);
+    
+    // Case 1: Long horizontal objects (walls) - keep as single object if uniform
+    if (width > height * 2 && density > 0.7 && !shouldSplitHorizontally) {
+      console.log('Detected long horizontal object (wall) - keeping as single tile');
+      return [bounds];
+    }
+    
+    // Case 2: Multiple similar objects arranged horizontally
+    if (shouldSplitHorizontally && width > this.tileSizeX * 1.5) {
+      console.log('Splitting horizontal arrangement into individual objects');
+      return this.splitObjectByGrid(objectData, 'horizontal');
+    }
+    
+    // Case 3: Multiple similar objects arranged vertically
+    if (shouldSplitVertically && height > this.tileSizeY * 1.5) {
+      console.log('Splitting vertical arrangement into individual objects');
+      return this.splitObjectByGrid(objectData, 'vertical');
+    }
+    
+    // Case 4: Large sparse objects - likely multiple separate items
+    if (density < 0.4 && boundingArea > gridSize * gridSize * 2) {
+      console.log('Splitting sparse large object');
+      return this.splitObjectByDensity(objectData);
+    }
+    
+    // Default: keep as single object
+    return [bounds];
+  }
+
+  private shouldSplitDirection(
+    pixels: Array<{x: number, y: number}>,
+    bounds: { x: number; y: number; width: number; height: number },
+    direction: 'horizontal' | 'vertical',
+    gridSize: number
+  ): boolean {
+    const { x: minX, y: minY, width, height } = bounds;
+    
+    if (direction === 'horizontal') {
+      // Check for gaps that suggest separate objects
+      const columnDensities: number[] = [];
+      const step = Math.max(1, Math.floor(width / (width / gridSize)));
+      
+      for (let x = 0; x < width; x += step) {
+        let columnPixels = 0;
+        for (const pixel of pixels) {
+          if (pixel.x >= minX + x && pixel.x < minX + x + step) {
+            columnPixels++;
+          }
+        }
+        columnDensities.push(columnPixels);
+      }
+      
+      // Look for significant gaps between dense areas
+      let gapCount = 0;
+      let denseRegions = 0;
+      const avgDensity = columnDensities.reduce((a, b) => a + b, 0) / columnDensities.length;
+      
+      for (let i = 0; i < columnDensities.length; i++) {
+        if (columnDensities[i] < avgDensity * 0.3) {
+          gapCount++;
+        } else if (columnDensities[i] > avgDensity * 0.7) {
+          denseRegions++;
+        }
+      }
+      
+      return denseRegions >= 2 && gapCount >= 1;
+    } else {
+      // Similar logic for vertical
+      const rowDensities: number[] = [];
+      const step = Math.max(1, Math.floor(height / (height / gridSize)));
+      
+      for (let y = 0; y < height; y += step) {
+        let rowPixels = 0;
+        for (const pixel of pixels) {
+          if (pixel.y >= minY + y && pixel.y < minY + y + step) {
+            rowPixels++;
+          }
+        }
+        rowDensities.push(rowPixels);
+      }
+      
+      let gapCount = 0;
+      let denseRegions = 0;
+      const avgDensity = rowDensities.reduce((a, b) => a + b, 0) / rowDensities.length;
+      
+      for (let i = 0; i < rowDensities.length; i++) {
+        if (rowDensities[i] < avgDensity * 0.3) {
+          gapCount++;
+        } else if (rowDensities[i] > avgDensity * 0.7) {
+          denseRegions++;
+        }
+      }
+      
+      return denseRegions >= 2 && gapCount >= 1;
+    }
+  }
+
+  private splitObjectByGrid(
+    objectData: { bounds: { x: number; y: number; width: number; height: number }; pixels: Array<{x: number, y: number}> },
+    direction: 'horizontal' | 'vertical'
+  ): Array<{ x: number; y: number; width: number; height: number }> {
+    const { bounds } = objectData;
+    const results: Array<{ x: number; y: number; width: number; height: number }> = [];
+    
+    if (direction === 'horizontal') {
+      // Split into vertical strips based on tile size
+      const stripWidth = this.tileSizeX;
+      for (let x = bounds.x; x < bounds.x + bounds.width; x += stripWidth) {
+        const stripBounds = this.findContentInRegion(objectData.pixels, {
+          x: x,
+          y: bounds.y,
+          width: Math.min(stripWidth, bounds.x + bounds.width - x),
+          height: bounds.height
+        });
+        
+        if (stripBounds) {
+          results.push(stripBounds);
+        }
+      }
+    } else {
+      // Split into horizontal strips based on tile size
+      const stripHeight = this.tileSizeY;
+      for (let y = bounds.y; y < bounds.y + bounds.height; y += stripHeight) {
+        const stripBounds = this.findContentInRegion(objectData.pixels, {
+          x: bounds.x,
+          y: y,
+          width: bounds.width,
+          height: Math.min(stripHeight, bounds.y + bounds.height - y)
+        });
+        
+        if (stripBounds) {
+          results.push(stripBounds);
+        }
+      }
+    }
+    
+    return results.length > 0 ? results : [bounds];
+  }
+
+  private splitObjectByDensity(
+    objectData: { bounds: { x: number; y: number; width: number; height: number }; pixels: Array<{x: number, y: number}> }
+  ): Array<{ x: number; y: number; width: number; height: number }> {
+    // For sparse objects, try to find clusters of pixels
+    const { bounds } = objectData;
+    const gridSize = Math.min(this.tileSizeX, this.tileSizeY);
+    const results: Array<{ x: number; y: number; width: number; height: number }> = [];
+    
+    // Divide into grid regions and find content in each
+    for (let y = bounds.y; y < bounds.y + bounds.height; y += gridSize) {
+      for (let x = bounds.x; x < bounds.x + bounds.width; x += gridSize) {
+        const regionBounds = this.findContentInRegion(objectData.pixels, {
+          x: x,
+          y: y,
+          width: Math.min(gridSize, bounds.x + bounds.width - x),
+          height: Math.min(gridSize, bounds.y + bounds.height - y)
+        });
+        
+        if (regionBounds) {
+          results.push(regionBounds);
+        }
+      }
+    }
+    
+    return results.length > 0 ? results : [bounds];
+  }
+
+  private findContentInRegion(
+    pixels: Array<{x: number, y: number}>,
+    region: { x: number; y: number; width: number; height: number }
+  ): { x: number; y: number; width: number; height: number } | null {
+    let minX = Number.MAX_SAFE_INTEGER;
+    let maxX = Number.MIN_SAFE_INTEGER;
+    let minY = Number.MAX_SAFE_INTEGER;
+    let maxY = Number.MIN_SAFE_INTEGER;
+    let hasContent = false;
+    
+    for (const pixel of pixels) {
+      if (pixel.x >= region.x && pixel.x < region.x + region.width &&
+          pixel.y >= region.y && pixel.y < region.y + region.height) {
+        minX = Math.min(minX, pixel.x);
+        maxX = Math.max(maxX, pixel.x);
+        minY = Math.min(minY, pixel.y);
+        maxY = Math.max(maxY, pixel.y);
+        hasContent = true;
+      }
+    }
+    
+    if (!hasContent) return null;
+    
+    // Add padding
+    const padding = 1;
+    return {
+      x: Math.max(0, minX - padding),
+      y: Math.max(0, minY - padding),
+      width: maxX - minX + 1 + (padding * 2),
+      height: maxY - minY + 1 + (padding * 2)
+    };
+  }
+
+  private isValidObjectSize(bounds: { x: number; y: number; width: number; height: number }): boolean {
+    // Filter out very small objects (likely noise or artifacts)
+    const minSize = 8;
+    const maxSize = Math.max(this.tilesetImage?.width || 512, this.tilesetImage?.height || 512);
+    
+    return bounds.width >= minSize && 
+           bounds.height >= minSize && 
+           bounds.width <= maxSize && 
+           bounds.height <= maxSize &&
+           (bounds.width * bounds.height) >= (minSize * minSize);
+  }
+
+  // Add method to adjust sensitivity for object separation
+  public setObjectSeparationSensitivity(sensitivity: number): void {
+    // sensitivity: 0 = merge everything connected, 1 = separate more aggressively
+    this.objectSeparationSensitivity = Math.max(0, Math.min(1, sensitivity));
+  }
+
+  public getObjectSeparationSensitivity(): number {
+    return this.objectSeparationSensitivity;
+  }
+
+  private tileHasContent(ctx: CanvasRenderingContext2D): boolean {
+    try {
+      const imageData = ctx.getImageData(0, 0, this.tileSizeX, this.tileSizeY);
+      const data = imageData.data;
+      
+      // Check for any non-transparent pixels
+      // Look for pixels with alpha > threshold (to account for anti-aliasing)
+      for (let i = 3; i < data.length; i += 4) {
+        if (data[i] > this.tileContentThreshold) {
+          return true;
+        }
+      }
+      
+      return false;
+    } catch (error) {
+      // If we can't read the image data (e.g., CORS issues), assume it has content
+      console.warn('Could not analyze tile content, assuming tile has content:', error);
+      return true;
     }
   }
 
@@ -1101,8 +1606,10 @@ export class TileMapEditor {
     // Update selected tile visual
     const tiles = document.querySelectorAll('.palette-tile');
     tiles.forEach(tile => tile.classList.remove('selected'));
+    
     if (this.activeGid > 0) {
-      const selectedTile = tiles[this.activeGid - 1];
+      // Find the tile with matching data-tile-index
+      const selectedTile = document.querySelector(`.palette-tile[data-tile-index="${this.activeGid}"]`);
       if (selectedTile) {
         selectedTile.classList.add('selected');
       }

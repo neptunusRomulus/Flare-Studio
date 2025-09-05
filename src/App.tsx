@@ -71,6 +71,8 @@ function App() {
   const [lastSaveTime, setLastSaveTime] = useState<number>(0);
   const [isManuallySaving, setIsManuallySaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  // Current project path for Electron saves
+  const [projectPath, setProjectPath] = useState<string | null>(null);
   
   // Custom tooltip states
   const [tooltip, setTooltip] = useState<{
@@ -813,14 +815,32 @@ function App() {
     if (!editor) return;
     setIsManuallySaving(true);
     try {
-      editor.forceSave();
-      // Add a small delay to show the loading animation
-      await new Promise(resolve => setTimeout(resolve, 500));
-      toast({
-        title: "Saved",
-        description: "Your map has been saved (autosave logic triggered).",
-        variant: "default",
-      });
+      if (window.electronAPI?.saveMapProject && projectPath) {
+        const success = await editor.saveProjectData(projectPath);
+        await new Promise(resolve => setTimeout(resolve, 300));
+        if (success) {
+          setLastSaveTime(Date.now());
+          toast({
+            title: "Saved",
+            description: "Project saved to disk, including tileset.",
+            variant: "default",
+          });
+        } else {
+          toast({
+            title: "Save Error",
+            description: "Failed to save the project to disk.",
+            variant: "destructive",
+          });
+        }
+      } else {
+        editor.forceSave();
+        await new Promise(resolve => setTimeout(resolve, 500));
+        toast({
+          title: "Saved (Local Backup)",
+          description: "Saved to local backup. Open a project folder to save to disk.",
+          variant: "default",
+        });
+      }
     } catch (error) {
       console.error('Save error:', error);
       toast({
@@ -840,9 +860,12 @@ function App() {
     setShowMinimap(!showMinimap);
   };
 
-  const handleCreateNewMap = (config: MapConfig) => {
+  const handleCreateNewMap = (config: MapConfig, newProjectPath?: string) => {
     // Clear any localStorage data immediately
     localStorage.removeItem('tilemap_autosave_backup');
+    
+    // Save the project path if provided (Electron)
+    setProjectPath(newProjectPath ?? null);
     
     setMapWidth(config.width);
     setMapHeight(config.height);
@@ -869,10 +892,16 @@ function App() {
   };
 
   const handleOpenMap = async (projectPath: string) => {
+    console.log('=== HANDLE OPEN MAP CALLED ===', projectPath);
     try {
+      // Remember project path for subsequent saves
+      setProjectPath(projectPath);
       if (window.electronAPI?.openMapProject) {
+        console.log('Calling electronAPI.openMapProject...');
         const mapConfig = await window.electronAPI.openMapProject(projectPath);
+        console.log('Got mapConfig:', mapConfig);
         if (mapConfig) {
+          console.log('Setting map dimensions and clearing editor...');
           setMapWidth(mapConfig.width);
           setMapHeight(mapConfig.height);
           setShowWelcome(false);
@@ -884,14 +913,50 @@ function App() {
           
           // Initialize editor with loaded configuration
           if (canvasRef.current) {
+            console.log('Creating new editor...');
             const newEditor = new TileMapEditor(canvasRef.current);
             // Clear auto-save backup to prevent old data from loading
             newEditor.clearLocalStorageBackup();
             newEditor.setMapSize(mapConfig.width, mapConfig.height);
             
             // Try to load project data including tileset images
+            console.log('Loading project data...');
             await loadProjectData(newEditor, mapConfig);
+
+            // Always try to discover and auto-import tileset images from disk (same as Import Tileset button)
+            // This ensures we use the latest tileset files even if JSON is outdated
+            console.log('=== STARTING AUTO-TILESET DISCOVERY ===');
+            try {
+              if (window.electronAPI?.discoverTilesetImages) {
+                console.log('Calling discoverTilesetImages for path:', projectPath);
+                const found = await window.electronAPI.discoverTilesetImages(projectPath);
+                console.log('Discovery result:', found);
+                const keys = Object.keys(found.tilesetImages || {});
+                console.log('Found tileset keys:', keys);
+                if (keys.length > 0) {
+                  // Import the first found tileset (same logic as Import Tileset button)
+                  const firstKey = keys[0];
+                  console.log('Auto-importing tileset:', firstKey);
+                  await newEditor.loadTilesetFromDataURL(found.tilesetImages[firstKey], firstKey);
+                  console.log('Auto-imported tileset from disk (like Import button):', firstKey);
+                  
+                  // Update UI state to reflect tileset loaded (same as after Import Tileset)
+                  setHasTileset(true);
+                  setTileCount((newEditor as any).tileCount || 0);
+                  
+                  // Trigger auto-save to preserve the imported tileset
+                  (newEditor as any).markAsChanged?.(true);
+                } else {
+                  console.log('No tileset images found in project folder');
+                }
+              } else {
+                console.log('discoverTilesetImages API not available');
+              }
+            } catch (discErr) {
+              console.warn('Auto-discovery of tileset images failed:', discErr);
+            }
             
+            console.log('Setting up autosave and updating UI...');
             setupAutoSave(newEditor);
             setEditor(newEditor);
             updateLayersList();
@@ -933,20 +998,30 @@ function App() {
         tilesetImages: mapConfig.tilesetImages ? Object.keys(mapConfig.tilesetImages).length : 0,
         layers: mapConfig.layers ? mapConfig.layers.length : 0
       });
-      
+
       // Load basic project data (layers, objects, dimensions)
       newEditor.loadProjectData(mapConfig);
-      
+
+      let tilesetLoaded = false;
       // If there are tileset images, load them
       if (mapConfig.tilesets && mapConfig.tilesets.length > 0) {
         const tileset = mapConfig.tilesets[0];
         console.log('First tileset:', tileset);
-        
+
         if (tileset.fileName && mapConfig.tilesetImages && mapConfig.tilesetImages[tileset.fileName]) {
           console.log('Loading tileset image:', tileset.fileName);
           console.log('Image data length:', mapConfig.tilesetImages[tileset.fileName].length);
           await newEditor.loadTilesetFromDataURL(mapConfig.tilesetImages[tileset.fileName], tileset.fileName);
           console.log('Tileset loaded successfully');
+          tilesetLoaded = true;
+        } else if (mapConfig.tilesetImages && Object.keys(mapConfig.tilesetImages).length > 0) {
+          // Fallback: use the first available tileset image if the expected key is missing
+          const firstKey = Object.keys(mapConfig.tilesetImages)[0];
+          const imgData = mapConfig.tilesetImages[firstKey];
+          console.log('Falling back to first available tileset image:', firstKey);
+          await newEditor.loadTilesetFromDataURL(imgData, firstKey);
+          console.log('Tileset loaded from fallback image');
+          tilesetLoaded = true;
         } else {
           console.log('No tileset image data found for:', tileset.fileName);
           console.log('Available tileset images:', Object.keys(mapConfig.tilesetImages || {}));
@@ -954,7 +1029,17 @@ function App() {
       } else {
         console.log('No tilesets found in map config');
       }
-      
+
+      // Always update UI state if tileset was loaded
+      if (tilesetLoaded) {
+        console.log('Updating UI state: hasTileset true, tileCount:', (newEditor as any).tileCount);
+        setHasTileset(true);
+        setTileCount((newEditor as any).tileCount || 0);
+      } else {
+        setHasTileset(false);
+        setTileCount(0);
+      }
+
       newEditor.redraw();
       console.log('Project data loading completed');
     } catch (error) {
@@ -1948,7 +2033,7 @@ function App() {
                                   >
                                     <X className="w-3 h-3" />
                                   </Button>
-                                </div>
+                                                               </div>
                               ))}
                             </div>
                           )}

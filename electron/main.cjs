@@ -134,6 +134,73 @@ ipcMain.handle('open-map-project', async (event, projectPath) => {
         layers: mapData.layers ? mapData.layers.length : 0
       });
       
+      // Ensure tilesetImages are present; if missing, attempt to load from assets folder or project root
+      try {
+        const assetsPath = path.join(projectPath, 'assets');
+        const ensureTilesetImages = {};
+        if (mapData.tilesetImages && typeof mapData.tilesetImages === 'object') {
+          Object.assign(ensureTilesetImages, mapData.tilesetImages);
+        }
+
+        if (Array.isArray(mapData.tilesets)) {
+          for (const ts of mapData.tilesets) {
+            const fileName = ts?.fileName || ts?.name;
+            if (!fileName) continue;
+            const hasEmbedded = ensureTilesetImages[fileName] && typeof ensureTilesetImages[fileName] === 'string';
+            const candidateAssetsPath = path.join(assetsPath, fileName);
+            const candidateRootPath = path.join(projectPath, fileName);
+            if (!hasEmbedded) {
+              if (fs.existsSync(candidateAssetsPath)) {
+                const fileBuf = fs.readFileSync(candidateAssetsPath);
+                const b64 = fileBuf.toString('base64');
+                ensureTilesetImages[fileName] = `data:image/png;base64,${b64}`;
+                console.log(`Embedded tileset from assets: ${fileName} (${b64.length} chars)`);
+              } else if (fs.existsSync(candidateRootPath)) {
+                const fileBuf = fs.readFileSync(candidateRootPath);
+                const b64 = fileBuf.toString('base64');
+                ensureTilesetImages[fileName] = `data:image/png;base64,${b64}`;
+                console.log(`Embedded tileset from project root: ${fileName} (${b64.length} chars)`);
+              }
+            }
+          }
+        }
+
+        // If no tilesets defined but we can find images, synthesize tilesets array
+        const haveAnyEmbedded = Object.keys(ensureTilesetImages).length > 0;
+        if ((!Array.isArray(mapData.tilesets) || mapData.tilesets.length === 0) && !haveAnyEmbedded) {
+          // Look for png files in assets or project root
+          const candidates = [];
+          try {
+            if (fs.existsSync(assetsPath)) {
+              const assetFiles = fs.readdirSync(assetsPath).filter(f => /\.(png|jpg|jpeg)$/i.test(f));
+              for (const f of assetFiles) {
+                candidates.push({ name: f, fullPath: path.join(assetsPath, f) });
+              }
+            }
+          } catch {}
+          try {
+            const rootFiles = fs.readdirSync(projectPath).filter(f => /\.(png|jpg|jpeg)$/i.test(f));
+            for (const f of rootFiles) {
+              candidates.push({ name: f, fullPath: path.join(projectPath, f) });
+            }
+          } catch {}
+          if (candidates.length > 0) {
+            const first = candidates[0];
+            const fileBuf = fs.readFileSync(first.fullPath);
+            const b64 = fileBuf.toString('base64');
+            ensureTilesetImages[first.name] = `data:image/png;base64,${b64}`;
+            mapData.tilesets = [{ name: first.name, fileName: first.name }];
+            console.log(`Synthesized tileset from discovered image: ${first.name}`);
+          }
+        }
+
+        if (Object.keys(ensureTilesetImages).length > 0) {
+          mapData.tilesetImages = ensureTilesetImages;
+        }
+      } catch (embErr) {
+        console.warn('Warning while embedding tilesets from assets:', embErr);
+      }
+
       if (mapData.tilesetImages) {
         console.log('Tileset image files found:', Object.keys(mapData.tilesetImages));
         // Show first few characters of each image data
@@ -233,6 +300,47 @@ ipcMain.handle('save-map-project', async (event, projectPath, mapData) => {
   } catch (error) {
     console.error('Error saving map project:', error);
     return false;
+  }
+});
+
+// Discover tileset images in a project folder and return as data URLs
+ipcMain.handle('discover-tileset-images', async (event, projectPath) => {
+  try {
+    if (!projectPath) return { tilesetImages: {}, tilesets: [] };
+    const tilesetImages = {};
+    const tilesets = [];
+    const assetsPath = path.join(projectPath, 'assets');
+
+    const addIfImage = (fullPath, name) => {
+      try {
+        if (/\.(png|jpg|jpeg)$/i.test(name) && fs.existsSync(fullPath)) {
+          const buf = fs.readFileSync(fullPath);
+          const b64 = buf.toString('base64');
+          const ext = (name.split('.').pop() || 'png').toLowerCase();
+          tilesetImages[name] = `data:image/${ext === 'jpg' ? 'jpeg' : ext};base64,${b64}`;
+          tilesets.push({ name, fileName: name });
+        }
+      } catch {}
+    };
+
+    try {
+      if (fs.existsSync(assetsPath)) {
+        for (const f of fs.readdirSync(assetsPath)) {
+          addIfImage(path.join(assetsPath, f), f);
+        }
+      }
+    } catch {}
+
+    try {
+      for (const f of fs.readdirSync(projectPath)) {
+        addIfImage(path.join(projectPath, f), f);
+      }
+    } catch {}
+
+    return { tilesetImages, tilesets };
+  } catch (e) {
+    console.warn('discover-tileset-images failed:', e);
+    return { tilesetImages: {}, tilesets: [] };
   }
 });
 

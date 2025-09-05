@@ -85,7 +85,7 @@ export interface UndoRedoState {
   timestamp: number;
 }
 
-export type Tool = 'tiles';
+export type Tool = 'tiles' | 'brush' | 'eraser' | 'bucket' | 'selection';
 
 export type Orientation = 'isometric';
 

@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, Download, Undo2, Redo2, Plus, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Sliders, MapPin, Save, ArrowUpDown, Link2, Scissors, Trash2, Check } from 'lucide-react';
+import { Upload, Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Sliders, MapPin, Save, ArrowUpDown, Link2, Scissors, Trash2, Check } from 'lucide-react';
 import { TileMapEditor } from './editor/TileMapEditor';
 import { TileLayer } from './types';
 import { useToast } from '@/hooks/use-toast';
@@ -858,61 +858,6 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     }
   };
 
-  const handleAddLayer = () => {
-    setShowAddLayerDropdown(!showAddLayerDropdown);
-  };
-
-  const handleCreateLayer = (type: 'npc' | 'enemy' | 'event' | 'collision' | 'object' | 'background') => {
-    if (editor) {
-      // Check if this type already exists
-      const existingLayer = layers.find(layer => layer.type === type);
-      if (existingLayer) {
-        toast({
-          variant: "destructive",
-          title: "Cannot add layer",
-          description: `A ${type} layer already exists. Only one layer per type is allowed.`,
-        });
-        setShowAddLayerDropdown(false);
-        return;
-      }
-
-      // Generate appropriate default name for the layer type with "Layer" suffix
-      const defaultNames = {
-        'npc': 'NPC Layer',
-        'enemy': 'Enemy Layer', 
-        'event': 'Event Layer',
-        'collision': 'Collision Layer',
-        'object': 'Object Layer',
-        'background': 'Background Layer'
-      };
-
-      const success = editor.addLayer(defaultNames[type], type);
-      if (success) {
-        updateLayersList();
-        toast({
-          title: "Layer created",
-          description: `${defaultNames[type]} has been created successfully.`,
-        });
-      }
-      setShowAddLayerDropdown(false);
-    }
-  };
-
-  const handleDeleteLayer = (layerId: number) => {
-    if (editor) {
-      const success = editor.deleteLayer(layerId);
-      if (success) {
-        updateLayersList();
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Cannot delete layer",
-          description: "There must be at least one layer.",
-        });
-      }
-    }
-  };
-
   const handleSetActiveLayer = (layerId: number) => {
     if (editor) {
       editor.setActiveLayer(layerId);
@@ -1544,17 +1489,6 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                         <span className="text-sm font-medium">{layer.name}</span>
                         <span className="text-xs text-gray-500">({layer.type})</span>
                       </div>
-                      <div className="flex gap-1">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteLayer(layer.id);
-                          }}
-                          className="text-xs hover:bg-red-200 p-1 rounded text-red-600"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      </div>
                     </div>
                   </div>
                   
@@ -1610,64 +1544,6 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                   )}
                 </div>
               ))}
-              
-              {/* Add Layer Dropdown */}
-              <div className="relative">
-                <div
-                  className="p-2 border rounded cursor-pointer transition-colors text-sm border-dashed border-gray-300 hover:bg-gray-50 hover:border-gray-400"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleAddLayer();
-                  }}
-                >
-                  <div className="flex items-center justify-center gap-2 text-gray-600">
-                    <Plus className="w-4 h-4" />
-                    <span className="text-sm font-medium">Add Layer</span>
-                  </div>
-                </div>
-                
-                {/* Dropdown Menu */}
-                {showAddLayerDropdown && (
-                  <div 
-                    className="absolute top-full left-0 right-0 mt-1 bg-white border rounded shadow-lg z-50"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {(() => {
-                      const allTypes: ('npc' | 'enemy' | 'event' | 'collision' | 'object' | 'background')[] = 
-                        ['npc', 'enemy', 'event', 'collision', 'object', 'background'];
-                      const existingTypes = layers.map(layer => layer.type);
-                      const availableTypes = allTypes.filter(type => !existingTypes.includes(type));
-                      
-                      const typeLabels = {
-                        'npc': 'NPC Layer',
-                        'enemy': 'Enemy Layer',
-                        'event': 'Event Layer',
-                        'collision': 'Collision Layer',
-                        'object': 'Object Layer',
-                        'background': 'Background Layer'
-                      };
-
-                      if (availableTypes.length === 0) {
-                        return (
-                          <div className="p-2 text-xs text-gray-500 text-center">
-                            All layer types already exist
-                          </div>
-                        );
-                      }
-
-                      return availableTypes.map(type => (
-                        <div
-                          key={type}
-                          className="p-2 text-sm hover:bg-gray-100 cursor-pointer transition-colors"
-                          onClick={() => handleCreateLayer(type)}
-                        >
-                          {typeLabels[type]}
-                        </div>
-                      ));
-                    })()}
-                  </div>
-                )}
-              </div>
             </div>
           </section>
         </aside>

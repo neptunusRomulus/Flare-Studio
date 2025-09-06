@@ -52,6 +52,25 @@ export class TileMapEditor {
     return [];
   }
 
+  // Get the active GID for the current layer
+  private getCurrentLayerActiveGid(): number {
+    const activeLayer = this.tileLayers.find(l => l.id === this.activeLayerId);
+    if (activeLayer) {
+      return this.layerActiveGid.get(activeLayer.type) || 0;
+    }
+    return 0;
+  }
+
+  // Set the active GID for the current layer
+  private setCurrentLayerActiveGid(gid: number): void {
+    const activeLayer = this.tileLayers.find(l => l.id === this.activeLayerId);
+    if (activeLayer) {
+      this.layerActiveGid.set(activeLayer.type, gid);
+      // Update global activeGid for UI consistency
+      this.activeGid = gid;
+    }
+  }
+
   // Brush management methods
   public mergeBrushes(brushIds: number[]): void {
     if (brushIds.length < 2) return;
@@ -354,6 +373,9 @@ export class TileMapEditor {
     width: number;
     height: number;
   }>> = new Map();
+
+  // Per-layer active tile selection
+  private layerActiveGid: Map<string, number> = new Map();
   
   // Legacy tileset management (for backward compatibility)
   private tilesets: TilesetInfo[] = [];
@@ -767,6 +789,9 @@ export class TileMapEditor {
         const currentValue = layer.data[index];
         let newValue: number;
 
+        // Get the active GID for the current layer
+        const currentLayerActiveGid = this.getCurrentLayerActiveGid();
+
         // Determine the action based on right-click or current tool
         if (isRightClick) {
           // Right-click always acts as eraser
@@ -775,22 +800,22 @@ export class TileMapEditor {
           // Left-click behavior depends on current tool
           switch (this.currentTool) {
             case 'brush':
-              newValue = this.activeGid;
+              newValue = currentLayerActiveGid;
               break;
             case 'eraser':
               newValue = 0;
               break;
             case 'bucket':
               // Bucket fill uses a different approach
-              if (currentValue !== this.activeGid) {
+              if (currentValue !== currentLayerActiveGid) {
                 this.saveState();
-                this.bucketFill(layer, x, y, this.activeGid);
+                this.bucketFill(layer, x, y, currentLayerActiveGid);
                 this.markAsChanged();
                 this.draw(); // Immediately reflect changes
               }
               return; // Exit early for bucket fill
             default:
-              newValue = this.activeGid;
+              newValue = currentLayerActiveGid;
               break;
           }
         }
@@ -916,13 +941,16 @@ export class TileMapEditor {
     const layer = this.tileLayers.find(l => l.id === this.activeLayerId);
     if (!layer) return;
 
+    // Get the active GID for the current layer
+    const currentLayerActiveGid = this.getCurrentLayerActiveGid();
+
     // Apply the shape to the layer
-    if (this.shapeDrawing.preview.length > 0 && this.activeGid > 0) {
+    if (this.shapeDrawing.preview.length > 0 && currentLayerActiveGid > 0) {
       this.saveState();
       
       this.shapeDrawing.preview.forEach(point => {
         const index = point.y * this.mapWidth + point.x;
-        layer.data[index] = this.activeGid;
+        layer.data[index] = currentLayerActiveGid;
       });
 
       this.markAsChanged();
@@ -944,8 +972,8 @@ export class TileMapEditor {
       const gid = layer.data[index];
       
       if (gid > 0) {
-        // Set the active GID and update tile palette selection
-        this.activeGid = gid;
+        // Set the active GID for the current layer
+        this.setCurrentLayerActiveGid(gid);
         this.updateTilePaletteSelection();
         
         // Switch back to brush tool automatically
@@ -1125,13 +1153,21 @@ export class TileMapEditor {
   }
 
   private drawTiles(): void {
-    if (!this.tilesetImage) return;
-    
     for (const layer of this.tileLayers) {
       if (!layer.visible) continue;
       
+      // Get the tileset for this layer type
+      const layerTileset = this.layerTilesets.get(layer.type);
+      if (!layerTileset || !layerTileset.image) {
+        // Skip this layer if it has no tileset
+        continue;
+      }
+      
       // Set layer transparency
       this.ctx.globalAlpha = layer.transparency || 1.0;
+      
+      // Get layer-specific tile data
+      const layerTileData = this.layerTileData.get(layer.type) || new Map();
       
       for (let y = 0; y < this.mapHeight; y++) {
         for (let x = 0; x < this.mapWidth; x++) {
@@ -1139,7 +1175,7 @@ export class TileMapEditor {
           const gid = layer.data[index];
           
           if (gid > 0) {
-            this.drawTile(x, y, gid);
+            this.drawTileFromLayer(x, y, gid, layerTileset, layerTileData);
           }
         }
       }
@@ -1147,6 +1183,58 @@ export class TileMapEditor {
     
     // Reset alpha for other drawing operations
     this.ctx.globalAlpha = 1.0;
+  }
+
+  private drawTileFromLayer(
+    x: number, 
+    y: number, 
+    gid: number, 
+    layerTileset: { image: HTMLImageElement | null; fileName: string | null; columns: number; rows: number; count: number },
+    layerTileData: Map<number, { sourceX: number; sourceY: number; width: number; height: number }>
+  ): void {
+    if (!layerTileset.image || gid <= 0) return;
+    
+    // Check if we have variable-sized tile data for this gid in this layer
+    const tileData = layerTileData.get(gid);
+    
+    let sourceX: number, sourceY: number, tileWidth: number, tileHeight: number;
+    
+    if (tileData) {
+      // Use variable-sized tile data
+      sourceX = tileData.sourceX;
+      sourceY = tileData.sourceY;
+      tileWidth = tileData.width;
+      tileHeight = tileData.height;
+    } else {
+      // Fallback to fixed grid layout using layer's tileset properties
+      const tileIndex = gid - 1;
+      sourceX = (tileIndex % layerTileset.columns) * this.tileSizeX;
+      sourceY = Math.floor(tileIndex / layerTileset.columns) * this.tileSizeY;
+      tileWidth = this.tileSizeX;
+      tileHeight = this.tileSizeY;
+    }
+    
+    // Use isometric screen coordinates with zoom applied
+    const screenPos = this.mapToScreen(x, y);
+    const scaledTileX = tileWidth * this.zoom;
+    const scaledTileY = tileHeight * this.zoom;
+    
+    // For isometric tiles, adjust positioning based on tile height
+    // Taller tiles (like walls) need to be positioned higher to align with the base
+    const baseOffsetX = scaledTileX / 2;
+    const baseOffsetY = scaledTileY / 2;
+    
+    // Additional offset for tall tiles to align their base with the tile position
+    const heightAdjustment = tileData ? (tileHeight - this.tileSizeY) * this.zoom : 0;
+    
+    const destX = screenPos.x - baseOffsetX;
+    const destY = screenPos.y - baseOffsetY - heightAdjustment;
+    
+    this.ctx.drawImage(
+      layerTileset.image,
+      sourceX, sourceY, tileWidth, tileHeight,
+      destX, destY, scaledTileX, scaledTileY
+    );
   }
 
   private drawTile(x: number, y: number, gid: number): void {
@@ -1596,7 +1684,7 @@ export class TileMapEditor {
         } else {
           // Normal tile selection
           console.log('Normal tile selection');
-          this.activeGid = tile.index;
+          this.setCurrentLayerActiveGid(tile.index);
           this.updateActiveTile();
         }
       });
@@ -3217,6 +3305,10 @@ export class TileMapEditor {
         }
       }
       
+      // Restore the active GID for this layer
+      const layerActiveGid = this.layerActiveGid.get(layerType) || 0;
+      this.activeGid = layerActiveGid;
+      
       this.createTilePalette();
     } else {
       // Clear current tileset if no tileset for this layer type
@@ -3226,6 +3318,7 @@ export class TileMapEditor {
       this.tilesetRows = 0;
       this.tileCount = 0;
       this.detectedTileData.clear();
+      this.activeGid = 0;
       this.clearTilePalette();
     }
   }
@@ -4068,6 +4161,16 @@ export class TileMapEditor {
       };
       img.src = dataURL;
     });
+  }
+
+  // Debug method to log layer data
+  public debugLayerData(): void {
+    console.log('=== LAYER DATA DEBUG ===');
+    for (const layer of this.tileLayers) {
+      const nonZeroTiles = layer.data.filter(gid => gid > 0).length;
+      const layerTileset = this.layerTilesets.get(layer.type);
+      console.log(`Layer ${layer.name} (${layer.type}): ${nonZeroTiles} painted tiles, has tileset: ${!!layerTileset?.image}`);
+    }
   }
 
   // Public method to redraw canvas

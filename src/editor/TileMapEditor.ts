@@ -1054,21 +1054,17 @@ export class TileMapEditor {
 
   // Coordinate transformation methods for isometric rendering with zoom and pan
   private mapToScreen(mapX: number, mapY: number): { x: number, y: number } {
-    // Calculate the position of the tile corner
+    // Calculate the basic isometric screen coordinates (top point of diamond)
     const screenX = (mapX - mapY) * (this.tileSizeX / 2);
     const screenY = (mapX + mapY) * (this.tileSizeY / 2);
-    
-    // Offset to center of tile (move from corner to center)
-    const centeredX = screenX + (this.tileSizeX / 2);
-    const centeredY = screenY + (this.tileSizeY / 2);
     
     // Apply zoom and pan transformations
     const offsetX = this.mapCanvas.width / 2 + this.panX;
     const offsetY = 100 + this.panY;
     
     return {
-      x: (centeredX + offsetX) * this.zoom,
-      y: (centeredY + offsetY) * this.zoom
+      x: (screenX + offsetX) * this.zoom,
+      y: (screenY + offsetY) * this.zoom
     };
   }
 
@@ -1127,14 +1123,17 @@ export class TileMapEditor {
     // This is more reliable than trying to optimize with estimates
     const candidates: Array<{ x: number, y: number, distance: number }> = [];
     
+    // Convert world position to screen for distance calculations
+    const worldScreen = this.worldToScreen(worldX, worldY);
+    
     for (let tileY = 0; tileY < this.mapHeight; tileY++) {
       for (let tileX = 0; tileX < this.mapWidth; tileX++) {
         if (this.isPointInTileDiamond(worldX, worldY, tileX, tileY)) {
-          // Calculate distance from mouse to tile center for tie-breaking
-          const tileCenter = this.tileToWorld(tileX, tileY);
+          // Calculate distance from mouse to tile center in screen space
+          const tileScreen = this.mapToScreen(tileX, tileY);
           const distance = Math.sqrt(
-            Math.pow(worldX - tileCenter.x, 2) + 
-            Math.pow(worldY - tileCenter.y, 2)
+            Math.pow(worldScreen.x - tileScreen.x, 2) + 
+            Math.pow(worldScreen.y - tileScreen.y, 2)
           );
           candidates.push({ x: tileX, y: tileY, distance });
         }
@@ -1151,18 +1150,21 @@ export class TileMapEditor {
   }
 
   private isPointInTileDiamond(worldX: number, worldY: number, tileX: number, tileY: number): boolean {
-    // Get the tile's center position in world coordinates (both are now centered)
-    const tileCenter = this.tileToWorld(tileX, tileY);
+    // Use the exact same positioning as the debug grid and tile rendering
+    const screenPos = this.mapToScreen(tileX, tileY);
     
-    // Transform point to tile-local coordinates
-    const localX = worldX - tileCenter.x;
-    const localY = worldY - tileCenter.y;
+    // Convert world coordinates to screen coordinates for comparison
+    const worldScreen = this.worldToScreen(worldX, worldY);
+    
+    // Calculate local coordinates relative to the tile center
+    const localX = worldScreen.x - screenPos.x;
+    const localY = worldScreen.y - screenPos.y;
     
     // Check if point is inside diamond using the diamond equation
     // For a diamond centered at origin with half-widths w and h:
     // |x/w| + |y/h| <= 1
-    const halfWidth = this.tileSizeX / 2;
-    const halfHeight = this.tileSizeY / 2;
+    const halfWidth = (this.tileSizeX / 2) * this.zoom;
+    const halfHeight = (this.tileSizeY / 2) * this.zoom;
     
     // Use slightly smaller diamond for better edge detection and avoid floating point edge cases
     const tolerance = 0.90; // Shrink diamond by 10% to avoid edge cases
@@ -1174,14 +1176,10 @@ export class TileMapEditor {
   }
 
   private tileToWorld(tileX: number, tileY: number): { x: number, y: number } {
-    // Calculate corner position first
-    const cornerX = (tileX - tileY) * (this.tileSizeX / 2);
-    const cornerY = (tileX + tileY) * (this.tileSizeY / 2);
-    
-    // Add offset to get center position (consistent with mapToScreen)
+    // Return the basic isometric coordinates (no centering offset)
     return {
-      x: cornerX + (this.tileSizeX / 2),
-      y: cornerY + (this.tileSizeY / 2)
+      x: (tileX - tileY) * (this.tileSizeX / 2),
+      y: (tileX + tileY) * (this.tileSizeY / 2)
     };
   }
 
@@ -1199,32 +1197,49 @@ export class TileMapEditor {
   private drawDebugInfo(): void {
     if (!this.debugMode) return;
     
-    // Draw diamond boundaries for all tiles
+    // Draw diamond boundaries for all tiles using EXACTLY the same logic as drawHover
     this.ctx.strokeStyle = 'rgba(255, 0, 0, 0.5)';
     this.ctx.lineWidth = 1;
     
     for (let tileY = 0; tileY < this.mapHeight; tileY++) {
       for (let tileX = 0; tileX < this.mapWidth; tileX++) {
-        const worldCenter = this.tileToWorld(tileX, tileY);
-        const screenCenter = this.worldToScreen(worldCenter.x, worldCenter.y);
+        // Use the exact same positioning logic as drawHover
+        const screenPos = this.mapToScreen(tileX, tileY);
+        const halfTileX = (this.tileSizeX / 2) * this.zoom;
+        const halfTileY = (this.tileSizeY / 2) * this.zoom;
         
-        // Draw diamond shape
-        const halfWidth = (this.tileSizeX / 2) * this.zoom;
-        const halfHeight = (this.tileSizeY / 2) * this.zoom;
-        
+        // Draw diamond shape using the same exact pattern as hover
         this.ctx.beginPath();
-        this.ctx.moveTo(screenCenter.x, screenCenter.y - halfHeight);
-        this.ctx.lineTo(screenCenter.x + halfWidth, screenCenter.y);
-        this.ctx.lineTo(screenCenter.x, screenCenter.y + halfHeight);
-        this.ctx.lineTo(screenCenter.x - halfWidth, screenCenter.y);
+        this.ctx.moveTo(screenPos.x, screenPos.y - halfTileY); // Top
+        this.ctx.lineTo(screenPos.x + halfTileX, screenPos.y); // Right
+        this.ctx.lineTo(screenPos.x, screenPos.y + halfTileY); // Bottom
+        this.ctx.lineTo(screenPos.x - halfTileX, screenPos.y); // Left
         this.ctx.closePath();
         this.ctx.stroke();
+        
+        // ALSO draw where the tile image would actually be positioned
+        this.ctx.strokeStyle = 'rgba(0, 255, 0, 0.5)';
+        this.ctx.lineWidth = 1;
+        
+        // Calculate where the tile image is actually drawn (matching drawTile logic)
+        const scaledTileX = this.tileSizeX * this.zoom;
+        const scaledTileY = this.tileSizeY * this.zoom;
+        const baseOffsetX = scaledTileX / 2;
+        const baseOffsetY = scaledTileY / 2;
+        const destX = screenPos.x - baseOffsetX;
+        const destY = screenPos.y - baseOffsetY;
+        
+        // Draw rectangle showing where the tile image is actually placed
+        this.ctx.strokeRect(destX, destY, scaledTileX, scaledTileY);
+        
+        // Reset color for coordinates
+        this.ctx.strokeStyle = 'rgba(255, 0, 0, 0.5)';
         
         // Draw tile coordinates
         this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
         this.ctx.font = '10px Arial';
         this.ctx.textAlign = 'center';
-        this.ctx.fillText(`${tileX},${tileY}`, screenCenter.x, screenCenter.y);
+        this.ctx.fillText(`${tileX},${tileY}`, screenPos.x, screenPos.y);
       }
     }
   }

@@ -1330,11 +1330,11 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             <h2 className="text-sm font-semibold mb-2">Layers</h2>
             
             {/* Layers List */}
-            <div className="mb-2 space-y-1">
+            <div className="mb-2 space-y-0.5">
               {layers.map((layer) => (
                 <div
                   key={layer.id}
-                  className={`p-2 border rounded transition-colors text-sm ${
+                  className={`px-2 py-1 border rounded transition-colors text-xs ${
                     activeLayerId === layer.id ? 'border-orange-500 bg-orange-50' : 'hover:bg-gray-50'
                   }`}
                 >
@@ -1343,7 +1343,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                     onClick={() => handleSetActiveLayer(layer.id)}
                   >
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1">
                         <Button
                           variant="ghost"
                           size="sm"
@@ -1351,16 +1351,16 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                             e.stopPropagation();
                             handleToggleLayerVisibility(layer.id);
                           }}
-                          className="w-6 h-6 p-0 hover:bg-gray-200"
+                          className="w-4 h-4 p-0 hover:bg-gray-200"
                           title={layer.visible ? "Hide layer" : "Show layer"}
                         >
-                          {layer.visible ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3 text-gray-400" />}
+                          {layer.visible ? <Eye className="w-2.5 h-2.5" /> : <EyeOff className="w-2.5 h-2.5 text-gray-400" />}
                         </Button>
                         
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="w-6 h-6 p-0 hover:bg-gray-200"
+                          className="w-4 h-4 p-0 hover:bg-gray-200"
                           onMouseEnter={(e) => {
                             const transparencyPercent = Math.round((layer.transparency || 0) * 100);
                             showTooltipWithDelay(
@@ -1391,10 +1391,10 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                             );
                           }}
                         >
-                          <Blend className="w-3 h-3" />
+                          <Blend className="w-2.5 h-2.5" />
                         </Button>
                         
-                        <span className="text-sm font-medium">{layer.name}</span>
+                        <span className="text-xs font-medium truncate">{layer.name}</span>
                       </div>
                     </div>
                   </div>

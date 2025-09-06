@@ -103,6 +103,37 @@
     min-height: 300px;
     max-height: 300px;
     overflow-y: auto;
+    
+    /* Modern minimal scrollbar */
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+}
+
+/* Webkit scrollbar styling for modern browsers */
+.tile-palette::-webkit-scrollbar {
+    width: 10px; /* Increased to accommodate margins */
+}
+
+.tile-palette::-webkit-scrollbar-track {
+    background: transparent;
+    margin: 4px 0; /* Top and bottom margin */
+}
+
+.tile-palette::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--muted-foreground) / 0.3);
+    border-radius: 3px;
+    border: 2px solid transparent; /* Creates spacing from edges */
+    background-clip: content-box; /* Ensures background doesn't show in border area */
+    transition: background-color 0.2s ease;
+    margin: 2px; /* Additional margin for spacing */
+}
+
+.tile-palette::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--muted-foreground) / 0.5);
+}
+
+.tile-palette::-webkit-scrollbar-corner {
+    background: transparent;
 }
 
 .palette-tile {

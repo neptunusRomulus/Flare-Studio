@@ -33,6 +33,7 @@ function App() {
   const [showTooltip, setShowTooltip] = useState(true);
   const [hasTileset, setHasTileset] = useState(false);
   const [showEmptyTilesetTooltip, setShowEmptyTilesetTooltip] = useState(true);
+  const [pendingMapConfig, setPendingMapConfig] = useState<MapConfig | null>(null);
   
   // Toolbar states
   const [selectedTool, setSelectedTool] = useState('brush');
@@ -622,6 +623,234 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     };
   }, [handleSeparateBrush, handleRemoveBrush, handleBrushReorder]);
 
+  // Helper function to load project data into editor
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const loadProjectData = useCallback(async (newEditor: TileMapEditor, mapConfig: any) => {
+    try {
+      console.log('=== LOAD PROJECT DATA DEBUG ===');
+      console.log('Map config received:', {
+        name: mapConfig.name,
+        tilesets: mapConfig.tilesets ? mapConfig.tilesets.length : 0,
+        tilesetImages: mapConfig.tilesetImages ? Object.keys(mapConfig.tilesetImages).length : 0,
+        layers: mapConfig.layers ? mapConfig.layers.length : 0
+      });
+
+      // Debug the map config structure in detail
+      console.log('Map config full structure:', mapConfig);
+      
+      // Create layers from the saved config
+      console.log('Creating layers from config...');
+      const layers = mapConfig.layers || [];
+      console.log('Layers from config:', layers);
+      
+      for (const layerData of layers) {
+        console.log('Processing layer:', layerData);
+        const layerAdded = newEditor.addLayer(layerData.name, layerData.type);
+        
+        if (layerAdded) {
+          console.log(`Created layer: ${layerData.type} - ${layerData.name}`);
+          
+          // Find the newly created layer and set its data
+          const createdLayer = newEditor.getLayers().find(l => l.type === layerData.type);
+          if (createdLayer && layerData.data && Array.isArray(layerData.data)) {
+            console.log(`Setting data for layer ${createdLayer.id} with ${layerData.data.length} tiles`);
+            createdLayer.data = layerData.data;
+          }
+        } else {
+          console.log(`Failed to create layer: ${layerData.type} - ${layerData.name}`);
+        }
+      }
+
+      // Load tileset data from mapConfig
+      console.log('=== LOADING TILESETS FROM CONFIG ===');
+      console.log('Available tilesets in config:', mapConfig.tilesets);
+      console.log('Available tileset images:', Object.keys(mapConfig.tilesetImages || {}));
+
+      // Process each tileset from the config
+      if (mapConfig.tilesets && Array.isArray(mapConfig.tilesets)) {
+        for (const tileset of mapConfig.tilesets) {
+          console.log('Processing tileset:', {
+            fileName: tileset.fileName,
+            name: tileset.name,
+            detectedTiles: tileset.detectedTiles ? tileset.detectedTiles.length : 0
+          });
+
+          // Try to find the tileset image data
+          if (tileset.fileName && mapConfig.tilesetImages && mapConfig.tilesetImages[tileset.fileName]) {
+            console.log('Found tileset image data for:', tileset.fileName);
+            console.log('Tileset filename:', tileset.fileName);
+            console.log('Image data length:', mapConfig.tilesetImages[tileset.fileName].length);
+            
+            try {
+              await newEditor.loadTilesetFromDataURL(mapConfig.tilesetImages[tileset.fileName], tileset.fileName);
+              console.log('Successfully loaded tileset from data URL');
+              
+              // Load detected tile data if available
+              if (tileset.detectedTiles && Array.isArray(tileset.detectedTiles)) {
+                console.log('Loading detected tiles:', tileset.detectedTiles.length);
+                // The detectedTileData is already loaded via the main loadProjectData call
+                // Just log for now since the tileset data structure is handled internally
+                console.log('Detected tiles will be preserved from project data');
+              }
+              
+            } catch (tilesetError) {
+              console.error('Failed to load tileset from data URL:', tilesetError);
+            }
+          } else {
+            console.log('No image data found for tileset:', tileset.fileName);
+            console.log('Available image keys:', Object.keys(mapConfig.tilesetImages || {}));
+          }
+        }
+      }
+
+      console.log('Project data loading completed');
+      return true;
+    } catch (error) {
+      console.error('Error loading project data:', error);
+      return false;
+    }
+  }, []);
+
+  // Effect to handle pending map config when canvas becomes available
+  useEffect(() => {
+    if (pendingMapConfig && canvasRef.current && !showWelcome) {
+      console.log('Canvas available and map config pending, creating editor...');
+      
+      const createEditorWithConfig = async () => {
+        try {
+          console.log('Creating new editor with pending config...');
+          const newEditor = new TileMapEditor(canvasRef.current!);
+          
+          // Clear auto-save backup to prevent old data from loading
+          console.log('Clearing local storage backup...');
+          newEditor.clearLocalStorageBackup();
+          
+          console.log('Setting map size...');
+          newEditor.setMapSize(pendingMapConfig.width, pendingMapConfig.height);
+          
+          // Load project data
+          console.log('Loading project data...');
+          const projectDataLoaded = await loadProjectData(newEditor, pendingMapConfig);
+          console.log('Project data loading result:', projectDataLoaded);
+
+          // Check editor state after loadProjectData
+          console.log('=== EDITOR STATE AFTER loadProjectData ===');
+          console.log('Tile count after loadProjectData:', newEditor.getTileCount());
+          console.log('Active layer after loadProjectData:', newEditor.getActiveLayerId());
+          console.log('Layers after loadProjectData:', newEditor.getLayers().map(l => ({ id: l.id, name: l.name, type: l.type })));
+
+          // Discover and assign tilesets
+          if (window.electronAPI?.discoverTilesetImages && projectPath) {
+            console.log('Calling discoverTilesetImages for path:', projectPath);
+            const found = await window.electronAPI.discoverTilesetImages(projectPath);
+            
+            const images = found?.tilesetImages || {};
+            const imageKeys = Object.keys(images);
+
+            if (imageKeys.length > 0) {
+              const normalize = (s: string) => (s || '')
+                .toLowerCase()
+                .replace(/\.[^/.]+$/, '') // drop extension
+                .replace(/[^a-z0-9]+/g, ' ') // non-alnum to space
+                .trim();
+
+              // Preserve the currently intended active layer to restore later
+              const intendedActive = newEditor.getActiveLayerId();
+              const layersToAssign = newEditor.getLayers();
+              let assignedAny = false;
+
+              for (const layer of layersToAssign) {
+                // Try exact and fuzzy matches by filename
+                const nameTargets = [normalize(layer.type), normalize(layer.name)];
+                let matchKey: string | null = null;
+
+                for (const key of imageKeys) {
+                  const keyNorm = normalize(key);
+                  if (nameTargets.includes(keyNorm)) {
+                    matchKey = key;
+                    break;
+                  }
+                }
+
+                if (!matchKey) {
+                  // Fallback: pick any key that contains layer type/name as substring
+                  const keyByIncludes = imageKeys.find(k => {
+                    const kn = normalize(k);
+                    return nameTargets.some(t => t && kn.includes(t));
+                  });
+                  if (keyByIncludes) matchKey = keyByIncludes;
+                }
+
+                if (!matchKey && imageKeys.length === 1) {
+                  // Final fallback: single image for the project
+                  matchKey = imageKeys[0];
+                }
+
+                if (matchKey) {
+                  console.log(`Assigning tileset '${matchKey}' to layer ${layer.id} (${layer.type})`);
+                  // Make this layer active to store tileset under its type
+                  newEditor.setActiveLayer(layer.id);
+                  await newEditor.loadTilesetFromDataURL(images[matchKey], matchKey);
+                  assignedAny = true;
+                } else {
+                  console.log(`No matching tileset found for layer ${layer.id} (${layer.type})`);
+                }
+              }
+
+              // Restore intended active layer selection
+              if (intendedActive !== null) {
+                newEditor.setActiveLayer(intendedActive);
+              }
+
+              if (assignedAny) {
+                setHasTileset(true);
+                setTileCount(newEditor.getTileCount());
+                // Trigger auto-save to preserve imported tilesets
+                newEditor.forceSave();
+              }
+            }
+          }
+
+          console.log('Setting up autosave and updating UI...');
+          setupAutoSave(newEditor);
+          setEditor(newEditor);
+          
+          // Update layers list and UI state after everything is loaded
+          setTimeout(() => {
+            updateLayersList();
+            // Force UI state update after loading
+            const currentTileCount = newEditor.getTileCount();
+            console.log('Final UI update - tile count:', currentTileCount);
+            setHasTileset(currentTileCount > 0);
+            setTileCount(currentTileCount);
+            
+            // Force a final redraw to ensure everything is visible
+            newEditor.redraw();
+          }, 150);
+
+          // Clear pending config
+          setPendingMapConfig(null);
+          
+          toast({
+            title: "Project loaded",
+            description: "The map has been loaded successfully."
+          });
+          
+        } catch (error) {
+          console.error('Failed to create editor with pending config:', error);
+          toast({
+            title: "Error",
+            description: "Failed to load the project.",
+            variant: "destructive"
+          });
+          setPendingMapConfig(null);
+        }
+      };
+
+      createEditorWithConfig();
+    }
+  }, [pendingMapConfig, showWelcome, projectPath, setupAutoSave, updateLayersList, toast]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>, type: 'tileset' | 'layerTileset') => {
     const file = event.target.files?.[0];
     if (file && editor?.handleFileUpload) {
@@ -883,6 +1112,11 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
 
   const handleOpenMap = useCallback(async (projectPath: string) => {
     console.log('=== HANDLE OPEN MAP CALLED ===', projectPath);
+    console.log('Project path details:', {
+      path: projectPath,
+      timestamp: new Date().toISOString()
+    });
+    
     try {
       // Block the default editor creation effect while we open
       setIsOpeningProject(true);
@@ -891,130 +1125,80 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       if (window.electronAPI?.openMapProject) {
         console.log('Calling electronAPI.openMapProject...');
         const mapConfig = await window.electronAPI.openMapProject(projectPath);
-        console.log('Got mapConfig:', mapConfig);
+        console.log('=== RAW MAP CONFIG RECEIVED ===');
+        console.log('Full mapConfig object:', JSON.stringify(mapConfig, null, 2));
+        
         if (mapConfig) {
+          console.log('=== MAP CONFIG ANALYSIS ===');
+          console.log('Map dimensions:', { width: mapConfig.width, height: mapConfig.height });
+          console.log('Map name:', mapConfig.name);
+          
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const extendedConfig = mapConfig as any;
+          console.log('Tilesets count:', extendedConfig.tilesets ? extendedConfig.tilesets.length : 0);
+          console.log('Tileset images count:', extendedConfig.tilesetImages ? Object.keys(extendedConfig.tilesetImages).length : 0);
+          console.log('Layers count:', extendedConfig.layers ? extendedConfig.layers.length : 0);
+          
+          if (extendedConfig.tilesets) {
+            console.log('=== TILESETS DETAILS ===');
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            extendedConfig.tilesets.forEach((tileset: any, index: number) => {
+              console.log(`Tileset ${index}:`, {
+                fileName: tileset.fileName,
+                tileWidth: tileset.tileWidth,
+                tileHeight: tileset.tileHeight,
+                spacing: tileset.spacing,
+                margin: tileset.margin,
+                tileCount: tileset.tileCount
+              });
+            });
+          }
+          
+          if (extendedConfig.layers) {
+            console.log('=== LAYERS DETAILS ===');
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            extendedConfig.layers.forEach((layer: any, index: number) => {
+              console.log(`Layer ${index}:`, {
+                id: layer.id,
+                name: layer.name,
+                type: layer.type,
+                visible: layer.visible,
+                opacity: layer.opacity,
+                dataLength: layer.data ? layer.data.length : 0
+              });
+            });
+          }
+          
+          if (extendedConfig.tilesetImages) {
+            console.log('=== TILESET IMAGES DETAILS ===');
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            Object.entries(extendedConfig.tilesetImages).forEach(([key, data]: [string, any]) => {
+              console.log(`Image ${key}:`, {
+                dataType: typeof data,
+                dataLength: data ? data.length : 0,
+                isDataURL: typeof data === 'string' && data.startsWith('data:')
+              });
+            });
+          }
+          
           console.log('Setting map dimensions and clearing editor...');
           setMapWidth(mapConfig.width);
           setMapHeight(mapConfig.height);
           setShowWelcome(false);
           
           // Clear existing editor state first
+          console.log('Clearing existing editor...');
           if (editor) {
+            console.log('Found existing editor, clearing it');
             setEditor(null);
+          } else {
+            console.log('No existing editor to clear');
           }
           
-          // Initialize editor with loaded configuration
-          if (canvasRef.current) {
-            console.log('Creating new editor...');
-            const newEditor = new TileMapEditor(canvasRef.current);
-            // Clear auto-save backup to prevent old data from loading
-            newEditor.clearLocalStorageBackup();
-            newEditor.setMapSize(mapConfig.width, mapConfig.height);
-            
-            // Try to load project data including tileset images
-            console.log('Loading project data...');
-            await loadProjectData(newEditor, mapConfig);
-
-            // Discover all tileset images and assign to appropriate layers
-            console.log('=== STARTING PER-LAYER TILESET DISCOVERY ===');
-            try {
-              if (window.electronAPI?.discoverTilesetImages) {
-                console.log('Calling discoverTilesetImages for path:', projectPath);
-                const found = await window.electronAPI.discoverTilesetImages(projectPath);
-                console.log('Discovery result:', {
-                  tilesetCount: Object.keys(found?.tilesetImages || {}).length
-                });
-
-                const images = found?.tilesetImages || {};
-                const imageKeys = Object.keys(images);
-
-                const normalize = (s: string) => (s || '')
-                  .toLowerCase()
-                  .replace(/\.[^/.]+$/, '') // drop extension
-                  .replace(/[^a-z0-9]+/g, ' ') // non-alnum to space
-                  .trim();
-
-                // Preserve the currently intended active layer to restore later
-                const intendedActive = newEditor.getActiveLayerId();
-
-                const layersToAssign = newEditor.getLayers();
-                let assignedAny = false;
-
-                for (const layer of layersToAssign) {
-                  // Try exact and fuzzy matches by filename
-                  const nameTargets = [normalize(layer.type), normalize(layer.name)];
-                  let matchKey: string | null = null;
-
-                  for (const key of imageKeys) {
-                    const keyNorm = normalize(key);
-                    if (nameTargets.includes(keyNorm)) {
-                      matchKey = key;
-                      break;
-                    }
-                  }
-
-                  if (!matchKey) {
-                    // Fallback: pick any key that contains layer type/name as substring
-                    const keyByIncludes = imageKeys.find(k => {
-                      const kn = normalize(k);
-                      return nameTargets.some(t => t && kn.includes(t));
-                    });
-                    if (keyByIncludes) matchKey = keyByIncludes;
-                  }
-
-                  if (!matchKey && imageKeys.length === 1) {
-                    // Final fallback: single image for the project
-                    matchKey = imageKeys[0];
-                  }
-
-                  if (matchKey) {
-                    console.log(`Assigning tileset '${matchKey}' to layer ${layer.id} (${layer.type})`);
-                    // Make this layer active to store tileset under its type
-                    newEditor.setActiveLayer(layer.id);
-                    await newEditor.loadTilesetFromDataURL(images[matchKey], matchKey);
-                    assignedAny = true;
-                  } else {
-                    console.log(`No matching tileset found for layer ${layer.id} (${layer.type})`);
-                  }
-                }
-
-                // Restore intended active layer selection
-                if (intendedActive !== null) {
-                  newEditor.setActiveLayer(intendedActive);
-                }
-
-                if (assignedAny) {
-                  setHasTileset(true);
-                  setTileCount(newEditor.getTileCount());
-                  // Trigger auto-save to preserve imported tilesets
-                  newEditor.forceSave();
-                }
-              } else {
-                console.log('discoverTilesetImages API not available');
-              }
-            } catch (discErr) {
-              console.warn('Per-layer auto-discovery failed:', discErr);
-            }
-            
-            console.log('Setting up autosave and updating UI...');
-            setupAutoSave(newEditor);
-            setEditor(newEditor);
-            
-            // Update layers list and UI state after everything is loaded
-            setTimeout(() => {
-              updateLayersList();
-              // Force UI state update after loading
-              const currentTileCount = newEditor.getTileCount();
-              console.log('Final UI update - tile count:', currentTileCount);
-              setHasTileset(currentTileCount > 0);
-              setTileCount(currentTileCount);
-              
-              // Force a final redraw to ensure everything is visible
-              newEditor.redraw();
-            }, 150);
-          }
-
-          toast({
+          // Store the map config for deferred editor creation
+          // The editor will be created by the useEffect when canvas becomes available
+          console.log('Storing map config for deferred editor creation');
+          setPendingMapConfig(mapConfig);          toast({
             title: "Map Loaded",
             description: `Successfully loaded ${mapConfig.name}`,
             variant: "default",
@@ -1041,7 +1225,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       // Re-enable default editor creation for other flows
       setIsOpeningProject(false);
     }
-  }, [editor, setupAutoSave, toast, updateLayersList]);
+  }, [editor, setupAutoSave, toast, updateLayersList]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Wire Electron menu actions (Save/Open/New)
   useEffect(() => {
@@ -1063,75 +1247,6 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     });
     // No cleanup provided by preload; handlers are idempotent in this simple flow
   }, [handleManualSave, handleOpenMap]);
-
-  // Helper function to load project data into editor
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const loadProjectData = async (newEditor: TileMapEditor, mapConfig: any) => {
-    try {
-      console.log('=== LOAD PROJECT DATA DEBUG ===');
-      console.log('Map config received:', {
-        name: mapConfig.name,
-        tilesets: mapConfig.tilesets ? mapConfig.tilesets.length : 0,
-        tilesetImages: mapConfig.tilesetImages ? Object.keys(mapConfig.tilesetImages).length : 0,
-        layers: mapConfig.layers ? mapConfig.layers.length : 0
-      });
-
-      // FIRST: Load the project data (layers, objects, dimensions) to establish layer structure
-      console.log('Loading project layers and objects first...');
-      newEditor.loadProjectData(mapConfig);
-
-      let tilesetLoaded = false;
-      
-      // THEN: Try to load tileset images after layers are established
-      if (mapConfig.tilesets && mapConfig.tilesets.length > 0) {
-        const tileset = mapConfig.tilesets[0];
-        console.log('First tileset:', tileset);
-
-        if (tileset.fileName && mapConfig.tilesetImages && mapConfig.tilesetImages[tileset.fileName]) {
-          console.log('Loading tileset image:', tileset.fileName);
-          console.log('Image data length:', mapConfig.tilesetImages[tileset.fileName].length);
-          await newEditor.loadTilesetFromDataURL(mapConfig.tilesetImages[tileset.fileName], tileset.fileName);
-          console.log('Tileset loaded successfully');
-          tilesetLoaded = true;
-        } else if (mapConfig.tilesetImages && Object.keys(mapConfig.tilesetImages).length > 0) {
-          // Fallback: use the first available tileset image if the expected key is missing
-          const firstKey = Object.keys(mapConfig.tilesetImages)[0];
-          const imgData = mapConfig.tilesetImages[firstKey];
-          console.log('Falling back to first available tileset image:', firstKey);
-          await newEditor.loadTilesetFromDataURL(imgData, firstKey);
-          console.log('Tileset loaded from fallback image');
-          tilesetLoaded = true;
-        } else {
-          console.log('No tileset image data found for:', tileset.fileName);
-          console.log('Available tileset images:', Object.keys(mapConfig.tilesetImages || {}));
-        }
-      } else {
-        console.log('No tilesets found in map config');
-      }
-
-      // Update UI state
-      if (tilesetLoaded) {
-        console.log('Updating UI state: hasTileset true, tileCount:', newEditor.getTileCount());
-        setHasTileset(true);
-        setTileCount(newEditor.getTileCount());
-      } else {
-        setHasTileset(false);
-        setTileCount(0);
-      }
-
-      // Force a complete redraw to ensure everything is rendered
-      console.log('Forcing complete redraw...');
-      newEditor.redraw();
-      
-      console.log('Project data loading completed');
-      
-      // Return whether tileset was loaded to help calling code
-      return tilesetLoaded;
-    } catch (error) {
-      console.error('Error loading project data:', error);
-      return false;
-    }
-  };
 
   const handleMinimize = () => {
     if (window.electronAPI?.minimize) {

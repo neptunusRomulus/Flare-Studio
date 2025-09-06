@@ -1264,6 +1264,21 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                   >
                     <Trash2 className="w-3 h-3" />
                   </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs px-2 py-1 h-7 border-red-500 hover:border-red-600 hover:bg-red-50"
+                    onClick={() => {
+                      if (editor) {
+                        if (window.confirm('Are you sure you want to remove the tileset for this layer? This will clear the tileset but keep any placed tiles.')) {
+                          editor.removeLayerTileset();
+                        }
+                      }
+                    }}
+                    title="Remove tileset for current layer"
+                  >
+                    <X className="w-3 h-3 text-red-500" />
+                  </Button>
                 </div>
                 
                 {/* Merge Tool Controls */}
@@ -1729,6 +1744,23 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                       onMouseLeave={hideTooltip}
                     >
                       <Eraser className="w-4 h-4" />
+                    </Button>
+                    <Button 
+                      variant={selectedBrushTool === 'clear' ? 'default' : 'ghost'} 
+                      size="sm" 
+                      className="w-8 h-8 p-0 sub-tool-button border-red-500 hover:border-red-600 hover:bg-red-50"
+                      onClick={() => {
+                        if (editor) {
+                          if (window.confirm('Are you sure you want to clear all tiles from the current layer? This action cannot be undone.')) {
+                            editor.clearLayer();
+                            setSelectedBrushTool('brush'); // Reset to brush tool after clearing
+                          }
+                        }
+                      }}
+                      onMouseEnter={(e) => showTooltipWithDelay('Clear Layer', e.currentTarget)}
+                      onMouseLeave={hideTooltip}
+                    >
+                      <X className="w-4 h-4 text-red-500" />
                     </Button>
                   </div>
                 )}

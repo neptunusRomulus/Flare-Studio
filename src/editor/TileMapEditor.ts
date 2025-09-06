@@ -3340,6 +3340,31 @@ export class TileMapEditor {
     this.draw();
   }
 
+  public removeLayerTileset(): void {
+    const activeLayer = this.tileLayers.find(l => l.id === this.activeLayerId);
+    if (activeLayer) {
+      const layerType = activeLayer.type;
+      
+      // Remove from layer tilesets
+      this.layerTilesets.delete(layerType);
+      
+      // Remove layer tile data
+      this.layerTileData.delete(layerType);
+      
+      // Clear current tileset display if this was the active layer
+      this.tilesetImage = null;
+      this.tilesetFileName = null;
+      this.tilesetColumns = 0;
+      this.tilesetRows = 0;
+      this.tileCount = 0;
+      this.detectedTileData.clear();
+      this.activeGid = 0;
+      this.clearTilePalette();
+      
+      this.draw();
+    }
+  }
+
   // Flare export system
   public exportFlareMap(): void {
     if (!this.tilesetImage || !this.tilesetFileName) {

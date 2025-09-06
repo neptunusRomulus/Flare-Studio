@@ -6,6 +6,7 @@ import { Plus, FolderOpen, Grid3X3, Folder, Minus, Square, X } from 'lucide-reac
 interface WelcomeScreenProps {
   onCreateNewMap: (config: MapConfig, projectPath?: string) => void;
   onOpenMap: (projectPath: string) => void;
+  isDarkMode: boolean;
 }
 
 interface MapConfig {
@@ -23,7 +24,7 @@ interface RecentMap {
   path: string;
 }
 
-const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap }) => {
+const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap, isDarkMode }) => {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [recentMaps, setRecentMaps] = useState<RecentMap[]>([]);
   const [mapConfig, setMapConfig] = useState<MapConfig>({
@@ -155,28 +156,28 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
 
   if (showCreateForm) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col">
+      <div className={`min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-neutral-900 dark:to-neutral-800 flex flex-col ${isDarkMode ? 'dark' : ''}`}>
         {/* Custom Title Bar */}
-        <div className="bg-gray-100 text-orange-600 flex justify-between items-center px-4 py-1 select-none drag-region border-b border-gray-200">
+        <div className="bg-gray-100 dark:bg-neutral-900 text-orange-600 dark:text-orange-400 flex justify-between items-center px-4 py-1 select-none drag-region border-b border-gray-200 dark:border-neutral-700">
           <div className="text-sm font-medium">Tile Map Editor</div>
           <div className="flex no-drag">
             <button 
               onClick={handleMinimize}
-              className="text-gray-500 hover:text-gray-700 hover:bg-gray-200 px-3 py-1 text-sm rounded transition-colors"
+              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
               title="Minimize"
             >
               <Minus className="w-4 h-4" />
             </button>
             <button 
               onClick={handleMaximize}
-              className="text-gray-500 hover:text-gray-700 hover:bg-gray-200 px-3 py-1 text-sm rounded transition-colors"
+              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
               title="Maximize"
             >
               <Square className="w-4 h-4" />
             </button>
             <button 
               onClick={handleClose}
-              className="text-gray-500 hover:text-red-600 hover:bg-gray-200 px-3 py-1 text-sm rounded transition-colors"
+              className="text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
               title="Close"
             >
               <X className="w-4 h-4" />
@@ -185,18 +186,18 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
         </div>
         
         <div className="flex-1 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
+          <div className="bg-white dark:bg-neutral-900 rounded-lg shadow-xl p-8 w-full max-w-md">
           <div className="text-center mb-6">
             <div className="inline-flex items-center justify-center">
               <img src="/flare-logo.png" alt="Flare Logo" className="w-40 h-40 object-contain" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900">Create a New Flare Project</h2>
-            <p className="text-gray-600 mt-2">Configure your new project</p>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Create a New Flare Project</h2>
+            <p className="text-gray-600 dark:text-gray-300 mt-2">Configure your new project</p>
           </div>
 
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Project Name
               </label>
               <Input
@@ -208,7 +209,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Width (tiles)
                 </label>
                 <Input
@@ -220,7 +221,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Height (tiles)
                 </label>
                 <Input
@@ -234,7 +235,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Project Location
               </label>
               <div className="flex gap-2">
@@ -277,28 +278,28 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex flex-col">
+    <div className={`min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-neutral-900 dark:to-neutral-800 flex flex-col ${isDarkMode ? 'dark' : ''}`}>
       {/* Custom Title Bar */}
-      <div className="bg-gray-100 text-orange-600 flex justify-between items-center px-4 py-1 select-none drag-region border-b border-gray-200">
+      <div className="bg-gray-100 dark:bg-neutral-900 text-orange-600 dark:text-orange-400 flex justify-between items-center px-4 py-1 select-none drag-region border-b border-gray-200 dark:border-neutral-700">
         <div className="text-sm font-medium">Flarism</div> {/* TODO: ADD A SMALL ICON BEFORE THIS TEXT */}
         <div className="flex no-drag">
           <button 
             onClick={handleMinimize}
-            className="text-gray-500 hover:text-gray-700 hover:bg-gray-200 px-3 py-1 text-sm rounded transition-colors"
+            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
             title="Minimize"
           >
             <Minus className="w-4 h-4" />
           </button>
           <button 
             onClick={handleMaximize}
-            className="text-gray-500 hover:text-gray-700 hover:bg-gray-200 px-3 py-1 text-sm rounded transition-colors"
+            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
             title="Maximize"
           >
             <Square className="w-4 h-4" />
           </button>
           <button 
             onClick={handleClose}
-            className="text-gray-500 hover:text-red-600 hover:bg-gray-200 px-3 py-1 text-sm rounded transition-colors"
+            className="text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
             title="Close"
           >
             <X className="w-4 h-4" />
@@ -308,23 +309,23 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
       
       <div className="flex flex-1 min-h-0">
         {/* Left Sidebar - Recent Maps */}
-        <div className="w-80 bg-white border-r border-slate-200 p-6">
+        <div className="w-80 bg-white dark:bg-neutral-900 border-r border-slate-200 dark:border-neutral-700 p-6">
           <div className="mb-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Projects</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Recent Projects</h3>
             <div className="space-y-2">
               {recentMaps.map((map) => (
                 <div
                   key={map.id}
-                  className="p-3 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer transition-colors"
+                  className="p-3 rounded-lg border border-slate-200 dark:border-neutral-700 hover:bg-slate-50 dark:hover:bg-neutral-800 cursor-pointer transition-colors"
                   onClick={() => handleOpenRecentMap(map)}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-orange-100 rounded flex items-center justify-center">
-                      <Grid3X3 className="w-4 h-4 text-orange-600" />
+                    <div className="w-8 h-8 bg-orange-100 dark:bg-orange-900 rounded flex items-center justify-center">
+                      <Grid3X3 className="w-4 h-4 text-orange-600 dark:text-orange-400" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-gray-900 truncate">{map.name}</p>
-                      <p className="text-sm text-gray-500">{map.lastModified}</p>
+                      <p className="font-medium text-gray-900 dark:text-white truncate">{map.name}</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-400">{map.lastModified}</p>
                     </div>
                   </div>
                 </div>
@@ -333,8 +334,8 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
           </div>
 
           {recentMaps.length === 0 && (
-            <div className="text-center text-gray-500 py-8">
-              <Grid3X3 className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+            <div className="text-center text-gray-500 dark:text-gray-400 py-8">
+              <Grid3X3 className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-gray-600" />
               <p>No recent project</p>
               <p className="text-sm">Create your first projet to get started</p>
             </div>
@@ -349,7 +350,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
               <div className="inline-flex items-center justify-center w-50 h-20">
                 <img src="/flare-logo.png" alt="Flare Logo" className="w-100 h-100 object-contain"/>
               </div>
-              <p className="text-gray-600 text-lg">Modern & Simple GUI for Flare</p>
+              <p className="text-gray-600 dark:text-gray-300 text-lg">Modern & Simple GUI for Flare</p>
             </div>
 
             {/* Action Buttons */}

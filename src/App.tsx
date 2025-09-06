@@ -106,9 +106,15 @@ function App() {
     } else {
       document.documentElement.classList.remove('dark');
     }
+    
+    // Update editor dark mode if it exists
+    if (editor) {
+      editor.setDarkMode(isDarkMode);
+    }
+    
     // Save to localStorage
     localStorage.setItem('isDarkMode', JSON.stringify(isDarkMode));
-  }, [isDarkMode]);
+  }, [isDarkMode, editor]);
 
   // Helper function to set up auto-save for an editor instance
 const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
@@ -152,11 +158,13 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     // Skip if we're actively opening a project (handleOpenMap will create the editor)
     if (canvasRef.current && !showWelcome && !editor && !isOpeningProject) {
       const tileEditor = new TileMapEditor(canvasRef.current);
+      // Set initial dark mode state
+      tileEditor.setDarkMode(isDarkMode);
       // Do NOT call loadFromLocalStorage() here - let the user manually load if needed
       setupAutoSave(tileEditor);
       setEditor(tileEditor);
     }
-  }, [showWelcome, editor, setupAutoSave, isOpeningProject]);
+  }, [showWelcome, editor, setupAutoSave, isOpeningProject, isDarkMode]);
 
   // Track hover coordinates
   useEffect(() => {
@@ -752,6 +760,8 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           }
 
           console.log('Setting up autosave and updating UI...');
+          // Set dark mode state
+          newEditor.setDarkMode(isDarkMode);
           setupAutoSave(newEditor);
           setEditor(newEditor);
           
@@ -945,6 +955,8 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       // Reset all data to ensure clean state
       newEditor.resetForNewProject();
       newEditor.setMapSize(config.width, config.height);
+      // Set dark mode state
+      newEditor.setDarkMode(isDarkMode);
       setupAutoSave(newEditor);
       setEditor(newEditor);
       updateLayersList();
@@ -1137,11 +1149,12 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         <WelcomeScreen 
           onCreateNewMap={handleCreateNewMap}
           onOpenMap={handleOpenMap}
+          isDarkMode={isDarkMode}
         />
       ) : (
         <div className="h-screen bg-background text-foreground flex flex-col overflow-hidden">
       {/* Custom Title Bar */}
-      <div className="bg-gray-100 text-orange-600 flex justify-between items-center px-4 py-1 select-none drag-region border-b border-gray-200">
+      <div className="bg-gray-100 dark:bg-neutral-900 text-orange-600 dark:text-orange-400 flex justify-between items-center px-4 py-1 select-none drag-region border-b border-gray-200 dark:border-neutral-700">
         <div className="flex items-center gap-3">
           <div className="text-sm font-medium">Flare Map Editor</div>
           {/* Save Status Indicator */}
@@ -1175,21 +1188,21 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         <div className="flex no-drag">
           <button 
             onClick={handleMinimize}
-            className="text-gray-500 hover:text-gray-700 hover:bg-gray-200 p-1 rounded transition-colors"
+            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 p-1 rounded transition-colors"
             title="Minimize"
           >
             <Minus className="w-4 h-4" />
           </button>
           <button 
             onClick={handleMaximize}
-            className="text-gray-500 hover:text-gray-700 hover:bg-gray-200 p-1 rounded transition-colors"
+            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 p-1 rounded transition-colors"
             title="Maximize"
           >
             <Square className="w-4 h-4" />
           </button>
           <button 
             onClick={handleClose}
-            className="text-gray-500 hover:text-red-600 hover:bg-gray-200 p-1 rounded transition-colors"
+            className="text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 hover:bg-gray-200 dark:hover:bg-gray-700 p-1 rounded transition-colors"
             title="Close"
           >
             <X className="w-4 h-4" />
@@ -1200,7 +1213,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       {/* Main Content */}
       <main className="flex flex-1 min-h-0">
         {/* Left Sidebar */}
-        <aside className="w-80 border-r bg-muted/30 p-4 overflow-y-auto">
+        <aside className="w-80 border-r border-border bg-muted/30 p-4 overflow-y-auto">
           {/* Tileset Section */}
           <section className="mb-6">
             <div className="flex items-center justify-between mb-3">
@@ -1336,7 +1349,9 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 <div
                   key={layer.id}
                   className={`px-2 py-1 border rounded transition-colors text-xs ${
-                    activeLayerId === layer.id ? 'border-orange-500 bg-orange-50' : 'hover:bg-gray-50'
+                    activeLayerId === layer.id 
+                      ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 dark:border-orange-400' 
+                      : 'border-border hover:bg-gray-50 dark:hover:bg-gray-800'
                   }`}
                 >
                   <div 
@@ -1352,16 +1367,16 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                             e.stopPropagation();
                             handleToggleLayerVisibility(layer.id);
                           }}
-                          className="w-4 h-4 p-0 hover:bg-gray-200"
+                          className="w-4 h-4 p-0 hover:bg-gray-200 dark:hover:bg-gray-700"
                           title={layer.visible ? "Hide layer" : "Show layer"}
                         >
-                          {layer.visible ? <Eye className="w-2.5 h-2.5" /> : <EyeOff className="w-2.5 h-2.5 text-gray-400" />}
+                          {layer.visible ? <Eye className="w-2.5 h-2.5" /> : <EyeOff className="w-2.5 h-2.5 text-gray-400 dark:text-gray-500" />}
                         </Button>
                         
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="w-4 h-4 p-0 hover:bg-gray-200"
+                          className="w-4 h-4 p-0 hover:bg-gray-200 dark:hover:bg-gray-700"
                           onMouseEnter={(e) => {
                             const transparencyPercent = Math.round((layer.transparency || 0) * 100);
                             showTooltipWithDelay(
@@ -1408,7 +1423,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         {/* Settings Modal */}
         {showSettings && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 w-96">
+            <div className="bg-background border border-border rounded-lg p-6 w-96">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-semibold">Map Settings</h3>
                 <Button 
@@ -1458,7 +1473,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium mb-2">Theme</label>
+                  <label className="block text-sm font-medium mb-2">Theme (Experimental)</label>
                   <div className="flex items-center justify-between">
                     <span className="text-sm">Light Mode</span>
                     <button
@@ -1539,9 +1554,9 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         {/* Help Modal */}
         {showHelp && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 w-[800px] max-h-[80vh] overflow-y-auto help-modal">
+            <div className="bg-background border border-border rounded-lg p-6 w-[800px] max-h-[80vh] overflow-y-auto help-modal">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-2xl font-bold text-gray-800">Help & Documentation</h3>
+                <h3 className="text-2xl font-bold text-foreground">Help & Documentation</h3>
                 <Button 
                   variant="ghost" 
                   size="sm" 
@@ -1559,7 +1574,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                     <Target className="w-5 h-5 text-blue-600" />
                     Getting Started
                   </h4>
-                  <div className="space-y-2 text-gray-700">
+                  <div className="space-y-2 text-foreground">
                     <p>Welcome to the Isometric Tile Map Editor! This tool allows you to create beautiful isometric tile-based maps.</p>
                     <ul className="list-disc list-inside space-y-1 ml-4">
                       <li>Start by creating a new map or loading an existing one</li>
@@ -1608,7 +1623,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                     Layer System
                   </h4>
                   <div className="space-y-3">
-                    <p className="text-gray-700">Layers help organize your map content. Each layer can have its own tileset and transparency.</p>
+                    <p className="text-foreground">Layers help organize your map content. Each layer can have its own tileset and transparency.</p>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div className="flex items-start gap-3">
                         <Eye className="w-4 h-4 mt-1 text-green-500" />
@@ -1687,7 +1702,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                     Tileset Management
                   </h4>
                   <div className="space-y-3">
-                    <p className="text-gray-700">Each layer can have its own tileset. Import PNG images to use as tilesets.</p>
+                    <p className="text-foreground">Each layer can have its own tileset. Import PNG images to use as tilesets.</p>
                     <div className="space-y-3">
                       <div className="flex items-start gap-3">
                         <Upload className="w-4 h-4 mt-1 text-blue-500" />
@@ -1751,32 +1766,32 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                     <Target className="w-5 h-5 text-yellow-600" />
                     Keyboard Shortcuts
                   </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-gray-50 p-4 rounded-lg">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-gray-50 dark:bg-neutral-900 p-4 rounded-lg">
                     <div className="space-y-2">
                       <div className="flex justify-between">
-                        <span className="font-mono text-sm bg-gray-200 px-2 py-1 rounded">Ctrl+Z</span>
+                        <span className="font-mono text-sm bg-gray-200 dark:bg-neutral-800 px-2 py-1 rounded">Ctrl+Z</span>
                         <span className="text-sm">Undo</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="font-mono text-sm bg-gray-200 px-2 py-1 rounded">Ctrl+Y</span>
+                        <span className="font-mono text-sm bg-gray-200 dark:bg-neutral-800 px-2 py-1 rounded">Ctrl+Y</span>
                         <span className="text-sm">Redo</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="font-mono text-sm bg-gray-200 px-2 py-1 rounded">Ctrl+S</span>
+                        <span className="font-mono text-sm bg-gray-200 dark:bg-neutral-800 px-2 py-1 rounded">Ctrl+S</span>
                         <span className="text-sm">Save Map</span>
                       </div>
                     </div>
                     <div className="space-y-2">
                       <div className="flex justify-between">
-                        <span className="font-mono text-sm bg-gray-200 px-2 py-1 rounded">Mouse Wheel</span>
+                        <span className="font-mono text-sm bg-gray-200 dark:bg-neutral-800 px-2 py-1 rounded">Mouse Wheel</span>
                         <span className="text-sm">Zoom</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="font-mono text-sm bg-gray-200 px-2 py-1 rounded">Middle Click + Drag</span>
+                        <span className="font-mono text-sm bg-gray-200 dark:bg-neutral-800 px-2 py-1 rounded">Middle Click + Drag</span>
                         <span className="text-sm">Pan</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="font-mono text-sm bg-gray-200 px-2 py-1 rounded">Hover + Wheel</span>
+                        <span className="font-mono text-sm bg-gray-200 dark:bg-neutral-800 px-2 py-1 rounded">Hover + Wheel</span>
                         <span className="text-sm">Layer Transparency</span>
                       </div>
                     </div>
@@ -1789,7 +1804,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                     <Wand2 className="w-5 h-5 text-pink-600" />
                     Tips & Best Practices
                   </h4>
-                  <div className="space-y-2 text-gray-700">
+                  <div className="space-y-2 text-foreground">
                     <ul className="list-disc list-inside space-y-1 ml-4">
                       <li>Use separate layers for different map elements (background, objects, decorations)</li>
                       <li>Name your layers descriptively for better organization</li>
@@ -1876,7 +1891,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           <div className="bg-gray-100 flex-1 min-h-0 flex items-center justify-center overflow-hidden relative">
             {/* Canvas Tooltip Panel */}
             {showTooltip && (
-              <div className="absolute top-4 left-4 z-20 p-3 bg-white/90 backdrop-blur-sm rounded-lg border shadow-lg">
+              <div className="absolute top-4 left-4 z-20 p-3 bg-white/90 dark:bg-neutral-900/90 backdrop-blur-sm rounded-lg border border-border shadow-lg">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -1887,19 +1902,19 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 </Button>
                 
                 <div className="space-y-2 pr-6">
-                  <div className="flex items-center gap-2 text-xs text-gray-700">
+                  <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
                     <MousePointer2 className="w-4 h-4" />
                     <span>Left Click to Paint</span>
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-gray-700">
+                  <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
                     <Mouse className="w-4 h-4" />
                     <span>Right Click to Delete</span>
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-gray-700">
+                  <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
                     <Move className="w-4 h-4" />
                     <span>Spacebar + Mouse to Pan</span>
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-gray-700">
+                  <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
                     <div className="relative">
                       <Mouse className="w-4 h-4" />
                       <Circle className="w-2 h-2 absolute top-1 left-1.5 opacity-60" />
@@ -1918,8 +1933,8 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             
             {/* Hover Coordinates Display */}
             {hoverCoords && (
-              <div className="absolute bottom-4 left-4 z-10 p-2 bg-white/90 backdrop-blur-sm rounded-md border border-gray-200 text-gray-800 text-xs font-mono flex items-center gap-2 shadow-sm">
-                <MapPin className="w-4 h-4 text-gray-500" />
+              <div className="absolute bottom-4 left-4 z-10 p-2 bg-white/90 dark:bg-neutral-900/90 backdrop-blur-sm rounded-md border border-gray-200 dark:border-neutral-600 text-gray-800 dark:text-white text-xs font-mono flex items-center gap-2 shadow-sm">
+                <MapPin className="w-4 h-4 text-gray-500 dark:text-gray-400" />
                 <span>{hoverCoords.x}, {hoverCoords.y}</span>
               </div>
             )}
@@ -1965,7 +1980,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           </div>
           
           {/* Toolbar */}
-          <div className="flex-shrink-0 bg-gray-50 border-t p-2">
+          <div className="flex-shrink-0 bg-gray-50 dark:bg-neutral-900 border-t border-border p-2">
             <div className="flex gap-1 justify-center">
               
               {/* Brush Tool */}
@@ -1989,7 +2004,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 
                 {showBrushOptions && (
                   <div 
-                    className="absolute bottom-full left-0 mb-1 bg-white border rounded shadow-lg p-1 flex gap-1 min-w-max z-50"
+                    className="absolute bottom-full left-0 mb-1 bg-white dark:bg-neutral-900 border border-border rounded shadow-lg p-1 flex gap-1 min-w-max z-50"
                     onMouseEnter={handleShowBrushOptions}
                     onMouseLeave={handleHideBrushOptions}
                   >
@@ -2065,7 +2080,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 
                 {showSelectionOptions && (
                   <div 
-                    className="absolute bottom-full left-0 mb-1 bg-white border rounded shadow-lg p-1 flex gap-1 min-w-max z-50"
+                    className="absolute bottom-full left-0 mb-1 bg-white dark:bg-neutral-900 border border-border rounded shadow-lg p-1 flex gap-1 min-w-max z-50"
                     onMouseEnter={handleShowSelectionOptions}
                     onMouseLeave={handleHideSelectionOptions}
                   >
@@ -2129,7 +2144,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 
                 {showShapeOptions && (
                   <div 
-                    className="absolute bottom-full left-0 mb-1 bg-white border rounded shadow-lg p-1 flex gap-1 min-w-max z-50"
+                    className="absolute bottom-full left-0 mb-1 bg-white dark:bg-neutral-900 border border-border rounded shadow-lg p-1 flex gap-1 min-w-max z-50"
                     onMouseEnter={handleShowShapeOptions}
                     onMouseLeave={handleHideShapeOptions}
                   >

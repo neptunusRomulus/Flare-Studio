@@ -307,3 +307,35 @@ button:active:not(.no-click-effect) {
     transform: scale(0.98);
     transition: transform 0.1s ease-in-out;
 }
+
+/* Modern scrollbar for help modal */
+.help-modal {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+}
+
+.help-modal::-webkit-scrollbar {
+    width: 8px;
+}
+
+.help-modal::-webkit-scrollbar-track {
+    background: transparent;
+    margin: 8px 0;
+}
+
+.help-modal::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 6px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+    transition: background-color 0.2s ease;
+}
+
+.help-modal::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+    background-clip: content-box;
+}
+
+.help-modal::-webkit-scrollbar-corner {
+    background: transparent;
+}

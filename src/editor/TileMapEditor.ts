@@ -234,7 +234,7 @@ export class TileMapEditor {
     
     // Rebuild the map with new order and reassign IDs sequentially
     this.detectedTileData.clear();
-    brushArray.forEach(([oldId, data], newIndex) => {
+    brushArray.forEach(([_oldId, data], newIndex) => {
       // Use newIndex as the new ID to maintain sequential order
       this.detectedTileData.set(newIndex, data);
     });
@@ -1547,7 +1547,7 @@ export class TileMapEditor {
         }
       });
       
-      wrapper.addEventListener('dragend', (e) => {
+      wrapper.addEventListener('dragend', (_e) => {
         wrapper.style.opacity = '1';
         this.dispatchBrushEvent('dragend', tile.index);
       });
@@ -1563,7 +1563,7 @@ export class TileMapEditor {
         }
       });
       
-      wrapper.addEventListener('dragleave', (e) => {
+      wrapper.addEventListener('dragleave', (_e) => {
         wrapper.style.borderTop = '';
       });
       
@@ -1843,7 +1843,7 @@ export class TileMapEditor {
     const area = pixels.length;
     const boundingArea = width * height;
     const density = area / boundingArea;
-    const aspectRatio = Math.max(width / height, height / width);
+    // const aspectRatio = Math.max(width / height, height / width);
     
     // Determine if this looks like a repeating pattern (multiple similar objects)
     const gridSize = Math.max(this.tileSizeX, this.tileSizeY);
@@ -1976,7 +1976,7 @@ export class TileMapEditor {
   }
 
   private hasConsistentVerticalWidth(pixels: Array<{x: number, y: number}>, bounds: { x: number; y: number; width: number; height: number }): boolean {
-    const { x: minX, y: minY, height } = bounds;
+    const { y: minY, height } = bounds;
     const segmentHeight = Math.max(1, Math.floor(height / 5)); // Divide into 5 segments
     
     const widths: number[] = [];
@@ -2013,7 +2013,7 @@ export class TileMapEditor {
   }
 
   private hasConsistentHorizontalHeight(pixels: Array<{x: number, y: number}>, bounds: { x: number; y: number; width: number; height: number }): boolean {
-    const { x: minX, y: minY, width } = bounds;
+    const { x: minX, width } = bounds;
     const segmentWidth = Math.max(1, Math.floor(width / 5)); // Divide into 5 segments
     
     const heights: number[] = [];
@@ -2163,7 +2163,7 @@ export class TileMapEditor {
   }
 
   private hasDiamondLikeShape(pixels: Array<{x: number, y: number}>, bounds: { x: number; y: number; width: number; height: number }): boolean {
-    const { x: minX, y: minY, width, height } = bounds;
+    const { y: minY, height } = bounds;
     
     // For diamond shapes, expect more pixels in the middle rows than at the edges
     const rowDensities: number[] = [];

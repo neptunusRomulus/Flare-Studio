@@ -48,12 +48,12 @@ function App() {
   // Brush management states
   const [brushTool, setBrushTool] = useState<'none' | 'move' | 'merge' | 'separate' | 'remove'>('none');
   const [selectedBrushes, setSelectedBrushes] = useState<number[]>([]);
-  const [draggedBrush, setDraggedBrush] = useState<number | null>(null);
   
   // Stamp states
   const [stamps, setStamps] = useState<import('./types').Stamp[]>([]);
   const [selectedStamp, setSelectedStamp] = useState<string | null>(null);
   const [stampMode, setStampMode] = useState<'select' | 'create' | 'place'>('select');
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [showStampDialog, setShowStampDialog] = useState(false);
   const [newStampName, setNewStampName] = useState('');
   
@@ -151,25 +151,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
   }, [autoSaveEnabled, projectPath]);
 
   // Wire Electron menu actions (Save/Open/New)
-  useEffect(() => {
-    if (!window.electronAPI) return;
-    // Save Map
-    window.electronAPI.onMenuSaveMap(async () => {
-      await handleManualSave();
-    });
-    // Open Map
-    window.electronAPI.onMenuOpenMap(async () => {
-      const selected = await window.electronAPI.selectDirectory();
-      if (selected) {
-        await handleOpenMap(selected);
-      }
-    });
-    // New Map
-    window.electronAPI.onMenuNewMap(() => {
-      setShowWelcome(true);
-    });
-    // No cleanup provided by preload; handlers are idempotent in this simple flow
-  }, []);
+  // Moved after function definitions
 
   useEffect(() => {
     // Only create a default editor when switching from welcome screen to editor
@@ -572,22 +554,6 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     }
   }, [editor]);
 
-  const handleBrushClick = useCallback((brushId: number) => {
-    if (brushTool === 'merge') {
-      setSelectedBrushes(prev => {
-        if (prev.includes(brushId)) {
-          return prev.filter(id => id !== brushId);
-        } else {
-          return [...prev, brushId];
-        }
-      });
-    } else if (brushTool === 'separate') {
-      handleSeparateBrush(brushId);
-    } else if (brushTool === 'remove') {
-      handleRemoveBrush(brushId);
-    }
-  }, [brushTool, handleSeparateBrush, handleRemoveBrush]);
-
   const handleBrushReorder = useCallback((fromTileIndex: number, toTileIndex: number) => {
     if (!editor) return;
     
@@ -640,12 +606,6 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           break;
         case 'remove':
           handleRemoveBrush(tileIndex);
-          break;
-        case 'dragstart':
-          setDraggedBrush(tileIndex);
-          break;
-        case 'dragend':
-          setDraggedBrush(null);
           break;
         case 'drop':
           if (event.detail.from && event.detail.to) {
@@ -841,7 +801,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     }
   };
 
-  const handleManualSave = async () => {
+  const handleManualSave = useCallback(async () => {
     if (!editor) return;
     setIsManuallySaving(true);
     try {
@@ -881,7 +841,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     } finally {
       setIsManuallySaving(false);
     }
-  };
+  }, [editor, projectPath, toast]);
 
   const handleToggleMinimap = () => {
     if (editor?.toggleMinimap) {
@@ -921,7 +881,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     }
   };
 
-  const handleOpenMap = async (projectPath: string) => {
+  const handleOpenMap = useCallback(async (projectPath: string) => {
     console.log('=== HANDLE OPEN MAP CALLED ===', projectPath);
     try {
       // Block the default editor creation effect while we open
@@ -953,7 +913,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             
             // Try to load project data including tileset images
             console.log('Loading project data...');
-            const tilesetLoadedFromProject = await loadProjectData(newEditor, mapConfig);
+            await loadProjectData(newEditor, mapConfig);
 
             // Discover all tileset images and assign to appropriate layers
             console.log('=== STARTING PER-LAYER TILESET DISCOVERY ===');
@@ -1081,7 +1041,28 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       // Re-enable default editor creation for other flows
       setIsOpeningProject(false);
     }
-  };
+  }, [editor, setupAutoSave, toast, updateLayersList]);
+
+  // Wire Electron menu actions (Save/Open/New)
+  useEffect(() => {
+    if (!window.electronAPI) return;
+    // Save Map
+    window.electronAPI.onMenuSaveMap(async () => {
+      await handleManualSave();
+    });
+    // Open Map
+    window.electronAPI.onMenuOpenMap(async () => {
+      const selected = await window.electronAPI.selectDirectory();
+      if (selected) {
+        await handleOpenMap(selected);
+      }
+    });
+    // New Map
+    window.electronAPI.onMenuNewMap(() => {
+      setShowWelcome(true);
+    });
+    // No cleanup provided by preload; handlers are idempotent in this simple flow
+  }, [handleManualSave, handleOpenMap]);
 
   // Helper function to load project data into editor
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

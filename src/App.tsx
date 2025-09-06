@@ -29,7 +29,6 @@ function App() {
   const [showAddLayerDropdown, setShowAddLayerDropdown] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showTooltip, setShowTooltip] = useState(true);
-  const [hasTileset, setHasTileset] = useState(false);
   const [pendingMapConfig, setPendingMapConfig] = useState<MapConfig | null>(null);
   
   // Toolbar states
@@ -77,7 +76,7 @@ function App() {
   
   // Custom tooltip states
   const [tooltip, setTooltip] = useState<{
-    text: string;
+    content: React.ReactNode;
     x: number;
     y: number;
     visible: boolean;
@@ -258,14 +257,6 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       setLayers([...currentLayers]); // Create a new array to ensure React detects changes
       const activeId = editor.getActiveLayerId();
       setActiveLayerId(activeId);
-      
-      // Check if active layer has a tileset
-      const activeLayer = currentLayers.find(layer => layer.id === activeId);
-      if (activeLayer) {
-        setHasTileset(editor.hasLayerTileset(activeLayer.type));
-      } else {
-        setHasTileset(false);
-      }
     }
   }, [editor]);
 
@@ -293,13 +284,13 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
   }, [showAddLayerDropdown]);
 
   // Custom tooltip handlers
-  const showTooltipWithDelay = useCallback((text: string, element: HTMLElement) => {
+  const showTooltipWithDelay = useCallback((content: React.ReactNode, element: HTMLElement) => {
     const rect = element.getBoundingClientRect();
     const x = rect.left + rect.width / 2;
     const y = rect.top - 10;
     
     setTooltip({
-      text,
+      content,
       x,
       y,
       visible: true,
@@ -750,20 +741,12 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               }
 
               if (assignedAny) {
-                setHasTileset(true);
                 // Trigger auto-save to preserve imported tilesets
                 newEditor.forceSave();
               }
             } else {
               console.log('Per-layer tilesets already loaded, skipping fallback assignment');
               // Just update UI state based on what was loaded
-              const activeLayerId = newEditor.getActiveLayerId();
-              const activeLayer = newEditor.getLayers().find(l => l.id === activeLayerId);
-              if (activeLayer) {
-                setHasTileset(newEditor.hasLayerTileset(activeLayer.type));
-              } else {
-                setHasTileset(false);
-              }
             }
           }
 
@@ -778,11 +761,6 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             const activeLayerId = newEditor.getActiveLayerId();
             const activeLayer = newEditor.getLayers().find(l => l.id === activeLayerId);
             console.log('Final UI update - checking active layer:', activeLayerId, activeLayer?.type);
-            if (activeLayer) {
-              setHasTileset(newEditor.hasLayerTileset(activeLayer.type));
-            } else {
-              setHasTileset(false);
-            }
             
             // Force a final redraw to ensure everything is visible
             newEditor.redraw();
@@ -824,13 +802,6 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       setActiveLayerId(layerId);
       
       // Update hasTileset state based on the new active layer
-      const layers = editor.getLayers();
-      const newActiveLayer = layers.find(layer => layer.id === layerId);
-      if (newActiveLayer) {
-        setHasTileset(editor.hasLayerTileset(newActiveLayer.type));
-      } else {
-        setHasTileset(false);
-      }
     }
   };
 
@@ -842,10 +813,17 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       setLayers([...currentLayers]); // Create a new array to trigger re-render
       
       // Also update tileset status for the active layer
-      const activeId = editor.getActiveLayerId();
-      const activeLayer = currentLayers.find(layer => layer.id === activeId);
-      if (activeLayer) {
-        setHasTileset(editor.hasLayerTileset(activeLayer.type));
+    }
+  };
+
+  const handleLayerTransparencyChange = (layerId: number, delta: number) => {
+    if (editor) {
+      const layer = layers.find(l => l.id === layerId);
+      if (layer) {
+        const currentTransparency = layer.transparency || 0;
+        const newTransparency = Math.max(0, Math.min(1, currentTransparency + delta));
+        editor.setLayerTransparency(layerId, newTransparency);
+        updateLayersList(); // Update UI to reflect changes
       }
     }
   };
@@ -969,7 +947,6 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       setupAutoSave(newEditor);
       setEditor(newEditor);
       updateLayersList();
-      setHasTileset(false); // Reset tileset state
     }
   };
 
@@ -1328,22 +1305,6 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 )}
               </div>
               
-              {!hasTileset && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="bg-gray-100 rounded-lg shadow-lg border p-6 mx-4 my-4 relative max-w-sm">
-                    {/* Content */}
-                    <div className="text-center">
-                      <div className="flex items-center justify-center mb-3">
-                        <Upload className="w-10 h-10 text-gray-500" />
-                      </div>
-                      <h3 className="text-sm font-semibold text-gray-800 mb-2">No Tileset Imported</h3>
-                      <p className="text-xs text-gray-600 leading-relaxed">
-                        Import your tileset and start to paint map in the selected layer.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
             
             <p className="text-xs text-muted-foreground mt-2">Active GID: <span id="activeGid">{activeGid}</span></p>
@@ -1386,9 +1347,34 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                           size="sm"
                           className="w-6 h-6 p-0 hover:bg-gray-200"
                           onMouseEnter={(e) => {
-                            showTooltipWithDelay('🖱️ Change transparency of the layer', e.currentTarget);
+                            const transparencyPercent = Math.round((layer.transparency || 0) * 100);
+                            showTooltipWithDelay(
+                              <div className="flex items-center gap-1">
+                                <Mouse className="w-3 h-3" />
+                                Transparency ({transparencyPercent}%)
+                              </div>,
+                              e.currentTarget
+                            );
                           }}
                           onMouseLeave={hideTooltip}
+                          onWheel={(e) => {
+                            e.preventDefault();
+                            const delta = e.deltaY > 0 ? 0.1 : -0.1; // 10% steps
+                            const currentTransparency = layer.transparency || 0;
+                            const newTransparency = Math.max(0, Math.min(1, currentTransparency + delta));
+                            
+                            handleLayerTransparencyChange(layer.id, delta);
+                            
+                            // Update tooltip with new value immediately
+                            const newPercent = Math.round(newTransparency * 100);
+                            showTooltipWithDelay(
+                              <div className="flex items-center gap-1">
+                                <Mouse className="w-3 h-3" />
+                                Transparency ({newPercent}%)
+                              </div>,
+                              e.currentTarget
+                            );
+                          }}
                         >
                           <Blend className="w-3 h-3" />
                         </Button>
@@ -2046,7 +2032,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             top: tooltip.y,
           }}
         >
-          {tooltip.text}
+          {tooltip.content}
         </div>
       )}
         </div>

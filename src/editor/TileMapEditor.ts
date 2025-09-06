@@ -3326,7 +3326,7 @@ export class TileMapEditor {
   private clearTilePalette(): void {
     const container = document.getElementById('tilesContainer');
     if (container) {
-      container.innerHTML = '<p class="text-sm text-gray-500">No tileset loaded for this layer type</p>';
+      container.innerHTML = '';
     }
   }
 

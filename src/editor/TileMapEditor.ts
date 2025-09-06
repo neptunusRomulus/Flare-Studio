@@ -44,10 +44,12 @@ export class TileMapEditor {
   }
 
   // Get detected tiles for a specific layer (for per-layer save/load)
-  public getDetectedTilesForLayer(_layerType: string): Array<[number, { sourceX: number; sourceY: number; width: number; height: number }]> {
-    // For now, return all detected tiles since we haven't implemented per-layer tile detection yet
-    // In the future, this could filter tiles based on which layer they're actually used in
-    return Array.from(this.detectedTileData.entries());
+  public getDetectedTilesForLayer(layerType: string): Array<[number, { sourceX: number; sourceY: number; width: number; height: number }]> {
+    const layerTiles = this.layerTileData.get(layerType);
+    if (layerTiles) {
+      return Array.from(layerTiles.entries());
+    }
+    return [];
   }
 
   // Brush management methods
@@ -344,6 +346,14 @@ export class TileMapEditor {
     rows: number;
     count: number;
   }> = new Map();
+  
+  // Per-layer detected tile data
+  private layerTileData: Map<string, Map<number, {
+    sourceX: number;
+    sourceY: number;
+    width: number;
+    height: number;
+  }>> = new Map();
   
   // Legacy tileset management (for backward compatibility)
   private tilesets: TilesetInfo[] = [];
@@ -1475,6 +1485,17 @@ export class TileMapEditor {
         });
         return tile;
       });
+      
+      // Also store the detected tiles in the current layer's data
+      const activeLayer = this.tileLayers.find(l => l.id === this.activeLayerId);
+      if (activeLayer) {
+        const layerTileMap = new Map<number, { sourceX: number; sourceY: number; width: number; height: number }>();
+        for (const [gid, data] of this.detectedTileData.entries()) {
+          layerTileMap.set(gid, data);
+        }
+        this.layerTileData.set(activeLayer.type, layerTileMap);
+        console.log(`Stored ${layerTileMap.size} newly detected tiles for layer type: ${activeLayer.type}`);
+      }
     }
     
     let validTileIndex = 0;
@@ -3186,6 +3207,16 @@ export class TileMapEditor {
       this.tilesetColumns = tileset.columns;
       this.tilesetRows = tileset.rows;
       this.tileCount = tileset.count;
+      
+      // Update the global detectedTileData to match this layer's tiles
+      const layerTiles = this.layerTileData.get(layerType);
+      this.detectedTileData.clear();
+      if (layerTiles) {
+        for (const [gid, data] of layerTiles.entries()) {
+          this.detectedTileData.set(gid, data);
+        }
+      }
+      
       this.createTilePalette();
     } else {
       // Clear current tileset if no tileset for this layer type
@@ -3194,6 +3225,7 @@ export class TileMapEditor {
       this.tilesetColumns = 0;
       this.tilesetRows = 0;
       this.tileCount = 0;
+      this.detectedTileData.clear();
       this.clearTilePalette();
     }
   }
@@ -3817,6 +3849,9 @@ export class TileMapEditor {
       if (projectData.tilesets && Array.isArray(projectData.tilesets)) {
         console.log('Loading tilesets:', projectData.tilesets.length);
         
+        let loadedCount = 0;
+        const totalTilesets = projectData.tilesets.length;
+        
         for (const tilesetData of projectData.tilesets) {
           if (tilesetData.fileName && projectData.tilesetImages && projectData.tilesetImages[tilesetData.fileName]) {
             const dataURL = projectData.tilesetImages[tilesetData.fileName];
@@ -3835,7 +3870,7 @@ export class TileMapEditor {
               };
               
               if (tilesetData.layerType) {
-                // Per-layer tileset
+                // Per-layer tileset - store in the correct layer
                 this.layerTilesets.set(tilesetData.layerType, tilesetInfo);
                 console.log(`Set tileset for layer type ${tilesetData.layerType}`);
               } else {
@@ -3859,24 +3894,54 @@ export class TileMapEditor {
                 console.log(`Restoring ${tilesetData.detectedTiles.length} detected tiles for ${tilesetData.layerType || 'legacy'}`);
                 
                 if (tilesetData.layerType) {
-                  // For now, we'll still use the global detectedTileData since we haven't fully separated per-layer tiles
-                  // In the future, we could have per-layer tile data maps
+                  // Store tiles specifically for this layer type
+                  const layerTileMap = new Map<number, { sourceX: number; sourceY: number; width: number; height: number }>();
                   for (const [gid, data] of tilesetData.detectedTiles) {
-                    this.detectedTileData.set(gid, data);
+                    layerTileMap.set(gid, data);
                   }
+                  this.layerTileData.set(tilesetData.layerType, layerTileMap);
+                  console.log(`Stored ${layerTileMap.size} tiles for layer type: ${tilesetData.layerType}`);
                 } else {
-                  // Legacy detected tiles
+                  // Legacy detected tiles - store in global and current active layer
                   this.detectedTileData.clear();
                   for (const [gid, data] of tilesetData.detectedTiles) {
                     this.detectedTileData.set(gid, data);
                   }
+                  
+                  // Also store in the active layer's tile data
+                  const activeLayer = this.tileLayers.find(l => l.id === this.activeLayerId);
+                  if (activeLayer) {
+                    const layerTileMap = new Map<number, { sourceX: number; sourceY: number; width: number; height: number }>();
+                    for (const [gid, data] of tilesetData.detectedTiles) {
+                      layerTileMap.set(gid, data);
+                    }
+                    this.layerTileData.set(activeLayer.type, layerTileMap);
+                  }
                 }
               }
               
-              // Create tile palette for the current tileset
-              this.createTilePalette(true);
+              // Check if all tilesets are loaded
+              loadedCount++;
+              if (loadedCount === totalTilesets) {
+                console.log('All tilesets loaded, updating UI for active layer');
+                // Update the current tileset UI to show the active layer's tileset
+                const activeLayer = this.tileLayers.find(l => l.id === this.activeLayerId);
+                if (activeLayer) {
+                  this.updateCurrentTileset(activeLayer.type);
+                }
+              }
             };
             img.src = dataURL;
+          } else {
+            // No image data for this tileset, still count it as "loaded"
+            loadedCount++;
+            if (loadedCount === totalTilesets) {
+              console.log('All tilesets processed, updating UI for active layer');
+              const activeLayer = this.tileLayers.find(l => l.id === this.activeLayerId);
+              if (activeLayer) {
+                this.updateCurrentTileset(activeLayer.type);
+              }
+            }
           }
         }
       }
@@ -3963,18 +4028,33 @@ export class TileMapEditor {
             rows: this.tilesetRows,
             count: this.tileCount
           });
+          
+          // Check if this layer already has saved tile data
+          const hasLayerTileData = this.layerTileData.has(activeLayer.type);
+          console.log(`Layer ${activeLayer.type} has existing tile data:`, hasLayerTileData);
+          
+          if (!hasLayerTileData) {
+            // Clear the global detected tile data for fresh detection
+            this.detectedTileData.clear();
+          } else {
+            // Load the existing tile data for this layer into global scope
+            const layerTiles = this.layerTileData.get(activeLayer.type);
+            this.detectedTileData.clear();
+            if (layerTiles) {
+              for (const [gid, data] of layerTiles.entries()) {
+                this.detectedTileData.set(gid, data);
+              }
+            }
+          }
         } else {
           console.log('No active layer found, storing as global tileset');
         }
         
-        // Preserve existing detected tile mapping if it was loaded from project data
-        const hasSavedBrushMapping = this.detectedTileData.size > 0;
-        if (!hasSavedBrushMapping) {
-          // Clear previous detection data only when we don't have a saved mapping
-          this.detectedTileData.clear();
-        }
+        // Preserve existing detected tile mapping if it was loaded from project data  
+        const hasLayerTileData = activeLayer ? this.layerTileData.has(activeLayer.type) : false;
+        
         // Create the tile palette (preserve order if mapping exists)
-        this.createTilePalette(hasSavedBrushMapping);
+        this.createTilePalette(hasLayerTileData);
         
         console.log('Tile detection completed, detected tiles:', this.detectedTileData.size);
         

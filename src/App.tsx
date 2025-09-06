@@ -661,48 +661,10 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         }
       }
 
-      // Load tileset data from mapConfig
-      console.log('=== LOADING TILESETS FROM CONFIG ===');
-      console.log('Available tilesets in config:', mapConfig.tilesets);
-      console.log('Available tileset images:', Object.keys(mapConfig.tilesetImages || {}));
-
-      // Process each tileset from the config
-      if (mapConfig.tilesets && Array.isArray(mapConfig.tilesets)) {
-        for (const tileset of mapConfig.tilesets) {
-          console.log('Processing tileset:', {
-            fileName: tileset.fileName,
-            name: tileset.name,
-            detectedTiles: tileset.detectedTiles ? tileset.detectedTiles.length : 0
-          });
-
-          // Try to find the tileset image data
-          if (tileset.fileName && mapConfig.tilesetImages && mapConfig.tilesetImages[tileset.fileName]) {
-            console.log('Found tileset image data for:', tileset.fileName);
-            console.log('Tileset filename:', tileset.fileName);
-            console.log('Image data length:', mapConfig.tilesetImages[tileset.fileName].length);
-            
-            try {
-              await newEditor.loadTilesetFromDataURL(mapConfig.tilesetImages[tileset.fileName], tileset.fileName);
-              console.log('Successfully loaded tileset from data URL');
-              
-              // Load detected tile data if available
-              if (tileset.detectedTiles && Array.isArray(tileset.detectedTiles)) {
-                console.log('Loading detected tiles:', tileset.detectedTiles.length);
-                // The detectedTileData is already loaded via the main loadProjectData call
-                // Just log for now since the tileset data structure is handled internally
-                console.log('Detected tiles will be preserved from project data');
-              }
-              
-            } catch (tilesetError) {
-              console.error('Failed to load tileset from data URL:', tilesetError);
-            }
-          } else {
-            console.log('No image data found for tileset:', tileset.fileName);
-            console.log('Available image keys:', Object.keys(mapConfig.tilesetImages || {}));
-          }
-        }
-      }
-
+      // Load the complete project data into the editor
+      console.log('=== CALLING EDITOR loadProjectData ===');
+      newEditor.loadProjectData(mapConfig);
+      
       console.log('Project data loading completed');
       return true;
     } catch (error) {
@@ -739,15 +701,26 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           console.log('Active layer after loadProjectData:', newEditor.getActiveLayerId());
           console.log('Layers after loadProjectData:', newEditor.getLayers().map(l => ({ id: l.id, name: l.name, type: l.type })));
 
-          // Discover and assign tilesets
+          // Discover and assign tilesets - only for projects without per-layer tileset data
           if (window.electronAPI?.discoverTilesetImages && projectPath) {
             console.log('Calling discoverTilesetImages for path:', projectPath);
             const found = await window.electronAPI.discoverTilesetImages(projectPath);
             
             const images = found?.tilesetImages || {};
             const imageKeys = Object.keys(images);
-
-            if (imageKeys.length > 0) {
+            
+            // Check if the project already has per-layer tilesets loaded
+            const mapConfigWithTilesets = pendingMapConfig as { tilesets?: Array<{ layerType?: string }> };
+            const hasPerLayerTilesets = mapConfigWithTilesets.tilesets && 
+              Array.isArray(mapConfigWithTilesets.tilesets) && 
+              mapConfigWithTilesets.tilesets.some((ts) => ts.layerType);
+            
+            console.log('Has per-layer tilesets in project:', hasPerLayerTilesets);
+            console.log('Available discovered images:', imageKeys);
+            
+            // Only use fallback tileset assignment if no per-layer tilesets exist
+            if (!hasPerLayerTilesets && imageKeys.length > 0) {
+              console.log('No per-layer tilesets found, using fallback assignment');
               const normalize = (s: string) => (s || '')
                 .toLowerCase()
                 .replace(/\.[^/.]+$/, '') // drop extension
@@ -808,6 +781,11 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 // Trigger auto-save to preserve imported tilesets
                 newEditor.forceSave();
               }
+            } else {
+              console.log('Per-layer tilesets already loaded, skipping fallback assignment');
+              // Just update UI state based on what was loaded
+              setHasTileset(newEditor.getTileCount() > 0);
+              setTileCount(newEditor.getTileCount());
             }
           }
 

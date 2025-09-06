@@ -1,8 +1,7 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Sliders, MapPin, Save, ArrowUpDown, Link2, Scissors, Trash2, Check } from 'lucide-react';
+import { Upload, Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Blend, MapPin, Save, ArrowUpDown, Link2, Scissors, Trash2, Check } from 'lucide-react';
 import { TileMapEditor } from './editor/TileMapEditor';
 import { TileLayer } from './types';
 import { useToast } from '@/hooks/use-toast';
@@ -18,7 +17,6 @@ interface MapConfig {
 }
 
 function App() {
-  const [tileCount, setTileCount] = useState(0);
   const [showWelcome, setShowWelcome] = useState(true);
   const [editor, setEditor] = useState<TileMapEditor | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -32,7 +30,6 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showTooltip, setShowTooltip] = useState(true);
   const [hasTileset, setHasTileset] = useState(false);
-  const [showEmptyTilesetTooltip, setShowEmptyTilesetTooltip] = useState(true);
   const [pendingMapConfig, setPendingMapConfig] = useState<MapConfig | null>(null);
   
   // Toolbar states
@@ -92,10 +89,6 @@ function App() {
   const brushOptionsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const selectionOptionsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const shapeOptionsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
-  // Transparency states
-  const [showTransparencySlider, setShowTransparencySlider] = useState<number | null>(null);
-  const [layerTransparencies, setLayerTransparencies] = useState<{[key: number]: number}>({});
   
   // Hover coordinates state
   const [hoverCoords, setHoverCoords] = useState<{ x: number; y: number } | null>(null);
@@ -162,16 +155,8 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       // Do NOT call loadFromLocalStorage() here - let the user manually load if needed
       setupAutoSave(tileEditor);
       setEditor(tileEditor);
-      setTileCount(tileEditor.getTileCount());
     }
   }, [showWelcome, editor, setupAutoSave, isOpeningProject]);
-
-  // Update tileCount when tileset changes
-  useEffect(() => {
-    if (editor) {
-      setTileCount(editor.getTileCount());
-    }
-  }, [editor, hasTileset, layers]);
 
   // Track hover coordinates
   useEffect(() => {
@@ -273,17 +258,6 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       setLayers([...currentLayers]); // Create a new array to ensure React detects changes
       const activeId = editor.getActiveLayerId();
       setActiveLayerId(activeId);
-      
-      // Initialize transparency values for new layers
-      setLayerTransparencies(prev => {
-        const newTransparencies = { ...prev };
-        currentLayers.forEach(layer => {
-          if (!(layer.id in newTransparencies)) {
-            newTransparencies[layer.id] = Math.round((layer.transparency || 1.0) * 100);
-          }
-        });
-        return newTransparencies;
-      });
       
       // Check if active layer has a tileset
       const activeLayer = currentLayers.find(layer => layer.id === activeId);
@@ -777,15 +751,19 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
 
               if (assignedAny) {
                 setHasTileset(true);
-                setTileCount(newEditor.getTileCount());
                 // Trigger auto-save to preserve imported tilesets
                 newEditor.forceSave();
               }
             } else {
               console.log('Per-layer tilesets already loaded, skipping fallback assignment');
               // Just update UI state based on what was loaded
-              setHasTileset(newEditor.getTileCount() > 0);
-              setTileCount(newEditor.getTileCount());
+              const activeLayerId = newEditor.getActiveLayerId();
+              const activeLayer = newEditor.getLayers().find(l => l.id === activeLayerId);
+              if (activeLayer) {
+                setHasTileset(newEditor.hasLayerTileset(activeLayer.type));
+              } else {
+                setHasTileset(false);
+              }
             }
           }
 
@@ -796,11 +774,15 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           // Update layers list and UI state after everything is loaded
           setTimeout(() => {
             updateLayersList();
-            // Force UI state update after loading
-            const currentTileCount = newEditor.getTileCount();
-            console.log('Final UI update - tile count:', currentTileCount);
-            setHasTileset(currentTileCount > 0);
-            setTileCount(currentTileCount);
+            // Force UI state update after loading - check current active layer
+            const activeLayerId = newEditor.getActiveLayerId();
+            const activeLayer = newEditor.getLayers().find(l => l.id === activeLayerId);
+            console.log('Final UI update - checking active layer:', activeLayerId, activeLayer?.type);
+            if (activeLayer) {
+              setHasTileset(newEditor.hasLayerTileset(activeLayer.type));
+            } else {
+              setHasTileset(false);
+            }
             
             // Force a final redraw to ensure everything is visible
             newEditor.redraw();
@@ -840,6 +822,15 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     if (editor) {
       editor.setActiveLayer(layerId);
       setActiveLayerId(layerId);
+      
+      // Update hasTileset state based on the new active layer
+      const layers = editor.getLayers();
+      const newActiveLayer = layers.find(layer => layer.id === layerId);
+      if (newActiveLayer) {
+        setHasTileset(editor.hasLayerTileset(newActiveLayer.type));
+      } else {
+        setHasTileset(false);
+      }
     }
   };
 
@@ -856,56 +847,6 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       if (activeLayer) {
         setHasTileset(editor.hasLayerTileset(activeLayer.type));
       }
-    }
-  };
-
-  const handleTransparencyChange = (layerId: number, transparency: number) => {
-    setLayerTransparencies(prev => ({
-      ...prev,
-      [layerId]: transparency
-    }));
-    
-    if (editor) {
-      editor.setLayerTransparency(layerId, transparency / 100);
-    }
-  };
-
-  const handleToggleTransparencySlider = (layerId: number) => {
-    setShowTransparencySlider(prev => prev === layerId ? null : layerId);
-  };
-
-  const handleLayerTypeChange = (layerId: number, newType: 'npc' | 'enemy' | 'event' | 'collision' | 'object' | 'background') => {
-    if (!editor) return;
-
-    // Check if this type already exists in another layer
-    const existingLayer = layers.find(layer => layer.type === newType && layer.id !== layerId);
-    if (existingLayer) {
-      toast({
-        variant: "destructive",
-        title: "Cannot change layer type",
-        description: `A ${newType} layer already exists. Only one layer per type is allowed.`,
-      });
-      return;
-    }
-
-    // Generate appropriate name for the new type
-    const typeNames = {
-      'npc': 'NPC Layer',
-      'enemy': 'Enemy Layer', 
-      'event': 'Event Layer',
-      'collision': 'Collision Layer',
-      'object': 'Object Layer',
-      'background': 'Background Layer'
-    };
-
-    // Update the layer type and name
-    const success = editor.changeLayerType(layerId, newType, typeNames[newType]);
-    if (success) {
-      updateLayersList();
-      toast({
-        title: "Layer type changed",
-        description: `Layer has been changed to ${typeNames[newType]}.`,
-      });
     }
   };
 
@@ -1028,7 +969,6 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       setupAutoSave(newEditor);
       setEditor(newEditor);
       updateLayersList();
-      setTileCount(0); // Reset tile count for new project
       setHasTileset(false); // Reset tileset state
     }
   };
@@ -1388,21 +1328,11 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 )}
               </div>
               
-              {tileCount === 0 && showEmptyTilesetTooltip && (
+              {!hasTileset && (
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="bg-gray-100 rounded-lg shadow-lg border p-6 mx-4 my-4 relative max-w-sm">
-                    {/* Close button */}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="absolute top-2 right-2 w-6 h-6 p-0 hover:bg-gray-200"
-                      onClick={() => setShowEmptyTilesetTooltip(false)}
-                    >
-                      <X className="w-3 h-3" />
-                    </Button>
-                    
                     {/* Content */}
-                    <div className="text-center pt-4">
+                    <div className="text-center">
                       <div className="flex items-center justify-center mb-3">
                         <Upload className="w-10 h-10 text-gray-500" />
                       </div>
@@ -1454,72 +1384,19 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleToggleTransparencySlider(layer.id);
-                          }}
                           className="w-6 h-6 p-0 hover:bg-gray-200"
-                          title="Adjust layer transparency"
+                          onMouseEnter={(e) => {
+                            showTooltipWithDelay('🖱️ Change transparency of the layer', e.currentTarget);
+                          }}
+                          onMouseLeave={hideTooltip}
                         >
-                          <Sliders className="w-3 h-3" />
+                          <Blend className="w-3 h-3" />
                         </Button>
                         
                         <span className="text-sm font-medium">{layer.name}</span>
-                        <span className="text-xs text-gray-500">({layer.type})</span>
                       </div>
                     </div>
                   </div>
-                  
-                  {/* Transparency Slider */}
-                  {showTransparencySlider === layer.id && (
-                    <div className="mt-2 p-3 bg-gray-50 rounded border">
-                      {/* Layer Type Selector */}
-                      <div className="mb-3">
-                        <label className="text-xs font-medium mb-1 block">Layer Type:</label>
-                        <Select
-                          value={layer.type}
-                          onValueChange={(newType: 'npc' | 'enemy' | 'event' | 'collision' | 'object' | 'background') => 
-                            handleLayerTypeChange(layer.id, newType)
-                          }
-                        >
-                          <SelectTrigger className="h-8 text-xs">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="background">Background</SelectItem>
-                            <SelectItem value="object">Object</SelectItem>
-                            <SelectItem value="collision">Collision</SelectItem>
-                            <SelectItem value="event">Event</SelectItem>
-                            <SelectItem value="enemy">Enemy</SelectItem>
-                            <SelectItem value="npc">NPC</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      
-                      {/* Transparency Control */}
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="text-xs font-medium">Transparency:</span>
-                        <span className="text-xs text-gray-600">
-                          {Math.round((layerTransparencies[layer.id] || 100))}%
-                        </span>
-                      </div>
-                      <input
-                        type="range"
-                        min="0"
-                        max="100"
-                        value={layerTransparencies[layer.id] || 100}
-                        onChange={(e) => handleTransparencyChange(layer.id, Number(e.target.value))}
-                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
-                        style={{
-                          background: `linear-gradient(to right, #ea580c 0%, #ea580c ${layerTransparencies[layer.id] || 100}%, #e5e7eb ${layerTransparencies[layer.id] || 100}%, #e5e7eb 100%)`
-                        }}
-                      />
-                      <div className="flex justify-between text-xs text-gray-500 mt-1">
-                        <span>Transparent</span>
-                        <span>Opaque</span>
-                      </div>
-                    </div>
-                  )}
                 </div>
               ))}
             </div>

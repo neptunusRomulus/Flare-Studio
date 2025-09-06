@@ -1640,8 +1640,8 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             
             {/* Hover Coordinates Display */}
             {hoverCoords && (
-              <div className="absolute bottom-4 left-4 z-10 p-2 bg-gray-800/90 backdrop-blur-sm rounded-md border border-gray-600 text-white text-xs font-mono flex items-center gap-2">
-                <MapPin className="w-4 h-4 text-gray-300" />
+              <div className="absolute bottom-4 left-4 z-10 p-2 bg-white/90 backdrop-blur-sm rounded-md border border-gray-200 text-gray-800 text-xs font-mono flex items-center gap-2 shadow-sm">
+                <MapPin className="w-4 h-4 text-gray-500" />
                 <span>{hoverCoords.x}, {hoverCoords.y}</span>
               </div>
             )}

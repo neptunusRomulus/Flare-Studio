@@ -1497,6 +1497,37 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 </div>
 
                 <div>
+                  <label className="block text-sm font-medium mb-2">Debug Mode</label>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">Disabled</span>
+                    <button
+                      onClick={() => {
+                        if (editor) {
+                          editor.toggleDebugMode();
+                        }
+                      }}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        editor?.getDebugMode() ? 'bg-orange-600' : 'bg-gray-200'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          editor?.getDebugMode() ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                      <span className="sr-only">Toggle debug mode</span>
+                    </button>
+                    <span className="text-sm flex items-center gap-1">
+                      <Target className="w-4 h-4" />
+                      Debug Tiles
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Shows tile boundaries and coordinates for debugging
+                  </p>
+                </div>
+
+                <div>
                   <label className="block text-sm font-medium mb-2">Auto-Save</label>
                   <div className="flex items-center justify-between">
                     <span className="text-sm">Disabled</span>

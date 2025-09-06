@@ -1205,8 +1205,8 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           <section className="mb-6">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-lg font-semibold">Tileset</h2>
-              <Button variant="outline" size="sm" className="relative">
-                <Upload className="w-4 h-4 mr-2" />
+              <Button variant="outline" size="sm" className="relative bg-orange-500 hover:bg-orange-600 text-white border-orange-500 hover:border-orange-600 h-6 text-xs px-2 shadow-sm">
+                <Upload className="w-3 h-3 mr-1" />
                 Import Tileset
                 <input
                   type="file"
@@ -1232,7 +1232,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                   <Button
                     variant={brushTool === 'move' ? 'default' : 'outline'}
                     size="sm"
-                    className="text-xs px-2 py-1 h-7"
+                    className="text-xs px-1 py-1 h-6 shadow-sm"
                     onClick={() => setBrushTool(brushTool === 'move' ? 'none' : 'move')}
                     title="Move/Reorder brushes"
                   >
@@ -1241,7 +1241,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                   <Button
                     variant={brushTool === 'merge' ? 'default' : 'outline'}
                     size="sm"
-                    className="text-xs px-2 py-1 h-7"
+                    className="text-xs px-1 py-1 h-6 shadow-sm"
                     onClick={() => setBrushTool(brushTool === 'merge' ? 'none' : 'merge')}
                     title="Merge brushes"
                   >
@@ -1250,7 +1250,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                   <Button
                     variant={brushTool === 'separate' ? 'default' : 'outline'}
                     size="sm"
-                    className="text-xs px-2 py-1 h-7"
+                    className="text-xs px-1 py-1 h-6 shadow-sm"
                     onClick={() => setBrushTool(brushTool === 'separate' ? 'none' : 'separate')}
                     title="Separate brushes"
                   >
@@ -1259,7 +1259,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                   <Button
                     variant={brushTool === 'remove' ? 'default' : 'outline'}
                     size="sm"
-                    className="text-xs px-2 py-1 h-7"
+                    className="text-xs px-1 py-1 h-6 shadow-sm"
                     onClick={() => setBrushTool(brushTool === 'remove' ? 'none' : 'remove')}
                     title="Remove brushes"
                   >
@@ -1268,7 +1268,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                   <Button
                     variant="outline"
                     size="sm"
-                    className="text-xs px-2 py-1 h-7 border-red-500 hover:border-red-600 hover:bg-red-50"
+                    className="text-xs px-1 py-1 h-6 border-red-500 hover:border-red-600 hover:bg-red-50 shadow-sm"
                     onClick={() => {
                       if (editor) {
                         if (window.confirm('Are you sure you want to remove the tileset for this layer? This will clear the tileset but keep any placed tiles.')) {
@@ -2294,16 +2294,16 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           <Button 
             onClick={handleExportMap} 
             title="Export Flare map.txt and tileset definition"
-            className="shadow-lg flex items-center gap-2 px-4 py-2"
+            className="shadow-sm flex items-center gap-1 px-3 py-1 h-7 text-xs"
             size="sm"
           >
-            <Download className="w-4 h-4" />
+            <Download className="w-3 h-3" />
             <span>Export Map</span>
           </Button>
           <Button 
             onClick={handleManualSave}
             title={hasUnsavedChanges ? "Save changes" : "All changes saved"}
-            className={`w-10 h-10 p-0 shadow-lg transition-colors ${
+            className={`w-7 h-7 p-0 shadow-sm transition-colors ${
               isManuallySaving 
                 ? 'bg-blue-500 hover:bg-blue-600' 
                 : hasUnsavedChanges 
@@ -2314,28 +2314,28 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             size="sm"
           >
             {isManuallySaving ? (
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
             ) : (
-              <Save className="w-4 h-4" />
+              <Save className="w-3 h-3" />
             )}
           </Button>
           <Button 
             onClick={() => setShowHelp(true)} 
             title="Help & Documentation"
-            className="w-10 h-10 p-0 shadow-lg"
+            className="w-7 h-7 p-0 shadow-sm"
             variant="outline"
             size="sm"
           >
-            <HelpCircle className="w-4 h-4" />
+            <HelpCircle className="w-3 h-3" />
           </Button>
           <Button 
             onClick={() => setShowSettings(true)} 
             title="Map Settings"
-            className="w-10 h-10 p-0 shadow-lg"
+            className="w-7 h-7 p-0 shadow-sm"
             variant="outline"
             size="sm"
           >
-            <Settings className="w-4 h-4" />
+            <Settings className="w-3 h-3" />
           </Button>
         </div>
       </div>

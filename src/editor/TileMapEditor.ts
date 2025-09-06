@@ -337,6 +337,7 @@ export class TileMapEditor {
   private ctx!: CanvasRenderingContext2D;
   private mapCanvas: HTMLCanvasElement;
   private showMinimap: boolean = true;
+  private isDarkMode: boolean = false;
 
   // State variables
   private mapWidth: number = 20;
@@ -1127,7 +1128,8 @@ export class TileMapEditor {
   }
 
   private drawGrid(): void {
-    this.ctx.strokeStyle = '#999'; // Make grid more visible with darker color
+    // Use different grid colors based on dark mode
+    this.ctx.strokeStyle = this.isDarkMode ? '#666' : '#999';
     this.ctx.lineWidth = Math.max(1, Math.min(3, 2 / this.zoom)); // Make lines more visible
     this.ctx.globalAlpha = 0.8; // Slightly transparent
     
@@ -1460,15 +1462,15 @@ export class TileMapEditor {
     // Save current context state
     this.ctx.save();
 
-    // Draw minimap background
-    this.ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    // Draw minimap background - adapt to dark mode
+    this.ctx.fillStyle = this.isDarkMode ? 'rgba(42, 42, 42, 0.9)' : 'rgba(0, 0, 0, 0.7)';
     this.ctx.fillRect(x - 5, y - 5, minimapWidth + 10, minimapHeight + 10);
 
-    this.ctx.fillStyle = '#f0f0f0';
+    this.ctx.fillStyle = this.isDarkMode ? '#2a2a2a' : '#f0f0f0';
     this.ctx.fillRect(x, y, minimapWidth, minimapHeight);
 
-    // Draw border
-    this.ctx.strokeStyle = '#333';
+    // Draw border - light gray in dark mode, dark gray in light mode
+    this.ctx.strokeStyle = this.isDarkMode ? '#999' : '#333';
     this.ctx.lineWidth = 1;
     this.ctx.strokeRect(x, y, minimapWidth, minimapHeight);
 
@@ -3573,6 +3575,11 @@ export class TileMapEditor {
       clearTimeout(this.autoSaveTimeout);
       this.autoSaveTimeout = null;
     }
+  }
+
+  public setDarkMode(isDark: boolean): void {
+    this.isDarkMode = isDark;
+    this.draw(); // Redraw to apply new grid colors
   }
 
   private markAsChanged(immediate: boolean = false): void {

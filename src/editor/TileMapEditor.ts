@@ -1221,13 +1221,12 @@ export class TileMapEditor {
         this.ctx.strokeStyle = 'rgba(0, 255, 0, 0.5)';
         this.ctx.lineWidth = 1;
         
-        // Calculate where the tile image is actually drawn (matching drawTile logic)
-        const scaledTileX = this.tileSizeX * this.zoom;
-        const scaledTileY = this.tileSizeY * this.zoom;
-        const baseOffsetX = scaledTileX / 2;
-        const baseOffsetY = scaledTileY / 2;
-        const destX = screenPos.x - baseOffsetX;
-        const destY = screenPos.y - baseOffsetY;
+  // Calculate where the tile image is actually drawn (matching drawTile logic)
+  const scaledTileX = this.tileSizeX * this.zoom;
+  const scaledTileY = this.tileSizeY * this.zoom;
+  const groundY = screenPos.y + halfTileY;
+  const destX = screenPos.x - (scaledTileX / 2);
+  const destY = groundY - scaledTileY;
         
         // Draw rectangle showing where the tile image is actually placed
         this.ctx.strokeRect(destX, destY, scaledTileX, scaledTileY);
@@ -1383,21 +1382,21 @@ export class TileMapEditor {
       tileHeight = this.tileSizeY;
     }
     
-    // Use isometric screen coordinates with zoom applied
-    const screenPos = this.mapToScreen(x, y);
-    const scaledTileX = tileWidth * this.zoom;
-    const scaledTileY = tileHeight * this.zoom;
-    
-    // For isometric tiles, adjust positioning based on tile height
-    // Taller tiles (like walls) need to be positioned higher to align with the base
-    const baseOffsetX = scaledTileX / 2;
-    const baseOffsetY = scaledTileY / 2;
-    
-    // Additional offset for tall tiles to align their base with the tile position
-    const heightAdjustment = tileData ? (tileHeight - this.tileSizeY) * this.zoom : 0;
-    
-    const destX = screenPos.x - baseOffsetX;
-    const destY = screenPos.y - baseOffsetY - heightAdjustment;
+  // Use isometric screen coordinates with zoom applied
+  const screenPos = this.mapToScreen(x, y);
+  const scaledTileX = tileWidth * this.zoom;
+  const scaledTileY = tileHeight * this.zoom;
+
+  // Compute ground (base) position for the tile diamond. We want the
+  // bottom-center of the sprite to sit on the tile base (so sprites don't
+  // appear to "float" above the grid lines). screenPos is the diamond
+  // center, so bottom of the diamond is screenPos.y + halfTileY.
+  const halfTileY = (this.tileSizeY / 2) * this.zoom;
+  const groundY = screenPos.y + halfTileY;
+
+  // Draw image so its bottom-center aligns to groundY and center X
+  const destX = screenPos.x - (scaledTileX / 2);
+  const destY = groundY - scaledTileY;
     
     this.ctx.drawImage(
       layerTileset.image,
@@ -1429,21 +1428,21 @@ export class TileMapEditor {
       tileHeight = this.tileSizeY;
     }
     
-    // Use isometric screen coordinates with zoom applied
-    const screenPos = this.mapToScreen(x, y);
-    const scaledTileX = tileWidth * this.zoom;
-    const scaledTileY = tileHeight * this.zoom;
-    
-    // For isometric tiles, adjust positioning based on tile height
-    // Taller tiles (like walls) need to be positioned higher to align with the base
-    const baseOffsetX = scaledTileX / 2;
-    const baseOffsetY = scaledTileY / 2;
-    
-    // Additional offset for tall tiles to align their base with the tile position
-    const heightAdjustment = tileData ? (tileHeight - this.tileSizeY) * this.zoom : 0;
-    
-    const destX = screenPos.x - baseOffsetX;
-    const destY = screenPos.y - baseOffsetY - heightAdjustment;
+  // Use isometric screen coordinates with zoom applied
+  const screenPos = this.mapToScreen(x, y);
+  const scaledTileX = tileWidth * this.zoom;
+  const scaledTileY = tileHeight * this.zoom;
+
+  // Compute ground (base) position for the tile diamond. We want the
+  // bottom-center of the sprite to sit on the tile base (so sprites don't
+  // appear to "float" above the grid lines). screenPos is the diamond
+  // center, so bottom of the diamond is screenPos.y + halfTileY.
+  const halfTileY = (this.tileSizeY / 2) * this.zoom;
+  const groundY = screenPos.y + halfTileY;
+
+  // Draw image so its bottom-center aligns to groundY and center X
+  const destX = screenPos.x - (scaledTileX / 2);
+  const destY = groundY - scaledTileY;
     
     this.ctx.drawImage(
       this.tilesetImage,

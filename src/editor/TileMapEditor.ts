@@ -799,12 +799,20 @@ export class TileMapEditor {
           // Left-click behavior depends on current tool
           switch (this.currentTool) {
             case 'brush':
+              // Don't paint if no tile is selected (activeGid is 0)
+              if (currentLayerActiveGid === 0) {
+                return; // Exit early, don't paint anything
+              }
               newValue = currentLayerActiveGid;
               break;
             case 'eraser':
               newValue = 0;
               break;
             case 'bucket':
+              // Don't bucket fill if no tile is selected (activeGid is 0)
+              if (currentLayerActiveGid === 0) {
+                return; // Exit early, don't paint anything
+              }
               // Bucket fill uses a different approach
               if (currentValue !== currentLayerActiveGid) {
                 this.saveState();
@@ -814,6 +822,10 @@ export class TileMapEditor {
               }
               return; // Exit early for bucket fill
             default:
+              // Don't paint if no tile is selected (activeGid is 0)
+              if (currentLayerActiveGid === 0) {
+                return; // Exit early, don't paint anything
+              }
               newValue = currentLayerActiveGid;
               break;
           }
@@ -822,6 +834,13 @@ export class TileMapEditor {
         // Only save state and apply change if the value is actually changing
         if (currentValue !== newValue) {
           this.saveState();
+          
+          // Debug: Log layer information
+          console.log(`Painting on layer: ${layer.name} (ID: ${layer.id}, Type: ${layer.type})`);
+          console.log(`Position: (${x}, ${y}), Index: ${index}`);
+          console.log(`Current value: ${currentValue}, New value: ${newValue}`);
+          console.log(`Active GID for this layer: ${currentLayerActiveGid}`);
+          
           layer.data[index] = newValue;
           this.markAsChanged();
           this.draw(); // Immediately reflect changes
@@ -1321,7 +1340,11 @@ export class TileMapEditor {
   }
 
   private drawTiles(): void {
-    for (const layer of this.tileLayers) {
+    // Render layers in reverse priority order so higher priority layers appear on top
+    // Background (priority 6) renders first, collision (priority 4) renders later and appears on top
+    const layersReversed = [...this.tileLayers].reverse();
+    
+    for (const layer of layersReversed) {
       if (!layer.visible) continue;
       
       // Get the tileset for this layer type

@@ -1,14 +1,15 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 
-interface TooltipProps {
+export interface TooltipProps {
   content: React.ReactNode;
   side?: 'top' | 'bottom' | 'left' | 'right' | 'auto';
   className?: string;
+  // vertical offset in pixels from the trigger to the tooltip (default 8)
+  offsetY?: number;
   children: React.ReactNode;
 }
-
-export default function Tooltip({ content, side = 'top', className = '', children }: TooltipProps) {
+const Tooltip: React.FC<TooltipProps> = ({ content, side = 'top', className = '', children, offsetY = 8 }: TooltipProps) => {
   // Basic shadcn-like tooltip using Tailwind. Keeps markup simple and local.
   // Note: positioning is handled by the portal-based tooltip rendering below.
 
@@ -35,22 +36,43 @@ export default function Tooltip({ content, side = 'top', className = '', childre
   const [hovered, setHovered] = React.useState(false);
   const [pos, setPos] = React.useState<{ left: number; top: number } | null>(null);
 
+  // Helper to get the offset from props or dataset
+  const getLocalOffset = React.useCallback(() => {
+    let localOffset = offsetY;
+    if (wrapperRef.current) {
+      try {
+        const ds = (wrapperRef.current as HTMLElement).dataset;
+        if (ds && ds.tooltipOffset) {
+          const parsed = parseInt(ds.tooltipOffset, 10);
+          if (!Number.isNaN(parsed)) localOffset = parsed;
+        }
+      } catch (e) {
+        // ignore dataset parsing errors
+      }
+    }
+    return localOffset;
+  }, [offsetY]);
+
   const computeOffset = React.useCallback(() => {
-  if (!wrapperRef.current) return;
-  const trig = wrapperRef.current.getBoundingClientRect();
+    if (!wrapperRef.current) return;
+    const trig = wrapperRef.current.getBoundingClientRect();
+    const localOffset = getLocalOffset();
 
-  // initial center x for tooltip
-  const centerX = trig.left + trig.width / 2;
+    // initial center x for tooltip
+    const centerX = trig.left + trig.width / 2;
 
-  // compute default top depending on side
-  let top = trig.top;
-  if (side === 'top') top = trig.top - 8; // above
-  else if (side === 'bottom' || side === 'auto') top = trig.bottom + 8; // below
-  else top = trig.top + trig.height / 2;
+    // For initial positioning, estimate tooltip height (will be refined later)
+    const estimatedTooltipHeight = 40; // reasonable estimate for single line tooltip
+    
+    // compute default top depending on side
+    let top = trig.top;
+    if (side === 'top') top = trig.top - estimatedTooltipHeight - localOffset; // above
+    else if (side === 'bottom' || side === 'auto') top = trig.bottom + localOffset; // below
+    else top = trig.top + trig.height / 2;
 
-  setPos({ left: centerX, top });
-  // measurement and fine adjustment will run in effect after portal renders
-  }, [side]);
+    setPos({ left: centerX, top });
+    // measurement and fine adjustment will run in effect after portal renders
+  }, [side, getLocalOffset]);
 
   React.useEffect(() => {
     // recompute on resize so the tooltip stays inside when the window changes
@@ -75,6 +97,7 @@ export default function Tooltip({ content, side = 'top', className = '', childre
     if (!hovered || !portalRef.current || !wrapperRef.current) return;
     const portalRect = portalRef.current.getBoundingClientRect();
     const trig = wrapperRef.current.getBoundingClientRect();
+    const localOffset = getLocalOffset();
 
     const halfWidth = portalRect.width / 2;
     let left = trig.left + trig.width / 2;
@@ -84,13 +107,13 @@ export default function Tooltip({ content, side = 'top', className = '', childre
     if (left > maxCenter) left = maxCenter;
 
     // For top/bottom we position the portal with transform translateX(-50%) so left is center
-    let top = trig.top - portalRect.height - 8;
-    if (side === 'bottom' || side === 'auto') top = trig.bottom + 8;
+    let top = trig.top - portalRect.height - localOffset;
+    if (side === 'bottom' || side === 'auto') top = trig.bottom + localOffset;
     // clamp vertical to viewport
     top = Math.max(8, Math.min(window.innerHeight - portalRect.height - 8, top));
 
     setPos({ left, top });
-  }, [hovered, side]);
+  }, [hovered, side, getLocalOffset]);
 
   // Render wrapper and portal tooltip to avoid clipping by overflow parents
   return (
@@ -120,7 +143,7 @@ export default function Tooltip({ content, side = 'top', className = '', childre
         >
           <span
             ref={tooltipRef}
-            className="inline-block bg-gray-900 text-white text-xs px-3 py-1.5 rounded-md shadow-md max-w-[14rem] break-words"
+            className="inline-block bg-black text-white text-xs px-3 py-1.5 rounded-md shadow-md max-w-[18rem] break-words"
             style={{
               display: '-webkit-box',
               WebkitLineClamp: 2,
@@ -131,10 +154,12 @@ export default function Tooltip({ content, side = 'top', className = '', childre
             {content}
           </span>
           {/* arrow */}
-          <span className="absolute left-1/2 -translate-x-1/2 mt-[-6px] w-2 h-2 rotate-45 bg-gray-900" aria-hidden />
+          <span className="absolute left-1/2 -translate-x-1/2 mt-[-6px] w-2 h-2 rotate-45 bg-black" aria-hidden />
         </div>,
         document.body
       )}
     </>
   );
-}
+};
+
+export default Tooltip;

@@ -1366,18 +1366,19 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleToggleLayerVisibility(layer.id);
-                          }}
-                          className="w-4 h-4 p-0 hover:bg-gray-200 dark:hover:bg-gray-700"
-                          title={layer.visible ? "Hide layer" : "Show layer"}
-                        >
-                          {layer.visible ? <Eye className="w-2.5 h-2.5" /> : <EyeOff className="w-2.5 h-2.5 text-gray-400 dark:text-gray-500" />}
-                        </Button>
+                        <Tooltip content={layer.visible ? "Hide layer" : "Show layer"}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleLayerVisibility(layer.id);
+                            }}
+                            className="w-4 h-4 p-0 hover:bg-gray-200 dark:hover:bg-gray-700"
+                          >
+                            {layer.visible ? <Eye className="w-2.5 h-2.5" /> : <EyeOff className="w-2.5 h-2.5 text-gray-400 dark:text-gray-500" />}
+                          </Button>
+                        </Tooltip>
                         
                         <Button
                           variant="ghost"
@@ -1952,7 +1953,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 <ZoomOut className="w-4 h-4" />
               </Button>
             </Tooltip>
-            <Tooltip content="Reset Zoom & Pan" side="bottom">
+            <Tooltip content="Reset View" side="bottom">
               <Button 
                 size="sm" 
                 variant="outline" 
@@ -2340,15 +2341,16 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                               <div className="flex flex-col gap-1">
                                 {stamps.map((stamp) => (
                                   <div key={stamp.id} className="flex items-center gap-1">
-                                    <Button
-                                      variant={selectedStamp === stamp.id ? 'default' : 'ghost'}
-                                      size="sm"
-                                      className="flex-1 text-xs justify-start"
-                                      onClick={() => handleStampSelect(stamp.id)}
-                                      title={`${stamp.name} (${stamp.width}x${stamp.height})`}
-                                    >
-                                      {stamp.name}
-                                    </Button>
+                                    <Tooltip content={`${stamp.name} (${stamp.width}x${stamp.height})`}>
+                                      <Button
+                                        variant={selectedStamp === stamp.id ? 'default' : 'ghost'}
+                                        size="sm"
+                                        className="flex-1 text-xs justify-start"
+                                        onClick={() => handleStampSelect(stamp.id)}
+                                      >
+                                        {stamp.name}
+                                      </Button>
+                                    </Tooltip>
                                     <Tooltip content="Delete stamp">
                                       <Button
                                         variant="ghost"
@@ -2390,8 +2392,9 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       {/* Fixed Export and Settings Buttons at Bottom of Screen */}
       <div className="fixed bottom-4 left-0 w-80 z-40">
         <div className="flex gap-2 justify-center px-4">
-          <Tooltip content="Export Flare map.txt and tileset definition">
+          <Tooltip content="Export the map file and tilesetdef">
             <Button 
+              data-tooltip-offset="20"
               onClick={handleExportMap} 
               className="shadow-sm flex items-center gap-1 px-3 py-1 h-7 text-xs"
               size="sm"
@@ -2402,6 +2405,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           </Tooltip>
           <Tooltip content={hasUnsavedChanges ? 'Save changes' : 'All changes saved'}>
             <Button 
+              data-tooltip-offset="20"
               onClick={handleManualSave}
               className={`w-7 h-7 p-0 shadow-sm transition-colors ${
                 isManuallySaving 
@@ -2422,6 +2426,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           </Tooltip>
           <Tooltip content="Help & Documentation">
             <Button 
+              data-tooltip-offset="20"
               onClick={() => setShowHelp(true)} 
               className="w-7 h-7 p-0 shadow-sm"
               variant="outline"
@@ -2432,6 +2437,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           </Tooltip>
           <Tooltip content="Map Settings">
             <Button 
+              data-tooltip-offset="20"
               onClick={() => setShowSettings(true)} 
               className="w-7 h-7 p-0 shadow-sm"
               variant="outline"

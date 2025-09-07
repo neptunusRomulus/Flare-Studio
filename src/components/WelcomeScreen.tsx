@@ -37,12 +37,44 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
     location: ''
   });
 
-  // Load recent maps from localStorage on component mount
+  // Load recent maps from localStorage on component mount and prune any missing projects (desktop)
   useEffect(() => {
-    const savedRecentMaps = localStorage.getItem('recentMaps');
-    if (savedRecentMaps) {
-      setRecentMaps(JSON.parse(savedRecentMaps));
-    }
+    const loadAndPrune = async () => {
+      const savedRecentMaps = localStorage.getItem('recentMaps');
+      if (!savedRecentMaps) return;
+
+      let maps: RecentMap[] = JSON.parse(savedRecentMaps);
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const api: any = (window as any).electronAPI;
+      if (api && typeof api.checkProjectExists === 'function') {
+        try {
+          const checks = await Promise.all(maps.map(async (m) => {
+            try {
+              const exists = await api.checkProjectExists(m.path);
+              return exists ? m : null;
+            } catch (e) {
+              // If check fails, keep the entry to avoid accidental deletion
+              return m;
+            }
+          }));
+
+          const filtered = checks.filter(Boolean) as RecentMap[];
+          maps = filtered;
+          // Persist pruned list if changed
+          if (filtered.length !== JSON.parse(savedRecentMaps).length) {
+            localStorage.setItem('recentMaps', JSON.stringify(filtered));
+          }
+        } catch (e) {
+          console.warn('Prune recent maps failed:', e);
+        }
+      }
+
+      setRecentMaps(maps);
+    };
+
+    loadAndPrune();
+    // run only on mount
   }, []);
 
   // Load thumbnails for recent maps (try electron API, then file fallback)
@@ -101,6 +133,8 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recentMaps]);
+
+  
 
   // Save recent maps to localStorage
   const saveRecentMaps = (maps: RecentMap[]) => {
@@ -340,7 +374,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
   }
 
   return (
-    <div className={`min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-neutral-900 dark:to-neutral-800 flex flex-col ${isDarkMode ? 'dark' : ''}`}>
+    <div className={`h-screen overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100 dark:from-neutral-900 dark:to-neutral-800 flex flex-col ${isDarkMode ? 'dark' : ''}`}>
       {/* Custom Title Bar */}
       <div className="bg-gray-100 dark:bg-neutral-900 text-orange-600 dark:text-orange-400 flex justify-between items-center px-4 py-1 select-none drag-region border-b border-gray-200 dark:border-neutral-700">
         <div className="text-sm font-medium">Flarism</div> {/* TODO: ADD A SMALL ICON BEFORE THIS TEXT */}
@@ -372,12 +406,15 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
         </div>
       </div>
       
-      <div className="flex flex-1 min-h-0">
-        {/* Left Sidebar - Recent Maps */}
-        <div className="w-80 bg-white dark:bg-neutral-900 border-r border-slate-200 dark:border-neutral-700 p-6">
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Recent Projects</h3>
-            <div className="space-y-2">
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+  {/* Left Sidebar - Recent Maps (scroll confined here) */}
+  <div className="w-80 bg-white dark:bg-neutral-900 border-r border-slate-200 dark:border-neutral-700 p-6 flex flex-col h-full">
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Recent Projects</h3>
+          </div>
+
+          <div className="flex-1 min-h-0 h-full">
+            <div className="space-y-2 overflow-y-auto minimal-scroll px-1 py-1 h-full">
               {recentMaps.map((map) => (
                 <div
                   key={map.id}
@@ -402,15 +439,15 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
                 </div>
               ))}
             </div>
-          </div>
 
-          {recentMaps.length === 0 && (
-            <div className="text-center text-gray-500 dark:text-gray-400 py-8">
-              <Grid3X3 className="w-20 h-20 mx-auto mb-3 text-gray-300 dark:text-gray-600" />
-              <p>No recent project</p>
-              <p className="text-sm">Create your first projet to get started</p>
-            </div>
-          )}
+            {recentMaps.length === 0 && (
+              <div className="text-center text-gray-500 dark:text-gray-400 py-8">
+                <Grid3X3 className="w-20 h-20 mx-auto mb-3 text-gray-300 dark:text-gray-600" />
+                <p>No recent project</p>
+                <p className="text-sm">Create your first projet to get started</p>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Main Content */}

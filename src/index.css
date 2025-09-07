@@ -343,3 +343,27 @@ button:active:not(.no-click-effect) {
 .help-modal::-webkit-scrollbar-corner {
     background: transparent;
 }
+
+/* Minimal modern scrollbar reusable utility */
+.minimal-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(100,100,100,0.35) transparent;
+}
+.minimal-scroll::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+.minimal-scroll::-webkit-scrollbar-track {
+    background: transparent;
+    margin: 6px 0;
+}
+.minimal-scroll::-webkit-scrollbar-thumb {
+    background: rgba(100,100,100,0.35);
+    border-radius: 6px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+}
+.minimal-scroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(100,100,100,0.55);
+}
+.minimal-scroll::-webkit-scrollbar-corner { background: transparent; }

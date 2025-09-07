@@ -1669,29 +1669,32 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         {/* Help Modal */}
         {showHelp && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-background border border-border rounded-lg p-6 w-[800px] max-h-[80vh] overflow-y-auto help-modal">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-2xl font-bold text-foreground">Help & Documentation</h3>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => setShowHelp(false)}
-                  className="w-8 h-8 p-0"
-                >
-                  <X className="w-4 h-4" />
-                </Button>
+            <div className="bg-background border border-border rounded-lg p-0 w-[800px] max-h-[80vh] overflow-y-auto help-modal relative">
+              {/* Modal-local header that stays visible while the modal body scrolls */}
+              <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm border-b border-border py-3 px-4 rounded-t-lg">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Help & Documentation</h3>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowHelp(false)}
+                    className="w-8 h-8 p-0"
+                    aria-label="Close Help"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
-              
-              <div className="space-y-6">
-                {/* Getting Started */}
+
+              <div className="p-6 space-y-6">
                 <section>
-                  <h4 className="text-xl font-semibold mb-3 flex items-center gap-2">
-                    <Target className="w-5 h-5 text-blue-600" />
+                  <h4 className="text-xl font-semibold mb-3 flex items-center gap-2 text-gray-800 dark:text-gray-100">
+                    <Target className="w-5 h-5 text-orange-500" />
                     Getting Started
                   </h4>
-                  <div className="space-y-2 text-foreground">
+                  <div className="space-y-2 text-gray-700 dark:text-gray-400">
                     <p>Welcome to the Isometric Tile Map Editor! This tool allows you to create beautiful isometric tile-based maps.</p>
-                    <ul className="list-disc list-inside space-y-1 ml-4">
+                    <ul className="list-disc list-inside space-y-1 ml-4 text-gray-700 dark:text-gray-400">
                       <li>Start by creating a new map or loading an existing one</li>
                       <li>Import tilesets to begin designing</li>
                       <li>Use layers to organize different elements of your map</li>
@@ -1700,227 +1703,190 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                   </div>
                 </section>
 
-                {/* Map Management */}
                 <section>
                   <h4 className="text-xl font-semibold mb-3 flex items-center gap-2">
-                    <Map className="w-5 h-5 text-green-600" />
+                    <Map className="w-5 h-5 text-orange-500" />
                     Map Management
                   </h4>
                   <div className="space-y-3">
-                    <div className="flex items-start gap-3">
-                      <Save className="w-4 h-4 mt-1 text-blue-500" />
-                      <div>
-                        <h5 className="font-medium">Save/Export</h5>
-                        <p className="text-sm text-gray-600">Save your map as JSON or export as PNG image</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <Upload className="w-4 h-4 mt-1 text-blue-500" />
-                      <div>
-                        <h5 className="font-medium">Load Map</h5>
-                        <p className="text-sm text-gray-600">Load previously saved JSON map files</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-3">
-                      <Settings className="w-4 h-4 mt-1 text-blue-500" />
-                      <div>
-                        <h5 className="font-medium">Map Settings</h5>
-                        <p className="text-sm text-gray-600">Configure map dimensions, tile size, and other properties</p>
-                      </div>
-                    </div>
-                  </div>
-                </section>
-
-                {/* Layers */}
-                <section>
-                  <h4 className="text-xl font-semibold mb-3 flex items-center gap-2">
-                    <ArrowUpDown className="w-5 h-5 text-purple-600" />
-                    Layer System
-                  </h4>
-                  <div className="space-y-3">
-                    <p className="text-foreground">Layers help organize your map content. Each layer can have its own tileset and transparency.</p>
+                    <p className="text-gray-700 dark:text-gray-400">Layers help organize your map content. Each layer can have its own tileset and transparency.</p>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div className="flex items-start gap-3">
-                        <Eye className="w-4 h-4 mt-1 text-green-500" />
+                        <Save className="w-4 h-4 mt-1 text-orange-500" />
                         <div>
-                          <h5 className="font-medium">Visibility Toggle</h5>
-                          <p className="text-sm text-gray-600">Show/hide layers to focus on specific elements</p>
+                          <h5 className="font-medium text-gray-800 dark:text-gray-100">Save/Export</h5>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">Save your map as JSON or export as PNG image</p>
                         </div>
                       </div>
                       <div className="flex items-start gap-3">
-                        <Blend className="w-4 h-4 mt-1 text-orange-500" />
+                        <Upload className="w-4 h-4 mt-1 text-orange-500" />
                         <div>
-                          <h5 className="font-medium">Transparency</h5>
-                          <p className="text-sm text-gray-600">Hover and use mouse wheel to adjust layer opacity</p>
+                          <h5 className="font-medium text-gray-800 dark:text-gray-100">Load Map</h5>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">Load previously saved JSON map files</p>
                         </div>
                       </div>
                       <div className="flex items-start gap-3">
-                        <Link2 className="w-4 h-4 mt-1 text-blue-500" />
+                        <Settings className="w-4 h-4 mt-1 text-orange-500" />
                         <div>
-                          <h5 className="font-medium">Lock/Unlock</h5>
-                          <p className="text-sm text-gray-600">Prevent accidental edits to completed layers</p>
+                          <h5 className="font-medium text-gray-800 dark:text-gray-100">Map Settings</h5>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">Configure map dimensions, tile size, and other properties</p>
                         </div>
                       </div>
                       <div className="flex items-start gap-3">
-                        <Trash2 className="w-4 h-4 mt-1 text-red-500" />
+                        <Link2 className="w-4 h-4 mt-1 text-orange-500" />
                         <div>
-                          <h5 className="font-medium">Clear Layer</h5>
-                          <p className="text-sm text-gray-600">Remove all tiles from the selected layer</p>
+                          <h5 className="font-medium text-gray-800 dark:text-gray-100">Lock/Unlock</h5>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">Prevent accidental edits to completed layers</p>
                         </div>
                       </div>
                     </div>
                   </div>
                 </section>
 
-                {/* Drawing Tools */}
                 <section>
-                  <h4 className="text-xl font-semibold mb-3 flex items-center gap-2">
-                    <Paintbrush2 className="w-5 h-5 text-red-600" />
+                  <h4 className="text-xl font-semibold mb-3 flex items-center gap-2 text-gray-800 dark:text-gray-100">
+                    <Paintbrush2 className="w-5 h-5 text-orange-500" />
                     Drawing Tools
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div className="flex items-start gap-3">
-                      <Paintbrush2 className="w-4 h-4 mt-1 text-blue-500" />
+                      <Paintbrush2 className="w-4 h-4 mt-1 text-orange-500" />
                       <div>
-                        <h5 className="font-medium">Brush Tool</h5>
-                        <p className="text-sm text-gray-600">Paint individual tiles by clicking</p>
+                        <h5 className="font-medium text-gray-800 dark:text-gray-100">Brush Tool</h5>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Paint individual tiles by clicking</p>
                       </div>
                     </div>
                     <div className="flex items-start gap-3">
-                      <PaintBucket className="w-4 h-4 mt-1 text-green-500" />
+                      <PaintBucket className="w-4 h-4 mt-1 text-orange-500" />
                       <div>
-                        <h5 className="font-medium">Bucket Fill</h5>
-                        <p className="text-sm text-gray-600">Fill connected areas with the same tile</p>
+                        <h5 className="font-medium text-gray-800 dark:text-gray-100">Bucket Fill</h5>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Fill connected areas with the same tile</p>
                       </div>
                     </div>
                     <div className="flex items-start gap-3">
-                      <Eraser className="w-4 h-4 mt-1 text-gray-500" />
+                      <Eraser className="w-4 h-4 mt-1 text-orange-500" />
                       <div>
-                        <h5 className="font-medium">Eraser</h5>
-                        <p className="text-sm text-gray-600">Remove tiles from the map</p>
+                        <h5 className="font-medium text-gray-800 dark:text-gray-100">Eraser</h5>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Remove tiles from the map</p>
                       </div>
                     </div>
                     <div className="flex items-start gap-3">
-                      <Pipette className="w-4 h-4 mt-1 text-purple-500" />
+                      <Pipette className="w-4 h-4 mt-1 text-orange-500" />
                       <div>
-                        <h5 className="font-medium">Eyedropper</h5>
-                        <p className="text-sm text-gray-600">Select a tile from the map to use as brush</p>
+                        <h5 className="font-medium text-gray-800 dark:text-gray-100">Eyedropper</h5>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Select a tile from the map to use as brush</p>
                       </div>
                     </div>
                   </div>
                 </section>
 
-                {/* Tileset Management */}
                 <section>
-                  <h4 className="text-xl font-semibold mb-3 flex items-center gap-2">
-                    <Square className="w-5 h-5 text-indigo-600" />
+                  <h4 className="text-xl font-semibold mb-3 flex items-center gap-2 text-gray-800 dark:text-gray-100">
+                    <Square className="w-5 h-5 text-orange-500" />
                     Tileset Management
                   </h4>
                   <div className="space-y-3">
-                    <p className="text-foreground">Each layer can have its own tileset. Import PNG images to use as tilesets.</p>
+                    <p className="text-gray-700 dark:text-gray-400">Each layer can have its own tileset. Import PNG images to use as tilesets.</p>
                     <div className="space-y-3">
                       <div className="flex items-start gap-3">
-                        <Upload className="w-4 h-4 mt-1 text-blue-500" />
+                        <Upload className="w-4 h-4 mt-1 text-orange-500" />
                         <div>
-                          <h5 className="font-medium">Import Tileset</h5>
-                          <p className="text-sm text-gray-600">Click the upload button for each layer to import a tileset image</p>
+                          <h5 className="font-medium text-gray-800 dark:text-gray-100">Import Tileset</h5>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">Click the upload button for each layer to import a tileset image</p>
                         </div>
                       </div>
                       <div className="flex items-start gap-3">
-                        <X className="w-4 h-4 mt-1 text-red-500" />
+                        <X className="w-4 h-4 mt-1 text-orange-500" />
                         <div>
-                          <h5 className="font-medium">Remove Tileset</h5>
-                          <p className="text-sm text-gray-600">Use the red X button to remove a tileset from a layer</p>
+                          <h5 className="font-medium text-gray-800 dark:text-gray-100">Remove Tileset</h5>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">Use the red X button to remove a tileset from a layer</p>
                         </div>
                       </div>
                     </div>
                   </div>
                 </section>
 
-                {/* Navigation & Viewport */}
                 <section>
-                  <h4 className="text-xl font-semibold mb-3 flex items-center gap-2">
-                    <Move className="w-5 h-5 text-cyan-600" />
+                  <h4 className="text-xl font-semibold mb-3 flex items-center gap-2 text-gray-800 dark:text-gray-100">
+                    <Move className="w-5 h-5 text-orange-500" />
                     Navigation & Viewport
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div className="flex items-start gap-3">
-                      <ZoomIn className="w-4 h-4 mt-1 text-blue-500" />
+                      <ZoomIn className="w-4 h-4 mt-1 text-orange-500" />
                       <div>
-                        <h5 className="font-medium">Zoom Controls</h5>
-                        <p className="text-sm text-gray-600">Use +/- buttons or mouse wheel to zoom in/out</p>
+                        <h5 className="font-medium text-gray-800 dark:text-gray-100">Zoom Controls</h5>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Use +/- buttons or mouse wheel to zoom in/out</p>
                       </div>
                     </div>
                     <div className="flex items-start gap-3">
-                      <Move className="w-4 h-4 mt-1 text-green-500" />
+                      <Move className="w-4 h-4 mt-1 text-orange-500" />
                       <div>
-                        <h5 className="font-medium">Pan View</h5>
-                        <p className="text-sm text-gray-600">Hold and drag the middle mouse button to pan</p>
+                        <h5 className="font-medium text-gray-800 dark:text-gray-100">Pan View</h5>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Hold and drag the middle mouse button to pan</p>
                       </div>
                     </div>
                     <div className="flex items-start gap-3">
-                      <RotateCcw className="w-4 h-4 mt-1 text-purple-500" />
+                      <RotateCcw className="w-4 h-4 mt-1 text-orange-500" />
                       <div>
-                        <h5 className="font-medium">Reset View</h5>
-                        <p className="text-sm text-gray-600">Reset zoom and center the view</p>
+                        <h5 className="font-medium text-gray-800 dark:text-gray-100">Reset View</h5>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Reset zoom and center the view</p>
                       </div>
                     </div>
                     <div className="flex items-start gap-3">
                       <MapPin className="w-4 h-4 mt-1 text-orange-500" />
                       <div>
-                        <h5 className="font-medium">Coordinates</h5>
-                        <p className="text-sm text-gray-600">Hover over the map to see tile coordinates</p>
+                        <h5 className="font-medium text-gray-800 dark:text-gray-100">Coordinates</h5>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">Hover over the map to see tile coordinates</p>
                       </div>
                     </div>
                   </div>
                 </section>
 
-                {/* Keyboard Shortcuts */}
                 <section>
                   <h4 className="text-xl font-semibold mb-3 flex items-center gap-2">
-                    <Target className="w-5 h-5 text-yellow-600" />
+                    <Target className="w-5 h-5 text-orange-500" />
                     Keyboard Shortcuts
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-gray-50 dark:bg-neutral-900 p-4 rounded-lg">
                     <div className="space-y-2">
                       <div className="flex justify-between">
                         <span className="font-mono text-sm bg-gray-200 dark:bg-neutral-800 px-2 py-1 rounded">Ctrl+Z</span>
-                        <span className="text-sm">Undo</span>
+                        <span className="text-sm text-gray-400">Undo</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="font-mono text-sm bg-gray-200 dark:bg-neutral-800 px-2 py-1 rounded">Ctrl+Y</span>
-                        <span className="text-sm">Redo</span>
+                        <span className="text-sm text-gray-400">Redo</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="font-mono text-sm bg-gray-200 dark:bg-neutral-800 px-2 py-1 rounded">Ctrl+S</span>
-                        <span className="text-sm">Save Map</span>
+                        <span className="text-sm text-gray-400">Save Map</span>
                       </div>
                     </div>
                     <div className="space-y-2">
                       <div className="flex justify-between">
                         <span className="font-mono text-sm bg-gray-200 dark:bg-neutral-800 px-2 py-1 rounded">Mouse Wheel</span>
-                        <span className="text-sm">Zoom</span>
+                        <span className="text-sm text-gray-400">Zoom</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="font-mono text-sm bg-gray-200 dark:bg-neutral-800 px-2 py-1 rounded">Middle Click + Drag</span>
-                        <span className="text-sm">Pan</span>
+                        <span className="text-sm text-gray-400">Pan</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="font-mono text-sm bg-gray-200 dark:bg-neutral-800 px-2 py-1 rounded">Hover + Wheel</span>
-                        <span className="text-sm">Layer Transparency</span>
+                        <span className="text-sm text-gray-400">Layer Transparency</span>
                       </div>
                     </div>
                   </div>
                 </section>
 
-                {/* Tips & Best Practices */}
                 <section>
                   <h4 className="text-xl font-semibold mb-3 flex items-center gap-2">
-                    <Wand2 className="w-5 h-5 text-pink-600" />
+                    <Wand2 className="w-5 h-5 text-orange-500" />
                     Tips & Best Practices
                   </h4>
-                  <div className="space-y-2 text-foreground">
-                    <ul className="list-disc list-inside space-y-1 ml-4">
+                  <div className="space-y-2 text-gray-700 dark:text-gray-400">
+                    <ul className="list-disc list-inside space-y-1 ml-4 text-gray-700 dark:text-gray-400">
                       <li>Use separate layers for different map elements (background, objects, decorations)</li>
                       <li>Name your layers descriptively for better organization</li>
                       <li>Lock completed layers to prevent accidental changes</li>
@@ -1932,9 +1898,8 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                   </div>
                 </section>
 
-                {/* Footer */}
                 <div className="pt-4 border-t border-gray-200 text-center">
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
                     Isometric Tile Map Editor - Create beautiful tile-based maps with ease
                   </p>
                 </div>

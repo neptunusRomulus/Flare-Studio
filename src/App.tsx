@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import Tooltip from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Upload, Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Blend, MapPin, Save, ArrowUpDown, Link2, Scissors, Trash2, Check, HelpCircle, Folder } from 'lucide-react';
+import { Upload, Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Blend, MapPin, Save, ArrowUpDown, Link2, Scissors, Trash2, Check, HelpCircle, Folder, Calendar, Zap } from 'lucide-react';
 import { TileMapEditor } from './editor/TileMapEditor';
 import { TileLayer } from './types';
 import { useToast } from '@/hooks/use-toast';
@@ -98,6 +98,12 @@ function App() {
     fadeOut: boolean;
   } | null>(null);
   const tooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  
+  // Object management states
+  const [showObjectDialog, setShowObjectDialog] = useState(false);
+  const [editingObject, setEditingObject] = useState<import('./types').MapObject | null>(null);
+  const [objectMode, setObjectMode] = useState<'select' | 'add-event' | 'add-enemy'>('select');
+  const [objects, setObjects] = useState<import('./types').MapObject[]>([]);
   
   // Tool dropdown timeout refs
   const brushOptionsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -597,6 +603,98 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       console.error('Failed to reorder brush:', error);
     }
   }, [editor]);
+
+  // Object management handlers
+  const handleAddObject = useCallback((objectType: 'event' | 'enemy', x: number, y: number) => {
+    if (!editor) return;
+    
+    const newObject = editor.addMapObject(objectType, x, y, 1, 1);
+    
+    // Update with Flare-specific properties
+    const updates: Partial<import('./types').MapObject> = {
+      category: objectType === 'event' ? 'block' : 'creature',
+    };
+    
+    if (objectType === 'enemy') {
+      updates.level = 1;
+      updates.number = 1;
+      updates.wander_radius = 4;
+    } else {
+      updates.activate = 'on_trigger';
+      updates.hotspot = '0,0,1,1';
+    }
+    
+    editor.updateMapObject(newObject.id, updates);
+    const updatedObjects = editor.getMapObjects();
+    setObjects(updatedObjects);
+  }, [editor]);
+
+  const handleEditObject = useCallback((objectId: number) => {
+    if (!editor) return;
+    
+    const obj = editor.getMapObjects().find((o: import('./types').MapObject) => o.id === objectId);
+    if (obj) {
+      setEditingObject(obj);
+      setShowObjectDialog(true);
+    }
+  }, [editor]);
+
+  const handleUpdateObject = useCallback((updatedObject: import('./types').MapObject) => {
+    if (!editor) return;
+    
+    editor.updateMapObject(updatedObject.id, updatedObject);
+    const updatedObjects = editor.getMapObjects();
+    setObjects(updatedObjects);
+    setEditingObject(null);
+    setShowObjectDialog(false);
+  }, [editor]);
+
+  const handleRemoveObject = useCallback((objectId: number) => {
+    if (!editor) return;
+    
+    editor.removeMapObject(objectId);
+    const updatedObjects = editor.getMapObjects();
+    setObjects(updatedObjects);
+  }, [editor]);
+
+  const refreshObjects = useCallback(() => {
+    if (!editor) return;
+    const currentObjects = editor.getMapObjects();
+    setObjects(currentObjects);
+  }, [editor]);
+
+  // Sync objects with editor
+  useEffect(() => {
+    if (editor) {
+      refreshObjects();
+    }
+  }, [editor, refreshObjects]);
+
+  // Canvas click handler for object placement
+  useEffect(() => {
+    if (!editor || !canvasRef.current) return;
+
+    const handleCanvasClick = (_event: MouseEvent) => {
+      if (objectMode === 'select') return; // Let editor handle selection
+
+      // Use hover coordinates from editor if available
+      const hoverCoords = editor.getHoverCoordinates();
+      
+      if (hoverCoords && (objectMode === 'add-event' || objectMode === 'add-enemy')) {
+        const objectType = objectMode === 'add-event' ? 'event' : 'enemy';
+        handleAddObject(objectType, hoverCoords.x, hoverCoords.y);
+        // Switch back to select mode after placing
+        setObjectMode('select');
+      }
+    };
+
+    const canvas = canvasRef.current;
+    canvas.addEventListener('click', handleCanvasClick);
+
+    return () => {
+      canvas.removeEventListener('click', handleCanvasClick);
+    };
+  }, [editor, objectMode, handleAddObject]);
 
   // Effect to handle brush tool state changes
   useEffect(() => {
@@ -1463,6 +1561,93 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                   </div>
                 </div>
               ))}
+            </div>
+          </section>
+
+          {/* Objects Section */}
+          <section className="mb-4 flex-shrink-0">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-sm font-semibold">Objects</h2>
+              <div className="flex gap-1">
+                <Tooltip content="Add Event">
+                  <Button
+                    variant={objectMode === 'add-event' ? 'default' : 'outline'}
+                    size="sm"
+                    className="text-xs px-1 py-1 h-6 shadow-sm"
+                    onClick={() => setObjectMode(objectMode === 'add-event' ? 'select' : 'add-event')}
+                  >
+                    <Calendar className="w-3 h-3" />
+                  </Button>
+                </Tooltip>
+                <Tooltip content="Add Enemy">
+                  <Button
+                    variant={objectMode === 'add-enemy' ? 'default' : 'outline'}
+                    size="sm"
+                    className="text-xs px-1 py-1 h-6 shadow-sm"
+                    onClick={() => setObjectMode(objectMode === 'add-enemy' ? 'select' : 'add-enemy')}
+                  >
+                    <Zap className="w-3 h-3" />
+                  </Button>
+                </Tooltip>
+              </div>
+            </div>
+            
+            {/* Objects List */}
+            <div className="space-y-0.5 max-h-32 overflow-y-auto">
+              {objects.length === 0 ? (
+                <div className="text-xs text-muted-foreground text-center py-2">
+                  No objects yet. Click + to add events or enemies.
+                </div>
+              ) : (
+                objects.map((obj) => (
+                  <div
+                    key={obj.id}
+                    className="px-2 py-1 border rounded transition-colors text-xs border-border hover:bg-gray-50 dark:hover:bg-gray-800"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1">
+                        {obj.type === 'event' ? (
+                          <Calendar className="w-3 h-3 text-blue-500" />
+                        ) : (
+                          <Zap className="w-3 h-3 text-red-500" />
+                        )}
+                        <span className="text-xs font-medium truncate">
+                          {obj.name || `${obj.type} (${obj.x},${obj.y})`}
+                        </span>
+                      </div>
+                      <div className="flex gap-1">
+                        <Tooltip content="Edit">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditObject(obj.id)}
+                            className="w-4 h-4 p-0 hover:bg-gray-200 dark:hover:bg-gray-700"
+                          >
+                            <Pen className="w-2.5 h-2.5" />
+                          </Button>
+                        </Tooltip>
+                        <Tooltip content="Remove">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveObject(obj.id)}
+                            className="w-4 h-4 p-0 hover:bg-red-200 dark:hover:bg-red-700"
+                          >
+                            <Trash2 className="w-2.5 h-2.5 text-red-500" />
+                          </Button>
+                        </Tooltip>
+                      </div>
+                    </div>
+                    {(obj.category || obj.level) && (
+                      <div className="text-xs text-muted-foreground mt-0.5">
+                        {obj.category}
+                        {obj.level && ` • Level ${obj.level}`}
+                        {obj.number && obj.number > 1 && ` • x${obj.number}`}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
             </div>
           </section>
 
@@ -2492,6 +2677,46 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                   )}
                 </div>
 
+                {/* Object Tools */}
+                <div className="relative">
+                  <Button
+                    variant={objectMode === 'select' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="w-7 h-7 p-1 rounded-full tool-button"
+                    onClick={() => setObjectMode('select')}
+                    onMouseEnter={(e) => showTooltipWithDelay('Select Objects', e.currentTarget)}
+                    onMouseLeave={hideTooltip}
+                  >
+                    <MousePointer className="w-3 h-3" />
+                  </Button>
+                </div>
+
+                <div className="relative">
+                  <Button
+                    variant={objectMode === 'add-event' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="w-7 h-7 p-1 rounded-full tool-button"
+                    onClick={() => setObjectMode('add-event')}
+                    onMouseEnter={(e) => showTooltipWithDelay('Add Event', e.currentTarget)}
+                    onMouseLeave={hideTooltip}
+                  >
+                    <Calendar className="w-3 h-3" />
+                  </Button>
+                </div>
+
+                <div className="relative">
+                  <Button
+                    variant={objectMode === 'add-enemy' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="w-7 h-7 p-1 rounded-full tool-button"
+                    onClick={() => setObjectMode('add-enemy')}
+                    onMouseEnter={(e) => showTooltipWithDelay('Add Enemy', e.currentTarget)}
+                    onMouseLeave={hideTooltip}
+                  >
+                    <Zap className="w-3 h-3" />
+                  </Button>
+                </div>
+
                 {/* Eyedropper Tool */}
                 <Button
                   variant={selectedTool === 'eyedropper' ? 'default' : 'ghost'}
@@ -2526,6 +2751,135 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             </Button>
             <Button onClick={confirmSeparateBrush}>
               Separate
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Object Management Dialog */}
+      <Dialog open={showObjectDialog} onOpenChange={setShowObjectDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {editingObject ? `Edit ${editingObject.type}` : 'Add Object'}
+            </DialogTitle>
+            <DialogDescription>
+              Configure {editingObject?.type || 'object'} properties for Flare engine compatibility.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {editingObject && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Name</label>
+                  <Input
+                    value={editingObject.name || ''}
+                    onChange={(e) => setEditingObject({...editingObject, name: e.target.value})}
+                    placeholder="Object name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Category</label>
+                  <Input
+                    value={editingObject.category || ''}
+                    onChange={(e) => setEditingObject({...editingObject, category: e.target.value})}
+                    placeholder={editingObject.type === 'enemy' ? 'creature' : 'block'}
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">X Position</label>
+                  <Input
+                    type="number"
+                    value={editingObject.x}
+                    onChange={(e) => setEditingObject({...editingObject, x: Number(e.target.value)})}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Y Position</label>
+                  <Input
+                    type="number"
+                    value={editingObject.y}
+                    onChange={(e) => setEditingObject({...editingObject, y: Number(e.target.value)})}
+                  />
+                </div>
+              </div>
+
+              {editingObject.type === 'enemy' && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Level</label>
+                    <Input
+                      type="number"
+                      value={editingObject.level || 1}
+                      onChange={(e) => setEditingObject({...editingObject, level: Number(e.target.value)})}
+                      min="1"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Number</label>
+                    <Input
+                      type="number"
+                      value={editingObject.number || 1}
+                      onChange={(e) => setEditingObject({...editingObject, number: Number(e.target.value)})}
+                      min="1"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {editingObject.type === 'enemy' && (
+                <div>
+                  <label className="block text-sm font-medium mb-1">Wander Radius</label>
+                  <Input
+                    type="number"
+                    value={editingObject.wander_radius || 4}
+                    onChange={(e) => setEditingObject({...editingObject, wander_radius: Number(e.target.value)})}
+                    min="0"
+                  />
+                </div>
+              )}
+
+              {editingObject.type === 'event' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Activate</label>
+                    <Input
+                      value={editingObject.activate || 'on_trigger'}
+                      onChange={(e) => setEditingObject({...editingObject, activate: e.target.value})}
+                      placeholder="on_trigger, on_load, etc."
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Hotspot</label>
+                    <Input
+                      value={editingObject.hotspot || '0,0,1,1'}
+                      onChange={(e) => setEditingObject({...editingObject, hotspot: e.target.value})}
+                      placeholder="x,y,width,height"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Tooltip</label>
+                    <Input
+                      value={editingObject.tooltip || ''}
+                      onChange={(e) => setEditingObject({...editingObject, tooltip: e.target.value})}
+                      placeholder="Hover text"
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowObjectDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={() => editingObject && handleUpdateObject(editingObject)}>
+              Save
             </Button>
           </DialogFooter>
         </DialogContent>

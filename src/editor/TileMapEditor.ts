@@ -543,6 +543,7 @@ export class TileMapEditor {
   // Collision and object management
   private collisionData: number[] = [];
   private objects: MapObject[] = [];
+  private selectedObject: MapObject | null = null;
   private nextObjectId: number = 1;
   private selectedObjectId: number | null = null;
 
@@ -3847,7 +3848,7 @@ export class TileMapEditor {
       return;
     }
 
-    // Generate both the map TXT and tilesetdefs.txt
+    // Generate both the map TXT and tilesetdefs.txt with enhanced Flare compatibility
     const mapTxt = this.generateFlareMapTxt();
     const tilesetDef = this.generateFlareTilesetDef();
 
@@ -3857,7 +3858,11 @@ export class TileMapEditor {
     // Create and download tilesetdefs/tileset.txt
     this.downloadFile(tilesetDef, 'tileset.txt', 'text/plain');
     
-    console.log('Flare map and tileset definition exported successfully!');
+    console.log('Flare-compatible map exported successfully!');
+    console.log('📁 Files exported:');
+    console.log('  • map.txt (place in maps/ folder)');
+    console.log('  • tileset.txt (place in tilesetdefs/ folder)');
+    console.log('🎮 Format: Fully compatible with Flare Engine');
   }
 
   // Silent auto-save export (no alerts, no downloads)
@@ -3896,12 +3901,26 @@ export class TileMapEditor {
     lines.push(`tilewidth=${this.tileSizeX}`);
     lines.push(`tileheight=${this.tileSizeY}`);
     lines.push(`orientation=isometric`);
-    lines.push(`tileset=tileset.txt`);
+    lines.push(`hero_pos=${Math.floor(this.mapWidth/2)},${Math.floor(this.mapHeight/2)}`);
+    lines.push(`music=music/default_theme.ogg`);
+    lines.push(`tileset=tilesetdefs/tileset.txt`);
+    lines.push(`title=${this.tilesetFileName?.replace(/\.[^/.]+$/, '') || 'Untitled Map'}`);
     lines.push('');
     
-    // Export each visible layer
-    for (const layer of this.tileLayers) {
-      if (!layer.visible) continue;
+    // [tilesets] section - Flare format requirement
+    lines.push(`[tilesets]`);
+    if (this.tilesetFileName) {
+      // Main tileset reference with proper format: image,tilewidth,tileheight,offset_x,offset_y
+      lines.push(`tileset=../maps/${this.tilesetFileName},${this.tileSizeX},${this.tileSizeY},0,0`);
+    }
+    lines.push('');
+    
+    // Export layers in Flare-standard order: background -> object -> collision
+    const flareLayerOrder = ['background', 'object', 'collision'];
+    
+    for (const layerType of flareLayerOrder) {
+      const layer = this.tileLayers.find(l => l.type === layerType && l.visible);
+      if (!layer) continue;
       
       lines.push(`[layer]`);
       lines.push(`type=${layer.type}`);
@@ -3919,6 +3938,53 @@ export class TileMapEditor {
       lines.push('');
     }
     
+    // Export [event] sections
+    const events = this.objects.filter(obj => obj.type === 'event');
+    for (const event of events) {
+      lines.push(`[event]`);
+      lines.push(`# ${event.name}`);
+      lines.push(`type=event`);
+      lines.push(`location=${event.x},${event.y},${event.width},${event.height}`);
+      
+      // Add event-specific properties
+      if (event.activate) lines.push(`activate=${event.activate}`);
+      if (event.hotspot) lines.push(`hotspot=${event.hotspot}`);
+      if (event.intermap) lines.push(`intermap=${event.intermap}`);
+      if (event.loot) lines.push(`loot=${event.loot}`);
+      if (event.soundfx) lines.push(`soundfx=${event.soundfx}`);
+      if (event.mapmod) lines.push(`mapmod=${event.mapmod}`);
+      if (event.repeat !== undefined) lines.push(`repeat=${event.repeat}`);
+      if (event.tooltip) lines.push(`tooltip=${event.tooltip}`);
+      
+      // Add any custom properties
+      for (const [key, value] of Object.entries(event.properties)) {
+        lines.push(`${key}=${value}`);
+      }
+      
+      lines.push('');
+    }
+    
+    // Export [enemy] sections
+    const enemies = this.objects.filter(obj => obj.type === 'enemy');
+    for (const enemy of enemies) {
+      lines.push(`[enemy]`);
+      lines.push(`type=enemy`);
+      lines.push(`location=${enemy.x},${enemy.y},${enemy.width},${enemy.height}`);
+      
+      // Add enemy-specific properties
+      if (enemy.category) lines.push(`category=${enemy.category}`);
+      if (enemy.level) lines.push(`level=${enemy.level}`);
+      if (enemy.number) lines.push(`number=${enemy.number}`);
+      if (enemy.wander_radius !== undefined) lines.push(`wander_radius=${enemy.wander_radius}`);
+      
+      // Add any custom properties
+      for (const [key, value] of Object.entries(enemy.properties)) {
+        lines.push(`${key}=${value}`);
+      }
+      
+      lines.push('');
+    }
+    
     return lines.join('\n');
   }
 
@@ -3927,19 +3993,21 @@ export class TileMapEditor {
     
     const lines: string[] = [];
     
-    // Image reference
+    // Image reference - Flare format expects relative path from tilesetdefs folder
     lines.push(`img=../maps/${this.tilesetFileName}`);
     lines.push('');
     
-    // Generate tile definitions
+    // Generate tile definitions with proper Flare format
+    // Format: tile=id,left_x,top_y,width,height,offset_x,offset_y
     for (let i = 0; i < this.tileCount; i++) {
       const id = i + 1; // Start from 1
       const left_x = (i % this.tilesetColumns) * this.tileSizeX;
       const top_y = Math.floor(i / this.tilesetColumns) * this.tileSizeY;
       const width = this.tileSizeX;
       const height = this.tileSizeY;
-      const offset_x = this.tileSizeX / 2;
-      const offset_y = this.tileSizeY / 2;
+      // For isometric tiles, offset is typically half the tile size for proper positioning
+      const offset_x = Math.floor(this.tileSizeX / 2);
+      const offset_y = Math.floor(this.tileSizeY / 2);
       
       lines.push(`tile=${id},${left_x},${top_y},${width},${height},${offset_x},${offset_y}`);
     }
@@ -4382,6 +4450,73 @@ export class TileMapEditor {
       clearTimeout(this.autoSaveTimeout);
     }
     this.performAutoSave();
+  }
+
+  // Object management methods
+  public addMapObject(type: 'event' | 'enemy', x: number, y: number, width: number = 1, height: number = 1): MapObject {
+    const object: MapObject = {
+      id: this.nextObjectId++,
+      name: `${type}_${this.nextObjectId - 1}`,
+      type: type,
+      x: x,
+      y: y,
+      width: width,
+      height: height,
+      properties: {}
+    };
+
+    // Set default properties based on type
+    if (type === 'event') {
+      object.activate = 'on_trigger';
+      object.hotspot = 'location';
+      object.tooltip = 'Event';
+    } else if (type === 'enemy') {
+      object.category = 'enemy';
+      object.level = 1;
+      object.number = 1;
+      object.wander_radius = 4;
+    }
+
+    this.objects.push(object);
+    this.saveState();
+    return object;
+  }
+
+  public removeMapObject(objectId: number): boolean {
+    const index = this.objects.findIndex(obj => obj.id === objectId);
+    if (index >= 0) {
+      this.objects.splice(index, 1);
+      if (this.selectedObject?.id === objectId) {
+        this.selectedObject = null;
+      }
+      this.saveState();
+      return true;
+    }
+    return false;
+  }
+
+  public updateMapObject(objectId: number, updates: Partial<MapObject>): boolean {
+    const object = this.objects.find(obj => obj.id === objectId);
+    if (object) {
+      Object.assign(object, updates);
+      this.saveState();
+      return true;
+    }
+    return false;
+  }
+
+  public getMapObjects(): MapObject[] {
+    return [...this.objects];
+  }
+
+  public selectObject(objectId: number): MapObject | null {
+    const object = this.objects.find(obj => obj.id === objectId);
+    this.selectedObject = object || null;
+    return this.selectedObject;
+  }
+
+  public getSelectedObject(): MapObject | null {
+    return this.selectedObject;
   }
 
   // Reset editor for a new project - clears all data and localStorage

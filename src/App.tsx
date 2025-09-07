@@ -54,6 +54,10 @@ function App() {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [showStampDialog, setShowStampDialog] = useState(false);
   const [newStampName, setNewStampName] = useState('');
+  // Clear layer confirmation dialog state (replaces window.confirm)
+  const [showClearLayerDialog, setShowClearLayerDialog] = useState(false);
+  // Generic confirmation dialog for other destructive actions
+  const [confirmAction, setConfirmAction] = useState<null | { type: 'removeBrush' | 'removeTileset'; payload?: any }>(null);
   
   // Settings states
   const [mapName, setMapName] = useState('Untitled Map');
@@ -517,16 +521,8 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     if (!editor) return;
     
     console.log(`handleRemoveBrush called with brushId: ${brushId}`);
-    const confirmed = window.confirm('Are you sure you want to remove this brush?');
-    if (confirmed) {
-      try {
-        editor.removeBrush(brushId);
-      } catch (error) {
-        console.error('Failed to remove brush:', error);
-      }
-    } else {
-      console.log('Brush removal cancelled by user');
-    }
+  // Open generic confirm dialog
+  setConfirmAction({ type: 'removeBrush', payload: brushId });
   }, [editor]);
 
   const handleBrushReorder = useCallback((fromTileIndex: number, toTileIndex: number) => {
@@ -1283,11 +1279,8 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                     size="sm"
                     className="text-xs px-1 py-1 h-6 border-red-500 hover:border-red-600 hover:bg-red-50 shadow-sm"
                     onClick={() => {
-                      if (editor) {
-                        if (window.confirm('Are you sure you want to remove the tileset for this layer? This will clear the tileset but keep any placed tiles.')) {
-                          editor.removeLayerTileset();
-                        }
-                      }
+                      // Open generic confirm dialog for tileset removal
+                      setConfirmAction({ type: 'removeTileset' });
                     }}
                     title="Remove tileset for current layer"
                   >
@@ -1576,6 +1569,84 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                   className="flex-1"
                 >
                   Apply Changes
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Clear Layer Confirmation Dialog (replaces native confirm) */}
+        {showClearLayerDialog && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-background border border-border rounded-lg p-6 w-80">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold">Clear Layer</h3>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setShowClearLayerDialog(false)}
+                  className="w-8 h-8 p-0"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+              <div className="text-sm text-foreground mb-4">Are you sure you want to clear all tiles from the current layer? This action cannot be undone.</div>
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" onClick={() => setShowClearLayerDialog(false)}>Cancel</Button>
+                <Button
+                  onClick={() => {
+                    if (editor) {
+                      editor.clearLayer();
+                    }
+                    setSelectedBrushTool('brush'); // Reset to brush tool after clearing
+                    setShowClearLayerDialog(false);
+                  }}
+                >
+                  Clear
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Generic Confirmation Dialog for destructive actions */}
+        {confirmAction && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-background border border-border rounded-lg p-6 w-80">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold">Confirm</h3>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setConfirmAction(null)}
+                  className="w-8 h-8 p-0"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+              <div className="text-sm text-foreground mb-4">
+                {confirmAction.type === 'removeBrush' && 'Are you sure you want to remove this brush?'}
+                {confirmAction.type === 'removeTileset' && 'Are you sure you want to remove the tileset for this layer? This will clear the tileset but keep any placed tiles.'}
+              </div>
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" onClick={() => setConfirmAction(null)}>Cancel</Button>
+                <Button
+                  onClick={() => {
+                    try {
+                      if (confirmAction.type === 'removeBrush') {
+                        const brushId = confirmAction.payload as number;
+                        if (editor) editor.removeBrush(brushId);
+                      } else if (confirmAction.type === 'removeTileset') {
+                        if (editor) editor.removeLayerTileset();
+                      }
+                    } catch (error) {
+                      console.error('Confirm action failed:', error);
+                    } finally {
+                      setConfirmAction(null);
+                    }
+                  }}
+                >
+                  Confirm
                 </Button>
               </div>
             </div>
@@ -2069,17 +2140,13 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                     >
                       <Eraser className="w-4 h-4" />
                     </Button>
-                    <Button 
-                      variant={selectedBrushTool === 'clear' ? 'default' : 'ghost'} 
-                      size="sm" 
+                    <Button
+                      variant={selectedBrushTool === 'clear' ? 'default' : 'ghost'}
+                      size="sm"
                       className="w-8 h-8 p-0 sub-tool-button border-red-500 hover:border-red-600 hover:bg-red-50"
                       onClick={() => {
-                        if (editor) {
-                          if (window.confirm('Are you sure you want to clear all tiles from the current layer? This action cannot be undone.')) {
-                            editor.clearLayer();
-                            setSelectedBrushTool('brush'); // Reset to brush tool after clearing
-                          }
-                        }
+                        // Open an inline dialog instead of using window.confirm
+                        setShowClearLayerDialog(true);
                       }}
                       onMouseEnter={(e) => showTooltipWithDelay('Clear Layer', e.currentTarget)}
                       onMouseLeave={hideTooltip}

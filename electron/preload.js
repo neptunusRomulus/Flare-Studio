@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   createMapProject: (config) => ipcRenderer.invoke('create-map-project', config),
   openMapProject: (projectPath) => ipcRenderer.invoke('open-map-project', projectPath),
   saveMapProject: (projectPath, mapData) => ipcRenderer.invoke('save-map-project', projectPath, mapData),
+  saveExportFiles: (projectPath, projectName, mapTxt, tilesetDef) => ipcRenderer.invoke('save-export-files', projectPath, projectName, mapTxt, tilesetDef),
   discoverTilesetImages: (projectPath) => ipcRenderer.invoke('discover-tileset-images', projectPath),
   getProjectThumbnail: (projectPath) => ipcRenderer.invoke('get-project-thumbnail', projectPath),
   checkProjectExists: (projectPath) => ipcRenderer.invoke('check-project-exists', projectPath),

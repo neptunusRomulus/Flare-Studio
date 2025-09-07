@@ -1,8 +1,10 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import Tooltip from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
-import { Upload, Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Blend, MapPin, Save, ArrowUpDown, Link2, Scissors, Trash2, Check, HelpCircle } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Upload, Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Blend, MapPin, Save, ArrowUpDown, Link2, Scissors, Trash2, Check, HelpCircle, Folder } from 'lucide-react';
 import { TileMapEditor } from './editor/TileMapEditor';
 import { TileLayer } from './types';
 import { useToast } from '@/hooks/use-toast';
@@ -47,6 +49,8 @@ function App() {
   // Brush management states
   const [brushTool, setBrushTool] = useState<'none' | 'move' | 'merge' | 'separate' | 'remove'>('none');
   const [selectedBrushes, setSelectedBrushes] = useState<number[]>([]);
+  const [showSeparateDialog, setShowSeparateDialog] = useState(false);
+  const [brushToSeparate, setBrushToSeparate] = useState<number | null>(null);
   
   // Stamp states
   const [stamps, setStamps] = useState<import('./types').Stamp[]>([]);
@@ -79,6 +83,11 @@ function App() {
   // When true, we're in the middle of opening an existing project
   // and should avoid creating a blank editor instance.
   const [isOpeningProject, setIsOpeningProject] = useState(false);
+  
+  // Export loading state
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
+  const [showExportSuccess, setShowExportSuccess] = useState(false);
   
   // Custom tooltip states
   const [tooltip, setTooltip] = useState<{
@@ -543,14 +552,25 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
   }, []);
 
   const handleSeparateBrush = useCallback((brushId: number) => {
-    if (!editor) return;
+    setBrushToSeparate(brushId);
+    setShowSeparateDialog(true);
+  }, []);
+
+  const confirmSeparateBrush = useCallback(() => {
+    if (!editor || brushToSeparate === null) return;
     
     try {
-      editor.separateBrush(brushId);
+      // Call the editor's separate brush method
+      editor.separateBrush(brushToSeparate);
+      console.log(`Separated brush with ID: ${brushToSeparate}`);
     } catch (error) {
       console.error('Failed to separate brush:', error);
     }
-  }, [editor]);
+    
+    setShowSeparateDialog(false);
+    setBrushToSeparate(null);
+    setBrushTool('none'); // Exit separate mode after action
+  }, [editor, brushToSeparate]);
 
   const handleRemoveBrush = useCallback((brushId: number) => {
     if (!editor) return;
@@ -901,9 +921,61 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     }
   };
 
-  const handleExportMap = () => {
-    if (editor?.exportFlareMap) {
-      editor.exportFlareMap();
+  const handleExportMap = async () => {
+    if (!editor || !projectPath) {
+      toast({
+        title: "Export Failed",
+        description: "No project loaded or editor not initialized.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsExporting(true);
+    setExportProgress(0);
+
+    try {
+      // Simulate progress updates
+      setExportProgress(25);
+      
+      // Generate the map and tileset content
+      const mapTxt = editor.generateFlareMapTxt();
+      setExportProgress(50);
+      
+      const tilesetDef = editor.generateFlareTilesetDef();
+      setExportProgress(75);
+      
+      // Save files to project folder using Electron API
+      if (window.electronAPI?.saveExportFiles) {
+        const success = await window.electronAPI.saveExportFiles(projectPath, mapName, mapTxt, tilesetDef);
+        setExportProgress(100);
+        
+        if (success) {
+          // Show success modal after a delay to let the loading bar animation complete
+          setTimeout(() => {
+            setShowExportSuccess(true);
+          }, 1500);
+        } else {
+          throw new Error("Failed to save export files");
+        }
+      } else {
+        // Fallback to original download method if Electron API not available
+        editor.exportFlareMap();
+        setExportProgress(100);
+      }
+    } catch (error) {
+      console.error('Export failed:', error);
+      toast({
+        title: "Export Failed",
+        description: "An error occurred while exporting the map.",
+        variant: "destructive",
+      });
+    } finally {
+      // Reset loading state after a brief delay to show completion
+      setTimeout(() => {
+        setIsExporting(false);
+        setExportProgress(0);
+      }, 1000);
     }
   };
 
@@ -1213,15 +1285,16 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       {/* Main Content */}
       <main className="flex flex-1 min-h-0">
         {/* Left Sidebar */}
-        <aside className="w-80 border-r border-border bg-muted/30 p-4 overflow-y-auto">
-          {/* Tileset Section */}
-          <section className="mb-6">
+        <aside className="w-80 border-r border-border bg-muted/30 p-4 overflow-y-auto flex flex-col">
+          {/* Tileset Brushes Section */}
+          <section className="flex flex-col flex-1">
+            {/* Header with Import Button */}
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-lg font-semibold">Tileset</h2>
+              <h2 className="text-lg font-semibold">Tileset Brushes</h2>
               <Tooltip content="Import a PNG tileset for the active layer" side="bottom">
                 <Button variant="outline" size="sm" className="relative bg-orange-500 hover:bg-orange-600 text-white border-orange-500 hover:border-orange-600 h-6 text-xs px-2 shadow-sm">
                   <Upload className="w-3 h-3 mr-1" />
-                  Import Tileset
+                  Import
                   <input
                     type="file"
                     accept="image/png"
@@ -1231,126 +1304,94 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 </Button>
               </Tooltip>
             </div>
-            <div className="text-sm text-muted-foreground mb-2">
-              <div><span className="font-medium">{activeLayerId ? `${layers.find(l => l.id === activeLayerId)?.type || 'none'} tileset` : 'none tileset'}</span></div>
-            </div>
+            
             <div id="tilesetMeta" className="text-sm text-muted-foreground mb-2"></div>
             
-            {/* Tiles Container with conditional tooltip */}
-            <div className="relative">
-              <div id="tilesContainer" className="tile-palette"></div>
-              
-              {/* Brush Management Tools */}
-              <div className="mt-2 border-t pt-2">
-                <div className="text-xs text-muted-foreground mb-2">Brush Tools</div>
-                <div className="flex gap-1 flex-wrap">
-                  <Tooltip content="Move/Reorder brushes">
-                    <Button
-                      variant={brushTool === 'move' ? 'default' : 'outline'}
-                      size="sm"
-                      className="text-xs px-1 py-1 h-6 shadow-sm"
-                      onClick={() => setBrushTool(brushTool === 'move' ? 'none' : 'move')}
-                    >
-                      <ArrowUpDown className="w-3 h-3" />
-                    </Button>
-                  </Tooltip>
-                  <Tooltip content="Merge brushes">
-                    <Button
-                      variant={brushTool === 'merge' ? 'default' : 'outline'}
-                      size="sm"
-                      className="text-xs px-1 py-1 h-6 shadow-sm"
-                      onClick={() => setBrushTool(brushTool === 'merge' ? 'none' : 'merge')}
-                    >
-                      <Link2 className="w-3 h-3" />
-                    </Button>
-                  </Tooltip>
-                  <Tooltip content="Separate brushes">
-                    <Button
-                      variant={brushTool === 'separate' ? 'default' : 'outline'}
-                      size="sm"
-                      className="text-xs px-1 py-1 h-6 shadow-sm"
-                      onClick={() => setBrushTool(brushTool === 'separate' ? 'none' : 'separate')}
-                    >
-                      <Scissors className="w-3 h-3" />
-                    </Button>
-                  </Tooltip>
-                  <Tooltip content="Remove brushes">
-                    <Button
-                      variant={brushTool === 'remove' ? 'default' : 'outline'}
-                      size="sm"
-                      className="text-xs px-1 py-1 h-6 shadow-sm"
-                      onClick={() => setBrushTool(brushTool === 'remove' ? 'none' : 'remove')}
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </Button>
-                  </Tooltip>
-                  <Tooltip content="Remove tileset for current layer">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-xs px-1 py-1 h-6 border-red-500 hover:border-red-600 hover:bg-red-50 shadow-sm"
-                      onClick={() => {
-                        // Open generic confirm dialog for tileset removal
-                        setConfirmAction({ type: 'removeTileset' });
-                      }}
-                    >
-                      <X className="w-3 h-3 text-red-500" />
-                    </Button>
+            {/* Tileset Brushes Window - Takes maximum space */}
+            <div className="flex-1 flex flex-col min-h-0">
+              <div className="relative flex-1 min-h-0 overflow-auto h-full">
+                <div id="tilesContainer" className="tile-palette h-full"></div>
+                
+                {/* Hidden element to track brush tool state */}
+                <div data-brush-tool={brushTool} className="hidden"></div>
+                
+                {/* Active GID Badge - Fixed position at bottom-left */}
+                <div className="absolute bottom-2 left-2 z-10">
+                  <Tooltip content="Active GID number of selected tilebrush">
+                    <Badge variant="secondary" className="text-xs px-2 py-1 bg-black/80 text-white border-gray-600 hover:bg-black/90">
+                      <span id="activeGid">{activeGid}</span>
+                    </Badge>
                   </Tooltip>
                 </div>
-                
-                {/* Merge Tool Controls */}
-                {brushTool === 'merge' && (
-                  <div className="mt-2 flex gap-2 items-center">
-                    <div className="text-xs text-muted-foreground">
-                      Selected: {selectedBrushes.length}
-                    </div>
-                    <Tooltip content="Approve merge">
-                      <Button
-                        variant="default"
-                        size="sm"
-                        className="text-xs px-2 py-1 h-6"
-                        onClick={handleMergeBrushes}
-                        disabled={selectedBrushes.length < 2}
-                      >
-                        <Check className="w-3 h-3" />
-                      </Button>
-                    </Tooltip>
-                    <Tooltip content="Cancel merge">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="text-xs px-2 py-1 h-6"
-                        onClick={handleCancelMerge}
-                      >
-                        <X className="w-3 h-3" />
-                      </Button>
-                    </Tooltip>
-                  </div>
-                )}
-                
-                {/* Tool Instructions */}
-                {brushTool !== 'none' && (
-                  <div className="mt-2 text-xs text-muted-foreground bg-gray-50 p-2 rounded">
-                    {brushTool === 'move' && 'Drag brushes to reorder them'}
-                    {brushTool === 'merge' && 'Click brushes to select them, then approve to merge'}
-                    {brushTool === 'separate' && 'Click on merged brushes to separate them'}
-                    {brushTool === 'remove' && 'Click on brushes to remove them (with confirmation)'}
-                  </div>
-                )}
               </div>
-              
             </div>
             
-            <p className="text-xs text-muted-foreground mt-2">Active GID: <span id="activeGid">{activeGid}</span></p>
+            {/* Brush Tools Header */}
+            <div className="flex items-center justify-between mb-1 mt-2">
+              <div className="text-xs text-muted-foreground">Brush Tools</div>
+              <div className="flex gap-1">
+                <Tooltip content="Move/Reorder brushes">
+                  <Button
+                    variant={brushTool === 'move' ? 'default' : 'outline'}
+                    size="sm"
+                    className="text-xs px-1 py-1 h-6 shadow-sm"
+                    onClick={() => setBrushTool(brushTool === 'move' ? 'none' : 'move')}
+                  >
+                    <ArrowUpDown className="w-3 h-3" />
+                  </Button>
+                </Tooltip>
+                <Tooltip content="Merge brushes">
+                  <Button
+                    variant={brushTool === 'merge' ? 'default' : 'outline'}
+                    size="sm"
+                    className="text-xs px-1 py-1 h-6 shadow-sm"
+                    onClick={() => setBrushTool(brushTool === 'merge' ? 'none' : 'merge')}
+                  >
+                    <Link2 className="w-3 h-3" />
+                  </Button>
+                </Tooltip>
+                <Tooltip content="Separate brushes">
+                  <Button
+                    variant={brushTool === 'separate' ? 'default' : 'outline'}
+                    size="sm"
+                    className="text-xs px-1 py-1 h-6 shadow-sm"
+                    onClick={() => setBrushTool(brushTool === 'separate' ? 'none' : 'separate')}
+                  >
+                    <Scissors className="w-3 h-3" />
+                  </Button>
+                </Tooltip>
+                <Tooltip content="Remove brushes">
+                  <Button
+                    variant={brushTool === 'remove' ? 'default' : 'outline'}
+                    size="sm"
+                    className="text-xs px-1 py-1 h-6 shadow-sm"
+                    onClick={() => setBrushTool(brushTool === 'remove' ? 'none' : 'remove')}
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </Button>
+                </Tooltip>
+                <Tooltip content="Remove tileset for current layer">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs px-1 py-1 h-6 border-red-500 hover:border-red-600 hover:bg-red-50 shadow-sm"
+                    onClick={() => {
+                      setConfirmAction({ type: 'removeTileset' });
+                    }}
+                  >
+                    <X className="w-3 h-3 text-red-500" />
+                  </Button>
+                </Tooltip>
+              </div>
+            </div>
           </section>
 
           {/* Layers Section */}
-          <section>
+          <section className="mb-4 flex-shrink-0">
             <h2 className="text-sm font-semibold mb-2">Layers</h2>
             
             {/* Layers List */}
-            <div className="mb-2 space-y-0.5">
+            <div className="mb-2 space-y-0.5 max-h-48 overflow-y-auto">
               {layers.map((layer) => (
                 <div
                   key={layer.id}
@@ -1397,13 +1438,12 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                           onMouseLeave={hideTooltip}
                           onWheel={(e) => {
                             e.preventDefault();
-                            const delta = e.deltaY > 0 ? 0.1 : -0.1; // 10% steps
+                            const delta = e.deltaY > 0 ? 0.1 : -0.1;
                             const currentTransparency = layer.transparency || 0;
                             const newTransparency = Math.max(0, Math.min(1, currentTransparency + delta));
                             
                             handleLayerTransparencyChange(layer.id, delta);
                             
-                            // Update tooltip with new value immediately
                             const newPercent = Math.round(newTransparency * 100);
                             showTooltipWithDelay(
                               <div className="flex items-center gap-1">
@@ -1423,6 +1463,86 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                   </div>
                 </div>
               ))}
+            </div>
+          </section>
+
+          {/* Bottom Action Buttons */}
+          <section className="flex-shrink-0">
+            {/* Export Loading Bar - Always reserve space */}
+            <div className="w-full h-1.5 mb-2">
+              {isExporting ? (
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-full overflow-hidden">
+                  <div 
+                    className="bg-gradient-to-r from-orange-500 to-orange-600 h-full transition-all duration-1000 ease-out rounded-full"
+                    style={{ width: `${exportProgress}%` }}
+                  />
+                </div>
+              ) : (
+                <div className="w-full h-full" />
+              )}
+            </div>
+            
+            <div className="flex gap-2 justify-center">
+              <Tooltip content="Export the map file and tilesetdef">
+                <Button 
+                  onClick={handleExportMap} 
+                  className="shadow-sm flex items-center gap-1 px-3 py-1 h-7 text-xs w-20"
+                  size="sm"
+                  disabled={isExporting}
+                >
+                  {isExporting ? (
+                    <>
+                      <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>Export</span>
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-3 h-3" />
+                      <span>Export</span>
+                    </>
+                  )}
+                </Button>
+              </Tooltip>
+              <Tooltip content={hasUnsavedChanges ? 'Save changes' : 'All changes saved'}>
+                <Button 
+                  onClick={handleManualSave}
+                  className={`w-7 h-7 p-0 shadow-sm transition-colors ${
+                    isManuallySaving 
+                      ? 'bg-blue-500 hover:bg-blue-600' 
+                      : hasUnsavedChanges 
+                        ? 'bg-orange-500 hover:bg-orange-600 text-white' 
+                        : 'bg-green-500 hover:bg-green-600 text-white'
+                  }`}
+                  disabled={isManuallySaving}
+                  size="sm"
+                >
+                  {isManuallySaving ? (
+                    <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  ) : (
+                    <Save className="w-3 h-3" />
+                  )}
+                </Button>
+              </Tooltip>
+              <Tooltip content="Help & Documentation">
+                <Button 
+                  onClick={() => setShowHelp(true)} 
+                  className="w-7 h-7 p-0 shadow-sm"
+                  variant="outline"
+                  size="sm"
+                >
+                  <HelpCircle className="w-3 h-3" />
+                </Button>
+              </Tooltip>
+              <Tooltip content="Map Settings">
+                <Button 
+                  onClick={() => setShowSettings(true)} 
+                  className="w-7 h-7 p-0 shadow-sm"
+                  variant="outline"
+                  size="sm"
+                >
+                  <Settings className="w-3 h-3" />
+                </Button>
+              </Tooltip>
             </div>
           </section>
         </aside>
@@ -1901,7 +2021,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
 
                 <div className="pt-4 border-t border-gray-200 text-center">
                   <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Isometric Tile Map Editor - Create beautiful tile-based maps with ease
+                    Flarism | GUI for Flare Engine by ism.
                   </p>
                 </div>
               </div>
@@ -2389,68 +2509,61 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         </section>
       </main>
       
-      {/* Fixed Export and Settings Buttons at Bottom of Screen */}
-      <div className="fixed bottom-4 left-0 w-80 z-40">
-        <div className="flex gap-2 justify-center px-4">
-          <Tooltip content="Export the map file and tilesetdef">
-            <Button 
-              data-tooltip-offset="20"
-              onClick={handleExportMap} 
-              className="shadow-sm flex items-center gap-1 px-3 py-1 h-7 text-xs"
-              size="sm"
-            >
-              <Download className="w-3 h-3" />
-              <span>Export Map</span>
-            </Button>
-          </Tooltip>
-          <Tooltip content={hasUnsavedChanges ? 'Save changes' : 'All changes saved'}>
-            <Button 
-              data-tooltip-offset="20"
-              onClick={handleManualSave}
-              className={`w-7 h-7 p-0 shadow-sm transition-colors ${
-                isManuallySaving 
-                  ? 'bg-blue-500 hover:bg-blue-600' 
-                  : hasUnsavedChanges 
-                    ? 'bg-orange-500 hover:bg-orange-600 text-white' 
-                    : 'bg-green-500 hover:bg-green-600 text-white'
-              }`}
-              disabled={isManuallySaving}
-              size="sm"
-            >
-              {isManuallySaving ? (
-                <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-              ) : (
-                <Save className="w-3 h-3" />
-              )}
-            </Button>
-          </Tooltip>
-          <Tooltip content="Help & Documentation">
-            <Button 
-              data-tooltip-offset="20"
-              onClick={() => setShowHelp(true)} 
-              className="w-7 h-7 p-0 shadow-sm"
-              variant="outline"
-              size="sm"
-            >
-              <HelpCircle className="w-3 h-3" />
-            </Button>
-          </Tooltip>
-          <Tooltip content="Map Settings">
-            <Button 
-              data-tooltip-offset="20"
-              onClick={() => setShowSettings(true)} 
-              className="w-7 h-7 p-0 shadow-sm"
-              variant="outline"
-              size="sm"
-            >
-              <Settings className="w-3 h-3" />
-            </Button>
-          </Tooltip>
-        </div>
-      </div>
-      
       <Toaster />
       
+      {/* Separate Brush Confirmation Dialog */}
+      <Dialog open={showSeparateDialog} onOpenChange={setShowSeparateDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Separate Brush</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to separate this brush?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSeparateDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={confirmSeparateBrush}>
+              Separate
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Export Success Modal */}
+      {showExportSuccess && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-black rounded-lg shadow-xl p-6 max-w-md mx-4 relative">
+            {/* Close button */}
+            <button
+              onClick={() => setShowExportSuccess(false)}
+              className="absolute top-3 right-3 text-gray-400 hover:text-gray-200 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            
+            {/* Content */}
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
+                <Check className="w-5 h-5 text-green-600 dark:text-green-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-white">
+                Export Successful
+              </h3>
+            </div>
+            
+            <p className="text-gray-300 flex items-center gap-2">
+              Map files and tile definitions saved to 
+              <span className="inline-flex items-center gap-1 font-medium text-white">
+                <Folder className="w-4 h-4" />
+                Export
+              </span>.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Custom Tooltip */}
       {tooltip && (
         <div

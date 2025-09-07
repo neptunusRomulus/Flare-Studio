@@ -316,6 +316,69 @@ ipcMain.handle('save-map-project', async (event, projectPath, mapData) => {
   }
 });
 
+// Save export files (map.txt and tileset.txt) to project folder
+ipcMain.handle('save-export-files', async (event, projectPath, projectName, mapTxt, tilesetDef) => {
+  try {
+    const fs = require('fs');
+    const path = require('path');
+    
+    // Ensure the project directory exists
+    if (!fs.existsSync(projectPath)) {
+      throw new Error('Project path does not exist');
+    }
+    
+    // Create Export directory if it doesn't exist
+    const exportDir = path.join(projectPath, 'Export');
+    if (!fs.existsSync(exportDir)) {
+      fs.mkdirSync(exportDir, { recursive: true });
+    }
+    
+    // Helper function to find next available filename
+    const getAvailableFilename = (basePath, baseName, extension) => {
+      let filename = `${baseName}${extension}`;
+      let filepath = path.join(basePath, filename);
+      
+      if (!fs.existsSync(filepath)) {
+        return { filename, filepath };
+      }
+      
+      // If file exists, find the next available number
+      let counter = 1;
+      while (true) {
+        filename = `${baseName}_${counter}${extension}`;
+        filepath = path.join(basePath, filename);
+        
+        if (!fs.existsSync(filepath)) {
+          return { filename, filepath };
+        }
+        counter++;
+      }
+    };
+    
+    // Sanitize project name for filename (remove invalid characters)
+    const sanitizedProjectName = projectName.replace(/[<>:"/\\|?*]/g, '_');
+    
+    // Get available filenames for both files using project name
+    const mapFile = getAvailableFilename(exportDir, sanitizedProjectName, '.txt');
+    const tilesetFile = getAvailableFilename(exportDir, `${sanitizedProjectName} tileset`, '.txt');
+    
+    // Save map file to Export directory
+    fs.writeFileSync(mapFile.filepath, mapTxt, 'utf8');
+    
+    // Save tileset file to Export directory
+    fs.writeFileSync(tilesetFile.filepath, tilesetDef, 'utf8');
+    
+    console.log('Export files saved successfully:');
+    console.log('- Map:', mapFile.filepath);
+    console.log('- Tileset:', tilesetFile.filepath);
+    
+    return true;
+  } catch (error) {
+    console.error('Error saving export files:', error);
+    return false;
+  }
+});
+
 // Discover tileset images in a project folder and return as data URLs
 ipcMain.handle('discover-tileset-images', async (event, projectPath) => {
   try {

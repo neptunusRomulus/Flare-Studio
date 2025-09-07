@@ -133,10 +133,15 @@ export class TileMapEditor {
   }
 
   public separateBrush(brushId: number): void {
+    console.log(`separateBrush called with brushId: ${brushId}`);
+    
     const brushData = this.detectedTileData.get(brushId);
     if (!brushData) {
+      console.error(`Brush ${brushId} not found`);
       throw new Error(`Brush ${brushId} not found`);
     }
+    
+    console.log(`Separating brush ${brushId} with data:`, brushData);
     
     // Convert Map to array to work with positions
     const brushArray = Array.from(this.detectedTileData.entries());
@@ -166,33 +171,89 @@ export class TileMapEditor {
         
         const imageData = tempCtx.getImageData(0, 0, brushData.width, brushData.height);
         const data = imageData.data;
-        const visited = new Array(brushData.width * brushData.height).fill(false);
         
-        // Find connected components within this area
-        for (let y = 0; y < brushData.height; y++) {
-          for (let x = 0; x < brushData.width; x++) {
-            const pixelIndex = y * brushData.width + x;
-            
-            if (visited[pixelIndex] || this.isPixelTransparent(data, x, y, brushData.width)) {
-              continue;
+        console.log(`Analyzing brush area: ${brushData.width}x${brushData.height}`);
+        
+        // First, try to find vertical separation lines (gaps between objects)
+        const verticalGaps = this.findVerticalGaps(data, brushData.width, brushData.height);
+        console.log(`Found vertical gaps:`, verticalGaps);
+        
+        if (verticalGaps.length > 0) {
+          // Use vertical gaps to separate objects
+          let lastX = 0;
+          
+          for (const gapX of verticalGaps) {
+            if (gapX > lastX) {
+              const segmentWidth = gapX - lastX;
+              const bounds = this.findObjectBoundsInRegion(data, brushData.width, brushData.height, lastX, 0, segmentWidth, brushData.height);
+              
+              if (bounds && bounds.width > 0 && bounds.height > 0) {
+                newBrushes.push({
+                  sourceX: brushData.sourceX + bounds.x,
+                  sourceY: brushData.sourceY + bounds.y,
+                  width: bounds.width,
+                  height: bounds.height
+                });
+              }
             }
+            lastX = gapX + 1; // Skip the gap pixel
+          }
+          
+          // Handle the last segment
+          if (lastX < brushData.width) {
+            const segmentWidth = brushData.width - lastX;
+            const bounds = this.findObjectBoundsInRegion(data, brushData.width, brushData.height, lastX, 0, segmentWidth, brushData.height);
             
-            const objectData = this.floodFillObjectDataInRegion(
-              data, brushData.width, brushData.height, x, y, visited
-            );
-            
-            if (objectData && this.isValidObjectSize(objectData.bounds)) {
-              // Adjust coordinates back to original image space
+            if (bounds && bounds.width > 0 && bounds.height > 0) {
               newBrushes.push({
-                sourceX: brushData.sourceX + objectData.bounds.x,
-                sourceY: brushData.sourceY + objectData.bounds.y,
-                width: objectData.bounds.width,
-                height: objectData.bounds.height
+                sourceX: brushData.sourceX + bounds.x,
+                sourceY: brushData.sourceY + bounds.y,
+                width: bounds.width,
+                height: bounds.height
               });
+            }
+          }
+        } else {
+          // Fallback to flood fill if no clear vertical gaps
+          const visited = new Array(brushData.width * brushData.height).fill(false);
+          
+          for (let y = 0; y < brushData.height; y++) {
+            for (let x = 0; x < brushData.width; x++) {
+              const pixelIndex = y * brushData.width + x;
+              
+              if (visited[pixelIndex] || this.isPixelTransparent(data, x, y, brushData.width)) {
+                continue;
+              }
+              
+              console.log(`Starting flood fill at pixel (${x}, ${y})`);
+              const objectData = this.floodFillObjectDataInRegion(
+                data, brushData.width, brushData.height, x, y, visited
+              );
+              
+              if (objectData && this.isValidObjectSize(objectData.bounds)) {
+                console.log(`Found valid connected component:`, objectData);
+                // Adjust coordinates back to original image space
+                newBrushes.push({
+                  sourceX: brushData.sourceX + objectData.bounds.x,
+                  sourceY: brushData.sourceY + objectData.bounds.y,
+                  width: objectData.bounds.width,
+                  height: objectData.bounds.height
+                });
+              } else if (objectData) {
+                console.log(`Found invalid connected component (too small):`, objectData);
+              }
             }
           }
         }
       }
+    }
+    
+    console.log(`Found ${newBrushes.length} new brushes from separation:`, newBrushes);
+    
+    // Check if we actually found multiple objects
+    if (newBrushes.length <= 1) {
+      console.log(`No separation needed - only found ${newBrushes.length} component(s)`);
+      return; // Don't separate if we only found one component or none
     }
     
     // Insert the new brushes at the position where the original brush was
@@ -274,6 +335,93 @@ export class TileMapEditor {
     this.markAsChanged(true);
     
     console.log(`Reordered brush from index ${fromIndex} to ${toIndex}`);
+  }
+
+  private findVerticalGaps(data: Uint8ClampedArray, width: number, height: number): number[] {
+    const gaps: number[] = [];
+    
+    // Check each column for vertical gaps
+    for (let x = 1; x < width - 1; x++) { // Skip first and last columns
+      let hasContent = false;
+      
+      // Check if this column has any content
+      for (let y = 0; y < height; y++) {
+        if (!this.isPixelTransparent(data, x, y, width)) {
+          hasContent = true;
+          break;
+        }
+      }
+      
+      // If column is completely transparent, check adjacent columns for content
+      if (!hasContent) {
+        let leftHasContent = false;
+        let rightHasContent = false;
+        
+        // Check left column
+        for (let y = 0; y < height; y++) {
+          if (!this.isPixelTransparent(data, x - 1, y, width)) {
+            leftHasContent = true;
+            break;
+          }
+        }
+        
+        // Check right column
+        for (let y = 0; y < height; y++) {
+          if (!this.isPixelTransparent(data, x + 1, y, width)) {
+            rightHasContent = true;
+            break;
+          }
+        }
+        
+        // Only consider as a gap if there's content on both sides
+        if (leftHasContent && rightHasContent) {
+          gaps.push(x);
+        }
+      }
+    }
+    
+    console.log(`Detected ${gaps.length} vertical gaps at columns:`, gaps);
+    return gaps;
+  }
+  
+  private findObjectBoundsInRegion(
+    data: Uint8ClampedArray,
+    imageWidth: number,
+    imageHeight: number,
+    regionX: number,
+    regionY: number,
+    regionWidth: number,
+    regionHeight: number
+  ): { x: number; y: number; width: number; height: number } | null {
+    let minX = regionX + regionWidth;
+    let maxX = regionX;
+    let minY = regionY + regionHeight;
+    let maxY = regionY;
+    let hasContent = false;
+    
+    // Find bounds of content within the specified region
+    for (let y = regionY; y < regionY + regionHeight && y < imageHeight; y++) {
+      for (let x = regionX; x < regionX + regionWidth && x < imageWidth; x++) {
+        if (!this.isPixelTransparent(data, x, y, imageWidth)) {
+          hasContent = true;
+          minX = Math.min(minX, x);
+          maxX = Math.max(maxX, x);
+          minY = Math.min(minY, y);
+          maxY = Math.max(maxY, y);
+        }
+      }
+    }
+    
+    if (!hasContent) {
+      return null;
+    }
+    
+    return {
+      x: minX,
+      y: minY,
+      width: maxX - minX + 1,
+      height: maxY - minY + 1
+    };
   }
 
   private floodFillObjectDataInRegion(
@@ -1889,6 +2037,56 @@ export class TileMapEditor {
       removeOverlay.style.zIndex = '10';
       removeOverlay.textContent = '✕';
       
+      // Add separate icon for separate tool
+      const separateIcon = document.createElement('div');
+      separateIcon.className = 'separate-icon';
+      separateIcon.style.position = 'absolute';
+      separateIcon.style.top = '50%';
+      separateIcon.style.left = '50%';
+      separateIcon.style.transform = 'translate(-50%, -50%)';
+      separateIcon.style.display = 'none';
+      separateIcon.style.alignItems = 'center';
+      separateIcon.style.justifyContent = 'center';
+      separateIcon.style.background = 'none';
+      separateIcon.style.color = 'white';
+      separateIcon.style.zIndex = '2';
+      separateIcon.style.pointerEvents = 'none';
+      separateIcon.style.width = '24px';
+      separateIcon.style.height = '24px';
+      separateIcon.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="6" cy="6" r="3"></circle>
+          <circle cx="6" cy="18" r="3"></circle>
+          <line x1="20" y1="4" x2="8.12" y2="15.88"></line>
+          <line x1="14.47" y1="14.48" x2="20" y2="20"></line>
+          <line x1="8.12" y1="8.12" x2="12" y2="12"></line>
+        </svg>
+      `;
+      
+      // Add merge icon for merge tool
+      const mergeIcon = document.createElement('div');
+      mergeIcon.className = 'merge-icon';
+      mergeIcon.style.position = 'absolute';
+      mergeIcon.style.top = '50%';
+      mergeIcon.style.left = '50%';
+      mergeIcon.style.transform = 'translate(-50%, -50%)';
+      mergeIcon.style.display = 'none';
+      mergeIcon.style.alignItems = 'center';
+      mergeIcon.style.justifyContent = 'center';
+      mergeIcon.style.background = 'none';
+      mergeIcon.style.color = 'white';
+      mergeIcon.style.zIndex = '2';
+      mergeIcon.style.pointerEvents = 'none';
+      mergeIcon.style.width = '24px';
+      mergeIcon.style.height = '24px';
+      mergeIcon.innerHTML = `
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="m8 6 4-4 4 4"></path>
+          <path d="M12 2v10.3a4 4 0 0 1-1.172 2.872L4 22"></path>
+          <path d="m20 22-6.828-6.828A4 4 0 0 1 12 12.3"></path>
+        </svg>
+      `;
+      
       // Add click handler to the remove overlay
       removeOverlay.addEventListener('click', (e) => {
         e.preventDefault();
@@ -1909,7 +2107,7 @@ export class TileMapEditor {
         if (currentBrushTool === 'merge') {
           // Handle merge tool selection
           console.log('Handling merge tool selection');
-          this.handleBrushSelection(tile.index, wrapper, selectionNumber);
+          this.handleBrushMerge(tile.index, wrapper);
         } else if (currentBrushTool === 'separate') {
           // Handle separate tool
           console.log('Handling separate tool');
@@ -1980,27 +2178,41 @@ export class TileMapEditor {
         }
       });
       
-      // Update draggable property when brush tool changes
-      const updateDraggable = () => {
+      // Update draggable property and classes when brush tool changes
+      const updateBrushToolState = () => {
         const brushToolElement = document.querySelector('[data-brush-tool]');
         const currentBrushTool = brushToolElement?.getAttribute('data-brush-tool') || 'none';
-        wrapper.draggable = currentBrushTool === 'move';
+        
+        // Reset all tool-specific classes
+        wrapper.classList.remove('separate-mode', 'merge-mode', 'merge-selected-first', 'merge-selected-second');
+        wrapper.draggable = false;
+        wrapper.style.cursor = '';
+        wrapper.title = '';
+        
+        // Add tile index for tracking
+        wrapper.setAttribute('data-tile-index', tile.index.toString());
         
         if (currentBrushTool === 'move') {
+          wrapper.draggable = true;
           wrapper.style.cursor = 'move';
           wrapper.title = 'Drag to reorder';
-        } else {
-          wrapper.style.cursor = '';
-          wrapper.title = '';
+        } else if (currentBrushTool === 'separate') {
+          wrapper.classList.add('separate-mode');
+          wrapper.style.cursor = 'pointer';
+          wrapper.title = 'Click to separate';
+        } else if (currentBrushTool === 'merge') {
+          wrapper.classList.add('merge-mode');
+          wrapper.style.cursor = 'pointer';
+          wrapper.title = 'Click to merge (max 2 brushes)';
         }
       };
       
       // Initial setup
-      updateDraggable();
+      updateBrushToolState();
       
       // Listen for brush tool changes
       const observer = new MutationObserver(() => {
-        updateDraggable();
+        updateBrushToolState();
       });
       
       const brushToolElement = document.querySelector('[data-brush-tool]');
@@ -2032,6 +2244,8 @@ export class TileMapEditor {
       wrapper.appendChild(canvas);
       wrapper.appendChild(selectionNumber);
       wrapper.appendChild(removeOverlay);
+      wrapper.appendChild(separateIcon);
+      wrapper.appendChild(mergeIcon);
       container.appendChild(wrapper);
       validTileIndex++;
     }
@@ -2040,24 +2254,48 @@ export class TileMapEditor {
   }
 
   // Brush management interaction handlers
-  private handleBrushSelection(tileIndex: number, wrapper: HTMLElement, selectionNumber: HTMLElement): void {
-    const isSelected = wrapper.classList.contains('brush-selected');
+  private handleBrushMerge(tileIndex: number, wrapper: HTMLElement): void {
+    // Get all currently selected brushes for merge
+    const firstSelected = document.querySelector('.merge-selected-first');
+    const secondSelected = document.querySelector('.merge-selected-second');
     
-    if (isSelected) {
-      // Deselect
-      wrapper.classList.remove('brush-selected');
-      selectionNumber.style.display = 'none';
-      this.dispatchBrushEvent('deselect', tileIndex);
+    // If this brush is already selected, deselect it
+    if (wrapper.classList.contains('merge-selected-first') || wrapper.classList.contains('merge-selected-second')) {
+      wrapper.classList.remove('merge-selected-first', 'merge-selected-second');
+      return;
+    }
+    
+    if (!firstSelected) {
+      // This is the first selection - add orange stroke
+      wrapper.classList.add('merge-selected-first');
+    } else if (!secondSelected) {
+      // This is the second selection - add orange fill and merge icon, then auto-merge
+      wrapper.classList.add('merge-selected-second');
+      
+      // Auto-merge after a short delay to show the visual feedback
+      setTimeout(() => {
+        const firstTileIndex = parseInt(firstSelected.getAttribute('data-tile-index') || '0');
+        this.performMerge(firstTileIndex, tileIndex);
+        
+        // Clear selections
+        firstSelected.classList.remove('merge-selected-first');
+        wrapper.classList.remove('merge-selected-second');
+      }, 300);
     } else {
-      // Select
-      wrapper.classList.add('brush-selected');
-      selectionNumber.style.display = 'flex';
-      
-      // Get current selection count to display number
-      const selectedBrushes = document.querySelectorAll('.brush-selected').length;
-      selectionNumber.textContent = selectedBrushes.toString();
-      
-      this.dispatchBrushEvent('select', tileIndex);
+      // Already have 2 selected, ignore further selections
+      return;
+    }
+  }
+
+  private performMerge(firstTileIndex: number, secondTileIndex: number): void {
+    console.log(`Merging tiles ${firstTileIndex} and ${secondTileIndex}`);
+    
+    try {
+      // Call the editor's merge brush method
+      this.mergeBrushes([firstTileIndex, secondTileIndex]);
+      console.log(`Successfully merged brushes ${firstTileIndex} and ${secondTileIndex}`);
+    } catch (error) {
+      console.error('Failed to merge brushes:', error);
     }
   }
 
@@ -3648,7 +3886,7 @@ export class TileMapEditor {
     }
   }
 
-  private generateFlareMapTxt(): string {
+  public generateFlareMapTxt(): string {
     const lines: string[] = [];
     
     // Header information with [header] section
@@ -3684,7 +3922,7 @@ export class TileMapEditor {
     return lines.join('\n');
   }
 
-  private generateFlareTilesetDef(): string {
+  public generateFlareTilesetDef(): string {
     if (!this.tilesetFileName) return '';
     
     const lines: string[] = [];

@@ -1,30 +1,140 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 
 interface TooltipProps {
   content: React.ReactNode;
-  side?: 'top' | 'bottom' | 'left' | 'right';
+  side?: 'top' | 'bottom' | 'left' | 'right' | 'auto';
   className?: string;
   children: React.ReactNode;
 }
 
 export default function Tooltip({ content, side = 'top', className = '', children }: TooltipProps) {
   // Basic shadcn-like tooltip using Tailwind. Keeps markup simple and local.
-  const posClass = {
-    top: '-translate-y-2 bottom-full left-1/2 -translate-x-1/2 mb-2',
-    bottom: 'top-full left-1/2 -translate-x-1/2 mt-2',
-    left: 'right-full top-1/2 -translate-y-1/2 mr-2',
-    right: 'left-full top-1/2 -translate-y-1/2 ml-2'
-  }[side];
+  // Note: positioning is handled by the portal-based tooltip rendering below.
 
+  // accessibility: give each tooltip a stable id and link it via aria-describedby
+  const id = `tooltip-${React.useId()}`;
+
+  // If children is a single React element, clone it and add aria-describedby so
+  // screen readers and keyboard users can reference the tooltip. Otherwise wrap
+  // the children in a span with the attribute.
+  const trigger = React.isValidElement(children)
+    ? React.cloneElement(children as React.ReactElement, {
+        'aria-describedby': id,
+      })
+    : (
+        <span tabIndex={0} aria-describedby={id} className="inline-flex">
+          {children}
+        </span>
+      );
+
+  // refs for measuring and avoiding overflow
+  const wrapperRef = React.useRef<HTMLSpanElement | null>(null);
+  const tooltipRef = React.useRef<HTMLSpanElement | null>(null);
+  const portalRef = React.useRef<HTMLDivElement | null>(null);
+  const [hovered, setHovered] = React.useState(false);
+  const [pos, setPos] = React.useState<{ left: number; top: number } | null>(null);
+
+  const computeOffset = React.useCallback(() => {
+  if (!wrapperRef.current) return;
+  const trig = wrapperRef.current.getBoundingClientRect();
+
+  // initial center x for tooltip
+  const centerX = trig.left + trig.width / 2;
+
+  // compute default top depending on side
+  let top = trig.top;
+  if (side === 'top') top = trig.top - 8; // above
+  else if (side === 'bottom' || side === 'auto') top = trig.bottom + 8; // below
+  else top = trig.top + trig.height / 2;
+
+  setPos({ left: centerX, top });
+  // measurement and fine adjustment will run in effect after portal renders
+  }, [side]);
+
+  React.useEffect(() => {
+    // recompute on resize so the tooltip stays inside when the window changes
+  window.addEventListener('resize', computeOffset);
+  return () => window.removeEventListener('resize', computeOffset);
+  }, [computeOffset]);
+
+  // recompute when the tooltip becomes visible via hover/focus. We attach handlers
+  // on the wrapper to trigger measurement.
+  const onTriggerEnter = () => {
+    // measure on next frame so layout is stable
+    requestAnimationFrame(() => computeOffset());
+    setHovered(true);
+  };
+
+  const onTriggerLeave = () => {
+    setHovered(false);
+  };
+
+  // after portal tooltip renders, measure and clamp its position
+  React.useEffect(() => {
+    if (!hovered || !portalRef.current || !wrapperRef.current) return;
+    const portalRect = portalRef.current.getBoundingClientRect();
+    const trig = wrapperRef.current.getBoundingClientRect();
+
+    const halfWidth = portalRect.width / 2;
+    let left = trig.left + trig.width / 2;
+    const minCenter = 8 + halfWidth;
+    const maxCenter = window.innerWidth - 8 - halfWidth;
+    if (left < minCenter) left = minCenter;
+    if (left > maxCenter) left = maxCenter;
+
+    // For top/bottom we position the portal with transform translateX(-50%) so left is center
+    let top = trig.top - portalRect.height - 8;
+    if (side === 'bottom' || side === 'auto') top = trig.bottom + 8;
+    // clamp vertical to viewport
+    top = Math.max(8, Math.min(window.innerHeight - portalRect.height - 8, top));
+
+    setPos({ left, top });
+  }, [hovered, side]);
+
+  // Render wrapper and portal tooltip to avoid clipping by overflow parents
   return (
-    <span className={`relative inline-flex group ${className}`}>
-      {children}
+    <>
       <span
-        role="tooltip"
-        className={`pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-150 select-none absolute z-50 ${posClass}`}
+        ref={wrapperRef}
+        onMouseEnter={onTriggerEnter}
+        onFocus={onTriggerEnter}
+        onMouseLeave={onTriggerLeave}
+        onBlur={onTriggerLeave}
+        className={`relative inline-flex ${className}`}
       >
-        <span className="inline-block bg-gray-900 text-white text-xs px-2 py-1 rounded shadow-md">{content}</span>
+        {trigger}
       </span>
-    </span>
+      {typeof document !== 'undefined' && pos && hovered && createPortal(
+        <div
+          ref={portalRef}
+          id={id}
+          role="tooltip"
+          className={`pointer-events-none opacity-100 scale-100 transition duration-150 ease-out select-none absolute z-50`}
+          style={{
+            left: pos.left,
+            top: pos.top,
+            transform: 'translateX(-50%)',
+            pointerEvents: 'none'
+          }}
+        >
+          <span
+            ref={tooltipRef}
+            className="inline-block bg-gray-900 text-white text-xs px-3 py-1.5 rounded-md shadow-md max-w-[14rem] break-words"
+            style={{
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden'
+            }}
+          >
+            {content}
+          </span>
+          {/* arrow */}
+          <span className="absolute left-1/2 -translate-x-1/2 mt-[-6px] w-2 h-2 rotate-45 bg-gray-900" aria-hidden />
+        </div>,
+        document.body
+      )}
+    </>
   );
 }

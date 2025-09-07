@@ -105,7 +105,7 @@
     background: hsl(var(--background));
     border: 1px solid hsl(var(--border));
     min-height: 300px;
-    max-height: 300px;
+    max-height: 60vh;
     overflow-y: auto;
     
     /* Modern minimal scrollbar */
@@ -216,20 +216,105 @@
 /* Drag and drop styles for move tool */
 .brush-wrapper[draggable="true"] {
     cursor: move !important;
+    position: relative;
 }
 
-.brush-wrapper[draggable="true"]:hover {
-    transform: scale(1.05);
-    transition: transform 0.2s ease;
-}
-
-.brush-wrapper[draggable="true"] .palette-tile {
-    border: 2px dashed #007acc;
+.brush-wrapper[draggable="true"]:hover::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    pointer-events: none;
+    z-index: 1;
 }
 
 .brush-wrapper.drag-over {
     border-top: 3px solid #007acc !important;
     background: rgba(0, 122, 204, 0.1);
+}
+
+/* Separate tool styles */
+.brush-wrapper.separate-mode {
+    position: relative;
+    cursor: pointer;
+}
+
+.brush-wrapper.separate-mode:hover::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 165, 0, 0.5);
+    pointer-events: none;
+    z-index: 1;
+}
+
+.brush-wrapper.separate-mode:hover .separate-icon {
+    display: flex;
+}
+
+.separate-icon {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    color: white;
+    z-index: 2;
+    pointer-events: none;
+    width: 24px;
+    height: 24px;
+}
+
+/* Merge tool styles */
+.brush-wrapper.merge-mode {
+    position: relative;
+    cursor: pointer;
+}
+
+.brush-wrapper.merge-selected-first .palette-tile {
+    border: 2px solid hsl(var(--primary)) !important;
+    box-shadow: 0 0 0 1px hsl(var(--primary));
+}
+
+.brush-wrapper.merge-selected-second::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 165, 0, 0.5);
+    pointer-events: none;
+    z-index: 1;
+}
+
+.brush-wrapper.merge-selected-second .merge-icon {
+    display: flex;
+}
+
+.merge-icon {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    color: white;
+    z-index: 2;
+    pointer-events: none;
+    width: 24px;
+    height: 24px;
 }
 
 .tool-active {

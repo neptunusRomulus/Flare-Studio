@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
+import Tooltip from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import { Upload, Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Blend, MapPin, Save, ArrowUpDown, Link2, Scissors, Trash2, Check, HelpCircle } from 'lucide-react';
 import { TileMapEditor } from './editor/TileMapEditor';
@@ -1158,27 +1159,30 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           </div>
         </div>
         <div className="flex no-drag">
-          <button 
-            onClick={handleMinimize}
-            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 p-1 rounded transition-colors"
-            title="Minimize"
-          >
-            <Minus className="w-4 h-4" />
-          </button>
-          <button 
-            onClick={handleMaximize}
-            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 p-1 rounded transition-colors"
-            title="Maximize"
-          >
-            <Square className="w-4 h-4" />
-          </button>
-          <button 
-            onClick={handleClose}
-            className="text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 hover:bg-gray-200 dark:hover:bg-gray-700 p-1 rounded transition-colors"
-            title="Close"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <Tooltip content="Minimize">
+            <button 
+              onClick={handleMinimize}
+              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 p-1 rounded transition-colors"
+            >
+              <Minus className="w-4 h-4" />
+            </button>
+          </Tooltip>
+          <Tooltip content="Maximize">
+            <button 
+              onClick={handleMaximize}
+              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 p-1 rounded transition-colors"
+            >
+              <Square className="w-4 h-4" />
+            </button>
+          </Tooltip>
+          <Tooltip content="Close">
+            <button 
+              onClick={handleClose}
+              className="text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 hover:bg-gray-200 dark:hover:bg-gray-700 p-1 rounded transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </Tooltip>
         </div>
       </div>
 
@@ -1214,54 +1218,59 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               <div className="mt-2 border-t pt-2">
                 <div className="text-xs text-muted-foreground mb-2">Brush Tools</div>
                 <div className="flex gap-1 flex-wrap">
-                  <Button
-                    variant={brushTool === 'move' ? 'default' : 'outline'}
-                    size="sm"
-                    className="text-xs px-1 py-1 h-6 shadow-sm"
-                    onClick={() => setBrushTool(brushTool === 'move' ? 'none' : 'move')}
-                    title="Move/Reorder brushes"
-                  >
-                    <ArrowUpDown className="w-3 h-3" />
-                  </Button>
-                  <Button
-                    variant={brushTool === 'merge' ? 'default' : 'outline'}
-                    size="sm"
-                    className="text-xs px-1 py-1 h-6 shadow-sm"
-                    onClick={() => setBrushTool(brushTool === 'merge' ? 'none' : 'merge')}
-                    title="Merge brushes"
-                  >
-                    <Link2 className="w-3 h-3" />
-                  </Button>
-                  <Button
-                    variant={brushTool === 'separate' ? 'default' : 'outline'}
-                    size="sm"
-                    className="text-xs px-1 py-1 h-6 shadow-sm"
-                    onClick={() => setBrushTool(brushTool === 'separate' ? 'none' : 'separate')}
-                    title="Separate brushes"
-                  >
-                    <Scissors className="w-3 h-3" />
-                  </Button>
-                  <Button
-                    variant={brushTool === 'remove' ? 'default' : 'outline'}
-                    size="sm"
-                    className="text-xs px-1 py-1 h-6 shadow-sm"
-                    onClick={() => setBrushTool(brushTool === 'remove' ? 'none' : 'remove')}
-                    title="Remove brushes"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-xs px-1 py-1 h-6 border-red-500 hover:border-red-600 hover:bg-red-50 shadow-sm"
-                    onClick={() => {
-                      // Open generic confirm dialog for tileset removal
-                      setConfirmAction({ type: 'removeTileset' });
-                    }}
-                    title="Remove tileset for current layer"
-                  >
-                    <X className="w-3 h-3 text-red-500" />
-                  </Button>
+                  <Tooltip content="Move/Reorder brushes">
+                    <Button
+                      variant={brushTool === 'move' ? 'default' : 'outline'}
+                      size="sm"
+                      className="text-xs px-1 py-1 h-6 shadow-sm"
+                      onClick={() => setBrushTool(brushTool === 'move' ? 'none' : 'move')}
+                    >
+                      <ArrowUpDown className="w-3 h-3" />
+                    </Button>
+                  </Tooltip>
+                  <Tooltip content="Merge brushes">
+                    <Button
+                      variant={brushTool === 'merge' ? 'default' : 'outline'}
+                      size="sm"
+                      className="text-xs px-1 py-1 h-6 shadow-sm"
+                      onClick={() => setBrushTool(brushTool === 'merge' ? 'none' : 'merge')}
+                    >
+                      <Link2 className="w-3 h-3" />
+                    </Button>
+                  </Tooltip>
+                  <Tooltip content="Separate brushes">
+                    <Button
+                      variant={brushTool === 'separate' ? 'default' : 'outline'}
+                      size="sm"
+                      className="text-xs px-1 py-1 h-6 shadow-sm"
+                      onClick={() => setBrushTool(brushTool === 'separate' ? 'none' : 'separate')}
+                    >
+                      <Scissors className="w-3 h-3" />
+                    </Button>
+                  </Tooltip>
+                  <Tooltip content="Remove brushes">
+                    <Button
+                      variant={brushTool === 'remove' ? 'default' : 'outline'}
+                      size="sm"
+                      className="text-xs px-1 py-1 h-6 shadow-sm"
+                      onClick={() => setBrushTool(brushTool === 'remove' ? 'none' : 'remove')}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </Tooltip>
+                  <Tooltip content="Remove tileset for current layer">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs px-1 py-1 h-6 border-red-500 hover:border-red-600 hover:bg-red-50 shadow-sm"
+                      onClick={() => {
+                        // Open generic confirm dialog for tileset removal
+                        setConfirmAction({ type: 'removeTileset' });
+                      }}
+                    >
+                      <X className="w-3 h-3 text-red-500" />
+                    </Button>
+                  </Tooltip>
                 </div>
                 
                 {/* Merge Tool Controls */}
@@ -1270,25 +1279,27 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                     <div className="text-xs text-muted-foreground">
                       Selected: {selectedBrushes.length}
                     </div>
-                    <Button
-                      variant="default"
-                      size="sm"
-                      className="text-xs px-2 py-1 h-6"
-                      onClick={handleMergeBrushes}
-                      disabled={selectedBrushes.length < 2}
-                      title="Approve merge"
-                    >
-                      <Check className="w-3 h-3" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-xs px-2 py-1 h-6"
-                      onClick={handleCancelMerge}
-                      title="Cancel merge"
-                    >
-                      <X className="w-3 h-3" />
-                    </Button>
+                    <Tooltip content="Approve merge">
+                      <Button
+                        variant="default"
+                        size="sm"
+                        className="text-xs px-2 py-1 h-6"
+                        onClick={handleMergeBrushes}
+                        disabled={selectedBrushes.length < 2}
+                      >
+                        <Check className="w-3 h-3" />
+                      </Button>
+                    </Tooltip>
+                    <Tooltip content="Cancel merge">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs px-2 py-1 h-6"
+                        onClick={handleCancelMerge}
+                      >
+                        <X className="w-3 h-3" />
+                      </Button>
+                    </Tooltip>
                   </div>
                 )}
                 
@@ -1910,60 +1921,66 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         <section className="flex-1 min-w-0 flex flex-col relative">
           {/* Zoom Controls & Undo/Redo */}
           <div className="absolute top-2 right-2 z-10 flex gap-1">
-            <Button 
-              size="sm" 
-              variant="outline" 
-              className="w-8 h-8 p-0"
-              onClick={handleUndo}
-              title="Undo (Ctrl+Z)"
-            >
-              <Undo2 className="w-4 h-4" />
-            </Button>
-            <Button 
-              size="sm" 
-              variant="outline" 
-              className="w-8 h-8 p-0"
-              onClick={handleRedo}
-              title="Redo (Ctrl+Y)"
-            >
-              <Redo2 className="w-4 h-4" />
-            </Button>
-            <Button 
-              size="sm" 
-              variant="outline" 
-              className="w-8 h-8 p-0"
-              onClick={handleZoomIn}
-              title="Zoom In"
-            >
-              <ZoomIn className="w-4 h-4" />
-            </Button>
-            <Button 
-              size="sm" 
-              variant="outline" 
-              className="w-8 h-8 p-0"
-              onClick={handleZoomOut}
-              title="Zoom Out"
-            >
-              <ZoomOut className="w-4 h-4" />
-            </Button>
-            <Button 
-              size="sm" 
-              variant="outline" 
-              className="w-8 h-8 p-0"
-              onClick={handleResetZoom}
-              title="Reset Zoom & Pan"
-            >
-              <RotateCcw className="w-4 h-4" />
-            </Button>
-            <Button 
-              size="sm" 
-              variant={showMinimap ? "default" : "outline"}
-              className="w-8 h-8 p-0"
-              onClick={handleToggleMinimap}
-              title="Toggle Minimap"
-            >
-              <Map className="w-4 h-4" />
-            </Button>
+            <Tooltip content="Undo (Ctrl+Z)">
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="w-8 h-8 p-0"
+                onClick={handleUndo}
+              >
+                <Undo2 className="w-4 h-4" />
+              </Button>
+            </Tooltip>
+            <Tooltip content="Redo (Ctrl+Y)">
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="w-8 h-8 p-0"
+                onClick={handleRedo}
+              >
+                <Redo2 className="w-4 h-4" />
+              </Button>
+            </Tooltip>
+            <Tooltip content="Zoom In">
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="w-8 h-8 p-0"
+                onClick={handleZoomIn}
+              >
+                <ZoomIn className="w-4 h-4" />
+              </Button>
+            </Tooltip>
+            <Tooltip content="Zoom Out">
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="w-8 h-8 p-0"
+                onClick={handleZoomOut}
+              >
+                <ZoomOut className="w-4 h-4" />
+              </Button>
+            </Tooltip>
+            <Tooltip content="Reset Zoom & Pan">
+              <Button 
+                size="sm" 
+                variant="outline" 
+                className="w-8 h-8 p-0"
+                onClick={handleResetZoom}
+              >
+                <RotateCcw className="w-4 h-4" />
+              </Button>
+            </Tooltip>
+            <Tooltip content="Toggle Minimap">
+              <Button 
+                size="sm" 
+                variant={showMinimap ? "default" : "outline"}
+                className="w-8 h-8 p-0"
+                onClick={handleToggleMinimap}
+              >
+                <Map className="w-4 h-4" />
+              </Button>
+            </Tooltip>
           </div>
           
           <div className="bg-gray-100 flex-1 min-h-0 flex items-center justify-center overflow-hidden relative">
@@ -2025,33 +2042,36 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                   <span>{selectionCount} tiles selected</span>
                 </div>
                 <div className="flex items-center gap-1">
-                  <Button 
-                    size="sm" 
-                    variant="ghost" 
-                    className="h-6 px-2 text-xs text-white hover:bg-orange-500/50"
-                    onClick={handleFillSelection}
-                    title="Fill selection with active tile"
-                  >
-                    Fill
-                  </Button>
-                  <Button 
-                    size="sm" 
-                    variant="ghost" 
-                    className="h-6 px-2 text-xs text-white hover:bg-orange-500/50"
-                    onClick={handleDeleteSelection}
-                    title="Delete selected tiles (DEL)"
-                  >
-                    Delete
-                  </Button>
-                  <Button 
-                    size="sm" 
-                    variant="ghost" 
-                    className="h-6 px-2 text-xs text-white hover:bg-orange-500/50"
-                    onClick={handleClearSelection}
-                    title="Clear selection (ESC)"
-                  >
-                    Clear
-                  </Button>
+                  <Tooltip content="Fill selection with active tile">
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      className="h-6 px-2 text-xs text-white hover:bg-orange-500/50"
+                      onClick={handleFillSelection}
+                    >
+                      Fill
+                    </Button>
+                  </Tooltip>
+                  <Tooltip content="Delete selected tiles (DEL)">
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      className="h-6 px-2 text-xs text-white hover:bg-orange-500/50"
+                      onClick={handleDeleteSelection}
+                    >
+                      Delete
+                    </Button>
+                  </Tooltip>
+                  <Tooltip content="Clear selection (ESC)">
+                    <Button 
+                      size="sm" 
+                      variant="ghost" 
+                      className="h-6 px-2 text-xs text-white hover:bg-orange-500/50"
+                      onClick={handleClearSelection}
+                    >
+                      Clear
+                    </Button>
+                  </Tooltip>
                 </div>
               </div>
             )}
@@ -2060,22 +2080,24 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               <div className="flex items-center gap-1 bg-white/90 dark:bg-neutral-900/90 border border-border rounded-full px-2 py-1 shadow-md">
                 {/* Brush Tool */}
                 <div className="relative">
-                  <Button
-                    variant={selectedTool === 'brush' ? 'default' : 'ghost'}
-                    size="sm"
-                    className="w-7 h-7 p-1 rounded-full tool-button"
-                    onClick={() => setSelectedTool('brush')}
-                    onMouseEnter={(e) => {
-                      handleShowBrushOptions();
-                      showTooltipWithDelay('Brush Tool', e.currentTarget);
-                    }}
-                    onMouseLeave={() => {
-                      handleHideBrushOptions();
-                      hideTooltip();
-                    }}
-                  >
-                    {getBrushIcon()}
-                  </Button>
+                  <Tooltip content="Brush Tool">
+                    <Button
+                        variant={selectedTool === 'brush' ? 'default' : 'ghost'}
+                        size="sm"
+                        className="w-7 h-7 p-1 rounded-full tool-button"
+                        onClick={() => setSelectedTool('brush')}
+                        onMouseEnter={(e) => {
+                          handleShowBrushOptions();
+                          showTooltipWithDelay('Brush Tool', e.currentTarget);
+                        }}
+                        onMouseLeave={() => {
+                          handleHideBrushOptions();
+                          hideTooltip();
+                        }}
+                      >
+                        {getBrushIcon()}
+                      </Button>
+                  </Tooltip>
 
                   {showBrushOptions && (
                     <div
@@ -2129,22 +2151,24 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
 
                 {/* Selection Tool */}
                 <div className="relative">
-                  <Button
-                    variant={selectedTool === 'selection' ? 'default' : 'ghost'}
-                    size="sm"
-                    className="w-7 h-7 p-1 rounded-full tool-button"
-                    onClick={() => setSelectedTool('selection')}
-                    onMouseEnter={(e) => {
-                      handleShowSelectionOptions();
-                      showTooltipWithDelay('Selection Tool', e.currentTarget);
-                    }}
-                    onMouseLeave={() => {
-                      handleHideSelectionOptions();
-                      hideTooltip();
-                    }}
-                  >
-                    {getSelectionIcon()}
-                  </Button>
+                  <Tooltip content="Selection Tool">
+                    <Button
+                      variant={selectedTool === 'selection' ? 'default' : 'ghost'}
+                      size="sm"
+                      className="w-7 h-7 p-1 rounded-full tool-button"
+                      onClick={() => setSelectedTool('selection')}
+                      onMouseEnter={(e) => {
+                        handleShowSelectionOptions();
+                        showTooltipWithDelay('Selection Tool', e.currentTarget);
+                      }}
+                      onMouseLeave={() => {
+                        handleHideSelectionOptions();
+                        hideTooltip();
+                      }}
+                    >
+                      {getSelectionIcon()}
+                    </Button>
+                  </Tooltip>
 
                   {showSelectionOptions && (
                     <div
@@ -2198,17 +2222,18 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
 
                 {/* Shape Tool */}
                 <div className="relative">
-                  <Button
-                    variant={selectedTool === 'shape' ? 'default' : 'ghost'}
-                    size="sm"
-                    className="w-7 h-7 p-1 rounded-full tool-button"
-                    onClick={() => setSelectedTool('shape')}
-                    onMouseEnter={() => handleShowShapeOptions()}
-                    onMouseLeave={() => handleHideShapeOptions()}
-                    title="Shape Tool"
-                  >
-                    {getShapeIcon()}
-                  </Button>
+                  <Tooltip content="Shape Tool">
+                    <Button
+                      variant={selectedTool === 'shape' ? 'default' : 'ghost'}
+                      size="sm"
+                      className="w-7 h-7 p-1 rounded-full tool-button"
+                      onClick={() => setSelectedTool('shape')}
+                      onMouseEnter={() => handleShowShapeOptions()}
+                      onMouseLeave={() => handleHideShapeOptions()}
+                    >
+                      {getShapeIcon()}
+                    </Button>
+                  </Tooltip>
 
                   {showShapeOptions && (
                     <div
@@ -2216,72 +2241,78 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                       onMouseEnter={handleShowShapeOptions}
                       onMouseLeave={handleHideShapeOptions}
                     >
-                      <Button
-                        variant={selectedShapeTool === 'rectangle' ? 'default' : 'ghost'}
-                        size="sm"
-                        className="w-6 h-6 p-1 rounded-full sub-tool-button"
-                        onClick={() => setSelectedShapeTool('rectangle')}
-                        title="Rectangle Shape"
-                      >
-                        <Square className="w-3 h-3" />
-                      </Button>
-                      <Button
-                        variant={selectedShapeTool === 'circle' ? 'default' : 'ghost'}
-                        size="sm"
-                        className="w-6 h-6 p-1 rounded-full sub-tool-button"
-                        onClick={() => setSelectedShapeTool('circle')}
-                        title="Circle Shape"
-                      >
-                        <Circle className="w-3 h-3" />
-                      </Button>
-                      <Button
-                        variant={selectedShapeTool === 'line' ? 'default' : 'ghost'}
-                        size="sm"
-                        className="w-6 h-6 p-1 rounded-full sub-tool-button"
-                        onClick={() => setSelectedShapeTool('line')}
-                        title="Line Shape"
-                      >
-                        <Pen className="w-3 h-3" />
-                      </Button>
+                      <Tooltip content="Rectangle Shape">
+                        <Button
+                          variant={selectedShapeTool === 'rectangle' ? 'default' : 'ghost'}
+                          size="sm"
+                          className="w-6 h-6 p-1 rounded-full sub-tool-button"
+                          onClick={() => setSelectedShapeTool('rectangle')}
+                        >
+                          <Square className="w-3 h-3" />
+                        </Button>
+                      </Tooltip>
+                      <Tooltip content="Circle Shape">
+                        <Button
+                          variant={selectedShapeTool === 'circle' ? 'default' : 'ghost'}
+                          size="sm"
+                          className="w-6 h-6 p-1 rounded-full sub-tool-button"
+                          onClick={() => setSelectedShapeTool('circle')}
+                        >
+                          <Circle className="w-3 h-3" />
+                        </Button>
+                      </Tooltip>
+                      <Tooltip content="Line Shape">
+                        <Button
+                          variant={selectedShapeTool === 'line' ? 'default' : 'ghost'}
+                          size="sm"
+                          className="w-6 h-6 p-1 rounded-full sub-tool-button"
+                          onClick={() => setSelectedShapeTool('line')}
+                        >
+                          <Pen className="w-3 h-3" />
+                        </Button>
+                      </Tooltip>
                     </div>
                   )}
                 </div>
 
                 {/* Stamp Tool */}
                 <div className="relative">
-                  <Button
-                    variant={selectedTool === 'stamp' ? 'default' : 'ghost'}
-                    size="sm"
-                    className="w-7 h-7 p-1 rounded-full tool-button"
-                    onClick={() => setSelectedTool('stamp')}
-                    title="Stamp Tool - Group tiles into a stamp and place them together"
-                  >
-                    <Stamp className="w-3 h-3" />
-                  </Button>
+                  <Tooltip content="Stamp Tool - Group tiles into a stamp and place them together">
+                    <Button
+                      variant={selectedTool === 'stamp' ? 'default' : 'ghost'}
+                      size="sm"
+                      className="w-7 h-7 p-1 rounded-full tool-button"
+                      onClick={() => setSelectedTool('stamp')}
+                    >
+                      <Stamp className="w-3 h-3" />
+                    </Button>
+                  </Tooltip>
 
                   {selectedTool === 'stamp' && (
                     <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-2 min-w-[200px] z-10">
                       <div className="flex flex-col gap-2">
                         {/* Stamp Mode Controls */}
                         <div className="flex gap-1">
-                          <Button
-                            variant={stampMode === 'select' ? 'default' : 'ghost'}
-                            size="sm"
-                            className="flex-1 text-xs"
-                            onClick={() => setStampMode('select')}
-                            title="Select and place existing stamps"
-                          >
-                            Select
-                          </Button>
-                          <Button
-                            variant={stampMode === 'create' ? 'default' : 'ghost'}
-                            size="sm"
-                            className="flex-1 text-xs"
-                            onClick={() => setStampMode('create')}
-                            title="Create stamp from selection"
-                          >
-                            Create
-                          </Button>
+                          <Tooltip content="Select and place existing stamps">
+                            <Button
+                              variant={stampMode === 'select' ? 'default' : 'ghost'}
+                              size="sm"
+                              className="flex-1 text-xs"
+                              onClick={() => setStampMode('select')}
+                            >
+                              Select
+                            </Button>
+                          </Tooltip>
+                          <Tooltip content="Create stamp from selection">
+                            <Button
+                              variant={stampMode === 'create' ? 'default' : 'ghost'}
+                              size="sm"
+                              className="flex-1 text-xs"
+                              onClick={() => setStampMode('create')}
+                            >
+                              Create
+                            </Button>
+                          </Tooltip>
                         </div>
 
                         {/* Create Stamp Section */}
@@ -2333,15 +2364,16 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                                     >
                                       {stamp.name}
                                     </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="w-6 h-6 p-0 text-red-500"
-                                      onClick={() => handleDeleteStamp(stamp.id)}
-                                      title="Delete stamp"
-                                    >
-                                      <X className="w-3 h-3" />
-                                    </Button>
+                                    <Tooltip content="Delete stamp">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="w-6 h-6 p-0 text-red-500"
+                                        onClick={() => handleDeleteStamp(stamp.id)}
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </Button>
+                                    </Tooltip>
                                   </div>
                                 ))}
                               </div>
@@ -2354,15 +2386,16 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 </div>
 
                 {/* Eyedropper Tool */}
-                <Button
-                  variant={selectedTool === 'eyedropper' ? 'default' : 'ghost'}
-                  size="sm"
-                  className="w-7 h-7 p-1 rounded-full tool-button"
-                  onClick={() => setSelectedTool('eyedropper')}
-                  title="Eyedropper Tool - Pick a tile from the map to reuse"
-                >
-                  <Pipette className="w-3 h-3" />
-                </Button>
+                <Tooltip content="Eyedropper Tool - Pick a tile from the map to reuse">
+                  <Button
+                    variant={selectedTool === 'eyedropper' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="w-7 h-7 p-1 rounded-full tool-button"
+                    onClick={() => setSelectedTool('eyedropper')}
+                  >
+                    <Pipette className="w-3 h-3" />
+                  </Button>
+                </Tooltip>
               </div>
             </div>
           </div>
@@ -2372,52 +2405,56 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       {/* Fixed Export and Settings Buttons at Bottom of Screen */}
       <div className="fixed bottom-4 left-0 w-80 z-40">
         <div className="flex gap-2 justify-center px-4">
-          <Button 
-            onClick={handleExportMap} 
-            title="Export Flare map.txt and tileset definition"
-            className="shadow-sm flex items-center gap-1 px-3 py-1 h-7 text-xs"
-            size="sm"
-          >
-            <Download className="w-3 h-3" />
-            <span>Export Map</span>
-          </Button>
-          <Button 
-            onClick={handleManualSave}
-            title={hasUnsavedChanges ? "Save changes" : "All changes saved"}
-            className={`w-7 h-7 p-0 shadow-sm transition-colors ${
-              isManuallySaving 
-                ? 'bg-blue-500 hover:bg-blue-600' 
-                : hasUnsavedChanges 
-                  ? 'bg-orange-500 hover:bg-orange-600 text-white' 
-                  : 'bg-green-500 hover:bg-green-600 text-white'
-            }`}
-            disabled={isManuallySaving}
-            size="sm"
-          >
-            {isManuallySaving ? (
-              <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-            ) : (
-              <Save className="w-3 h-3" />
-            )}
-          </Button>
-          <Button 
-            onClick={() => setShowHelp(true)} 
-            title="Help & Documentation"
-            className="w-7 h-7 p-0 shadow-sm"
-            variant="outline"
-            size="sm"
-          >
-            <HelpCircle className="w-3 h-3" />
-          </Button>
-          <Button 
-            onClick={() => setShowSettings(true)} 
-            title="Map Settings"
-            className="w-7 h-7 p-0 shadow-sm"
-            variant="outline"
-            size="sm"
-          >
-            <Settings className="w-3 h-3" />
-          </Button>
+          <Tooltip content="Export Flare map.txt and tileset definition">
+            <Button 
+              onClick={handleExportMap} 
+              className="shadow-sm flex items-center gap-1 px-3 py-1 h-7 text-xs"
+              size="sm"
+            >
+              <Download className="w-3 h-3" />
+              <span>Export Map</span>
+            </Button>
+          </Tooltip>
+          <Tooltip content={hasUnsavedChanges ? 'Save changes' : 'All changes saved'}>
+            <Button 
+              onClick={handleManualSave}
+              className={`w-7 h-7 p-0 shadow-sm transition-colors ${
+                isManuallySaving 
+                  ? 'bg-blue-500 hover:bg-blue-600' 
+                  : hasUnsavedChanges 
+                    ? 'bg-orange-500 hover:bg-orange-600 text-white' 
+                    : 'bg-green-500 hover:bg-green-600 text-white'
+              }`}
+              disabled={isManuallySaving}
+              size="sm"
+            >
+              {isManuallySaving ? (
+                <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+              ) : (
+                <Save className="w-3 h-3" />
+              )}
+            </Button>
+          </Tooltip>
+          <Tooltip content="Help & Documentation">
+            <Button 
+              onClick={() => setShowHelp(true)} 
+              className="w-7 h-7 p-0 shadow-sm"
+              variant="outline"
+              size="sm"
+            >
+              <HelpCircle className="w-3 h-3" />
+            </Button>
+          </Tooltip>
+          <Tooltip content="Map Settings">
+            <Button 
+              onClick={() => setShowSettings(true)} 
+              className="w-7 h-7 p-0 shadow-sm"
+              variant="outline"
+              size="sm"
+            >
+              <Settings className="w-3 h-3" />
+            </Button>
+          </Tooltip>
         </div>
       </div>
       

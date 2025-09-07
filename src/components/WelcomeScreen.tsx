@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+import Tooltip from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import { Plus, FolderOpen, Grid3X3, Folder, Minus, Square, X } from 'lucide-react';
 
@@ -161,27 +162,30 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
         <div className="bg-gray-100 dark:bg-neutral-900 text-orange-600 dark:text-orange-400 flex justify-between items-center px-4 py-1 select-none drag-region border-b border-gray-200 dark:border-neutral-700">
           <div className="text-sm font-medium">Tile Map Editor</div>
           <div className="flex no-drag">
-            <button 
-              onClick={handleMinimize}
-              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
-              title="Minimize"
-            >
-              <Minus className="w-4 h-4" />
-            </button>
-            <button 
-              onClick={handleMaximize}
-              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
-              title="Maximize"
-            >
-              <Square className="w-4 h-4" />
-            </button>
-            <button 
-              onClick={handleClose}
-              className="text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
-              title="Close"
-            >
-              <X className="w-4 h-4" />
-            </button>
+            <Tooltip content="Minimize">
+              <button 
+                onClick={handleMinimize}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
+              >
+                <Minus className="w-4 h-4" />
+              </button>
+            </Tooltip>
+            <Tooltip content="Maximize">
+              <button 
+                onClick={handleMaximize}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
+              >
+                <Square className="w-4 h-4" />
+              </button>
+            </Tooltip>
+            <Tooltip content="Close">
+              <button 
+                onClick={handleClose}
+                className="text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </Tooltip>
           </div>
         </div>
         
@@ -283,27 +287,30 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
       <div className="bg-gray-100 dark:bg-neutral-900 text-orange-600 dark:text-orange-400 flex justify-between items-center px-4 py-1 select-none drag-region border-b border-gray-200 dark:border-neutral-700">
         <div className="text-sm font-medium">Flarism</div> {/* TODO: ADD A SMALL ICON BEFORE THIS TEXT */}
         <div className="flex no-drag">
-          <button 
-            onClick={handleMinimize}
-            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
-            title="Minimize"
-          >
-            <Minus className="w-4 h-4" />
-          </button>
-          <button 
-            onClick={handleMaximize}
-            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
-            title="Maximize"
-          >
-            <Square className="w-4 h-4" />
-          </button>
-          <button 
-            onClick={handleClose}
-            className="text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
-            title="Close"
-          >
-            <X className="w-4 h-4" />
-          </button>
+          <Tooltip content="Minimize">
+            <button 
+              onClick={handleMinimize}
+              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
+            >
+              <Minus className="w-4 h-4" />
+            </button>
+          </Tooltip>
+          <Tooltip content="Maximize">
+            <button 
+              onClick={handleMaximize}
+              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
+            >
+              <Square className="w-4 h-4" />
+            </button>
+          </Tooltip>
+          <Tooltip content="Close">
+            <button 
+              onClick={handleClose}
+              className="text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </Tooltip>
         </div>
       </div>
       

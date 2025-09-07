@@ -3885,6 +3885,54 @@ export class TileMapEditor {
     return '';
   }
 
+  // Generate a small top-down minimap as a PNG data URL for saving with the project
+  private generateMinimapDataUrl(): string {
+    try {
+      // Target max dimensions for the minimap image
+      const targetW = 160;
+      const targetH = 120;
+
+      // Determine pixel size for each map tile
+      const tilePixel = Math.max(1, Math.floor(Math.min(targetW / Math.max(1, this.mapWidth), targetH / Math.max(1, this.mapHeight))));
+      const canvasW = this.mapWidth * tilePixel;
+      const canvasH = this.mapHeight * tilePixel;
+
+      const c = document.createElement('canvas');
+      c.width = canvasW;
+      c.height = canvasH;
+      const ctx = c.getContext('2d');
+      if (!ctx) return '';
+
+      ctx.imageSmoothingEnabled = false;
+
+      // Fill with background
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvasW, canvasH);
+
+      // Draw tiles per layer using a consistent color mapping
+      for (let li = 0; li < this.tileLayers.length; li++) {
+        const layer = this.tileLayers[li];
+        if (!layer.visible) continue;
+        for (let y = 0; y < this.mapHeight; y++) {
+          for (let x = 0; x < this.mapWidth; x++) {
+            const idx = y * this.mapWidth + x;
+            const gid = layer.data[idx];
+            if (gid > 0) {
+              const hue = (gid * 137.5) % 360;
+              ctx.fillStyle = `hsl(${hue},55%,${li === 0 ? '45%' : '60%'})`;
+              ctx.fillRect(x * tilePixel, y * tilePixel, tilePixel, tilePixel);
+            }
+          }
+        }
+      }
+
+      return c.toDataURL('image/png');
+    } catch (e) {
+      console.warn('generateMinimapDataUrl failed', e);
+      return '';
+    }
+  }
+
   public loadFromLocalStorage(): boolean {
     try {
       const backupData = localStorage.getItem('tilemap_autosave_backup');
@@ -4020,6 +4068,8 @@ export class TileMapEditor {
         objects: this.objects,
         tilesets: tilesets,
         tilesetImages,
+  // Small minimap image (data URL) for welcome thumbnails and quick previews
+  minimap: this.generateMinimapDataUrl(),
         version: "1.0",
         // Global settings
         tileContentThreshold: this.tileContentThreshold,

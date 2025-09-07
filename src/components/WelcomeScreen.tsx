@@ -28,6 +28,7 @@ interface RecentMap {
 const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap, isDarkMode }) => {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [recentMaps, setRecentMaps] = useState<RecentMap[]>([]);
+  const [thumbnails, setThumbnails] = useState<Record<string, string | null>>({});
   const [mapConfig, setMapConfig] = useState<MapConfig>({
     name: 'New Map',
     width: 20,
@@ -43,6 +44,63 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
       setRecentMaps(JSON.parse(savedRecentMaps));
     }
   }, []);
+
+  // Load thumbnails for recent maps (try electron API, then file fallback)
+  useEffect(() => {
+    if (!recentMaps || recentMaps.length === 0) return;
+
+    const loadFor = async (map: RecentMap) => {
+      // If recentMaps entry already contains a thumbnailDataUrl, use it
+      // (Some flows might store it in localStorage)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const anyMap = map as any;
+      if (anyMap.thumbnailDataUrl) {
+        setThumbnails(prev => ({ ...prev, [map.id]: anyMap.thumbnailDataUrl }));
+        return;
+      }
+
+      try {
+        // Preferred: ask preload/electron to return a data URL for the project's minimap
+        // We check for a permissive API but gracefully continue if it doesn't exist
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const api: any = (window as any).electronAPI;
+        if (api && typeof api.getProjectThumbnail === 'function') {
+          const dataUrl = await api.getProjectThumbnail(map.path);
+          if (dataUrl) {
+            setThumbnails(prev => ({ ...prev, [map.id]: dataUrl }));
+            return;
+          }
+        }
+
+        // If the preload API doesn't provide thumbnails, avoid attempting file:// access
+        // from the renderer; it will be blocked by CSP in many dev setups. Instead
+        // we simply mark the thumbnail as unavailable and rely on the preload API
+        // or other flows to supply thumbnails.
+        if (!(api && typeof api.getProjectThumbnail === 'function')) {
+          setThumbnails(prev => ({ ...prev, [map.id]: null }));
+          return;
+        }
+      } catch (e) {
+        console.error('Failed to load thumbnail for', map.path, e);
+      }
+
+      // No thumbnail available
+      setThumbnails(prev => ({ ...prev, [map.id]: null }));
+    };
+
+    recentMaps.forEach(m => {
+      // kick off loading but do not block render
+      loadFor(m);
+    });
+
+    // Cleanup: revoke object URLs on unmount
+    return () => {
+      Object.values(thumbnails).forEach(v => {
+        if (v && v.startsWith('blob:')) URL.revokeObjectURL(v);
+      });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recentMaps]);
 
   // Save recent maps to localStorage
   const saveRecentMaps = (maps: RecentMap[]) => {
@@ -327,8 +385,14 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
                   onClick={() => handleOpenRecentMap(map)}
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-orange-100 dark:bg-orange-900 rounded flex items-center justify-center">
-                      <Grid3X3 className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                    <div className="w-20 h-20 bg-orange-100 dark:bg-orange-900 rounded overflow-hidden flex items-center justify-center">
+                      {thumbnails[map.id] ? (
+                        <img src={thumbnails[map.id] || ''} alt={`${map.name} thumbnail`} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Grid3X3 className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                        </div>
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-gray-900 dark:text-white truncate">{map.name}</p>
@@ -342,7 +406,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
 
           {recentMaps.length === 0 && (
             <div className="text-center text-gray-500 dark:text-gray-400 py-8">
-              <Grid3X3 className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-gray-600" />
+              <Grid3X3 className="w-20 h-20 mx-auto mb-3 text-gray-300 dark:text-gray-600" />
               <p>No recent project</p>
               <p className="text-sm">Create your first projet to get started</p>
             </div>

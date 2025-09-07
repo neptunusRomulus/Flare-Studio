@@ -295,6 +295,18 @@ ipcMain.handle('save-map-project', async (event, projectPath, mapData) => {
     } else {
       console.log('No tileset images to save');
     }
+
+    // Save minimap image if provided in mapData.minimap
+    try {
+      if (mapData.minimap && typeof mapData.minimap === 'string' && mapData.minimap.startsWith('data:image')) {
+        const minimapBase64 = mapData.minimap.replace(/^data:image\/[a-z]+;base64,/, '');
+        const minimapPath = path.join(projectPath, 'assets', 'minimap.png');
+        fs.writeFileSync(minimapPath, minimapBase64, 'base64');
+        console.log('Saved minimap to:', minimapPath);
+      }
+    } catch (mmErr) {
+      console.warn('Failed to save minimap:', mmErr);
+    }
     
     console.log('Map project saved successfully:', mapConfigPath);
     return true;
@@ -342,6 +354,21 @@ ipcMain.handle('discover-tileset-images', async (event, projectPath) => {
   } catch (e) {
     console.warn('discover-tileset-images failed:', e);
     return { tilesetImages: {}, tilesets: [] };
+  }
+});
+
+// Return project minimap thumbnail (data URL) if available
+ipcMain.handle('get-project-thumbnail', async (event, projectPath) => {
+  try {
+    if (!projectPath) return null;
+    const minimapPath = path.join(projectPath, 'assets', 'minimap.png');
+    if (!fs.existsSync(minimapPath)) return null;
+    const buf = fs.readFileSync(minimapPath);
+    const b64 = buf.toString('base64');
+    return `data:image/png;base64,${b64}`;
+  } catch (e) {
+    console.warn('get-project-thumbnail failed:', e);
+    return null;
   }
 });
 

@@ -1628,32 +1628,64 @@ export class TileMapEditor {
     // Save current context state
     this.ctx.save();
 
-    // Draw minimap background - adapt to dark mode
+    // Draw minimap background and border with rounded corners
+    const outerPad = 5;
+    const outerX = x - outerPad;
+    const outerY = y - outerPad;
+    const outerW = minimapWidth + outerPad * 2;
+    const outerH = minimapHeight + outerPad * 2;
+    const outerRadius = Math.min(12, Math.floor(Math.min(outerW, outerH) / 6));
+
+    const innerRadius = Math.min(8, Math.floor(Math.min(minimapWidth, minimapHeight) / 8));
+
+    // helper to create rounded rect path
+    const roundedRectPath = (rx: number, ry: number, rw: number, rh: number, rr: number) => {
+      const r = Math.max(0, Math.min(rr, Math.min(rw, rh) / 2));
+      this.ctx.beginPath();
+      this.ctx.moveTo(rx + r, ry);
+      this.ctx.lineTo(rx + rw - r, ry);
+      this.ctx.quadraticCurveTo(rx + rw, ry, rx + rw, ry + r);
+      this.ctx.lineTo(rx + rw, ry + rh - r);
+      this.ctx.quadraticCurveTo(rx + rw, ry + rh, rx + rw - r, ry + rh);
+      this.ctx.lineTo(rx + r, ry + rh);
+      this.ctx.quadraticCurveTo(rx, ry + rh, rx, ry + rh - r);
+      this.ctx.lineTo(rx, ry + r);
+      this.ctx.quadraticCurveTo(rx, ry, rx + r, ry);
+      this.ctx.closePath();
+    };
+
+    // Outer background (slightly transparent)
     this.ctx.fillStyle = this.isDarkMode ? 'rgba(42, 42, 42, 0.9)' : 'rgba(0, 0, 0, 0.7)';
-    this.ctx.fillRect(x - 5, y - 5, minimapWidth + 10, minimapHeight + 10);
+    roundedRectPath(outerX, outerY, outerW, outerH, outerRadius);
+    this.ctx.fill();
 
+    // Inner minimap background
     this.ctx.fillStyle = this.isDarkMode ? '#2a2a2a' : '#f0f0f0';
-    this.ctx.fillRect(x, y, minimapWidth, minimapHeight);
+    roundedRectPath(x, y, minimapWidth, minimapHeight, innerRadius);
+    this.ctx.fill();
 
-    // Draw border - light gray in dark mode, dark gray in light mode
+    // Draw border with rounded corners
     this.ctx.strokeStyle = this.isDarkMode ? '#999' : '#333';
     this.ctx.lineWidth = 1;
-    this.ctx.strokeRect(x, y, minimapWidth, minimapHeight);
+    roundedRectPath(x, y, minimapWidth, minimapHeight, innerRadius);
+    this.ctx.stroke();
 
-    // Calculate orthogonal scale for minimap (not isometric)
-    const orthogonalTileWidth = 8; // Small tile size for minimap
-    const orthogonalTileHeight = 8;
-    const scaleX = minimapWidth / (this.mapWidth * orthogonalTileWidth);
-    const scaleY = minimapHeight / (this.mapHeight * orthogonalTileHeight);
-    const scale = Math.min(scaleX, scaleY);
+    // Calculate crisp integer tile pixel size to ensure squares (disable fractional scaling)
+    // We choose the largest integer tile size that fits both directions.
+    const maxTileWidth = Math.floor(minimapWidth / this.mapWidth) || 1;
+    const maxTileHeight = Math.floor(minimapHeight / this.mapHeight) || 1;
+    const tilePixel = Math.max(1, Math.min(maxTileWidth, maxTileHeight));
 
-    // Center the map within the minimap
-    const mapPixelWidth = this.mapWidth * orthogonalTileWidth * scale;
-    const mapPixelHeight = this.mapHeight * orthogonalTileHeight * scale;
-    const offsetX = x + (minimapWidth - mapPixelWidth) / 2;
-    const offsetY = y + (minimapHeight - mapPixelHeight) / 2;
+    // Recompute centered offsets using integer math so tiles align to pixel grid
+    const mapPixelWidth = this.mapWidth * tilePixel;
+    const mapPixelHeight = this.mapHeight * tilePixel;
+    const offsetX = x + Math.floor((minimapWidth - mapPixelWidth) / 2);
+    const offsetY = y + Math.floor((minimapHeight - mapPixelHeight) / 2);
 
-    // Draw tiles in orthogonal view
+  // Disable smoothing for pixel-perfect minimap (modern engines)
+  this.ctx.imageSmoothingEnabled = false;
+
+    // Draw tiles in orthogonal (top-down) view using square pixels
     for (let layerIndex = 0; layerIndex < this.tileLayers.length; layerIndex++) {
       const layer = this.tileLayers[layerIndex];
       if (!layer.visible) continue;
@@ -1664,13 +1696,27 @@ export class TileMapEditor {
           const gid = layer.data[index];
 
           if (gid > 0) {
-            const pixelX = offsetX + tileX * orthogonalTileWidth * scale;
-            const pixelY = offsetY + tileY * orthogonalTileHeight * scale;
+            const pixelX = offsetX + tileX * tilePixel;
+            const pixelY = offsetY + tileY * tilePixel;
 
-            // Draw a simple colored rectangle for each tile
-            this.ctx.fillStyle = `hsl(${(gid * 137.5) % 360}, 50%, 50%)`;
-            this.ctx.fillRect(pixelX, pixelY, orthogonalTileWidth * scale, orthogonalTileHeight * scale);
+            // Use a stable color mapping per GID but slightly desaturated for minimap clarity
+            const hue = (gid * 137.5) % 360;
+            this.ctx.fillStyle = `hsl(${hue}, 55%, ${layerIndex === 0 ? '45%' : '60%'})`;
+            this.ctx.fillRect(pixelX, pixelY, tilePixel, tilePixel);
           }
+        }
+      }
+    }
+
+    // Optional subtle grid for clarity when tiles are large enough
+    if (tilePixel >= 3) {
+      this.ctx.strokeStyle = this.isDarkMode ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.05)';
+      this.ctx.lineWidth = 0.5;
+      for (let ty = 0; ty < this.mapHeight; ty++) {
+        for (let tx = 0; tx < this.mapWidth; tx++) {
+          const gx = offsetX + tx * tilePixel + 0.25;
+          const gy = offsetY + ty * tilePixel + 0.25;
+          this.ctx.strokeRect(gx, gy, tilePixel - 0.5, tilePixel - 0.5);
         }
       }
     }

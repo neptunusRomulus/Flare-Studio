@@ -27,6 +27,19 @@ export interface MapObject {
   width: number;
   height: number;
   properties: Record<string, string>;
+  // Flare-specific extensions
+  category?: string;      // For enemies: antlion, antlion_hatchling, etc.
+  level?: number;         // For enemies: difficulty level
+  number?: number;        // For enemies: spawn count
+  wander_radius?: number; // For enemies: movement range
+  activate?: string;      // For events: on_trigger, on_load, etc.
+  hotspot?: string;       // For events: location, click, etc.
+  intermap?: string;      // For events: map transitions
+  loot?: string;          // For events: treasure/loot table
+  soundfx?: string;       // For events: sound effects
+  mapmod?: string;        // For events: map modifications
+  repeat?: boolean;       // For events: can be triggered multiple times
+  tooltip?: string;       // For events: hover text
 }
 
 export interface ExportTMXParams {
@@ -59,6 +72,7 @@ export interface ExportFlareTXTParams {
   heroPos?: string;
   music?: string;
   title?: string;
+  tilesetDefs?: string[]; // For [tilesets] section
 }
 
 export interface FlareEvent {

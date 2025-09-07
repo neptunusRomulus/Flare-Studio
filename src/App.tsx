@@ -57,7 +57,7 @@ function App() {
   // Clear layer confirmation dialog state (replaces window.confirm)
   const [showClearLayerDialog, setShowClearLayerDialog] = useState(false);
   // Generic confirmation dialog for other destructive actions
-  const [confirmAction, setConfirmAction] = useState<null | { type: 'removeBrush' | 'removeTileset'; payload?: any }>(null);
+  const [confirmAction, setConfirmAction] = useState<null | { type: 'removeBrush' | 'removeTileset'; payload?: number }>(null);
   
   // Settings states
   const [mapName, setMapName] = useState('Untitled Map');
@@ -2079,323 +2079,315 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 </div>
               </div>
             )}
-          </div>
-          
-          {/* Toolbar */}
-          <div className="flex-shrink-0 bg-gray-50 dark:bg-neutral-900 border-t border-border p-2">
-            <div className="flex gap-1 justify-center">
-              
-              {/* Brush Tool */}
-              <div className="relative">
-                <Button
-                  variant={selectedTool === 'brush' ? 'default' : 'ghost'}
-                  size="sm"
-                  className="w-8 h-8 p-0 tool-button"
-                  onClick={() => setSelectedTool('brush')}
-                  onMouseEnter={(e) => {
-                    handleShowBrushOptions();
-                    showTooltipWithDelay('Brush Tool', e.currentTarget);
-                  }}
-                  onMouseLeave={() => {
-                    handleHideBrushOptions();
-                    hideTooltip();
-                  }}
-                >
-                  {getBrushIcon()}
-                </Button>
-                
-                {showBrushOptions && (
-                  <div 
-                    className="absolute bottom-full left-0 mb-1 bg-white dark:bg-neutral-900 border border-border rounded shadow-lg p-1 flex gap-1 min-w-max z-50"
-                    onMouseEnter={handleShowBrushOptions}
-                    onMouseLeave={handleHideBrushOptions}
+            {/* Floating Toolbar (inside canvas, centered, pill-sized) */}
+            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-30">
+              <div className="flex items-center gap-1 bg-white/90 dark:bg-neutral-900/90 border border-border rounded-full px-2 py-1 shadow-md">
+                {/* Brush Tool */}
+                <div className="relative">
+                  <Button
+                    variant={selectedTool === 'brush' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="w-7 h-7 p-1 rounded-full tool-button"
+                    onClick={() => setSelectedTool('brush')}
+                    onMouseEnter={(e) => {
+                      handleShowBrushOptions();
+                      showTooltipWithDelay('Brush Tool', e.currentTarget);
+                    }}
+                    onMouseLeave={() => {
+                      handleHideBrushOptions();
+                      hideTooltip();
+                    }}
                   >
-                    <Button 
-                      variant={selectedBrushTool === 'brush' ? 'default' : 'ghost'} 
-                      size="sm" 
-                      className="w-8 h-8 p-0 sub-tool-button"
-                      onClick={() => setSelectedBrushTool('brush')}
-                      onMouseEnter={(e) => showTooltipWithDelay('Brush Tool', e.currentTarget)}
-                      onMouseLeave={hideTooltip}
-                    >
-                      <Paintbrush2 className="w-4 h-4" />
-                    </Button>
-                    <Button 
-                      variant={selectedBrushTool === 'bucket' ? 'default' : 'ghost'} 
-                      size="sm" 
-                      className="w-8 h-8 p-0 sub-tool-button"
-                      onClick={() => setSelectedBrushTool('bucket')}
-                      onMouseEnter={(e) => showTooltipWithDelay('Bucket Fill', e.currentTarget)}
-                      onMouseLeave={hideTooltip}
-                    >
-                      <PaintBucket className="w-4 h-4" />
-                    </Button>
-                    <Button 
-                      variant={selectedBrushTool === 'eraser' ? 'default' : 'ghost'} 
-                      size="sm" 
-                      className="w-8 h-8 p-0 sub-tool-button"
-                      onClick={() => setSelectedBrushTool('eraser')}
-                      onMouseEnter={(e) => showTooltipWithDelay('Eraser', e.currentTarget)}
-                      onMouseLeave={hideTooltip}
-                    >
-                      <Eraser className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant={selectedBrushTool === 'clear' ? 'default' : 'ghost'}
-                      size="sm"
-                      className="w-8 h-8 p-0 sub-tool-button border-red-500 hover:border-red-600 hover:bg-red-50"
-                      onClick={() => {
-                        // Open an inline dialog instead of using window.confirm
-                        setShowClearLayerDialog(true);
-                      }}
-                      onMouseEnter={(e) => showTooltipWithDelay('Clear Layer', e.currentTarget)}
-                      onMouseLeave={hideTooltip}
-                    >
-                      <X className="w-4 h-4 text-red-500" />
-                    </Button>
-                  </div>
-                )}
-              </div>
+                    {getBrushIcon()}
+                  </Button>
 
-              {/* Selection Tool */}
-              <div className="relative">
-                <Button
-                  variant={selectedTool === 'selection' ? 'default' : 'ghost'}
-                  size="sm"
-                  className="w-8 h-8 p-0 tool-button"
-                  onClick={() => setSelectedTool('selection')}
-                  onMouseEnter={(e) => {
-                    handleShowSelectionOptions();
-                    showTooltipWithDelay('Selection Tool', e.currentTarget);
-                  }}
-                  onMouseLeave={() => {
-                    handleHideSelectionOptions();
-                    hideTooltip();
-                  }}
-                >
-                  {getSelectionIcon()}
-                </Button>
-                
-                {showSelectionOptions && (
-                  <div 
-                    className="absolute bottom-full left-0 mb-1 bg-white dark:bg-neutral-900 border border-border rounded shadow-lg p-1 flex gap-1 min-w-max z-50"
-                    onMouseEnter={handleShowSelectionOptions}
-                    onMouseLeave={handleHideSelectionOptions}
-                  >
-                    <Button 
-                      variant={selectedSelectionTool === 'rectangular' ? 'default' : 'ghost'} 
-                      size="sm" 
-                      className="w-8 h-8 p-0 sub-tool-button"
-                      onClick={() => setSelectedSelectionTool('rectangular')}
-                      onMouseEnter={(e) => showTooltipWithDelay('Rectangular Selection', e.currentTarget)}
-                      onMouseLeave={hideTooltip}
+                  {showBrushOptions && (
+                    <div
+                      className="absolute bottom-full left-0 mb-1 bg-white dark:bg-neutral-900 border border-border rounded shadow-lg p-1 flex gap-1 min-w-max z-50"
+                      onMouseEnter={handleShowBrushOptions}
+                      onMouseLeave={handleHideBrushOptions}
                     >
-                      <Square className="w-4 h-4" />
-                    </Button>
-                    <Button 
-                      variant={selectedSelectionTool === 'magic-wand' ? 'default' : 'ghost'} 
-                      size="sm" 
-                      className="w-8 h-8 p-0 sub-tool-button"
-                      onClick={() => setSelectedSelectionTool('magic-wand')}
-                      onMouseEnter={(e) => showTooltipWithDelay('Magic Wand', e.currentTarget)}
-                      onMouseLeave={hideTooltip}
-                    >
-                      <Wand2 className="w-4 h-4" />
-                    </Button>
-                    <Button 
-                      variant={selectedSelectionTool === 'same-tile' ? 'default' : 'ghost'} 
-                      size="sm" 
-                      className="w-8 h-8 p-0 sub-tool-button"
-                      onClick={() => setSelectedSelectionTool('same-tile')}
-                      onMouseEnter={(e) => showTooltipWithDelay('Select Same Tile', e.currentTarget)}
-                      onMouseLeave={hideTooltip}
-                    >
-                      <Target className="w-4 h-4" />
-                    </Button>
-                    <Button 
-                      variant={selectedSelectionTool === 'circular' ? 'default' : 'ghost'} 
-                      size="sm" 
-                      className="w-8 h-8 p-0 sub-tool-button"
-                      onClick={() => setSelectedSelectionTool('circular')}
-                      onMouseEnter={(e) => showTooltipWithDelay('Circular Select', e.currentTarget)}
-                      onMouseLeave={hideTooltip}
-                    >
-                      <Circle className="w-4 h-4" />
-                    </Button>
-                  </div>
-                )}
-              </div>
-
-              {/* Shape Tool */}
-              <div className="relative">
-                <Button
-                  variant={selectedTool === 'shape' ? 'default' : 'ghost'}
-                  size="sm"
-                  className="w-8 h-8 p-0 tool-button"
-                  onClick={() => setSelectedTool('shape')}
-                  onMouseEnter={() => handleShowShapeOptions()}
-                  onMouseLeave={() => handleHideShapeOptions()}
-                  title="Shape Tool"
-                >
-                  {getShapeIcon()}
-                </Button>
-                
-                {showShapeOptions && (
-                  <div 
-                    className="absolute bottom-full left-0 mb-1 bg-white dark:bg-neutral-900 border border-border rounded shadow-lg p-1 flex gap-1 min-w-max z-50"
-                    onMouseEnter={handleShowShapeOptions}
-                    onMouseLeave={handleHideShapeOptions}
-                  >
-                    <Button 
-                      variant={selectedShapeTool === 'rectangle' ? 'default' : 'ghost'} 
-                      size="sm" 
-                      className="w-8 h-8 p-0 sub-tool-button"
-                      onClick={() => setSelectedShapeTool('rectangle')}
-                      title="Rectangle Shape"
-                    >
-                      <Square className="w-4 h-4" />
-                    </Button>
-                    <Button 
-                      variant={selectedShapeTool === 'circle' ? 'default' : 'ghost'} 
-                      size="sm" 
-                      className="w-8 h-8 p-0 sub-tool-button"
-                      onClick={() => setSelectedShapeTool('circle')}
-                      title="Circle Shape"
-                    >
-                      <Circle className="w-4 h-4" />
-                    </Button>
-                    <Button 
-                      variant={selectedShapeTool === 'line' ? 'default' : 'ghost'} 
-                      size="sm" 
-                      className="w-8 h-8 p-0 sub-tool-button"
-                      onClick={() => setSelectedShapeTool('line')}
-                      title="Line Shape"
-                    >
-                      <Pen className="w-4 h-4" />
-                    </Button>
-                  </div>
-                )}
-              </div>
-
-              {/* Stamp Tool */}
-              <div className="relative">
-                <Button
-                  variant={selectedTool === 'stamp' ? 'default' : 'ghost'}
-                  size="sm"
-                  className="w-8 h-8 p-0 tool-button"
-                  onClick={() => setSelectedTool('stamp')}
-                  title="Stamp Tool - Group tiles into a stamp and place them together"
-                >
-                  <Stamp className="w-4 h-4" />
-                </Button>
-
-                {selectedTool === 'stamp' && (
-                  <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-2 min-w-[200px] z-10">
-                    <div className="flex flex-col gap-2">
-                      {/* Stamp Mode Controls */}
-                      <div className="flex gap-1">
-                        <Button
-                          variant={stampMode === 'select' ? 'default' : 'ghost'}
-                          size="sm"
-                          className="flex-1 text-xs"
-                          onClick={() => setStampMode('select')}
-                          title="Select and place existing stamps"
-                        >
-                          Select
-                        </Button>
-                        <Button
-                          variant={stampMode === 'create' ? 'default' : 'ghost'}
-                          size="sm"
-                          className="flex-1 text-xs"
-                          onClick={() => setStampMode('create')}
-                          title="Create stamp from selection"
-                        >
-                          Create
-                        </Button>
-                      </div>
-
-                      {/* Create Stamp Section */}
-                      {stampMode === 'create' && (
-                        <div className="border-t pt-2">
-                          <div className="text-xs font-medium mb-1">Create New Stamp</div>
-                          <div className="flex gap-1">
-                            <input
-                              type="text"
-                              placeholder="Stamp name"
-                              value={newStampName}
-                              onChange={(e) => setNewStampName(e.target.value)}
-                              className="flex-1 text-xs px-2 py-1 border rounded"
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                  handleCreateStamp();
-                                }
-                              }}
-                            />
-                            <Button
-                              size="sm"
-                              className="text-xs"
-                              onClick={handleCreateStamp}
-                              disabled={!newStampName.trim()}
-                            >
-                              Create
-                            </Button>
-                          </div>
-                          <div className="text-xs text-gray-500 mt-1">
-                            First select tiles, then create stamp
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Stamps List */}
-                      {stampMode === 'select' && (
-                        <div className="border-t pt-2 max-h-32 overflow-y-auto">
-                          <div className="text-xs font-medium mb-1">Available Stamps</div>
-                          {stamps.length === 0 ? (
-                            <div className="text-xs text-gray-500">No stamps created yet</div>
-                          ) : (
-                            <div className="flex flex-col gap-1">
-                              {stamps.map((stamp) => (
-                                <div key={stamp.id} className="flex items-center gap-1">
-                                  <Button
-                                    variant={selectedStamp === stamp.id ? 'default' : 'ghost'}
-                                    size="sm"
-                                    className="flex-1 text-xs justify-start"
-                                    onClick={() => handleStampSelect(stamp.id)}
-                                    title={`${stamp.name} (${stamp.width}x${stamp.height})`}
-                                  >
-                                    {stamp.name}
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="w-6 h-6 p-0 text-red-500"
-                                    onClick={() => handleDeleteStamp(stamp.id)}
-                                    title="Delete stamp"
-                                  >
-                                    <X className="w-3 h-3" />
-                                  </Button>
-                                                               </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
+                      <Button
+                        variant={selectedBrushTool === 'brush' ? 'default' : 'ghost'}
+                        size="sm"
+                        className="w-6 h-6 p-1 rounded-full sub-tool-button"
+                        onClick={() => setSelectedBrushTool('brush')}
+                        onMouseEnter={(e) => showTooltipWithDelay('Brush Tool', e.currentTarget)}
+                        onMouseLeave={hideTooltip}
+                      >
+                        <Paintbrush2 className="w-3 h-3" />
+                      </Button>
+                      <Button
+                        variant={selectedBrushTool === 'bucket' ? 'default' : 'ghost'}
+                        size="sm"
+                        className="w-6 h-6 p-1 rounded-full sub-tool-button"
+                        onClick={() => setSelectedBrushTool('bucket')}
+                        onMouseEnter={(e) => showTooltipWithDelay('Bucket Fill', e.currentTarget)}
+                        onMouseLeave={hideTooltip}
+                      >
+                        <PaintBucket className="w-3 h-3" />
+                      </Button>
+                      <Button
+                        variant={selectedBrushTool === 'eraser' ? 'default' : 'ghost'}
+                        size="sm"
+                        className="w-6 h-6 p-1 rounded-full sub-tool-button"
+                        onClick={() => setSelectedBrushTool('eraser')}
+                        onMouseEnter={(e) => showTooltipWithDelay('Eraser', e.currentTarget)}
+                        onMouseLeave={hideTooltip}
+                      >
+                        <Eraser className="w-3 h-3" />
+                      </Button>
+                      <Button
+                        variant={selectedBrushTool === 'clear' ? 'default' : 'ghost'}
+                        size="sm"
+                        className="w-6 h-6 p-1 rounded-full sub-tool-button border-red-500 hover:border-red-600 hover:bg-red-50"
+                        onClick={() => setShowClearLayerDialog(true)}
+                        onMouseEnter={(e) => showTooltipWithDelay('Clear Layer', e.currentTarget)}
+                        onMouseLeave={hideTooltip}
+                      >
+                        <X className="w-3 h-3 text-red-500" />
+                      </Button>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
+
+                {/* Selection Tool */}
+                <div className="relative">
+                  <Button
+                    variant={selectedTool === 'selection' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="w-7 h-7 p-1 rounded-full tool-button"
+                    onClick={() => setSelectedTool('selection')}
+                    onMouseEnter={(e) => {
+                      handleShowSelectionOptions();
+                      showTooltipWithDelay('Selection Tool', e.currentTarget);
+                    }}
+                    onMouseLeave={() => {
+                      handleHideSelectionOptions();
+                      hideTooltip();
+                    }}
+                  >
+                    {getSelectionIcon()}
+                  </Button>
+
+                  {showSelectionOptions && (
+                    <div
+                      className="absolute bottom-full left-0 mb-1 bg-white dark:bg-neutral-900 border border-border rounded shadow-lg p-1 flex gap-1 min-w-max z-50"
+                      onMouseEnter={handleShowSelectionOptions}
+                      onMouseLeave={handleHideSelectionOptions}
+                    >
+                      <Button
+                        variant={selectedSelectionTool === 'rectangular' ? 'default' : 'ghost'}
+                        size="sm"
+                        className="w-6 h-6 p-1 rounded-full sub-tool-button"
+                        onClick={() => setSelectedSelectionTool('rectangular')}
+                        onMouseEnter={(e) => showTooltipWithDelay('Rectangular Selection', e.currentTarget)}
+                        onMouseLeave={hideTooltip}
+                      >
+                        <Square className="w-3 h-3" />
+                      </Button>
+                      <Button
+                        variant={selectedSelectionTool === 'magic-wand' ? 'default' : 'ghost'}
+                        size="sm"
+                        className="w-6 h-6 p-1 rounded-full sub-tool-button"
+                        onClick={() => setSelectedSelectionTool('magic-wand')}
+                        onMouseEnter={(e) => showTooltipWithDelay('Magic Wand', e.currentTarget)}
+                        onMouseLeave={hideTooltip}
+                      >
+                        <Wand2 className="w-3 h-3" />
+                      </Button>
+                      <Button
+                        variant={selectedSelectionTool === 'same-tile' ? 'default' : 'ghost'}
+                        size="sm"
+                        className="w-6 h-6 p-1 rounded-full sub-tool-button"
+                        onClick={() => setSelectedSelectionTool('same-tile')}
+                        onMouseEnter={(e) => showTooltipWithDelay('Select Same Tile', e.currentTarget)}
+                        onMouseLeave={hideTooltip}
+                      >
+                        <Target className="w-3 h-3" />
+                      </Button>
+                      <Button
+                        variant={selectedSelectionTool === 'circular' ? 'default' : 'ghost'}
+                        size="sm"
+                        className="w-6 h-6 p-1 rounded-full sub-tool-button"
+                        onClick={() => setSelectedSelectionTool('circular')}
+                        onMouseEnter={(e) => showTooltipWithDelay('Circular Select', e.currentTarget)}
+                        onMouseLeave={hideTooltip}
+                      >
+                        <Circle className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Shape Tool */}
+                <div className="relative">
+                  <Button
+                    variant={selectedTool === 'shape' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="w-7 h-7 p-1 rounded-full tool-button"
+                    onClick={() => setSelectedTool('shape')}
+                    onMouseEnter={() => handleShowShapeOptions()}
+                    onMouseLeave={() => handleHideShapeOptions()}
+                    title="Shape Tool"
+                  >
+                    {getShapeIcon()}
+                  </Button>
+
+                  {showShapeOptions && (
+                    <div
+                      className="absolute bottom-full left-0 mb-1 bg-white dark:bg-neutral-900 border border-border rounded shadow-lg p-1 flex gap-1 min-w-max z-50"
+                      onMouseEnter={handleShowShapeOptions}
+                      onMouseLeave={handleHideShapeOptions}
+                    >
+                      <Button
+                        variant={selectedShapeTool === 'rectangle' ? 'default' : 'ghost'}
+                        size="sm"
+                        className="w-6 h-6 p-1 rounded-full sub-tool-button"
+                        onClick={() => setSelectedShapeTool('rectangle')}
+                        title="Rectangle Shape"
+                      >
+                        <Square className="w-3 h-3" />
+                      </Button>
+                      <Button
+                        variant={selectedShapeTool === 'circle' ? 'default' : 'ghost'}
+                        size="sm"
+                        className="w-6 h-6 p-1 rounded-full sub-tool-button"
+                        onClick={() => setSelectedShapeTool('circle')}
+                        title="Circle Shape"
+                      >
+                        <Circle className="w-3 h-3" />
+                      </Button>
+                      <Button
+                        variant={selectedShapeTool === 'line' ? 'default' : 'ghost'}
+                        size="sm"
+                        className="w-6 h-6 p-1 rounded-full sub-tool-button"
+                        onClick={() => setSelectedShapeTool('line')}
+                        title="Line Shape"
+                      >
+                        <Pen className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Stamp Tool */}
+                <div className="relative">
+                  <Button
+                    variant={selectedTool === 'stamp' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="w-7 h-7 p-1 rounded-full tool-button"
+                    onClick={() => setSelectedTool('stamp')}
+                    title="Stamp Tool - Group tiles into a stamp and place them together"
+                  >
+                    <Stamp className="w-3 h-3" />
+                  </Button>
+
+                  {selectedTool === 'stamp' && (
+                    <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-2 min-w-[200px] z-10">
+                      <div className="flex flex-col gap-2">
+                        {/* Stamp Mode Controls */}
+                        <div className="flex gap-1">
+                          <Button
+                            variant={stampMode === 'select' ? 'default' : 'ghost'}
+                            size="sm"
+                            className="flex-1 text-xs"
+                            onClick={() => setStampMode('select')}
+                            title="Select and place existing stamps"
+                          >
+                            Select
+                          </Button>
+                          <Button
+                            variant={stampMode === 'create' ? 'default' : 'ghost'}
+                            size="sm"
+                            className="flex-1 text-xs"
+                            onClick={() => setStampMode('create')}
+                            title="Create stamp from selection"
+                          >
+                            Create
+                          </Button>
+                        </div>
+
+                        {/* Create Stamp Section */}
+                        {stampMode === 'create' && (
+                          <div className="border-t pt-2">
+                            <div className="text-xs font-medium mb-1">Create New Stamp</div>
+                            <div className="flex gap-1">
+                              <input
+                                type="text"
+                                placeholder="Stamp name"
+                                value={newStampName}
+                                onChange={(e) => setNewStampName(e.target.value)}
+                                className="flex-1 text-xs px-2 py-1 border rounded"
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    handleCreateStamp();
+                                  }
+                                }}
+                              />
+                              <Button
+                                size="sm"
+                                className="text-xs"
+                                onClick={handleCreateStamp}
+                                disabled={!newStampName.trim()}
+                              >
+                                Create
+                              </Button>
+                            </div>
+                            <div className="text-xs text-gray-500 mt-1">First select tiles, then create stamp</div>
+                          </div>
+                        )}
+
+                        {/* Stamps List */}
+                        {stampMode === 'select' && (
+                          <div className="border-t pt-2 max-h-32 overflow-y-auto">
+                            <div className="text-xs font-medium mb-1">Available Stamps</div>
+                            {stamps.length === 0 ? (
+                              <div className="text-xs text-gray-500">No stamps created yet</div>
+                            ) : (
+                              <div className="flex flex-col gap-1">
+                                {stamps.map((stamp) => (
+                                  <div key={stamp.id} className="flex items-center gap-1">
+                                    <Button
+                                      variant={selectedStamp === stamp.id ? 'default' : 'ghost'}
+                                      size="sm"
+                                      className="flex-1 text-xs justify-start"
+                                      onClick={() => handleStampSelect(stamp.id)}
+                                      title={`${stamp.name} (${stamp.width}x${stamp.height})`}
+                                    >
+                                      {stamp.name}
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="w-6 h-6 p-0 text-red-500"
+                                      onClick={() => handleDeleteStamp(stamp.id)}
+                                      title="Delete stamp"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </Button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Eyedropper Tool */}
+                <Button
+                  variant={selectedTool === 'eyedropper' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="w-7 h-7 p-1 rounded-full tool-button"
+                  onClick={() => setSelectedTool('eyedropper')}
+                  title="Eyedropper Tool - Pick a tile from the map to reuse"
+                >
+                  <Pipette className="w-3 h-3" />
+                </Button>
               </div>
-
-              {/* Eyedropper Tool */}
-              <Button
-                variant={selectedTool === 'eyedropper' ? 'default' : 'ghost'}
-                size="sm"
-                className="w-8 h-8 p-0 tool-button"
-                onClick={() => setSelectedTool('eyedropper')}
-                title="Eyedropper Tool - Pick a tile from the map to reuse"
-              >
-                <Pipette className="w-4 h-4" />
-              </Button>
-
             </div>
           </div>
         </section>

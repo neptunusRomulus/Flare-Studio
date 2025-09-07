@@ -94,6 +94,8 @@ function App() {
   const brushOptionsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const selectionOptionsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const shapeOptionsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Floating toolbar ref for anchored tooltip
+  const toolbarRef = useRef<HTMLDivElement | null>(null);
   
   // Hover coordinates state
   const [hoverCoords, setHoverCoords] = useState<{ x: number; y: number } | null>(null);
@@ -309,17 +311,39 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
 
   // Custom tooltip handlers
   const showTooltipWithDelay = useCallback((content: React.ReactNode, element: HTMLElement) => {
-    const rect = element.getBoundingClientRect();
-    const x = rect.left + rect.width / 2;
-    const y = rect.top - 10;
-    
-    setTooltip({
-      content,
-      x,
-      y,
-      visible: true,
-      fadeOut: false
-    });
+    // If a toolbarRef exists, anchor the tooltip to the left of the floating toolbar
+    if (toolbarRef.current) {
+      const tb = toolbarRef.current.getBoundingClientRect();
+      // Place tooltip centered on screen and above the floating toolbar
+  // Center horizontally then nudge a bit to the right and higher above the toolbar
+      // Center horizontally to the canvas grid area if available, otherwise fall back to window center.
+      let x = window.innerWidth / 2;
+      if (canvasRef && canvasRef.current) {
+        const cr = canvasRef.current.getBoundingClientRect();
+        x = cr.left + cr.width / 2;
+      }
+  const y = Math.max(8, tb.top - 60); // 60px above the toolbar top (a little higher)
+
+      setTooltip({
+        content,
+        x,
+        y,
+        visible: true,
+        fadeOut: false
+      });
+    } else {
+      const rect = element.getBoundingClientRect();
+      const x = rect.left + rect.width / 2;
+      const y = rect.top - 10;
+
+      setTooltip({
+        content,
+        x,
+        y,
+        visible: true,
+        fadeOut: false
+      });
+    }
 
     // Clear any existing timeout
     if (tooltipTimeoutRef.current) {
@@ -1194,16 +1218,18 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           <section className="mb-6">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-lg font-semibold">Tileset</h2>
-              <Button variant="outline" size="sm" className="relative bg-orange-500 hover:bg-orange-600 text-white border-orange-500 hover:border-orange-600 h-6 text-xs px-2 shadow-sm">
-                <Upload className="w-3 h-3 mr-1" />
-                Import Tileset
-                <input
-                  type="file"
-                  accept="image/png"
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                  onChange={(e) => handleFileUpload(e, 'layerTileset')}
-                />
-              </Button>
+              <Tooltip content="Import a PNG tileset for the active layer" side="bottom">
+                <Button variant="outline" size="sm" className="relative bg-orange-500 hover:bg-orange-600 text-white border-orange-500 hover:border-orange-600 h-6 text-xs px-2 shadow-sm">
+                  <Upload className="w-3 h-3 mr-1" />
+                  Import Tileset
+                  <input
+                    type="file"
+                    accept="image/png"
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    onChange={(e) => handleFileUpload(e, 'layerTileset')}
+                  />
+                </Button>
+              </Tooltip>
             </div>
             <div className="text-sm text-muted-foreground mb-2">
               <div><span className="font-medium">{activeLayerId ? `${layers.find(l => l.id === activeLayerId)?.type || 'none'} tileset` : 'none tileset'}</span></div>
@@ -1921,7 +1947,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         <section className="flex-1 min-w-0 flex flex-col relative">
           {/* Zoom Controls & Undo/Redo */}
           <div className="absolute top-2 right-2 z-10 flex gap-1">
-            <Tooltip content="Undo (Ctrl+Z)">
+            <Tooltip content="Undo (Ctrl+Z)" side="bottom">
               <Button 
                 size="sm" 
                 variant="outline" 
@@ -1931,7 +1957,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 <Undo2 className="w-4 h-4" />
               </Button>
             </Tooltip>
-            <Tooltip content="Redo (Ctrl+Y)">
+            <Tooltip content="Redo (Ctrl+Y)" side="bottom">
               <Button 
                 size="sm" 
                 variant="outline" 
@@ -1941,7 +1967,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 <Redo2 className="w-4 h-4" />
               </Button>
             </Tooltip>
-            <Tooltip content="Zoom In">
+            <Tooltip content="Zoom In" side="bottom">
               <Button 
                 size="sm" 
                 variant="outline" 
@@ -1951,7 +1977,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 <ZoomIn className="w-4 h-4" />
               </Button>
             </Tooltip>
-            <Tooltip content="Zoom Out">
+            <Tooltip content="Zoom Out" side="bottom">
               <Button 
                 size="sm" 
                 variant="outline" 
@@ -1961,7 +1987,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 <ZoomOut className="w-4 h-4" />
               </Button>
             </Tooltip>
-            <Tooltip content="Reset Zoom & Pan">
+            <Tooltip content="Reset Zoom & Pan" side="bottom">
               <Button 
                 size="sm" 
                 variant="outline" 
@@ -1971,7 +1997,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 <RotateCcw className="w-4 h-4" />
               </Button>
             </Tooltip>
-            <Tooltip content="Toggle Minimap">
+            <Tooltip content="Toggle Minimap" side="bottom">
               <Button 
                 size="sm" 
                 variant={showMinimap ? "default" : "outline"}
@@ -2076,12 +2102,11 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               </div>
             )}
             {/* Floating Toolbar (inside canvas, centered, pill-sized) */}
-            <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-30">
+            <div ref={toolbarRef} className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-30">
               <div className="flex items-center gap-1 bg-white/90 dark:bg-neutral-900/90 border border-border rounded-full px-2 py-1 shadow-md">
                 {/* Brush Tool */}
                 <div className="relative">
-                  <Tooltip content="Brush Tool">
-                    <Button
+                  <Button
                         variant={selectedTool === 'brush' ? 'default' : 'ghost'}
                         size="sm"
                         className="w-7 h-7 p-1 rounded-full tool-button"
@@ -2097,7 +2122,6 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                       >
                         {getBrushIcon()}
                       </Button>
-                  </Tooltip>
 
                   {showBrushOptions && (
                     <div
@@ -2151,8 +2175,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
 
                 {/* Selection Tool */}
                 <div className="relative">
-                  <Tooltip content="Selection Tool">
-                    <Button
+                  <Button
                       variant={selectedTool === 'selection' ? 'default' : 'ghost'}
                       size="sm"
                       className="w-7 h-7 p-1 rounded-full tool-button"
@@ -2168,7 +2191,6 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                     >
                       {getSelectionIcon()}
                     </Button>
-                  </Tooltip>
 
                   {showSelectionOptions && (
                     <div
@@ -2222,18 +2244,16 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
 
                 {/* Shape Tool */}
                 <div className="relative">
-                  <Tooltip content="Shape Tool">
-                    <Button
+                  <Button
                       variant={selectedTool === 'shape' ? 'default' : 'ghost'}
                       size="sm"
                       className="w-7 h-7 p-1 rounded-full tool-button"
                       onClick={() => setSelectedTool('shape')}
-                      onMouseEnter={() => handleShowShapeOptions()}
-                      onMouseLeave={() => handleHideShapeOptions()}
+                      onMouseEnter={(e) => { handleShowShapeOptions(); showTooltipWithDelay('Shape Tool', e.currentTarget); }}
+                      onMouseLeave={() => { handleHideShapeOptions(); hideTooltip(); }}
                     >
                       {getShapeIcon()}
                     </Button>
-                  </Tooltip>
 
                   {showShapeOptions && (
                     <div
@@ -2277,16 +2297,16 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
 
                 {/* Stamp Tool */}
                 <div className="relative">
-                  <Tooltip content="Stamp Tool - Group tiles into a stamp and place them together">
-                    <Button
+                  <Button
                       variant={selectedTool === 'stamp' ? 'default' : 'ghost'}
                       size="sm"
                       className="w-7 h-7 p-1 rounded-full tool-button"
                       onClick={() => setSelectedTool('stamp')}
+                      onMouseEnter={(e) => showTooltipWithDelay('Stamp Tool - Group tiles into a stamp and place them together', e.currentTarget)}
+                      onMouseLeave={hideTooltip}
                     >
                       <Stamp className="w-3 h-3" />
                     </Button>
-                  </Tooltip>
 
                   {selectedTool === 'stamp' && (
                     <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-2 min-w-[200px] z-10">
@@ -2386,16 +2406,16 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 </div>
 
                 {/* Eyedropper Tool */}
-                <Tooltip content="Eyedropper Tool - Pick a tile from the map to reuse">
-                  <Button
-                    variant={selectedTool === 'eyedropper' ? 'default' : 'ghost'}
-                    size="sm"
-                    className="w-7 h-7 p-1 rounded-full tool-button"
-                    onClick={() => setSelectedTool('eyedropper')}
-                  >
-                    <Pipette className="w-3 h-3" />
-                  </Button>
-                </Tooltip>
+                <Button
+                  variant={selectedTool === 'eyedropper' ? 'default' : 'ghost'}
+                  size="sm"
+                  className="w-7 h-7 p-1 rounded-full tool-button"
+                  onClick={() => setSelectedTool('eyedropper')}
+                  onMouseEnter={(e) => showTooltipWithDelay('Eyedropper Tool - Pick a tile from the map to reuse', e.currentTarget)}
+                  onMouseLeave={hideTooltip}
+                >
+                  <Pipette className="w-3 h-3" />
+                </Button>
               </div>
             </div>
           </div>

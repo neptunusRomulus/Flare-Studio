@@ -252,14 +252,15 @@
     z-index: 1000;
     background: rgba(0, 0, 0, 0.9);
     color: white;
-    padding: 2px 6px;
-    border-radius: 3px;
-    font-size: 10px;
-    white-space: nowrap;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    white-space: normal;
     pointer-events: none;
     opacity: 0;
     transition: opacity 0.3s ease-in-out;
-    transform: translateX(-50%);
+    transform-origin: center bottom;
+    transform: translateX(-50%) translateY(-6px);
 }
 
 .custom-tooltip.visible {
@@ -268,6 +269,15 @@
 
 .custom-tooltip.fade-out {
     opacity: 0;
+}
+
+/* Limit tooltip to 2 lines for the anchored left tooltip */
+.custom-tooltip > * {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    max-width: 12rem;
 }
 
 /* Tool button click effects */

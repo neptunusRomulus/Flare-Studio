@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveMapProject: (projectPath, mapData) => ipcRenderer.invoke('save-map-project', projectPath, mapData),
   discoverTilesetImages: (projectPath) => ipcRenderer.invoke('discover-tileset-images', projectPath),
   getProjectThumbnail: (projectPath) => ipcRenderer.invoke('get-project-thumbnail', projectPath),
+  checkProjectExists: (projectPath) => ipcRenderer.invoke('check-project-exists', projectPath),
   // Menu event listeners
   onMenuNewMap: (callback) => ipcRenderer.on('menu-new-map', (_e) => callback && callback()),
   onMenuOpenMap: (callback) => ipcRenderer.on('menu-open-map', (_e) => callback && callback()),

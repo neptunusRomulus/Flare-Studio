@@ -372,6 +372,17 @@ ipcMain.handle('get-project-thumbnail', async (event, projectPath) => {
   }
 });
 
+// Check if a project path still exists on disk
+ipcMain.handle('check-project-exists', async (event, projectPath) => {
+  try {
+    if (!projectPath) return false;
+    return fs.existsSync(projectPath) && fs.statSync(projectPath).isDirectory();
+  } catch (e) {
+    console.warn('check-project-exists failed for', projectPath, e);
+    return false;
+  }
+});
+
 function createMenu() {
   const template = [
     {

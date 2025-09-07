@@ -103,6 +103,16 @@ function App() {
   
   const { toast } = useToast();
 
+  // Keep 'toast' referenced to avoid unused variable errors while toasts are suppressed.
+  // This creates a stable noop reference that will never show UI.
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const _noopToast = toast;
+    return () => {
+      // no-op cleanup
+    };
+  }, [toast]);
+
   // Handle dark mode toggle
   useEffect(() => {
     if (isDarkMode) {
@@ -776,25 +786,18 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           // Clear pending config
           setPendingMapConfig(null);
           
-          toast({
-            title: "Project loaded",
-            description: "The map has been loaded successfully."
-          });
+          // toast suppressed: Project loaded
           
         } catch (error) {
           console.error('Failed to create editor with pending config:', error);
-          toast({
-            title: "Error",
-            description: "Failed to load the project.",
-            variant: "destructive"
-          });
+          // toast suppressed: Failed to load the project
           setPendingMapConfig(null);
         }
       };
 
       createEditorWithConfig();
     }
-  }, [pendingMapConfig, showWelcome, projectPath, setupAutoSave, updateLayersList, toast]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pendingMapConfig, showWelcome, projectPath, setupAutoSave, updateLayersList]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>, type: 'tileset' | 'layerTileset') => {
     const file = event.target.files?.[0];
@@ -888,38 +891,22 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         await new Promise(resolve => setTimeout(resolve, 300));
         if (success) {
           setLastSaveTime(Date.now());
-          toast({
-            title: "Saved",
-            description: "Project saved to disk, including tileset.",
-            variant: "default",
-          });
+          // toast suppressed: Project saved to disk
         } else {
-          toast({
-            title: "Save Error",
-            description: "Failed to save the project to disk.",
-            variant: "destructive",
-          });
+          // toast suppressed: Failed to save the project to disk
         }
       } else {
-        editor.forceSave();
-        await new Promise(resolve => setTimeout(resolve, 500));
-        toast({
-          title: "Saved (Local Backup)",
-          description: "Saved to local backup. Open a project folder to save to disk.",
-          variant: "default",
-        });
+  editor.forceSave();
+  await new Promise(resolve => setTimeout(resolve, 500));
+  // toast suppressed: Saved to local backup
       }
     } catch (error) {
       console.error('Save error:', error);
-      toast({
-        title: "Save Error",
-        description: "Failed to save your map. Please try again.",
-        variant: "destructive",
-      });
+      // toast suppressed: Failed to save your map
     } finally {
       setIsManuallySaving(false);
     }
-  }, [editor, projectPath, toast]);
+  }, [editor, projectPath]);
 
   const handleToggleMinimap = () => {
     if (editor?.toggleMinimap) {
@@ -1047,34 +1034,23 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           // Store the map config for deferred editor creation
           // The editor will be created by the useEffect when canvas becomes available
           console.log('Storing map config for deferred editor creation');
-          setPendingMapConfig(mapConfig);          toast({
-            title: "Map Loaded",
-            description: `Successfully loaded ${mapConfig.name}`,
-            variant: "default",
-          });
+          setPendingMapConfig(mapConfig);
+          // toast suppressed: Map Loaded
         }
-      } else {
+        } else {
         // Fallback for web
         console.log('Opening map project:', projectPath);
-        toast({
-          title: "Feature Unavailable",
-          description: "Map loading requires the desktop app.",
-          variant: "default",
-        });
+        // toast suppressed: Feature Unavailable (requires desktop app)
       }
     } catch (error) {
       console.error('Error opening map project:', error);
-      toast({
-        title: "Error",
-        description: "Failed to open map project. Please try again.",
-        variant: "destructive",
-      });
+      // toast suppressed: Failed to open map project
     }
     finally {
       // Re-enable default editor creation for other flows
       setIsOpeningProject(false);
     }
-  }, [editor, setupAutoSave, toast, updateLayersList]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [editor, setupAutoSave, updateLayersList]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Wire Electron menu actions (Save/Open/New)
   useEffect(() => {

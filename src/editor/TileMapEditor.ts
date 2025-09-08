@@ -3921,10 +3921,19 @@ export class TileMapEditor {
     
     // [tilesets] section - Flare format requirement
     lines.push(`[tilesets]`);
+    
+    // Export main tileset if available
     if (this.tilesetFileName) {
-      // Main tileset reference with proper format: image,tilewidth,tileheight,offset_x,offset_y
-      lines.push(`tileset=../maps/${this.tilesetFileName},${this.tileSizeX},${this.tileSizeY},0,0`);
+      lines.push(`tileset=../images/tilesets/${this.tilesetFileName},${this.tileSizeX},${this.tileSizeY},0,0`);
     }
+    
+    // Export layer-specific tilesets
+    for (const tileset of this.layerTilesets.values()) {
+      if (tileset.fileName && tileset.fileName !== this.tilesetFileName) {
+        lines.push(`tileset=../images/tilesets/${tileset.fileName},${this.tileSizeX},${this.tileSizeY},0,0`);
+      }
+    }
+    
     lines.push('');
     
     // Export layers in Flare-standard order: background -> object -> collision
@@ -4006,7 +4015,7 @@ export class TileMapEditor {
     const lines: string[] = [];
     
     // Image reference - Flare format expects relative path from tilesetdefs folder
-    lines.push(`img=../maps/${this.tilesetFileName}`);
+    lines.push(`img=../images/tilesets/${this.tilesetFileName}`);
     lines.push('');
     
     // Generate tile definitions with proper Flare format

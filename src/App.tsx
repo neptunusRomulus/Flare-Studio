@@ -104,6 +104,16 @@ function App() {
   const [showObjectDialog, setShowObjectDialog] = useState(false);
   const [editingObject, setEditingObject] = useState<import('./types').MapObject | null>(null);
   
+  // Hero position edit dialog state
+  const [showHeroEditDialog, setShowHeroEditDialog] = useState(false);
+  const [heroEditData, setHeroEditData] = useState<{
+    currentX: number;
+    currentY: number;
+    mapWidth: number;
+    mapHeight: number;
+    onConfirm: (x: number, y: number) => void;
+  } | null>(null);
+  
   // Tool dropdown timeout refs
   const brushOptionsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const selectionOptionsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -178,6 +188,12 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     // Set up stamp callback to update stamps list
     editorInstance.setStampCallback((stampsList) => {
       setStamps(stampsList);
+    });
+
+    // Set up hero edit callback to show dialog
+    editorInstance.setHeroEditCallback((currentX, currentY, mapWidth, mapHeight, onConfirm) => {
+      setHeroEditData({ currentX, currentY, mapWidth, mapHeight, onConfirm });
+      setShowHeroEditDialog(true);
     });
   }, [autoSaveEnabled, projectPath]);
 
@@ -621,6 +637,20 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     setEditingObject(null);
     setShowObjectDialog(false);
   }, [editor]);
+
+  // Hero position edit handlers
+  const handleHeroEditConfirm = useCallback((x: number, y: number) => {
+    if (heroEditData?.onConfirm) {
+      heroEditData.onConfirm(x, y);
+    }
+    setShowHeroEditDialog(false);
+    setHeroEditData(null);
+  }, [heroEditData]);
+
+  const handleHeroEditCancel = useCallback(() => {
+    setShowHeroEditDialog(false);
+    setHeroEditData(null);
+  }, []);
 
   // Canvas double-click handler for editing objects
   useEffect(() => {
@@ -1356,7 +1386,16 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       {/* Custom Title Bar */}
       <div className="bg-gray-100 dark:bg-neutral-900 text-orange-600 dark:text-orange-400 flex justify-between items-center px-4 py-1 select-none drag-region border-b border-gray-200 dark:border-neutral-700">
         <div className="flex items-center gap-3">
-          <div className="text-sm font-medium">Flare Map Editor</div>
+          {/* Logo and Brand */}
+          <div className="flex items-center gap-1">
+            <img 
+              src="/flare-ico.png" 
+              alt="Flarism Logo" 
+              className="w-4 h-6"
+            />
+            <span className="text-sm font-semibold text-orange-600 dark:text-orange-400">Flarism</span>
+          </div>
+          <div className="text-sm font-medium"></div>
           {/* Save Status Indicator */}
           <div className="flex items-center gap-1 text-xs">
             {saveStatus === 'saving' && (
@@ -2890,6 +2929,79 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             </Button>
             <Button onClick={() => editingObject && handleUpdateObject(editingObject)}>
               Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Hero Position Edit Dialog */}
+      <Dialog open={showHeroEditDialog} onOpenChange={setShowHeroEditDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Hero Position</DialogTitle>
+            <DialogDescription>
+              Set the hero spawn position on the map.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {heroEditData && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">X Position</label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={heroEditData.mapWidth - 1}
+                    defaultValue={heroEditData.currentX}
+                    onChange={(e) => {
+                      const newX = parseInt(e.target.value);
+                      if (!isNaN(newX)) {
+                        setHeroEditData({
+                          ...heroEditData,
+                          currentX: newX
+                        });
+                      }
+                    }}
+                  />
+                  <span className="text-xs text-gray-500">
+                    (0 - {heroEditData.mapWidth - 1})
+                  </span>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Y Position</label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={heroEditData.mapHeight - 1}
+                    defaultValue={heroEditData.currentY}
+                    onChange={(e) => {
+                      const newY = parseInt(e.target.value);
+                      if (!isNaN(newY)) {
+                        setHeroEditData({
+                          ...heroEditData,
+                          currentY: newY
+                        });
+                      }
+                    }}
+                  />
+                  <span className="text-xs text-gray-500">
+                    (0 - {heroEditData.mapHeight - 1})
+                  </span>
+                </div>
+              </div>
+              <div className="text-sm text-gray-600">
+                Current position: ({heroEditData.currentX}, {heroEditData.currentY})
+              </div>
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={handleHeroEditCancel}>
+              Cancel
+            </Button>
+            <Button onClick={() => heroEditData && handleHeroEditConfirm(heroEditData.currentX, heroEditData.currentY)}>
+              Confirm
             </Button>
           </DialogFooter>
         </DialogContent>

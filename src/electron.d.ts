@@ -18,6 +18,8 @@ interface ProjectMapData {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   tilesets: any[];
   tilesetImages: { [key: string]: string };
+  heroX?: number;
+  heroY?: number;
   version: string;
   // Optional editor-specific fields to preserve brush mapping and settings
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

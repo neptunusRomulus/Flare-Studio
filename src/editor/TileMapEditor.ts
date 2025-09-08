@@ -547,6 +547,12 @@ export class TileMapEditor {
   private nextObjectId: number = 1;
   private selectedObjectId: number | null = null;
 
+  // Hero position management
+  private heroX: number = 0;
+  private heroY: number = 0;
+  private isDraggingHero: boolean = false;
+  private heroLastClickTime: number = 0;
+
   // Tool and interaction state
   private tool: Tool = 'tiles';
   private currentTool: 'brush' | 'eraser' | 'bucket' = 'brush';
@@ -782,6 +788,12 @@ export class TileMapEditor {
       this.isMouseDown = true;
       const tileCoords = this.screenToTile(x, y);
       if (tileCoords) {
+        // Check if clicking on hero position
+        if (this.isHeroAtPosition(tileCoords.x, tileCoords.y)) {
+          this.handleHeroClick(tileCoords.x, tileCoords.y, event);
+          return;
+        }
+        
         if (this.tool === 'tiles') {
           this.handleTileClick(tileCoords.x, tileCoords.y, event.button === 2);
         } else if (this.tool === 'selection') {
@@ -831,7 +843,10 @@ export class TileMapEditor {
         }
         
         if (this.isMouseDown && !this.spacePressed) {
-          if (this.tool === 'tiles') {
+          if (this.isDraggingHero) {
+            // Update hero position while dragging
+            this.setHeroPosition(tileCoords.x, tileCoords.y);
+          } else if (this.tool === 'tiles') {
             this.handleTileClick(tileCoords.x, tileCoords.y, false);
           } else if (this.isSelecting) {
             this.handleSelectionDrag(tileCoords.x, tileCoords.y);
@@ -851,6 +866,12 @@ export class TileMapEditor {
     } else if (this.isDrawingShape) {
       this.handleShapeEnd();
     }
+    
+    // Stop hero dragging
+    if (this.isDraggingHero) {
+      this.isDraggingHero = false;
+    }
+    
     this.isMouseDown = false;
     this.isPanning = false;
   }
@@ -862,6 +883,38 @@ export class TileMapEditor {
     this.hoverX = -1;
     this.hoverY = -1;
     this.draw();
+  }
+
+  private handleHeroClick(_x: number, _y: number, _event: MouseEvent): void {
+    const currentTime = Date.now();
+    
+    // Check for double-click (within 300ms)
+    if (currentTime - this.heroLastClickTime < 300) {
+      // Double-click detected - open hero edit dialog
+      this.openHeroEditDialog();
+    } else {
+      // Single click - start dragging
+      this.isDraggingHero = true;
+    }
+    
+    this.heroLastClickTime = currentTime;
+  }
+
+  private openHeroEditDialog(): void {
+    if (this.heroEditCallback) {
+      this.heroEditCallback(
+        this.heroX,
+        this.heroY,
+        this.mapWidth,
+        this.mapHeight,
+        (x: number, y: number) => {
+          this.setHeroPosition(x, y);
+        }
+      );
+    } else {
+      // Fallback to alert if no callback is set
+      alert(`Hero position: (${this.heroX}, ${this.heroY}). Set up hero edit dialog in React component.`);
+    }
   }
 
   private handleWheel(event: WheelEvent): void {
@@ -1243,6 +1296,9 @@ export class TileMapEditor {
     
     // Draw selection
     this.drawSelection();
+    
+    // Draw hero position marker
+    this.drawHeroPosition();
     
     // Draw shape preview
     this.drawShapePreview();
@@ -1842,6 +1898,103 @@ export class TileMapEditor {
     });
 
     this.ctx.setLineDash([]); // Reset line dash
+  }
+
+  private drawHeroPosition(): void {
+    // Draw the hero position marker as a fully orange filled cell
+    const screenPos = this.mapToScreen(this.heroX, this.heroY);
+    const halfTileX = (this.tileSizeX / 2) * this.zoom;
+    const halfTileY = (this.tileSizeY / 2) * this.zoom;
+    
+    this.ctx.save();
+    
+    // Check if mouse is hovering over hero position
+    const isHovering = this.hoverX === this.heroX && this.hoverY === this.heroY;
+    
+    if (isHovering) {
+      // Draw orange glow effect when hovering
+      const glowLayers = [
+        { color: 'rgba(255, 107, 0, 0.1)', width: 8 },
+        { color: 'rgba(255, 107, 0, 0.2)', width: 6 },
+        { color: 'rgba(255, 107, 0, 0.3)', width: 4 },
+        { color: 'rgba(255, 107, 0, 0.5)', width: 2 }
+      ];
+      
+      // Draw glow layers from largest to smallest
+      glowLayers.forEach(layer => {
+        this.ctx.strokeStyle = layer.color;
+        this.ctx.lineWidth = Math.max(1, Math.min(layer.width, layer.width / this.zoom));
+        this.ctx.shadowColor = '#ff6b00';
+        this.ctx.shadowBlur = Math.max(2, Math.min(10, layer.width / this.zoom));
+        
+        this.ctx.beginPath();
+        this.ctx.moveTo(screenPos.x, screenPos.y - halfTileY); // Top
+        this.ctx.lineTo(screenPos.x + halfTileX, screenPos.y); // Right
+        this.ctx.lineTo(screenPos.x, screenPos.y + halfTileY); // Bottom
+        this.ctx.lineTo(screenPos.x - halfTileX, screenPos.y); // Left
+        this.ctx.closePath();
+        this.ctx.stroke();
+      });
+    }
+    
+    // Reset shadow settings
+    this.ctx.shadowColor = 'transparent';
+    this.ctx.shadowBlur = 0;
+    
+    // Draw filled orange diamond
+    this.ctx.fillStyle = '#ff6b00';
+    this.ctx.beginPath();
+    this.ctx.moveTo(screenPos.x, screenPos.y - halfTileY); // Top
+    this.ctx.lineTo(screenPos.x + halfTileX, screenPos.y); // Right
+    this.ctx.lineTo(screenPos.x, screenPos.y + halfTileY); // Bottom
+    this.ctx.lineTo(screenPos.x - halfTileX, screenPos.y); // Left
+    this.ctx.closePath();
+    this.ctx.fill();
+    
+    // Draw bright orange border
+    this.ctx.strokeStyle = '#ff8c00';
+    this.ctx.lineWidth = Math.max(1, Math.min(2, 2 / this.zoom));
+    this.ctx.beginPath();
+    this.ctx.moveTo(screenPos.x, screenPos.y - halfTileY); // Top
+    this.ctx.lineTo(screenPos.x + halfTileX, screenPos.y); // Right
+    this.ctx.lineTo(screenPos.x, screenPos.y + halfTileY); // Bottom
+    this.ctx.lineTo(screenPos.x - halfTileX, screenPos.y); // Left
+    this.ctx.closePath();
+    this.ctx.stroke();
+    
+    // Draw hero icon in the center
+    this.drawHeroIcon(screenPos.x, screenPos.y);
+    
+    this.ctx.restore();
+  }
+
+  private drawHeroIcon(centerX: number, centerY: number): void {
+    const iconSize = Math.max(12, Math.min(20, 16 * this.zoom));
+    const halfSize = iconSize / 2;
+    
+    this.ctx.save();
+    this.ctx.fillStyle = '#ffffff';
+    this.ctx.strokeStyle = '#ffffff';
+    this.ctx.lineWidth = 1.5;
+    
+    // Draw user/hero icon (simplified person silhouette)
+    // Head (circle)
+    this.ctx.beginPath();
+    this.ctx.arc(centerX, centerY - halfSize * 0.6, halfSize * 0.25, 0, Math.PI * 2);
+    this.ctx.fill();
+    
+    // Body (rounded rectangle)
+    this.ctx.beginPath();
+    this.ctx.roundRect(
+      centerX - halfSize * 0.3, 
+      centerY - halfSize * 0.2, 
+      halfSize * 0.6, 
+      halfSize * 0.8, 
+      halfSize * 0.15
+    );
+    this.ctx.fill();
+    
+    this.ctx.restore();
   }
 
   private drawStampPreview(): void {
@@ -3400,6 +3553,7 @@ export class TileMapEditor {
   private activeStamp: import('../types').Stamp | null = null;
   private stampPreview: { x: number; y: number; visible: boolean } = { x: 0, y: 0, visible: false };
   private stampCallback: ((stamps: import('../types').Stamp[]) => void) | null = null;
+  private heroEditCallback: ((currentX: number, currentY: number, mapWidth: number, mapHeight: number, onConfirm: (x: number, y: number) => void) => void) | null = null;
 
   public setEyedropperCallback(callback: (() => void) | null): void {
     this.eyedropperCallback = callback;
@@ -3516,6 +3670,10 @@ export class TileMapEditor {
 
   public setStampCallback(callback: ((stamps: import('../types').Stamp[]) => void) | null): void {
     this.stampCallback = callback;
+  }
+
+  public setHeroEditCallback(callback: ((currentX: number, currentY: number, mapWidth: number, mapHeight: number, onConfirm: (x: number, y: number) => void) => void) | null): void {
+    this.heroEditCallback = callback;
   }
 
   private placeStamp(gridX: number, gridY: number): void {
@@ -4000,7 +4158,7 @@ export class TileMapEditor {
     lines.push(`tilewidth=${this.tileSizeX}`);
     lines.push(`tileheight=${this.tileSizeY}`);
     lines.push(`orientation=isometric`);
-    lines.push(`hero_pos=${Math.floor(this.mapWidth/2)},${Math.floor(this.mapHeight/2)}`);
+    lines.push(`hero_pos=${this.heroX},${this.heroY}`);
     lines.push(`music=music/default_theme.ogg`);
     lines.push(`tileset=tilesetdefs/tileset.txt`);
     lines.push(`title=${this.tilesetFileName?.replace(/\.[^/.]+$/, '') || 'Untitled Map'}`);
@@ -4293,6 +4451,8 @@ export class TileMapEditor {
         mapHeight: this.mapHeight,
         layers: this.tileLayers,
         objects: this.objects,
+        heroX: this.heroX,
+        heroY: this.heroY,
         tilesetFileName: this.tilesetFileName,
         tilesetImage: this.tilesetImage ? this.canvasToDataURL(this.tilesetImage) : null,
         tileSizeX: this.tileSizeX,
@@ -4386,6 +4546,15 @@ export class TileMapEditor {
       this.tileLayers = data.layers;
       this.objects = data.objects;
       this.tilesetFileName = data.tilesetFileName;
+
+      // Restore hero position if available
+      if (data.heroX !== undefined && data.heroY !== undefined) {
+        this.heroX = Math.max(0, Math.min(data.heroX, this.mapWidth - 1));
+        this.heroY = Math.max(0, Math.min(data.heroY, this.mapHeight - 1));
+      } else {
+        this.heroX = 0;
+        this.heroY = 0;
+      }
 
       // Restore brush-related settings if available
       if (data.tileContentThreshold !== undefined) {
@@ -4503,6 +4672,8 @@ export class TileMapEditor {
         tileSize: 64,
         layers: this.tileLayers,
         objects: this.objects,
+        heroX: this.heroX,
+        heroY: this.heroY,
         tilesets: tilesets,
         tilesetImages,
   // Small minimap image (data URL) for welcome thumbnails and quick previews
@@ -4621,7 +4792,29 @@ export class TileMapEditor {
     return this.objects.filter(obj => obj.x === x && obj.y === y);
   }
 
+  public isHeroAtPosition(x: number, y: number): boolean {
+    return this.heroX === x && this.heroY === y;
+  }
+
+  public setHeroPosition(x: number, y: number): void {
+    this.heroX = Math.max(0, Math.min(x, this.mapWidth - 1));
+    this.heroY = Math.max(0, Math.min(y, this.mapHeight - 1));
+    this.saveState();
+    this.draw();
+  }
+
+  public getHeroPosition(): { x: number, y: number } {
+    return { x: this.heroX, y: this.heroY };
+  }
+
   private updateCursorForHover(): void {
+    // Check if we're hovering over the hero position
+    if (this.isHeroAtPosition(this.hoverX, this.hoverY)) {
+      this.mapCanvas.style.cursor = 'move';
+      this.showHeroTooltip();
+      return;
+    }
+    
     // Check if we're hovering over an object on an interactive layer
     const activeLayer = this.getActiveLayer();
     const interactiveLayers = ['enemy', 'npc', 'object', 'event', 'background'];
@@ -4698,6 +4891,54 @@ export class TileMapEditor {
     if (tooltip) {
       tooltip.style.display = 'none';
     }
+  }
+
+  private showHeroTooltip(): void {
+    // Create or update hero tooltip
+    let tooltip = document.getElementById('object-tooltip') as HTMLElement;
+    if (!tooltip) {
+      tooltip = document.createElement('div');
+      tooltip.id = 'object-tooltip';
+      tooltip.style.position = 'absolute';
+      tooltip.style.background = 'rgba(0, 0, 0, 0.35)'; // 65% transparent (35% opacity)
+      tooltip.style.color = 'white';
+      tooltip.style.padding = '4px 6px'; // Reduced padding
+      tooltip.style.borderRadius = '3px'; // Slightly smaller border radius
+      tooltip.style.fontSize = '11px'; // Smaller font size
+      tooltip.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'; // Editor's font
+      tooltip.style.lineHeight = '1.2'; // Tighter line height
+      tooltip.style.pointerEvents = 'none';
+      tooltip.style.zIndex = '1000';
+      tooltip.style.border = '1px solid rgba(255, 107, 0, 0.8)'; // Semi-transparent border
+      tooltip.style.boxShadow = '0 1px 4px rgba(0,0,0,0.3)'; // Smaller shadow
+      tooltip.style.backdropFilter = 'blur(2px)'; // Add subtle blur effect
+      document.body.appendChild(tooltip);
+    }
+
+    // Mouse icon SVG (from Lucide React) - smaller version
+    const mouseIcon = `
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; margin-right: 4px;">
+        <rect x="5" y="2" width="14" height="20" rx="7"/>
+        <path d="M12 6v4"/>
+      </svg>
+    `;
+
+    // Update tooltip content with hero-specific information
+    tooltip.innerHTML = `
+      <div style="font-weight: bold; margin-bottom: 2px; color: #ff6b00; font-size: 10px;">
+        ${mouseIcon}Double click to edit or drag to move
+      </div>
+      <div style="font-weight: bold; margin-bottom: 1px;">Hero Position</div>
+      <div style="font-size: 10px; color: rgba(255,255,255,0.9);">Position: (${this.heroX}, ${this.heroY})</div>
+    `;
+
+    // Position tooltip near mouse cursor
+    const rect = this.mapCanvas.getBoundingClientRect();
+    const screenPos = this.mapToScreen(this.hoverX, this.hoverY);
+    
+    tooltip.style.left = `${rect.left + screenPos.x + 20}px`;
+    tooltip.style.top = `${rect.top + screenPos.y - 10}px`;
+    tooltip.style.display = 'block';
   }
 
   private createObjectFromTile(x: number, y: number, layerType: string, _gid: number): void {
@@ -4794,6 +5035,11 @@ export class TileMapEditor {
     this.objects = [];
     this.nextObjectId = 1;
     this.selectedObjectId = null;
+    
+    // Reset hero position
+    this.heroX = 0;
+    this.heroY = 0;
+    this.isDraggingHero = false;
     
     // Reset layer-specific tilesets
     this.layerTilesets.clear();
@@ -5016,6 +5262,17 @@ export class TileMapEditor {
         console.log('Setting map dimensions:', projectData.width, 'x', projectData.height);
         this.mapWidth = projectData.width;
         this.mapHeight = projectData.height;
+      }
+      
+      // Load hero position if provided, otherwise default to (0,0)
+      if (projectData.heroX !== undefined && projectData.heroY !== undefined) {
+        console.log('Loading hero position:', projectData.heroX, ',', projectData.heroY);
+        this.heroX = Math.max(0, Math.min(projectData.heroX, this.mapWidth - 1));
+        this.heroY = Math.max(0, Math.min(projectData.heroY, this.mapHeight - 1));
+      } else {
+        console.log('No hero position found, defaulting to (0,0)');
+        this.heroX = 0;
+        this.heroY = 0;
       }
       
       console.log('Project data loaded successfully');

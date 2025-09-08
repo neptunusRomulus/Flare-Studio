@@ -252,7 +252,14 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
       <div className={`min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-neutral-900 dark:to-neutral-800 flex flex-col ${isDarkMode ? 'dark' : ''}`}>
         {/* Custom Title Bar */}
         <div className="bg-gray-100 dark:bg-neutral-900 text-orange-600 dark:text-orange-400 flex justify-between items-center px-4 py-1 select-none drag-region border-b border-gray-200 dark:border-neutral-700">
-          <div className="text-sm font-medium">Tile Map Editor</div>
+          <div className="flex items-center gap-2">
+            <img 
+              src="/flare-ico.png" 
+              alt="Flarism Logo" 
+              className="w-6 h-6"
+            />
+            <span className="text-sm font-semibold">Flarism</span>
+          </div>
           <div className="flex no-drag">
             <Tooltip content="Minimize">
               <button 
@@ -377,7 +384,14 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
     <div className={`h-screen overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100 dark:from-neutral-900 dark:to-neutral-800 flex flex-col ${isDarkMode ? 'dark' : ''}`}>
       {/* Custom Title Bar */}
       <div className="bg-gray-100 dark:bg-neutral-900 text-orange-600 dark:text-orange-400 flex justify-between items-center px-4 py-1 select-none drag-region border-b border-gray-200 dark:border-neutral-700">
-        <div className="text-sm font-medium">Flarism</div> {/* TODO: ADD A SMALL ICON BEFORE THIS TEXT */}
+        <div className="flex items-center gap-1">
+          <img 
+            src="/flare-ico.png" 
+            alt="Flarism Logo" 
+            className="w-4 h-6"
+          />
+          <span className="text-sm font-semibold">Flarism</span>
+        </div>
         <div className="flex no-drag">
           <Tooltip content="Minimize">
             <button 
@@ -458,7 +472,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
               <div className="inline-flex items-center justify-center w-50 h-20">
                 <img src="/flare-logo.png" alt="Flare Logo" className="w-100 h-100 object-contain"/>
               </div>
-              <p className="text-gray-600 dark:text-gray-300 text-lg">Modern & Simple GUI for Flare</p>
+              <p className="text-gray-600 dark:text-gray-300 text-lg">Flarism is an unofficial, community-made editor inspired by the Flare engine. It is not affiliated with the official Flare developers.</p>
             </div>
 
             {/* Action Buttons */}

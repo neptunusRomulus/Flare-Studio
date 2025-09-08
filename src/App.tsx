@@ -627,18 +627,46 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     if (!editor || !canvasRef.current) return;
 
     const handleCanvasDoubleClick = (_event: MouseEvent) => {
+      console.log('Double-click detected on canvas');
+      
+      // Get current active layer to check if it's an interactive layer
+      const activeLayer = editor.getActiveLayer();
+      console.log('Active layer:', activeLayer);
+      
+      if (!activeLayer) {
+        console.log('No active layer found');
+        return;
+      }
+      
+      // Only allow double-click editing on interactive layers
+      const interactiveLayers = ['enemy', 'npc', 'object', 'event', 'background'];
+      if (!interactiveLayers.includes(activeLayer.type)) {
+        console.log(`Layer type '${activeLayer.type}' is not interactive, skipping double-click`);
+        return;
+      }
+      
       // Get hover coordinates from editor
       const hoverCoords = editor.getHoverCoordinates();
+      console.log('Hover coordinates:', hoverCoords);
       
       if (hoverCoords) {
         // Check if there's an object at this position
         const objects = editor.getMapObjects();
+        const objectsAtPosition = editor.getObjectsAtPosition(hoverCoords.x, hoverCoords.y);
+        console.log('All objects:', objects.length);
+        console.log('Objects at hover position:', objectsAtPosition);
+        
         const objectAtPosition = objects.find(obj => 
           obj.x === hoverCoords.x && obj.y === hoverCoords.y
         );
         
+        console.log('Object at position (find method):', objectAtPosition);
+        
         if (objectAtPosition) {
+          console.log(`Opening edit dialog for object ID: ${objectAtPosition.id}`);
           handleEditObject(objectAtPosition.id);
+        } else {
+          console.log('No object found at hover position');
         }
       }
     };
@@ -960,19 +988,19 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     }
   };
 
-  const handleUndo = () => {
+  const handleUndo = useCallback(() => {
     if (editor?.undo) {
       editor.undo();
       updateLayersList(); // Update UI after undo
     }
-  };
+  }, [editor, updateLayersList]);
 
-  const handleRedo = () => {
+  const handleRedo = useCallback(() => {
     if (editor?.redo) {
       editor.redo();
       updateLayersList(); // Update UI after redo
     }
-  };
+  }, [editor, updateLayersList]);
 
   const handleExportMap = async () => {
     if (!editor || !projectPath) {
@@ -1220,8 +1248,58 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     window.electronAPI.onMenuNewMap(() => {
       setShowWelcome(true);
     });
+    // Undo
+    window.electronAPI.onMenuUndo(() => {
+      handleUndo();
+    });
+    // Redo
+    window.electronAPI.onMenuRedo(() => {
+      handleRedo();
+    });
     // No cleanup provided by preload; handlers are idempotent in this simple flow
-  }, [handleManualSave, handleOpenMap]);
+  }, [handleManualSave, handleOpenMap, handleUndo, handleRedo]);
+
+  // Handle close confirmation events
+  useEffect(() => {
+    if (!window.electronAPI) return;
+    
+    // Handle before close check
+    window.electronAPI.onBeforeClose(async () => {
+      await window.electronAPI.confirmClose(hasUnsavedChanges);
+      // The main process handles the actual close logic
+    });
+
+    // Handle save and close request
+    window.electronAPI.onSaveAndClose(async () => {
+      try {
+        await handleManualSave();
+        // After save is complete, tell main process to close
+        window.electronAPI.closeAfterSave();
+      } catch (error) {
+        console.error('Failed to save before close:', error);
+        // Even if save fails, we could show another dialog or just close
+        window.electronAPI.closeAfterSave();
+      }
+    });
+  }, [hasUnsavedChanges, handleManualSave]);
+
+  // Handle browser beforeunload event (for web version)
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        event.preventDefault();
+        event.returnValue = ''; // Required for Chrome
+        return ''; // Required for some browsers
+      }
+      return undefined;
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [hasUnsavedChanges]);
 
   const handleMinimize = () => {
     if (window.electronAPI?.minimize) {

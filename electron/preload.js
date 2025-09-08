@@ -6,6 +6,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   minimize: () => ipcRenderer.send('window-minimize'),
   maximize: () => ipcRenderer.send('window-maximize'),
   close: () => ipcRenderer.send('window-close'),
+  confirmClose: (hasUnsavedChanges) => ipcRenderer.invoke('confirm-close', hasUnsavedChanges),
+  onBeforeClose: (callback) => ipcRenderer.on('before-close', () => callback && callback()),
+  onSaveAndClose: (callback) => ipcRenderer.on('save-and-close', () => callback && callback()),
+  closeAfterSave: () => ipcRenderer.send('close-after-save'),
   selectDirectory: () => ipcRenderer.invoke('select-directory'),
   createMapProject: (config) => ipcRenderer.invoke('create-map-project', config),
   openMapProject: (projectPath) => ipcRenderer.invoke('open-map-project', projectPath),
@@ -17,5 +21,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Menu event listeners
   onMenuNewMap: (callback) => ipcRenderer.on('menu-new-map', (_e) => callback && callback()),
   onMenuOpenMap: (callback) => ipcRenderer.on('menu-open-map', (_e) => callback && callback()),
-  onMenuSaveMap: (callback) => ipcRenderer.on('menu-save-map', (_e) => callback && callback())
+  onMenuSaveMap: (callback) => ipcRenderer.on('menu-save-map', (_e) => callback && callback()),
+  onMenuUndo: (callback) => ipcRenderer.on('menu-undo', (_e) => callback && callback()),
+  onMenuRedo: (callback) => ipcRenderer.on('menu-redo', (_e) => callback && callback())
 });

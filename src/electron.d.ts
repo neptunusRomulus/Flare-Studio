@@ -32,6 +32,10 @@ declare global {
       minimize: () => void;
       maximize: () => void;
       close: () => void;
+      confirmClose: (hasUnsavedChanges: boolean) => Promise<boolean>;
+      onBeforeClose: (callback: () => void) => void;
+      onSaveAndClose: (callback: () => void) => void;
+      closeAfterSave: () => void;
       selectDirectory: () => Promise<string | null>;
       createMapProject: (config: MapConfig) => Promise<boolean>;
       openMapProject: (projectPath: string) => Promise<MapConfig | null>;
@@ -42,6 +46,8 @@ declare global {
       onMenuNewMap: (callback: () => void) => void;
       onMenuOpenMap: (callback: () => void) => void;
       onMenuSaveMap: (callback: () => void) => void;
+      onMenuUndo: (callback: () => void) => void;
+      onMenuRedo: (callback: () => void) => void;
     };
   }
 }

@@ -693,6 +693,7 @@ export class TileMapEditor {
     this.mapCanvas.addEventListener('mousedown', this.handleMouseDown.bind(this));
     this.mapCanvas.addEventListener('mousemove', this.handleMouseMove.bind(this));
     this.mapCanvas.addEventListener('mouseup', this.handleMouseUp.bind(this));
+    this.mapCanvas.addEventListener('mouseleave', this.handleMouseLeave.bind(this));
     this.mapCanvas.addEventListener('contextmenu', (e) => e.preventDefault());
     
     // Zoom events
@@ -819,6 +820,9 @@ export class TileMapEditor {
         this.hoverX = tileCoords.x;
         this.hoverY = tileCoords.y;
         
+        // Check if there's an object at hover position and update cursor
+        this.updateCursorForHover();
+        
         // Update stamp preview position
         if (this.tool === 'stamp' && this.currentStampMode === 'place' && this.activeStamp) {
           this.stampPreview.x = tileCoords.x;
@@ -851,6 +855,15 @@ export class TileMapEditor {
     this.isPanning = false;
   }
 
+  private handleMouseLeave(): void {
+    // Hide tooltip when mouse leaves canvas
+    this.hideObjectTooltip();
+    // Reset hover coordinates
+    this.hoverX = -1;
+    this.hoverY = -1;
+    this.draw();
+  }
+
   private handleWheel(event: WheelEvent): void {
     event.preventDefault();
     
@@ -865,9 +878,24 @@ export class TileMapEditor {
       this.mapCanvas.style.cursor = 'grab';
     }
     
-    // Selection shortcuts
+    // Undo/Redo shortcuts
     if (event.ctrlKey || event.metaKey) {
       switch (event.code) {
+        case 'KeyZ':
+          event.preventDefault();
+          if (event.shiftKey) {
+            // Ctrl+Shift+Z = Redo (alternative)
+            this.redo();
+          } else {
+            // Ctrl+Z = Undo
+            this.undo();
+          }
+          break;
+        case 'KeyY':
+          // Ctrl+Y = Redo
+          event.preventDefault();
+          this.redo();
+          break;
         case 'KeyA':
           event.preventDefault();
           this.selectAll();
@@ -993,7 +1021,7 @@ export class TileMapEditor {
           layer.data[index] = newValue;
           
           // Handle object creation/removal based on layer type
-          if (layer.type === 'event' || layer.type === 'enemy' || layer.type === 'npc') {
+          if (layer.type === 'event' || layer.type === 'enemy' || layer.type === 'npc' || layer.type === 'object') {
             if (newValue > 0) {
               // Create object when placing tile
               this.createObjectFromTile(x, y, layer.type, newValue);
@@ -1636,21 +1664,73 @@ export class TileMapEditor {
   }
 
   private drawHover(): void {
-    this.ctx.strokeStyle = '#007acc';
-    this.ctx.lineWidth = Math.max(1, Math.min(3, 2 / this.zoom)); // Scale line width inversely with zoom, but constrain to 1-3px
-    
-    // Draw isometric diamond outline for hover - same as grid cell
     const screenPos = this.mapToScreen(this.hoverX, this.hoverY);
     const halfTileX = (this.tileSizeX / 2) * this.zoom;
     const halfTileY = (this.tileSizeY / 2) * this.zoom;
     
-    this.ctx.beginPath();
-    this.ctx.moveTo(screenPos.x, screenPos.y - halfTileY); // Top
-    this.ctx.lineTo(screenPos.x + halfTileX, screenPos.y); // Right
-    this.ctx.lineTo(screenPos.x, screenPos.y + halfTileY); // Bottom
-    this.ctx.lineTo(screenPos.x - halfTileX, screenPos.y); // Left
-    this.ctx.closePath();
-    this.ctx.stroke();
+    // Check if we're hovering over an object on an interactive layer
+    const activeLayer = this.getActiveLayer();
+    const interactiveLayers = ['enemy', 'npc', 'object', 'event', 'background'];
+    const hasObjectAtPosition = activeLayer && 
+                               interactiveLayers.includes(activeLayer.type) && 
+                               this.getObjectsAtPosition(this.hoverX, this.hoverY).length > 0;
+    
+    if (hasObjectAtPosition) {
+      // Draw orange glow effect for objects
+      this.ctx.save();
+      
+      // Create orange glow with multiple layers
+      const glowLayers = [
+        { color: 'rgba(255, 107, 0, 0.1)', width: 8 },
+        { color: 'rgba(255, 107, 0, 0.2)', width: 6 },
+        { color: 'rgba(255, 107, 0, 0.3)', width: 4 },
+        { color: 'rgba(255, 107, 0, 0.5)', width: 2 }
+      ];
+      
+      // Draw glow layers from largest to smallest
+      glowLayers.forEach(layer => {
+        this.ctx.strokeStyle = layer.color;
+        this.ctx.lineWidth = Math.max(1, Math.min(layer.width, layer.width / this.zoom));
+        this.ctx.shadowColor = '#ff6b00';
+        this.ctx.shadowBlur = Math.max(2, Math.min(10, layer.width / this.zoom));
+        
+        this.ctx.beginPath();
+        this.ctx.moveTo(screenPos.x, screenPos.y - halfTileY); // Top
+        this.ctx.lineTo(screenPos.x + halfTileX, screenPos.y); // Right
+        this.ctx.lineTo(screenPos.x, screenPos.y + halfTileY); // Bottom
+        this.ctx.lineTo(screenPos.x - halfTileX, screenPos.y); // Left
+        this.ctx.closePath();
+        this.ctx.stroke();
+      });
+      
+      // Draw bright orange border
+      this.ctx.shadowColor = 'transparent';
+      this.ctx.shadowBlur = 0;
+      this.ctx.strokeStyle = '#ff6b00';
+      this.ctx.lineWidth = Math.max(1, Math.min(3, 3 / this.zoom));
+      
+      this.ctx.beginPath();
+      this.ctx.moveTo(screenPos.x, screenPos.y - halfTileY); // Top
+      this.ctx.lineTo(screenPos.x + halfTileX, screenPos.y); // Right
+      this.ctx.lineTo(screenPos.x, screenPos.y + halfTileY); // Bottom
+      this.ctx.lineTo(screenPos.x - halfTileX, screenPos.y); // Left
+      this.ctx.closePath();
+      this.ctx.stroke();
+      
+      this.ctx.restore();
+    } else {
+      // Default blue hover outline
+      this.ctx.strokeStyle = '#007acc';
+      this.ctx.lineWidth = Math.max(1, Math.min(3, 2 / this.zoom)); // Scale line width inversely with zoom, but constrain to 1-3px
+      
+      this.ctx.beginPath();
+      this.ctx.moveTo(screenPos.x, screenPos.y - halfTileY); // Top
+      this.ctx.lineTo(screenPos.x + halfTileX, screenPos.y); // Right
+      this.ctx.lineTo(screenPos.x, screenPos.y + halfTileY); // Bottom
+      this.ctx.lineTo(screenPos.x - halfTileX, screenPos.y); // Left
+      this.ctx.closePath();
+      this.ctx.stroke();
+    }
   }
 
   private drawSelection(): void {
@@ -3265,6 +3345,13 @@ export class TileMapEditor {
     return null;
   }
 
+  public getActiveLayer(): TileLayer | null {
+    if (this.activeLayerId !== null) {
+      return this.tileLayers.find(l => l.id === this.activeLayerId) || null;
+    }
+    return null;
+  }
+
   // Tool management methods
   public setCurrentTool(tool: 'brush' | 'eraser' | 'bucket'): void {
     this.currentTool = tool;
@@ -4530,10 +4617,96 @@ export class TileMapEditor {
     return [...this.objects];
   }
 
+  public getObjectsAtPosition(x: number, y: number): MapObject[] {
+    return this.objects.filter(obj => obj.x === x && obj.y === y);
+  }
+
+  private updateCursorForHover(): void {
+    // Check if we're hovering over an object on an interactive layer
+    const activeLayer = this.getActiveLayer();
+    const interactiveLayers = ['enemy', 'npc', 'object', 'event', 'background'];
+    
+    if (activeLayer && interactiveLayers.includes(activeLayer.type)) {
+      const objectsAtPosition = this.getObjectsAtPosition(this.hoverX, this.hoverY);
+      if (objectsAtPosition.length > 0) {
+        this.mapCanvas.style.cursor = 'pointer';
+        this.showObjectTooltip(objectsAtPosition[0]);
+        return;
+      }
+    }
+    
+    // Default cursor behavior
+    if (this.spacePressed) {
+      this.mapCanvas.style.cursor = this.isPanning ? 'grabbing' : 'grab';
+    } else {
+      this.mapCanvas.style.cursor = 'crosshair';
+    }
+    this.hideObjectTooltip();
+  }
+
+  private showObjectTooltip(object: MapObject): void {
+    // Create or update tooltip
+    let tooltip = document.getElementById('object-tooltip') as HTMLElement;
+    if (!tooltip) {
+      tooltip = document.createElement('div');
+      tooltip.id = 'object-tooltip';
+      tooltip.style.position = 'absolute';
+      tooltip.style.background = 'rgba(0, 0, 0, 0.35)'; // 65% transparent (35% opacity)
+      tooltip.style.color = 'white';
+      tooltip.style.padding = '4px 6px'; // Reduced padding
+      tooltip.style.borderRadius = '3px'; // Slightly smaller border radius
+      tooltip.style.fontSize = '11px'; // Smaller font size
+      tooltip.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'; // Editor's font
+      tooltip.style.lineHeight = '1.2'; // Tighter line height
+      tooltip.style.pointerEvents = 'none';
+      tooltip.style.zIndex = '1000';
+      tooltip.style.border = '1px solid rgba(255, 107, 0, 0.8)'; // Semi-transparent border
+      tooltip.style.boxShadow = '0 1px 4px rgba(0,0,0,0.3)'; // Smaller shadow
+      tooltip.style.backdropFilter = 'blur(2px)'; // Add subtle blur effect
+      document.body.appendChild(tooltip);
+    }
+
+    // Mouse icon SVG (from Lucide React) - smaller version
+    const mouseIcon = `
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; margin-right: 4px;">
+        <rect x="5" y="2" width="14" height="20" rx="7"/>
+        <path d="M12 6v4"/>
+      </svg>
+    `;
+
+    // Update tooltip content with tighter spacing
+    const typeDisplay = object.type === 'enemy' ? object.category || 'enemy' : object.type;
+    tooltip.innerHTML = `
+      <div style="font-weight: bold; margin-bottom: 2px; color: #ff6b00; font-size: 10px;">
+        ${mouseIcon}Double click to edit
+      </div>
+      <div style="font-weight: bold; margin-bottom: 1px;">${object.name || 'Unnamed'}</div>
+      <div style="font-size: 10px; color: rgba(255,255,255,0.9);">Type: ${typeDisplay}</div>
+    `;
+
+    // Position tooltip near mouse cursor
+    const rect = this.mapCanvas.getBoundingClientRect();
+    const screenPos = this.mapToScreen(this.hoverX, this.hoverY);
+    
+    tooltip.style.left = `${rect.left + screenPos.x + 20}px`;
+    tooltip.style.top = `${rect.top + screenPos.y - 10}px`;
+    tooltip.style.display = 'block';
+  }
+
+  private hideObjectTooltip(): void {
+    const tooltip = document.getElementById('object-tooltip');
+    if (tooltip) {
+      tooltip.style.display = 'none';
+    }
+  }
+
   private createObjectFromTile(x: number, y: number, layerType: string, _gid: number): void {
+    console.log(`Creating object from tile at (${x}, ${y}) for layer type: ${layerType}`);
+    
     // Check if there's already an object at this position
     const existingObject = this.objects.find(obj => obj.x === x && obj.y === y);
     if (existingObject) {
+      console.log(`Found existing object at (${x}, ${y}), updating instead of creating new one`);
       // Update existing object instead of creating a new one
       const updates: Partial<MapObject> = {
         name: `${layerType}_${x}_${y}`,
@@ -4547,25 +4720,30 @@ export class TileMapEditor {
     let objectType: 'event' | 'enemy';
     if (layerType === 'event') {
       objectType = 'event';
-    } else if (layerType === 'enemy' || layerType === 'npc') {
-      objectType = 'enemy'; // NPCs are treated as enemies in Flare
+    } else if (layerType === 'enemy' || layerType === 'npc' || layerType === 'object') {
+      objectType = 'enemy'; // NPCs and objects are treated as enemies in Flare
     } else {
+      console.log(`Unsupported layer type: ${layerType}`);
       return; // Unsupported layer type
     }
+
+    console.log(`Creating new ${objectType} object at (${x}, ${y})`);
 
     // Create the object using the existing addMapObject method
     const newObject = this.addMapObject(objectType, x, y, 1, 1);
     
+    console.log(`Created object with ID: ${newObject.id}`);
+    
     // Set appropriate defaults based on type
     const updates: Partial<MapObject> = {
       name: `${layerType}_${x}_${y}`,
-      category: objectType === 'event' ? 'block' : (layerType === 'npc' ? 'npc' : 'creature'),
+      category: objectType === 'event' ? 'block' : (layerType === 'npc' ? 'npc' : (layerType === 'object' ? 'object' : 'creature')),
     };
     
     if (objectType === 'enemy') {
       updates.level = 1;
       updates.number = 1;
-      updates.wander_radius = layerType === 'npc' ? 0 : 4; // NPCs don't wander
+      updates.wander_radius = (layerType === 'npc' || layerType === 'object') ? 0 : 4; // NPCs and objects don't wander
     } else {
       updates.activate = 'on_trigger';
       updates.hotspot = '0,0,1,1';

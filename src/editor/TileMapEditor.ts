@@ -4120,6 +4120,57 @@ export class TileMapEditor {
     console.log('  • map.txt (place in maps/ folder)');
     console.log('  • tileset.txt (place in tilesetdefs/ folder)');
     console.log('🎮 Format: Fully compatible with Flare Engine');
+    
+    // Log global tileset mapping for debugging
+    this.logGlobalTilesetMapping();
+  }
+
+  // Debug helper: Log the global tileset mapping
+  private logGlobalTilesetMapping(): void {
+    console.log('🗺️ Global Tileset Mapping:');
+    
+    const globalTilesets: Array<{
+      fileName: string;
+      count: number;
+      layerType: string;
+      offset: number;
+    }> = [];
+    
+    let currentOffset = 1;
+    
+    // Build same mapping as export functions
+    if (this.tilesetFileName) {
+      globalTilesets.push({
+        fileName: this.tilesetFileName,
+        count: this.tileCount,
+        layerType: 'main',
+        offset: currentOffset
+      });
+      currentOffset += this.tileCount;
+    }
+    
+    const addedTilesets = new Set<string>();
+    if (this.tilesetFileName) {
+      addedTilesets.add(this.tilesetFileName);
+    }
+    
+    for (const [layerType, tileset] of this.layerTilesets.entries()) {
+      if (tileset.fileName && !addedTilesets.has(tileset.fileName)) {
+        globalTilesets.push({
+          fileName: tileset.fileName,
+          count: tileset.count,
+          layerType: layerType,
+          offset: currentOffset
+        });
+        currentOffset += tileset.count;
+        addedTilesets.add(tileset.fileName);
+      }
+    }
+    
+    for (const tileset of globalTilesets) {
+      const endOffset = tileset.offset + tileset.count - 1;
+      console.log(`  ${tileset.fileName} (${tileset.layerType}): IDs ${tileset.offset}-${endOffset} (${tileset.count} tiles)`);
+    }
   }
 
   // Silent auto-save export (no alerts, no downloads)
@@ -4164,19 +4215,61 @@ export class TileMapEditor {
     lines.push(`title=${this.tilesetFileName?.replace(/\.[^/.]+$/, '') || 'Untitled Map'}`);
     lines.push('');
     
+    // FLARE GLOBAL TILESET SYSTEM:
+    // Build global tileset list from all layer tilesets to ensure consistent ID mapping.
+    // Each tileset gets a unique offset in the global ID space to prevent ID collisions.
+    // This solves the "dark background" issue where per-layer tile IDs were incorrect.
+    const globalTilesets: Array<{
+      fileName: string;
+      count: number;
+      layerType: string;
+      offset: number; // Starting tile ID for this tileset in global space
+    }> = [];
+    
+    let currentOffset = 1; // Flare tile IDs start from 1 (0 = empty/transparent)
+    
+    // First, add main tileset if it exists
+    if (this.tilesetFileName) {
+      globalTilesets.push({
+        fileName: this.tilesetFileName,
+        count: this.tileCount,
+        layerType: 'main',
+        offset: currentOffset
+      });
+      currentOffset += this.tileCount;
+    }
+    
+    // Then add layer-specific tilesets (avoid duplicates)
+    const addedTilesets = new Set<string>();
+    if (this.tilesetFileName) {
+      addedTilesets.add(this.tilesetFileName);
+    }
+    
+    for (const [layerType, tileset] of this.layerTilesets.entries()) {
+      if (tileset.fileName && !addedTilesets.has(tileset.fileName)) {
+        globalTilesets.push({
+          fileName: tileset.fileName,
+          count: tileset.count,
+          layerType: layerType,
+          offset: currentOffset
+        });
+        currentOffset += tileset.count;
+        addedTilesets.add(tileset.fileName);
+      }
+    }
+    
+    // Create tileset offset lookup for quick ID conversion during layer export
+    const tilesetOffsets = new Map<string, number>();
+    for (const globalTileset of globalTilesets) {
+      tilesetOffsets.set(globalTileset.fileName, globalTileset.offset);
+    }
+    
     // [tilesets] section - Flare format requirement
     lines.push(`[tilesets]`);
     
-    // Export main tileset if available
-    if (this.tilesetFileName) {
-      lines.push(`tileset=../images/tilesets/${this.tilesetFileName},${this.tileSizeX},${this.tileSizeY},0,0`);
-    }
-    
-    // Export layer-specific tilesets
-    for (const tileset of this.layerTilesets.values()) {
-      if (tileset.fileName && tileset.fileName !== this.tilesetFileName) {
-        lines.push(`tileset=../images/tilesets/${tileset.fileName},${this.tileSizeX},${this.tileSizeY},0,0`);
-      }
+    // Export all tilesets from global list (no duplicates)
+    for (const globalTileset of globalTilesets) {
+      lines.push(`tileset=../images/tilesets/${globalTileset.fileName},${this.tileSizeX},${this.tileSizeY},0,0`);
     }
     
     lines.push('');
@@ -4192,12 +4285,28 @@ export class TileMapEditor {
       lines.push(`type=${layer.type}`);
       lines.push(`data=`);
       
-      // Export tile data in comma-separated format
+      // Get the tileset for this layer to calculate global IDs
+      const layerTileset = this.layerTilesets.get(layerType);
+      const tilesetOffset = layerTileset?.fileName ? tilesetOffsets.get(layerTileset.fileName) || 0 : 0;
+      
+      // GLOBAL ID CONVERSION:
+      // Convert per-layer tile IDs to global IDs using the offset system
+      // Formula: global_tile_id = tileset_offset + (local_tile_index - 1)
+      // This ensures all layers reference the same global tileset space
       for (let y = 0; y < this.mapHeight; y++) {
         const row: string[] = [];
         for (let x = 0; x < this.mapWidth; x++) {
           const index = y * this.mapWidth + x;
-          row.push(layer.data[index].toString());
+          const localTileId = layer.data[index];
+          
+          // Convert local tile ID to global ID
+          // Note: local_tile_index is 1-based, but we need 0-based for offset calculation
+          let globalTileId = 0;
+          if (localTileId > 0) {
+            globalTileId = tilesetOffset + (localTileId - 1);
+          }
+          
+          row.push(globalTileId.toString());
         }
         lines.push(row.join(','));
       }
@@ -4255,27 +4364,93 @@ export class TileMapEditor {
   }
 
   public generateFlareTilesetDef(): string {
-    if (!this.tilesetFileName) return '';
-    
     const lines: string[] = [];
     
-    // Image reference - Flare format expects relative path from tilesetdefs folder
-    lines.push(`img=../images/tilesets/${this.tilesetFileName}`);
+    // Check if we have any tilesets to export
+    if (!this.tilesetFileName && this.layerTilesets.size === 0) {
+      return '# No tilesets found - please load tilesets before exporting\n';
+    }
+    
+    // FLARE GLOBAL TILESET DEFINITIONS:
+    // Generate tile definitions for ALL tilesets used across all layers
+    // with proper global ID offsets to match the map export
+    const globalTilesets: Array<{
+      fileName: string;
+      count: number;
+      layerType: string;
+      offset: number;
+      tileset: {
+        columns: number;
+        rows: number;
+        count: number;
+      }; // Store reference to tileset data
+    }> = [];
+    
+    let currentOffset = 1; // Flare tile IDs start from 1 (0 = empty/transparent)
+    
+    // First, add main tileset if it exists
+    if (this.tilesetFileName) {
+      globalTilesets.push({
+        fileName: this.tilesetFileName,
+        count: this.tileCount,
+        layerType: 'main',
+        offset: currentOffset,
+        tileset: {
+          columns: this.tilesetColumns,
+          rows: this.tilesetRows,
+          count: this.tileCount
+        }
+      });
+      currentOffset += this.tileCount;
+    }
+    
+    // Then add layer-specific tilesets (avoid duplicates)
+    const addedTilesets = new Set<string>();
+    if (this.tilesetFileName) {
+      addedTilesets.add(this.tilesetFileName);
+    }
+    
+    for (const [layerType, tileset] of this.layerTilesets.entries()) {
+      if (tileset.fileName && !addedTilesets.has(tileset.fileName)) {
+        globalTilesets.push({
+          fileName: tileset.fileName,
+          count: tileset.count,
+          layerType: layerType,
+          offset: currentOffset,
+          tileset: tileset
+        });
+        currentOffset += tileset.count;
+        addedTilesets.add(tileset.fileName);
+      }
+    }
+    
+    // Generate image references for all tilesets
+    for (const globalTileset of globalTilesets) {
+      lines.push(`img=../images/tilesets/${globalTileset.fileName}`);
+    }
     lines.push('');
     
-    // Generate tile definitions with proper Flare format
+    // Generate tile definitions for all tilesets with proper global IDs
     // Format: tile=id,left_x,top_y,width,height,offset_x,offset_y
-    for (let i = 0; i < this.tileCount; i++) {
-      const id = i + 1; // Start from 1
-      const left_x = (i % this.tilesetColumns) * this.tileSizeX;
-      const top_y = Math.floor(i / this.tilesetColumns) * this.tileSizeY;
-      const width = this.tileSizeX;
-      const height = this.tileSizeY;
-      // For isometric tiles, offset is typically half the tile size for proper positioning
-      const offset_x = Math.floor(this.tileSizeX / 2);
-      const offset_y = Math.floor(this.tileSizeY / 2);
+    for (const globalTileset of globalTilesets) {
+      const tileset = globalTileset.tileset;
       
-      lines.push(`tile=${id},${left_x},${top_y},${width},${height},${offset_x},${offset_y}`);
+      for (let i = 0; i < globalTileset.count; i++) {
+        // Global ID starts from the tileset's offset
+        const globalId = globalTileset.offset + i;
+        
+        // Calculate position within the tileset image
+        const left_x = (i % tileset.columns) * this.tileSizeX;
+        const top_y = Math.floor(i / tileset.columns) * this.tileSizeY;
+        const width = this.tileSizeX;
+        const height = this.tileSizeY;
+        
+        // For isometric tiles, offset is typically half the tile size for proper positioning
+        const offset_x = Math.floor(this.tileSizeX / 2);
+        const offset_y = Math.floor(this.tileSizeY / 2);
+        
+        lines.push(`tile=${globalId},${left_x},${top_y},${width},${height},${offset_x},${offset_y}`);
+      }
     }
     
     return lines.join('\n');

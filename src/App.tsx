@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import Tooltip from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Upload, Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Blend, MapPin, Save, ArrowUpDown, Link2, Scissors, Trash2, Check, HelpCircle, Folder, Calendar, Zap } from 'lucide-react';
+import { Upload, Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Blend, MapPin, Save, ArrowUpDown, Link2, Scissors, Trash2, Check, HelpCircle, Folder } from 'lucide-react';
 import { TileMapEditor } from './editor/TileMapEditor';
 import { TileLayer } from './types';
 import { useToast } from '@/hooks/use-toast';
@@ -99,11 +99,9 @@ function App() {
   } | null>(null);
   const tooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
-  // Object management states
+  // Object management states  
   const [showObjectDialog, setShowObjectDialog] = useState(false);
   const [editingObject, setEditingObject] = useState<import('./types').MapObject | null>(null);
-  const [objectMode, setObjectMode] = useState<'select' | 'add-event' | 'add-enemy'>('select');
-  const [objects, setObjects] = useState<import('./types').MapObject[]>([]);
   
   // Tool dropdown timeout refs
   const brushOptionsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -605,30 +603,6 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
   }, [editor]);
 
   // Object management handlers
-  const handleAddObject = useCallback((objectType: 'event' | 'enemy', x: number, y: number) => {
-    if (!editor) return;
-    
-    const newObject = editor.addMapObject(objectType, x, y, 1, 1);
-    
-    // Update with Flare-specific properties
-    const updates: Partial<import('./types').MapObject> = {
-      category: objectType === 'event' ? 'block' : 'creature',
-    };
-    
-    if (objectType === 'enemy') {
-      updates.level = 1;
-      updates.number = 1;
-      updates.wander_radius = 4;
-    } else {
-      updates.activate = 'on_trigger';
-      updates.hotspot = '0,0,1,1';
-    }
-    
-    editor.updateMapObject(newObject.id, updates);
-    const updatedObjects = editor.getMapObjects();
-    setObjects(updatedObjects);
-  }, [editor]);
-
   const handleEditObject = useCallback((objectId: number) => {
     if (!editor) return;
     
@@ -643,58 +617,38 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     if (!editor) return;
     
     editor.updateMapObject(updatedObject.id, updatedObject);
-    const updatedObjects = editor.getMapObjects();
-    setObjects(updatedObjects);
     setEditingObject(null);
     setShowObjectDialog(false);
   }, [editor]);
 
-  const handleRemoveObject = useCallback((objectId: number) => {
-    if (!editor) return;
-    
-    editor.removeMapObject(objectId);
-    const updatedObjects = editor.getMapObjects();
-    setObjects(updatedObjects);
-  }, [editor]);
-
-  const refreshObjects = useCallback(() => {
-    if (!editor) return;
-    const currentObjects = editor.getMapObjects();
-    setObjects(currentObjects);
-  }, [editor]);
-
-  // Sync objects with editor
-  useEffect(() => {
-    if (editor) {
-      refreshObjects();
-    }
-  }, [editor, refreshObjects]);
-
-  // Canvas click handler for object placement
+  // Canvas double-click handler for editing objects
   useEffect(() => {
     if (!editor || !canvasRef.current) return;
 
-    const handleCanvasClick = (_event: MouseEvent) => {
-      if (objectMode === 'select') return; // Let editor handle selection
-
-      // Use hover coordinates from editor if available
+    const handleCanvasDoubleClick = (_event: MouseEvent) => {
+      // Get hover coordinates from editor
       const hoverCoords = editor.getHoverCoordinates();
       
-      if (hoverCoords && (objectMode === 'add-event' || objectMode === 'add-enemy')) {
-        const objectType = objectMode === 'add-event' ? 'event' : 'enemy';
-        handleAddObject(objectType, hoverCoords.x, hoverCoords.y);
-        // Switch back to select mode after placing
-        setObjectMode('select');
+      if (hoverCoords) {
+        // Check if there's an object at this position
+        const objects = editor.getMapObjects();
+        const objectAtPosition = objects.find(obj => 
+          obj.x === hoverCoords.x && obj.y === hoverCoords.y
+        );
+        
+        if (objectAtPosition) {
+          handleEditObject(objectAtPosition.id);
+        }
       }
     };
 
     const canvas = canvasRef.current;
-    canvas.addEventListener('click', handleCanvasClick);
+    canvas.addEventListener('dblclick', handleCanvasDoubleClick);
 
     return () => {
-      canvas.removeEventListener('click', handleCanvasClick);
+      canvas.removeEventListener('dblclick', handleCanvasDoubleClick);
     };
-  }, [editor, objectMode, handleAddObject]);
+  }, [editor, handleEditObject]);
 
   // Effect to handle brush tool state changes
   useEffect(() => {
@@ -1561,93 +1515,6 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                   </div>
                 </div>
               ))}
-            </div>
-          </section>
-
-          {/* Objects Section */}
-          <section className="mb-4 flex-shrink-0">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-sm font-semibold">Objects</h2>
-              <div className="flex gap-1">
-                <Tooltip content="Add Event">
-                  <Button
-                    variant={objectMode === 'add-event' ? 'default' : 'outline'}
-                    size="sm"
-                    className="text-xs px-1 py-1 h-6 shadow-sm"
-                    onClick={() => setObjectMode(objectMode === 'add-event' ? 'select' : 'add-event')}
-                  >
-                    <Calendar className="w-3 h-3" />
-                  </Button>
-                </Tooltip>
-                <Tooltip content="Add Enemy">
-                  <Button
-                    variant={objectMode === 'add-enemy' ? 'default' : 'outline'}
-                    size="sm"
-                    className="text-xs px-1 py-1 h-6 shadow-sm"
-                    onClick={() => setObjectMode(objectMode === 'add-enemy' ? 'select' : 'add-enemy')}
-                  >
-                    <Zap className="w-3 h-3" />
-                  </Button>
-                </Tooltip>
-              </div>
-            </div>
-            
-            {/* Objects List */}
-            <div className="space-y-0.5 max-h-32 overflow-y-auto">
-              {objects.length === 0 ? (
-                <div className="text-xs text-muted-foreground text-center py-2">
-                  No objects yet. Click + to add events or enemies.
-                </div>
-              ) : (
-                objects.map((obj) => (
-                  <div
-                    key={obj.id}
-                    className="px-2 py-1 border rounded transition-colors text-xs border-border hover:bg-gray-50 dark:hover:bg-gray-800"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1">
-                        {obj.type === 'event' ? (
-                          <Calendar className="w-3 h-3 text-blue-500" />
-                        ) : (
-                          <Zap className="w-3 h-3 text-red-500" />
-                        )}
-                        <span className="text-xs font-medium truncate">
-                          {obj.name || `${obj.type} (${obj.x},${obj.y})`}
-                        </span>
-                      </div>
-                      <div className="flex gap-1">
-                        <Tooltip content="Edit">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEditObject(obj.id)}
-                            className="w-4 h-4 p-0 hover:bg-gray-200 dark:hover:bg-gray-700"
-                          >
-                            <Pen className="w-2.5 h-2.5" />
-                          </Button>
-                        </Tooltip>
-                        <Tooltip content="Remove">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleRemoveObject(obj.id)}
-                            className="w-4 h-4 p-0 hover:bg-red-200 dark:hover:bg-red-700"
-                          >
-                            <Trash2 className="w-2.5 h-2.5 text-red-500" />
-                          </Button>
-                        </Tooltip>
-                      </div>
-                    </div>
-                    {(obj.category || obj.level) && (
-                      <div className="text-xs text-muted-foreground mt-0.5">
-                        {obj.category}
-                        {obj.level && ` • Level ${obj.level}`}
-                        {obj.number && obj.number > 1 && ` • x${obj.number}`}
-                      </div>
-                    )}
-                  </div>
-                ))
-              )}
             </div>
           </section>
 
@@ -2675,46 +2542,6 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                       </div>
                     </div>
                   )}
-                </div>
-
-                {/* Object Tools */}
-                <div className="relative">
-                  <Button
-                    variant={objectMode === 'select' ? 'default' : 'ghost'}
-                    size="sm"
-                    className="w-7 h-7 p-1 rounded-full tool-button"
-                    onClick={() => setObjectMode('select')}
-                    onMouseEnter={(e) => showTooltipWithDelay('Select Objects', e.currentTarget)}
-                    onMouseLeave={hideTooltip}
-                  >
-                    <MousePointer className="w-3 h-3" />
-                  </Button>
-                </div>
-
-                <div className="relative">
-                  <Button
-                    variant={objectMode === 'add-event' ? 'default' : 'ghost'}
-                    size="sm"
-                    className="w-7 h-7 p-1 rounded-full tool-button"
-                    onClick={() => setObjectMode('add-event')}
-                    onMouseEnter={(e) => showTooltipWithDelay('Add Event', e.currentTarget)}
-                    onMouseLeave={hideTooltip}
-                  >
-                    <Calendar className="w-3 h-3" />
-                  </Button>
-                </div>
-
-                <div className="relative">
-                  <Button
-                    variant={objectMode === 'add-enemy' ? 'default' : 'ghost'}
-                    size="sm"
-                    className="w-7 h-7 p-1 rounded-full tool-button"
-                    onClick={() => setObjectMode('add-enemy')}
-                    onMouseEnter={(e) => showTooltipWithDelay('Add Enemy', e.currentTarget)}
-                    onMouseLeave={hideTooltip}
-                  >
-                    <Zap className="w-3 h-3" />
-                  </Button>
                 </div>
 
                 {/* Eyedropper Tool */}

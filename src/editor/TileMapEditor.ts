@@ -991,6 +991,18 @@ export class TileMapEditor {
           console.log(`Active GID for this layer: ${currentLayerActiveGid}`);
           
           layer.data[index] = newValue;
+          
+          // Handle object creation/removal based on layer type
+          if (layer.type === 'event' || layer.type === 'enemy' || layer.type === 'npc') {
+            if (newValue > 0) {
+              // Create object when placing tile
+              this.createObjectFromTile(x, y, layer.type, newValue);
+            } else {
+              // Remove object when erasing tile
+              this.removeObjectAtPosition(x, y);
+            }
+          }
+          
           this.markAsChanged();
           this.draw(); // Immediately reflect changes
         }
@@ -4507,6 +4519,57 @@ export class TileMapEditor {
 
   public getMapObjects(): MapObject[] {
     return [...this.objects];
+  }
+
+  private createObjectFromTile(x: number, y: number, layerType: string, _gid: number): void {
+    // Check if there's already an object at this position
+    const existingObject = this.objects.find(obj => obj.x === x && obj.y === y);
+    if (existingObject) {
+      // Update existing object instead of creating a new one
+      const updates: Partial<MapObject> = {
+        name: `${layerType}_${x}_${y}`,
+        type: layerType === 'npc' ? 'npc' : layerType,
+      };
+      this.updateMapObject(existingObject.id, updates);
+      return;
+    }
+
+    // Create new object based on layer type
+    let objectType: 'event' | 'enemy';
+    if (layerType === 'event') {
+      objectType = 'event';
+    } else if (layerType === 'enemy' || layerType === 'npc') {
+      objectType = 'enemy'; // NPCs are treated as enemies in Flare
+    } else {
+      return; // Unsupported layer type
+    }
+
+    // Create the object using the existing addMapObject method
+    const newObject = this.addMapObject(objectType, x, y, 1, 1);
+    
+    // Set appropriate defaults based on type
+    const updates: Partial<MapObject> = {
+      name: `${layerType}_${x}_${y}`,
+      category: objectType === 'event' ? 'block' : (layerType === 'npc' ? 'npc' : 'creature'),
+    };
+    
+    if (objectType === 'enemy') {
+      updates.level = 1;
+      updates.number = 1;
+      updates.wander_radius = layerType === 'npc' ? 0 : 4; // NPCs don't wander
+    } else {
+      updates.activate = 'on_trigger';
+      updates.hotspot = '0,0,1,1';
+    }
+    
+    this.updateMapObject(newObject.id, updates);
+  }
+
+  private removeObjectAtPosition(x: number, y: number): void {
+    const objectAtPosition = this.objects.find(obj => obj.x === x && obj.y === y);
+    if (objectAtPosition) {
+      this.removeMapObject(objectAtPosition.id);
+    }
   }
 
   public selectObject(objectId: number): MapObject | null {

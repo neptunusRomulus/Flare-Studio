@@ -488,6 +488,18 @@ export class TileMapEditor {
   private isDarkMode: boolean = false;
   private debugMode: boolean = false;
 
+  // Canvas management for cleanup
+  private resizeObserver: ResizeObserver | null = null;
+  private boundResizeHandler: (() => void) | null = null;
+  
+  // Canvas event handlers for cleanup
+  private boundMouseDown: ((event: MouseEvent) => void) | null = null;
+  private boundMouseMove: ((event: MouseEvent) => void) | null = null;
+  private boundMouseUp: ((event: MouseEvent) => void) | null = null;
+  private boundMouseLeave: ((event: MouseEvent) => void) | null = null;
+  private boundWheel: ((event: WheelEvent) => void) | null = null;
+  private boundContextMenu: ((event: Event) => void) | null = null;
+
   // State variables
   private mapWidth: number = 20;
   private mapHeight: number = 15;
@@ -652,18 +664,71 @@ export class TileMapEditor {
     // Set up canvas properties
     this.ctx.imageSmoothingEnabled = false;
     
+    // Clean up previous observers if they exist
+    this.cleanupCanvasObservers();
+    
     // Set canvas dimensions to fill the available container
     this.resizeCanvas();
     
+    // Create bound resize handler to allow proper cleanup
+    this.boundResizeHandler = () => this.resizeCanvas();
+    
     // Listen for window resize to adjust canvas size
-    window.addEventListener('resize', () => this.resizeCanvas());
+    window.addEventListener('resize', this.boundResizeHandler);
     
     // Use ResizeObserver for more accurate container size tracking
     if (window.ResizeObserver) {
-      const resizeObserver = new ResizeObserver(() => this.resizeCanvas());
+      this.resizeObserver = new ResizeObserver(() => this.resizeCanvas());
       if (this.mapCanvas.parentElement) {
-        resizeObserver.observe(this.mapCanvas.parentElement);
+        this.resizeObserver.observe(this.mapCanvas.parentElement);
       }
+    }
+  }
+
+  private cleanupCanvasObservers(): void {
+    // Clean up previous resize observer
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+      this.resizeObserver = null;
+    }
+    
+    // Clean up previous window resize listener
+    if (this.boundResizeHandler) {
+      window.removeEventListener('resize', this.boundResizeHandler);
+      this.boundResizeHandler = null;
+    }
+  }
+
+  private cleanupCanvasEvents(): void {
+    // Clean up canvas-specific event listeners
+    if (this.boundMouseDown) {
+      this.mapCanvas.removeEventListener('mousedown', this.boundMouseDown);
+      this.boundMouseDown = null;
+    }
+    
+    if (this.boundMouseMove) {
+      this.mapCanvas.removeEventListener('mousemove', this.boundMouseMove);
+      this.boundMouseMove = null;
+    }
+    
+    if (this.boundMouseUp) {
+      this.mapCanvas.removeEventListener('mouseup', this.boundMouseUp);
+      this.boundMouseUp = null;
+    }
+    
+    if (this.boundMouseLeave) {
+      this.mapCanvas.removeEventListener('mouseleave', this.boundMouseLeave);
+      this.boundMouseLeave = null;
+    }
+    
+    if (this.boundWheel) {
+      this.mapCanvas.removeEventListener('wheel', this.boundWheel);
+      this.boundWheel = null;
+    }
+    
+    if (this.boundContextMenu) {
+      this.mapCanvas.removeEventListener('contextmenu', this.boundContextMenu);
+      this.boundContextMenu = null;
     }
   }
 
@@ -695,15 +760,26 @@ export class TileMapEditor {
   }
 
   private bindEvents(): void {
+    // Clean up any existing canvas event listeners first
+    this.cleanupCanvasEvents();
+    
+    // Create bound handlers
+    this.boundMouseDown = this.handleMouseDown.bind(this);
+    this.boundMouseMove = this.handleMouseMove.bind(this);
+    this.boundMouseUp = this.handleMouseUp.bind(this);
+    this.boundMouseLeave = this.handleMouseLeave.bind(this);
+    this.boundWheel = this.handleWheel.bind(this);
+    this.boundContextMenu = (e) => e.preventDefault();
+    
     // Mouse events for the main canvas
-    this.mapCanvas.addEventListener('mousedown', this.handleMouseDown.bind(this));
-    this.mapCanvas.addEventListener('mousemove', this.handleMouseMove.bind(this));
-    this.mapCanvas.addEventListener('mouseup', this.handleMouseUp.bind(this));
-    this.mapCanvas.addEventListener('mouseleave', this.handleMouseLeave.bind(this));
-    this.mapCanvas.addEventListener('contextmenu', (e) => e.preventDefault());
+    this.mapCanvas.addEventListener('mousedown', this.boundMouseDown);
+    this.mapCanvas.addEventListener('mousemove', this.boundMouseMove);
+    this.mapCanvas.addEventListener('mouseup', this.boundMouseUp);
+    this.mapCanvas.addEventListener('mouseleave', this.boundMouseLeave);
+    this.mapCanvas.addEventListener('contextmenu', this.boundContextMenu);
     
     // Zoom events
-    this.mapCanvas.addEventListener('wheel', this.handleWheel.bind(this));
+    this.mapCanvas.addEventListener('wheel', this.boundWheel);
     
     // Keyboard events for panning (need to be on document for spacebar)
     document.addEventListener('keydown', this.handleKeyDown.bind(this));
@@ -5557,5 +5633,31 @@ export class TileMapEditor {
 
   public getMapHeight(): number {
     return this.mapHeight;
+  }
+
+  // Method to update canvas reference when DOM element changes
+  public updateCanvas(newCanvas: HTMLCanvasElement): void {
+    console.log('TileMapEditor: Updating canvas reference and rebinding events');
+    
+    // Clean up observers and events from the old canvas
+    this.cleanupCanvasObservers();
+    this.cleanupCanvasEvents();
+    
+    // Update canvas reference
+    this.mapCanvas = newCanvas;
+    
+    // Reinitialize with new canvas (this will set up observers)
+    this.initializeCanvas();
+    
+    // Rebind canvas events (this will set up mouse/wheel events)
+    this.bindEvents();
+    
+    // Refresh the tile palette to restore tileset brushes
+    this.refreshTilePalette(true);
+    
+    // Redraw to restore the content
+    this.draw();
+    
+    console.log('TileMapEditor: Canvas update complete - events rebound');
   }
 }

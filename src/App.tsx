@@ -49,7 +49,7 @@ function App() {
   
   // Brush management states
   const [brushTool, setBrushTool] = useState<'none' | 'move' | 'merge' | 'separate' | 'remove'>('none');
-  const [selectedBrushes, setSelectedBrushes] = useState<number[]>([]);
+  // Removed unused state: selectedBrushes
   const [showSeparateDialog, setShowSeparateDialog] = useState(false);
   const [brushToSeparate, setBrushToSeparate] = useState<number | null>(null);
   
@@ -555,22 +555,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
   };
 
   // Brush management handlers
-  const handleMergeBrushes = useCallback(() => {
-    if (!editor || selectedBrushes.length < 2) return;
-    
-    try {
-      editor.mergeBrushes(selectedBrushes);
-      setSelectedBrushes([]);
-      setBrushTool('none');
-    } catch (error) {
-      console.error('Failed to merge brushes:', error);
-    }
-  }, [editor, selectedBrushes]);
-
-  const handleCancelMerge = useCallback(() => {
-    setSelectedBrushes([]);
-    setBrushTool('none');
-  }, []);
+  // Removed unused handlers: handleMergeBrushes, handleCancelMerge
 
   const handleSeparateBrush = useCallback((brushId: number) => {
     setBrushToSeparate(brushId);
@@ -730,14 +715,8 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
   useEffect(() => {
     const handleBrushAction = (event: CustomEvent) => {
       const { action, tileIndex } = event.detail;
-      
       switch (action) {
-        case 'select':
-          setSelectedBrushes(prev => [...prev, tileIndex]);
-          break;
-        case 'deselect':
-          setSelectedBrushes(prev => prev.filter(id => id !== tileIndex));
-          break;
+        // Removed select/deselect cases as selectedBrushes state is gone
         case 'separate':
           handleSeparateBrush(tileIndex);
           break;
@@ -748,6 +727,8 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           if (event.detail.from && event.detail.to) {
             handleBrushReorder(event.detail.from, event.detail.to);
           }
+          break;
+        default:
           break;
       }
     };

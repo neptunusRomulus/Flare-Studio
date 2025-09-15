@@ -1,12 +1,12 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import Tooltip from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Upload, Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Blend, MapPin, Save, ArrowUpDown, Link2, Scissors, Trash2, Check, HelpCircle, Folder, Shield } from 'lucide-react';
+import { Upload, Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Blend, MapPin, Save, ArrowUpDown, Link2, Scissors, Trash2, Check, HelpCircle, Folder, Shield, Plus } from 'lucide-react';
 import { TileMapEditor } from './editor/TileMapEditor';
-import { TileLayer } from './types';
+import { TileLayer, MapObject } from './types';
 import { useToast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/toaster';
 import WelcomeScreen from './components/WelcomeScreen';
@@ -99,10 +99,19 @@ function App() {
     fadeOut: boolean;
   } | null>(null);
   const tooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  
+
   // Object management states  
   const [showObjectDialog, setShowObjectDialog] = useState(false);
-  const [editingObject, setEditingObject] = useState<import('./types').MapObject | null>(null);
+  const [editingObject, setEditingObject] = useState<MapObject | null>(null);
+  const [mapObjects, setMapObjects] = useState<MapObject[]>([]);
+  const [actorDialogState, setActorDialogState] = useState<{
+    type: 'npc' | 'enemy';
+    name: string;
+    x: string;
+    y: string;
+    tilesetPath: string;
+  } | null>(null);
+  const [actorDialogError, setActorDialogError] = useState<string | null>(null);
   
   // Hero position edit dialog state
   const [showHeroEditDialog, setShowHeroEditDialog] = useState(false);
@@ -120,15 +129,23 @@ function App() {
   const shapeOptionsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   // Floating toolbar ref for anchored tooltip
   const toolbarRef = useRef<HTMLDivElement | null>(null);
-  
+
   // Hover coordinates state
   const [hoverCoords, setHoverCoords] = useState<{ x: number; y: number } | null>(null);
-  
+
   // Selection state
   const [selectionCount, setSelectionCount] = useState(0);
   const [hasSelection, setHasSelection] = useState(false);
-  
+
   const { toast } = useToast();
+
+  const syncMapObjects = useCallback(() => {
+    if (editor) {
+      setMapObjects(editor.getMapObjects());
+    } else {
+      setMapObjects([]);
+    }
+  }, [editor]);
 
   // Keep 'toast' referenced to avoid unused variable errors while toasts are suppressed.
   // This creates a stable noop reference that will never show UI.
@@ -184,10 +201,14 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       setSelectedTool('brush');
       setSelectedBrushTool('brush');
     });
-    
+
     // Set up stamp callback to update stamps list
     editorInstance.setStampCallback((stampsList) => {
       setStamps(stampsList);
+    });
+
+    editorInstance.setObjectsChangedCallback((objects) => {
+      setMapObjects(objects);
     });
 
     // Set up hero edit callback to show dialog
@@ -313,14 +334,19 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       setLayers([...currentLayers]); // Create a new array to ensure React detects changes
       const activeId = editor.getActiveLayerId();
       setActiveLayerId(activeId);
+      syncMapObjects();
     }
-  }, [editor]);
+  }, [editor, syncMapObjects]);
 
   useEffect(() => {
     if (editor) {
       updateLayersList();
     }
   }, [editor, updateLayersList]);
+
+  useEffect(() => {
+    syncMapObjects();
+  }, [syncMapObjects]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -607,21 +633,146 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
   // Object management handlers
   const handleEditObject = useCallback((objectId: number) => {
     if (!editor) return;
-    
-    const obj = editor.getMapObjects().find((o: import('./types').MapObject) => o.id === objectId);
+
+    const obj = editor.getMapObjects().find((o: MapObject) => o.id === objectId);
     if (obj) {
       setEditingObject(obj);
       setShowObjectDialog(true);
     }
   }, [editor]);
 
-  const handleUpdateObject = useCallback((updatedObject: import('./types').MapObject) => {
+  const handleUpdateObject = useCallback((updatedObject: MapObject) => {
     if (!editor) return;
-    
+
     editor.updateMapObject(updatedObject.id, updatedObject);
     setEditingObject(null);
     setShowObjectDialog(false);
-  }, [editor]);
+    syncMapObjects();
+  }, [editor, syncMapObjects]);
+
+  const handleOpenActorDialog = useCallback((type: 'npc' | 'enemy') => {
+    const defaultX = hoverCoords?.x ?? 0;
+    const defaultY = hoverCoords?.y ?? 0;
+
+    setActorDialogState({
+      type,
+      name: '',
+      x: defaultX.toString(),
+      y: defaultY.toString(),
+      tilesetPath: ''
+    });
+    setActorDialogError(null);
+  }, [hoverCoords]);
+
+  const handleActorFieldChange = useCallback((field: 'name' | 'x' | 'y' | 'tilesetPath', value: string) => {
+    setActorDialogState((prev) => {
+      if (!prev) return prev;
+      return { ...prev, [field]: value };
+    });
+    setActorDialogError(null);
+  }, []);
+
+  const handleCloseActorDialog = useCallback(() => {
+    setActorDialogState(null);
+    setActorDialogError(null);
+  }, []);
+
+  const handleRemoveActor = useCallback((objectId: number) => {
+    if (!editor) return;
+    editor.removeMapObject(objectId);
+    syncMapObjects();
+  }, [editor, syncMapObjects]);
+
+  const handleActorSubmit = useCallback(() => {
+    if (!editor || !actorDialogState) {
+      return;
+    }
+
+    const parsedX = parseInt(actorDialogState.x, 10);
+    const parsedY = parseInt(actorDialogState.y, 10);
+
+    if (!actorDialogState.name.trim()) {
+      setActorDialogError('Name is required.');
+      return;
+    }
+
+    if (Number.isNaN(parsedX) || Number.isNaN(parsedY)) {
+      setActorDialogError('Position must be whole numbers.');
+      return;
+    }
+
+    if (
+      parsedX < 0 ||
+      parsedX >= editor.getMapWidth() ||
+      parsedY < 0 ||
+      parsedY >= editor.getMapHeight()
+    ) {
+      setActorDialogError('Position is outside of the map bounds.');
+      return;
+    }
+
+    if (!actorDialogState.tilesetPath.trim()) {
+      setActorDialogError('Tileset location is required.');
+      return;
+    }
+
+    const tilesetPath = actorDialogState.tilesetPath.trim();
+    const name = actorDialogState.name.trim();
+    const occupiedByType = editor
+      .getObjectsAtPosition(parsedX, parsedY)
+      .find((obj) => obj.type === actorDialogState.type);
+
+    if (occupiedByType) {
+      setActorDialogError(
+        `There is already a ${actorDialogState.type === 'npc' ? 'NPC' : 'enemy'} at that position.`
+      );
+      return;
+    }
+
+    const newObject = editor.addMapObject('enemy', parsedX, parsedY, 1, 1);
+    editor.updateMapObject(newObject.id, {
+      name,
+      x: parsedX,
+      y: parsedY,
+      type: actorDialogState.type,
+      category: actorDialogState.type === 'npc' ? 'npc' : 'enemy',
+      wander_radius: actorDialogState.type === 'npc' ? 0 : newObject.wander_radius,
+      properties: {
+        ...(newObject.properties || {}),
+        tilesetPath
+      }
+    });
+
+    syncMapObjects();
+    handleCloseActorDialog();
+  }, [actorDialogState, editor, handleCloseActorDialog, syncMapObjects]);
+
+  const updateEditingObjectProperty = useCallback((key: string, value: string | null) => {
+    setEditingObject((prev) => {
+      if (!prev) return prev;
+      const properties = { ...(prev.properties || {}) };
+      if (value === null || value === '') {
+        delete properties[key];
+      } else {
+        properties[key] = value;
+      }
+      return { ...prev, properties };
+    });
+  }, []);
+
+  const updateEditingObjectBoolean = useCallback((key: string, checked: boolean) => {
+    setEditingObject((prev) => {
+      if (!prev) return prev;
+      const properties = { ...(prev.properties || {}) };
+      properties[key] = checked ? 'true' : 'false';
+      return { ...prev, properties };
+    });
+  }, []);
+
+  const getEditingObjectProperty = useCallback((key: string, fallback = '') => {
+    if (!editingObject || !editingObject.properties) return fallback;
+    return editingObject.properties[key] ?? fallback;
+  }, [editingObject]);
 
   // Hero position edit handlers
   const handleHeroEditConfirm = useCallback((x: number, y: number) => {
@@ -1003,15 +1154,17 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     if (editor?.undo) {
       editor.undo();
       updateLayersList(); // Update UI after undo
+      syncMapObjects();
     }
-  }, [editor, updateLayersList]);
+  }, [editor, updateLayersList, syncMapObjects]);
 
   const handleRedo = useCallback(() => {
     if (editor?.redo) {
       editor.redo();
       updateLayersList(); // Update UI after redo
+      syncMapObjects();
     }
-  }, [editor, updateLayersList]);
+  }, [editor, updateLayersList, syncMapObjects]);
 
   const handleExportMap = async () => {
     if (!editor || !projectPath) {
@@ -1354,6 +1507,23 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     }
   };
 
+  const activeLayer = useMemo(() => {
+    return layers.find((layer) => layer.id === activeLayerId) ?? null;
+  }, [layers, activeLayerId]);
+
+  const isNpcLayer = activeLayer?.type === 'npc';
+  const isEnemyLayer = activeLayer?.type === 'enemy';
+
+  const actorEntries = useMemo(() => {
+    if (isNpcLayer) {
+      return mapObjects.filter((obj) => obj.type === 'npc');
+    }
+    if (isEnemyLayer) {
+      return mapObjects.filter((obj) => obj.type === 'enemy');
+    }
+    return [];
+  }, [mapObjects, isNpcLayer, isEnemyLayer]);
+
   return (
     <>
       {showWelcome ? (
@@ -1439,6 +1609,70 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         <aside className="w-80 border-r border-border bg-muted/30 p-4 overflow-y-auto flex flex-col">
           {/* Tileset Brushes Section */}
           <section className="flex flex-col flex-1">
+            {isNpcLayer || isEnemyLayer ? (
+              <div className="flex flex-col flex-1">
+                <div className="flex items-center justify-between mb-3">
+                  <h2 className="text-lg font-semibold">{isNpcLayer ? 'NPCs' : 'Enemies'}</h2>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="bg-orange-500 hover:bg-orange-600 text-white border-orange-500 hover:border-orange-600 h-6 text-xs px-2 shadow-sm"
+                    onClick={() => handleOpenActorDialog(isNpcLayer ? 'npc' : 'enemy')}
+                  >
+                    <Plus className="w-3 h-3 mr-1" />
+                    {isNpcLayer ? 'Add NPC' : 'Add Enemy'}
+                  </Button>
+                </div>
+                <div className="flex-1 min-h-0">
+                  {actorEntries.length === 0 ? (
+                    <div className="h-full border border-dashed border-border rounded-md flex items-center justify-center text-sm text-muted-foreground px-4 text-center">
+                      {isNpcLayer ? 'No NPCs added yet. Use the button above to place your first NPC.' : 'No enemies added yet. Use the button above to place an enemy.'}
+                    </div>
+                  ) : (
+                    <div className="space-y-2 overflow-y-auto pr-1">
+                      {actorEntries.map((actor) => (
+                        <div
+                          key={actor.id}
+                          className="border border-border rounded-md px-3 py-2 bg-background/50 hover:bg-background transition-colors cursor-pointer"
+                          onClick={() => handleEditObject(actor.id)}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="space-y-1 text-sm">
+                              <div className="font-medium text-foreground">
+                                {actor.name || `${actor.type === 'npc' ? 'NPC' : 'Enemy'} #${actor.id}`}
+                              </div>
+                              <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                <MapPin className="w-3 h-3" />
+                                ({actor.x}, {actor.y})
+                              </div>
+                              {actor.properties?.tilesetPath && (
+                                <div className="text-xs text-muted-foreground break-all">
+                                  {actor.properties.tilesetPath}
+                                </div>
+                              )}
+                            </div>
+                            <Tooltip content="Remove">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="w-6 h-6 p-0 text-red-500 hover:text-red-600"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  handleRemoveActor(actor.id);
+                                }}
+                              >
+                                <X className="w-3 h-3" />
+                              </Button>
+                            </Tooltip>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <>
             {/* Header with Import Button */}
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-lg font-semibold">Tileset Brushes</h2>
@@ -1535,6 +1769,8 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 </Tooltip>
               </div>
             </div>
+              </>
+            )}
           </section>
 
           {/* Layers Section */}
@@ -2786,9 +3022,78 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         </DialogContent>
       </Dialog>
 
+      {/* NPC / Enemy Creation Dialog */}
+      <Dialog open={actorDialogState !== null} onOpenChange={(open) => (open ? void 0 : handleCloseActorDialog())}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {actorDialogState?.type === 'npc' ? 'Add NPC' : 'Add Enemy'}
+            </DialogTitle>
+            <DialogDescription>
+              Define the placement details for this {actorDialogState?.type === 'npc' ? 'NPC' : 'enemy'}.
+            </DialogDescription>
+          </DialogHeader>
+          {actorDialogState && (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Name</label>
+                <Input
+                  value={actorDialogState.name}
+                  onChange={(event) => handleActorFieldChange('name', event.target.value)}
+                  placeholder={actorDialogState.type === 'npc' ? 'Village Elder' : 'Goblin Scout'}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1">X Position</label>
+                  <Input
+                    type="number"
+                    value={actorDialogState.x}
+                    onChange={(event) => handleActorFieldChange('x', event.target.value)}
+                    min={0}
+                    max={editor?.getMapWidth() ?? undefined}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Y Position</label>
+                  <Input
+                    type="number"
+                    value={actorDialogState.y}
+                    onChange={(event) => handleActorFieldChange('y', event.target.value)}
+                    min={0}
+                    max={editor?.getMapHeight() ?? undefined}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Tileset Location</label>
+                <Input
+                  value={actorDialogState.tilesetPath}
+                  onChange={(event) => handleActorFieldChange('tilesetPath', event.target.value)}
+                  placeholder="Desktop/mytilesets/npcs/mynpc.png"
+                />
+              </div>
+              {actorDialogError && (
+                <div className="text-sm text-red-500">
+                  {actorDialogError}
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={handleCloseActorDialog}>
+              Cancel
+            </Button>
+            <Button onClick={handleActorSubmit}>
+              {actorDialogState?.type === 'npc' ? 'Add NPC' : 'Add Enemy'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Object Management Dialog */}
       <Dialog open={showObjectDialog} onOpenChange={setShowObjectDialog}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-5xl w-full h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>
               {editingObject ? `Edit ${editingObject.type}` : 'Add Object'}
@@ -2798,8 +3103,9 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             </DialogDescription>
           </DialogHeader>
           
-          {editingObject && (
-            <div className="space-y-4">
+          <div className="flex-1 overflow-y-auto pr-2">
+            {editingObject && (
+            <div className="space-y-4 pb-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">Name</label>
@@ -2839,38 +3145,328 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               </div>
 
               {editingObject.type === 'enemy' && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Level</label>
-                    <Input
-                      type="number"
-                      value={editingObject.level || 1}
-                      onChange={(e) => setEditingObject({...editingObject, level: Number(e.target.value)})}
-                      min="1"
-                    />
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Level</label>
+                      <Input
+                        type="number"
+                        value={editingObject.level || 1}
+                        onChange={(e) => setEditingObject({...editingObject, level: Number(e.target.value)})}
+                        min="1"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Number</label>
+                      <Input
+                        type="number"
+                        value={editingObject.number || 1}
+                        onChange={(e) => setEditingObject({...editingObject, number: Number(e.target.value)})}
+                        min="1"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Number</label>
-                    <Input
-                      type="number"
-                      value={editingObject.number || 1}
-                      onChange={(e) => setEditingObject({...editingObject, number: Number(e.target.value)})}
-                      min="1"
-                    />
-                  </div>
-                </div>
-              )}
 
-              {editingObject.type === 'enemy' && (
-                <div>
-                  <label className="block text-sm font-medium mb-1">Wander Radius</label>
-                  <Input
-                    type="number"
-                    value={editingObject.wander_radius || 4}
-                    onChange={(e) => setEditingObject({...editingObject, wander_radius: Number(e.target.value)})}
-                    min="0"
-                  />
-                </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Wander Radius</label>
+                    <Input
+                      type="number"
+                      value={editingObject.wander_radius || 4}
+                      onChange={(e) => setEditingObject({...editingObject, wander_radius: Number(e.target.value)})}
+                      min="0"
+                    />
+                  </div>
+
+                  <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
+                    <div>
+                      <h4 className="text-sm font-semibold">Enemy Specifications</h4>
+                      <p className="text-xs text-muted-foreground">Configure Flare StatBlock-compatible values.</p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">XP</label>
+                        <Input
+                          type="number"
+                          value={getEditingObjectProperty('xp', '')}
+                          onChange={(e) => updateEditingObjectProperty('xp', e.target.value)}
+                          min="0"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">XP Scaling Table</label>
+                        <Input
+                          value={getEditingObjectProperty('xp_scaling', '')}
+                          onChange={(e) => updateEditingObjectProperty('xp_scaling', e.target.value)}
+                          placeholder="tables/xp_scaling.txt"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Defeat Status</label>
+                        <Input
+                          value={getEditingObjectProperty('defeat_status', '')}
+                          onChange={(e) => updateEditingObjectProperty('defeat_status', e.target.value)}
+                          placeholder="campaign_status_id"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Convert Status</label>
+                        <Input
+                          value={getEditingObjectProperty('convert_status', '')}
+                          onChange={(e) => updateEditingObjectProperty('convert_status', e.target.value)}
+                          placeholder="campaign_status_id"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">First Defeat Loot</label>
+                        <Input
+                          value={getEditingObjectProperty('first_defeat_loot', '')}
+                          onChange={(e) => updateEditingObjectProperty('first_defeat_loot', e.target.value)}
+                          placeholder="items/id.txt"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Animations Definition</label>
+                        <Input
+                          value={getEditingObjectProperty('animations', '')}
+                          onChange={(e) => updateEditingObjectProperty('animations', e.target.value)}
+                          placeholder="animations/enemies/foo.txt"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Loot Entries (one per line)</label>
+                      <textarea
+                        className="w-full min-h-[80px] text-sm rounded-md border border-border bg-background px-2 py-1"
+                        value={getEditingObjectProperty('loot', '')}
+                        onChange={(e) => updateEditingObjectProperty('loot', e.target.value)}
+                        placeholder="item_id, chance"
+                      />
+                    </div>
+
+                    {(() => {
+                      const lootCountRaw = getEditingObjectProperty('loot_count', '');
+                      const [lootCountMin = '', lootCountMax = ''] = lootCountRaw.split(',').map((part) => part.trim());
+                      return (
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium mb-1">Loot Count Min</label>
+                            <Input
+                              type="number"
+                              value={lootCountMin}
+                              min="0"
+                              onChange={(e) => {
+                                const newMin = e.target.value;
+                                if (!newMin) {
+                                  updateEditingObjectProperty('loot_count', '');
+                                } else {
+                                  updateEditingObjectProperty('loot_count', lootCountMax ? `${newMin},${lootCountMax}` : newMin);
+                                }
+                              }}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium mb-1">Loot Count Max</label>
+                            <Input
+                              type="number"
+                              value={lootCountMax}
+                              min="0"
+                              onChange={(e) => {
+                                const newMax = e.target.value;
+                                if (!lootCountMin) {
+                                  updateEditingObjectProperty('loot_count', '');
+                                } else {
+                                  updateEditingObjectProperty('loot_count', newMax ? `${lootCountMin},${newMax}` : lootCountMin);
+                                }
+                              }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Threat Range (engage, stop)</label>
+                        {(() => {
+                          const raw = getEditingObjectProperty('threat_range', '');
+                          const [engage = '', stop = ''] = raw.split(',').map((part) => part.trim());
+                          return (
+                            <div className="grid grid-cols-2 gap-2">
+                              <Input
+                                type="number"
+                                value={engage}
+                                onChange={(e) => {
+                                  const newEngage = e.target.value;
+                                  if (!newEngage) {
+                                    updateEditingObjectProperty('threat_range', stop ? `0,${stop}` : '');
+                                  } else {
+                                    updateEditingObjectProperty('threat_range', stop ? `${newEngage},${stop}` : newEngage);
+                                  }
+                                }}
+                              />
+                              <Input
+                                type="number"
+                                value={stop}
+                                onChange={(e) => {
+                                  const newStop = e.target.value;
+                                  if (!engage) {
+                                    updateEditingObjectProperty('threat_range', '');
+                                  } else {
+                                    updateEditingObjectProperty('threat_range', newStop ? `${engage},${newStop}` : engage);
+                                  }
+                                }}
+                              />
+                            </div>
+                          );
+                        })()}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Flee Range</label>
+                        <Input
+                          type="number"
+                          value={getEditingObjectProperty('flee_range', '')}
+                          onChange={(e) => updateEditingObjectProperty('flee_range', e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Chance Pursue (%)</label>
+                        <Input
+                          type="number"
+                          value={getEditingObjectProperty('chance_pursue', '')}
+                          onChange={(e) => updateEditingObjectProperty('chance_pursue', e.target.value)}
+                          min="0"
+                          max="100"
+                          step="0.1"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Chance Flee (%)</label>
+                        <Input
+                          type="number"
+                          value={getEditingObjectProperty('chance_flee', '')}
+                          onChange={(e) => updateEditingObjectProperty('chance_flee', e.target.value)}
+                          min="0"
+                          max="100"
+                          step="0.1"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Waypoint Pause</label>
+                        <Input
+                          value={getEditingObjectProperty('waypoint_pause', '')}
+                          onChange={(e) => updateEditingObjectProperty('waypoint_pause', e.target.value)}
+                          placeholder="250ms"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Turn Delay</label>
+                        <Input
+                          value={getEditingObjectProperty('turn_delay', '')}
+                          onChange={(e) => updateEditingObjectProperty('turn_delay', e.target.value)}
+                          placeholder="100ms"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Combat Style</label>
+                      <select
+                        className="w-full rounded-md border border-border bg-background px-2 py-1 text-sm"
+                        value={getEditingObjectProperty('combat_style', '')}
+                        onChange={(e) => updateEditingObjectProperty('combat_style', e.target.value)}
+                      >
+                        <option value="">Default</option>
+                        <option value="default">default</option>
+                        <option value="aggressive">aggressive</option>
+                        <option value="passive">passive</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Triggered Powers (state,power,chance per line)</label>
+                      <textarea
+                        className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
+                        value={getEditingObjectProperty('power', '')}
+                        onChange={(e) => updateEditingObjectProperty('power', e.target.value)}
+                        placeholder="melee,power/melee_slash,25"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Passive Powers (one power id per line)</label>
+                      <textarea
+                        className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
+                        value={getEditingObjectProperty('passive_powers', '')}
+                        onChange={(e) => updateEditingObjectProperty('passive_powers', e.target.value)}
+                        placeholder="power_id"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Quest Loot (one per line: status,not_status,item_id)</label>
+                      <textarea
+                        className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
+                        value={getEditingObjectProperty('quest_loot', '')}
+                        onChange={(e) => updateEditingObjectProperty('quest_loot', e.target.value)}
+                        placeholder="status_required,status_block,item_id"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Flee Duration</label>
+                        <Input
+                          value={getEditingObjectProperty('flee_duration', '')}
+                          onChange={(e) => updateEditingObjectProperty('flee_duration', e.target.value)}
+                          placeholder="1.5s"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Flee Cooldown</label>
+                        <Input
+                          value={getEditingObjectProperty('flee_cooldown', '')}
+                          onChange={(e) => updateEditingObjectProperty('flee_cooldown', e.target.value)}
+                          placeholder="5s"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3">
+                      {[
+                        { key: 'humanoid', label: 'Humanoid' },
+                        { key: 'lifeform', label: 'Lifeform' },
+                        { key: 'flying', label: 'Flying' },
+                        { key: 'intangible', label: 'Intangible' },
+                        { key: 'facing', label: 'Facing' },
+                        { key: 'suppress_hp', label: 'Hide HP Bar' }
+                      ].map((field) => (
+                        <label key={field.key} className="flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            className="w-4 h-4"
+                            checked={getEditingObjectProperty(field.key, 'false') === 'true'}
+                            onChange={(e) => updateEditingObjectBoolean(field.key, e.target.checked)}
+                          />
+                          {field.label}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </>
               )}
 
               {editingObject.type === 'event' && (
@@ -2901,10 +3497,11 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                   </div>
                 </>
               )}
-            </div>
-          )}
-          
-          <DialogFooter>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="mt-4 flex-shrink-0">
             <Button variant="outline" onClick={() => setShowObjectDialog(false)}>
               Cancel
             </Button>

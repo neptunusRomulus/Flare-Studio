@@ -19,6 +19,259 @@ interface MapConfig {
   location: string;
 }
 
+type PropertyType =
+  | 'string'
+  | 'int'
+  | 'float'
+  | 'bool'
+  | 'filename'
+  | 'duration'
+  | 'intPair'
+  | 'floatPair'
+  | 'direction'
+  | 'point'
+  | 'list'
+  | 'predefined';
+
+interface PropertySpec {
+  type: PropertyType;
+  min?: number;
+  max?: number;
+  options?: string[];
+}
+
+const ENEMY_PROPERTY_SPECS: Record<string, PropertySpec> = {
+  xp: { type: 'int', min: 0 },
+  xp_scaling: { type: 'filename' },
+  defeat_status: { type: 'string' },
+  convert_status: { type: 'string' },
+  first_defeat_loot: { type: 'int', min: 1 },
+  animations: { type: 'filename' },
+  loot: { type: 'list' },
+  loot_count: { type: 'intPair', min: 0 },
+  threat_range: { type: 'floatPair', min: 0 },
+  flee_range: { type: 'float', min: 0 },
+  chance_pursue: { type: 'float', min: 0 },
+  chance_flee: { type: 'float', min: 0 },
+  waypoint_pause: { type: 'duration' },
+  turn_delay: { type: 'duration' },
+  combat_style: { type: 'predefined', options: ['default', 'aggressive', 'passive'] },
+  power: { type: 'list' },
+  passive_powers: { type: 'list' },
+  quest_loot: { type: 'list' },
+  flee_duration: { type: 'duration' },
+  flee_cooldown: { type: 'duration' },
+  humanoid: { type: 'bool' },
+  lifeform: { type: 'bool' },
+  flying: { type: 'bool' },
+  intangible: { type: 'bool' },
+  facing: { type: 'bool' },
+  suppress_hp: { type: 'bool' }
+};
+
+const NPC_PROPERTY_SPECS: Record<string, PropertySpec> = {
+  'dialog.id': { type: 'string' },
+  'dialog.topic': { type: 'string' },
+  'dialog.group': { type: 'string' },
+  'dialog.voice': { type: 'list' },
+  'dialog.him': { type: 'list' },
+  'dialog.her': { type: 'list' },
+  'dialog.you': { type: 'list' },
+  'dialog.portrait_him': { type: 'list' },
+  'dialog.portrait_her': { type: 'list' },
+  'dialog.portrait_you': { type: 'list' },
+  'dialog.response': { type: 'list' },
+  'dialog.allow_movement': { type: 'bool' },
+  'dialog.take_a_party': { type: 'bool' },
+  'dialog.response_only': { type: 'bool' },
+  'npc.name': { type: 'string' },
+  'npc.portrait': { type: 'filename' },
+  'npc.filename': { type: 'filename' },
+  'npc.direction': { type: 'direction' },
+  'npc.waypoints': { type: 'list' },
+  'npc.wander_radius': { type: 'int', min: 0 },
+  'npc.show_on_minimap': { type: 'bool' },
+  'npc.talker': { type: 'bool' },
+  'npc.vendor': { type: 'bool' },
+  'npc.requires_status': { type: 'list' },
+  'npc.requires_not_status': { type: 'list' },
+  'npc.requires_item': { type: 'list' },
+  'npc.requires_not_item': { type: 'list' },
+  'npc.requires_level': { type: 'int', min: 0 },
+  'npc.requires_not_level': { type: 'int', min: 0 },
+  'npc.requires_currency': { type: 'int', min: 0 },
+  'npc.requires_not_currency': { type: 'int', min: 0 },
+  'npc.requires_class': { type: 'string' },
+  'npc.requires_not_class': { type: 'string' },
+  'npc.vendor_requires_status': { type: 'list' },
+  'npc.vendor_requires_not_status': { type: 'list' },
+  'npc.constant_stock': { type: 'list' },
+  'npc.status_stock': { type: 'list' },
+  'npc.random_stock': { type: 'list' },
+  'npc.random_stock_count': { type: 'intPair', min: 0 },
+  'npc.vendor_ratio_buy': { type: 'float', min: 0 },
+  'npc.vendor_ratio_sell': { type: 'float', min: 0 },
+  'npc.vendor_ratio_sell_old': { type: 'float', min: 0 },
+  'npc.vox_intro': { type: 'list' }
+};
+
+const BOOLEAN_STRINGS = new Set(['true', 'false']);
+const CARDINAL_DIRECTIONS = new Set(['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']);
+
+function validateValue(key: string, value: string, spec: PropertySpec): string | null {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  switch (spec.type) {
+    case 'int': {
+      if (!/^-?\d+$/.test(trimmed)) {
+        return `${key} must be an integer.`;
+      }
+      const parsed = Number.parseInt(trimmed, 10);
+      if (spec.min !== undefined && parsed < spec.min) {
+        return `${key} must be greater than or equal to ${spec.min}.`;
+      }
+      if (spec.max !== undefined && parsed > spec.max) {
+        return `${key} must be less than or equal to ${spec.max}.`;
+      }
+      return null;
+    }
+    case 'float': {
+      const parsed = Number.parseFloat(trimmed);
+      if (Number.isNaN(parsed)) {
+        return `${key} must be a number.`;
+      }
+      if (spec.min !== undefined && parsed < spec.min) {
+        return `${key} must be greater than or equal to ${spec.min}.`;
+      }
+      if (spec.max !== undefined && parsed > spec.max) {
+        return `${key} must be less than or equal to ${spec.max}.`;
+      }
+      return null;
+    }
+    case 'bool': {
+      if (!BOOLEAN_STRINGS.has(trimmed.toLowerCase())) {
+        return `${key} must be true or false.`;
+      }
+      return null;
+    }
+    case 'filename': {
+      if (!trimmed) {
+        return `${key} cannot be empty.`;
+      }
+      return null;
+    }
+    case 'duration': {
+      if (!/^\d+(ms|s)?$/i.test(trimmed)) {
+        return `${key} must be a duration such as 200ms or 2s.`;
+      }
+      return null;
+    }
+    case 'intPair': {
+      const parts = trimmed.split(',').map(part => part.trim()).filter(Boolean);
+      if (parts.length === 0 || parts.length > 2) {
+        return `${key} must contain one or two comma-separated integers.`;
+      }
+      for (const part of parts) {
+        if (!/^-?\d+$/.test(part)) {
+          return `${key} must contain valid integers.`;
+        }
+        const parsed = Number.parseInt(part, 10);
+        if (spec.min !== undefined && parsed < spec.min) {
+          return `${key} values must be greater than or equal to ${spec.min}.`;
+        }
+        if (spec.max !== undefined && parsed > spec.max) {
+          return `${key} values must be less than or equal to ${spec.max}.`;
+        }
+      }
+      return null;
+    }
+    case 'floatPair': {
+      const parts = trimmed.split(',').map(part => part.trim()).filter(Boolean);
+      if (parts.length === 0 || parts.length > 2) {
+        return `${key} must contain one or two comma-separated numbers.`;
+      }
+      for (const part of parts) {
+        const parsed = Number.parseFloat(part);
+        if (Number.isNaN(parsed)) {
+          return `${key} must contain valid numbers.`;
+        }
+        if (spec.min !== undefined && parsed < spec.min) {
+          return `${key} values must be greater than or equal to ${spec.min}.`;
+        }
+        if (spec.max !== undefined && parsed > spec.max) {
+          return `${key} values must be less than or equal to ${spec.max}.`;
+        }
+      }
+      return null;
+    }
+    case 'direction': {
+      const upper = trimmed.toUpperCase();
+      if (CARDINAL_DIRECTIONS.has(upper)) {
+        return null;
+      }
+      const parsed = Number.parseInt(trimmed, 10);
+      if (!Number.isNaN(parsed) && parsed >= 0 && parsed <= 7) {
+        return null;
+      }
+      return `${key} must be a direction (N, NE, ... , NW) or a number between 0 and 7.`;
+    }
+    case 'point': {
+      const parts = trimmed.split(',').map(part => part.trim());
+      if (parts.length !== 2 || !parts.every(part => /^-?\d+$/.test(part))) {
+        return `${key} must be two comma-separated integers.`;
+      }
+      return null;
+    }
+    case 'predefined': {
+      if (spec.options && !spec.options.includes(trimmed)) {
+        return `${key} must be one of: ${spec.options.join(', ')}.`;
+      }
+      return null;
+    }
+    case 'list':
+    case 'string':
+    default:
+      return null;
+  }
+}
+
+function validateAndSanitizeObject(object: MapObject): { errors: string[]; sanitized: Record<string, string> } {
+  const specs = object.type === 'enemy' ? ENEMY_PROPERTY_SPECS
+    : object.type === 'npc' ? NPC_PROPERTY_SPECS
+    : {};
+
+  const sanitized: Record<string, string> = {};
+  const errors: string[] = [];
+  const properties = object.properties || {};
+
+  for (const [key, rawValue] of Object.entries(properties)) {
+    const value = (rawValue ?? '').toString();
+    const trimmed = value.trim();
+    const spec = specs[key];
+
+    if (spec) {
+      const error = validateValue(key, trimmed, spec);
+      if (error) {
+        errors.push(error);
+      }
+      if (spec.type === 'bool') {
+        sanitized[key] = trimmed.toLowerCase();
+      } else if (spec.type === 'direction' && CARDINAL_DIRECTIONS.has(trimmed.toUpperCase())) {
+        sanitized[key] = trimmed.toUpperCase();
+      } else {
+        sanitized[key] = trimmed;
+      }
+    } else {
+      sanitized[key] = trimmed;
+    }
+  }
+
+  return { errors, sanitized };
+}
+
 function App() {
   const [showWelcome, setShowWelcome] = useState(true);
   const [editor, setEditor] = useState<TileMapEditor | null>(null);
@@ -103,6 +356,7 @@ function App() {
   // Object management states  
   const [showObjectDialog, setShowObjectDialog] = useState(false);
   const [editingObject, setEditingObject] = useState<MapObject | null>(null);
+  const [objectValidationErrors, setObjectValidationErrors] = useState<string[]>([]);
   const [mapObjects, setMapObjects] = useState<MapObject[]>([]);
   const [actorDialogState, setActorDialogState] = useState<{
     type: 'npc' | 'enemy';
@@ -634,6 +888,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
   const handleEditObject = useCallback((objectId: number) => {
     if (!editor) return;
 
+    setObjectValidationErrors([]);
     const obj = editor.getMapObjects().find((o: MapObject) => o.id === objectId);
     if (obj) {
       setEditingObject(obj);
@@ -648,6 +903,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     setEditingObject(null);
     setShowObjectDialog(false);
     syncMapObjects();
+    setObjectValidationErrors([]);
   }, [editor, syncMapObjects]);
 
   const handleOpenActorDialog = useCallback((type: 'npc' | 'enemy') => {
@@ -746,6 +1002,25 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     syncMapObjects();
     handleCloseActorDialog();
   }, [actorDialogState, editor, handleCloseActorDialog, syncMapObjects]);
+
+  const handleObjectDialogClose = useCallback(() => {
+    setShowObjectDialog(false);
+    setEditingObject(null);
+    setObjectValidationErrors([]);
+  }, []);
+
+  const handleObjectDialogSave = useCallback(() => {
+    if (!editingObject) return;
+
+    const { errors, sanitized } = validateAndSanitizeObject(editingObject);
+    if (errors.length > 0) {
+      setObjectValidationErrors(errors);
+      return;
+    }
+
+    setObjectValidationErrors([]);
+    handleUpdateObject({ ...editingObject, properties: sanitized });
+  }, [editingObject, handleUpdateObject]);
 
   const updateEditingObjectProperty = useCallback((key: string, value: string | null) => {
     setEditingObject((prev) => {
@@ -3092,7 +3367,16 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       </Dialog>
 
       {/* Object Management Dialog */}
-      <Dialog open={showObjectDialog} onOpenChange={setShowObjectDialog}>
+      <Dialog
+        open={showObjectDialog}
+        onOpenChange={(open) => {
+          if (!open) {
+            handleObjectDialogClose();
+          } else {
+            setShowObjectDialog(true);
+          }
+        }}
+      >
         <DialogContent className="max-w-5xl w-full h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>
@@ -3103,7 +3387,18 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             </DialogDescription>
           </DialogHeader>
           
-          <div className="flex-1 overflow-y-auto pr-2">
+          {objectValidationErrors.length > 0 && (
+            <div className="mb-3 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+              <p className="font-semibold mb-1">Please fix the following:</p>
+              <ul className="ml-4 list-disc space-y-1">
+                {objectValidationErrors.map((error, index) => (
+                  <li key={`${error}-${index}`}>{error}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className="flex-1 overflow-y-auto pr-2 minimal-scroll">
             {editingObject && (
             <div className="space-y-4 pb-4">
               <div className="grid grid-cols-2 gap-4">
@@ -3469,6 +3764,445 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 </>
               )}
 
+              {editingObject.type === 'npc' && (
+                <>
+                  <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
+                    <div>
+                      <h4 className="text-sm font-semibold">Dialog</h4>
+                      <p className="text-xs text-muted-foreground">Configure dialog tree content and metadata.</p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Dialog ID</label>
+                        <Input
+                          value={getEditingObjectProperty('dialog.id', '')}
+                          onChange={(e) => updateEditingObjectProperty('dialog.id', e.target.value)}
+                          placeholder="villager_intro"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Topic</label>
+                        <Input
+                          value={getEditingObjectProperty('dialog.topic', '')}
+                          onChange={(e) => updateEditingObjectProperty('dialog.topic', e.target.value)}
+                          placeholder="Greetings"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Group</label>
+                        <Input
+                          value={getEditingObjectProperty('dialog.group', '')}
+                          onChange={(e) => updateEditingObjectProperty('dialog.group', e.target.value)}
+                          placeholder="main_story"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Voice File(s)</label>
+                        <textarea
+                          className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
+                          value={getEditingObjectProperty('dialog.voice', '')}
+                          onChange={(e) => updateEditingObjectProperty('dialog.voice', e.target.value)}
+                          placeholder="voice/npcs/intro.ogg"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Lines (Him)</label>
+                        <textarea
+                          className="w-full min-h-[80px] text-sm rounded-md border border-border bg-background px-2 py-1"
+                          value={getEditingObjectProperty('dialog.him', '')}
+                          onChange={(e) => updateEditingObjectProperty('dialog.him', e.target.value)}
+                          placeholder="Hello there!"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Lines (Her)</label>
+                        <textarea
+                          className="w-full min-h-[80px] text-sm rounded-md border border-border bg-background px-2 py-1"
+                          value={getEditingObjectProperty('dialog.her', '')}
+                          onChange={(e) => updateEditingObjectProperty('dialog.her', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Lines (You)</label>
+                        <textarea
+                          className="w-full min-h-[80px] text-sm rounded-md border border-border bg-background px-2 py-1"
+                          value={getEditingObjectProperty('dialog.you', '')}
+                          onChange={(e) => updateEditingObjectProperty('dialog.you', e.target.value)}
+                          placeholder="What brings you here?"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Portrait (Him)</label>
+                        <textarea
+                          className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
+                          value={getEditingObjectProperty('dialog.portrait_him', '')}
+                          onChange={(e) => updateEditingObjectProperty('dialog.portrait_him', e.target.value)}
+                          placeholder="portraits/npcs/villager.png"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Portrait (Her)</label>
+                        <textarea
+                          className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
+                          value={getEditingObjectProperty('dialog.portrait_her', '')}
+                          onChange={(e) => updateEditingObjectProperty('dialog.portrait_her', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Portrait (You)</label>
+                        <textarea
+                          className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
+                          value={getEditingObjectProperty('dialog.portrait_you', '')}
+                          onChange={(e) => updateEditingObjectProperty('dialog.portrait_you', e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Response IDs (one per line, must precede dialog text)</label>
+                      <textarea
+                        className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
+                        value={getEditingObjectProperty('dialog.response', '')}
+                        onChange={(e) => updateEditingObjectProperty('dialog.response', e.target.value)}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3">
+                      {[
+                        { key: 'dialog.allow_movement', label: 'Allow Movement' },
+                        { key: 'dialog.take_a_party', label: 'Take/Release Party' },
+                        { key: 'dialog.response_only', label: 'Response Only' }
+                      ].map((field) => (
+                        <label key={field.key} className="flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            className="w-4 h-4"
+                            checked={getEditingObjectProperty(field.key, 'false') === 'true'}
+                            onChange={(e) => updateEditingObjectBoolean(field.key, e.target.checked)}
+                          />
+                          {field.label}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
+                    <div>
+                      <h4 className="text-sm font-semibold">NPC Details</h4>
+                      <p className="text-xs text-muted-foreground">Configure appearance, behavior, and requirements.</p>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">NPC Name</label>
+                        <Input
+                          value={getEditingObjectProperty('npc.name', editingObject.name || '')}
+                          onChange={(e) => updateEditingObjectProperty('npc.name', e.target.value)}
+                          placeholder="Villager"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Portrait</label>
+                        <Input
+                          value={getEditingObjectProperty('npc.portrait', '')}
+                          onChange={(e) => updateEditingObjectProperty('npc.portrait', e.target.value)}
+                          placeholder="portraits/npcs/villager.png"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Definition File</label>
+                        <Input
+                          value={getEditingObjectProperty('npc.filename', '')}
+                          onChange={(e) => updateEditingObjectProperty('npc.filename', e.target.value)}
+                          placeholder="npcs/villager.txt"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Direction</label>
+                        <Input
+                          value={getEditingObjectProperty('npc.direction', '')}
+                          onChange={(e) => updateEditingObjectProperty('npc.direction', e.target.value)}
+                          placeholder="south"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Waypoints (x,y per line)</label>
+                        <textarea
+                          className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
+                          value={getEditingObjectProperty('npc.waypoints', '')}
+                          onChange={(e) => updateEditingObjectProperty('npc.waypoints', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Wander Radius</label>
+                        <Input
+                          type="number"
+                          value={getEditingObjectProperty('npc.wander_radius', '')}
+                          onChange={(e) => updateEditingObjectProperty('npc.wander_radius', e.target.value)}
+                          min="0"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-4 gap-3">
+                      {[
+                        { key: 'npc.show_on_minimap', label: 'Show on Minimap', defaultValue: 'true' },
+                        { key: 'npc.talker', label: 'Talkable', defaultValue: 'true' },
+                        { key: 'npc.vendor', label: 'Vendor', defaultValue: 'false' }
+                      ].map((field) => (
+                        <label key={field.key} className="flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            className="w-4 h-4"
+                            checked={getEditingObjectProperty(field.key, field.defaultValue || 'false') === 'true'}
+                            onChange={(e) => updateEditingObjectBoolean(field.key, e.target.checked)}
+                          />
+                          {field.label}
+                        </label>
+                      ))}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Requires Status (one per line)</label>
+                        <textarea
+                          className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
+                          value={getEditingObjectProperty('npc.requires_status', '')}
+                          onChange={(e) => updateEditingObjectProperty('npc.requires_status', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Requires Not Status</label>
+                        <textarea
+                          className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
+                          value={getEditingObjectProperty('npc.requires_not_status', '')}
+                          onChange={(e) => updateEditingObjectProperty('npc.requires_not_status', e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Requires Item (one per line)</label>
+                        <textarea
+                          className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
+                          value={getEditingObjectProperty('npc.requires_item', '')}
+                          onChange={(e) => updateEditingObjectProperty('npc.requires_item', e.target.value)}
+                          placeholder="items/potion:2"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Requires Not Item</label>
+                        <textarea
+                          className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
+                          value={getEditingObjectProperty('npc.requires_not_item', '')}
+                          onChange={(e) => updateEditingObjectProperty('npc.requires_not_item', e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Requires Level ≥</label>
+                        <Input
+                          type="number"
+                          value={getEditingObjectProperty('npc.requires_level', '')}
+                          onChange={(e) => updateEditingObjectProperty('npc.requires_level', e.target.value)}
+                          min="0"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Requires Level &lt;</label>
+                        <Input
+                          type="number"
+                          value={getEditingObjectProperty('npc.requires_not_level', '')}
+                          onChange={(e) => updateEditingObjectProperty('npc.requires_not_level', e.target.value)}
+                          min="0"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Requires Class</label>
+                        <Input
+                          value={getEditingObjectProperty('npc.requires_class', '')}
+                          onChange={(e) => updateEditingObjectProperty('npc.requires_class', e.target.value)}
+                          placeholder="warrior"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Requires Currency ≥</label>
+                        <Input
+                          type="number"
+                          value={getEditingObjectProperty('npc.requires_currency', '')}
+                          onChange={(e) => updateEditingObjectProperty('npc.requires_currency', e.target.value)}
+                          min="0"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Requires Currency &lt;</label>
+                        <Input
+                          type="number"
+                          value={getEditingObjectProperty('npc.requires_not_currency', '')}
+                          onChange={(e) => updateEditingObjectProperty('npc.requires_not_currency', e.target.value)}
+                          min="0"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Requires Not Class</label>
+                        <Input
+                          value={getEditingObjectProperty('npc.requires_not_class', '')}
+                          onChange={(e) => updateEditingObjectProperty('npc.requires_not_class', e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <h5 className="text-sm font-semibold">Vendor Options</h5>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Vendor Requires Status</label>
+                          <textarea
+                            className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
+                            value={getEditingObjectProperty('npc.vendor_requires_status', '')}
+                            onChange={(e) => updateEditingObjectProperty('npc.vendor_requires_status', e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Vendor Requires Not Status</label>
+                          <textarea
+                            className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
+                            value={getEditingObjectProperty('npc.vendor_requires_not_status', '')}
+                            onChange={(e) => updateEditingObjectProperty('npc.vendor_requires_not_status', e.target.value)}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Constant Stock (items per line)</label>
+                          <textarea
+                            className="w-full min-h-[80px] text-sm rounded-md border border-border bg-background px-2 py-1"
+                            value={getEditingObjectProperty('npc.constant_stock', '')}
+                            onChange={(e) => updateEditingObjectProperty('npc.constant_stock', e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Status Stock (status: items)</label>
+                          <textarea
+                            className="w-full min-h-[80px] text-sm rounded-md border border-border bg-background px-2 py-1"
+                            value={getEditingObjectProperty('npc.status_stock', '')}
+                            onChange={(e) => updateEditingObjectProperty('npc.status_stock', e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Random Stock (loot definitions)</label>
+                          <textarea
+                            className="w-full min-h-[80px] text-sm rounded-md border border-border bg-background px-2 py-1"
+                            value={getEditingObjectProperty('npc.random_stock', '')}
+                            onChange={(e) => updateEditingObjectProperty('npc.random_stock', e.target.value)}
+                          />
+                        </div>
+                      </div>
+
+                      {(() => {
+                        const raw = getEditingObjectProperty('npc.random_stock_count', '');
+                        const [minCount = '', maxCount = ''] = raw.split(',').map((part) => part.trim());
+                        return (
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-sm font-medium mb-1">Random Stock Min</label>
+                              <Input
+                                type="number"
+                                value={minCount}
+                                min="0"
+                                onChange={(e) => {
+                                  const newMin = e.target.value;
+                                  if (!newMin) {
+                                    updateEditingObjectProperty('npc.random_stock_count', maxCount ? `0,${maxCount}` : '');
+                                  } else {
+                                    updateEditingObjectProperty('npc.random_stock_count', maxCount ? `${newMin},${maxCount}` : newMin);
+                                  }
+                                }}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium mb-1">Random Stock Max</label>
+                              <Input
+                                type="number"
+                                value={maxCount}
+                                min="0"
+                                onChange={(e) => {
+                                  const newMax = e.target.value;
+                                  if (!minCount) {
+                                    updateEditingObjectProperty('npc.random_stock_count', '');
+                                  } else {
+                                    updateEditingObjectProperty('npc.random_stock_count', newMax ? `${minCount},${newMax}` : minCount);
+                                  }
+                                }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Buy Ratio</label>
+                          <Input
+                            type="number"
+                            value={getEditingObjectProperty('npc.vendor_ratio_buy', '')}
+                            onChange={(e) => updateEditingObjectProperty('npc.vendor_ratio_buy', e.target.value)}
+                            step="0.01"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Sell Ratio</label>
+                          <Input
+                            type="number"
+                            value={getEditingObjectProperty('npc.vendor_ratio_sell', '')}
+                            onChange={(e) => updateEditingObjectProperty('npc.vendor_ratio_sell', e.target.value)}
+                            step="0.01"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Sell Ratio (Old)</label>
+                          <Input
+                            type="number"
+                            value={getEditingObjectProperty('npc.vendor_ratio_sell_old', '')}
+                            onChange={(e) => updateEditingObjectProperty('npc.vendor_ratio_sell_old', e.target.value)}
+                            step="0.01"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Vox Intro (one file per line)</label>
+                      <textarea
+                        className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
+                        value={getEditingObjectProperty('npc.vox_intro', '')}
+                        onChange={(e) => updateEditingObjectProperty('npc.vox_intro', e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
               {editingObject.type === 'event' && (
                 <>
                   <div>
@@ -3502,10 +4236,10 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           </div>
 
           <DialogFooter className="mt-4 flex-shrink-0">
-            <Button variant="outline" onClick={() => setShowObjectDialog(false)}>
+            <Button variant="outline" onClick={handleObjectDialogClose}>
               Cancel
             </Button>
-            <Button onClick={() => editingObject && handleUpdateObject(editingObject)}>
+            <Button onClick={handleObjectDialogSave}>
               Save
             </Button>
           </DialogFooter>

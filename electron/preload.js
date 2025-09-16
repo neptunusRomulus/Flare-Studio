@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onSaveAndClose: (callback) => ipcRenderer.on('save-and-close', () => callback && callback()),
   closeAfterSave: () => ipcRenderer.send('close-after-save'),
   selectDirectory: () => ipcRenderer.invoke('select-directory'),
+  selectTilesetFile: () => ipcRenderer.invoke('select-tileset-file'),
   createMapProject: (config) => ipcRenderer.invoke('create-map-project', config),
   openMapProject: (projectPath) => ipcRenderer.invoke('open-map-project', projectPath),
   saveMapProject: (projectPath, mapData) => ipcRenderer.invoke('save-map-project', projectPath, mapData),

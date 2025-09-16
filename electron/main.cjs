@@ -77,6 +77,22 @@ ipcMain.handle('select-directory', async () => {
   return null;
 });
 
+ipcMain.handle('select-tileset-file', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openFile'],
+    filters: [
+      { name: 'Tileset Images', extensions: ['png'] },
+      { name: 'All Files', extensions: ['*'] }
+    ]
+  });
+
+  if (!result.canceled && result.filePaths.length > 0) {
+    return result.filePaths[0];
+  }
+
+  return null;
+});
+
 ipcMain.handle('create-map-project', async (event, config) => {
   try {
     const projectPath = path.join(config.location, config.name);

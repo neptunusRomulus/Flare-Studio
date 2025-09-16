@@ -39,6 +39,7 @@ declare global {
       onSaveAndClose: (callback: () => void) => void;
       closeAfterSave: () => void;
       selectDirectory: () => Promise<string | null>;
+      selectTilesetFile: () => Promise<string | null>;
       createMapProject: (config: MapConfig) => Promise<boolean>;
       openMapProject: (projectPath: string) => Promise<MapConfig | null>;
       saveMapProject: (projectPath: string, mapData: ProjectMapData) => Promise<boolean>;

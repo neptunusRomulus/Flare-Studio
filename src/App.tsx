@@ -288,6 +288,9 @@ function App() {
   const [activeHelpTab, setActiveHelpTab] = useState('engine');
   const [showTooltip, setShowTooltip] = useState(true);
   const [pendingMapConfig, setPendingMapConfig] = useState<MapConfig | null>(null);
+  const canUseTilesetDialog = useMemo(() => {
+    return typeof window !== 'undefined' && !!window.electronAPI?.selectTilesetFile;
+  }, []);
   
   // Toolbar states
   const [selectedTool, setSelectedTool] = useState('brush');
@@ -928,6 +931,21 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     setActorDialogError(null);
   }, []);
 
+  const handleActorTilesetBrowse = useCallback(async () => {
+    if (typeof window === 'undefined' || !window.electronAPI?.selectTilesetFile) {
+      return;
+    }
+
+    try {
+      const selected = await window.electronAPI.selectTilesetFile();
+      if (selected) {
+        handleActorFieldChange('tilesetPath', selected);
+      }
+    } catch (error) {
+      console.error('Failed to select tileset file for actor:', error);
+    }
+  }, [handleActorFieldChange]);
+
   const handleCloseActorDialog = useCallback(() => {
     setActorDialogState(null);
     setActorDialogError(null);
@@ -1048,6 +1066,21 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     if (!editingObject || !editingObject.properties) return fallback;
     return editingObject.properties[key] ?? fallback;
   }, [editingObject]);
+
+  const handleEditingTilesetBrowse = useCallback(async () => {
+    if (typeof window === 'undefined' || !window.electronAPI?.selectTilesetFile) {
+      return;
+    }
+
+    try {
+      const selected = await window.electronAPI.selectTilesetFile();
+      if (selected) {
+        updateEditingObjectProperty('tilesetPath', selected);
+      }
+    } catch (error) {
+      console.error('Failed to select tileset for editing object:', error);
+    }
+  }, [updateEditingObjectProperty]);
 
   // Hero position edit handlers
   const handleHeroEditConfirm = useCallback((x: number, y: number) => {
@@ -3342,11 +3375,25 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Tileset Location</label>
-                <Input
-                  value={actorDialogState.tilesetPath}
-                  onChange={(event) => handleActorFieldChange('tilesetPath', event.target.value)}
-                  placeholder="Desktop/mytilesets/npcs/mynpc.png"
-                />
+                <div className="flex gap-2">
+                  <Input
+                    className="flex-1"
+                    value={actorDialogState.tilesetPath}
+                    onChange={(event) => handleActorFieldChange('tilesetPath', event.target.value)}
+                    placeholder="Desktop/mytilesets/npcs/mynpc.png"
+                    readOnly={canUseTilesetDialog}
+                    onClick={canUseTilesetDialog ? () => { void handleActorTilesetBrowse(); } : undefined}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => { void handleActorTilesetBrowse(); }}
+                    disabled={!canUseTilesetDialog}
+                  >
+                    Browse
+                  </Button>
+                </div>
               </div>
               {actorDialogError && (
                 <div className="text-sm text-red-500">
@@ -3438,6 +3485,31 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                   />
                 </div>
               </div>
+
+              {(editingObject.type === 'npc' || editingObject.type === 'enemy') && (
+                <div>
+                  <label className="block text-sm font-medium mb-1">Tileset Location</label>
+                  <div className="flex gap-2">
+                    <Input
+                      className="flex-1"
+                      value={getEditingObjectProperty('tilesetPath', '')}
+                      onChange={(e) => updateEditingObjectProperty('tilesetPath', e.target.value)}
+                      placeholder="Desktop/mytilesets/npcs/mynpc.png"
+                      readOnly={canUseTilesetDialog}
+                      onClick={canUseTilesetDialog ? () => { void handleEditingTilesetBrowse(); } : undefined}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => { void handleEditingTilesetBrowse(); }}
+                      disabled={!canUseTilesetDialog}
+                    >
+                      Browse
+                    </Button>
+                  </div>
+                </div>
+              )}
 
               {editingObject.type === 'enemy' && (
                 <>

@@ -4953,7 +4953,9 @@ export class TileMapEditor {
       this.mapWidth = data.mapWidth;
       this.mapHeight = data.mapHeight;
       this.tileLayers = data.layers;
-      this.objects = data.objects;
+      const loadedObjects = this.normalizeLoadedObjects(data.objects);
+      this.objects = loadedObjects;
+      this.nextObjectId = this.calculateNextObjectId(loadedObjects);
       this.notifyObjectsChanged();
       this.tilesetFileName = data.tilesetFileName;
 
@@ -5146,6 +5148,40 @@ export class TileMapEditor {
     if (this.objectsChangedCallback) {
       this.objectsChangedCallback(this.getMapObjects());
     }
+  }
+
+  private calculateNextObjectId(objects: MapObject[]): number {
+    if (!objects.length) {
+      return 1;
+    }
+    return objects.reduce((maxId, obj) => Math.max(maxId, typeof obj.id === 'number' ? obj.id : 0), 0) + 1;
+  }
+
+  private normalizeLoadedObjects(objects: MapObject[] | null | undefined): MapObject[] {
+    if (!Array.isArray(objects)) {
+      return [];
+    }
+
+    return objects.map((object, index) => {
+      const normalized: MapObject = {
+        ...object,
+        id: typeof object.id === 'number' && !Number.isNaN(object.id) ? object.id : index + 1,
+        width: typeof object.width === 'number' && object.width > 0 ? object.width : 1,
+        height: typeof object.height === 'number' && object.height > 0 ? object.height : 1,
+        properties: object.properties || {}
+      };
+
+      if (normalized.category === 'npc' || normalized.type === 'npc') {
+        normalized.category = 'npc';
+        normalized.type = 'npc';
+        normalized.wander_radius = 0;
+      } else if (normalized.category === 'enemy' || normalized.category === 'creature' || normalized.type === 'enemy') {
+        normalized.type = 'enemy';
+        normalized.category = normalized.category || 'enemy';
+      }
+
+      return normalized;
+    });
   }
 
   public addMapObject(type: 'event' | 'enemy', x: number, y: number, width: number = 1, height: number = 1): MapObject {
@@ -5457,6 +5493,12 @@ export class TileMapEditor {
       category: objectType === 'event' ? 'block' : (layerType === 'npc' ? 'npc' : (layerType === 'object' ? 'object' : 'creature')),
     };
     
+    if (layerType === 'npc') {
+      updates.type = 'npc';
+    } else if (layerType === 'enemy') {
+      updates.type = 'enemy';
+    }
+
     if (objectType === 'enemy') {
       updates.level = 1;
       updates.number = 1;
@@ -5729,12 +5771,10 @@ export class TileMapEditor {
       }
       
       // Load object data if available
-      if (projectData.objects && projectData.objects.length > 0) {
-        console.log('Loading objects:', projectData.objects.length);
-        this.objects = [...projectData.objects]; // Create new array
-      } else {
-        this.objects = [];
-      }
+      const normalizedObjects = this.normalizeLoadedObjects(projectData.objects);
+      console.log('Loading objects:', normalizedObjects.length);
+      this.objects = normalizedObjects;
+      this.nextObjectId = this.calculateNextObjectId(normalizedObjects);
       this.notifyObjectsChanged();
       
       // Set dimensions if provided

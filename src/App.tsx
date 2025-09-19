@@ -276,8 +276,12 @@ function App() {
   const [showWelcome, setShowWelcome] = useState(true);
   const [editor, setEditor] = useState<TileMapEditor | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [mapWidth, setMapWidth] = useState(20);
-  const [mapHeight, setMapHeight] = useState(15);
+  const [mapWidth, setMapWidth] = useState(0);
+  const [mapHeight, setMapHeight] = useState(0);
+  const [mapInitialized, setMapInitialized] = useState(false);
+  const [showCreateMapDialog, setShowCreateMapDialog] = useState(false);
+  const [newMapWidth, setNewMapWidth] = useState(20);
+  const [newMapHeight, setNewMapHeight] = useState(15);
   const [activeGid] = useState('(none)'); // Removed unused setter
   const [showMinimap, setShowMinimap] = useState(true);
   const [layers, setLayers] = useState<TileLayer[]>([]);
@@ -479,17 +483,38 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
   // Moved after function definitions
 
   useEffect(() => {
-    // Only create a default editor when switching from welcome screen to editor
-    // Skip if we're actively opening a project (handleOpenMap will create the editor)
-    if (canvasRef.current && !showWelcome && !editor && !isOpeningProject) {
+    // Prepare an editor instance when entering the workspace, unless a project load is in progress
+    if (
+      canvasRef.current &&
+      !showWelcome &&
+      !editor &&
+      !isOpeningProject &&
+      !pendingMapConfig
+    ) {
       const tileEditor = new TileMapEditor(canvasRef.current);
-      // Set initial dark mode state
       tileEditor.setDarkMode(isDarkMode);
-      // Do NOT call loadFromLocalStorage() here - let the user manually load if needed
       setupAutoSave(tileEditor);
+
+      tileEditor.resetForNewProject();
+      if (mapInitialized && mapWidth > 0 && mapHeight > 0) {
+        tileEditor.setMapSize(mapWidth, mapHeight);
+      } else {
+        tileEditor.setMapSize(0, 0);
+      }
+
       setEditor(tileEditor);
     }
-  }, [showWelcome, editor, setupAutoSave, isOpeningProject, isDarkMode]);
+  }, [
+    showWelcome,
+    editor,
+    setupAutoSave,
+    isOpeningProject,
+    isDarkMode,
+    pendingMapConfig,
+    mapInitialized,
+    mapWidth,
+    mapHeight
+  ]);
 
   // Track hover coordinates
   useEffect(() => {
@@ -1366,6 +1391,8 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           newEditor.setDarkMode(isDarkMode);
           setupAutoSave(newEditor);
           setEditor(newEditor);
+          setMapInitialized(true);
+          setShowCreateMapDialog(false);
           
           // Update layers list and UI state after everything is loaded
           setTimeout(() => {
@@ -1456,6 +1483,43 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     if (editor?.resetZoom) {
       editor.resetZoom();
     }
+  };
+
+  const handleOpenCreateMapDialog = () => {
+    setNewMapWidth(mapWidth > 0 ? mapWidth : 20);
+    setNewMapHeight(mapHeight > 0 ? mapHeight : 15);
+    setShowCreateMapDialog(true);
+  };
+
+  const handleConfirmCreateMap = () => {
+    const width = Math.max(1, Math.floor(newMapWidth) || 0);
+    const height = Math.max(1, Math.floor(newMapHeight) || 0);
+
+    let targetEditor = editor;
+
+    if (!targetEditor && canvasRef.current) {
+      targetEditor = new TileMapEditor(canvasRef.current);
+      targetEditor.setDarkMode(isDarkMode);
+      setupAutoSave(targetEditor);
+    }
+
+    if (targetEditor) {
+      targetEditor.resetForNewProject();
+      targetEditor.setMapSize(width, height);
+      targetEditor.setDarkMode(isDarkMode);
+      if (!editor) {
+        setEditor(targetEditor);
+      }
+      updateLayersList();
+      syncMapObjects();
+    }
+
+    setMapWidth(width);
+    setMapHeight(height);
+    setMapInitialized(true);
+    setHasSelection(false);
+    setSelectionCount(0);
+    setShowCreateMapDialog(false);
   };
 
   const handleUndo = useCallback(() => {
@@ -1566,34 +1630,26 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
   };
 
   const handleCreateNewMap = (config: MapConfig, newProjectPath?: string) => {
-    // Clear any localStorage data immediately
     localStorage.removeItem('tilemap_autosave_backup');
-    
-    // Save the project path if provided (Electron)
     setProjectPath(newProjectPath ?? null);
-    
-    setMapWidth(config.width);
-    setMapHeight(config.height);
+
     setMapName(config.name);
+    setMapWidth(0);
+    setMapHeight(0);
+    setNewMapWidth(config.width);
+    setNewMapHeight(config.height);
+    setMapInitialized(false);
+    setLayers([]);
+    setActiveLayerId(null);
+    setStamps([]);
+    setMapObjects([]);
+    setHoverCoords(null);
+    setHasSelection(false);
+    setSelectionCount(0);
+    setPendingMapConfig(null);
+    setEditor(null);
+    setShowCreateMapDialog(false);
     setShowWelcome(false);
-    
-    // Clear existing editor state first
-    if (editor) {
-      setEditor(null);
-    }
-    
-    // Initialize editor with new configuration
-    if (canvasRef.current) {
-      const newEditor = new TileMapEditor(canvasRef.current);
-      // Reset all data to ensure clean state
-      newEditor.resetForNewProject();
-      newEditor.setMapSize(config.width, config.height);
-      // Set dark mode state
-      newEditor.setDarkMode(isDarkMode);
-      setupAutoSave(newEditor);
-      setEditor(newEditor);
-      updateLayersList();
-    }
   };
 
   const handleOpenMap = useCallback(async (projectPath: string) => {
@@ -1670,7 +1726,9 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           console.log('Setting map dimensions and clearing editor...');
           setMapWidth(mapConfig.width);
           setMapHeight(mapConfig.height);
+          setMapInitialized(true);
           setShowWelcome(false);
+          setShowCreateMapDialog(false);
           
           // Clear existing editor state first
           console.log('Clearing existing editor...');
@@ -1719,6 +1777,11 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     // New Map
     window.electronAPI.onMenuNewMap(() => {
       setShowWelcome(true);
+      setMapInitialized(false);
+      setEditor(null);
+      setMapWidth(0);
+      setMapHeight(0);
+      setShowCreateMapDialog(false);
     });
     // Undo
     window.electronAPI.onMenuUndo(() => {
@@ -2936,6 +2999,21 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               id="mapCanvas"
               className="tile-canvas w-full h-full max-w-full max-h-full"
             />
+            {!mapInitialized && (
+              <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+                <div className="flex items-center gap-3 px-4 py-2 rounded-full border border-dashed border-border bg-background/90 shadow-sm">
+                  <span className="text-sm font-medium text-muted-foreground">Create a map</span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-8 h-8 p-0 rounded-full"
+                    onClick={handleOpenCreateMapDialog}
+                  >
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
             
             {/* Hover Coordinates Display */}
             {hoverCoords && (
@@ -4318,6 +4396,50 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={showCreateMapDialog} onOpenChange={setShowCreateMapDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create Map</DialogTitle>
+            <DialogDescription>
+              Choose the width and height for your new map.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-4 py-4">
+            <div>
+              <label className="block text-sm font-medium text-muted-foreground mb-1">
+                Width (tiles)
+              </label>
+              <Input
+                type="number"
+                min={1}
+                max={100}
+                value={newMapWidth}
+                onChange={(e) => setNewMapWidth(Math.max(1, Number.parseInt(e.target.value, 10) || 0))}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-muted-foreground mb-1">
+                Height (tiles)
+              </label>
+              <Input
+                type="number"
+                min={1}
+                max={100}
+                value={newMapHeight}
+                onChange={(e) => setNewMapHeight(Math.max(1, Number.parseInt(e.target.value, 10) || 0))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowCreateMapDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmCreateMap}>
+              Create
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       {/* Hero Position Edit Dialog */}
       <Dialog open={showHeroEditDialog} onOpenChange={setShowHeroEditDialog}>
         <DialogContent className="max-w-md">
@@ -4443,3 +4565,4 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
 }
 
 export default App;
+

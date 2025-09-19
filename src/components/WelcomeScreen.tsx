@@ -30,7 +30,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
   const [recentMaps, setRecentMaps] = useState<RecentMap[]>([]);
   const [thumbnails, setThumbnails] = useState<Record<string, string | null>>({});
   const [mapConfig, setMapConfig] = useState<MapConfig>({
-    name: 'New Map',
+    name: 'ProjectName',
     width: 20,
     height: 15,
     tileSize: 64, // Fixed tile size for isometric tiles
@@ -308,33 +308,6 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
                 onChange={(e) => setMapConfig({ ...mapConfig, name: e.target.value })}
                 placeholder="Enter map name"
               />
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Width (tiles)
-                </label>
-                <Input
-                  type="number"
-                  value={mapConfig.width}
-                  onChange={(e) => setMapConfig({ ...mapConfig, width: parseInt(e.target.value) || 20 })}
-                  min="5"
-                  max="100"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Height (tiles)
-                </label>
-                <Input
-                  type="number"
-                  value={mapConfig.height}
-                  onChange={(e) => setMapConfig({ ...mapConfig, height: parseInt(e.target.value) || 15 })}
-                  min="5"
-                  max="100"
-                />
-              </div>
             </div>
 
             <div>

@@ -4,6 +4,7 @@ interface MapConfig {
   height: number;
   tileSize: number;
   location: string;
+  isStartingMap?: boolean;
 }
 
 interface ProjectMapData {
@@ -21,6 +22,7 @@ interface ProjectMapData {
   heroX?: number;
   heroY?: number;
   version: string;
+  isStartingMap?: boolean;
   // Optional editor-specific fields to preserve brush mapping and settings
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   detectedTileData?: Array<[number, any]>;

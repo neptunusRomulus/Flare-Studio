@@ -16,6 +16,7 @@ interface MapConfig {
   height: number;
   tileSize: number;
   location: string;
+  isStartingMap?: boolean;
 }
 
 interface RecentMap {
@@ -34,7 +35,8 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
     width: 20,
     height: 15,
     tileSize: 64, // Fixed tile size for isometric tiles
-    location: ''
+    location: '',
+    isStartingMap: false
   });
 
   // Load recent maps from localStorage on component mount and prune any missing projects (desktop)
@@ -295,7 +297,6 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
               <img src="/flare-logo.png" alt="Flare Logo" className="w-40 h-40 object-contain" />
             </div>
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Create a New Flare Project</h2>
-            <p className="text-gray-600 dark:text-gray-300 mt-2">Configure your new project</p>
           </div>
 
           <div className="space-y-4">
@@ -344,7 +345,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
               onClick={handleCreateMap}
               className="flex-1"
             >
-              Create Map
+              Confirm
             </Button>
           </div>
           </div>

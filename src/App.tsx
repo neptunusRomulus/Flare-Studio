@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
+﻿import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import Tooltip from '@/components/ui/tooltip';
@@ -1796,7 +1796,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
 
       const sanitizedMapFileBase = (() => {
         const sanitized = mapName
-          .replace(/[<>:"/\|?*]/g, '_')
+          .replace(/[<>:"/|?*]/g, '_')
           .trim()
           .replace(/\s+/g, '_')
           .replace(/_{2,}/g, '_');
@@ -2211,6 +2211,9 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     }
     return [];
   }, [mapObjects, isNpcLayer, isEnemyLayer]);
+
+  // Settings modal tab state
+  const [settingsTab, setSettingsTab] = useState<'map' | 'other'>('map');
 
   return (
     <>
@@ -2638,7 +2641,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-background border border-border rounded-lg p-6 w-96">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold">Map Settings</h3>
+                <h3 className="text-lg font-semibold">Settings</h3>
                 <Button 
                   variant="ghost" 
                   size="sm" 
@@ -2648,149 +2651,189 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                   <X className="w-4 h-4" />
                 </Button>
               </div>
-              
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">Map Name</label>
-                  <Input
-                    type="text"
-                    value={mapName}
-                    onChange={(e) => setMapName(e.target.value)}
-                    placeholder="Enter map name"
-                    className="w-full"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium mb-2">Map Width</label>
-                  <Input
-                    type="number"
-                    value={mapWidth}
-                    onChange={(e) => setMapWidth(Number(e.target.value))}
-                    min="1"
-                    max="100"
-                    className="w-full"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium mb-2">Map Height</label>
-                  <Input
-                    type="number"
-                    value={mapHeight}
-                    onChange={(e) => setMapHeight(Number(e.target.value))}
-                    min="1"
-                    max="100"
-                    className="w-full"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium mb-2">Theme (Experimental)</label>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Light Mode</span>
-                    <button
-                      onClick={() => setIsDarkMode(!isDarkMode)}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        isDarkMode ? 'bg-orange-600' : 'bg-gray-200'
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          isDarkMode ? 'translate-x-6' : 'translate-x-1'
-                        }`}
-                      />
-                      <span className="sr-only">Toggle dark mode</span>
-                    </button>
-                    <span className="text-sm flex items-center gap-1">
-                      {isDarkMode ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
-                      Dark Mode
-                    </span>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2">Debug Mode</label>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Disabled</span>
-                    <button
-                      onClick={() => {
-                        if (editor) {
-                          editor.toggleDebugMode();
-                        }
-                      }}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        editor?.getDebugMode() ? 'bg-orange-600' : 'bg-gray-200'
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          editor?.getDebugMode() ? 'translate-x-6' : 'translate-x-1'
-                        }`}
-                      />
-                      <span className="sr-only">Toggle debug mode</span>
-                    </button>
-                    <span className="text-sm flex items-center gap-1">
-                      <Target className="w-4 h-4" />
-                      Debug Tiles
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Shows tile boundaries and coordinates for debugging
-                  </p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2">Auto-Save</label>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Disabled</span>
-                    <button
-                      onClick={() => {
-                        const newEnabled = !autoSaveEnabled;
-                        setAutoSaveEnabledState(newEnabled);
-                        if (editor) {
-                          editor.setAutoSaveEnabled(newEnabled);
-                        }
-                      }}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        autoSaveEnabled ? 'bg-orange-600' : 'bg-gray-200'
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          autoSaveEnabled ? 'translate-x-6' : 'translate-x-1'
-                        }`}
-                      />
-                      <span className="sr-only">Toggle auto-save</span>
-                    </button>
-                    <span className="text-sm">
-                      Enabled
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Automatically saves your work every 8 seconds
-                  </p>
-                </div>
-              </div>
-              
-              <div className="flex gap-2 mt-6">
-                <Button 
-                  variant="outline" 
-                  onClick={() => setShowSettings(false)}
-                  className="flex-1"
+              <div className="flex border-b mb-4">
+                <button
+                  className={`flex-1 py-2 text-sm font-medium border-b-2 transition-colors ${settingsTab === 'map' ? 'border-orange-500 text-orange-600' : 'border-transparent text-gray-500'}`}
+                  onClick={() => setSettingsTab('map')}
                 >
-                  Cancel
-                </Button>
-                <Button 
-                  onClick={() => {
-                    handleMapResize();
-                    setShowSettings(false);
-                  }}
-                  className="flex-1"
+                  Current Map Settings
+                </button>
+                <button
+                  className={`flex-1 py-2 text-sm font-medium border-b-2 transition-colors ${settingsTab === 'other' ? 'border-orange-500 text-orange-600' : 'border-transparent text-gray-500'}`}
+                  onClick={() => setSettingsTab('other')}
                 >
-                  Apply Changes
-                </Button>
+                  Other Options
+                </button>
               </div>
+              {settingsTab === 'map' ? (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Map Name</label>
+                    <Input
+                      type="text"
+                      value={mapName}
+                      onChange={(e) => setMapName(e.target.value)}
+                      placeholder="Enter map name"
+                      className="w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Map Width</label>
+                    <Input
+                      type="number"
+                      value={mapWidth}
+                      onChange={(e) => setMapWidth(Number(e.target.value))}
+                      min="1"
+                      max="100"
+                      className="w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Map Height</label>
+                    <Input
+                      type="number"
+                      value={mapHeight}
+                      onChange={(e) => setMapHeight(Number(e.target.value))}
+                      min="1"
+                      max="100"
+                      className="w-full"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <label htmlFor="starting-map-checkbox" className="text-sm font-medium text-muted-foreground">
+                        Starting Map
+                      </label>
+                      <Tooltip content="If this map is the map that players will start the game then mark this option">
+                        <HelpCircle className="h-4 w-4 text-muted-foreground" aria-hidden />
+                      </Tooltip>
+                    </div>
+                    <input
+                      id="starting-map-checkbox"
+                      type="checkbox"
+                      className="h-4 w-4 rounded border border-border accent-orange-500"
+                      checked={isStartingMap}
+                      onChange={(e) => setIsStartingMap(e.target.checked)}
+                      aria-checked={isStartingMap}
+                      aria-label="Set this map as the starting map"
+                    />
+                  </div>
+                  <div className="flex gap-2 mt-6">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setShowSettings(false)}
+                      className="flex-1"
+                    >
+                      Cancel
+                    </Button>
+                    <Button 
+                      onClick={() => {
+                        handleMapResize();
+                        setShowSettings(false);
+                      }}
+                      className="flex-1"
+                    >
+                      Apply Changes
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Theme (Experimental)</label>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Light Mode</span>
+                      <button
+                        onClick={() => setIsDarkMode(!isDarkMode)}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          isDarkMode ? 'bg-orange-600' : 'bg-gray-200'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            isDarkMode ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                        <span className="sr-only">Toggle dark mode</span>
+                      </button>
+                      <span className="text-sm flex items-center gap-1">
+                        {isDarkMode ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+                        Dark Mode
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Debug Mode</label>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Disabled</span>
+                      <button
+                        onClick={() => {
+                          if (editor) {
+                            editor.toggleDebugMode();
+                          }
+                        }}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          editor?.getDebugMode() ? 'bg-orange-600' : 'bg-gray-200'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            editor?.getDebugMode() ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                        <span className="sr-only">Toggle debug mode</span>
+                      </button>
+                      <span className="text-sm flex items-center gap-1">
+                        <Target className="w-4 h-4" />
+                        Debug Tiles
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Shows tile boundaries and coordinates for debugging
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Auto-Save</label>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Disabled</span>
+                      <button
+                        onClick={() => {
+                          const newEnabled = !autoSaveEnabled;
+                          setAutoSaveEnabledState(newEnabled);
+                          if (editor) {
+                            editor.setAutoSaveEnabled(newEnabled);
+                          }
+                        }}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          autoSaveEnabled ? 'bg-orange-600' : 'bg-gray-200'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            autoSaveEnabled ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                        <span className="sr-only">Toggle auto-save</span>
+                      </button>
+                      <span className="text-sm">
+                        Enabled
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Automatically saves your work every 8 seconds
+                    </p>
+                  </div>
+                  <div className="flex gap-2 mt-6">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setShowSettings(false)}
+                      className="flex-1"
+                    >
+                      Close
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -2812,7 +2855,9 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               </div>
               <div className="text-sm text-foreground mb-4">Are you sure you want to clear all tiles from the current layer? This action cannot be undone.</div>
               <div className="flex gap-2 justify-end">
-                <Button variant="outline" onClick={() => setShowClearLayerDialog(false)}>Cancel</Button>
+                <Button variant="outline" onClick={() => setShowClearLayerDialog(false)}>
+                  Cancel
+                </Button>
                 <Button
                   onClick={() => {
                     if (editor) {
@@ -2939,7 +2984,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                     </section>
 
                     <section>
-                      <h4 className="text-xl font-semibold mb-3 flex items-center gap-2">
+                      <h4 className="text-xl font-semibold mb-3 flex items-center gap-2 text-gray-800 dark:text-gray-100">
                         <Map className="w-5 h-5 text-orange-500" />
                         Map Management
                       </h4>
@@ -3036,43 +3081,6 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                               <h5 className="font-medium text-gray-800 dark:text-gray-100">Remove Tileset</h5>
                               <p className="text-sm text-gray-600 dark:text-gray-400">Use the red X button to remove a tileset from a layer</p>
                             </div>
-                          </div>
-                        </div>
-                      </div>
-                    </section>
-
-                    <section>
-                      <h4 className="text-xl font-semibold mb-3 flex items-center gap-2 text-gray-800 dark:text-gray-100">
-                        <Move className="w-5 h-5 text-orange-500" />
-                        Navigation & Viewport
-                      </h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div className="flex items-start gap-3">
-                          <ZoomIn className="w-4 h-4 mt-1 text-orange-500" />
-                          <div>
-                            <h5 className="font-medium text-gray-800 dark:text-gray-100">Zoom Controls</h5>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">Use +/- buttons or mouse wheel to zoom in/out</p>
-                          </div>
-                        </div>
-                        <div className="flex items-start gap-3">
-                          <Move className="w-4 h-4 mt-1 text-orange-500" />
-                          <div>
-                            <h5 className="font-medium text-gray-800 dark:text-gray-100">Pan View</h5>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">Hold and drag the middle mouse button to pan</p>
-                          </div>
-                        </div>
-                        <div className="flex items-start gap-3">
-                          <RotateCcw className="w-4 h-4 mt-1 text-orange-500" />
-                          <div>
-                            <h5 className="font-medium text-gray-800 dark:text-gray-100">Reset View</h5>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">Reset zoom and center the view</p>
-                          </div>
-                        </div>
-                        <div className="flex items-start gap-3">
-                          <MapPin className="w-4 h-4 mt-1 text-orange-500" />
-                          <div>
-                            <h5 className="font-medium text-gray-800 dark:text-gray-100">Coordinates</h5>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">Hover over the map to see tile coordinates</p>
                           </div>
                         </div>
                       </div>
@@ -3795,15 +3803,15 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           </DialogHeader>
           {actorDialogState && (
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Name</label>
-                <Input
-                  value={actorDialogState.name}
-                  onChange={(event) => handleActorFieldChange('name', event.target.value)}
-                  placeholder={actorDialogState.type === 'npc' ? 'Village Elder' : 'Goblin Scout'}
-                />
-              </div>
               <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Name</label>
+                  <Input
+                    value={actorDialogState.name}
+                    onChange={(event) => handleActorFieldChange('name', event.target.value)}
+                    placeholder={actorDialogState.type === 'npc' ? 'Village Elder' : 'Goblin Scout'}
+                  />
+                </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">X Position</label>
                   <Input

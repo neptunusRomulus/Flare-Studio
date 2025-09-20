@@ -284,6 +284,8 @@ function App() {
   const [newMapWidth, setNewMapWidth] = useState(20);
   const [newMapHeight, setNewMapHeight] = useState(15);
   const [newMapName, setNewMapName] = useState('Untitled Map');
+  const [createMapError, setCreateMapError] = useState<string | null>(null);
+  const [reservedMapNames, setReservedMapNames] = useState<string[]>([]);
   const [newMapStarting, setNewMapStarting] = useState(false);
   const [activeGid] = useState('(none)'); // Removed unused setter
   const [showMinimap, setShowMinimap] = useState(true);
@@ -457,6 +459,7 @@ function App() {
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
   const [showExportSuccess, setShowExportSuccess] = useState(false);
+  const [isPreparingNewMap, setIsPreparingNewMap] = useState(false);
   
   // Custom tooltip states
   const [tooltip, setTooltip] = useState<{
@@ -1631,49 +1634,132 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     }
   };
 
-  const handleOpenCreateMapDialog = () => {
+  const isDuplicateMapName = useCallback((candidate: string) => {
+    const normalized = candidate.trim().toLowerCase();
+    if (!normalized) {
+      return false;
+    }
+
+    const knownNames = new Set<string>();
+
+    reservedMapNames.forEach((name) => {
+      if (name) {
+        knownNames.add(name);
+      }
+    });
+
+    if (mapName.trim()) {
+      knownNames.add(mapName.trim().toLowerCase());
+    }
+
+    try {
+      const stored = localStorage.getItem('recentMaps');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((entry) => {
+            if (entry && typeof entry.name === 'string') {
+              const name = entry.name.trim().toLowerCase();
+              if (name) {
+                knownNames.add(name);
+              }
+            }
+          });
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to read recent map names for duplicate check:', error);
+    }
+
+    return knownNames.has(normalized);
+  }, [mapName, reservedMapNames]);
+
+  const handleOpenCreateMapDialog = useCallback(() => {
     setNewMapWidth(mapWidth > 0 ? mapWidth : 20);
     setNewMapHeight(mapHeight > 0 ? mapHeight : 15);
     setNewMapName(mapName || 'Untitled Map');
     setNewMapStarting(isStartingMap);
+    setCreateMapError(null);
     setShowCreateMapDialog(true);
-  };
+  }, [mapWidth, mapHeight, mapName, isStartingMap]);
 
-  const handleConfirmCreateMap = () => {
+  const handleConfirmCreateMap = async () => {
+    if (isPreparingNewMap) return;
+
     const width = Math.max(1, Math.floor(newMapWidth) || 0);
     const height = Math.max(1, Math.floor(newMapHeight) || 0);
     const trimmedName = newMapName.trim();
     const resolvedName = trimmedName ? trimmedName : 'Untitled Map';
 
-    let targetEditor = editor;
-
-    if (!targetEditor && canvasRef.current) {
-      targetEditor = new TileMapEditor(canvasRef.current);
-      targetEditor.setDarkMode(isDarkMode);
-      setupAutoSave(targetEditor);
+    if (isDuplicateMapName(resolvedName)) {
+      setCreateMapError("There can't be maps that have the same name. Please type another name.");
+      return;
     }
 
-    if (targetEditor) {
-      targetEditor.resetForNewProject();
-      targetEditor.setMapSize(width, height);
-      targetEditor.setDarkMode(isDarkMode);
-      if (!editor) {
-        setEditor(targetEditor);
+    setCreateMapError(null);
+    setIsPreparingNewMap(true);
+
+    try {
+      const exported = await performExport({ silent: true });
+      if (!exported) {
+        setCreateMapError('Failed to export the current map. Please resolve any errors and try again.');
+        return;
       }
-      updateLayersList();
-      syncMapObjects();
-    }
 
-    setMapWidth(width);
-    setMapHeight(height);
-    setMapInitialized(true);
-    showToolbarTemporarily();
-    showBottomToolbarTemporarily();
-    setMapName(resolvedName);
-    setIsStartingMap(newMapStarting);
-    setHasSelection(false);
-    setSelectionCount(0);
-    setShowCreateMapDialog(false);
+      setReservedMapNames((prev) => {
+        const normalized = mapName.trim().toLowerCase();
+        if (!normalized || prev.includes(normalized)) {
+          return prev;
+        }
+        return [...prev, normalized];
+      });
+
+
+      setLayers([]);
+      setActiveLayerId(null);
+      setStamps([]);
+      setSelectedStamp(null);
+      setMapObjects([]);
+      setHoverCoords(null);
+      setBrushTool('none');
+      setShowSeparateDialog(false);
+      setBrushToSeparate(null);
+      setSaveStatus('saved');
+      setHasUnsavedChanges(false);
+
+      let targetEditor = editor;
+
+      if (!targetEditor && canvasRef.current) {
+        targetEditor = new TileMapEditor(canvasRef.current);
+        targetEditor.setDarkMode(isDarkMode);
+        setupAutoSave(targetEditor);
+      }
+
+      if (targetEditor) {
+        targetEditor.resetForNewProject();
+        targetEditor.setMapSize(width, height);
+        targetEditor.setDarkMode(isDarkMode);
+        if (!editor) {
+          setEditor(targetEditor);
+        }
+        updateLayersList();
+        syncMapObjects();
+      }
+
+      setMapWidth(width);
+      setMapHeight(height);
+      setMapInitialized(true);
+      showToolbarTemporarily();
+      showBottomToolbarTemporarily();
+      setMapName(resolvedName);
+      setIsStartingMap(newMapStarting);
+      setHasSelection(false);
+      setSelectionCount(0);
+      setCreateMapError(null);
+      setShowCreateMapDialog(false);
+    } finally {
+      setIsPreparingNewMap(false);
+    }
   };
 
   const handleUndo = useCallback(() => {
@@ -1692,63 +1778,88 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     }
   }, [editor, updateLayersList, syncMapObjects]);
 
-  const handleExportMap = async () => {
-    if (!editor || !projectPath) {
-      toast({
-        title: "Export Failed",
-        description: "No project loaded or editor not initialized.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsExporting(true);
-    setExportProgress(0);
-
-    try {
-      // Simulate progress updates
-      setExportProgress(25);
-      
-      // Generate the map and tileset content
-      const mapTxt = editor.generateFlareMapTxt();
-      setExportProgress(50);
-      
-      const tilesetDef = editor.generateFlareTilesetDef();
-      setExportProgress(75);
-      
-      // Save files to project folder using Electron API
-      if (window.electronAPI?.saveExportFiles) {
-        const success = await window.electronAPI.saveExportFiles(projectPath, mapName, mapTxt, tilesetDef);
-        setExportProgress(100);
-        
-        if (success) {
-          // Show success modal after a delay to let the loading bar animation complete
-          setTimeout(() => {
-            setShowExportSuccess(true);
-          }, 1500);
-        } else {
-          throw new Error("Failed to save export files");
-        }
-      } else {
-        // Fallback to original download method if Electron API not available
-        editor.exportFlareMap();
-        setExportProgress(100);
+  const performExport = useCallback(
+    async ({ silent = false }: { silent?: boolean } = {}) => {
+      if (!editor || !projectPath) {
+        toast({
+          title: "Export Failed",
+          description: "No project loaded or editor not initialized.",
+          variant: "destructive",
+        });
+        return false;
       }
-    } catch (error) {
-      console.error('Export failed:', error);
-      toast({
-        title: "Export Failed",
-        description: "An error occurred while exporting the map.",
-        variant: "destructive",
-      });
-    } finally {
-      // Reset loading state after a brief delay to show completion
-      setTimeout(() => {
-        setIsExporting(false);
+
+      if (!silent) {
+        setIsExporting(true);
         setExportProgress(0);
-      }, 1000);
-    }
-  };
+      }
+
+      try {
+        if (!silent) {
+          setExportProgress(25);
+        }
+
+        const mapTxt = editor.generateFlareMapTxt();
+
+        if (!silent) {
+          setExportProgress(50);
+        }
+
+        const tilesetDef = editor.generateFlareTilesetDef();
+
+        if (!silent) {
+          setExportProgress(75);
+        }
+
+        if (window.electronAPI?.saveExportFiles) {
+          const success = await window.electronAPI.saveExportFiles(
+            projectPath,
+            mapName,
+            mapTxt,
+            tilesetDef
+          );
+
+          if (!success) {
+            throw new Error("Failed to save export files");
+          }
+
+          if (!silent) {
+            setExportProgress(100);
+            setTimeout(() => {
+              setShowExportSuccess(true);
+            }, 1500);
+          }
+        } else {
+          editor.exportFlareMap();
+          if (!silent) {
+            setExportProgress(100);
+          }
+        }
+
+        return true;
+      } catch (error) {
+        console.error('Export failed:', error);
+        toast({
+          title: "Export Failed",
+          description: "An error occurred while exporting the map.",
+          variant: "destructive",
+        });
+        return false;
+      } finally {
+        if (!silent) {
+          setTimeout(() => {
+            setIsExporting(false);
+            setExportProgress(0);
+          }, 1000);
+        }
+      }
+    },
+    [editor, projectPath, mapName, toast]
+  );
+
+  const handleExportMap = useCallback(async () => {
+    await performExport();
+  }, [performExport]);
 
   const handleManualSave = useCallback(async () => {
     if (!editor) return;
@@ -1807,6 +1918,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     setSelectionCount(0);
     setPendingMapConfig(null);
     setEditor(null);
+    setCreateMapError(null);
     setShowCreateMapDialog(false);
     setShowWelcome(false);
   };
@@ -2414,7 +2526,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                   onClick={handleExportMap} 
                   className="shadow-sm flex items-center gap-1 px-3 py-1 h-7 text-xs w-20"
                   size="sm"
-                  disabled={isExporting}
+                  disabled={isExporting || isPreparingNewMap}
                 >
                   {isExporting ? (
                     <>
@@ -2429,6 +2541,17 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                   )}
                 </Button>
               </Tooltip>
+              <Tooltip content="Open the create map dialog (current map exports after you confirm)">
+                <Button 
+                  onClick={handleOpenCreateMapDialog}
+                  className="shadow-sm flex items-center gap-1 px-3 py-1 h-7 text-xs w-36"
+                  size="sm"
+                  disabled={isExporting || isPreparingNewMap}
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>Create a New Map</span>
+                </Button>
+              </Tooltip>
               <Tooltip content={hasUnsavedChanges ? 'Save changes' : 'All changes saved'}>
                 <Button 
                   onClick={handleManualSave}
@@ -2439,7 +2562,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                         ? 'bg-orange-500 hover:bg-orange-600 text-white' 
                         : 'bg-green-500 hover:bg-green-600 text-white'
                   }`}
-                  disabled={isManuallySaving}
+                  disabled={isManuallySaving || isPreparingNewMap}
                   size="sm"
                 >
                   {isManuallySaving ? (
@@ -3198,6 +3321,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                     variant="default"
                     className="w-9 h-9 p-0 rounded-full bg-orange-500 text-white shadow-sm transition-all duration-150 hover:bg-orange-600 hover:shadow-md hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
                     onClick={handleOpenCreateMapDialog}
+                    disabled={isPreparingNewMap}
                   >
                     <Plus className="w-4 h-4" />
                   </Button>
@@ -4609,7 +4733,15 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showCreateMapDialog} onOpenChange={setShowCreateMapDialog}>
+      <Dialog
+        open={showCreateMapDialog}
+        onOpenChange={(open) => {
+          setShowCreateMapDialog(open);
+          if (!open) {
+            setCreateMapError(null);
+          }
+        }}
+      >
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Create Map</DialogTitle>
@@ -4624,9 +4756,17 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               </label>
               <Input
                 value={newMapName}
-                onChange={(e) => setNewMapName(e.target.value)}
+                onChange={(e) => {
+                  setNewMapName(e.target.value);
+                  if (createMapError) {
+                    setCreateMapError(null);
+                  }
+                }}
                 placeholder="Enter map name"
               />
+              {createMapError && (
+                <p className="mt-1 text-xs text-red-500">{createMapError}</p>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -4675,11 +4815,28 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreateMapDialog(false)}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowCreateMapDialog(false);
+                setCreateMapError(null);
+              }}
+            >
               Cancel
             </Button>
-            <Button onClick={handleConfirmCreateMap}>
-              Create
+            <Button
+              onClick={handleConfirmCreateMap}
+              disabled={isPreparingNewMap}
+              className="flex items-center gap-2"
+            >
+              {isPreparingNewMap ? (
+                <>
+                  <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <span>Creating...</span>
+                </>
+              ) : (
+                <span>Create</span>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -4809,4 +4966,5 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
 }
 
 export default App;
+
 

@@ -96,12 +96,12 @@ ipcMain.handle('select-tileset-file', async () => {
 ipcMain.handle('create-map-project', async (event, config) => {
   try {
     const projectPath = path.join(config.location, config.name);
-    
+
     // Create project directory
     if (!fs.existsSync(projectPath)) {
       fs.mkdirSync(projectPath, { recursive: true });
     }
-    
+
     // Create basic project structure
     const mapData = {
       name: config.name,
@@ -112,17 +112,45 @@ ipcMain.handle('create-map-project', async (event, config) => {
       tilesets: [],
       version: "1.0"
     };
-    
+
     // Save map configuration
     const mapConfigPath = path.join(projectPath, `${config.name}.json`);
     fs.writeFileSync(mapConfigPath, JSON.stringify(mapData, null, 2));
-    
+
     // Create assets folder
     const assetsPath = path.join(projectPath, 'assets');
     if (!fs.existsSync(assetsPath)) {
       fs.mkdirSync(assetsPath);
     }
-    
+
+    // Create maps folder
+    const mapsPath = path.join(projectPath, 'maps');
+    if (!fs.existsSync(mapsPath)) {
+      fs.mkdirSync(mapsPath);
+    }
+
+    // Write spawn.txt
+    const sanitizedMapFileBase = String(config.name).replace(/[<>:"/\\|?*]/g, '_').trim().replace(/\s+/g, '_').replace(/_{2,}/g, '_') || 'Untitled_Map';
+    const spawnIntermapTarget = config.isStartingMap ? `maps/${sanitizedMapFileBase}.txt` : 'maps/test11.txt';
+    const spawnContent = [
+      '# this file is automatically loaded when a New Game starts.',
+      "# it's a dummy map to send the player to the actual starting point.",
+      '',
+      '[header]',
+      'width=1',
+      'height=1',
+      'hero_pos=0,0',
+      '',
+      '[event]',
+      'type=event',
+      'location=0,0,1,1',
+      'activate=on_load',
+      `intermap=${spawnIntermapTarget}`,
+      ''
+    ].join('\n');
+    const spawnFilePath = path.join(mapsPath, 'spawn.txt');
+    fs.writeFileSync(spawnFilePath, spawnContent, 'utf8');
+
     return true;
   } catch (error) {
     console.error('Error creating map project:', error);
@@ -333,7 +361,7 @@ ipcMain.handle('save-map-project', async (event, projectPath, mapData) => {
 });
 
 // Save export files (map.txt and tileset.txt) to project folder
-ipcMain.handle('save-export-files', async (event, projectPath, projectName, mapTxt, tilesetDef) => {
+ipcMain.handle('save-export-files', async (event, projectPath, projectName, mapTxt, tilesetDef, options = {}) => {
   try {
     const fs = require('fs');
     const path = require('path');
@@ -372,7 +400,12 @@ ipcMain.handle('save-export-files', async (event, projectPath, projectName, mapT
     };
     
     // Sanitize project name for filename (remove invalid characters)
-    const sanitizedProjectName = projectName.replace(/[<>:"/\\|?*]/g, '_');
+    const sanitizedProjectName = projectName
+      .replace(/[<>:"/\|?*]/g, '_')
+      .trim()
+      .replace(/\s+/g, '_')
+      .replace(/_{2,}/g, '_')
+      || 'exported_map';
     
     // Get available filenames for both files using project name
     const mapFile = getAvailableFilename(exportDir, sanitizedProjectName, '.txt');
@@ -383,6 +416,18 @@ ipcMain.handle('save-export-files', async (event, projectPath, projectName, mapT
     
     // Save tileset file to Export directory
     fs.writeFileSync(tilesetFile.filepath, tilesetDef, 'utf8');
+    
+    // Optionally create spawn file within maps folder
+    if (options.spawn && options.spawn.enabled && options.spawn.content) {
+      const mapsDir = path.join(projectPath, 'maps');
+      if (!fs.existsSync(mapsDir)) {
+        fs.mkdirSync(mapsDir, { recursive: true });
+      }
+      const spawnFilename = options.spawn.filename || 'spawn.txt';
+      const spawnPath = path.join(mapsDir, spawnFilename);
+      fs.writeFileSync(spawnPath, options.spawn.content, 'utf8');
+      console.log('Spawn file saved:', spawnPath);
+    }
     
     console.log('Export files saved successfully:');
     console.log('- Map:', mapFile.filepath);

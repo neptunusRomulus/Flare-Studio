@@ -174,6 +174,12 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
       return;
     }
 
+    const normalizedName = mapConfig.name.trim().toLowerCase();
+    if (recentMaps.some((map) => map.name.trim().toLowerCase() === normalizedName)) {
+      alert("There can't be maps that have the same name. Please type another name.");
+      return;
+    }
+
     try {
       // Create the project folder and save the map
       const projectPath = `${mapConfig.location}\\${mapConfig.name}`;

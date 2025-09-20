@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import Tooltip from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Upload, Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Blend, MapPin, Save, ArrowUpDown, Link2, Scissors, Trash2, Check, HelpCircle, Folder, Shield, Plus } from 'lucide-react';
+import { Upload, Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Blend, MapPin, Save, Scan, Link2, Scissors, Trash2, Check, HelpCircle, Folder, Shield, Plus } from 'lucide-react';
 import { TileMapEditor } from './editor/TileMapEditor';
 import { TileLayer, MapObject } from './types';
 import { useToast } from '@/hooks/use-toast';
@@ -17,6 +17,7 @@ interface MapConfig {
   height: number;
   tileSize: number;
   location: string;
+  isStartingMap?: boolean;
 }
 
 type PropertyType =
@@ -282,6 +283,8 @@ function App() {
   const [showCreateMapDialog, setShowCreateMapDialog] = useState(false);
   const [newMapWidth, setNewMapWidth] = useState(20);
   const [newMapHeight, setNewMapHeight] = useState(15);
+  const [newMapName, setNewMapName] = useState('Untitled Map');
+  const [newMapStarting, setNewMapStarting] = useState(false);
   const [activeGid] = useState('(none)'); // Removed unused setter
   const [showMinimap, setShowMinimap] = useState(true);
   const [layers, setLayers] = useState<TileLayer[]>([]);
@@ -291,7 +294,111 @@ function App() {
   const [showHelp, setShowHelp] = useState(false);
   const [activeHelpTab, setActiveHelpTab] = useState('engine');
   const [showTooltip, setShowTooltip] = useState(true);
+  const [toolbarExpanded, setToolbarExpanded] = useState(true);
+  const toolbarCollapseTimer = useRef<number | null>(null);
+  const toolbarContainerRef = useRef<HTMLDivElement | null>(null);
+  const [bottomToolbarExpanded, setBottomToolbarExpanded] = useState(true);
+  const bottomToolbarCollapseTimer = useRef<number | null>(null);
+  const bottomToolbarContainerRef = useRef<HTMLDivElement | null>(null);
   const [pendingMapConfig, setPendingMapConfig] = useState<MapConfig | null>(null);
+  const clearToolbarCollapseTimer = useCallback(() => {
+    if (toolbarCollapseTimer.current !== null) {
+      window.clearTimeout(toolbarCollapseTimer.current);
+      toolbarCollapseTimer.current = null;
+    }
+  }, []);
+
+  const scheduleToolbarCollapse = useCallback(() => {
+    clearToolbarCollapseTimer();
+    toolbarCollapseTimer.current = window.setTimeout(() => {
+      setToolbarExpanded(false);
+    }, 500);
+  }, [clearToolbarCollapseTimer]);
+
+  const showToolbarTemporarily = useCallback(() => {
+    setToolbarExpanded(true);
+    scheduleToolbarCollapse();
+  }, [scheduleToolbarCollapse]);
+
+  const handleToolbarMouseEnter = useCallback(() => {
+    clearToolbarCollapseTimer();
+    setToolbarExpanded(true);
+  }, [clearToolbarCollapseTimer]);
+
+  const handleToolbarMouseLeave = useCallback(() => {
+    const activeElement = typeof document !== 'undefined' ? document.activeElement : null;
+    if (activeElement && toolbarContainerRef.current?.contains(activeElement)) {
+      return;
+    }
+    scheduleToolbarCollapse();
+  }, [scheduleToolbarCollapse, toolbarContainerRef]);
+
+  const handleToolbarFocus = useCallback(() => {
+    clearToolbarCollapseTimer();
+    setToolbarExpanded(true);
+  }, [clearToolbarCollapseTimer]);
+
+  const handleToolbarBlur = useCallback((event: React.FocusEvent<HTMLDivElement>) => {
+    const nextTarget = event.relatedTarget as Node | null;
+    if (!event.currentTarget.contains(nextTarget)) {
+      scheduleToolbarCollapse();
+    }
+  }, [scheduleToolbarCollapse]);
+
+  const clearBottomToolbarCollapseTimer = useCallback(() => {
+    if (bottomToolbarCollapseTimer.current !== null) {
+      window.clearTimeout(bottomToolbarCollapseTimer.current);
+      bottomToolbarCollapseTimer.current = null;
+    }
+  }, []);
+
+  const scheduleBottomToolbarCollapse = useCallback(() => {
+    clearBottomToolbarCollapseTimer();
+    bottomToolbarCollapseTimer.current = window.setTimeout(() => {
+      setBottomToolbarExpanded(false);
+    }, 500);
+  }, [clearBottomToolbarCollapseTimer]);
+
+  const showBottomToolbarTemporarily = useCallback(() => {
+    setBottomToolbarExpanded(true);
+    scheduleBottomToolbarCollapse();
+  }, [scheduleBottomToolbarCollapse]);
+
+  const handleBottomToolbarMouseEnter = useCallback(() => {
+    clearBottomToolbarCollapseTimer();
+    setBottomToolbarExpanded(true);
+  }, [clearBottomToolbarCollapseTimer]);
+
+  const handleBottomToolbarMouseLeave = useCallback(() => {
+    const activeElement = typeof document !== 'undefined' ? document.activeElement : null;
+    if (activeElement && bottomToolbarContainerRef.current?.contains(activeElement)) {
+      return;
+    }
+    scheduleBottomToolbarCollapse();
+  }, [scheduleBottomToolbarCollapse]);
+
+  const handleBottomToolbarFocus = useCallback(() => {
+    clearBottomToolbarCollapseTimer();
+    setBottomToolbarExpanded(true);
+  }, [clearBottomToolbarCollapseTimer]);
+
+  const handleBottomToolbarBlur = useCallback((event: React.FocusEvent<HTMLDivElement>) => {
+    const nextTarget = event.relatedTarget as Node | null;
+    if (!event.currentTarget.contains(nextTarget)) {
+      scheduleBottomToolbarCollapse();
+    }
+  }, [scheduleBottomToolbarCollapse]);
+
+  const setBottomToolbarNode = useCallback((node: HTMLDivElement | null) => {
+    toolbarRef.current = node;
+    bottomToolbarContainerRef.current = node;
+  }, []);
+
+  const handleSelectTool = useCallback((tool: 'brush' | 'selection' | 'shape' | 'stamp' | 'eyedropper') => {
+    setSelectedTool(tool);
+    showBottomToolbarTemporarily();
+  }, [showBottomToolbarTemporarily]);
+
   const canUseTilesetDialog = useMemo(() => {
     return typeof window !== 'undefined' && !!window.electronAPI?.selectTilesetFile;
   }, []);
@@ -327,6 +434,7 @@ function App() {
   
   // Settings states
   const [mapName, setMapName] = useState('Untitled Map');
+  const [isStartingMap, setIsStartingMap] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(() => {
     // Initialize from localStorage or default to false
     const savedTheme = localStorage.getItem('isDarkMode');
@@ -459,7 +567,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     
     // Set up eyedropper callback to switch back to brush tool
     editorInstance.setEyedropperCallback(() => {
-      setSelectedTool('brush');
+      handleSelectTool('brush');
       setSelectedBrushTool('brush');
     });
 
@@ -477,7 +585,45 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       setHeroEditData({ currentX, currentY, mapWidth, mapHeight, onConfirm });
       setShowHeroEditDialog(true);
     });
-  }, [autoSaveEnabled, projectPath]);
+  }, [autoSaveEnabled, projectPath, handleSelectTool]);
+
+  useEffect(() => {
+    return () => {
+      clearToolbarCollapseTimer();
+    };
+  }, [clearToolbarCollapseTimer]);
+
+  useEffect(() => {
+    if (!showWelcome && mapInitialized) {
+      showToolbarTemporarily();
+    }
+  }, [showWelcome, mapInitialized, showToolbarTemporarily]);
+
+  useEffect(() => {
+    if (showWelcome || !mapInitialized) {
+      setToolbarExpanded(true);
+      clearToolbarCollapseTimer();
+    }
+  }, [showWelcome, mapInitialized, clearToolbarCollapseTimer]);
+
+  useEffect(() => {
+    return () => {
+      clearBottomToolbarCollapseTimer();
+    };
+  }, [clearBottomToolbarCollapseTimer]);
+
+  useEffect(() => {
+    if (!showWelcome && mapInitialized) {
+      showBottomToolbarTemporarily();
+    }
+  }, [showWelcome, mapInitialized, showBottomToolbarTemporarily]);
+
+  useEffect(() => {
+    if (showWelcome || !mapInitialized) {
+      setBottomToolbarExpanded(true);
+      clearBottomToolbarCollapseTimer();
+    }
+  }, [showWelcome, mapInitialized, clearBottomToolbarCollapseTimer]);
 
   // Wire Electron menu actions (Save/Open/New)
   // Moved after function definitions
@@ -1488,12 +1634,16 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
   const handleOpenCreateMapDialog = () => {
     setNewMapWidth(mapWidth > 0 ? mapWidth : 20);
     setNewMapHeight(mapHeight > 0 ? mapHeight : 15);
+    setNewMapName(mapName || 'Untitled Map');
+    setNewMapStarting(isStartingMap);
     setShowCreateMapDialog(true);
   };
 
   const handleConfirmCreateMap = () => {
     const width = Math.max(1, Math.floor(newMapWidth) || 0);
     const height = Math.max(1, Math.floor(newMapHeight) || 0);
+    const trimmedName = newMapName.trim();
+    const resolvedName = trimmedName ? trimmedName : 'Untitled Map';
 
     let targetEditor = editor;
 
@@ -1517,6 +1667,10 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     setMapWidth(width);
     setMapHeight(height);
     setMapInitialized(true);
+    showToolbarTemporarily();
+    showBottomToolbarTemporarily();
+    setMapName(resolvedName);
+    setIsStartingMap(newMapStarting);
     setHasSelection(false);
     setSelectionCount(0);
     setShowCreateMapDialog(false);
@@ -1633,7 +1787,12 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     localStorage.removeItem('tilemap_autosave_backup');
     setProjectPath(newProjectPath ?? null);
 
-    setMapName(config.name);
+    const resolvedName = config.name?.trim() ? config.name.trim() : 'Untitled Map';
+    const starting = Boolean(config.isStartingMap);
+    setMapName(resolvedName);
+    setIsStartingMap(starting);
+    setNewMapName(resolvedName);
+    setNewMapStarting(starting);
     setMapWidth(0);
     setMapHeight(0);
     setNewMapWidth(config.width);
@@ -1674,6 +1833,13 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           console.log('=== MAP CONFIG ANALYSIS ===');
           console.log('Map dimensions:', { width: mapConfig.width, height: mapConfig.height });
           console.log('Map name:', mapConfig.name);
+          
+          const resolvedName = mapConfig.name?.trim() ? mapConfig.name.trim() : 'Untitled Map';
+          const starting = Boolean((mapConfig as { isStartingMap?: boolean }).isStartingMap);
+          setMapName(resolvedName);
+          setNewMapName(resolvedName);
+          setIsStartingMap(starting);
+          setNewMapStarting(starting);
           
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const extendedConfig = mapConfig as any;
@@ -1727,6 +1893,8 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           setMapWidth(mapConfig.width);
           setMapHeight(mapConfig.height);
           setMapInitialized(true);
+          showToolbarTemporarily();
+          showBottomToolbarTemporarily();
           setShowWelcome(false);
           setShowCreateMapDialog(false);
           
@@ -2093,7 +2261,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                     className="text-xs px-1 py-1 h-6 shadow-sm"
                     onClick={() => setBrushTool(brushTool === 'move' ? 'none' : 'move')}
                   >
-                    <ArrowUpDown className="w-3 h-3" />
+                    <Scan className="w-3 h-3" />
                   </Button>
                 </Tooltip>
                 <Tooltip content="Merge brushes">
@@ -2557,7 +2725,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                     variant="ghost"
                     size="sm"
                     onClick={() => setShowHelp(false)}
-                    className="w-8 h-8 p-0"
+                    className="w-8 h-8 p-0 rounded-full"
                     aria-label="Close Help"
                   >
                     <X className="w-4 h-4" />
@@ -2894,69 +3062,91 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         {/* Center Area */}
         <section className="flex-1 min-w-0 flex flex-col relative">
           {/* Zoom Controls & Undo/Redo */}
-          <div className="absolute top-2 right-2 z-10 flex gap-1">
-            <Tooltip content="Undo (Ctrl+Z)" side="bottom">
-              <Button 
-                size="sm" 
-                variant="outline" 
-                className="w-8 h-8 p-0"
-                onClick={handleUndo}
+          <div
+            ref={toolbarContainerRef}
+            className="absolute top-2 right-2 z-10"
+            onMouseEnter={handleToolbarMouseEnter}
+            onMouseLeave={handleToolbarMouseLeave}
+            onFocus={handleToolbarFocus}
+            onBlur={handleToolbarBlur}
+            tabIndex={toolbarExpanded ? -1 : 0}
+            aria-label="Map controls"
+          >
+            <div
+              className={`flex items-center bg-white/90 dark:bg-neutral-900/90 border border-border rounded-full shadow-lg transition-all duration-300 ease-in-out ${toolbarExpanded ? 'px-2 py-1' : 'px-1 py-1'}`}
+            >
+              <div
+                className={`flex items-center gap-1 overflow-hidden transition-all duration-300 ease-out ${toolbarExpanded ? 'opacity-100 scale-100 max-w-[420px]' : 'opacity-0 scale-95 max-w-0 pointer-events-none'}`}
               >
-                <Undo2 className="w-4 h-4" />
-              </Button>
-            </Tooltip>
-            <Tooltip content="Redo (Ctrl+Y)" side="bottom">
-              <Button 
-                size="sm" 
-                variant="outline" 
-                className="w-8 h-8 p-0"
-                onClick={handleRedo}
+                <Tooltip content="Undo (Ctrl+Z)" side="bottom">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-8 h-8 p-0 rounded-full"
+                    onClick={handleUndo}
+                  >
+                    <Undo2 className="w-4 h-4" />
+                  </Button>
+                </Tooltip>
+                <Tooltip content="Redo (Ctrl+Y)" side="bottom">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-8 h-8 p-0 rounded-full"
+                    onClick={handleRedo}
+                  >
+                    <Redo2 className="w-4 h-4" />
+                  </Button>
+                </Tooltip>
+                <Tooltip content="Zoom In" side="bottom">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-8 h-8 p-0 rounded-full"
+                    onClick={handleZoomIn}
+                  >
+                    <ZoomIn className="w-4 h-4" />
+                  </Button>
+                </Tooltip>
+                <Tooltip content="Zoom Out" side="bottom">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-8 h-8 p-0 rounded-full"
+                    onClick={handleZoomOut}
+                  >
+                    <ZoomOut className="w-4 h-4" />
+                  </Button>
+                </Tooltip>
+                <Tooltip content="Reset View" side="bottom">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-8 h-8 p-0 rounded-full"
+                    onClick={handleResetZoom}
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                  </Button>
+                </Tooltip>
+                <Tooltip content="Toggle Minimap" side="bottom">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-8 h-8 p-0 rounded-full"
+                    onClick={handleToggleMinimap}
+                  >
+                    <Map className="w-4 h-4" />
+                  </Button>
+                </Tooltip>
+              </div>
+              <div
+                className={`flex items-center justify-center w-8 h-8 transition-all duration-300 ease-out ${toolbarExpanded ? 'opacity-50 scale-90' : 'opacity-100 scale-100'}`}
+                aria-hidden
               >
-                <Redo2 className="w-4 h-4" />
-              </Button>
-            </Tooltip>
-            <Tooltip content="Zoom In" side="bottom">
-              <Button 
-                size="sm" 
-                variant="outline" 
-                className="w-8 h-8 p-0"
-                onClick={handleZoomIn}
-              >
-                <ZoomIn className="w-4 h-4" />
-              </Button>
-            </Tooltip>
-            <Tooltip content="Zoom Out" side="bottom">
-              <Button 
-                size="sm" 
-                variant="outline" 
-                className="w-8 h-8 p-0"
-                onClick={handleZoomOut}
-              >
-                <ZoomOut className="w-4 h-4" />
-              </Button>
-            </Tooltip>
-            <Tooltip content="Reset View" side="bottom">
-              <Button 
-                size="sm" 
-                variant="outline" 
-                className="w-8 h-8 p-0"
-                onClick={handleResetZoom}
-              >
-                <RotateCcw className="w-4 h-4" />
-              </Button>
-            </Tooltip>
-            <Tooltip content="Toggle Minimap" side="bottom">
-              <Button 
-                size="sm" 
-                variant={showMinimap ? "default" : "outline"}
-                className="w-8 h-8 p-0"
-                onClick={handleToggleMinimap}
-              >
-                <Map className="w-4 h-4" />
-              </Button>
-            </Tooltip>
+                <Scan className="w-4 h-4 text-muted-foreground" />
+              </div>
+            </div>
           </div>
-          
           <div className="bg-gray-100 flex-1 min-h-0 flex items-center justify-center overflow-hidden relative">
             {/* Canvas Tooltip Panel */}
             {showTooltip && (
@@ -3001,12 +3191,12 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             />
             {!mapInitialized && (
               <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-                <div className="flex items-center gap-3 px-4 py-2 rounded-full border border-dashed border-border bg-background/90 shadow-sm">
+                <div className="flex items-center gap-3 px-4 py-2 rounded-full border-2 border-orange-500/80 bg-background/95 shadow-lg backdrop-blur-sm">
                   <span className="text-sm font-medium text-muted-foreground">Create a map</span>
                   <Button
                     size="sm"
-                    variant="outline"
-                    className="w-8 h-8 p-0 rounded-full"
+                    variant="default"
+                    className="w-9 h-9 p-0 rounded-full bg-orange-500 text-white shadow-sm transition-all duration-150 hover:bg-orange-600 hover:shadow-md hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
                     onClick={handleOpenCreateMapDialog}
                   >
                     <Plus className="w-4 h-4" />
@@ -3065,15 +3255,28 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               </div>
             )}
             {/* Floating Toolbar (inside canvas, centered, pill-sized) */}
-            <div ref={toolbarRef} className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-30">
-              <div className="flex items-center gap-1 bg-white/90 dark:bg-neutral-900/90 border border-border rounded-full px-2 py-1 shadow-md">
+            <div
+              ref={setBottomToolbarNode}
+              className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-30"
+              onMouseEnter={handleBottomToolbarMouseEnter}
+              onMouseLeave={handleBottomToolbarMouseLeave}
+              onFocus={handleBottomToolbarFocus}
+              onBlur={handleBottomToolbarBlur}
+              tabIndex={bottomToolbarExpanded ? -1 : 0}
+              aria-label="Tool selection"
+            >
+              <div
+                className={`flex items-center bg-white/90 dark:bg-neutral-900/90 border border-border rounded-full shadow-md transition-all duration-300 ease-in-out ${bottomToolbarExpanded ? 'gap-1 px-2 py-1' : 'gap-0 px-1 py-1'}`}
+              >
                 {/* Brush Tool */}
-                <div className="relative">
+                <div
+                  className={`relative flex-shrink-0 transition-all duration-300 ease-out ${bottomToolbarExpanded || selectedTool === 'brush' ? 'opacity-100 scale-100 max-w-[3rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
+                >
                   <Button
                         variant={selectedTool === 'brush' ? 'default' : 'ghost'}
                         size="sm"
                         className="w-7 h-7 p-1 rounded-full tool-button"
-                        onClick={() => setSelectedTool('brush')}
+                        onClick={() => handleSelectTool('brush')}
                         onMouseEnter={(e) => {
                           handleShowBrushOptions();
                           showTooltipWithDelay('Brush Tool', e.currentTarget);
@@ -3137,12 +3340,14 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 </div>
 
                 {/* Selection Tool */}
-                <div className="relative">
+                <div
+                  className={`relative flex-shrink-0 transition-all duration-300 ease-out ${bottomToolbarExpanded || selectedTool === 'selection' ? 'opacity-100 scale-100 max-w-[3rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
+                >
                   <Button
                       variant={selectedTool === 'selection' ? 'default' : 'ghost'}
                       size="sm"
                       className="w-7 h-7 p-1 rounded-full tool-button"
-                      onClick={() => setSelectedTool('selection')}
+                      onClick={() => handleSelectTool('selection')}
                       onMouseEnter={(e) => {
                         handleShowSelectionOptions();
                         showTooltipWithDelay('Selection Tool', e.currentTarget);
@@ -3206,12 +3411,14 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 </div>
 
                 {/* Shape Tool */}
-                <div className="relative">
+                <div
+                  className={`relative flex-shrink-0 transition-all duration-300 ease-out ${bottomToolbarExpanded || selectedTool === 'shape' ? 'opacity-100 scale-100 max-w-[3rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
+                >
                   <Button
                       variant={selectedTool === 'shape' ? 'default' : 'ghost'}
                       size="sm"
                       className="w-7 h-7 p-1 rounded-full tool-button"
-                      onClick={() => setSelectedTool('shape')}
+                      onClick={() => handleSelectTool('shape')}
                       onMouseEnter={(e) => { handleShowShapeOptions(); showTooltipWithDelay('Shape Tool', e.currentTarget); }}
                       onMouseLeave={() => { handleHideShapeOptions(); hideTooltip(); }}
                     >
@@ -3259,12 +3466,14 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 </div>
 
                 {/* Stamp Tool */}
-                <div className="relative">
+                <div
+                  className={`relative flex-shrink-0 transition-all duration-300 ease-out ${bottomToolbarExpanded || selectedTool === 'stamp' ? 'opacity-100 scale-100 max-w-[3rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
+                >
                   <Button
                       variant={selectedTool === 'stamp' ? 'default' : 'ghost'}
                       size="sm"
                       className="w-7 h-7 p-1 rounded-full tool-button"
-                      onClick={() => setSelectedTool('stamp')}
+                      onClick={() => handleSelectTool('stamp')}
                       onMouseEnter={(e) => showTooltipWithDelay('Stamp Tool - Group tiles into a stamp and place them together', e.currentTarget)}
                       onMouseLeave={hideTooltip}
                     >
@@ -3370,16 +3579,20 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 </div>
 
                 {/* Eyedropper Tool */}
-                <Button
-                  variant={selectedTool === 'eyedropper' ? 'default' : 'ghost'}
-                  size="sm"
-                  className="w-7 h-7 p-1 rounded-full tool-button"
-                  onClick={() => setSelectedTool('eyedropper')}
-                  onMouseEnter={(e) => showTooltipWithDelay('Eyedropper Tool - Pick a tile from the map to reuse', e.currentTarget)}
-                  onMouseLeave={hideTooltip}
+                <div
+                  className={`flex-shrink-0 transition-all duration-300 ease-out ${bottomToolbarExpanded || selectedTool === 'eyedropper' ? 'opacity-100 scale-100 max-w-[3rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
                 >
-                  <Pipette className="w-3 h-3" />
-                </Button>
+                  <Button
+                    variant={selectedTool === 'eyedropper' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="w-7 h-7 p-1 rounded-full tool-button"
+                    onClick={() => handleSelectTool('eyedropper')}
+                    onMouseEnter={(e) => showTooltipWithDelay('Eyedropper Tool - Pick a tile from the map to reuse', e.currentTarget)}
+                    onMouseLeave={hideTooltip}
+                  >
+                    <Pipette className="w-3 h-3" />
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
@@ -4401,32 +4614,63 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           <DialogHeader>
             <DialogTitle>Create Map</DialogTitle>
             <DialogDescription>
-              Choose the width and height for your new map.
+              Set the name, dimensions, and starting status for your new map.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-2 gap-4 py-4">
+          <div className="space-y-4 py-4">
             <div>
               <label className="block text-sm font-medium text-muted-foreground mb-1">
-                Width (tiles)
+                Map Name
               </label>
               <Input
-                type="number"
-                min={1}
-                max={100}
-                value={newMapWidth}
-                onChange={(e) => setNewMapWidth(Math.max(1, Number.parseInt(e.target.value, 10) || 0))}
+                value={newMapName}
+                onChange={(e) => setNewMapName(e.target.value)}
+                placeholder="Enter map name"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-muted-foreground mb-1">
-                Height (tiles)
-              </label>
-              <Input
-                type="number"
-                min={1}
-                max={100}
-                value={newMapHeight}
-                onChange={(e) => setNewMapHeight(Math.max(1, Number.parseInt(e.target.value, 10) || 0))}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-muted-foreground mb-1">
+                  Width (tiles)
+                </label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={newMapWidth}
+                  onChange={(e) => setNewMapWidth(Math.max(1, Number.parseInt(e.target.value, 10) || 0))}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-muted-foreground mb-1">
+                  Height (tiles)
+                </label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={newMapHeight}
+                  onChange={(e) => setNewMapHeight(Math.max(1, Number.parseInt(e.target.value, 10) || 0))}
+                />
+              </div>
+            </div>
+            <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
+              <div className="flex items-center gap-2">
+                <label htmlFor="starting-map-checkbox" className="text-sm font-medium text-muted-foreground">
+                  Starting Map
+                </label>
+                <Tooltip content="If this map is the map that players will start the game then mark this option">
+                  <HelpCircle className="h-4 w-4 text-muted-foreground" aria-hidden />
+                </Tooltip>
+              </div>
+              <input
+                id="starting-map-checkbox"
+                type="checkbox"
+                className="h-4 w-4 rounded border border-border accent-orange-500"
+                checked={newMapStarting}
+                onChange={(e) => setNewMapStarting(e.target.checked)}
+                aria-checked={newMapStarting}
+                aria-label="Set this map as the starting map"
               />
             </div>
           </div>

@@ -1794,6 +1794,35 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         setExportProgress(0);
       }
 
+      const sanitizedMapFileBase = (() => {
+        const sanitized = mapName
+          .replace(/[<>:"/\|?*]/g, '_')
+          .trim()
+          .replace(/\s+/g, '_')
+          .replace(/_{2,}/g, '_');
+        if (!sanitized) {
+          return 'Untitled_Map';
+        }
+        return sanitized;
+      })();
+      const spawnIntermapTarget = isStartingMap ? `maps/${sanitizedMapFileBase}.txt` : 'maps/test11.txt';
+      const spawnContent = [
+        '# this file is automatically loaded when a New Game starts.',
+        "# it's a dummy map to send the player to the actual starting point.",
+        '',
+        '[header]',
+        'width=1',
+        'height=1',
+        'hero_pos=0,0',
+        '',
+        '[event]',
+        'type=event',
+        'location=0,0,1,1',
+        'activate=on_load',
+        `intermap=${spawnIntermapTarget}`,
+        ''
+      ].join('\n');
+
       try {
         if (!silent) {
           setExportProgress(25);
@@ -1816,7 +1845,14 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             projectPath,
             mapName,
             mapTxt,
-            tilesetDef
+            tilesetDef,
+            {
+              spawn: {
+                enabled: true,
+                content: spawnContent,
+                filename: 'spawn.txt'
+              }
+            }
           );
 
           if (!success) {
@@ -1831,6 +1867,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           }
         } else {
           editor.exportFlareMap();
+          console.warn('Spawn file creation skipped: Electron API unavailable.');
           if (!silent) {
             setExportProgress(100);
           }
@@ -1854,7 +1891,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         }
       }
     },
-    [editor, projectPath, mapName, toast]
+    [editor, projectPath, mapName, isStartingMap, toast]
   );
 
   const handleExportMap = useCallback(async () => {

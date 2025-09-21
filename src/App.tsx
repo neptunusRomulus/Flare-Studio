@@ -18,7 +18,8 @@ interface MapConfig {
   tileSize: number;
   location: string;
   isStartingMap?: boolean;
-}
+// removed extraneous closing brace
+  }
 
 type PropertyType =
   | 'string'
@@ -302,6 +303,9 @@ function App() {
   const [bottomToolbarExpanded, setBottomToolbarExpanded] = useState(true);
   const bottomToolbarCollapseTimer = useRef<number | null>(null);
   const bottomToolbarContainerRef = useRef<HTMLDivElement | null>(null);
+  const [brushToolbarExpanded, setBrushToolbarExpanded] = useState(true);
+  const brushToolbarCollapseTimer = useRef<number | null>(null);
+  const brushToolbarContainerRef = useRef<HTMLDivElement | null>(null);
   const [pendingMapConfig, setPendingMapConfig] = useState<MapConfig | null>(null);
   const clearToolbarCollapseTimer = useCallback(() => {
     if (toolbarCollapseTimer.current !== null) {
@@ -391,6 +395,54 @@ function App() {
     }
   }, [scheduleBottomToolbarCollapse]);
 
+  const clearBrushToolbarCollapseTimer = useCallback(() => {
+    if (brushToolbarCollapseTimer.current !== null) {
+      window.clearTimeout(brushToolbarCollapseTimer.current);
+      brushToolbarCollapseTimer.current = null;
+    }
+  }, []);
+
+  const scheduleBrushToolbarCollapse = useCallback(() => {
+    clearBrushToolbarCollapseTimer();
+    brushToolbarCollapseTimer.current = window.setTimeout(() => {
+      setBrushToolbarExpanded(false);
+    }, 500);
+  }, [clearBrushToolbarCollapseTimer]);
+
+  const showBrushToolbarTemporarily = useCallback(() => {
+    setBrushToolbarExpanded(true);
+    scheduleBrushToolbarCollapse();
+  }, [scheduleBrushToolbarCollapse]);
+
+  const handleBrushToolbarMouseEnter = useCallback(() => {
+    clearBrushToolbarCollapseTimer();
+    setBrushToolbarExpanded(true);
+  }, [clearBrushToolbarCollapseTimer]);
+
+  const handleBrushToolbarMouseLeave = useCallback(() => {
+    const activeElement = typeof document !== 'undefined' ? document.activeElement : null;
+    if (activeElement && brushToolbarContainerRef.current?.contains(activeElement)) {
+      return;
+    }
+    scheduleBrushToolbarCollapse();
+  }, [scheduleBrushToolbarCollapse]);
+
+  const handleBrushToolbarFocus = useCallback(() => {
+    clearBrushToolbarCollapseTimer();
+    setBrushToolbarExpanded(true);
+  }, [clearBrushToolbarCollapseTimer]);
+
+  const handleBrushToolbarBlur = useCallback((event: React.FocusEvent<HTMLDivElement>) => {
+    const nextTarget = event.relatedTarget as Node | null;
+    if (!event.currentTarget.contains(nextTarget)) {
+      scheduleBrushToolbarCollapse();
+    }
+  }, [scheduleBrushToolbarCollapse]);
+
+  const setBrushToolbarNode = useCallback((node: HTMLDivElement | null) => {
+    brushToolbarContainerRef.current = node;
+  }, []);
+
   const setBottomToolbarNode = useCallback((node: HTMLDivElement | null) => {
     toolbarRef.current = node;
     bottomToolbarContainerRef.current = node;
@@ -400,6 +452,11 @@ function App() {
     setSelectedTool(tool);
     showBottomToolbarTemporarily();
   }, [showBottomToolbarTemporarily]);
+
+  const handleToggleBrushTool = useCallback((tool: 'move' | 'merge' | 'separate' | 'remove') => {
+    setBrushTool((current) => (current === tool ? 'none' : tool));
+    showBrushToolbarTemporarily();
+  }, [showBrushToolbarTemporarily]);
 
   const canUseTilesetDialog = useMemo(() => {
     return typeof window !== 'undefined' && !!window.electronAPI?.selectTilesetFile;
@@ -609,6 +666,24 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     }
   }, [showWelcome, mapInitialized, clearToolbarCollapseTimer]);
 
+  useEffect(() => {
+    return () => {
+      clearBrushToolbarCollapseTimer();
+    };
+  }, [clearBrushToolbarCollapseTimer]);
+
+  useEffect(() => {
+    if (!showWelcome && mapInitialized) {
+      showBrushToolbarTemporarily();
+    }
+  }, [showWelcome, mapInitialized, showBrushToolbarTemporarily]);
+
+  useEffect(() => {
+    if (showWelcome || !mapInitialized) {
+      setBrushToolbarExpanded(true);
+      clearBrushToolbarCollapseTimer();
+    }
+  }, [showWelcome, mapInitialized, clearBrushToolbarCollapseTimer]);
   useEffect(() => {
     return () => {
       clearBottomToolbarCollapseTimer();
@@ -2364,23 +2439,6 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               </div>
             ) : (
               <>
-            {/* Header with Import Button */}
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-lg font-semibold">Tileset Brushes</h2>
-              <Tooltip content="Import a PNG tileset for the active layer" side="bottom">
-                <Button variant="outline" size="sm" className="relative bg-orange-500 hover:bg-orange-600 text-white border-orange-500 hover:border-orange-600 h-6 text-xs px-2 shadow-sm">
-                  <Upload className="w-3 h-3 mr-1" />
-                  Import
-                  <input
-                    type="file"
-                    accept="image/png"
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    onChange={(e) => handleFileUpload(e, 'layerTileset')}
-                  />
-                </Button>
-              </Tooltip>
-            </div>
-            
             <div id="tilesetMeta" className="text-sm text-muted-foreground mb-2"></div>
             
             {/* Tileset Brushes Window - Takes maximum space */}
@@ -2402,62 +2460,108 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               </div>
             </div>
             
-            {/* Brush Tools Header */}
-            <div className="flex items-center justify-between mb-1 mt-2">
-              <div className="text-xs text-muted-foreground">Brush Tools</div>
-              <div className="flex gap-1">
-                <Tooltip content="Move/Reorder brushes">
-                  <Button
-                    variant={brushTool === 'move' ? 'default' : 'outline'}
-                    size="sm"
-                    className="text-xs px-1 py-1 h-6 shadow-sm"
-                    onClick={() => setBrushTool(brushTool === 'move' ? 'none' : 'move')}
-                  >
-                    <Scan className="w-3 h-3" />
-                  </Button>
-                </Tooltip>
-                <Tooltip content="Merge brushes">
-                  <Button
-                    variant={brushTool === 'merge' ? 'default' : 'outline'}
-                    size="sm"
-                    className="text-xs px-1 py-1 h-6 shadow-sm"
-                    onClick={() => setBrushTool(brushTool === 'merge' ? 'none' : 'merge')}
-                  >
-                    <Link2 className="w-3 h-3" />
-                  </Button>
-                </Tooltip>
-                <Tooltip content="Separate brushes">
-                  <Button
-                    variant={brushTool === 'separate' ? 'default' : 'outline'}
-                    size="sm"
-                    className="text-xs px-1 py-1 h-6 shadow-sm"
-                    onClick={() => setBrushTool(brushTool === 'separate' ? 'none' : 'separate')}
-                  >
-                    <Scissors className="w-3 h-3" />
-                  </Button>
-                </Tooltip>
-                <Tooltip content="Remove brushes">
-                  <Button
-                    variant={brushTool === 'remove' ? 'default' : 'outline'}
-                    size="sm"
-                    className="text-xs px-1 py-1 h-6 shadow-sm"
-                    onClick={() => setBrushTool(brushTool === 'remove' ? 'none' : 'remove')}
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </Button>
-                </Tooltip>
-                <Tooltip content="Remove tileset for current layer">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-xs px-1 py-1 h-6 border-red-500 hover:border-red-600 hover:bg-red-50 shadow-sm"
-                    onClick={() => {
-                      setConfirmAction({ type: 'removeTileset' });
-                    }}
-                  >
-                    <X className="w-3 h-3 text-red-500" />
-                  </Button>
-                </Tooltip>
+            {/* Brush Tools */}
+            <div className="flex items-center justify-between mb-3 mt-2">
+              <div className="text-xs text-muted-foreground"></div>
+              <div
+                ref={setBrushToolbarNode}
+                className={`flex items-center transition-all duration-300 ease-in-out ${brushToolbarExpanded ? 'gap-1' : 'gap-0.5'}`}
+                onMouseEnter={handleBrushToolbarMouseEnter}
+                onMouseLeave={handleBrushToolbarMouseLeave}
+                onFocus={handleBrushToolbarFocus}
+                onBlur={handleBrushToolbarBlur}
+                tabIndex={brushToolbarExpanded ? -1 : 0}
+              >
+                <div className="flex-shrink-0">
+                  <Tooltip content="Import a PNG tileset for the active layer" side="bottom">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="relative text-xs px-1 py-1 h-6 shadow-sm"
+                    >
+                      <Upload className="w-3 h-3" />
+                      <input
+                        type="file"
+                        accept="image/png"
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        onChange={(e) => handleFileUpload(e, 'layerTileset')}
+                      />
+                    </Button>
+                  </Tooltip>
+                </div>
+                <div
+                  className={`flex-shrink-0 overflow-hidden transition-all duration-300 ease-out ${brushToolbarExpanded || brushTool === 'move' ? 'opacity-100 scale-100 max-w-[2.5rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
+                >
+                  <Tooltip content="Move/Reorder brushes">
+                    <Button
+                      variant={brushTool === 'move' ? 'default' : 'outline'}
+                      size="sm"
+                      className="text-xs px-1 py-1 h-6 shadow-sm"
+                      onClick={() => handleToggleBrushTool('move')}
+                    >
+                      <Scan className="w-3 h-3" />
+                    </Button>
+                  </Tooltip>
+                </div>
+                <div
+                  className={`flex-shrink-0 overflow-hidden transition-all duration-300 ease-out ${brushToolbarExpanded || brushTool === 'merge' ? 'opacity-100 scale-100 max-w-[2.5rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
+                >
+                  <Tooltip content="Merge brushes">
+                    <Button
+                      variant={brushTool === 'merge' ? 'default' : 'outline'}
+                      size="sm"
+                      className="text-xs px-1 py-1 h-6 shadow-sm"
+                      onClick={() => handleToggleBrushTool('merge')}
+                    >
+                      <Link2 className="w-3 h-3" />
+                    </Button>
+                  </Tooltip>
+                </div>
+                <div
+                  className={`flex-shrink-0 overflow-hidden transition-all duration-300 ease-out ${brushToolbarExpanded || brushTool === 'separate' ? 'opacity-100 scale-100 max-w-[2.5rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
+                >
+                  <Tooltip content="Separate brushes">
+                    <Button
+                      variant={brushTool === 'separate' ? 'default' : 'outline'}
+                      size="sm"
+                      className="text-xs px-1 py-1 h-6 shadow-sm"
+                      onClick={() => handleToggleBrushTool('separate')}
+                    >
+                      <Scissors className="w-3 h-3" />
+                    </Button>
+                  </Tooltip>
+                </div>
+                <div
+                  className={`flex-shrink-0 overflow-hidden transition-all duration-300 ease-out ${brushToolbarExpanded || brushTool === 'remove' ? 'opacity-100 scale-100 max-w-[2.5rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
+                >
+                  <Tooltip content="Remove brushes">
+                    <Button
+                      variant={brushTool === 'remove' ? 'default' : 'outline'}
+                      size="sm"
+                      className="text-xs px-1 py-1 h-6 shadow-sm"
+                      onClick={() => handleToggleBrushTool('remove')}
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </Button>
+                  </Tooltip>
+                </div>
+                <div
+                  className={`flex-shrink-0 overflow-hidden transition-all duration-300 ease-out ${brushToolbarExpanded ? 'opacity-100 scale-100 max-w-[2.5rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
+                >
+                  <Tooltip content="Remove tileset for current layer">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-xs px-1 py-1 h-6 border-red-500 hover:border-red-600 hover:bg-red-50 shadow-sm"
+                      onClick={() => {
+                        showBrushToolbarTemporarily();
+                        setConfirmAction({ type: 'removeTileset' });
+                      }}
+                    >
+                      <X className="w-3 h-3 text-red-500" />
+                    </Button>
+                  </Tooltip>
+                </div>
               </div>
             </div>
               </>
@@ -2466,7 +2570,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
 
           {/* Layers Section */}
           <section className="mb-4 flex-shrink-0">
-            <h2 className="text-sm font-semibold mb-2">Layers</h2>
+            <h2 className="text-sm font-semibold mb-2"></h2>
             
             {/* Layers List */}
             <div className="mb-2 space-y-0.5 max-h-48 overflow-y-auto">
@@ -2561,35 +2665,28 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             </div>
             
             <div className="flex gap-2 justify-center">
-              <Tooltip content="Export the map file and tilesetdef">
+              <Tooltip content="Export Project as Flare-Ready">
                 <Button 
                   onClick={handleExportMap} 
-                  className="shadow-sm flex items-center gap-1 px-3 py-1 h-7 text-xs w-20"
+                  className="w-7 h-7 p-0 shadow-sm flex items-center justify-center"
                   size="sm"
                   disabled={isExporting || isPreparingNewMap}
                 >
                   {isExporting ? (
-                    <>
-                      <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                      <span>Export</span>
-                    </>
+                    <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                   ) : (
-                    <>
-                      <Download className="w-3 h-3" />
-                      <span>Export</span>
-                    </>
+                    <Download className="w-3 h-3" />
                   )}
                 </Button>
               </Tooltip>
-              <Tooltip content="Open the create map dialog (current map exports after you confirm)">
+              <Tooltip content="Create a New Map">
                 <Button 
                   onClick={handleOpenCreateMapDialog}
-                  className="shadow-sm flex items-center gap-1 px-3 py-1 h-7 text-xs w-36"
+                  className="w-7 h-7 p-0 shadow-sm flex items-center justify-center"
                   size="sm"
                   disabled={isExporting || isPreparingNewMap}
                 >
                   <Plus className="w-3 h-3" />
-                  <span>Create a New Map</span>
                 </Button>
               </Tooltip>
               <Tooltip content={hasUnsavedChanges ? 'Save changes' : 'All changes saved'}>
@@ -5011,5 +5108,4 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
 }
 
 export default App;
-
 

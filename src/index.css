@@ -477,3 +477,44 @@ button:active:not(.no-click-effect) {
     background: rgba(100,100,100,0.55);
 }
 .minimal-scroll::-webkit-scrollbar-corner { background: transparent; }
+
+/* Smooth sidebar collapse: animate width and inner content opacity to avoid sudden layout jumps */
+.app-sidebar {
+    transition: width 300ms cubic-bezier(.2,.9,.2,1), opacity 220ms ease, transform 300ms cubic-bezier(.2,.9,.2,1);
+    width: 14rem; /* default matching w-56 */
+    min-width: 0;
+    overflow: visible;
+    transform: translateX(0);
+}
+.app-sidebar .sidebar-inner {
+    transition: opacity 220ms ease, transform 300ms cubic-bezier(.2,.9,.2,1);
+    opacity: 1;
+    transform: translateX(0);
+}
+.app-sidebar.sidebar-collapsed {
+    width: 0 !important;
+    min-width: 0 !important;
+    opacity: 0 !important; /* fully transparent when collapsed */
+    padding: 0 !important; /* remove padding so inner background doesn't show */
+    background: transparent !important;
+    border-right-width: 0 !important; /* remove visible border */
+    box-shadow: none !important;
+    pointer-events: none; /* prevent interactions while collapsed */
+    overflow: hidden !important; /* ensure no inner content protrudes */
+    transform: translateX(-1px) !important; /* hide fractional-pixel slivers */
+}
+.app-sidebar.sidebar-collapsed .sidebar-inner {
+    opacity: 0;
+    transform: translateX(-6px);
+    pointer-events: none;
+}
+
+/* Canvas smoothing: slightly fade canvas during layout transitions to hide redraw flicker */
+.canvas-fade {
+    transition: opacity 260ms ease, transform 260ms ease;
+    will-change: opacity, transform;
+}
+.canvas-fade.during-sidebar-transition {
+    opacity: 0.97;
+    transform: translateZ(0);
+}

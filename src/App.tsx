@@ -202,7 +202,10 @@ function App() {
   // Show/hide Active GID indicator (user preference)
   const [showActiveGid, setShowActiveGid] = useState<boolean>(true);
   // Left sidebar collapsed (icon-strip) state
-  const [leftCollapsed, setLeftCollapsed] = useState<boolean>(true);
+  // Start expanded by default; users can toggle during the session
+  const [leftCollapsed, setLeftCollapsed] = useState<boolean>(false);
+  // transient flag during sidebar open/close animation to reduce canvas flicker
+  const [leftTransitioning, setLeftTransitioning] = useState<boolean>(false);
   const [layers, setLayers] = useState<TileLayer[]>([]);
   const [activeLayerId, setActiveLayerId] = useState<number | null>(null);
   const [showAddLayerDropdown, setShowAddLayerDropdown] = useState(false);
@@ -465,6 +468,9 @@ function App() {
   const mapsButtonRef = useRef<HTMLButtonElement | null>(null);
   const [mapsDropdownPos, setMapsDropdownPos] = useState<{ left: number; top: number } | null>(null);
   const mapsPortalRef = useRef<HTMLDivElement | null>(null);
+  const mapsSubPortalRef = useRef<HTMLDivElement | null>(null);
+  const [mapsSubPos, setMapsSubPos] = useState<{ left: number; top: number } | null>(null);
+  const [mapsSubOpen, setMapsSubOpen] = useState<boolean>(false);
 
   useEffect(() => {
     if (!mapsDropdownOpen) return;
@@ -484,20 +490,45 @@ function App() {
     };
   }, [mapsDropdownOpen]);
 
+  // Compute position for the nested maps submenu so it appears to the right of the main dropdown
+  useEffect(() => {
+    if (!mapsSubOpen) return;
+    const computeSubPos = () => {
+      const portal = mapsPortalRef.current;
+      if (!portal) return setMapsSubPos(null);
+      const rect = portal.getBoundingClientRect();
+      // place submenu to the right of the main portal with a small gap
+      setMapsSubPos({ left: rect.right + 8, top: rect.top });
+    };
+    computeSubPos();
+    window.addEventListener('resize', computeSubPos);
+    window.addEventListener('scroll', computeSubPos, true);
+    return () => {
+      window.removeEventListener('resize', computeSubPos);
+      window.removeEventListener('scroll', computeSubPos, true);
+    };
+  }, [mapsSubOpen]);
+
   // Close maps dropdown on Escape or clicking outside
   useEffect(() => {
     if (!mapsDropdownOpen) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setMapsDropdownOpen(false);
+      if (e.key === 'Escape') {
+        setMapsDropdownOpen(false);
+        setMapsSubOpen(false);
+      }
     };
     const onMouse = (e: MouseEvent) => {
       const portal = mapsPortalRef.current;
+      const subportal = mapsSubPortalRef.current;
       const btn = mapsButtonRef.current;
       const target = e.target as Node | null;
       if (!portal) return;
       if (portal.contains(target)) return;
+      if (subportal && subportal.contains(target)) return;
       if (btn && btn.contains(target)) return; // clicking the button toggles; allow it
       setMapsDropdownOpen(false);
+      setMapsSubOpen(false);
     };
     window.addEventListener('keydown', onKey);
     window.addEventListener('mousedown', onMouse);
@@ -2376,91 +2407,124 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       </div>
 
       {/* Main Content */}
+      {/* Left-edge collapse/expand toggle - placed outside the aside so it remains clickable when the sidebar is hidden */}
+      <button
+        onClick={() => {
+          setLeftTransitioning(true);
+          setLeftCollapsed((s) => !s);
+          // keep the transitioning flag for slightly longer than the CSS transition
+          window.setTimeout(() => setLeftTransitioning(false), 380);
+        }}
+        aria-label={leftCollapsed ? 'Show sidebar' : 'Hide sidebar'}
+        className="fixed left-0 top-1/2 transform -translate-y-1/2 z-50 bg-white/90 dark:bg-neutral-900/90 border border-border rounded-r-md p-1 shadow-md hover:bg-white dark:hover:bg-neutral-800"
+      >
+        {leftCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+      </button>
+
       <main className="flex flex-1 min-h-0">
         {/* Left Sidebar */}
         <aside
           className={
-            `relative border-r border-border bg-muted/30 p-2 overflow-visible flex flex-col transition-all duration-200 ease-in-out ` +
-            (leftCollapsed ? 'w-16' : 'w-80')
+            `relative border-r border-border bg-muted/30 p-2 overflow-visible flex flex-col transition-all duration-200 ease-in-out app-sidebar ` +
+            (leftCollapsed ? 'sidebar-collapsed' : '')
           }
+          aria-hidden={leftCollapsed}
         >
+          <div className="sidebar-inner">
           {/* Hover handle / visual affordance when collapsed (removed) */}
           {/* collapse toggle is provided on the outer edge (see edge button) */}
           {/* Tileset Brushes Section */}
           <section className="flex flex-col flex-1">
-            {isNpcLayer || isEnemyLayer ? (
-              <div className="flex flex-col flex-1">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <Users className="w-5 h-5 text-gray-700" />
-                    <h2 className="text-lg font-semibold">
-                      <span className={leftCollapsed ? 'sr-only' : ''}>{isNpcLayer ? 'NPCs' : 'Enemies'}</span>
-                    </h2>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="bg-orange-500 hover:bg-orange-600 text-white border-orange-500 hover:border-orange-600 h-6 text-xs px-2 shadow-sm"
-                    onClick={() => handleOpenActorDialog(isNpcLayer ? 'npc' : 'enemy')}
-                  >
-                    <Plus className="w-3 h-3 mr-1" />
-                    <span className={leftCollapsed ? 'sr-only' : ''}>{isNpcLayer ? 'Add NPC' : 'Add Enemy'}</span>
-                  </Button>
-                </div>
-                <div className="flex-1 min-h-0">
-                  {actorEntries.length === 0 ? (
-                    <div className="h-full border border-dashed border-border rounded-md flex items-center justify-center text-sm text-muted-foreground px-4 text-center">
-                      {isNpcLayer ? 'No NPCs added yet. Use the button above to place your first NPC.' : 'No enemies added yet. Use the button above to place an enemy.'}
+            {/* If this is an NPC, Enemy or Event layer render a header and actor controls (actors only for NPC/Enemy) */}
+            {(() => {
+              const isEventLayer = activeLayer?.type === 'event';
+              if (isNpcLayer || isEnemyLayer || isEventLayer) {
+                return (
+                  <>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <Users className="w-5 h-5 text-gray-700" />
+                        <h2 className="text-lg font-semibold">
+                          <span className={leftCollapsed ? 'sr-only' : ''}>{isNpcLayer ? 'NPCs' : isEnemyLayer ? 'Enemies' : 'Events'}</span>
+                        </h2>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="bg-orange-500 hover:bg-orange-600 text-white border-orange-500 hover:border-orange-600 h-6 text-xs px-2 shadow-sm"
+                        onClick={() => {
+                          if (isEventLayer) {
+                            toast({ title: 'Not implemented', description: 'Create Event will be implemented later.' });
+                          } else {
+                            handleOpenActorDialog(isNpcLayer ? 'npc' : 'enemy');
+                          }
+                        }}
+                      >
+                        <Plus className="w-3 h-3 mr-1" />
+                        <span className={leftCollapsed ? 'sr-only' : ''}>{isNpcLayer ? 'Add NPC' : isEnemyLayer ? 'Add Enemy' : 'Add Event'}</span>
+                      </Button>
                     </div>
-                  ) : (
-                    <div className="space-y-2 overflow-y-auto pr-1">
-                      {actorEntries.map((actor) => (
-                        <div
-                          key={actor.id}
-                          className="border border-border rounded-md px-3 py-2 bg-background/50 hover:bg-background transition-colors cursor-pointer"
-                          onClick={() => handleEditObject(actor.id)}
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                              <div className="space-y-1 text-sm">
-                              <div className="font-medium text-foreground" title={actor.name || `${actor.type === 'npc' ? 'NPC' : 'Enemy'} #${actor.id}`}>
-                                <span className={leftCollapsed ? 'sr-only' : ''}>{actor.name || `${actor.type === 'npc' ? 'NPC' : 'Enemy'} #${actor.id}`}</span>
-                                {!actor.name && leftCollapsed && <span className="text-xs text-muted-foreground">#{actor.id}</span>}
-                              </div>
-                              <div className="text-xs text-muted-foreground flex items-center gap-1">
-                                <MapPin className="w-3 h-3" />
-                                <span className={leftCollapsed ? 'sr-only' : ''}>({actor.x}, {actor.y})</span>
-                              </div>
-                              {actor.properties?.tilesetPath && (
-                                <div className="text-xs text-muted-foreground break-all">
-                                  {actor.properties.tilesetPath}
-                                </div>
-                              )}
-                            </div>
-                            <Tooltip content="Remove">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="w-6 h-6 p-0 text-red-500 hover:text-red-600"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  handleRemoveActor(actor.id);
-                                }}
-                              >
-                                <X className="w-3 h-3" />
-                              </Button>
-                            </Tooltip>
+
+                    {/* Actor entries shown only for NPC/Enemy layers */}
+                    {(isNpcLayer || isEnemyLayer) && (
+                      <div className="flex-1 min-h-0">
+                        {actorEntries.length === 0 ? (
+                          <div className="h-full border border-dashed border-border rounded-md flex items-center justify-center text-sm text-muted-foreground px-4 text-center">
+                            {isNpcLayer ? 'No NPCs added yet. Use the button above to place your first NPC.' : 'No enemies added yet. Use the button above to place an enemy.'}
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <>
+                        ) : (
+                          <div className="space-y-2 overflow-y-auto pr-1">
+                            {actorEntries.map((actor) => (
+                              <div
+                                key={actor.id}
+                                className="border border-border rounded-md px-3 py-2 bg-background/50 hover:bg-background transition-colors cursor-pointer"
+                                onClick={() => handleEditObject(actor.id)}
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                    <div className="space-y-1 text-sm">
+                                    <div className="font-medium text-foreground" title={actor.name || `${actor.type === 'npc' ? 'NPC' : 'Enemy'} #${actor.id}`}>
+                                      <span className={leftCollapsed ? 'sr-only' : ''}>{actor.name || `${actor.type === 'npc' ? 'NPC' : 'Enemy'} #${actor.id}`}</span>
+                                      {!actor.name && leftCollapsed && <span className="text-xs text-muted-foreground">#{actor.id}</span>}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                      <MapPin className="w-3 h-3" />
+                                      <span className={leftCollapsed ? 'sr-only' : ''}>({actor.x}, {actor.y})</span>
+                                    </div>
+                                    {actor.properties?.tilesetPath && (
+                                      <div className="text-xs text-muted-foreground break-all">
+                                        {actor.properties.tilesetPath}
+                                      </div>
+                                    )}
+                                  </div>
+                                  <Tooltip content="Remove">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="w-6 h-6 p-0 text-red-500 hover:text-red-600"
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        handleRemoveActor(actor.id);
+                                      }}
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </Button>
+                                  </Tooltip>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                );
+              }
+              return null;
+            })()}
+
+            {/* Tileset Brushes Window - render for all layers (including npc/enemy/event) */}
             <div id="tilesetMeta" className="text-sm text-muted-foreground mb-2"></div>
             
-            {/* Tileset Brushes Window - Takes maximum space */}
             <div className="flex-1 flex flex-col min-h-0">
               <div className="relative flex-1 min-h-0 overflow-auto h-full">
                 <div id="tilesContainer" className="tile-palette h-full"></div>
@@ -2474,19 +2538,20 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             
             {/* Brush Tools */}
             <div className="flex items-center mb-3 mt-2 sticky top-2 z-10 bg-transparent">
-              <div className="text-xs text-muted-foreground mr-2"></div>
+              <div className="text-xs text-muted-foreground"></div>
+              <div className="w-full flex justify-center">
               <div
                 ref={setBrushToolbarNode}
-                className={`flex items-center transition-all duration-300 ease-in-out gap-1`}
+                className={`flex items-center transition-all duration-300 ease-in-out gap-1 transform -translate-x-1`}
               >
                 <div className="flex-shrink-0">
                   <Tooltip content="Import a PNG tileset for the active layer" side="bottom">
                     <Button
-                      variant="outline"
+                      variant="default"
                       size="sm"
-                      className="relative text-xs px-1 py-1 h-6 shadow-sm"
+                      className="relative text-xs px-1 py-1 h-6 shadow-sm bg-orange-500 hover:bg-orange-600 text-white border-orange-500"
                     >
-                      <Upload className="w-3 h-3" />
+                      <Upload className="w-3 h-3 text-white" />
                       <input
                         type="file"
                         accept="image/png"
@@ -2571,19 +2636,9 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 </div>
               </div>
             </div>
-              </>
-            )}
+            </div>
           </section>
-
-          {/* Edge collapse toggle (right side, vertical center) */}
-          <button
-            aria-label={leftCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-            onClick={() => setLeftCollapsed(c => !c)}
-            className={`absolute right-[-12px] top-1/2 transform -translate-y-1/2 w-8 h-8 rounded-full bg-background border border-border flex items-center justify-center shadow-sm z-50`}
-            style={{ cursor: 'pointer' }}
-          >
-            {leftCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-          </button>
+          </div>
 
           {/* Layers Section */}
           <section
@@ -2592,7 +2647,6 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             onMouseLeave={() => setLayersPanelExpanded(false)}
             tabIndex={0}
           >
-            <h2 className="text-sm font-semibold mb-2">Layers</h2>
 
             {/* Layers List - reserve height to avoid layout shifts */}
             <div className="mb-2">
@@ -2623,7 +2677,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                           className="cursor-pointer"
                           onClick={() => handleSetActiveLayer(layer.id)}
                         >
-                          <div className={`flex items-center gap-2 ${isActive ? 'translate-y-0 -mb-1' : 'opacity-80'}`}>
+                          <div className={`flex items-center gap-2 ${isActive ? 'opacity-100' : 'opacity-80'}`}>
                             <Tooltip content={layer.visible ? 'Hide layer' : 'Show layer'}>
                               <Button
                                 variant="ghost"
@@ -2728,7 +2782,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               )}
             </div>
 
-            <div className={`flex gap-2 ${leftCollapsed ? 'justify-center' : 'justify-start'}`}>
+            <div className={`flex gap-2 justify-center`}>
               <div>
                 <Button
                   ref={mapsButtonRef}
@@ -2749,10 +2803,49 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                     style={{ left: mapsDropdownPos.left, top: mapsDropdownPos.top, position: 'absolute', transform: 'translateY(-100%)' }}
                     className="w-56 bg-background border border-border rounded shadow-lg z-[9999]"
                   >
-                    <div className="p-2 text-xs font-medium border-b border-border">Actions</div>
+                    {/* Actions header removed per UX request */}
                     <div className="max-h-60 overflow-y-auto">
                       {projectPath ? (
                         <>
+                          <div className="relative">
+                            <button
+                              className="w-full text-left p-2 hover:bg-gray-100 dark:hover:bg-neutral-800 text-xs flex items-center justify-between gap-2"
+                              onClick={() => setMapsSubOpen((s) => !s)}
+                            >
+                              <span className="flex items-center gap-2"><Folder className="w-3 h-3" /><span>Open map</span></span>
+                              <svg className={`w-3 h-3 transition-transform ${mapsSubOpen ? 'transform rotate-90' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+                            </button>
+
+                            {/* nested maps list: render into a separate portal to appear to the right */}
+                            {mapsSubOpen && mapsSubPos && createPortal(
+                              <div
+                                ref={mapsSubPortalRef}
+                                style={{ left: mapsSubPos.left, top: mapsSubPos.top, position: 'absolute' }}
+                                className="w-48 bg-background border border-border rounded shadow-md z-[10000] max-h-60 overflow-y-auto"
+                              >
+                                {projectMaps.length === 0 ? (
+                                  <div className="p-2 text-xs text-muted-foreground">No maps found</div>
+                                ) : (
+                                  projectMaps.map((f) => (
+                                    <button
+                                      key={f}
+                                      className="w-full text-left p-2 hover:bg-gray-100 dark:hover:bg-neutral-800 text-xs"
+                                      onClick={() => {
+                                        setMapsDropdownOpen(false);
+                                        setMapsSubOpen(false);
+                                        handleOpenMapFromMapsFolder(f);
+                                      }}
+                                    >
+                                      {f}
+                                    </button>
+                                  ))
+                                )}
+                              </div>, document.body
+                            )}
+                          </div>
+
+                          <div className="border-t border-border" />
+
                           <button
                             className="w-full text-left p-2 hover:bg-gray-100 dark:hover:bg-neutral-800 text-xs flex items-center gap-2"
                             onClick={async () => {
@@ -2763,26 +2856,6 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                             <Download className="w-3 h-3" />
                             <span>Export map</span>
                           </button>
-
-                          <div className="border-t border-border" />
-
-                          <div className="p-2 text-xs font-medium">Maps</div>
-                          {projectMaps.length === 0 ? (
-                            <div className="p-2 text-xs text-muted-foreground">No maps found</div>
-                          ) : (
-                            projectMaps.map((f) => (
-                              <button
-                                key={f}
-                                className="w-full text-left p-2 hover:bg-gray-100 dark:hover:bg-neutral-800 text-xs"
-                                onClick={() => {
-                                  setMapsDropdownOpen(false);
-                                  handleOpenMapFromMapsFolder(f);
-                                }}
-                              >
-                                {f}
-                              </button>
-                            ))
-                          )}
 
                           <div className="border-t border-border" />
 
@@ -3628,7 +3701,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             <canvas
               ref={canvasRef}
               id="mapCanvas"
-              className="tile-canvas w-full h-full max-w-full max-h-full"
+              className={`tile-canvas w-full h-full max-w-full max-h-full canvas-fade ${leftTransitioning ? 'during-sidebar-transition' : ''}`}
             />
 
             {/* Map initialization overlay - always mounted for smooth transitions */}

@@ -35,6 +35,8 @@ const Tooltip: React.FC<TooltipProps> = ({ content, side = 'top', className = ''
   const portalRef = React.useRef<HTMLDivElement | null>(null);
   const [hovered, setHovered] = React.useState(false);
   const [pos, setPos] = React.useState<{ left: number; top: number } | null>(null);
+  // keep the portal mounted briefly to allow CSS fade-out
+  const [visiblePortal, setVisiblePortal] = React.useState(false);
 
   // Helper to get the offset from props or dataset
   const getLocalOffset = React.useCallback(() => {
@@ -86,10 +88,13 @@ const Tooltip: React.FC<TooltipProps> = ({ content, side = 'top', className = ''
     // measure on next frame so layout is stable
     requestAnimationFrame(() => computeOffset());
     setHovered(true);
+    setVisiblePortal(true);
   };
 
   const onTriggerLeave = () => {
     setHovered(false);
+    // allow fade-out animation before removing portal
+    window.setTimeout(() => setVisiblePortal(false), 220);
   };
 
   // after portal tooltip renders, measure and clamp its position
@@ -128,22 +133,21 @@ const Tooltip: React.FC<TooltipProps> = ({ content, side = 'top', className = ''
       >
         {trigger}
       </span>
-      {typeof document !== 'undefined' && pos && hovered && createPortal(
+      {typeof document !== 'undefined' && pos && visiblePortal && createPortal(
         <div
           ref={portalRef}
           id={id}
           role="tooltip"
-          className={`pointer-events-none opacity-100 scale-100 transition duration-150 ease-out select-none absolute z-50`}
+          className={`custom-tooltip ${hovered ? 'visible' : 'fade-out'}`}
           style={{
             left: pos.left,
             top: pos.top,
-            transform: 'translateX(-50%)',
-            pointerEvents: 'none'
+            transform: 'translateX(-50%)'
           }}
         >
           <span
             ref={tooltipRef}
-            className="inline-block bg-black text-white text-xs px-3 py-1.5 rounded-md shadow-md max-w-[18rem] break-words"
+            className="inline-block text-xs px-3 py-1.5 rounded-md shadow-md max-w-[18rem] break-words"
             style={{
               display: '-webkit-box',
               WebkitLineClamp: 2,

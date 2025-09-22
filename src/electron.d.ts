@@ -47,6 +47,8 @@ declare global {
       saveMapProject: (projectPath: string, mapData: ProjectMapData) => Promise<boolean>;
       saveExportFiles: (projectPath: string, projectName: string, mapTxt: string, tilesetDef: string, options?: { spawn?: { enabled: boolean; content: string; filename?: string } }) => Promise<boolean>;
       discoverTilesetImages: (projectPath: string) => Promise<{ tilesetImages: { [key: string]: string }; tilesets: { name: string; fileName: string }[] }>;
+  listMaps: (projectPath: string) => Promise<string[]>;
+  readMapFile: (projectPath: string, filename: string) => Promise<string | null>;
       // Menu event listeners
       onMenuNewMap: (callback: () => void) => void;
       onMenuOpenMap: (callback: () => void) => void;

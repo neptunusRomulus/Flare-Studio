@@ -8,6 +8,12 @@ import {
 
 export class TileMapEditor {
 
+  // Stub: load a Flare-format TXT into the editor.
+  // Implementing a full parser is optional; this stub exists to provide a typed
+  // entry point so the renderer can call the loader without using `any`.
+  // Parameters: the raw text contents of the .txt map file.
+  public loadFlareMapTxt?(txt: string): void;
+
   public getTileCount(): number {
     return this.tileCount;
   }
@@ -68,6 +74,13 @@ export class TileMapEditor {
       this.layerActiveGid.set(activeLayer.type, gid);
       // Update global activeGid for UI consistency
       this.activeGid = gid;
+      if (this.activeGidCallback) {
+        try {
+          this.activeGidCallback(this.activeGid);
+        } catch (e) {
+          console.warn('activeGidCallback error', e);
+        }
+      }
     }
   }
 
@@ -637,6 +650,8 @@ export class TileMapEditor {
   private lastSaveTimestamp: number = 0;
   private autoSaveCallback: (() => void) | null = null;
   private saveStatusCallback: ((status: 'saving' | 'saved' | 'error' | 'unsaved') => void) | null = null;
+  // Callback to notify React app about active GID changes
+  private activeGidCallback: ((gid: number) => void) | null = null;
   private readonly AUTO_SAVE_DELAY = 8000; // 8 seconds for tile changes
   private readonly IMMEDIATE_SAVE_DELAY = 2000; // 2 seconds for critical changes
   private autoSaveEnabled: boolean = true;
@@ -652,6 +667,31 @@ export class TileMapEditor {
     this.saveState();
     
     this.draw();
+  }
+
+  // Internal helper to update activeGid and notify callback
+  private updateActiveGid(gid: number): void {
+    this.activeGid = gid;
+    if (this.activeGidCallback) {
+      try {
+        this.activeGidCallback(this.activeGid);
+      } catch (e) {
+        console.warn('activeGidCallback error', e);
+      }
+    }
+  }
+
+  // Allow external code (React) to observe active GID changes
+  public setActiveGidCallback(cb: ((gid: number) => void) | null): void {
+    this.activeGidCallback = cb;
+    // Immediately notify with current value if callback provided
+    if (cb) {
+      try {
+        cb(this.activeGid);
+      } catch (e) {
+        console.warn('setActiveGidCallback initial callback error', e);
+      }
+    }
   }
 
   private initializeCanvas(): void {
@@ -2442,7 +2482,12 @@ export class TileMapEditor {
       }
     }
     
-    let validTileIndex = 0;
+  let validTileIndex = 0;
+
+  // Helper to find the brush-tool state element. Prefer a stable id added by React
+  // (`brushToolState`) but fall back to the data attribute selector for backward
+  // compatibility.
+  const getBrushToolEl = () => document.getElementById('brushToolState') || document.querySelector('[data-brush-tool]');
     
     for (const tile of tilesToRender) {
       const canvas = document.createElement('canvas');
@@ -2568,13 +2613,14 @@ export class TileMapEditor {
       
       canvas.addEventListener('click', (e) => {
         e.preventDefault();
-        
-        // Get the current brush tool state from the DOM or global state
-        const brushToolElement = document.querySelector('[data-brush-tool]');
+
+        // Read the brush tool state using a stable id when possible. This avoids
+        // flakiness when React re-renders the hidden tracking element.
+        const brushToolElement = getBrushToolEl();
         const currentBrushTool = brushToolElement?.getAttribute('data-brush-tool') || 'none';
-        
+
         console.log(`Tile clicked! Index: ${tile.index}, Current brush tool: ${currentBrushTool}`);
-        
+
         if (currentBrushTool === 'merge') {
           // Handle merge tool selection
           console.log('Handling merge tool selection');
@@ -2584,7 +2630,7 @@ export class TileMapEditor {
           console.log('Handling separate tool');
           this.handleBrushSeparate(tile.index);
         } else if (currentBrushTool === 'remove') {
-          // Handle remove tool  
+          // Handle remove tool
           console.log('Handling remove tool');
           this.handleBrushRemove(tile.index);
         } else {
@@ -2599,9 +2645,9 @@ export class TileMapEditor {
       wrapper.draggable = false; // Will be set to true when move tool is active
       
       wrapper.addEventListener('dragstart', (e) => {
-        const brushToolElement = document.querySelector('[data-brush-tool]');
+        const brushToolElement = getBrushToolEl();
         const currentBrushTool = brushToolElement?.getAttribute('data-brush-tool') || 'none';
-        
+
         if (currentBrushTool === 'move') {
           wrapper.style.opacity = '0.5';
           e.dataTransfer!.effectAllowed = 'move';
@@ -2618,9 +2664,9 @@ export class TileMapEditor {
       });
       
       wrapper.addEventListener('dragover', (e) => {
-        const brushToolElement = document.querySelector('[data-brush-tool]');
+        const brushToolElement = getBrushToolEl();
         const currentBrushTool = brushToolElement?.getAttribute('data-brush-tool') || 'none';
-        
+
         if (currentBrushTool === 'move') {
           e.preventDefault();
           e.dataTransfer!.dropEffect = 'move';
@@ -2635,14 +2681,14 @@ export class TileMapEditor {
       wrapper.addEventListener('drop', (e) => {
         e.preventDefault();
         wrapper.style.borderTop = '';
-        
-        const brushToolElement = document.querySelector('[data-brush-tool]');
+
+        const brushToolElement = getBrushToolEl();
         const currentBrushTool = brushToolElement?.getAttribute('data-brush-tool') || 'none';
-        
+
         if (currentBrushTool === 'move') {
           const draggedTileIndex = parseInt(e.dataTransfer!.getData('text/plain'));
           const targetTileIndex = tile.index;
-          
+
           if (draggedTileIndex !== targetTileIndex) {
             this.dispatchBrushEvent('drop', { from: draggedTileIndex, to: targetTileIndex });
           }
@@ -2651,18 +2697,18 @@ export class TileMapEditor {
       
       // Update draggable property and classes when brush tool changes
       const updateBrushToolState = () => {
-        const brushToolElement = document.querySelector('[data-brush-tool]');
+        const brushToolElement = getBrushToolEl();
         const currentBrushTool = brushToolElement?.getAttribute('data-brush-tool') || 'none';
-        
+
         // Reset all tool-specific classes
         wrapper.classList.remove('separate-mode', 'merge-mode', 'merge-selected-first', 'merge-selected-second');
         wrapper.draggable = false;
         wrapper.style.cursor = '';
         wrapper.title = '';
-        
+
         // Add tile index for tracking
         wrapper.setAttribute('data-tile-index', tile.index.toString());
-        
+
         if (currentBrushTool === 'move') {
           wrapper.draggable = true;
           wrapper.style.cursor = 'move';
@@ -2686,7 +2732,7 @@ export class TileMapEditor {
         updateBrushToolState();
       });
       
-      const brushToolElement = document.querySelector('[data-brush-tool]');
+      const brushToolElement = getBrushToolEl();
       if (brushToolElement) {
         observer.observe(brushToolElement, { attributes: true, attributeFilter: ['data-brush-tool'] });
       }
@@ -4271,9 +4317,9 @@ export class TileMapEditor {
         }
       }
       
-      // Restore the active GID for this layer
-      const layerActiveGid = this.layerActiveGid.get(layerType) || 0;
-      this.activeGid = layerActiveGid;
+  // Restore the active GID for this layer
+  const layerActiveGid = this.layerActiveGid.get(layerType) || 0;
+  this.updateActiveGid(layerActiveGid);
       
       this.createTilePalette();
     } else {
@@ -4284,7 +4330,7 @@ export class TileMapEditor {
       this.tilesetRows = 0;
       this.tileCount = 0;
       this.detectedTileData.clear();
-      this.activeGid = 0;
+  this.updateActiveGid(0);
       this.clearTilePalette();
     }
   }

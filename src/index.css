@@ -401,6 +401,21 @@
     color: hsl(222.2 84% 4.9%) !important;
 }
 
+/* Ensure all inline SVG icons inherit the current text color and use currentColor for stroke/fill
+   This prevents icons from becoming invisible if a parent sets unexpected colors. */
+svg {
+    color: inherit !important;
+    stroke: currentColor !important;
+    /* Use outline style for lucide icons (no fill) so they render as strokes */
+    fill: none !important;
+}
+
+/* Ensure inner svg elements inherit stroke and do not fill */
+svg path, svg circle, svg rect, svg line, svg polyline, svg polygon {
+    stroke: currentColor !important;
+    fill: none !important;
+}
+
 /* General button click effect for better feedback */
 button:active:not(.no-click-effect) {
     transform: scale(0.98);

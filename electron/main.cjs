@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, dialog } = require('electron');
+const { app, BrowserWindow, Menu, dialog, ipcMain: ipcMainLocal } = require('electron');
 const path = require('path');
 const isDev = !app.isPackaged;
 
@@ -40,14 +40,13 @@ function createWindow() {
   createMenu();
 }
 
-const { ipcMain } = require('electron');
-ipcMain.on('window-minimize', () => {
+ipcMainLocal.on('window-minimize', () => {
   if (mainWindow) {
     mainWindow.minimize();
   }
 });
 
-ipcMain.on('window-maximize', () => {
+ipcMainLocal.on('window-maximize', () => {
   if (mainWindow) {
     if (mainWindow.isMaximized()) {
       mainWindow.unmaximize();
@@ -57,7 +56,7 @@ ipcMain.on('window-maximize', () => {
   }
 });
 
-ipcMain.on('window-close', () => {
+ipcMainLocal.on('window-close', () => {
   if (mainWindow) {
     mainWindow.close();
   }
@@ -66,7 +65,36 @@ ipcMain.on('window-close', () => {
 // Handle file system operations
 const fs = require('fs');
 
-ipcMain.handle('select-directory', async () => {
+// List map files in project/maps directory
+ipcMainLocal.handle('list-maps', async (event, projectPath) => {
+  try {
+    if (!projectPath) return [];
+    const mapsDir = path.join(projectPath, 'maps');
+    if (!fs.existsSync(mapsDir)) return [];
+    const files = fs.readdirSync(mapsDir).filter(f => f.toLowerCase().endsWith('.txt'));
+    return files;
+  } catch (e) {
+    console.error('list-maps failed:', e);
+    return [];
+  }
+});
+
+// Read a map file from project/maps
+ipcMainLocal.handle('read-map-file', async (event, projectPath, filename) => {
+  try {
+    if (!projectPath || !filename) return null;
+    const mapsDir = path.join(projectPath, 'maps');
+    const full = path.join(mapsDir, filename);
+    if (!fs.existsSync(full)) return null;
+    const content = fs.readFileSync(full, 'utf8');
+    return content;
+  } catch (e) {
+    console.error('read-map-file failed:', e);
+    return null;
+  }
+});
+
+ipcMainLocal.handle('select-directory', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     properties: ['openDirectory']
   });
@@ -77,7 +105,7 @@ ipcMain.handle('select-directory', async () => {
   return null;
 });
 
-ipcMain.handle('select-tileset-file', async () => {
+ipcMainLocal.handle('select-tileset-file', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     properties: ['openFile'],
     filters: [
@@ -93,7 +121,7 @@ ipcMain.handle('select-tileset-file', async () => {
   return null;
 });
 
-ipcMain.handle('create-map-project', async (event, config) => {
+ipcMainLocal.handle('create-map-project', async (event, config) => {
   try {
     const projectPath = path.join(config.location, config.name);
 
@@ -158,7 +186,7 @@ ipcMain.handle('create-map-project', async (event, config) => {
   }
 });
 
-ipcMain.handle('open-map-project', async (event, projectPath) => {
+ipcMainLocal.handle('open-map-project', async (event, projectPath) => {
   try {
     console.log('=== ELECTRON LOAD DEBUG ===');
     console.log('Loading project from:', projectPath);
@@ -268,7 +296,7 @@ ipcMain.handle('open-map-project', async (event, projectPath) => {
 });
 
 // Save map project data
-ipcMain.handle('save-map-project', async (event, projectPath, mapData) => {
+ipcMainLocal.handle('save-map-project', async (event, projectPath, mapData) => {
   try {
     console.log('=== ELECTRON SAVE DEBUG ===');
     console.log('Project path:', projectPath);
@@ -361,7 +389,7 @@ ipcMain.handle('save-map-project', async (event, projectPath, mapData) => {
 });
 
 // Save export files (map.txt and tileset.txt) to project folder
-ipcMain.handle('save-export-files', async (event, projectPath, projectName, mapTxt, tilesetDef, options = {}) => {
+ipcMainLocal.handle('save-export-files', async (event, projectPath, projectName, mapTxt, tilesetDef, options = {}) => {
   try {
     const fs = require('fs');
     const path = require('path');
@@ -441,7 +469,7 @@ ipcMain.handle('save-export-files', async (event, projectPath, projectName, mapT
 });
 
 // Discover tileset images in a project folder and return as data URLs
-ipcMain.handle('discover-tileset-images', async (event, projectPath) => {
+ipcMainLocal.handle('discover-tileset-images', async (event, projectPath) => {
   try {
     if (!projectPath) return { tilesetImages: {}, tilesets: [] };
     const tilesetImages = {};
@@ -482,7 +510,7 @@ ipcMain.handle('discover-tileset-images', async (event, projectPath) => {
 });
 
 // Return project minimap thumbnail (data URL) if available
-ipcMain.handle('get-project-thumbnail', async (event, projectPath) => {
+ipcMainLocal.handle('get-project-thumbnail', async (event, projectPath) => {
   try {
     if (!projectPath) return null;
     const minimapPath = path.join(projectPath, 'assets', 'minimap.png');
@@ -497,7 +525,7 @@ ipcMain.handle('get-project-thumbnail', async (event, projectPath) => {
 });
 
 // Check if a project path still exists on disk
-ipcMain.handle('check-project-exists', async (event, projectPath) => {
+ipcMainLocal.handle('check-project-exists', async (event, projectPath) => {
   try {
     if (!projectPath) return false;
     return fs.existsSync(projectPath) && fs.statSync(projectPath).isDirectory();

@@ -1,10 +1,11 @@
 ﻿import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import Tooltip from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Upload, Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Blend, MapPin, Save, Scan, Link2, Scissors, Trash2, Check, HelpCircle, Folder, Shield, Plus } from 'lucide-react';
+import { Upload, Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Blend, MapPin, Save, Scan, Link2, Scissors, Trash2, Check, HelpCircle, Folder, Shield, Plus, Image, Grid, Box, Users, Locate, Clock, Menu, ChevronLeft, ChevronRight } from 'lucide-react';
 import { TileMapEditor } from './editor/TileMapEditor';
 import { TileLayer, MapObject } from './types';
 import { useToast } from '@/hooks/use-toast';
@@ -67,170 +68,76 @@ const ENEMY_PROPERTY_SPECS: Record<string, PropertySpec> = {
   lifeform: { type: 'bool' },
   flying: { type: 'bool' },
   intangible: { type: 'bool' },
-  facing: { type: 'bool' },
-  suppress_hp: { type: 'bool' }
-};
+  };
 
-const NPC_PROPERTY_SPECS: Record<string, PropertySpec> = {
-  'dialog.id': { type: 'string' },
-  'dialog.topic': { type: 'string' },
-  'dialog.group': { type: 'string' },
-  'dialog.voice': { type: 'list' },
-  'dialog.him': { type: 'list' },
-  'dialog.her': { type: 'list' },
-  'dialog.you': { type: 'list' },
-  'dialog.portrait_him': { type: 'list' },
-  'dialog.portrait_her': { type: 'list' },
-  'dialog.portrait_you': { type: 'list' },
-  'dialog.response': { type: 'list' },
-  'dialog.allow_movement': { type: 'bool' },
-  'dialog.take_a_party': { type: 'bool' },
-  'dialog.response_only': { type: 'bool' },
-  'npc.name': { type: 'string' },
-  'npc.portrait': { type: 'filename' },
-  'npc.filename': { type: 'filename' },
-  'npc.direction': { type: 'direction' },
-  'npc.waypoints': { type: 'list' },
-  'npc.wander_radius': { type: 'int', min: 0 },
-  'npc.show_on_minimap': { type: 'bool' },
-  'npc.talker': { type: 'bool' },
-  'npc.vendor': { type: 'bool' },
-  'npc.requires_status': { type: 'list' },
-  'npc.requires_not_status': { type: 'list' },
-  'npc.requires_item': { type: 'list' },
-  'npc.requires_not_item': { type: 'list' },
-  'npc.requires_level': { type: 'int', min: 0 },
-  'npc.requires_not_level': { type: 'int', min: 0 },
-  'npc.requires_currency': { type: 'int', min: 0 },
-  'npc.requires_not_currency': { type: 'int', min: 0 },
-  'npc.requires_class': { type: 'string' },
-  'npc.requires_not_class': { type: 'string' },
-  'npc.vendor_requires_status': { type: 'list' },
-  'npc.vendor_requires_not_status': { type: 'list' },
-  'npc.constant_stock': { type: 'list' },
-  'npc.status_stock': { type: 'list' },
-  'npc.random_stock': { type: 'list' },
-  'npc.random_stock_count': { type: 'intPair', min: 0 },
-  'npc.vendor_ratio_buy': { type: 'float', min: 0 },
-  'npc.vendor_ratio_sell': { type: 'float', min: 0 },
-  'npc.vendor_ratio_sell_old': { type: 'float', min: 0 },
-  'npc.vox_intro': { type: 'list' }
-};
+// Helper sets used by validation
+const CARDINAL_DIRECTIONS = new Set(['N','NE','E','SE','S','SW','W','NW']);
+const BOOLEAN_STRINGS = new Set(['true','false','1','0']);
 
-const BOOLEAN_STRINGS = new Set(['true', 'false']);
-const CARDINAL_DIRECTIONS = new Set(['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']);
-
-function validateValue(key: string, value: string, spec: PropertySpec): string | null {
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return null;
-  }
-
+function validateValue(key: string, trimmed: string, spec: PropertySpec): string | null {
   switch (spec.type) {
     case 'int': {
-      if (!/^-?\d+$/.test(trimmed)) {
-        return `${key} must be an integer.`;
-      }
       const parsed = Number.parseInt(trimmed, 10);
-      if (spec.min !== undefined && parsed < spec.min) {
-        return `${key} must be greater than or equal to ${spec.min}.`;
-      }
-      if (spec.max !== undefined && parsed > spec.max) {
-        return `${key} must be less than or equal to ${spec.max}.`;
-      }
+      if (Number.isNaN(parsed)) return `${key} must be an integer.`;
+      if (spec.min !== undefined && parsed < spec.min) return `${key} must be greater than or equal to ${spec.min}.`;
+      if (spec.max !== undefined && parsed > spec.max) return `${key} must be less than or equal to ${spec.max}.`;
       return null;
     }
     case 'float': {
       const parsed = Number.parseFloat(trimmed);
-      if (Number.isNaN(parsed)) {
-        return `${key} must be a number.`;
-      }
-      if (spec.min !== undefined && parsed < spec.min) {
-        return `${key} must be greater than or equal to ${spec.min}.`;
-      }
-      if (spec.max !== undefined && parsed > spec.max) {
-        return `${key} must be less than or equal to ${spec.max}.`;
-      }
+      if (Number.isNaN(parsed)) return `${key} must be a number.`;
+      if (spec.min !== undefined && parsed < spec.min) return `${key} must be greater than or equal to ${spec.min}.`;
+      if (spec.max !== undefined && parsed > spec.max) return `${key} must be less than or equal to ${spec.max}.`;
       return null;
     }
     case 'bool': {
-      if (!BOOLEAN_STRINGS.has(trimmed.toLowerCase())) {
-        return `${key} must be true or false.`;
-      }
+      if (!BOOLEAN_STRINGS.has(trimmed.toLowerCase())) return `${key} must be true or false.`;
       return null;
     }
     case 'filename': {
-      if (!trimmed) {
-        return `${key} cannot be empty.`;
-      }
+      if (!trimmed) return `${key} cannot be empty.`;
       return null;
     }
     case 'duration': {
-      if (!/^\d+(ms|s)?$/i.test(trimmed)) {
-        return `${key} must be a duration such as 200ms or 2s.`;
-      }
+      if (!/^\d+(ms|s)?$/i.test(trimmed)) return `${key} must be a duration such as 200ms or 2s.`;
       return null;
     }
     case 'intPair': {
-      const parts = trimmed.split(',').map(part => part.trim()).filter(Boolean);
-      if (parts.length === 0 || parts.length > 2) {
-        return `${key} must contain one or two comma-separated integers.`;
-      }
+      const parts = trimmed.split(',').map(p => p.trim()).filter(Boolean);
+      if (parts.length === 0 || parts.length > 2) return `${key} must contain one or two comma-separated integers.`;
       for (const part of parts) {
-        if (!/^-?\d+$/.test(part)) {
-          return `${key} must contain valid integers.`;
-        }
+        if (!/^-?\d+$/.test(part)) return `${key} must contain valid integers.`;
         const parsed = Number.parseInt(part, 10);
-        if (spec.min !== undefined && parsed < spec.min) {
-          return `${key} values must be greater than or equal to ${spec.min}.`;
-        }
-        if (spec.max !== undefined && parsed > spec.max) {
-          return `${key} values must be less than or equal to ${spec.max}.`;
-        }
+        if (spec.min !== undefined && parsed < spec.min) return `${key} values must be greater than or equal to ${spec.min}.`;
+        if (spec.max !== undefined && parsed > spec.max) return `${key} values must be less than or equal to ${spec.max}.`;
       }
       return null;
     }
     case 'floatPair': {
-      const parts = trimmed.split(',').map(part => part.trim()).filter(Boolean);
-      if (parts.length === 0 || parts.length > 2) {
-        return `${key} must contain one or two comma-separated numbers.`;
-      }
+      const parts = trimmed.split(',').map(p => p.trim()).filter(Boolean);
+      if (parts.length === 0 || parts.length > 2) return `${key} must contain one or two comma-separated numbers.`;
       for (const part of parts) {
         const parsed = Number.parseFloat(part);
-        if (Number.isNaN(parsed)) {
-          return `${key} must contain valid numbers.`;
-        }
-        if (spec.min !== undefined && parsed < spec.min) {
-          return `${key} values must be greater than or equal to ${spec.min}.`;
-        }
-        if (spec.max !== undefined && parsed > spec.max) {
-          return `${key} values must be less than or equal to ${spec.max}.`;
-        }
+        if (Number.isNaN(parsed)) return `${key} must contain valid numbers.`;
+        if (spec.min !== undefined && parsed < spec.min) return `${key} values must be greater than or equal to ${spec.min}.`;
+        if (spec.max !== undefined && parsed > spec.max) return `${key} values must be less than or equal to ${spec.max}.`;
       }
       return null;
     }
     case 'direction': {
       const upper = trimmed.toUpperCase();
-      if (CARDINAL_DIRECTIONS.has(upper)) {
-        return null;
-      }
+      if (CARDINAL_DIRECTIONS.has(upper)) return null;
       const parsed = Number.parseInt(trimmed, 10);
-      if (!Number.isNaN(parsed) && parsed >= 0 && parsed <= 7) {
-        return null;
-      }
+      if (!Number.isNaN(parsed) && parsed >= 0 && parsed <= 7) return null;
       return `${key} must be a direction (N, NE, ... , NW) or a number between 0 and 7.`;
     }
     case 'point': {
-      const parts = trimmed.split(',').map(part => part.trim());
-      if (parts.length !== 2 || !parts.every(part => /^-?\d+$/.test(part))) {
-        return `${key} must be two comma-separated integers.`;
-      }
+      const parts = trimmed.split(',').map(p => p.trim());
+      if (parts.length !== 2 || !parts.every(part => /^-?\d+$/.test(part))) return `${key} must be two comma-separated integers.`;
       return null;
     }
     case 'predefined': {
-      if (spec.options && !spec.options.includes(trimmed)) {
-        return `${key} must be one of: ${spec.options.join(', ')}.`;
-      }
+      if (spec.options && !spec.options.includes(trimmed)) return `${key} must be one of: ${spec.options.join(', ')}.`;
       return null;
     }
     case 'list':
@@ -239,6 +146,8 @@ function validateValue(key: string, value: string, spec: PropertySpec): string |
       return null;
   }
 }
+
+const NPC_PROPERTY_SPECS: Record<string, PropertySpec> = {};
 
 function validateAndSanitizeObject(object: MapObject): { errors: string[]; sanitized: Record<string, string> } {
   const specs = object.type === 'enemy' ? ENEMY_PROPERTY_SPECS
@@ -288,12 +197,18 @@ function App() {
   const [createMapError, setCreateMapError] = useState<string | null>(null);
   const [reservedMapNames, setReservedMapNames] = useState<string[]>([]);
   const [newMapStarting, setNewMapStarting] = useState(false);
-  const [activeGid] = useState('(none)'); // Removed unused setter
+  const [activeGid, setActiveGid] = useState<string>('(none)');
   const [showMinimap, setShowMinimap] = useState(true);
+  // Show/hide Active GID indicator (user preference)
+  const [showActiveGid, setShowActiveGid] = useState<boolean>(true);
+  // Left sidebar collapsed (icon-strip) state
+  const [leftCollapsed, setLeftCollapsed] = useState<boolean>(true);
   const [layers, setLayers] = useState<TileLayer[]>([]);
   const [activeLayerId, setActiveLayerId] = useState<number | null>(null);
   const [showAddLayerDropdown, setShowAddLayerDropdown] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  // Layers panel expand/collapse state
+  const [layersPanelExpanded, setLayersPanelExpanded] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [activeHelpTab, setActiveHelpTab] = useState('engine');
   const [showTooltip, setShowTooltip] = useState(true);
@@ -306,6 +221,8 @@ function App() {
   const [brushToolbarExpanded, setBrushToolbarExpanded] = useState(true);
   const brushToolbarCollapseTimer = useRef<number | null>(null);
   const brushToolbarContainerRef = useRef<HTMLDivElement | null>(null);
+  // Left sidebar buttons expand/collapse (independent)
+  // Left bottom action buttons are always expanded now; no local state required.
   const [pendingMapConfig, setPendingMapConfig] = useState<MapConfig | null>(null);
   const clearToolbarCollapseTimer = useCallback(() => {
     if (toolbarCollapseTimer.current !== null) {
@@ -350,6 +267,8 @@ function App() {
       scheduleToolbarCollapse();
     }
   }, [scheduleToolbarCollapse]);
+
+  // Left bottom action buttons are always expanded now; collapse behavior removed.
 
   const clearBottomToolbarCollapseTimer = useCallback(() => {
     if (bottomToolbarCollapseTimer.current !== null) {
@@ -403,42 +322,14 @@ function App() {
   }, []);
 
   const scheduleBrushToolbarCollapse = useCallback(() => {
+    // Intentionally disabled: keep brush toolbar expanded permanently.
     clearBrushToolbarCollapseTimer();
-    brushToolbarCollapseTimer.current = window.setTimeout(() => {
-      setBrushToolbarExpanded(false);
-    }, 500);
   }, [clearBrushToolbarCollapseTimer]);
 
   const showBrushToolbarTemporarily = useCallback(() => {
     setBrushToolbarExpanded(true);
     scheduleBrushToolbarCollapse();
   }, [scheduleBrushToolbarCollapse]);
-
-  const handleBrushToolbarMouseEnter = useCallback(() => {
-    clearBrushToolbarCollapseTimer();
-    setBrushToolbarExpanded(true);
-  }, [clearBrushToolbarCollapseTimer]);
-
-  const handleBrushToolbarMouseLeave = useCallback(() => {
-    const activeElement = typeof document !== 'undefined' ? document.activeElement : null;
-    if (activeElement && brushToolbarContainerRef.current?.contains(activeElement)) {
-      return;
-    }
-    scheduleBrushToolbarCollapse();
-  }, [scheduleBrushToolbarCollapse]);
-
-  const handleBrushToolbarFocus = useCallback(() => {
-    clearBrushToolbarCollapseTimer();
-    setBrushToolbarExpanded(true);
-  }, [clearBrushToolbarCollapseTimer]);
-
-  const handleBrushToolbarBlur = useCallback((event: React.FocusEvent<HTMLDivElement>) => {
-    const nextTarget = event.relatedTarget as Node | null;
-    if (!event.currentTarget.contains(nextTarget)) {
-      scheduleBrushToolbarCollapse();
-    }
-  }, [scheduleBrushToolbarCollapse]);
-
   const setBrushToolbarNode = useCallback((node: HTMLDivElement | null) => {
     brushToolbarContainerRef.current = node;
   }, []);
@@ -568,6 +459,57 @@ function App() {
 
   const { toast } = useToast();
 
+  // Maps dropdown state (lists files from project/maps)
+  const [projectMaps, setProjectMaps] = useState<string[]>([]);
+  const [mapsDropdownOpen, setMapsDropdownOpen] = useState<boolean>(false);
+  const mapsButtonRef = useRef<HTMLButtonElement | null>(null);
+  const [mapsDropdownPos, setMapsDropdownPos] = useState<{ left: number; top: number } | null>(null);
+  const mapsPortalRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!mapsDropdownOpen) return;
+    const computePos = () => {
+      const btn = mapsButtonRef.current as HTMLButtonElement | null;
+      if (!btn) return setMapsDropdownPos(null);
+      const rect = btn.getBoundingClientRect();
+      // position the menu to open upwards: set top to the button's top and use translateY(-100%) in CSS
+      setMapsDropdownPos({ left: rect.left, top: rect.top - 8 });
+    };
+    computePos();
+    window.addEventListener('resize', computePos);
+    window.addEventListener('scroll', computePos, true);
+    return () => {
+      window.removeEventListener('resize', computePos);
+      window.removeEventListener('scroll', computePos, true);
+    };
+  }, [mapsDropdownOpen]);
+
+  // Close maps dropdown on Escape or clicking outside
+  useEffect(() => {
+    if (!mapsDropdownOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMapsDropdownOpen(false);
+    };
+    const onMouse = (e: MouseEvent) => {
+      const portal = mapsPortalRef.current;
+      const btn = mapsButtonRef.current;
+      const target = e.target as Node | null;
+      if (!portal) return;
+      if (portal.contains(target)) return;
+      if (btn && btn.contains(target)) return; // clicking the button toggles; allow it
+      setMapsDropdownOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('mousedown', onMouse);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('mousedown', onMouse);
+    };
+  }, [mapsDropdownOpen]);
+  // (selectedMapTxt removed — we call editor.loadFlareMapTxt when available)
+
+  // refreshProjectMaps and handleOpenMapFromMapsFolder are declared later (after helpers they depend on)
+
   const syncMapObjects = useCallback(() => {
     if (editor) {
       setMapObjects(editor.getMapObjects());
@@ -602,6 +544,19 @@ function App() {
     // Save to localStorage
     localStorage.setItem('isDarkMode', JSON.stringify(isDarkMode));
   }, [isDarkMode, editor]);
+
+  // Wire editor activeGid updates into React state
+  useEffect(() => {
+    if (!editor) return;
+    const cb = (gid: number) => {
+      setActiveGid(gid > 0 ? gid.toString() : '(none)');
+    };
+    editor.setActiveGidCallback(cb);
+    return () => {
+      // remove callback when editor changes/unmounts
+      editor.setActiveGidCallback(null);
+    };
+  }, [editor]);
 
   // Helper function to set up auto-save for an editor instance
 const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
@@ -1999,6 +1954,57 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     }
   }, [editor, projectPath]);
 
+  // Maps helpers (moved after performExport/handleManualSave to avoid forward ref issues)
+  const refreshProjectMaps = useCallback(async () => {
+    if (!projectPath || !window.electronAPI?.listMaps) {
+      setProjectMaps([]);
+      return;
+    }
+    try {
+      const maps = await window.electronAPI.listMaps(projectPath);
+      setProjectMaps(maps || []);
+    } catch (e) {
+      console.warn('Failed to list maps:', e);
+      setProjectMaps([]);
+    }
+  }, [projectPath]);
+
+  const handleOpenMapFromMapsFolder = useCallback(async (filename: string) => {
+    if (!projectPath) return;
+
+    try {
+      const exported = await performExport({ silent: true });
+      if (!exported) {
+        toast({ title: 'Export failed', description: 'Failed to export current map before opening a new one.', variant: 'destructive' });
+        return;
+      }
+
+      await handleManualSave();
+
+      const content = await window.electronAPI.readMapFile(projectPath, filename);
+      if (!content) {
+        toast({ title: 'Open failed', description: `Failed to read map file ${filename}`, variant: 'destructive' });
+        return;
+      }
+
+      // If editor has a loader for Flare TXT, use it. Otherwise notify user.
+      if (editor && typeof editor.loadFlareMapTxt === 'function') {
+        editor.loadFlareMapTxt!(content);
+        updateLayersList();
+        syncMapObjects();
+        setMapInitialized(true);
+        setMapName(filename.replace(/\.txt$/i, ''));
+        toast({ title: 'Map opened', description: `Opened ${filename}` });
+      } else {
+        // Editor does not implement a loader yet — notify user
+        toast({ title: 'Map loaded (raw)', description: 'Map content loaded but no parser available in the editor. Implement loadFlareMapTxt to parse it.' });
+      }
+    } catch (e) {
+      console.error('Open map error:', e);
+      toast({ title: 'Open failed', description: 'An unexpected error occurred while opening the map.', variant: 'destructive' });
+    }
+  }, [projectPath, performExport, handleManualSave, editor, updateLayersList, syncMapObjects, toast]);
+
   const handleToggleMinimap = () => {
     if (editor?.toggleMinimap) {
       editor.toggleMinimap();
@@ -2372,13 +2378,25 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       {/* Main Content */}
       <main className="flex flex-1 min-h-0">
         {/* Left Sidebar */}
-        <aside className="w-80 border-r border-border bg-muted/30 p-4 overflow-y-auto flex flex-col">
+        <aside
+          className={
+            `relative border-r border-border bg-muted/30 p-2 overflow-visible flex flex-col transition-all duration-200 ease-in-out ` +
+            (leftCollapsed ? 'w-16' : 'w-80')
+          }
+        >
+          {/* Hover handle / visual affordance when collapsed (removed) */}
+          {/* collapse toggle is provided on the outer edge (see edge button) */}
           {/* Tileset Brushes Section */}
           <section className="flex flex-col flex-1">
             {isNpcLayer || isEnemyLayer ? (
               <div className="flex flex-col flex-1">
                 <div className="flex items-center justify-between mb-3">
-                  <h2 className="text-lg font-semibold">{isNpcLayer ? 'NPCs' : 'Enemies'}</h2>
+                  <div className="flex items-center gap-2">
+                    <Users className="w-5 h-5 text-gray-700" />
+                    <h2 className="text-lg font-semibold">
+                      <span className={leftCollapsed ? 'sr-only' : ''}>{isNpcLayer ? 'NPCs' : 'Enemies'}</span>
+                    </h2>
+                  </div>
                   <Button
                     variant="outline"
                     size="sm"
@@ -2386,7 +2404,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                     onClick={() => handleOpenActorDialog(isNpcLayer ? 'npc' : 'enemy')}
                   >
                     <Plus className="w-3 h-3 mr-1" />
-                    {isNpcLayer ? 'Add NPC' : 'Add Enemy'}
+                    <span className={leftCollapsed ? 'sr-only' : ''}>{isNpcLayer ? 'Add NPC' : 'Add Enemy'}</span>
                   </Button>
                 </div>
                 <div className="flex-1 min-h-0">
@@ -2403,13 +2421,14 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                           onClick={() => handleEditObject(actor.id)}
                         >
                           <div className="flex items-start justify-between gap-2">
-                            <div className="space-y-1 text-sm">
-                              <div className="font-medium text-foreground">
-                                {actor.name || `${actor.type === 'npc' ? 'NPC' : 'Enemy'} #${actor.id}`}
+                              <div className="space-y-1 text-sm">
+                              <div className="font-medium text-foreground" title={actor.name || `${actor.type === 'npc' ? 'NPC' : 'Enemy'} #${actor.id}`}>
+                                <span className={leftCollapsed ? 'sr-only' : ''}>{actor.name || `${actor.type === 'npc' ? 'NPC' : 'Enemy'} #${actor.id}`}</span>
+                                {!actor.name && leftCollapsed && <span className="text-xs text-muted-foreground">#{actor.id}</span>}
                               </div>
                               <div className="text-xs text-muted-foreground flex items-center gap-1">
                                 <MapPin className="w-3 h-3" />
-                                ({actor.x}, {actor.y})
+                                <span className={leftCollapsed ? 'sr-only' : ''}>({actor.x}, {actor.y})</span>
                               </div>
                               {actor.properties?.tilesetPath && (
                                 <div className="text-xs text-muted-foreground break-all">
@@ -2445,32 +2464,20 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             <div className="flex-1 flex flex-col min-h-0">
               <div className="relative flex-1 min-h-0 overflow-auto h-full">
                 <div id="tilesContainer" className="tile-palette h-full"></div>
-                
+
                 {/* Hidden element to track brush tool state */}
                 <div data-brush-tool={brushTool} className="hidden"></div>
-                
-                {/* Active GID Badge - Fixed position at bottom-left */}
-                <div className="absolute bottom-2 left-2 z-10">
-                  <Tooltip content="Active GID number of selected tilebrush">
-                    <Badge variant="secondary" className="text-xs px-2 py-1 bg-black/80 text-white border-gray-600 hover:bg-black/90">
-                      <span id="activeGid">{activeGid}</span>
-                    </Badge>
-                  </Tooltip>
-                </div>
               </div>
+
+              {/* Active GID moved to canvas area (see Hover Coordinates Display) */}
             </div>
             
             {/* Brush Tools */}
-            <div className="flex items-center justify-between mb-3 mt-2">
-              <div className="text-xs text-muted-foreground"></div>
+            <div className="flex items-center mb-3 mt-2 sticky top-2 z-10 bg-transparent">
+              <div className="text-xs text-muted-foreground mr-2"></div>
               <div
                 ref={setBrushToolbarNode}
-                className={`flex items-center transition-all duration-300 ease-in-out ${brushToolbarExpanded ? 'gap-1' : 'gap-0.5'}`}
-                onMouseEnter={handleBrushToolbarMouseEnter}
-                onMouseLeave={handleBrushToolbarMouseLeave}
-                onFocus={handleBrushToolbarFocus}
-                onBlur={handleBrushToolbarBlur}
-                tabIndex={brushToolbarExpanded ? -1 : 0}
+                className={`flex items-center transition-all duration-300 ease-in-out gap-1`}
               >
                 <div className="flex-shrink-0">
                   <Tooltip content="Import a PNG tileset for the active layer" side="bottom">
@@ -2490,7 +2497,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                   </Tooltip>
                 </div>
                 <div
-                  className={`flex-shrink-0 overflow-hidden transition-all duration-300 ease-out ${brushToolbarExpanded || brushTool === 'move' ? 'opacity-100 scale-100 max-w-[2.5rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
+                  className={`flex-shrink-0 overflow-visible transition-all duration-300 ease-out opacity-100 scale-100 max-w-[2.5rem] w-auto`}
                 >
                   <Tooltip content="Move/Reorder brushes">
                     <Button
@@ -2568,93 +2575,150 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             )}
           </section>
 
+          {/* Edge collapse toggle (right side, vertical center) */}
+          <button
+            aria-label={leftCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            onClick={() => setLeftCollapsed(c => !c)}
+            className={`absolute right-[-12px] top-1/2 transform -translate-y-1/2 w-8 h-8 rounded-full bg-background border border-border flex items-center justify-center shadow-sm z-50`}
+            style={{ cursor: 'pointer' }}
+          >
+            {leftCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+          </button>
+
           {/* Layers Section */}
-          <section className="mb-4 flex-shrink-0">
-            <h2 className="text-sm font-semibold mb-2"></h2>
-            
-            {/* Layers List */}
-            <div className="mb-2 space-y-0.5 max-h-48 overflow-y-auto">
-              {layers.map((layer) => (
-                <div
-                  key={layer.id}
-                  className={`px-2 py-1 border rounded transition-colors text-xs ${
-                    activeLayerId === layer.id 
-                      ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 dark:border-orange-400' 
-                      : 'border-border hover:bg-gray-50 dark:hover:bg-gray-800'
-                  }`}
-                >
-                  <div 
-                    className="cursor-pointer"
-                    onClick={() => handleSetActiveLayer(layer.id)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1">
-                        <Tooltip content={layer.visible ? "Hide layer" : "Show layer"}>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleToggleLayerVisibility(layer.id);
-                            }}
-                            className="w-4 h-4 p-0 hover:bg-gray-200 dark:hover:bg-gray-700"
-                          >
-                            {layer.visible ? <Eye className="w-2.5 h-2.5" /> : <EyeOff className="w-2.5 h-2.5 text-gray-400 dark:text-gray-500" />}
-                          </Button>
-                        </Tooltip>
-                        
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="w-4 h-4 p-0 hover:bg-gray-200 dark:hover:bg-gray-700"
-                          onMouseEnter={(e) => {
-                            const transparencyPercent = Math.round((layer.transparency || 0) * 100);
-                            showTooltipWithDelay(
-                              <div className="flex items-center gap-1">
-                                <Mouse className="w-3 h-3" />
-                                Transparency ({transparencyPercent}%)
-                              </div>,
-                              e.currentTarget
-                            );
-                          }}
-                          onMouseLeave={hideTooltip}
-                          onWheel={(e) => {
-                            e.preventDefault();
-                            const delta = e.deltaY > 0 ? 0.1 : -0.1;
-                            const currentTransparency = layer.transparency || 0;
-                            const newTransparency = Math.max(0, Math.min(1, currentTransparency + delta));
-                            
-                            handleLayerTransparencyChange(layer.id, delta);
-                            
-                            const newPercent = Math.round(newTransparency * 100);
-                            showTooltipWithDelay(
-                              <div className="flex items-center gap-1">
-                                <Mouse className="w-3 h-3" />
-                                Transparency ({newPercent}%)
-                              </div>,
-                              e.currentTarget
-                            );
-                          }}
+          <section
+            className="mb-4 flex-shrink-0"
+            onMouseEnter={() => setLayersPanelExpanded(true)}
+            onMouseLeave={() => setLayersPanelExpanded(false)}
+            tabIndex={0}
+          >
+            <h2 className="text-sm font-semibold mb-2">Layers</h2>
+
+            {/* Layers List - reserve height to avoid layout shifts */}
+            <div className="mb-2">
+              <div className="h-48 overflow-hidden">
+                <div className="space-y-0.5 h-full overflow-y-auto">
+                  {layers.map((layer) => {
+                    const isActive = activeLayerId === layer.id;
+                    const visible = layersPanelExpanded || isActive;
+                    return (
+                      <div
+                        key={layer.id}
+                        className={`block w-max px-2 py-1 rounded transition-all text-xs transform-gpu ${
+                          isActive
+                            ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-400'
+                            : 'bg-transparent border-transparent'
+                        }`}
+                        style={{
+                          opacity: visible ? 1 : 0.65,
+                          transform: visible ? 'scaleY(1) translateY(0)' : 'scaleY(0.98) translateY(0)',
+                          transformOrigin: 'top',
+                          pointerEvents: visible ? 'auto' : 'none',
+                          transition: 'transform 400ms cubic-bezier(.2,.9,.2,1), opacity 400ms ease, box-shadow 300ms ease',
+                          boxShadow: isActive ? '0 6px 12px rgba(15,23,42,0.06)' : 'none',
+                          zIndex: isActive ? 30 : 10,
+                        }}
+                      >
+                        <div
+                          className="cursor-pointer"
+                          onClick={() => handleSetActiveLayer(layer.id)}
                         >
-                          <Blend className="w-2.5 h-2.5" />
-                        </Button>
-                        
-                        <span className="text-xs font-medium truncate">{layer.name}</span>
+                          <div className={`flex items-center gap-2 ${isActive ? 'translate-y-0 -mb-1' : 'opacity-80'}`}>
+                            <Tooltip content={layer.visible ? 'Hide layer' : 'Show layer'}>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleToggleLayerVisibility(layer.id);
+                                }}
+                                className="w-4 h-4 p-0 hover:bg-gray-200 dark:hover:bg-gray-700"
+                              >
+                                {layer.visible ? <Eye className="w-2.5 h-2.5" /> : <EyeOff className="w-2.5 h-2.5 text-gray-400 dark:text-gray-500" />}
+                              </Button>
+                            </Tooltip>
+
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="w-4 h-4 p-0 hover:bg-gray-200 dark:hover:bg-gray-700"
+                              onMouseEnter={(e) => {
+                                const transparencyPercent = Math.round((layer.transparency || 0) * 100);
+                                showTooltipWithDelay(
+                                  <div className="flex items-center gap-1">
+                                    <Mouse className="w-3 h-3" />
+                                    Transparency ({transparencyPercent}%)
+                                  </div>,
+                                  e.currentTarget
+                                );
+                              }}
+                              onMouseLeave={hideTooltip}
+                              onWheel={(e) => {
+                                e.preventDefault();
+                                const delta = e.deltaY > 0 ? 0.1 : -0.1;
+                                handleLayerTransparencyChange(layer.id, delta);
+                                const currentTransparency = layer.transparency || 0;
+                                const newTransparency = Math.max(0, Math.min(1, currentTransparency + delta));
+                                const newPercent = Math.round(newTransparency * 100);
+                                showTooltipWithDelay(
+                                  <div className="flex items-center gap-1">
+                                    <Mouse className="w-3 h-3" />
+                                    Transparency ({newPercent}%)
+                                  </div>,
+                                  e.currentTarget
+                                );
+                              }}
+                            >
+                              <Blend className="w-2.5 h-2.5" />
+                            </Button>
+
+                            <div className="flex items-center gap-2">
+                              <Tooltip content={layer.name}>
+                                <span className="text-xs font-medium truncate flex items-center gap-2">
+                                  {(() => {
+                                    switch ((layer.type || '').toLowerCase()) {
+                                      case 'background':
+                                      case 'bg':
+                                        return <Image className="w-4 h-4" />;
+                                      case 'collision':
+                                      case 'collision layer':
+                                        return <Grid className="w-4 h-4" />;
+                                      case 'objects':
+                                      case 'object':
+                                        return <Box className="w-4 h-4" />;
+                                      case 'npc':
+                                        return <Users className="w-4 h-4" />;
+                                      case 'enemy':
+                                        return <Locate className="w-4 h-4" />;
+                                      case 'event':
+                                        return <Clock className="w-4 h-4" />;
+                                      default:
+                                        return <Map className="w-4 h-4" />;
+                                    }
+                                  })()}
+                                </span>
+                              </Tooltip>
+                              <span className={leftCollapsed ? 'sr-only text-xs font-medium' : 'text-xs font-medium truncate'} title={layer.name}>
+                                {layer.name}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
+                    );
+                  })}
                 </div>
-              ))}
+              </div>
             </div>
           </section>
 
           {/* Bottom Action Buttons */}
           <section className="flex-shrink-0">
-            {/* Export Loading Bar - Always reserve space */}
+            {/* Export Loading Bar - reserve space */}
             <div className="w-full h-1.5 mb-2">
               {isExporting ? (
                 <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-full overflow-hidden">
-                  <div 
+                  <div
                     className="bg-gradient-to-r from-orange-500 to-orange-600 h-full transition-all duration-1000 ease-out rounded-full"
                     style={{ width: `${exportProgress}%` }}
                   />
@@ -2663,69 +2727,146 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 <div className="w-full h-full" />
               )}
             </div>
-            
-            <div className="flex gap-2 justify-center">
-              <Tooltip content="Export Project as Flare-Ready">
-                <Button 
-                  onClick={handleExportMap} 
-                  className="w-7 h-7 p-0 shadow-sm flex items-center justify-center"
+
+            <div className={`flex gap-2 ${leftCollapsed ? 'justify-center' : 'justify-start'}`}>
+              <div>
+                <Button
+                  ref={mapsButtonRef}
                   size="sm"
+                  className="w-7 h-7 p-0 shadow-sm"
+                  onClick={async () => {
+                    if (!mapsDropdownOpen) await refreshProjectMaps();
+                    setMapsDropdownOpen((s) => !s);
+                  }}
                   disabled={isExporting || isPreparingNewMap}
                 >
-                  {isExporting ? (
-                    <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  ) : (
-                    <Download className="w-3 h-3" />
-                  )}
+                  <Menu className="w-3 h-3" />
                 </Button>
-              </Tooltip>
-              <Tooltip content="Create a New Map">
-                <Button 
-                  onClick={handleOpenCreateMapDialog}
-                  className="w-7 h-7 p-0 shadow-sm flex items-center justify-center"
-                  size="sm"
-                  disabled={isExporting || isPreparingNewMap}
-                >
-                  <Plus className="w-3 h-3" />
-                </Button>
-              </Tooltip>
+
+                {mapsDropdownOpen && mapsDropdownPos && createPortal(
+                  <div
+                    ref={mapsPortalRef}
+                    style={{ left: mapsDropdownPos.left, top: mapsDropdownPos.top, position: 'absolute', transform: 'translateY(-100%)' }}
+                    className="w-56 bg-background border border-border rounded shadow-lg z-[9999]"
+                  >
+                    <div className="p-2 text-xs font-medium border-b border-border">Actions</div>
+                    <div className="max-h-60 overflow-y-auto">
+                      {projectPath ? (
+                        <>
+                          <button
+                            className="w-full text-left p-2 hover:bg-gray-100 dark:hover:bg-neutral-800 text-xs flex items-center gap-2"
+                            onClick={async () => {
+                              setMapsDropdownOpen(false);
+                              await handleExportMap();
+                            }}
+                          >
+                            <Download className="w-3 h-3" />
+                            <span>Export map</span>
+                          </button>
+
+                          <div className="border-t border-border" />
+
+                          <div className="p-2 text-xs font-medium">Maps</div>
+                          {projectMaps.length === 0 ? (
+                            <div className="p-2 text-xs text-muted-foreground">No maps found</div>
+                          ) : (
+                            projectMaps.map((f) => (
+                              <button
+                                key={f}
+                                className="w-full text-left p-2 hover:bg-gray-100 dark:hover:bg-neutral-800 text-xs"
+                                onClick={() => {
+                                  setMapsDropdownOpen(false);
+                                  handleOpenMapFromMapsFolder(f);
+                                }}
+                              >
+                                {f}
+                              </button>
+                            ))
+                          )}
+
+                          <div className="border-t border-border" />
+
+                          <button
+                            className="w-full text-left p-2 hover:bg-gray-100 dark:hover:bg-neutral-800 text-xs flex items-center gap-2"
+                            onClick={() => {
+                              setMapsDropdownOpen(false);
+                              handleOpenCreateMapDialog();
+                            }}
+                          >
+                            <Plus className="w-3 h-3" />
+                            <span>Create new map</span>
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            className="w-full text-left p-2 hover:bg-gray-100 dark:hover:bg-neutral-800 text-xs flex items-center gap-2"
+                            onClick={async () => {
+                              setMapsDropdownOpen(false);
+                              if (window.electronAPI?.selectDirectory) {
+                                try {
+                                  const selected = await window.electronAPI.selectDirectory();
+                                  if (selected) {
+                                    await handleOpenMap(selected);
+                                  }
+                                } catch (err) {
+                                  console.error('Failed to select directory:', err);
+                                  toast({ title: 'Open failed', description: 'Unable to open project directory.', variant: 'destructive' });
+                                }
+                              } else {
+                                toast({ title: 'Open unavailable', description: 'Open project requires the desktop app.', variant: 'destructive' });
+                              }
+                            }}
+                          >
+                            <Folder className="w-3 h-3" />
+                            <span>Open project...</span>
+                          </button>
+
+                          <div className="border-t border-border" />
+
+                          <div className="p-2 text-xs">No project is currently open. Open a project to list maps and enable Export.</div>
+
+                          <div className="border-t border-border" />
+
+                          <button
+                            className="w-full text-left p-2 hover:bg-gray-100 dark:hover:bg-neutral-800 text-xs flex items-center gap-2"
+                            onClick={() => {
+                              setMapsDropdownOpen(false);
+                              // Open the create map dialog in-app as fallback for creating a new map without an existing project
+                              handleOpenCreateMapDialog();
+                            }}
+                          >
+                            <Plus className="w-3 h-3" />
+                            <span>Create new map</span>
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>, document.body
+                )}
+              </div>
+
               <Tooltip content={hasUnsavedChanges ? 'Save changes' : 'All changes saved'}>
-                <Button 
+                <Button
                   onClick={handleManualSave}
                   className={`w-7 h-7 p-0 shadow-sm transition-colors ${
-                    isManuallySaving 
-                      ? 'bg-blue-500 hover:bg-blue-600' 
-                      : hasUnsavedChanges 
-                        ? 'bg-orange-500 hover:bg-orange-600 text-white' 
-                        : 'bg-green-500 hover:bg-green-600 text-white'
+                    isManuallySaving ? 'bg-blue-500 hover:bg-blue-600' : hasUnsavedChanges ? 'bg-orange-500 hover:bg-orange-600 text-white' : 'bg-green-500 hover:bg-green-600 text-white'
                   }`}
                   disabled={isManuallySaving || isPreparingNewMap}
                   size="sm"
                 >
                   {isManuallySaving ? (
-                    <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   ) : (
                     <Save className="w-3 h-3" />
                   )}
                 </Button>
               </Tooltip>
-              <Tooltip content="Help & Documentation">
-                <Button 
-                  onClick={() => setShowHelp(true)} 
-                  className="w-7 h-7 p-0 shadow-sm"
-                  variant="outline"
-                  size="sm"
-                >
-                  <HelpCircle className="w-3 h-3" />
-                </Button>
-              </Tooltip>
+
+              {/* Help button moved into Settings > Other Options */}
+
               <Tooltip content="Map Settings">
-                <Button 
-                  onClick={() => setShowSettings(true)} 
-                  className="w-7 h-7 p-0 shadow-sm"
-                  variant="outline"
-                  size="sm"
-                >
+                <Button onClick={() => setShowSettings(true)} className="w-7 h-7 p-0 shadow-sm" variant="outline" size="sm">
                   <Settings className="w-3 h-3" />
                 </Button>
               </Tooltip>
@@ -2920,6 +3061,30 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                       Automatically saves your work every 8 seconds
                     </p>
                   </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Active GID Indicator</label>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Show</span>
+                      <button
+                        onClick={() => {
+                          const newVal = !showActiveGid;
+                          setShowActiveGid(newVal);
+                        }}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          showActiveGid ? 'bg-orange-600' : 'bg-gray-200'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            showActiveGid ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                        <span className="sr-only">Toggle Active GID Indicator</span>
+                      </button>
+                      <span className="text-sm">{showActiveGid ? 'Shown' : 'Hidden'}</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Toggle whether the Active GID badge is visible next to the hover coordinates.</p>
+                  </div>
                   <div className="flex gap-2 mt-6">
                     <Button 
                       variant="outline" 
@@ -2927,6 +3092,16 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                       className="flex-1"
                     >
                       Close
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setShowHelp(true);
+                        setShowSettings(false);
+                      }}
+                      className="flex-1 flex items-center justify-center gap-2"
+                    >
+                      <HelpCircle className="w-4 h-4" />
+                      <span>Help & Docs</span>
                     </Button>
                   </div>
                 </div>
@@ -3413,113 +3588,124 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             </div>
           </div>
           <div className="bg-gray-100 flex-1 min-h-0 flex items-center justify-center overflow-hidden relative">
-            {/* Canvas Tooltip Panel */}
-            {showTooltip && (
-              <div className="absolute top-4 left-4 z-20 p-3 bg-white/90 dark:bg-neutral-900/90 backdrop-blur-sm rounded-lg border border-border shadow-lg">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="absolute top-1 right-1 w-6 h-6 p-0"
-                  onClick={() => setShowTooltip(false)}
-                >
-                  <X className="w-3 h-3" />
-                </Button>
-                
-                <div className="space-y-2 pr-6">
-                  <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
-                    <MousePointer2 className="w-4 h-4" />
-                    <span>Left Click to Paint</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
+            {/* Canvas Tooltip Panel - always mounted; visibility via classes */}
+            <div
+              className={`absolute top-4 left-4 z-20 p-3 bg-white/90 dark:bg-neutral-900/90 backdrop-blur-sm rounded-lg border border-border shadow-lg transition-opacity duration-300 ${showTooltip ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+              aria-hidden={!showTooltip}
+            >
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute top-1 right-1 w-6 h-6 p-0"
+                onClick={() => setShowTooltip(false)}
+              >
+                <X className="w-3 h-3" />
+              </Button>
+
+              <div className="space-y-2 pr-6">
+                <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
+                  <MousePointer2 className="w-4 h-4" />
+                  <span>Left Click to Paint</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
+                  <Mouse className="w-4 h-4" />
+                  <span>Right Click to Delete</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
+                  <Move className="w-4 h-4" />
+                  <span>Spacebar + Mouse to Pan</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
+                  <div className="relative">
                     <Mouse className="w-4 h-4" />
-                    <span>Right Click to Delete</span>
+                    <Circle className="w-2 h-2 absolute top-1 left-1.5 opacity-60" />
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
-                    <Move className="w-4 h-4" />
-                    <span>Spacebar + Mouse to Pan</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
-                    <div className="relative">
-                      <Mouse className="w-4 h-4" />
-                      <Circle className="w-2 h-2 absolute top-1 left-1.5 opacity-60" />
-                    </div>
-                    <span>Mouse Wheel to Zoom In-Out</span>
-                  </div>
+                  <span>Mouse Wheel to Zoom In-Out</span>
                 </div>
               </div>
-            )}
-            
+            </div>
+
             <canvas
               ref={canvasRef}
               id="mapCanvas"
               className="tile-canvas w-full h-full max-w-full max-h-full"
             />
-            {!mapInitialized && (
-              <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-                <div className="flex items-center gap-3 px-4 py-2 rounded-full border-2 border-orange-500/80 bg-background/95 shadow-lg backdrop-blur-sm">
-                  <span className="text-sm font-medium text-muted-foreground">Create a map</span>
-                  <Button
-                    size="sm"
-                    variant="default"
-                    className="w-9 h-9 p-0 rounded-full bg-orange-500 text-white shadow-sm transition-all duration-150 hover:bg-orange-600 hover:shadow-md hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
-                    onClick={handleOpenCreateMapDialog}
-                    disabled={isPreparingNewMap}
+
+            {/* Map initialization overlay - always mounted for smooth transitions */}
+            <div
+              className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${!mapInitialized ? 'opacity-100 pointer-events-auto bg-background/80 backdrop-blur-sm' : 'opacity-0 pointer-events-none'}`}
+              aria-hidden={mapInitialized}
+            >
+              <div className={`flex items-center gap-3 px-4 py-2 rounded-full border-2 border-orange-500/80 bg-background/95 shadow-lg backdrop-blur-sm transition-opacity duration-200 ${!mapInitialized ? 'opacity-100' : 'opacity-0'}`}>
+                <span className="text-sm font-medium text-muted-foreground">Create a map</span>
+                <Button
+                  size="sm"
+                  variant="default"
+                  className="w-9 h-9 p-0 rounded-full bg-orange-500 text-white shadow-sm transition-all duration-150 hover:bg-orange-600 hover:shadow-md hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
+                  onClick={handleOpenCreateMapDialog}
+                  disabled={isPreparingNewMap}
+                >
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Hover Coordinates Display - always mounted to allow transitions */}
+            <div
+              className={`absolute bottom-4 left-4 z-10 p-2 rounded-md text-xs font-mono flex items-center gap-2 transition-opacity duration-200 ${hoverCoords ? 'opacity-100 pointer-events-auto bg-white/90 dark:bg-neutral-900/90 border border-gray-200 dark:border-neutral-600 text-gray-800 dark:text-white shadow-sm' : 'opacity-0 pointer-events-none'}`}
+              aria-hidden={!hoverCoords}
+            >
+              <MapPin className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+              <span>{hoverCoords ? `${hoverCoords.x}, ${hoverCoords.y}` : ''}</span>
+              {/* Active GID Indicator - keep mounted but toggle visibility */}
+              <div className={`ml-2 transition-opacity duration-200 ${hoverCoords && showActiveGid ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+                <Tooltip content="Active GID number of selected tilebrush">
+                  <Badge variant="secondary" className="text-xs px-2 py-1 bg-black/80 text-white border-gray-600 hover:bg-black/90">
+                    <span id="activeGid">{activeGid}</span>
+                  </Badge>
+                </Tooltip>
+              </div>
+            </div>
+
+            {/* Selection Info Display - keep mounted to avoid reflows */}
+            <div className={`absolute bottom-4 left-32 z-10 p-2 rounded-md text-xs flex items-center gap-3 transition-opacity duration-200 ${hasSelection ? 'opacity-100 pointer-events-auto bg-orange-600/90 border border-orange-500 text-white' : 'opacity-0 pointer-events-none'}`}>
+              <div className="flex items-center gap-2 font-mono">
+                <Square className="w-4 h-4 text-orange-200" />
+                <span>{hasSelection ? `${selectionCount} tiles selected` : ''}</span>
+              </div>
+              <div className={`flex items-center gap-1 ${hasSelection ? '' : 'pointer-events-none'}`}>
+                <Tooltip content="Fill selection with active tile">
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    className="h-6 px-2 text-xs text-white hover:bg-orange-500/50"
+                    onClick={handleFillSelection}
                   >
-                    <Plus className="w-4 h-4" />
+                    Fill
                   </Button>
-                </div>
+                </Tooltip>
+                <Tooltip content="Delete selected tiles (DEL)">
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    className="h-6 px-2 text-xs text-white hover:bg-orange-500/50"
+                    onClick={handleDeleteSelection}
+                  >
+                    Delete
+                  </Button>
+                </Tooltip>
+                <Tooltip content="Clear selection (ESC)">
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    className="h-6 px-2 text-xs text-white hover:bg-orange-500/50"
+                    onClick={handleClearSelection}
+                  >
+                    Clear
+                  </Button>
+                </Tooltip>
               </div>
-            )}
-            
-            {/* Hover Coordinates Display */}
-            {hoverCoords && (
-              <div className="absolute bottom-4 left-4 z-10 p-2 bg-white/90 dark:bg-neutral-900/90 backdrop-blur-sm rounded-md border border-gray-200 dark:border-neutral-600 text-gray-800 dark:text-white text-xs font-mono flex items-center gap-2 shadow-sm">
-                <MapPin className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                <span>{hoverCoords.x}, {hoverCoords.y}</span>
-              </div>
-            )}
-            
-            {/* Selection Info Display */}
-            {hasSelection && (
-              <div className="absolute bottom-4 left-32 z-10 p-2 bg-orange-600/90 backdrop-blur-sm rounded-md border border-orange-500 text-white text-xs flex items-center gap-3">
-                <div className="flex items-center gap-2 font-mono">
-                  <Square className="w-4 h-4 text-orange-200" />
-                  <span>{selectionCount} tiles selected</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <Tooltip content="Fill selection with active tile">
-                    <Button 
-                      size="sm" 
-                      variant="ghost" 
-                      className="h-6 px-2 text-xs text-white hover:bg-orange-500/50"
-                      onClick={handleFillSelection}
-                    >
-                      Fill
-                    </Button>
-                  </Tooltip>
-                  <Tooltip content="Delete selected tiles (DEL)">
-                    <Button 
-                      size="sm" 
-                      variant="ghost" 
-                      className="h-6 px-2 text-xs text-white hover:bg-orange-500/50"
-                      onClick={handleDeleteSelection}
-                    >
-                      Delete
-                    </Button>
-                  </Tooltip>
-                  <Tooltip content="Clear selection (ESC)">
-                    <Button 
-                      size="sm" 
-                      variant="ghost" 
-                      className="h-6 px-2 text-xs text-white hover:bg-orange-500/50"
-                      onClick={handleClearSelection}
-                    >
-                      Clear
-                    </Button>
-                  </Tooltip>
-                </div>
-              </div>
-            )}
+            </div>
             {/* Floating Toolbar (inside canvas, centered, pill-sized) */}
             <div
               ref={setBottomToolbarNode}
@@ -4508,15 +4694,15 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
 
                     <div className="grid grid-cols-3 gap-3">
                       {[
-                        { key: 'dialog.allow_movement', label: 'Allow Movement' },
-                        { key: 'dialog.take_a_party', label: 'Take/Release Party' },
-                        { key: 'dialog.response_only', label: 'Response Only' }
+                        { key: 'dialog.allow_movement', label: 'Allow Movement', defaultValue: 'false' },
+                        { key: 'dialog.take_a_party', label: 'Take/Release Party', defaultValue: 'false' },
+                        { key: 'dialog.response_only', label: 'Response Only', defaultValue: 'false' }
                       ].map((field) => (
                         <label key={field.key} className="flex items-center gap-2 text-sm">
                           <input
                             type="checkbox"
                             className="w-4 h-4"
-                            checked={getEditingObjectProperty(field.key, 'false') === 'true'}
+                            checked={getEditingObjectProperty(field.key, field.defaultValue || 'false') === 'true'}
                             onChange={(e) => updateEditingObjectBoolean(field.key, e.target.checked)}
                           />
                           {field.label}

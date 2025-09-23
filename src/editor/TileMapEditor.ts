@@ -541,6 +541,19 @@ export class TileMapEditor {
     count: number;
   }> = new Map();
   
+  // Layer tab system: each layer type may have multiple tabs, each with its own tileset and detected tiles/brushes
+  private nextLayerTabId: number = 1;
+  private layerTabs: Map<string, Array<{
+    id: number;
+    name: string;
+    tileset?: { image: HTMLImageElement | null; fileName: string | null; columns: number; rows: number; count: number };
+    detectedTiles?: Map<number, { sourceX: number; sourceY: number; width: number; height: number }>;
+    brushes?: Array<{ image: HTMLImageElement; fileName: string; width: number; height: number }>;
+  }>> = new Map();
+
+  // Active tab id per layer type
+  private layerActiveTabId: Map<string, number> = new Map();
+  
   // Per-layer detected tile data
   private layerTileData: Map<string, Map<number, {
     sourceX: number;
@@ -888,6 +901,25 @@ export class TileMapEditor {
     this.activeLayerId = 6;
     this.nextLayerId = 7;
     this.sortLayersByPriority();
+    // Initialize layer tabs for background and object with one tab each
+    try {
+      // Clear any previous tab data
+      this.layerTabs.clear();
+      this.layerActiveTabId.clear();
+      // Create one tab for object and background if those layers exist
+      const hasObject = this.tileLayers.some(l => l.type === 'object');
+      const hasBackground = this.tileLayers.some(l => l.type === 'background');
+      if (hasObject) {
+        const id = this.createLayerTab('object');
+        this.setActiveLayerTab('object', id);
+      }
+      if (hasBackground) {
+        const id = this.createLayerTab('background');
+        this.setActiveLayerTab('background', id);
+      }
+    } catch (e) {
+      console.warn('Failed to initialize default layer tabs', e);
+    }
   }
 
   private getDraggableActorAt(x: number, y: number): MapObject | null {
@@ -4324,6 +4356,116 @@ export class TileMapEditor {
 
   public hasLayerTileset(layerType: string): boolean {
     return this.layerTilesets.has(layerType);
+  }
+
+  // Tab management API
+  public createLayerTab(layerType: string, name?: string): number {
+  const tabs = this.layerTabs.get(layerType) || [];
+  const id = this.nextLayerTabId++;
+  const tab = { id, name: name || `Tab ${tabs.length + 1}` };
+    tabs.push(tab);
+    this.layerTabs.set(layerType, tabs);
+    // If no active tab set for this layer, set this one
+    if (!this.layerActiveTabId.has(layerType)) {
+      this.layerActiveTabId.set(layerType, id);
+    }
+    return id;
+  }
+
+  public getLayerTabs(layerType: string) {
+    return this.layerTabs.get(layerType) || [];
+  }
+
+  public setActiveLayerTab(layerType: string, tabId: number): void {
+    this.layerActiveTabId.set(layerType, tabId);
+    // When switching active tab, update current tileset/palette to reflect tab's tileset if present
+    const tabs = this.layerTabs.get(layerType);
+    if (tabs) {
+      const tab = tabs.find(t => t.id === tabId);
+      if (tab && tab.tileset && tab.tileset.image) {
+        this.layerTilesets.set(layerType, {
+          image: tab.tileset.image,
+          fileName: tab.tileset.fileName,
+          columns: tab.tileset.columns,
+          rows: tab.tileset.rows,
+          count: tab.tileset.count
+        });
+        // Load detected tiles from tab if present
+        if (tab.detectedTiles) {
+          this.detectedTileData.clear();
+          for (const [gid, data] of tab.detectedTiles.entries()) {
+            this.detectedTileData.set(gid, data);
+          }
+        }
+        this.updateCurrentTileset(layerType);
+      } else {
+        // No tileset for this tab -> clear current tileset
+        this.layerTilesets.delete(layerType);
+        this.updateCurrentTileset(layerType);
+      }
+    }
+  }
+
+  public importBrushImageToLayerTab(layerType: string, tabId: number, file: File): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const tabs = this.layerTabs.get(layerType) || [];
+        const tab = tabs.find(t => t.id === tabId);
+        if (!tab) return reject(new Error('Tab not found'));
+        if (!tab.brushes) tab.brushes = [];
+        tab.brushes.push({ image: img as HTMLImageElement, fileName: file.name, width: img.width, height: img.height });
+        // If this tab has no tileset, optionally set it as tileset for quick use
+        if (!tab.tileset) {
+          tab.tileset = { image: img as HTMLImageElement, fileName: file.name, columns: Math.floor(img.width / this.tileSizeX), rows: Math.floor(img.height / this.tileSizeY), count: Math.floor(img.width / this.tileSizeX) * Math.floor(img.height / this.tileSizeY) };
+        }
+        // If this tab is active for the layer, update current tileset/palette
+        const activeTabId = this.layerActiveTabId.get(layerType);
+        if (activeTabId === tabId) {
+          this.setActiveLayerTab(layerType, tabId);
+        }
+        resolve();
+      };
+      img.onerror = (_e) => reject(new Error('Failed to load brush image'));
+      img.src = URL.createObjectURL(file);
+    });
+  }
+
+  public removeLayerTab(layerType: string, tabId: number): void {
+    const tabs = this.layerTabs.get(layerType) || [];
+    const idx = tabs.findIndex(t => t.id === tabId);
+    console.info(`removeLayerTab called for layer=${layerType} tabId=${tabId} (found idx=${idx})`);
+    if (idx !== -1) {
+      const removed = tabs.splice(idx, 1);
+      console.info('removeLayerTab removed:', removed);
+      this.layerTabs.set(layerType, tabs);
+      // If removed active tab, set another as active
+      const active = this.layerActiveTabId.get(layerType);
+      if (active === tabId) {
+        if (tabs.length > 0) {
+          // Use setActiveLayerTab so the editor updates the current tileset/palette immediately
+          try {
+            this.setActiveLayerTab(layerType, tabs[0].id);
+          } catch (e) {
+            // Fallback to direct set if something unexpected happens
+            console.warn('setActiveLayerTab failed during removeLayerTab fallback to direct set:', e);
+            this.layerActiveTabId.set(layerType, tabs[0].id);
+            this.updateCurrentTileset(layerType);
+          }
+        } else {
+          this.layerActiveTabId.delete(layerType);
+          // No tabs left -> clear tileset for this layer
+          this.layerTilesets.delete(layerType);
+          this.updateCurrentTileset(layerType);
+        }
+      }
+    } else {
+      console.warn(`removeLayerTab: tab id ${tabId} not found in layer ${layerType}. Current tabs:`, tabs.map(t=>t.id));
+    }
+  }
+
+  public getActiveLayerTabId(layerType: string): number | null {
+    return this.layerActiveTabId.get(layerType) || null;
   }
 
   public updateCurrentTileset(layerType: string): void {

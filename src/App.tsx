@@ -215,6 +215,8 @@ function App() {
   const [showHelp, setShowHelp] = useState(false);
   const [activeHelpTab, setActiveHelpTab] = useState('engine');
   const [showTooltip, setShowTooltip] = useState(true);
+  // Force refresh counter to trigger re-render when editor-managed tabs change
+  const [tabTick, setTabTick] = useState(0);
   const [toolbarExpanded, setToolbarExpanded] = useState(true);
   const toolbarCollapseTimer = useRef<number | null>(null);
   const toolbarContainerRef = useRef<HTMLDivElement | null>(null);
@@ -383,7 +385,12 @@ function App() {
   // Clear layer confirmation dialog state (replaces window.confirm)
   const [showClearLayerDialog, setShowClearLayerDialog] = useState(false);
   // Generic confirmation dialog for other destructive actions
-  const [confirmAction, setConfirmAction] = useState<null | { type: 'removeBrush' | 'removeTileset'; payload?: number }>(null);
+  const [confirmAction, setConfirmAction] = useState<null | { type: 'removeBrush' | 'removeTileset' | 'removeTab'; payload?: number | { layerType: string; tabId: number } }>(null);
+  // Keep a stable React state for the tab that was requested to be deleted so
+  // the confirmation handler can use the exact intended tab (avoids stale refs).
+  const [tabToDelete, setTabToDelete] = useState<null | { layerType: string; tabId: number }>(null);
+  // Keep an optional ref as a fallback for older flows
+  const confirmPayloadRef = React.useRef<null | { layerType: string; tabId: number }>(null);
   
   // Settings states
   const [mapName, setMapName] = useState('Untitled Map');
@@ -2531,6 +2538,55 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
 
             {/* Tileset Brushes Window - render for all layers (including npc/enemy/event) */}
             <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-0 m-0">
+              {/* Layer Tabs (background / object only) */}
+              {(() => {
+                const activeLayerType = activeLayer?.type;
+                const showTabs = activeLayerType === 'background' || activeLayerType === 'object';
+                if (!showTabs) return null;
+        return (
+          <div key={tabTick} className="flex items-center gap-2 px-2 pb-2">
+        <div
+          className={`flex-1 flex items-center gap-1 overflow-x-auto tabs-scroll ${(() => {
+            try {
+              const tabs = editor && activeLayerType ? (editor.getLayerTabs ? editor.getLayerTabs(activeLayerType) : []) : [];
+              return tabs && tabs.length > 7 ? 'tabs-limited' : '';
+            } catch (e) { return ''; }
+          })()}`}
+          onWheel={(e: React.WheelEvent<HTMLDivElement>) => {
+            const el = e.currentTarget as HTMLDivElement;
+            if (el.scrollWidth > el.clientWidth) {
+              e.preventDefault();
+              // vertical wheel scroll -> horizontal scroll
+              el.scrollLeft += e.deltaY;
+            }
+          }}
+        >
+                      {/* Render simple tabs using editor state when available (no import/add controls here) */}
+                      {editor ? (
+                        (editor.getLayerTabs ? editor.getLayerTabs(activeLayerType!) : []).map((tab: { id: number; name?: string; }, idx: number) => (
+                          <button
+                            key={tab.id}
+                            className={`w-5 h-5 flex items-center justify-center rounded-full text-white text-xs font-medium transition-colors shadow-sm ${editor && editor.getCurrentLayerType() === activeLayerType && editor.getActiveLayerTabId && editor.getActiveLayerTabId(activeLayerType) === tab.id ? 'opacity-100 scale-100 ring-2 ring-offset-1' : 'opacity-90 scale-95'}`}
+                            onClick={() => {
+                              if (!editor) return;
+                              editor.setActiveLayerTab(activeLayerType!, tab.id);
+                              try { editor.refreshTilePalette(true); } catch (err) { /* ignore */ }
+                              setTabTick(t => t + 1);
+                            }}
+                            style={{
+                              background: (editor && editor.getActiveLayerTabId && editor.getActiveLayerTabId(activeLayerType) === tab.id) ? '#ea580c' : '#f97316'
+                            }}
+                          >
+                            {idx + 1}
+                          </button>
+                        ))
+                      ) : (
+                        <div className="text-xs text-muted-foreground">No tabs</div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
               <div className="relative flex-1 min-h-0 overflow-auto flex flex-col">
                 <div
                   id="tilesContainer"
@@ -2558,16 +2614,40 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                   ref={setBrushToolbarNode}
                   className={`flex items-center transition-all duration-300 ease-in-out gap-1 transform -translate-x-1 mt-2 mb-2`}
                 >
-                  <div className="flex-shrink-0">
+                  <div className="flex-shrink-0 flex items-center gap-1">
+                    {/* Add Tab button (visible for background/object) */}
+                    { (activeLayer?.type === 'background' || activeLayer?.type === 'object') && (
+                      <Tooltip content="Add tab" side="bottom">
+                          <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-xs px-1 py-1 h-6"
+                          onClick={() => {
+                            if (!editor || !activeLayer) return;
+                            const tabs = editor.getLayerTabs ? editor.getLayerTabs(activeLayer.type) : [];
+                            if (tabs && tabs.length >= 8) {
+                              toast({ title: 'Maximum tabs reached', description: 'You can have up to 8 tabs per layer.', variant: 'destructive' });
+                              return;
+                            }
+                            const newId = editor.createLayerTab(activeLayer.type);
+                            editor.setActiveLayerTab(activeLayer.type, newId);
+                            // Trigger React render so tabs appear immediately
+                            setTabTick(t => t + 1);
+                          }}
+                        >
+                          +
+                        </Button>
+                      </Tooltip>
+                    )}
+
+                    {/* Existing Import button: now imports into active tab for background/object layers, falls back to existing layer tileset behavior for actor layers */}
                     {(() => {
                       const isNpc = activeLayer?.type === 'npc';
                       const isEnemy = activeLayer?.type === 'enemy';
                       const isEventLayer = activeLayer?.type === 'event';
                       const isActorLayer = isNpc || isEnemy || isEventLayer;
-                      const tooltip = isActorLayer ? `Add ${isEventLayer ? 'Event' : isNpc ? 'NPC' : 'Enemy'}` : 'Import a PNG tileset for the active layer';
+                      const tooltip = isActorLayer ? `Add ${isEventLayer ? 'Event' : isNpc ? 'NPC' : 'Enemy'}` : 'Import a PNG tileset or brush for the active layer tab';
                       if (isNpc || isEnemy || isEventLayer) {
-                        // For actor/event layers: clicking the icon should open the actor dialog (or show toast),
-                        // not open a file picker. Render a normal button without the file input overlay.
                         return (
                           <Tooltip content={tooltip} side="bottom">
                             <Button
@@ -2591,7 +2671,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                           </Tooltip>
                         );
                       }
-                      // Default: import PNG tileset for the active layer using file input overlay
+
                       return (
                         <Tooltip content={tooltip} side="bottom">
                           <Button
@@ -2605,8 +2685,36 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                               type="file"
                               accept="image/png"
                               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                              onChange={(e) => {
-                                handleFileUpload(e, 'layerTileset');
+                              onChange={async (e) => {
+                                // For background/object: import into active tab; otherwise fall back to layer tileset import
+                                if (!editor || !activeLayer) return;
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                const layerType = activeLayer.type;
+                                if (layerType === 'background' || layerType === 'object') {
+                                  // Import into the currently active tab if available. If there is
+                                  // no active tab yet, create one (respect the 8-tab limit).
+                                  const tabs = editor.getLayerTabs ? editor.getLayerTabs(layerType) : [];
+                                  let targetTabId = editor.getActiveLayerTabId ? editor.getActiveLayerTabId(layerType) : null;
+                                  if (typeof targetTabId !== 'number' || targetTabId === null) {
+                                    // No active tab -> create one, but respect the limit
+                                    if (tabs && tabs.length >= 8) {
+                                      toast({ title: 'Maximum tabs reached', description: 'You can have up to 8 tabs per layer.', variant: 'destructive' });
+                                      return;
+                                    }
+                                    targetTabId = editor.createLayerTab(layerType);
+                                    editor.setActiveLayerTab(layerType, targetTabId);
+                                  }
+                                  // Import into the active/target tab
+                                  await editor.importBrushImageToLayerTab(layerType, targetTabId, file);
+                                  // Refresh palette to show newly-added brush/tiles
+                                  editor.refreshTilePalette(true);
+                                  // Trigger UI update so changes appear immediately
+                                  setTabTick(t => t + 1);
+                                } else {
+                                  // Non-tab layers: keep legacy behavior
+                                  handleFileUpload(e as React.ChangeEvent<HTMLInputElement>, 'layerTileset');
+                                }
                               }}
                             />
                           </Button>
@@ -2673,14 +2781,32 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                   <div
                     className={`flex-shrink-0 overflow-hidden transition-all duration-300 ease-out ${brushToolbarExpanded ? 'opacity-100 scale-100 max-w-[2.5rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
                   >
-                    <Tooltip content="Remove tileset for current layer">
+                    <Tooltip content="Delete tileset tab">
                       <Button
                         variant="outline"
                         size="sm"
                         className="text-xs px-1 py-1 h-6 border-red-500 hover:border-red-600 hover:bg-red-50 shadow-sm"
                         onClick={() => {
                           showBrushToolbarTemporarily();
-                          setConfirmAction({ type: 'removeTileset' });
+                          if (!editor) {
+                            toast({ title: 'No editor', description: 'Editor is not initialized yet.', variant: 'destructive' });
+                            return;
+                          }
+                          const layerType = activeLayer?.type;
+                          if (!layerType) {
+                            toast({ title: 'No active layer', description: 'Please select a layer first.', variant: 'destructive' });
+                            return;
+                          }
+                          const activeTabId = editor.getActiveLayerTabId ? editor.getActiveLayerTabId(layerType) : null;
+                          if (typeof activeTabId !== 'number' || activeTabId === null) {
+                            toast({ title: 'No tab selected', description: 'There is no active tileset tab to delete for this layer.', variant: 'destructive' });
+                            return;
+                          }
+                          // Prompt confirmation to remove the active tab
+                          const payload = { layerType, tabId: activeTabId };
+                          confirmPayloadRef.current = payload;
+                          setTabToDelete(payload);
+                          setConfirmAction({ type: 'removeTab', payload });
                         }}
                       >
                         <X className="w-3 h-3 text-red-500" />
@@ -2856,7 +2982,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                     className="w-56 bg-background border border-border rounded shadow-lg z-[9999]"
                   >
                     {/* Actions header removed per UX request */}
-                    <div className="max-h-60 overflow-y-auto">
+                    <div className="max-h-60 overflow-y-auto minimal-scroll">
                       {projectPath ? (
                         <>
                           <div className="relative">
@@ -2873,7 +2999,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                               <div
                                 ref={mapsSubPortalRef}
                                 style={{ left: mapsSubPos.left, top: mapsSubPos.top, position: 'absolute' }}
-                                className="w-48 bg-background border border-border rounded shadow-md z-[10000] max-h-60 overflow-y-auto"
+                                className="w-48 bg-background border border-border rounded shadow-md z-[10000] max-h-60 overflow-y-auto minimal-scroll"
                               >
                                 {projectMaps.length === 0 ? (
                                   <div className="p-2 text-xs text-muted-foreground">No maps found</div>
@@ -3310,6 +3436,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               <div className="text-sm text-foreground mb-4">
                 {confirmAction.type === 'removeBrush' && 'Are you sure you want to remove this brush?'}
                 {confirmAction.type === 'removeTileset' && 'Are you sure you want to remove the tileset for this layer? This will clear the tileset but keep any placed tiles.'}
+                {confirmAction.type === 'removeTab' && 'Are you sure you want to remove this tileset tab?'}
               </div>
               <div className="flex gap-2 justify-end">
                 <Button variant="outline" onClick={() => setConfirmAction(null)}>Cancel</Button>
@@ -3321,6 +3448,39 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                         if (editor) editor.removeBrush(brushId);
                       } else if (confirmAction.type === 'removeTileset') {
                         if (editor) editor.removeLayerTileset();
+                      } else if (confirmAction.type === 'removeTab') {
+                        // Prefer the stable React state if present
+                        const payload = tabToDelete ?? confirmPayloadRef.current ?? (confirmAction.payload as { layerType: string; tabId: number } | undefined);
+                        if (editor && payload && payload.layerType) {
+                          // At confirmation time prefer the editor's current active tab for that layer
+                          const liveActive = editor.getActiveLayerTabId ? editor.getActiveLayerTabId(payload.layerType) : null;
+                          const finalTabId = (typeof liveActive === 'number' && liveActive !== null) ? liveActive : payload.tabId;
+                          console.info('Confirm removeTab: requested=', payload, 'liveActive=', liveActive, 'using=', finalTabId);
+                          if (typeof finalTabId === 'number') {
+                            editor.removeLayerTab(payload.layerType, finalTabId);
+                            // Force UI update and refresh palette
+                            setTabTick(t => t + 1);
+                            try { editor.refreshTilePalette(true); } catch (err) { console.warn('refreshTilePalette failed', err); }
+
+                            // Extra safeguard: explicitly set the editor's active tab to the new live active
+                            try {
+                              const newActive = editor.getActiveLayerTabId ? editor.getActiveLayerTabId(payload.layerType) : null;
+                              if (typeof newActive === 'number') {
+                                editor.setActiveLayerTab(payload.layerType, newActive);
+                                // one more refresh to ensure palette content is synced
+                                setTabTick(t => t + 1);
+                                try { editor.refreshTilePalette(true); } catch (err) { console.warn('refreshTilePalette failed', err); }
+                              }
+                            } catch (e) {
+                              console.warn('Post-remove setActiveLayerTab safeguard failed', e);
+                            }
+                          } else {
+                            console.warn('Confirm removeTab: no finalTabId available, aborting', payload);
+                          }
+                        }
+                        // Clear the state/ref after handling
+                        setTabToDelete(null);
+                        confirmPayloadRef.current = null;
                       }
                     } catch (error) {
                       console.error('Confirm action failed:', error);

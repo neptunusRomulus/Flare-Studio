@@ -494,6 +494,40 @@ button:active:not(.no-click-effect) {
 }
 .minimal-scroll::-webkit-scrollbar-corner { background: transparent; }
 
+/* Tabs area scrollbar: minimalist and modern, small thumb that becomes slightly more visible on hover */
+.tabs-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(100,100,100,0.25) transparent;
+}
+.tabs-scroll::-webkit-scrollbar {
+    height: 8px; /* horizontal scrollbar height */
+    width: 8px;  /* vertical if needed */
+}
+.tabs-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+.tabs-scroll::-webkit-scrollbar-thumb {
+    background: linear-gradient(90deg, rgba(120,120,120,0.18), rgba(245,127,23,0.18));
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+    transition: background-color 160ms ease, opacity 160ms ease;
+    opacity: 0.6;
+}
+.tabs-scroll:hover::-webkit-scrollbar-thumb {
+    opacity: 1;
+    background: linear-gradient(90deg, rgba(120,120,120,0.35), rgba(249,115,22,0.35));
+}
+.tabs-scroll::-webkit-scrollbar-corner { background: transparent; }
+
+/* Limit visible tabs to 7 items — when .tabs-limited is applied the container
+   will show a scrollbar even on wide screens so users can horizontally scroll
+   through additional tabs. Assumes each tab ~1.25rem wide + 0.25rem gap = 1.5rem.
+   7 * 1.5rem = 10.5rem */
+.tabs-scroll.tabs-limited {
+    max-width: 10.5rem; /* show ~7 tabs worth of width */
+}
+
 /* Smooth sidebar collapse: animate width and inner content opacity to avoid sudden layout jumps */
 .app-sidebar {
     transition: width 300ms cubic-bezier(.2,.9,.2,1), opacity 220ms ease, transform 300ms cubic-bezier(.2,.9,.2,1);

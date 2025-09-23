@@ -1702,6 +1702,20 @@ export class TileMapEditor {
     this.draw();
   }
 
+  // During sidebar open/close animations we can avoid recomputing minimap
+  // coordinates to prevent jitter. When this flag is true the drawMiniMap
+  // function will reuse the last computed coordinates until transitions end.
+  private sidebarTransitioning: boolean = false;
+  private lastMiniMapPos: { x: number; y: number } | null = null;
+
+  public setSidebarTransitioning(flag: boolean): void {
+    this.sidebarTransitioning = !!flag;
+    if (!this.sidebarTransitioning) {
+      // Clear cache when transition finishes so next draw computes fresh pos
+      this.lastMiniMapPos = null;
+    }
+  }
+
   public setPan(deltaX: number, deltaY: number): void {
     this.panX += deltaX;
     this.panY += deltaY;
@@ -2304,8 +2318,21 @@ export class TileMapEditor {
     const minimapWidth = 150;
     const minimapHeight = 120;
     const padding = 10;
-    const x = this.mapCanvas.width - minimapWidth - padding;
-    const y = this.mapCanvas.height - minimapHeight - padding;
+    // Anchor minimap to the screen's bottom-right corner so it doesn't
+    // shift during layout transitions (sidebar open/close). We compute the
+    // desired minimap position in screen coordinates and convert it to the
+    // canvas coordinate space by subtracting the canvas container's top-left.
+    const containerRect = this.mapCanvas.getBoundingClientRect();
+    const screenX = window.innerWidth - minimapWidth - padding;
+    const screenY = window.innerHeight - minimapHeight - padding;
+    // Convert to canvas-local coordinates
+    let x = Math.floor(screenX - containerRect.left);
+    let y = Math.floor(screenY - containerRect.top);
+    // Clamp inside canvas to avoid drawing outside if the canvas is smaller
+    x = Math.max(0, Math.min(this.mapCanvas.width - minimapWidth, x));
+    y = Math.max(0, Math.min(this.mapCanvas.height - minimapHeight, y));
+    // Update cached pos as well for compatibility with any other logic
+    this.lastMiniMapPos = { x, y };
 
     // Save current context state
     this.ctx.save();

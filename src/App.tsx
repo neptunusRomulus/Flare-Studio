@@ -393,6 +393,20 @@ function App() {
     const savedTheme = localStorage.getItem('isDarkMode');
     return savedTheme ? JSON.parse(savedTheme) : false;
   });
+
+  // Show/hide the left sidebar collapse toggle (user preference)
+  const [showSidebarToggle, setShowSidebarToggle] = useState(() => {
+    const saved = localStorage.getItem('showSidebarToggle');
+    return saved ? JSON.parse(saved) : true;
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('showSidebarToggle', JSON.stringify(showSidebarToggle));
+    } catch (e) {
+      // ignore storage errors
+    }
+  }, [showSidebarToggle]);
   
   // Auto-save states
   const [saveStatus, setSaveStatus] = useState<'saving' | 'saved' | 'error' | 'unsaved'>('saved');
@@ -1488,19 +1502,19 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
   useEffect(() => {
     if (pendingMapConfig && canvasRef.current && !showWelcome) {
       console.log('Canvas available and map config pending, creating editor...');
-      
+
       const createEditorWithConfig = async () => {
         try {
           console.log('Creating new editor with pending config...');
           const newEditor = new TileMapEditor(canvasRef.current!);
-          
+
           // Clear auto-save backup to prevent old data from loading
           console.log('Clearing local storage backup...');
           newEditor.clearLocalStorageBackup();
-          
+
           console.log('Setting map size...');
           newEditor.setMapSize(pendingMapConfig.width, pendingMapConfig.height);
-          
+
           // Load project data
           console.log('Loading project data...');
           const projectDataLoaded = await loadProjectData(newEditor, pendingMapConfig);
@@ -1516,19 +1530,19 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           if (window.electronAPI?.discoverTilesetImages && projectPath) {
             console.log('Calling discoverTilesetImages for path:', projectPath);
             const found = await window.electronAPI.discoverTilesetImages(projectPath);
-            
+
             const images = found?.tilesetImages || {};
             const imageKeys = Object.keys(images);
-            
+
             // Check if the project already has per-layer tilesets loaded
             const mapConfigWithTilesets = pendingMapConfig as { tilesets?: Array<{ layerType?: string }> };
-            const hasPerLayerTilesets = mapConfigWithTilesets.tilesets && 
-              Array.isArray(mapConfigWithTilesets.tilesets) && 
+            const hasPerLayerTilesets = mapConfigWithTilesets.tilesets &&
+              Array.isArray(mapConfigWithTilesets.tilesets) &&
               mapConfigWithTilesets.tilesets.some((ts) => ts.layerType);
-            
+
             console.log('Has per-layer tilesets in project:', hasPerLayerTilesets);
             console.log('Available discovered images:', imageKeys);
-            
+
             // Only use fallback tileset assignment if no per-layer tilesets exist
             if (!hasPerLayerTilesets && imageKeys.length > 0) {
               console.log('No per-layer tilesets found, using fallback assignment');
@@ -1603,7 +1617,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           setEditor(newEditor);
           setMapInitialized(true);
           setShowCreateMapDialog(false);
-          
+
           // Update layers list and UI state after everything is loaded
           setTimeout(() => {
             updateLayersList();
@@ -1611,20 +1625,23 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             const activeLayerId = newEditor.getActiveLayerId();
             const activeLayer = newEditor.getLayers().find(l => l.id === activeLayerId);
             console.log('Final UI update - checking active layer:', activeLayerId, activeLayer?.type);
-            
+
             // Force a final redraw to ensure everything is visible
             newEditor.redraw();
           }, 150);
 
           // Clear pending config
           setPendingMapConfig(null);
-          
+
           // toast suppressed: Project loaded
-          
+
         } catch (error) {
           console.error('Failed to create editor with pending config:', error);
-          // toast suppressed: Failed to load the project
           setPendingMapConfig(null);
+          setMapInitialized(false);
+          if (typeof toast === 'function') {
+            toast({ title: 'Failed to open project', description: (error && (error as any).message) ? (error as any).message : 'An error occurred while loading the project.', variant: 'destructive' });
+          }
         }
       };
 
@@ -2408,18 +2425,31 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
 
       {/* Main Content */}
       {/* Left-edge collapse/expand toggle - placed outside the aside so it remains clickable when the sidebar is hidden */}
-      <button
-        onClick={() => {
-          setLeftTransitioning(true);
-          setLeftCollapsed((s) => !s);
-          // keep the transitioning flag for slightly longer than the CSS transition
-          window.setTimeout(() => setLeftTransitioning(false), 380);
-        }}
-        aria-label={leftCollapsed ? 'Show sidebar' : 'Hide sidebar'}
-        className="fixed left-0 top-1/2 transform -translate-y-1/2 z-50 bg-white/90 dark:bg-neutral-900/90 border border-border rounded-r-md p-1 shadow-md hover:bg-white dark:hover:bg-neutral-800"
-      >
-        {leftCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-      </button>
+      {showSidebarToggle && (
+        <button
+          onClick={() => {
+            setLeftTransitioning(true);
+            if (editor && typeof editor.setSidebarTransitioning === 'function') {
+              try { editor.setSidebarTransitioning(true); } catch (e) { /* ignore */ }
+            }
+            setLeftCollapsed((s) => !s);
+            // keep the transitioning flag for slightly longer than the CSS transition
+            window.setTimeout(() => {
+              setLeftTransitioning(false);
+              if (editor && typeof editor.setSidebarTransitioning === 'function') {
+                try { editor.setSidebarTransitioning(false); } catch (e) { /* ignore */ }
+              }
+            }, 380);
+          }}
+          aria-label={leftCollapsed ? 'Show sidebar' : 'Hide sidebar'}
+          // Position the toggle at the outer right edge of the left sidebar.
+          // When expanded the sidebar width is 14rem (224px), otherwise it's 0.
+          style={{ left: leftCollapsed ? 0 : 224 }}
+          className="no-drag no-press-shift press-fill-effect fixed top-1/2 transform -translate-y-1/2 z-50 bg-white/90 dark:bg-neutral-900/90 border border-border rounded-l-md p-1 shadow-md hover:bg-white dark:hover:bg-neutral-800"
+        >
+          {leftCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+        </button>
+      )}
 
       <main className="flex flex-1 min-h-0">
         {/* Left Sidebar */}
@@ -2430,47 +2460,24 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           }
           aria-hidden={leftCollapsed}
         >
-          <div className="sidebar-inner">
+          <div className="sidebar-inner flex flex-col h-full">
           {/* Hover handle / visual affordance when collapsed (removed) */}
           {/* collapse toggle is provided on the outer edge (see edge button) */}
           {/* Tileset Brushes Section */}
           <section className="flex flex-col flex-1">
             {/* If this is an NPC, Enemy or Event layer render a header and actor controls (actors only for NPC/Enemy) */}
             {(() => {
+              // Keep actor entries for NPC/Enemy layers but remove the header and its add-button.
               const isEventLayer = activeLayer?.type === 'event';
               if (isNpcLayer || isEnemyLayer || isEventLayer) {
                 return (
                   <>
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center gap-2">
-                        <Users className="w-5 h-5 text-gray-700" />
-                        <h2 className="text-lg font-semibold">
-                          <span className={leftCollapsed ? 'sr-only' : ''}>{isNpcLayer ? 'NPCs' : isEnemyLayer ? 'Enemies' : 'Events'}</span>
-                        </h2>
-                      </div>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="bg-orange-500 hover:bg-orange-600 text-white border-orange-500 hover:border-orange-600 h-6 text-xs px-2 shadow-sm"
-                        onClick={() => {
-                          if (isEventLayer) {
-                            toast({ title: 'Not implemented', description: 'Create Event will be implemented later.' });
-                          } else {
-                            handleOpenActorDialog(isNpcLayer ? 'npc' : 'enemy');
-                          }
-                        }}
-                      >
-                        <Plus className="w-3 h-3 mr-1" />
-                        <span className={leftCollapsed ? 'sr-only' : ''}>{isNpcLayer ? 'Add NPC' : isEnemyLayer ? 'Add Enemy' : 'Add Event'}</span>
-                      </Button>
-                    </div>
-
-                    {/* Actor entries shown only for NPC/Enemy layers */}
+                    {/* Actor entries shown only for NPC/Enemy layers (header removed per UX request) */}
                     {(isNpcLayer || isEnemyLayer) && (
                       <div className="flex-1 min-h-0">
                         {actorEntries.length === 0 ? (
                           <div className="h-full border border-dashed border-border rounded-md flex items-center justify-center text-sm text-muted-foreground px-4 text-center">
-                            {isNpcLayer ? 'No NPCs added yet. Use the button above to place your first NPC.' : 'No enemies added yet. Use the button above to place an enemy.'}
+                            {isNpcLayer ? 'No NPCs added yet. Use the Add control to place your first NPC.' : 'No enemies added yet. Use the Add control to place an enemy.'}
                           </div>
                         ) : (
                           <div className="space-y-2 overflow-y-auto pr-1">
@@ -2523,142 +2530,186 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             })()}
 
             {/* Tileset Brushes Window - render for all layers (including npc/enemy/event) */}
-            <div id="tilesetMeta" className="text-sm text-muted-foreground mb-2"></div>
-            
-            <div className="flex-1 flex flex-col min-h-0">
-              <div className="relative flex-1 min-h-0 overflow-auto h-full">
-                <div id="tilesContainer" className="tile-palette h-full"></div>
-
+            <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-0 m-0">
+              <div className="relative flex-1 min-h-0 overflow-auto flex flex-col">
+                <div
+                  id="tilesContainer"
+                  className="tile-palette flex flex-col flex-1 min-h-0 overflow-y-auto p-0 m-0 justify-start pb-12"
+                  onWheel={(e: React.WheelEvent<HTMLDivElement>) => {
+                    // If content overflows horizontally, use the vertical wheel to scroll left/right
+                    const el = e.currentTarget as HTMLDivElement;
+                    if (el.scrollWidth > el.clientWidth) {
+                      e.preventDefault();
+                      // deltaY positive -> scroll right, negative -> scroll left
+                      el.scrollLeft += e.deltaY;
+                    }
+                  }}
+                ></div>
                 {/* Hidden element to track brush tool state */}
                 <div data-brush-tool={brushTool} className="hidden"></div>
               </div>
-
               {/* Active GID moved to canvas area (see Hover Coordinates Display) */}
             </div>
-            
-            {/* Brush Tools */}
-            <div className="flex items-center mb-3 mt-2 sticky top-2 z-10 bg-transparent">
+            {/* Brush Tools - stick to bottom so palette can fill remaining space */}
+            <div className="sticky bottom-0 z-10 bg-transparent py-2">
               <div className="text-xs text-muted-foreground"></div>
               <div className="w-full flex justify-center">
-              <div
-                ref={setBrushToolbarNode}
-                className={`flex items-center transition-all duration-300 ease-in-out gap-1 transform -translate-x-1`}
-              >
-                <div className="flex-shrink-0">
-                  <Tooltip content="Import a PNG tileset for the active layer" side="bottom">
-                    <Button
-                      variant="default"
-                      size="sm"
-                      className="relative text-xs px-1 py-1 h-6 shadow-sm bg-orange-500 hover:bg-orange-600 text-white border-orange-500"
-                    >
-                      <Upload className="w-3 h-3 text-white" />
-                      <input
-                        type="file"
-                        accept="image/png"
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                        onChange={(e) => handleFileUpload(e, 'layerTileset')}
-                      />
-                    </Button>
-                  </Tooltip>
-                </div>
                 <div
-                  className={`flex-shrink-0 overflow-visible transition-all duration-300 ease-out opacity-100 scale-100 max-w-[2.5rem] w-auto`}
+                  ref={setBrushToolbarNode}
+                  className={`flex items-center transition-all duration-300 ease-in-out gap-1 transform -translate-x-1 mt-2 mb-2`}
                 >
-                  <Tooltip content="Move/Reorder brushes">
-                    <Button
-                      variant={brushTool === 'move' ? 'default' : 'outline'}
-                      size="sm"
-                      className="text-xs px-1 py-1 h-6 shadow-sm"
-                      onClick={() => handleToggleBrushTool('move')}
-                    >
-                      <Scan className="w-3 h-3" />
-                    </Button>
-                  </Tooltip>
-                </div>
-                <div
-                  className={`flex-shrink-0 overflow-hidden transition-all duration-300 ease-out ${brushToolbarExpanded || brushTool === 'merge' ? 'opacity-100 scale-100 max-w-[2.5rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
-                >
-                  <Tooltip content="Merge brushes">
-                    <Button
-                      variant={brushTool === 'merge' ? 'default' : 'outline'}
-                      size="sm"
-                      className="text-xs px-1 py-1 h-6 shadow-sm"
-                      onClick={() => handleToggleBrushTool('merge')}
-                    >
-                      <Link2 className="w-3 h-3" />
-                    </Button>
-                  </Tooltip>
-                </div>
-                <div
-                  className={`flex-shrink-0 overflow-hidden transition-all duration-300 ease-out ${brushToolbarExpanded || brushTool === 'separate' ? 'opacity-100 scale-100 max-w-[2.5rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
-                >
-                  <Tooltip content="Separate brushes">
-                    <Button
-                      variant={brushTool === 'separate' ? 'default' : 'outline'}
-                      size="sm"
-                      className="text-xs px-1 py-1 h-6 shadow-sm"
-                      onClick={() => handleToggleBrushTool('separate')}
-                    >
-                      <Scissors className="w-3 h-3" />
-                    </Button>
-                  </Tooltip>
-                </div>
-                <div
-                  className={`flex-shrink-0 overflow-hidden transition-all duration-300 ease-out ${brushToolbarExpanded || brushTool === 'remove' ? 'opacity-100 scale-100 max-w-[2.5rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
-                >
-                  <Tooltip content="Remove brushes">
-                    <Button
-                      variant={brushTool === 'remove' ? 'default' : 'outline'}
-                      size="sm"
-                      className="text-xs px-1 py-1 h-6 shadow-sm"
-                      onClick={() => handleToggleBrushTool('remove')}
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </Button>
-                  </Tooltip>
-                </div>
-                <div
-                  className={`flex-shrink-0 overflow-hidden transition-all duration-300 ease-out ${brushToolbarExpanded ? 'opacity-100 scale-100 max-w-[2.5rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
-                >
-                  <Tooltip content="Remove tileset for current layer">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-xs px-1 py-1 h-6 border-red-500 hover:border-red-600 hover:bg-red-50 shadow-sm"
-                      onClick={() => {
-                        showBrushToolbarTemporarily();
-                        setConfirmAction({ type: 'removeTileset' });
-                      }}
-                    >
-                      <X className="w-3 h-3 text-red-500" />
-                    </Button>
-                  </Tooltip>
+                  <div className="flex-shrink-0">
+                    {(() => {
+                      const isNpc = activeLayer?.type === 'npc';
+                      const isEnemy = activeLayer?.type === 'enemy';
+                      const isEventLayer = activeLayer?.type === 'event';
+                      const isActorLayer = isNpc || isEnemy || isEventLayer;
+                      const tooltip = isActorLayer ? `Add ${isEventLayer ? 'Event' : isNpc ? 'NPC' : 'Enemy'}` : 'Import a PNG tileset for the active layer';
+                      if (isNpc || isEnemy || isEventLayer) {
+                        // For actor/event layers: clicking the icon should open the actor dialog (or show toast),
+                        // not open a file picker. Render a normal button without the file input overlay.
+                        return (
+                          <Tooltip content={tooltip} side="bottom">
+                            <Button
+                              variant="default"
+                              size="sm"
+                              aria-label={tooltip}
+                              className="relative z-20 text-xs px-1 py-1 h-6 shadow-sm bg-orange-500 hover:bg-orange-600 text-white border-orange-500"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                if (isNpc || isEnemy) {
+                                  handleOpenActorDialog(isNpc ? 'npc' : 'enemy');
+                                } else {
+                                  toast({ title: 'Not implemented', description: 'Create Event will be implemented later.' });
+                                }
+                              }}
+                              role="button"
+                            >
+                              <Upload className="w-3 h-3 text-white" />
+                            </Button>
+                          </Tooltip>
+                        );
+                      }
+                      // Default: import PNG tileset for the active layer using file input overlay
+                      return (
+                        <Tooltip content={tooltip} side="bottom">
+                          <Button
+                            variant="default"
+                            size="sm"
+                            aria-label={tooltip}
+                            className="relative text-xs px-1 py-1 h-6 shadow-sm bg-orange-500 hover:bg-orange-600 text-white border-orange-500"
+                          >
+                            <Upload className="w-3 h-3 text-white" />
+                            <input
+                              type="file"
+                              accept="image/png"
+                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                              onChange={(e) => {
+                                handleFileUpload(e, 'layerTileset');
+                              }}
+                            />
+                          </Button>
+                        </Tooltip>
+                      );
+                    })()}
+                  </div>
+                  <div
+                    className={`flex-shrink-0 overflow-visible transition-all duration-300 ease-out opacity-100 scale-100 max-w-[2.5rem] w-auto`}
+                  >
+                    <Tooltip content="Move/Reorder brushes">
+                      <Button
+                        variant={brushTool === 'move' ? 'default' : 'outline'}
+                        size="sm"
+                        className="text-xs px-1 py-1 h-6 shadow-sm"
+                        onClick={() => handleToggleBrushTool('move')}
+                      >
+                        <Scan className="w-3 h-3" />
+                      </Button>
+                    </Tooltip>
+                  </div>
+                  <div
+                    className={`flex-shrink-0 overflow-hidden transition-all duration-300 ease-out ${brushToolbarExpanded || brushTool === 'merge' ? 'opacity-100 scale-100 max-w-[2.5rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
+                  >
+                    <Tooltip content="Merge brushes">
+                      <Button
+                        variant={brushTool === 'merge' ? 'default' : 'outline'}
+                        size="sm"
+                        className="text-xs px-1 py-1 h-6 shadow-sm"
+                        onClick={() => handleToggleBrushTool('merge')}
+                      >
+                        <Link2 className="w-3 h-3" />
+                      </Button>
+                    </Tooltip>
+                  </div>
+                  <div
+                    className={`flex-shrink-0 overflow-hidden transition-all duration-300 ease-out ${brushToolbarExpanded || brushTool === 'separate' ? 'opacity-100 scale-100 max-w-[2.5rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
+                  >
+                    <Tooltip content="Separate brushes">
+                      <Button
+                        variant={brushTool === 'separate' ? 'default' : 'outline'}
+                        size="sm"
+                        className="text-xs px-1 py-1 h-6 shadow-sm"
+                        onClick={() => handleToggleBrushTool('separate')}
+                      >
+                        <Scissors className="w-3 h-3" />
+                      </Button>
+                    </Tooltip>
+                  </div>
+                  <div
+                    className={`flex-shrink-0 overflow-hidden transition-all duration-300 ease-out ${brushToolbarExpanded || brushTool === 'remove' ? 'opacity-100 scale-100 max-w-[2.5rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
+                  >
+                    <Tooltip content="Remove brushes">
+                      <Button
+                        variant={brushTool === 'remove' ? 'default' : 'outline'}
+                        size="sm"
+                        className="text-xs px-1 py-1 h-6 shadow-sm"
+                        onClick={() => handleToggleBrushTool('remove')}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </Tooltip>
+                  </div>
+                  <div
+                    className={`flex-shrink-0 overflow-hidden transition-all duration-300 ease-out ${brushToolbarExpanded ? 'opacity-100 scale-100 max-w-[2.5rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
+                  >
+                    <Tooltip content="Remove tileset for current layer">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs px-1 py-1 h-6 border-red-500 hover:border-red-600 hover:bg-red-50 shadow-sm"
+                        onClick={() => {
+                          showBrushToolbarTemporarily();
+                          setConfirmAction({ type: 'removeTileset' });
+                        }}
+                      >
+                        <X className="w-3 h-3 text-red-500" />
+                      </Button>
+                    </Tooltip>
+                  </div>
                 </div>
               </div>
             </div>
-            </div>
           </section>
-          </div>
 
           {/* Layers Section */}
           <section
-            className="mb-4 flex-shrink-0"
+            className="mb-0 flex-shrink-0 flex flex-col justify-center h-40" // reduced margin and height for less space below
             onMouseEnter={() => setLayersPanelExpanded(true)}
             onMouseLeave={() => setLayersPanelExpanded(false)}
             tabIndex={0}
           >
-
             {/* Layers List - reserve height to avoid layout shifts */}
-            <div className="mb-2">
-              <div className="h-48 overflow-hidden">
-                <div className="space-y-0.5 h-full overflow-y-auto">
+            <div className="mb-2 w-full flex flex-col justify-center h-full">
+              <div className="h-48 overflow-hidden flex flex-col justify-center w-full">
+                <div className="space-y-0.5 h-full overflow-y-auto flex flex-col justify-center w-full">
                   {layers.map((layer) => {
                     const isActive = activeLayerId === layer.id;
                     const visible = layersPanelExpanded || isActive;
                     return (
                       <div
                         key={layer.id}
-                        className={`block w-max px-2 py-1 rounded transition-all text-xs transform-gpu ${
+                        className={`block w-full max-w-xs px-2 py-1 rounded transition-all text-xs transform-gpu ${
                           isActive
                             ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-400'
                             : 'bg-transparent border-transparent'
@@ -2674,10 +2725,10 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                         }}
                       >
                         <div
-                          className="cursor-pointer"
+                          className="cursor-pointer w-full flex items-center"
                           onClick={() => handleSetActiveLayer(layer.id)}
                         >
-                          <div className={`flex items-center gap-2 ${isActive ? 'opacity-100' : 'opacity-80'}`}>
+                          <div className={`flex items-center gap-2 w-full ${isActive ? 'opacity-100' : 'opacity-80'}`}> 
                             <Tooltip content={layer.visible ? 'Hide layer' : 'Show layer'}>
                               <Button
                                 variant="ghost"
@@ -2765,9 +2816,10 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               </div>
             </div>
           </section>
+          </div>
 
           {/* Bottom Action Buttons */}
-          <section className="flex-shrink-0">
+          <section className="flex-shrink-0 mt-auto mb-2">
             {/* Export Loading Bar - reserve space */}
             <div className="w-full h-1.5 mb-2">
               {isExporting ? (
@@ -3157,6 +3209,27 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                       <span className="text-sm">{showActiveGid ? 'Shown' : 'Hidden'}</span>
                     </div>
                     <p className="text-xs text-gray-500 mt-1">Toggle whether the Active GID badge is visible next to the hover coordinates.</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Sidebar Collapse Button</label>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Show toggle</span>
+                      <button
+                        onClick={() => setShowSidebarToggle((s: boolean) => !s)}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          showSidebarToggle ? 'bg-orange-600' : 'bg-gray-200'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            showSidebarToggle ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                        <span className="sr-only">Toggle sidebar collapse button</span>
+                      </button>
+                      <span className="text-sm">{showSidebarToggle ? 'Shown' : 'Hidden'}</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Show or hide the left-edge sidebar collapse/expand toggle.</p>
                   </div>
                   <div className="flex gap-2 mt-6">
                     <Button 

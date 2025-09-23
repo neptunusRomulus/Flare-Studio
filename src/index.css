@@ -104,8 +104,8 @@
     padding: 8px;
     background: hsl(var(--background));
     border: 1px solid hsl(var(--border));
-    min-height: 300px;
-    max-height: 60vh;
+    /* Fixed, unchanging palette height to avoid layout shifts when content changes */
+    height: 520px; /* fixed size — adjust if you prefer a different constant */
     overflow-y: auto;
     
     /* Modern minimal scrollbar */
@@ -420,6 +420,22 @@ svg path, svg circle, svg rect, svg line, svg polyline, svg polygon {
 button:active:not(.no-click-effect) {
     transform: scale(0.98);
     transition: transform 0.1s ease-in-out;
+}
+
+/* Allow specific controls to opt out of the press-shift effect (useful for fixed-position UI over drag regions) */
+.no-press-shift:active {
+    /* Preserve the vertical centering translation the button uses
+       (Tailwind class -translate-y-1/2). We avoid applying scale on
+       active so the element doesn't visually shift. */
+    transform: translateY(-50%) !important;
+}
+
+/* Press fill effect: lighten the control on press using filter so it works in both light/dark themes */
+.press-fill-effect {
+    transition: filter 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
+}
+.press-fill-effect:active {
+    filter: brightness(1.08);
 }
 
 /* Modern scrollbar for help modal */

@@ -1,4 +1,4 @@
-﻿import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Upload, Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Blend, MapPin, Save, Scan, Link2, Scissors, Trash2, Check, HelpCircle, Folder, Shield, Plus, Image, Grid, Box, Users, Locate, Clock, Menu, ChevronLeft, ChevronRight } from 'lucide-react';
 import { TileMapEditor } from './editor/TileMapEditor';
+import type { EditorProjectData } from './editor/TileMapEditor';
 import { TileLayer, MapObject } from './types';
 import { useToast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/toaster';
@@ -19,8 +20,7 @@ interface MapConfig {
   tileSize: number;
   location: string;
   isStartingMap?: boolean;
-// removed extraneous closing brace
-  }
+}
 
 type PropertyType =
   | 'string'
@@ -73,6 +73,51 @@ const ENEMY_PROPERTY_SPECS: Record<string, PropertySpec> = {
 // Helper sets used by validation
 const CARDINAL_DIRECTIONS = new Set(['N','NE','E','SE','S','SW','W','NW']);
 const BOOLEAN_STRINGS = new Set(['true','false','1','0']);
+
+const STARTING_MAP_INVALID_NAMES = new Set(['', 'untitled map', 'map name', 'untitled_map']);
+
+const sanitizeMapFileBase = (rawName: string): string => {
+  const sanitized = rawName
+    .replace(/[<>:"/|?*]/g, '_')
+    .trim()
+    .replace(/\s+/g, '_')
+    .replace(/_{2,}/g, '_');
+  return sanitized || 'Untitled_Map';
+};
+
+const computeIntermapTarget = (starting: boolean, rawName: string | undefined | null): string | null => {
+  if (!starting) return null;
+  const name = (rawName ?? '').trim();
+  if (!name) return null;
+  if (STARTING_MAP_INVALID_NAMES.has(name.toLowerCase())) return null;
+  const sanitized = sanitizeMapFileBase(name);
+  return `maps/${sanitized}.txt`;
+};
+
+const buildSpawnContent = (intermapTarget: string | null): string => [
+  '# this file is automatically loaded when a New Game starts.',
+  "# it's a dummy map to send the player to the actual starting point.",
+  '',
+  '[header]',
+  'width=1',
+  'height=1',
+  'hero_pos=0,0',
+  '',
+  '[event]',
+  'type=event',
+  'location=0,0,1,1',
+  'activate=on_load',
+  `intermap=${intermapTarget ?? ''}`,
+  ''
+].join('\n');
+
+const extractSpawnIntermapValue = (content: string | null | undefined): string | null => {
+  if (!content) return null;
+  const match = content.match(/^\s*intermap\s*=\s*(.*)$/m);
+  if (!match) return null;
+  const value = match[1].trim();
+  return value ? value : null;
+};
 
 function validateValue(key: string, trimmed: string, spec: PropertySpec): string | null {
   switch (spec.type) {
@@ -228,7 +273,7 @@ function App() {
   const brushToolbarContainerRef = useRef<HTMLDivElement | null>(null);
   // Left sidebar buttons expand/collapse (independent)
   // Left bottom action buttons are always expanded now; no local state required.
-  const [pendingMapConfig, setPendingMapConfig] = useState<MapConfig | null>(null);
+  const [pendingMapConfig, setPendingMapConfig] = useState<EditorProjectData | null>(null);
   const clearToolbarCollapseTimer = useCallback(() => {
     if (toolbarCollapseTimer.current !== null) {
       window.clearTimeout(toolbarCollapseTimer.current);
@@ -395,6 +440,37 @@ function App() {
   // Settings states
   const [mapName, setMapName] = useState('Untitled Map');
   const [isStartingMap, setIsStartingMap] = useState(false);
+  const [currentProjectPath, setCurrentProjectPath] = useState<string | null>(null);
+  const [startingMapIntermap, setStartingMapIntermap] = useState<string | null>(null);
+  const previousMapNameRef = useRef(mapName);
+
+  const writeSpawnFile = useCallback(async (starting: boolean, mapNameOverride?: string) => {
+    const effectiveName = mapNameOverride ?? mapName;
+    const intermapTarget = computeIntermapTarget(starting, effectiveName);
+    if (!currentProjectPath || !window.electronAPI?.updateSpawnFile) {
+      setStartingMapIntermap(intermapTarget);
+      return;
+    }
+    const spawnContent = buildSpawnContent(intermapTarget);
+    try {
+      const success = await window.electronAPI.updateSpawnFile(currentProjectPath, spawnContent);
+      if (success) {
+        setStartingMapIntermap(intermapTarget);
+      }
+    } catch (error) {
+      console.error('Failed to update spawn file:', error);
+    }
+  }, [mapName, currentProjectPath]);
+
+  const updateStartingMap = useCallback(
+    (nextValue: boolean, options?: { propagate?: boolean; mapNameOverride?: string }) => {
+      setIsStartingMap(nextValue);
+      if (options?.propagate === false) return;
+      void writeSpawnFile(nextValue, options?.mapNameOverride);
+    },
+    [writeSpawnFile]
+  );
+
   const [isDarkMode, setIsDarkMode] = useState(() => {
     // Initialize from localStorage or default to false
     const savedTheme = localStorage.getItem('isDarkMode');
@@ -421,8 +497,56 @@ function App() {
   const [lastSaveTime, setLastSaveTime] = useState<number>(0);
   const [isManuallySaving, setIsManuallySaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  // Current project path for Electron saves
-  const [projectPath, setProjectPath] = useState<string | null>(null);
+  // Reload spawn metadata whenever project selection changes
+  useEffect(() => {
+    let cancelled = false;
+    const loadSpawnFile = async () => {
+      if (!currentProjectPath || !window.electronAPI?.readSpawnFile) {
+        if (!cancelled) {
+          setStartingMapIntermap(null);
+        }
+        return;
+      }
+      try {
+        const content = await window.electronAPI.readSpawnFile(currentProjectPath);
+        if (!cancelled) {
+          setStartingMapIntermap(extractSpawnIntermapValue(content));
+        }
+      } catch (error) {
+        console.warn('Failed to read spawn file:', error);
+        if (!cancelled) {
+          setStartingMapIntermap(null);
+        }
+      }
+    };
+    loadSpawnFile();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentProjectPath]);
+
+  useEffect(() => {
+    const previous = previousMapNameRef.current;
+    if (previous === mapName) {
+      return;
+    }
+    previousMapNameRef.current = mapName;
+    if (!isStartingMap) {
+      return;
+    }
+    const previousTarget = computeIntermapTarget(true, previous);
+    const nextTarget = computeIntermapTarget(true, mapName);
+    if (previousTarget !== nextTarget) {
+      updateStartingMap(true, { mapNameOverride: mapName });
+    }
+  }, [mapName, isStartingMap, updateStartingMap]);
+
+  useEffect(() => {
+    if (editor) {
+      editor.setMapName(mapName);
+    }
+  }, [editor, mapName]);
+
   // When true, we're in the middle of opening an existing project
   // and should avoid creating a blank editor instance.
   const [isOpeningProject, setIsOpeningProject] = useState(false);
@@ -616,8 +740,8 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     editorInstance.setAutoSaveCallback(async () => {
       // Persist to disk automatically when running in Electron with a project path
       try {
-        if (window.electronAPI && projectPath) {
-          await editorInstance.saveProjectData(projectPath);
+        if (window.electronAPI && currentProjectPath) {
+          await editorInstance.saveProjectData(currentProjectPath);
         }
       } catch (e) {
         console.warn('Auto-save to disk failed:', e);
@@ -652,7 +776,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       setHeroEditData({ currentX, currentY, mapWidth, mapHeight, onConfirm });
       setShowHeroEditDialog(true);
     });
-  }, [autoSaveEnabled, projectPath, handleSelectTool]);
+  }, [autoSaveEnabled, currentProjectPath, handleSelectTool]);
 
   useEffect(() => {
     return () => {
@@ -1456,8 +1580,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
   }, [handleSeparateBrush, handleRemoveBrush, handleBrushReorder]);
 
   // Helper function to load project data into editor
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const loadProjectData = useCallback(async (newEditor: TileMapEditor, mapConfig: any) => {
+  const loadProjectData = useCallback(async (newEditor: TileMapEditor, mapConfig: EditorProjectData) => {
     try {
       console.log('=== LOAD PROJECT DATA DEBUG ===');
       console.log('Map config received:', {
@@ -1514,13 +1637,18 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         try {
           console.log('Creating new editor with pending config...');
           const newEditor = new TileMapEditor(canvasRef.current!);
+          if (pendingMapConfig.name) {
+            newEditor.setMapName(pendingMapConfig.name);
+          } else {
+            newEditor.setMapName('Untitled Map');
+          }
 
           // Clear auto-save backup to prevent old data from loading
           console.log('Clearing local storage backup...');
           newEditor.clearLocalStorageBackup();
 
           console.log('Setting map size...');
-          newEditor.setMapSize(pendingMapConfig.width, pendingMapConfig.height);
+          newEditor.setMapSize(pendingMapConfig.width ?? 20, pendingMapConfig.height ?? 15);
 
           // Load project data
           console.log('Loading project data...');
@@ -1534,18 +1662,16 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           console.log('Layers after loadProjectData:', newEditor.getLayers().map(l => ({ id: l.id, name: l.name, type: l.type })));
 
           // Discover and assign tilesets - only for projects without per-layer tileset data
-          if (window.electronAPI?.discoverTilesetImages && projectPath) {
-            console.log('Calling discoverTilesetImages for path:', projectPath);
-            const found = await window.electronAPI.discoverTilesetImages(projectPath);
+          if (window.electronAPI?.discoverTilesetImages && currentProjectPath) {
+            console.log('Calling discoverTilesetImages for path:', currentProjectPath);
+            const found = await window.electronAPI.discoverTilesetImages(currentProjectPath);
 
             const images = found?.tilesetImages || {};
             const imageKeys = Object.keys(images);
 
             // Check if the project already has per-layer tilesets loaded
-            const mapConfigWithTilesets = pendingMapConfig as { tilesets?: Array<{ layerType?: string }> };
-            const hasPerLayerTilesets = mapConfigWithTilesets.tilesets &&
-              Array.isArray(mapConfigWithTilesets.tilesets) &&
-              mapConfigWithTilesets.tilesets.some((ts) => ts.layerType);
+            const hasPerLayerTilesets = Array.isArray(pendingMapConfig.tilesets) &&
+              pendingMapConfig.tilesets.some((ts) => Boolean(ts?.layerType));
 
             console.log('Has per-layer tilesets in project:', hasPerLayerTilesets);
             console.log('Available discovered images:', imageKeys);
@@ -1647,14 +1773,15 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           setPendingMapConfig(null);
           setMapInitialized(false);
           if (typeof toast === 'function') {
-            toast({ title: 'Failed to open project', description: (error && (error as any).message) ? (error as any).message : 'An error occurred while loading the project.', variant: 'destructive' });
+            const description = error instanceof Error ? error.message : 'An error occurred while loading the project.';
+            toast({ title: 'Failed to open project', description, variant: 'destructive' });
           }
         }
       };
 
       createEditorWithConfig();
     }
-  }, [pendingMapConfig, showWelcome, projectPath, setupAutoSave, updateLayersList]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pendingMapConfig, showWelcome, currentProjectPath, setupAutoSave, updateLayersList]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>, type: 'tileset' | 'layerTileset') => {
     const file = event.target.files?.[0];
@@ -1762,11 +1889,22 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
   const handleOpenCreateMapDialog = useCallback(() => {
     setNewMapWidth(mapWidth > 0 ? mapWidth : 20);
     setNewMapHeight(mapHeight > 0 ? mapHeight : 15);
-    setNewMapName(mapName || 'Untitled Map');
     setNewMapStarting(isStartingMap);
     setCreateMapError(null);
     setShowCreateMapDialog(true);
-  }, [mapWidth, mapHeight, mapName, isStartingMap]);
+  }, [mapWidth, mapHeight, isStartingMap]);
+
+  // Only reset newMapName the first time dialog is opened after mount
+  const hasOpenedCreateMapDialog = useRef(false);
+  useEffect(() => {
+    if (showCreateMapDialog && !hasOpenedCreateMapDialog.current) {
+      setNewMapName('Map Name');
+      hasOpenedCreateMapDialog.current = true;
+    }
+    if (!showCreateMapDialog) {
+      hasOpenedCreateMapDialog.current = false;
+    }
+  }, [showCreateMapDialog, mapName]);
 
   const handleConfirmCreateMap = async () => {
     if (isPreparingNewMap) return;
@@ -1785,14 +1923,9 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     setIsPreparingNewMap(true);
 
     try {
-      const exported = await performExport({ silent: true });
-      if (!exported) {
-        setCreateMapError('Failed to export the current map. Please resolve any errors and try again.');
-        return;
-      }
-
+      // No export on map creation. Only set reserved map names.
       setReservedMapNames((prev) => {
-        const normalized = mapName.trim().toLowerCase();
+        const normalized = resolvedName.trim().toLowerCase();
         if (!normalized || prev.includes(normalized)) {
           return prev;
         }
@@ -1822,6 +1955,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
 
       if (targetEditor) {
         targetEditor.resetForNewProject();
+        targetEditor.setMapName(resolvedName);
         targetEditor.setMapSize(width, height);
         targetEditor.setDarkMode(isDarkMode);
         if (!editor) {
@@ -1837,7 +1971,8 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       showToolbarTemporarily();
       showBottomToolbarTemporarily();
       setMapName(resolvedName);
-      setIsStartingMap(newMapStarting);
+      updateStartingMap(newMapStarting, { mapNameOverride: resolvedName });
+      setNewMapStarting(newMapStarting);
       setHasSelection(false);
       setSelectionCount(0);
       setCreateMapError(null);
@@ -1865,12 +2000,34 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
 
   const performExport = useCallback(
     async ({ silent = false }: { silent?: boolean } = {}) => {
-      if (!editor || !projectPath) {
+      if (!editor || !currentProjectPath) {
         toast({
           title: "Export Failed",
           description: "No project loaded or editor not initialized.",
           variant: "destructive",
         });
+        return false;
+      }
+      const trimmedName = mapName.trim();
+      if (!trimmedName || STARTING_MAP_INVALID_NAMES.has(trimmedName.toLowerCase())) {
+        if (!silent) {
+          toast({
+            title: "Export Skipped",
+            description: "Please create and name your map before exporting.",
+            variant: "destructive",
+          });
+        }
+        return false;
+      }
+
+      if (!startingMapIntermap) {
+        if (!silent) {
+          toast({
+            title: "Export Failed",
+            description: "No starting map selected.",
+            variant: "destructive",
+          });
+        }
         return false;
       }
 
@@ -1879,47 +2036,56 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         setExportProgress(0);
       }
 
-      const sanitizedMapFileBase = (() => {
-        const sanitized = mapName
-          .replace(/[<>:"/|?*]/g, '_')
-          .trim()
-          .replace(/\s+/g, '_')
-          .replace(/_{2,}/g, '_');
-        if (!sanitized) {
-          return 'Untitled_Map';
+      const spawnContent = buildSpawnContent(startingMapIntermap);
+
+      const tilesetExportInfo = editor.getTilesetExportInfo();
+      let pathOverrides: Record<string, string> | undefined;
+      if (tilesetExportInfo.length > 0) {
+        const overrides: Record<string, string> = {};
+        for (const info of tilesetExportInfo) {
+          const keys = [info.id];
+          if (info.sourcePath) keys.push(info.sourcePath);
+          if (info.fileName) keys.push(info.fileName);
+          let candidate = info.sourcePath ?? null;
+          if (currentProjectPath && info.sourcePath && window.electronAPI?.resolvePathRelative) {
+            try {
+              const relative = await window.electronAPI.resolvePathRelative(currentProjectPath, info.sourcePath);
+              if (relative && relative.trim()) {
+                candidate = relative;
+              }
+            } catch (error) {
+              console.warn('Failed to resolve tileset path relative to project:', error);
+            }
+          }
+          if (!candidate && info.fileName) {
+            candidate = info.fileName;
+          }
+          if (candidate) {
+            const normalized = candidate.replace(/\\/g, '/');
+            for (const key of keys) {
+              if (key) {
+                overrides[key] = normalized;
+              }
+            }
+          }
         }
-        return sanitized;
-      })();
-      const spawnIntermapTarget = isStartingMap ? `maps/${sanitizedMapFileBase}.txt` : 'maps/test11.txt';
-      const spawnContent = [
-        '# this file is automatically loaded when a New Game starts.',
-        "# it's a dummy map to send the player to the actual starting point.",
-        '',
-        '[header]',
-        'width=1',
-        'height=1',
-        'hero_pos=0,0',
-        '',
-        '[event]',
-        'type=event',
-        'location=0,0,1,1',
-        'activate=on_load',
-        `intermap=${spawnIntermapTarget}`,
-        ''
-      ].join('\n');
+        if (Object.keys(overrides).length > 0) {
+          pathOverrides = overrides;
+        }
+      }
 
       try {
         if (!silent) {
           setExportProgress(25);
         }
 
-        const mapTxt = editor.generateFlareMapTxt();
+        const mapTxt = editor.generateFlareMapTxt({ pathOverrides, mapName });
 
         if (!silent) {
           setExportProgress(50);
         }
 
-        const tilesetDef = editor.generateFlareTilesetDef();
+        const tilesetDef = editor.generateFlareTilesetDef({ pathOverrides });
 
         if (!silent) {
           setExportProgress(75);
@@ -1927,7 +2093,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
 
         if (window.electronAPI?.saveExportFiles) {
           const success = await window.electronAPI.saveExportFiles(
-            projectPath,
+            currentProjectPath,
             mapName,
             mapTxt,
             tilesetDef,
@@ -1976,7 +2142,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         }
       }
     },
-    [editor, projectPath, mapName, isStartingMap, toast]
+    [editor, currentProjectPath, mapName, startingMapIntermap, toast]
   );
 
   const handleExportMap = useCallback(async () => {
@@ -1987,8 +2153,8 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     if (!editor) return;
     setIsManuallySaving(true);
     try {
-      if (window.electronAPI && projectPath) {
-        const success = await editor.saveProjectData(projectPath);
+      if (window.electronAPI && currentProjectPath) {
+        const success = await editor.saveProjectData(currentProjectPath);
         await new Promise(resolve => setTimeout(resolve, 300));
         if (success) {
           setLastSaveTime(Date.now());
@@ -2007,25 +2173,25 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     } finally {
       setIsManuallySaving(false);
     }
-  }, [editor, projectPath]);
+  }, [editor, currentProjectPath]);
 
   // Maps helpers (moved after performExport/handleManualSave to avoid forward ref issues)
   const refreshProjectMaps = useCallback(async () => {
-    if (!projectPath || !window.electronAPI?.listMaps) {
+    if (!currentProjectPath || !window.electronAPI?.listMaps) {
       setProjectMaps([]);
       return;
     }
     try {
-      const maps = await window.electronAPI.listMaps(projectPath);
-      setProjectMaps(maps || []);
+      const maps: string[] = await window.electronAPI.listMaps(currentProjectPath);
+      setProjectMaps([...maps]);
     } catch (e) {
       console.warn('Failed to list maps:', e);
       setProjectMaps([]);
     }
-  }, [projectPath]);
+  }, [currentProjectPath]);
 
   const handleOpenMapFromMapsFolder = useCallback(async (filename: string) => {
-    if (!projectPath) return;
+    if (!currentProjectPath) return;
 
     try {
       const exported = await performExport({ silent: true });
@@ -2036,7 +2202,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
 
       await handleManualSave();
 
-      const content = await window.electronAPI.readMapFile(projectPath, filename);
+      const content = await window.electronAPI.readMapFile(currentProjectPath, filename);
       if (!content) {
         toast({ title: 'Open failed', description: `Failed to read map file ${filename}`, variant: 'destructive' });
         return;
@@ -2045,6 +2211,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       // If editor has a loader for Flare TXT, use it. Otherwise notify user.
       if (editor && typeof editor.loadFlareMapTxt === 'function') {
         editor.loadFlareMapTxt!(content);
+        editor.setMapName(filename.replace(/\.txt$/i, ''));
         updateLayersList();
         syncMapObjects();
         setMapInitialized(true);
@@ -2058,7 +2225,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       console.error('Open map error:', e);
       toast({ title: 'Open failed', description: 'An unexpected error occurred while opening the map.', variant: 'destructive' });
     }
-  }, [projectPath, performExport, handleManualSave, editor, updateLayersList, syncMapObjects, toast]);
+  }, [currentProjectPath, performExport, handleManualSave, editor, updateLayersList, syncMapObjects, toast]);
 
   const handleToggleMinimap = () => {
     if (editor?.toggleMinimap) {
@@ -2069,14 +2236,12 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
 
   const handleCreateNewMap = (config: MapConfig, newProjectPath?: string) => {
     localStorage.removeItem('tilemap_autosave_backup');
-    setProjectPath(newProjectPath ?? null);
+    setCurrentProjectPath(newProjectPath ?? null);
 
-    const resolvedName = config.name?.trim() ? config.name.trim() : 'Untitled Map';
-    const starting = Boolean(config.isStartingMap);
-    setMapName(resolvedName);
-    setIsStartingMap(starting);
-    setNewMapName(resolvedName);
-    setNewMapStarting(starting);
+  // Do not set mapName to project name here. Only set currentProjectPath and map config state.
+  updateStartingMap(Boolean(config.isStartingMap), { propagate: false });
+  setNewMapName('Map Name');
+  setNewMapStarting(Boolean(config.isStartingMap));
     setMapWidth(0);
     setMapHeight(0);
     setNewMapWidth(config.width);
@@ -2096,10 +2261,10 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     setShowWelcome(false);
   };
 
-  const handleOpenMap = useCallback(async (projectPath: string) => {
-    console.log('=== HANDLE OPEN MAP CALLED ===', projectPath);
+  const handleOpenMap = useCallback(async (projectDir: string) => {
+    console.log('=== HANDLE OPEN MAP CALLED ===', projectDir);
     console.log('Project path details:', {
-      path: projectPath,
+      path: projectDir,
       timestamp: new Date().toISOString()
     });
     
@@ -2107,100 +2272,95 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       // Block the default editor creation effect while we open
       setIsOpeningProject(true);
       // Remember project path for subsequent saves
-      setProjectPath(projectPath);
+      setCurrentProjectPath(projectDir);
+
+      let spawnIntermapTarget = startingMapIntermap;
+      if (window.electronAPI?.readSpawnFile) {
+        try {
+          const spawnContent = await window.electronAPI.readSpawnFile(projectDir);
+          spawnIntermapTarget = extractSpawnIntermapValue(spawnContent);
+          setStartingMapIntermap(spawnIntermapTarget);
+        } catch (error) {
+          console.warn('Failed to read spawn file:', error);
+          spawnIntermapTarget = null;
+          setStartingMapIntermap(null);
+        }
+      } else {
+        spawnIntermapTarget = null;
+        setStartingMapIntermap(null);
+      }
+
+      // Check if there are any maps in the project
+      let maps: string[] = [];
+      if (window.electronAPI?.listMaps) {
+        try {
+          const listed: string[] = await window.electronAPI.listMaps(projectDir);
+          maps = [...listed];
+        } catch (e) {
+          console.warn('Failed to list maps:', e);
+          maps = [];
+        }
+      }
+      if (maps.length === 0) {
+        // No maps yet: switch to the editor shell and prompt for map creation
+        setProjectMaps([]);
+        setMapInitialized(false);
+        setEditor(null);
+        setPendingMapConfig(null);
+        setMapName('');
+        setNewMapName((prev) => (typeof prev === 'string' && prev.trim() ? prev : 'Map Name'));
+        updateStartingMap(false);
+        setNewMapStarting(false);
+        setMapWidth(0);
+        setMapHeight(0);
+        setActiveLayerId(null);
+        setLayers([]);
+        setStamps([]);
+        setMapObjects([]);
+        setHoverCoords(null);
+        setReservedMapNames([]);
+        setHasSelection(false);
+        setSelectionCount(0);
+        setHasUnsavedChanges(false);
+        setSaveStatus('saved');
+        setCreateMapError(null);
+        setNewMapWidth((prev) => (typeof prev === 'number' && prev > 0 ? prev : 20));
+        setNewMapHeight((prev) => (typeof prev === 'number' && prev > 0 ? prev : 15));
+        setShowWelcome(false);
+        setShowCreateMapDialog(true);
+        return;
+      }
+      setProjectMaps([...maps]);
+      // If there are maps, proceed to open the first map as before
       if (window.electronAPI?.openMapProject) {
-        console.log('Calling electronAPI.openMapProject...');
-        const mapConfig = await window.electronAPI.openMapProject(projectPath);
-        console.log('=== RAW MAP CONFIG RECEIVED ===');
-        console.log('Full mapConfig object:', JSON.stringify(mapConfig, null, 2));
-        
+        const mapConfig = await window.electronAPI.openMapProject(projectDir);
         if (mapConfig) {
-          console.log('=== MAP CONFIG ANALYSIS ===');
-          console.log('Map dimensions:', { width: mapConfig.width, height: mapConfig.height });
-          console.log('Map name:', mapConfig.name);
-          
+          // ...existing code for setting up the map/editor...
           const resolvedName = mapConfig.name?.trim() ? mapConfig.name.trim() : 'Untitled Map';
-          const starting = Boolean((mapConfig as { isStartingMap?: boolean }).isStartingMap);
+          const starting = Boolean(mapConfig.isStartingMap);
           setMapName(resolvedName);
           setNewMapName(resolvedName);
-          setIsStartingMap(starting);
-          setNewMapStarting(starting);
-          
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const extendedConfig = mapConfig as any;
-          console.log('Tilesets count:', extendedConfig.tilesets ? extendedConfig.tilesets.length : 0);
-          console.log('Tileset images count:', extendedConfig.tilesetImages ? Object.keys(extendedConfig.tilesetImages).length : 0);
-          console.log('Layers count:', extendedConfig.layers ? extendedConfig.layers.length : 0);
-          
-          if (extendedConfig.tilesets) {
-            console.log('=== TILESETS DETAILS ===');
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            extendedConfig.tilesets.forEach((tileset: any, index: number) => {
-              console.log(`Tileset ${index}:`, {
-                fileName: tileset.fileName,
-                tileWidth: tileset.tileWidth,
-                tileHeight: tileset.tileHeight,
-                spacing: tileset.spacing,
-                margin: tileset.margin,
-                tileCount: tileset.tileCount
-              });
-            });
+          const sanitizedTarget = computeIntermapTarget(true, resolvedName);
+          const mapIsStarting = spawnIntermapTarget ? sanitizedTarget === spawnIntermapTarget : starting;
+          updateStartingMap(mapIsStarting, { propagate: false });
+          setNewMapStarting(mapIsStarting);
+          if (mapIsStarting && sanitizedTarget && spawnIntermapTarget !== sanitizedTarget) {
+            setStartingMapIntermap(sanitizedTarget);
+            spawnIntermapTarget = sanitizedTarget;
           }
-          
-          if (extendedConfig.layers) {
-            console.log('=== LAYERS DETAILS ===');
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            extendedConfig.layers.forEach((layer: any, index: number) => {
-              console.log(`Layer ${index}:`, {
-                id: layer.id,
-                name: layer.name,
-                type: layer.type,
-                visible: layer.visible,
-                opacity: layer.opacity,
-                dataLength: layer.data ? layer.data.length : 0
-              });
-            });
-          }
-          
-          if (extendedConfig.tilesetImages) {
-            console.log('=== TILESET IMAGES DETAILS ===');
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            Object.entries(extendedConfig.tilesetImages).forEach(([key, data]: [string, any]) => {
-              console.log(`Image ${key}:`, {
-                dataType: typeof data,
-                dataLength: data ? data.length : 0,
-                isDataURL: typeof data === 'string' && data.startsWith('data:')
-              });
-            });
-          }
-          
-          console.log('Setting map dimensions and clearing editor...');
-          setMapWidth(mapConfig.width);
-          setMapHeight(mapConfig.height);
+          setMapWidth(mapConfig.width ?? 20);
+          setMapHeight(mapConfig.height ?? 15);
           setMapInitialized(true);
           showToolbarTemporarily();
           showBottomToolbarTemporarily();
           setShowWelcome(false);
           setShowCreateMapDialog(false);
-          
-          // Clear existing editor state first
-          console.log('Clearing existing editor...');
-          if (editor) {
-            console.log('Found existing editor, clearing it');
-            setEditor(null);
-          } else {
-            console.log('No existing editor to clear');
-          }
-          
-          // Store the map config for deferred editor creation
-          // The editor will be created by the useEffect when canvas becomes available
-          console.log('Storing map config for deferred editor creation');
+          if (editor) setEditor(null);
           setPendingMapConfig(mapConfig);
-          // toast suppressed: Map Loaded
         }
         } else {
         // Fallback for web
-        console.log('Opening map project:', projectPath);
+        console.log('Opening map project:', projectDir);
         // toast suppressed: Feature Unavailable (requires desktop app)
       }
     } catch (error) {
@@ -2211,7 +2371,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       // Re-enable default editor creation for other flows
       setIsOpeningProject(false);
     }
-  }, [editor, setupAutoSave, updateLayersList]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [editor, setupAutoSave, updateLayersList, startingMapIntermap, updateStartingMap]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Wire Electron menu actions (Save/Open/New)
   useEffect(() => {
@@ -2983,7 +3143,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                   >
                     {/* Actions header removed per UX request */}
                     <div className="max-h-60 overflow-y-auto minimal-scroll">
-                      {projectPath ? (
+                      {currentProjectPath ? (
                         <>
                           <div className="relative">
                             <button
@@ -3202,7 +3362,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                       type="checkbox"
                       className="h-4 w-4 rounded border border-border accent-orange-500"
                       checked={isStartingMap}
-                      onChange={(e) => setIsStartingMap(e.target.checked)}
+                      onChange={(e) => updateStartingMap(e.target.checked)}
                       aria-checked={isStartingMap}
                       aria-label="Set this map as the starting map"
                     />
@@ -5396,7 +5556,12 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                     setCreateMapError(null);
                   }
                 }}
+                onKeyDown={(e) => {
+                  // Allow editing keys to work even if parent handlers exist
+                  e.stopPropagation();
+                }}
                 placeholder="Enter map name"
+                autoFocus
               />
               {createMapError && (
                 <p className="mt-1 text-xs text-red-500">{createMapError}</p>
@@ -5571,11 +5736,10 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             </div>
             
             <p className="text-gray-300 flex items-center gap-2">
-              Map files and tile definitions saved to 
               <span className="inline-flex items-center gap-1 font-medium text-white">
                 <Folder className="w-4 h-4" />
-                Export
-              </span>.
+              </span>
+              Project exported to project folder.
             </p>
           </div>
         </div>
@@ -5600,4 +5764,3 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
 }
 
 export default App;
-

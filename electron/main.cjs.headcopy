@@ -94,54 +94,6 @@ ipcMainLocal.handle('read-map-file', async (event, projectPath, filename) => {
   }
 });
 
-ipcMainLocal.handle('resolve-path-relative', async (_event, fromPath, toPath) => {
-  try {
-    if (!fromPath || !toPath) return toPath;
-    if (!path.isAbsolute(toPath)) {
-      return toPath.replace(/\\/g, '/');
-    }
-    const fromExists = fs.existsSync(fromPath);
-    const baseDir = fromExists && fs.statSync(fromPath).isDirectory()
-      ? fromPath
-      : path.dirname(fromPath);
-    const relative = path.relative(baseDir, toPath);
-    return relative ? relative.replace(/\\/g, '/') : toPath;
-  } catch (error) {
-    console.error('resolve-path-relative failed:', error);
-    return toPath;
-  }
-});
-
-ipcMainLocal.handle('update-spawn-file', async (_event, projectPath, content) => {
-  try {
-    if (!projectPath) return false;
-    const mapsDir = path.join(projectPath, 'maps');
-    if (!fs.existsSync(mapsDir)) {
-      fs.mkdirSync(mapsDir, { recursive: true });
-    }
-    const spawnPath = path.join(mapsDir, 'spawn.txt');
-    const data = typeof content === 'string' ? content : '';
-    fs.writeFileSync(spawnPath, data, 'utf8');
-    return true;
-  } catch (error) {
-    console.error('update-spawn-file failed:', error);
-    return false;
-  }
-});
-
-ipcMainLocal.handle('read-spawn-file', async (_event, projectPath) => {
-  try {
-    if (!projectPath) return null;
-    const spawnPath = path.join(projectPath, 'maps', 'spawn.txt');
-    if (!fs.existsSync(spawnPath)) return null;
-    return fs.readFileSync(spawnPath, 'utf8');
-  } catch (error) {
-    console.error('read-spawn-file failed:', error);
-    return null;
-  }
-});
-
-
 ipcMainLocal.handle('select-directory', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     properties: ['openDirectory']
@@ -193,14 +145,10 @@ ipcMainLocal.handle('create-map-project', async (event, config) => {
     const mapConfigPath = path.join(projectPath, `${config.name}.json`);
     fs.writeFileSync(mapConfigPath, JSON.stringify(mapData, null, 2));
 
-    // Create images/tilesets folder structure
-    const imagesPath = path.join(projectPath, 'images');
-    const tilesetsPath = path.join(imagesPath, 'tilesets');
-    if (!fs.existsSync(imagesPath)) {
-      fs.mkdirSync(imagesPath, { recursive: true });
-    }
-    if (!fs.existsSync(tilesetsPath)) {
-      fs.mkdirSync(tilesetsPath, { recursive: true });
+    // Create assets folder
+    const assetsPath = path.join(projectPath, 'assets');
+    if (!fs.existsSync(assetsPath)) {
+      fs.mkdirSync(assetsPath);
     }
 
     // Create maps folder
@@ -209,7 +157,27 @@ ipcMainLocal.handle('create-map-project', async (event, config) => {
       fs.mkdirSync(mapsPath);
     }
 
-    // Do not create spawn.txt yet. It will be generated when a starting map is selected.
+    // Write spawn.txt
+    const sanitizedMapFileBase = String(config.name).replace(/[<>:"/\\|?*]/g, '_').trim().replace(/\s+/g, '_').replace(/_{2,}/g, '_') || 'Untitled_Map';
+    const spawnIntermapTarget = config.isStartingMap ? `maps/${sanitizedMapFileBase}.txt` : 'maps/test11.txt';
+    const spawnContent = [
+      '# this file is automatically loaded when a New Game starts.',
+      "# it's a dummy map to send the player to the actual starting point.",
+      '',
+      '[header]',
+      'width=1',
+      'height=1',
+      'hero_pos=0,0',
+      '',
+      '[event]',
+      'type=event',
+      'location=0,0,1,1',
+      'activate=on_load',
+      `intermap=${spawnIntermapTarget}`,
+      ''
+    ].join('\n');
+    const spawnFilePath = path.join(mapsPath, 'spawn.txt');
+    fs.writeFileSync(spawnFilePath, spawnContent, 'utf8');
 
     return true;
   } catch (error) {
@@ -239,64 +207,63 @@ ipcMainLocal.handle('open-map-project', async (event, projectPath) => {
         layers: mapData.layers ? mapData.layers.length : 0
       });
       
-      // Ensure tilesetImages are present; if missing, attempt to load from images/tilesets (or legacy paths)
+      // Ensure tilesetImages are present; if missing, attempt to load from assets folder or project root
       try {
-        const imagesPath = path.join(projectPath, 'images');
-        const tilesetsPath = path.join(imagesPath, 'tilesets');
-        const legacyAssetsPath = path.join(projectPath, 'assets');
-        const searchDirs = [tilesetsPath, legacyAssetsPath, projectPath];
+        const assetsPath = path.join(projectPath, 'assets');
         const ensureTilesetImages = {};
         if (mapData.tilesetImages && typeof mapData.tilesetImages === 'object') {
           Object.assign(ensureTilesetImages, mapData.tilesetImages);
         }
-
-        const toDataUrl = (filePath) => {
-          const fileBuf = fs.readFileSync(filePath);
-          const ext = (path.extname(filePath).slice(1) || 'png').toLowerCase();
-          const normalizedExt = ext === 'jpg' ? 'jpeg' : ext;
-          return `data:image/${normalizedExt};base64,${fileBuf.toString('base64')}`;
-        };
 
         if (Array.isArray(mapData.tilesets)) {
           for (const ts of mapData.tilesets) {
             const fileName = ts?.fileName || ts?.name;
             if (!fileName) continue;
             const hasEmbedded = ensureTilesetImages[fileName] && typeof ensureTilesetImages[fileName] === 'string';
-            if (hasEmbedded) continue;
-
-            for (const dir of searchDirs) {
-              if (!dir) continue;
-              const candidatePath = path.join(dir, fileName);
-              if (fs.existsSync(candidatePath)) {
-                ensureTilesetImages[fileName] = toDataUrl(candidatePath);
-                const relativeSource = path.relative(projectPath, candidatePath) || candidatePath;
-                console.log(`Embedded tileset from ${relativeSource}: ${fileName}`);
-                break;
+            const candidateAssetsPath = path.join(assetsPath, fileName);
+            const candidateRootPath = path.join(projectPath, fileName);
+            if (!hasEmbedded) {
+              if (fs.existsSync(candidateAssetsPath)) {
+                const fileBuf = fs.readFileSync(candidateAssetsPath);
+                const b64 = fileBuf.toString('base64');
+                ensureTilesetImages[fileName] = `data:image/png;base64,${b64}`;
+                console.log(`Embedded tileset from assets: ${fileName} (${b64.length} chars)`);
+              } else if (fs.existsSync(candidateRootPath)) {
+                const fileBuf = fs.readFileSync(candidateRootPath);
+                const b64 = fileBuf.toString('base64');
+                ensureTilesetImages[fileName] = `data:image/png;base64,${b64}`;
+                console.log(`Embedded tileset from project root: ${fileName} (${b64.length} chars)`);
               }
             }
           }
         }
 
+        // If no tilesets defined but we can find images, synthesize tilesets array
         const haveAnyEmbedded = Object.keys(ensureTilesetImages).length > 0;
         if ((!Array.isArray(mapData.tilesets) || mapData.tilesets.length === 0) && !haveAnyEmbedded) {
+          // Look for png files in assets or project root
           const candidates = [];
-          for (const dir of searchDirs) {
-            try {
-              if (dir && fs.existsSync(dir)) {
-                for (const f of fs.readdirSync(dir)) {
-                  if (/\\.(png|jpg|jpeg)$/i.test(f)) {
-                    candidates.push({ name: f, fullPath: path.join(dir, f) });
-                  }
-                }
+          try {
+            if (fs.existsSync(assetsPath)) {
+              const assetFiles = fs.readdirSync(assetsPath).filter(f => /\.(png|jpg|jpeg)$/i.test(f));
+              for (const f of assetFiles) {
+                candidates.push({ name: f, fullPath: path.join(assetsPath, f) });
               }
-            } catch {}
-          }
+            }
+          } catch {}
+          try {
+            const rootFiles = fs.readdirSync(projectPath).filter(f => /\.(png|jpg|jpeg)$/i.test(f));
+            for (const f of rootFiles) {
+              candidates.push({ name: f, fullPath: path.join(projectPath, f) });
+            }
+          } catch {}
           if (candidates.length > 0) {
             const first = candidates[0];
-            ensureTilesetImages[first.name] = toDataUrl(first.fullPath);
+            const fileBuf = fs.readFileSync(first.fullPath);
+            const b64 = fileBuf.toString('base64');
+            ensureTilesetImages[first.name] = `data:image/png;base64,${b64}`;
             mapData.tilesets = [{ name: first.name, fileName: first.name }];
-            const relativeSource = path.relative(projectPath, first.fullPath) || first.fullPath;
-            console.log(`Synthesized tileset from discovered image: ${relativeSource}`);
+            console.log(`Synthesized tileset from discovered image: ${first.name}`);
           }
         }
 
@@ -304,7 +271,7 @@ ipcMainLocal.handle('open-map-project', async (event, projectPath) => {
           mapData.tilesetImages = ensureTilesetImages;
         }
       } catch (embErr) {
-        console.warn('Warning while embedding tilesets from project files:', embErr);
+        console.warn('Warning while embedding tilesets from assets:', embErr);
       }
 
       if (mapData.tilesetImages) {
@@ -378,25 +345,21 @@ ipcMainLocal.handle('save-map-project', async (event, projectPath, mapData) => {
     fs.writeFileSync(mapConfigPath, JSON.stringify(completeMapData, null, 2));
     console.log('Map configuration saved successfully');
     
-    // Save tileset images to images/tilesets if they exist
+    // Save tileset images to assets folder if they exist
     if (mapData.tilesetImages) {
       console.log('Processing tileset images:', Object.keys(mapData.tilesetImages));
-      const imagesPath = path.join(projectPath, 'images');
-      const tilesetsPath = path.join(imagesPath, 'tilesets');
-      if (!fs.existsSync(imagesPath)) {
-        fs.mkdirSync(imagesPath, { recursive: true });
-        console.log('Created images directory');
+      const assetsPath = path.join(projectPath, 'assets');
+      if (!fs.existsSync(assetsPath)) {
+        fs.mkdirSync(assetsPath, { recursive: true });
+        console.log('Created assets directory');
       }
-      if (!fs.existsSync(tilesetsPath)) {
-        fs.mkdirSync(tilesetsPath, { recursive: true });
-        console.log('Created tilesets directory');
-      }
-
+      
       for (const [filename, imageData] of Object.entries(mapData.tilesetImages)) {
         if (imageData && typeof imageData === 'string') {
           console.log('Saving image:', filename, 'Data length:', imageData.length);
+          // Handle base64 image data
           const base64Data = imageData.replace(/^data:image\/[a-z]+;base64,/, '');
-          const imagePath = path.join(tilesetsPath, filename);
+          const imagePath = path.join(assetsPath, filename);
           fs.writeFileSync(imagePath, base64Data, 'base64');
           console.log('Image saved to:', imagePath);
         }
@@ -409,16 +372,11 @@ ipcMainLocal.handle('save-map-project', async (event, projectPath, mapData) => {
     try {
       if (mapData.minimap && typeof mapData.minimap === 'string' && mapData.minimap.startsWith('data:image')) {
         const minimapBase64 = mapData.minimap.replace(/^data:image\/[a-z]+;base64,/, '');
-        const imagesPath = path.join(projectPath, 'images');
-        if (!fs.existsSync(imagesPath)) {
-          fs.mkdirSync(imagesPath, { recursive: true });
-        }
-        const minimapPath = path.join(imagesPath, 'minimap.png');
+        const minimapPath = path.join(projectPath, 'assets', 'minimap.png');
         fs.writeFileSync(minimapPath, minimapBase64, 'base64');
         console.log('Saved minimap to:', minimapPath);
       }
     } catch (mmErr) {
-
       console.warn('Failed to save minimap:', mmErr);
     }
     
@@ -431,58 +389,78 @@ ipcMainLocal.handle('save-map-project', async (event, projectPath, mapData) => {
 });
 
 // Save export files (map.txt and tileset.txt) to project folder
-ipcMainLocal.handle('save-export-files', async (event, projectPath, mapName, mapTxt, tilesetDef, options = {}) => {
+ipcMainLocal.handle('save-export-files', async (event, projectPath, projectName, mapTxt, tilesetDef, options = {}) => {
   try {
-    if (!projectPath) {
-      throw new Error('Project path is required');
-    }
+    const fs = require('fs');
+    const path = require('path');
+    
+    // Ensure the project directory exists
     if (!fs.existsSync(projectPath)) {
       throw new Error('Project path does not exist');
     }
-
-    const mapsDir = path.join(projectPath, 'maps');
-    if (!fs.existsSync(mapsDir)) {
-      fs.mkdirSync(mapsDir, { recursive: true });
+    
+    // Create Export directory if it doesn't exist
+    const exportDir = path.join(projectPath, 'Export');
+    if (!fs.existsSync(exportDir)) {
+      fs.mkdirSync(exportDir, { recursive: true });
     }
-
-    const sanitize = (input) => {
-      return String(input || '')
-        .replace(/[<>:"/\|?*]/g, '_')
-        .trim()
-        .replace(/\s+/g, '_')
-        .replace(/_{2,}/g, '_')
-        || 'Map_Name';
-    };
-
+    
+    // Helper function to find next available filename
     const getAvailableFilename = (basePath, baseName, extension) => {
-      let candidate = `${baseName}${extension}`;
-      let candidatePath = path.join(basePath, candidate);
-      let counter = 1;
-      while (fs.existsSync(candidatePath)) {
-        candidate = `${baseName}_${counter}${extension}`;
-        candidatePath = path.join(basePath, candidate);
-        counter += 1;
+      let filename = `${baseName}${extension}`;
+      let filepath = path.join(basePath, filename);
+      
+      if (!fs.existsSync(filepath)) {
+        return { filename, filepath };
       }
-      return { filename: candidate, filepath: candidatePath };
+      
+      // If file exists, find the next available number
+      let counter = 1;
+      while (true) {
+        filename = `${baseName}_${counter}${extension}`;
+        filepath = path.join(basePath, filename);
+        
+        if (!fs.existsSync(filepath)) {
+          return { filename, filepath };
+        }
+        counter++;
+      }
     };
-
-    const sanitizedMapName = sanitize(mapName);
-    const mapFile = getAvailableFilename(mapsDir, sanitizedMapName, '.txt');
-    const tilesetFile = getAvailableFilename(mapsDir, `${sanitizedMapName} tileset`, '.txt');
-
+    
+    // Sanitize project name for filename (remove invalid characters)
+    const sanitizedProjectName = projectName
+      .replace(/[<>:"/\|?*]/g, '_')
+      .trim()
+      .replace(/\s+/g, '_')
+      .replace(/_{2,}/g, '_')
+      || 'exported_map';
+    
+    // Get available filenames for both files using project name
+    const mapFile = getAvailableFilename(exportDir, sanitizedProjectName, '.txt');
+    const tilesetFile = getAvailableFilename(exportDir, `${sanitizedProjectName} tileset`, '.txt');
+    
+    // Save map file to Export directory
     fs.writeFileSync(mapFile.filepath, mapTxt, 'utf8');
+    
+    // Save tileset file to Export directory
     fs.writeFileSync(tilesetFile.filepath, tilesetDef, 'utf8');
-
+    
+    // Optionally create spawn file within maps folder
     if (options.spawn && options.spawn.enabled && options.spawn.content) {
+      const mapsDir = path.join(projectPath, 'maps');
+      if (!fs.existsSync(mapsDir)) {
+        fs.mkdirSync(mapsDir, { recursive: true });
+      }
       const spawnFilename = options.spawn.filename || 'spawn.txt';
       const spawnPath = path.join(mapsDir, spawnFilename);
       fs.writeFileSync(spawnPath, options.spawn.content, 'utf8');
       console.log('Spawn file saved:', spawnPath);
     }
-
+    
     console.log('Export files saved successfully:');
     console.log('- Map:', mapFile.filepath);
     console.log('- Tileset:', tilesetFile.filepath);
+    
     return true;
   } catch (error) {
     console.error('Error saving export files:', error);
@@ -491,39 +469,38 @@ ipcMainLocal.handle('save-export-files', async (event, projectPath, mapName, map
 });
 
 // Discover tileset images in a project folder and return as data URLs
-});
-
-// Discover tileset images in a project folder and return as data URLs
 ipcMainLocal.handle('discover-tileset-images', async (event, projectPath) => {
   try {
     if (!projectPath) return { tilesetImages: {}, tilesets: [] };
     const tilesetImages = {};
     const tilesets = [];
-    const imagesPath = path.join(projectPath, 'images');
-    const tilesetsPath = path.join(imagesPath, 'tilesets');
-    const legacyAssetsPath = path.join(projectPath, 'assets');
-    const searchDirs = [tilesetsPath, legacyAssetsPath, projectPath];
+    const assetsPath = path.join(projectPath, 'assets');
 
     const addIfImage = (fullPath, name) => {
       try {
-        if (/\\.(png|jpg|jpeg)$/i.test(name) && fs.existsSync(fullPath)) {
+        if (/\.(png|jpg|jpeg)$/i.test(name) && fs.existsSync(fullPath)) {
           const buf = fs.readFileSync(fullPath);
           const b64 = buf.toString('base64');
           const ext = (name.split('.').pop() || 'png').toLowerCase();
-          tilesetImages[name] = data:image/;base64,;
+          tilesetImages[name] = `data:image/${ext === 'jpg' ? 'jpeg' : ext};base64,${b64}`;
           tilesets.push({ name, fileName: name });
         }
       } catch {}
     };
 
-    for (const dir of searchDirs) {
-      try {
-        if (!dir || !fs.existsSync(dir)) continue;
-        for (const f of fs.readdirSync(dir)) {
-          addIfImage(path.join(dir, f), f);
+    try {
+      if (fs.existsSync(assetsPath)) {
+        for (const f of fs.readdirSync(assetsPath)) {
+          addIfImage(path.join(assetsPath, f), f);
         }
-      } catch {}
-    }
+      }
+    } catch {}
+
+    try {
+      for (const f of fs.readdirSync(projectPath)) {
+        addIfImage(path.join(projectPath, f), f);
+      }
+    } catch {}
 
     return { tilesetImages, tilesets };
   } catch (e) {
@@ -536,9 +513,7 @@ ipcMainLocal.handle('discover-tileset-images', async (event, projectPath) => {
 ipcMainLocal.handle('get-project-thumbnail', async (event, projectPath) => {
   try {
     if (!projectPath) return null;
-    const imagesMinimapPath = path.join(projectPath, 'images', 'minimap.png');
-    const legacyMinimapPath = path.join(projectPath, 'assets', 'minimap.png');
-    const minimapPath = fs.existsSync(imagesMinimapPath) ? imagesMinimapPath : legacyMinimapPath;
+    const minimapPath = path.join(projectPath, 'assets', 'minimap.png');
     if (!fs.existsSync(minimapPath)) return null;
     const buf = fs.readFileSync(minimapPath);
     const b64 = buf.toString('base64');

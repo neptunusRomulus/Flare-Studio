@@ -1,3 +1,6 @@
+import type { EditorProjectData, SavedTilesetEntry } from './editor/TileMapEditor';
+import type { TileLayer, MapObject } from './types';
+
 interface MapConfig {
   name: string;
   width: number;
@@ -7,29 +10,17 @@ interface MapConfig {
   isStartingMap?: boolean;
 }
 
-interface ProjectMapData {
+interface ProjectMapData extends EditorProjectData {
   name: string;
   width: number;
   height: number;
   tileSize: number;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  layers: any[];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  objects: any[];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  tilesets: any[];
-  tilesetImages: { [key: string]: string };
-  heroX?: number;
-  heroY?: number;
+  layers: TileLayer[];
+  objects: MapObject[];
+  tilesets: SavedTilesetEntry[];
+  tilesetImages: Record<string, string>;
   version: string;
-  isStartingMap?: boolean;
-  // Optional editor-specific fields to preserve brush mapping and settings
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  detectedTileData?: Array<[number, any]>;
-  tileContentThreshold?: number;
-  objectSeparationSensitivity?: number;
 }
-
 declare global {
   interface Window {
     electronAPI: {
@@ -43,12 +34,17 @@ declare global {
       selectDirectory: () => Promise<string | null>;
       selectTilesetFile: () => Promise<string | null>;
       createMapProject: (config: MapConfig) => Promise<boolean>;
-      openMapProject: (projectPath: string) => Promise<MapConfig | null>;
+      openMapProject: (projectPath: string) => Promise<EditorProjectData | null>;
       saveMapProject: (projectPath: string, mapData: ProjectMapData) => Promise<boolean>;
-      saveExportFiles: (projectPath: string, projectName: string, mapTxt: string, tilesetDef: string, options?: { spawn?: { enabled: boolean; content: string; filename?: string } }) => Promise<boolean>;
+      saveExportFiles: (projectPath: string, mapName: string, mapTxt: string, tilesetDef: string, options?: { spawn?: { enabled: boolean; content: string; filename?: string } }) => Promise<boolean>;
       discoverTilesetImages: (projectPath: string) => Promise<{ tilesetImages: { [key: string]: string }; tilesets: { name: string; fileName: string }[] }>;
-  listMaps: (projectPath: string) => Promise<string[]>;
-  readMapFile: (projectPath: string, filename: string) => Promise<string | null>;
+      listMaps: (projectPath: string) => Promise<string[]>;
+      readMapFile: (projectPath: string, filename: string) => Promise<string | null>;
+      updateSpawnFile: (projectPath: string, content: string) => Promise<boolean>;
+      readSpawnFile: (projectPath: string) => Promise<string | null>;
+      resolvePathRelative: (fromPath: string, toPath: string) => Promise<string>;
+      getProjectThumbnail: (projectPath: string) => Promise<string | null>;
+      checkProjectExists: (projectPath: string) => Promise<boolean>;
       // Menu event listeners
       onMenuNewMap: (callback: () => void) => void;
       onMenuOpenMap: (callback: () => void) => void;
@@ -60,3 +56,8 @@ declare global {
 }
 
 export {};
+
+
+
+
+

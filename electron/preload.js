@@ -19,6 +19,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   discoverTilesetImages: (projectPath) => ipcRenderer.invoke('discover-tileset-images', projectPath),
     listMaps: (projectPath) => ipcRenderer.invoke('list-maps', projectPath),
     readMapFile: (projectPath, filename) => ipcRenderer.invoke('read-map-file', projectPath, filename),
+  updateSpawnFile: (projectPath, content) => ipcRenderer.invoke('update-spawn-file', projectPath, content),
+  readSpawnFile: (projectPath) => ipcRenderer.invoke('read-spawn-file', projectPath),
+  resolvePathRelative: (fromPath, toPath) => ipcRenderer.invoke('resolve-path-relative', fromPath, toPath),
   getProjectThumbnail: (projectPath) => ipcRenderer.invoke('get-project-thumbnail', projectPath),
   checkProjectExists: (projectPath) => ipcRenderer.invoke('check-project-exists', projectPath),
   // Menu event listeners

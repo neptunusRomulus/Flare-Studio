@@ -89,7 +89,34 @@ export interface EditorProjectData {
   lastSaved?: string;
 }
 
+
 export class TileMapEditor {
+  /**
+   * Creates a settings.txt file in the project root folder for Flare compatibility.
+   * Call this after export. Updates description with project name.
+   */
+  public exportSettingsTxt(projectRoot: string) {
+    const fs = window.require ? window.require('fs') : null;
+    if (!fs) {
+      console.warn('fs module not available. Cannot write settings.txt');
+      return;
+    }
+    const content = `#this file is necesserey to work this project run in flare. please do not remove it. -Ism\ndescription=${this.projectName || '--> Project Name comes here.'}\ngame=flare_studio_game\nversion=1.14\nengine_version_min=1.13.01\n`;
+    const filePath = fs.existsSync(projectRoot) ? `${projectRoot}/settings.txt` : 'settings.txt';
+    try {
+      fs.writeFileSync(filePath, content, 'utf8');
+      console.log('settings.txt exported to', filePath);
+    } catch (err) {
+      console.error('Failed to write settings.txt:', err);
+    }
+  }
+  public projectName: string = '';
+  // Tileset image and metadata for legacy/global tileset usage
+  public tilesetImage: HTMLImageElement | null = null;
+  public tilesetFileName: string | null = null;
+  public tilesetColumns: number = 0;
+  public tilesetRows: number = 0;
+  public tileCount: number = 0;
 
   // Stub: load a Flare-format TXT into the editor.
   // Implementing a full parser is optional; this stub exists to provide a typed
@@ -4897,7 +4924,7 @@ export class TileMapEditor {
     }
 
     if (info.fileName) {
-      return `../images/tilesets/${info.fileName}`;
+      return `images/tilesets/${info.fileName}`;
     }
 
     return 'tileset.png';
@@ -4914,7 +4941,13 @@ export class TileMapEditor {
     lines.push(`orientation=isometric`);
     lines.push(`hero_pos=${this.heroX},${this.heroY}`);
     lines.push(`music=music/default_theme.ogg`);
-    lines.push(`tileset=tilesetdefs/tileset.txt`);
+    // Use the exported tilesetdefs/tileset_mapname.txt for this map
+    const sanitizedMapName = (this.mapName || 'Map_Name')
+      .replace(/[<>:"/\\|?*]/g, '_')
+      .trim()
+      .replace(/\s+/g, '_')
+      .replace(/_{2,}/g, '_');
+    lines.push(`tileset=tilesetdefs/tileset_${sanitizedMapName}.txt`);
     const mapTitle = (options.mapName && options.mapName.trim())
       || this.mapName
       || (this.tilesetFileName ? this.tilesetFileName.replace(/\.[^/.]+$/, '') : 'Untitled Map');
@@ -4931,9 +4964,12 @@ export class TileMapEditor {
     }
 
     lines.push(`[tilesets]`);
+    // Always use the exported/copy location for the tileset image
     for (const tileset of globalTilesets) {
-      const resolvedPath = this.resolveTilesetExportPath(tileset, options.pathOverrides);
-      lines.push(`tileset=${resolvedPath},${tileset.tileWidth},${tileset.tileHeight},${tileset.spacing},${tileset.margin}`);
+      if (!tileset.fileName) continue;
+      // Use relative path to images/tilesets folder from map file
+      const exportPath = `images/tilesets/${tileset.fileName}`;
+      lines.push(`tileset=${exportPath},${tileset.tileWidth},${tileset.tileHeight},${tileset.spacing},${tileset.margin}`);
     }
     lines.push('');
 
@@ -5011,7 +5047,7 @@ export class TileMapEditor {
     return lines.join('\n');
   }
 
-  public generateFlareTilesetDef(options: FlareExportOptions = {}): string {
+  public generateFlareTilesetDef(_options: FlareExportOptions = {}): string {
     const lines: string[] = [];
 
     const globalTilesets = this.collectGlobalTilesets();
@@ -5019,11 +5055,34 @@ export class TileMapEditor {
       return '# No tilesets found - please load tilesets before exporting\n';
     }
 
+    // Use relative path to images/tilesets folder from tilesetdefs
     for (const tileset of globalTilesets) {
-      const resolvedPath = this.resolveTilesetExportPath(tileset, options.pathOverrides);
-      lines.push(`img=${resolvedPath}`);
+      if (!tileset.fileName) continue;
+      const exportPath = `images/tilesets/${tileset.fileName}`;
+      lines.push(`img=${exportPath}`);
     }
     lines.push('');
+
+    // Build a lookup of detected tiles (global + per-layer) so we can export
+    // accurate per-tile bounds and origins when tiles are variable-sized.
+    const detectedLookup = new Map<number, { sourceX: number; sourceY: number; width: number; height: number }>();
+
+    // Global detected tiles (legacy)
+    if (this.detectedTileData && this.detectedTileData.size > 0) {
+      for (const [gid, data] of this.detectedTileData.entries()) {
+        detectedLookup.set(gid, { sourceX: data.sourceX, sourceY: data.sourceY, width: data.width, height: data.height });
+      }
+    }
+
+    // Per-layer detected tiles
+    for (const layerMap of this.layerTileData.values()) {
+      for (const [gid, data] of layerMap.entries()) {
+        // Prefer existing entry (global) only if already present; otherwise set
+        if (!detectedLookup.has(gid)) {
+          detectedLookup.set(gid, { sourceX: data.sourceX, sourceY: data.sourceY, width: data.width, height: data.height });
+        }
+      }
+    }
 
     for (const tileset of globalTilesets) {
       const columns = Math.max(1, tileset.columns);
@@ -5032,12 +5091,32 @@ export class TileMapEditor {
 
       for (let i = 0; i < tileset.count; i++) {
         const globalId = tileset.offset + i;
-        const left_x = (i % columns) * tileWidth;
-        const top_y = Math.floor(i / columns) * tileHeight;
-        const width = tileWidth;
-        const height = tileHeight;
-        const offset_x = Math.floor(tileWidth / 2);
-        const offset_y = Math.floor(tileHeight / 2);
+
+        // If we have detected (variable) tile data for this gid, prefer it.
+        const detected = detectedLookup.get(globalId);
+        let left_x: number;
+        let top_y: number;
+        let width: number;
+        let height: number;
+        let offset_x: number;
+        let offset_y: number;
+
+        if (detected) {
+          left_x = detected.sourceX;
+          top_y = detected.sourceY;
+          width = detected.width;
+          height = detected.height;
+          offset_x = Math.floor(width / 2);
+          offset_y = Math.floor(height / 2);
+        } else {
+          left_x = (i % columns) * tileWidth;
+          top_y = Math.floor(i / columns) * tileHeight;
+          width = tileWidth;
+          height = tileHeight;
+          offset_x = Math.floor(width / 2);
+          offset_y = Math.floor(height / 2);
+        }
+
         lines.push(`tile=${globalId},${left_x},${top_y},${width},${height},${offset_x},${offset_y}`);
       }
     }
@@ -5455,7 +5534,7 @@ export class TileMapEditor {
         });
       }
 
-      const projectData: ProjectSavePayload = {
+  const projectData: EditorProjectData = {
         name: this.mapName || (this.tilesetFileName ? this.tilesetFileName.replace(/\.[^/.]+$/, '') : 'Untitled Map'),
         width: this.mapWidth,
         height: this.mapHeight,
@@ -5476,15 +5555,28 @@ export class TileMapEditor {
 
       console.log('Project data prepared:', {
         name: projectData.name,
-        tilesetCount: Object.keys(projectData.tilesetImages).length,
-        layerCount: projectData.layers.length,
+  tilesetCount: Object.keys(projectData.tilesetImages || {}).length,
+  layerCount: (projectData.layers || []).length,
         layerTilesetCount: tilesets.length
       });
 
       // Save using Electron API if available
       if (window.electronAPI?.saveMapProject) {
         console.log('Saving via Electron API...');
-        const success = await window.electronAPI.saveMapProject(projectPath, projectData);
+  // Ensure name is always a string for ProjectMapData type
+        const safeProjectData = {
+          ...projectData,
+          name: projectData.name || 'Untitled Map',
+          width: projectData.width ?? 20,
+          height: projectData.height ?? 15,
+          tileSize: projectData.tileSize ?? 32,
+          layers: projectData.layers || [],
+          objects: projectData.objects || [],
+          tilesets: projectData.tilesets || [],
+          tilesetImages: projectData.tilesetImages || {},
+          version: projectData.version || '1.0'
+        };
+        const success = await window.electronAPI.saveMapProject(projectPath, safeProjectData);
         console.log('Electron save result:', success);
         return success;
       } else {

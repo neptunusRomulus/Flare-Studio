@@ -1,6 +1,15 @@
+﻿
 const { app, BrowserWindow, Menu, dialog, ipcMain: ipcMainLocal } = require('electron');
 const path = require('path');
 const isDev = !app.isPackaged;
+// Check if a file exists (for export overwrite confirmation)
+ipcMainLocal.handle('file-exists', async (_event, filePath) => {
+  try {
+    return fs.existsSync(filePath);
+  } catch {
+    return false;
+  }
+});
 
 let mainWindow;
 
@@ -207,6 +216,19 @@ ipcMainLocal.handle('create-map-project', async (event, config) => {
     const mapsPath = path.join(projectPath, 'maps');
     if (!fs.existsSync(mapsPath)) {
       fs.mkdirSync(mapsPath);
+    }
+
+    // Create a default settings.txt in the project root so the project is recognized by Flare
+    try {
+      const settingsContent = `description=${config.name || '--> Project Name comes here.'}\n` +
+        `game=flare-game\n` +
+        `version=1.14\n` +
+        `engine_version_min=1.13.01\n`;
+      const settingsPath = path.join(projectPath, 'settings.txt');
+      fs.writeFileSync(settingsPath, settingsContent, 'utf8');
+      console.log('Created default settings.txt at', settingsPath);
+    } catch (settingsErr) {
+      console.warn('Failed to write default settings.txt during project creation:', settingsErr);
     }
 
     // Do not create spawn.txt yet. It will be generated when a starting map is selected.
@@ -445,6 +467,12 @@ ipcMainLocal.handle('save-export-files', async (event, projectPath, mapName, map
       fs.mkdirSync(mapsDir, { recursive: true });
     }
 
+    // Create tilesetdefs directory
+    const tilesetDefsDir = path.join(projectPath, 'tilesetdefs');
+    if (!fs.existsSync(tilesetDefsDir)) {
+      fs.mkdirSync(tilesetDefsDir, { recursive: true });
+    }
+
     const sanitize = (input) => {
       return String(input || '')
         .replace(/[<>:"/\|?*]/g, '_')
@@ -454,24 +482,26 @@ ipcMainLocal.handle('save-export-files', async (event, projectPath, mapName, map
         || 'Map_Name';
     };
 
-    const getAvailableFilename = (basePath, baseName, extension) => {
-      let candidate = `${baseName}${extension}`;
-      let candidatePath = path.join(basePath, candidate);
-      let counter = 1;
-      while (fs.existsSync(candidatePath)) {
-        candidate = `${baseName}_${counter}${extension}`;
-        candidatePath = path.join(basePath, candidate);
-        counter += 1;
-      }
-      return { filename: candidate, filepath: candidatePath };
-    };
 
     const sanitizedMapName = sanitize(mapName);
-    const mapFile = getAvailableFilename(mapsDir, sanitizedMapName, '.txt');
-    const tilesetFile = getAvailableFilename(mapsDir, `${sanitizedMapName} tileset`, '.txt');
+    const mapFilePath = path.join(mapsDir, `${sanitizedMapName}.txt`);
+    const tilesetFilePath = path.join(tilesetDefsDir, `tileset_${sanitizedMapName}.txt`);
 
-    fs.writeFileSync(mapFile.filepath, mapTxt, 'utf8');
-    fs.writeFileSync(tilesetFile.filepath, tilesetDef, 'utf8');
+    fs.writeFileSync(mapFilePath, mapTxt, 'utf8');
+    fs.writeFileSync(tilesetFilePath, tilesetDef, 'utf8');
+
+    // Also create a settings.txt in the project root so the exported mod is recognized by Flare
+    try {
+      const settingsContent = `description=${(mapName && String(mapName).trim()) || sanitizedMapName || '--> Project Name comes here.'}\n` +
+        `game=flare-game\n` +
+        `version=1.14\n` +
+        `engine_version_min=1.13.01\n`;
+      const settingsPath = path.join(projectPath, 'settings.txt');
+      fs.writeFileSync(settingsPath, settingsContent, 'utf8');
+      console.log('Created settings.txt at', settingsPath);
+    } catch (settingsErr) {
+      console.warn('Failed to write settings.txt:', settingsErr);
+    }
 
     if (options.spawn && options.spawn.enabled && options.spawn.content) {
       const spawnFilename = options.spawn.filename || 'spawn.txt';
@@ -480,9 +510,9 @@ ipcMainLocal.handle('save-export-files', async (event, projectPath, mapName, map
       console.log('Spawn file saved:', spawnPath);
     }
 
-    console.log('Export files saved successfully:');
-    console.log('- Map:', mapFile.filepath);
-    console.log('- Tileset:', tilesetFile.filepath);
+  console.log('Export files saved successfully:');
+  console.log('- Map:', mapFilePath);
+  console.log('- Tileset:', tilesetFilePath);
     return true;
   } catch (error) {
     console.error('Error saving export files:', error);
@@ -490,8 +520,7 @@ ipcMainLocal.handle('save-export-files', async (event, projectPath, mapName, map
   }
 });
 
-// Discover tileset images in a project folder and return as data URLs
-});
+
 
 // Discover tileset images in a project folder and return as data URLs
 ipcMainLocal.handle('discover-tileset-images', async (event, projectPath) => {
@@ -506,11 +535,12 @@ ipcMainLocal.handle('discover-tileset-images', async (event, projectPath) => {
 
     const addIfImage = (fullPath, name) => {
       try {
-        if (/\\.(png|jpg|jpeg)$/i.test(name) && fs.existsSync(fullPath)) {
+        if (/\.(png|jpg|jpeg)$/i.test(name) && fs.existsSync(fullPath)) {
           const buf = fs.readFileSync(fullPath);
           const b64 = buf.toString('base64');
           const ext = (name.split('.').pop() || 'png').toLowerCase();
-          tilesetImages[name] = data:image/;base64,;
+          const normalizedExt = ext === 'jpg' ? 'jpeg' : ext;
+          tilesetImages[name] = `data:image/${normalizedExt};base64,${b64}`;
           tilesets.push({ name, fileName: name });
         }
       } catch {}
@@ -538,7 +568,10 @@ ipcMainLocal.handle('get-project-thumbnail', async (event, projectPath) => {
     if (!projectPath) return null;
     const imagesMinimapPath = path.join(projectPath, 'images', 'minimap.png');
     const legacyMinimapPath = path.join(projectPath, 'assets', 'minimap.png');
-    const minimapPath = fs.existsSync(imagesMinimapPath) ? imagesMinimapPath : legacyMinimapPath;
+    let minimapPath = imagesMinimapPath;
+    if (!fs.existsSync(minimapPath) && fs.existsSync(legacyMinimapPath)) {
+      minimapPath = legacyMinimapPath;
+    }
     if (!fs.existsSync(minimapPath)) return null;
     const buf = fs.readFileSync(minimapPath);
     const b64 = buf.toString('base64');

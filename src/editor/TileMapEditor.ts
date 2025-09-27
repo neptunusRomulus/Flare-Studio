@@ -93,6 +93,7 @@ export interface EditorProjectData {
   lastSaved?: string;
 }
 
+const INTERNAL_TILESET_FILENAMES = new Set<string>(['collision_tileset.png']);
 
 export class TileMapEditor {
   /**
@@ -4571,6 +4572,10 @@ export class TileMapEditor {
     return input.replace(/\\/g, '/');
   }
 
+  private isInternalTilesetFile(fileName: string | null | undefined): boolean {
+    return !!fileName && INTERNAL_TILESET_FILENAMES.has(fileName.toLowerCase());
+  }
+
   private extractFileSourcePath(file: File): string | null {
     const candidate = (file as File & { path?: string }).path;
     if (candidate && typeof candidate === 'string') {
@@ -4922,7 +4927,6 @@ export class TileMapEditor {
   private collectGlobalTilesets(): GlobalTilesetInfo[] {
     const results: GlobalTilesetInfo[] = [];
     const added = new Set<string>();
-    let currentOffset = 1;
 
     const pushTileset = (entry: {
       layerType: string;
@@ -4965,10 +4969,9 @@ export class TileMapEditor {
         margin,
         sourcePath: entry.sourcePath,
         image: entry.image,
-        offset: currentOffset
+        offset: 0
       });
 
-      currentOffset += count;
       added.add(uniqueKey);
     };
 
@@ -5015,6 +5018,33 @@ export class TileMapEditor {
         sourcePath: tileset.sourcePath ?? null,
         image: tileset.image ?? null
       });
+    }
+
+    const layerPriority: Record<string, number> = {
+      collision: 0,
+      main: 1,
+      background: 2,
+      object: 3,
+      event: 4,
+      enemy: 5,
+      npc: 6
+    };
+
+    results.sort((a, b) => {
+      const pa = layerPriority[a.layerType] ?? 99;
+      const pb = layerPriority[b.layerType] ?? 99;
+      if (pa !== pb) return pa - pb;
+      const fa = (a.fileName || '').toLowerCase();
+      const fb = (b.fileName || '').toLowerCase();
+      if (fa < fb) return -1;
+      if (fa > fb) return 1;
+      return 0;
+    });
+
+    let currentOffset = 1;
+    for (const entry of results) {
+      entry.offset = currentOffset;
+      currentOffset += Math.max(1, entry.count);
     }
 
     return results;
@@ -5073,8 +5103,9 @@ export class TileMapEditor {
     lines.push('');
 
     const globalTilesets = this.collectGlobalTilesets();
+    const mapTilesets = globalTilesets.filter(t => t.fileName);
     const tilesetOffsets = new Map<string, number>();
-    for (const tileset of globalTilesets) {
+    for (const tileset of mapTilesets) {
       if (!tileset.fileName) continue;
       if (!tilesetOffsets.has(tileset.fileName)) {
         tilesetOffsets.set(tileset.fileName, tileset.offset);
@@ -5083,7 +5114,7 @@ export class TileMapEditor {
 
     lines.push(`[tilesets]`);
     // Always use the exported/copy location for the tileset image
-    for (const tileset of globalTilesets) {
+    for (const tileset of mapTilesets) {
       if (!tileset.fileName) continue;
       // Use relative path to images/tilesets folder from map file
       const exportPath = `images/tilesets/${tileset.fileName}`;
@@ -5103,7 +5134,7 @@ export class TileMapEditor {
 
       const layerTileset = this.layerTilesets.get(layerType);
       const offsetKey = layerTileset?.fileName ?? null;
-      const tilesetOffset = offsetKey ? tilesetOffsets.get(offsetKey) ?? 0 : 0;
+      const tilesetOffset = offsetKey ? tilesetOffsets.get(offsetKey) : undefined;
 
       for (let y = 0; y < this.mapHeight; y++) {
         const row: string[] = [];
@@ -5112,7 +5143,11 @@ export class TileMapEditor {
           const localTileId = layer.data[index];
           let globalTileId = 0;
           if (localTileId > 0) {
-            globalTileId = tilesetOffset + (localTileId - 1);
+            if (tilesetOffset !== undefined && tilesetOffset >= 1) {
+              globalTileId = tilesetOffset + (localTileId - 1);
+            } else {
+              globalTileId = localTileId;
+            }
           }
           row.push(globalTileId.toString());
         }
@@ -5169,12 +5204,13 @@ export class TileMapEditor {
     const lines: string[] = [];
 
     const globalTilesets = this.collectGlobalTilesets();
-    if (globalTilesets.length === 0) {
+    const exportedTilesets = globalTilesets.filter(t => t.fileName && !this.isInternalTilesetFile(t.fileName));
+    if (exportedTilesets.length === 0) {
       return '# No tilesets found - please load tilesets before exporting\n';
     }
 
     // Use relative path to images/tilesets folder from tilesetdefs
-    for (const tileset of globalTilesets) {
+    for (const tileset of exportedTilesets) {
       if (!tileset.fileName) continue;
       const exportPath = `images/tilesets/${tileset.fileName}`;
       lines.push(`img=${exportPath}`);
@@ -5192,17 +5228,30 @@ export class TileMapEditor {
       }
     }
 
+    const exportedOffsetByFile = new Map<string, number>();
+    for (const tileset of exportedTilesets) {
+      if (tileset.fileName && !exportedOffsetByFile.has(tileset.fileName)) {
+        exportedOffsetByFile.set(tileset.fileName, tileset.offset);
+      }
+    }
+
     // Per-layer detected tiles
-    for (const layerMap of this.layerTileData.values()) {
+    for (const [layerType, layerMap] of this.layerTileData.entries()) {
+      const layerTileset = this.layerTilesets.get(layerType);
+      const fileName = layerTileset?.fileName ?? null;
+      if (!fileName || this.isInternalTilesetFile(fileName)) {
+        continue;
+      }
+      const baseOffset = exportedOffsetByFile.get(fileName);
       for (const [gid, data] of layerMap.entries()) {
-        // Prefer existing entry (global) only if already present; otherwise set
-        if (!detectedLookup.has(gid)) {
-          detectedLookup.set(gid, { sourceX: data.sourceX, sourceY: data.sourceY, width: data.width, height: data.height });
+        const globalKey = baseOffset !== undefined ? baseOffset + gid - 1 : gid;
+        if (!detectedLookup.has(globalKey)) {
+          detectedLookup.set(globalKey, { sourceX: data.sourceX, sourceY: data.sourceY, width: data.width, height: data.height });
         }
       }
     }
 
-    for (const tileset of globalTilesets) {
+    for (const tileset of exportedTilesets) {
       const columns = Math.max(1, tileset.columns);
       const tileWidth = tileset.tileWidth || this.tileSizeX;
       const tileHeight = tileset.tileHeight || this.tileSizeY;
@@ -5210,11 +5259,7 @@ export class TileMapEditor {
       for (let i = 0; i < tileset.count; i++) {
         const globalId = tileset.offset + i;
 
-  // If we have detected (variable) tile data for this gid, prefer it.
-  // Note: detected tiles in the editor are often stored with a tileset-local
-  // 1-based index; the exporter uses a globalId (tileset.offset + i).
-  // Try both keys so we don't miss detected tiles and fallback to grid.
-  const detected = detectedLookup.get(globalId) || detectedLookup.get(i + 1);
+        const detected = detectedLookup.get(globalId) || detectedLookup.get(i + 1);
         let left_x: number;
         let top_y: number;
         let width: number;

@@ -2128,6 +2128,36 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         }
 
         if (window.electronAPI?.saveExportFiles) {
+          // Collect tileset images (data URLs) to include in the export so Electron can write PNGs
+          const tilesetImages: Record<string, string> = {};
+          try {
+            const exportInfo = editor.getTilesetExportInfo();
+            for (const info of exportInfo) {
+              // Attempt to get the image element from the editor's layerTilesets by matching fileName
+              let tilesetEntry: unknown | undefined = undefined;
+              if (editor['layerTilesets'] && typeof editor['layerTilesets'].forEach === 'function') {
+                editor['layerTilesets'].forEach((val: unknown) => {
+                  const v = val as { fileName?: string; image?: HTMLImageElement } | undefined;
+                  if (v && v.fileName === info.fileName) tilesetEntry = v;
+                });
+              }
+              // Fallback: try to access editor.tilesetImage when fileName matches
+              let imgEl: HTMLImageElement | null = null;
+              if (tilesetEntry && tilesetEntry.image) imgEl = tilesetEntry.image as HTMLImageElement;
+              if (!imgEl && editor['tilesetFileName'] === info.fileName && editor['tilesetImage']) imgEl = editor['tilesetImage'];
+              if (imgEl) {
+                try {
+                  const dataUrl = editor['canvasToDataURL'](imgEl);
+                  tilesetImages[info.fileName] = dataUrl;
+                } catch (imgErr) {
+                  console.warn('Failed to serialize tileset image', info.fileName, imgErr);
+                }
+              }
+            }
+          } catch (err) {
+            console.warn('Failed to collect tileset images for export:', err);
+          }
+
           const success = await window.electronAPI.saveExportFiles(
             currentProjectPath,
             mapName,
@@ -2138,7 +2168,8 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 enabled: true,
                 content: spawnContent,
                 filename: 'spawn.txt'
-              }
+              },
+              tilesetImages
             }
           );
 

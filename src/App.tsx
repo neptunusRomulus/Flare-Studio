@@ -12,6 +12,7 @@ import { TileLayer, MapObject } from './types';
 import { useToast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/toaster';
 import WelcomeScreen from './components/WelcomeScreen';
+import OverwriteExportDialog from './components/OverwriteExportDialog';
 
 interface MapConfig {
   name: string;
@@ -1582,6 +1583,10 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
   // Helper function to load project data into editor
   const loadProjectData = useCallback(async (newEditor: TileMapEditor, mapConfig: EditorProjectData) => {
     try {
+      // Set projectName from loaded project data if available
+      if (mapConfig.name) {
+        newEditor.projectName = mapConfig.name;
+      }
       console.log('=== LOAD PROJECT DATA DEBUG ===');
       console.log('Map config received:', {
         name: mapConfig.name,
@@ -1947,6 +1952,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
 
       let targetEditor = editor;
 
+
       if (!targetEditor && canvasRef.current) {
         targetEditor = new TileMapEditor(canvasRef.current);
         targetEditor.setDarkMode(isDarkMode);
@@ -1954,6 +1960,10 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       }
 
       if (targetEditor) {
+
+        // Set projectName to the user-typed project name at creation
+        targetEditor.projectName = resolvedName;
+
         targetEditor.resetForNewProject();
         targetEditor.setMapName(resolvedName);
         targetEditor.setMapSize(width, height);
@@ -1998,8 +2008,25 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     }
   }, [editor, updateLayersList, syncMapObjects]);
 
+  const [showOverwriteDialog, setShowOverwriteDialog] = useState(false);
+  const [pendingExport, setPendingExport] = useState<null | (() => Promise<boolean>)>(null);
+
+  const checkExportFilesExist = useCallback(async (mapName: string) => {
+    if (!window.electronAPI?.resolvePathRelative || !currentProjectPath) return false;
+    const sanitizedMapName = mapName.replace(/[<>:"/\\|?*]/g, '_').trim().replace(/\s+/g, '_').replace(/_{2,}/g, '_') || 'Map_Name';
+    const mapFilePath = `${currentProjectPath}/maps/${sanitizedMapName}.txt`;
+    const tilesetFilePath = `${currentProjectPath}/tilesetdefs/tileset_${sanitizedMapName}.txt`;
+    try {
+      const mapExists = await window.electronAPI.fileExists?.(mapFilePath);
+      const tilesetExists = await window.electronAPI.fileExists?.(tilesetFilePath);
+      return !!mapExists || !!tilesetExists;
+    } catch {
+      return false;
+    }
+  }, [currentProjectPath]);
+
   const performExport = useCallback(
-    async ({ silent = false }: { silent?: boolean } = {}) => {
+    async ({ silent = false, forceOverwrite = false }: { silent?: boolean, forceOverwrite?: boolean } = {}) => {
       if (!editor || !currentProjectPath) {
         toast({
           title: "Export Failed",
@@ -2075,6 +2102,15 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       }
 
       try {
+        // Overwrite confirmation logic
+        if (!forceOverwrite && !silent) {
+          const exists = await checkExportFilesExist(mapName);
+          if (exists) {
+            setPendingExport(() => () => performExport({ silent, forceOverwrite: true }));
+            setShowOverwriteDialog(true);
+            return false;
+          }
+        }
         if (!silent) {
           setExportProgress(25);
         }
@@ -2142,12 +2178,26 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         }
       }
     },
-    [editor, currentProjectPath, mapName, startingMapIntermap, toast]
+  [editor, currentProjectPath, mapName, startingMapIntermap, toast, checkExportFilesExist]
   );
 
   const handleExportMap = useCallback(async () => {
     await performExport();
   }, [performExport]);
+
+  // Overwrite dialog handlers
+  const handleOverwriteConfirm = useCallback(() => {
+    setShowOverwriteDialog(false);
+    if (pendingExport) {
+      pendingExport();
+      setPendingExport(null);
+    }
+  }, [pendingExport]);
+
+  const handleOverwriteCancel = useCallback(() => {
+    setShowOverwriteDialog(false);
+    setPendingExport(null);
+  }, []);
 
   const handleManualSave = useCallback(async () => {
     if (!editor) return;
@@ -5713,6 +5763,13 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         </DialogContent>
       </Dialog>
       
+      {/* Overwrite Export Confirmation Dialog */}
+      <OverwriteExportDialog
+        open={showOverwriteDialog}
+        onConfirm={handleOverwriteConfirm}
+        onCancel={handleOverwriteCancel}
+      />
+
       {/* Export Success Modal */}
       {showExportSuccess && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">

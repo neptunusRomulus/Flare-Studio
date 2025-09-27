@@ -37,7 +37,8 @@ declare global {
       openMapProject: (projectPath: string) => Promise<EditorProjectData | null>;
       saveMapProject: (projectPath: string, mapData: ProjectMapData) => Promise<boolean>;
       saveExportFiles: (projectPath: string, mapName: string, mapTxt: string, tilesetDef: string, options?: { spawn?: { enabled: boolean; content: string; filename?: string } }) => Promise<boolean>;
-      discoverTilesetImages: (projectPath: string) => Promise<{ tilesetImages: { [key: string]: string }; tilesets: { name: string; fileName: string }[] }>;
+  discoverTilesetImages: (projectPath: string) => Promise<{ tilesetImages: { [key: string]: string }; tilesets: { name: string; fileName: string }[] }>;
+  fileExists: (filePath: string) => Promise<boolean>;
       listMaps: (projectPath: string) => Promise<string[]>;
       readMapFile: (projectPath: string, filename: string) => Promise<string | null>;
       updateSpawnFile: (projectPath: string, content: string) => Promise<boolean>;

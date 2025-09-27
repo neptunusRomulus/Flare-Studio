@@ -510,6 +510,28 @@ ipcMainLocal.handle('save-export-files', async (event, projectPath, mapName, map
       console.log('Spawn file saved:', spawnPath);
     }
 
+    // If exporter provided tileset images (base64 data URLs), save them to images/tilesets
+    try {
+      if (options.tilesetImages && typeof options.tilesetImages === 'object') {
+        const imagesPath = path.join(projectPath, 'images');
+        const tilesetsPath = path.join(imagesPath, 'tilesets');
+        if (!fs.existsSync(imagesPath)) fs.mkdirSync(imagesPath, { recursive: true });
+        if (!fs.existsSync(tilesetsPath)) fs.mkdirSync(tilesetsPath, { recursive: true });
+
+        for (const [filename, imageData] of Object.entries(options.tilesetImages)) {
+          if (imageData && typeof imageData === 'string') {
+            console.log('Export: saving tileset image', filename, 'length', imageData.length);
+            const base64Data = imageData.replace(/^data:image\/[a-z]+;base64,/, '');
+            const imagePath = path.join(tilesetsPath, filename);
+            fs.writeFileSync(imagePath, base64Data, 'base64');
+            console.log('Export: saved tileset image to', imagePath);
+          }
+        }
+      }
+    } catch (imgErr) {
+      console.warn('Failed to save exported tileset images:', imgErr);
+    }
+
   console.log('Export files saved successfully:');
   console.log('- Map:', mapFilePath);
   console.log('- Tileset:', tilesetFilePath);

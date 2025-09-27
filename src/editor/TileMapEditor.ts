@@ -3,7 +3,9 @@ import {
   TilesetInfo,
   MapObject,
   Tool,
-  Orientation
+  Orientation,
+  Stamp,
+  StampTile
 } from '../types';
 
 interface LayerTilesetEntry {
@@ -52,6 +54,8 @@ export type SerializedDetectedTile = [number, {
   sourceY: number;
   width: number;
   height: number;
+  originX?: number;
+  originY?: number;
 }];
 
 export interface SavedTilesetEntry {
@@ -641,6 +645,8 @@ export class TileMapEditor {
     sourceY: number;
     width: number;
     height: number;
+    originX?: number;
+    originY?: number;
   }> = new Map();
 
   // Layer-specific tileset management
@@ -652,7 +658,7 @@ export class TileMapEditor {
     id: number;
     name: string;
     tileset?: LayerTilesetEntry;
-    detectedTiles?: Map<number, { sourceX: number; sourceY: number; width: number; height: number }>;
+    detectedTiles?: Map<number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }>;
     brushes?: Array<{ image: HTMLImageElement; fileName: string; width: number; height: number }>;
   }>> = new Map();
 
@@ -665,6 +671,8 @@ export class TileMapEditor {
     sourceY: number;
     width: number;
     height: number;
+    originX?: number;
+    originY?: number;
   }>> = new Map();
 
   // Per-layer active tile selection
@@ -705,6 +713,8 @@ export class TileMapEditor {
   private currentShapeTool: 'rectangle' | 'circle' | 'line' = 'rectangle';
   private currentStampMode: 'select' | 'create' | 'place' = 'select';
   private activeGid: number = 0;
+  // Multi-selection of palette brushes when user holds Ctrl/Cmd and clicks
+  private multiSelectedBrushes: Set<number> = new Set();
   private isMouseDown: boolean = false;
 
   // Selection state
@@ -1320,9 +1330,18 @@ export class TileMapEditor {
           switch (this.currentTool) {
             case 'brush':
               // Don't paint if no tile is selected (activeGid is 0)
-              if (currentLayerActiveGid === 0) {
+              if (currentLayerActiveGid === 0 && this.multiSelectedBrushes.size === 0) {
                 return; // Exit early, don't paint anything
               }
+
+              // If multiple brushes are selected, stamp them as a block
+              if (this.multiSelectedBrushes.size > 1) {
+                this.saveState();
+                this.placeMultiSelectionAt(x, y);
+                this.markAsChanged();
+                return;
+              }
+
               newValue = currentLayerActiveGid;
               break;
             case 'eraser':
@@ -1933,14 +1952,15 @@ export class TileMapEditor {
     y: number, 
     gid: number, 
     layerTileset: { image: HTMLImageElement | null; fileName: string | null; columns: number; rows: number; count: number },
-    layerTileData: Map<number, { sourceX: number; sourceY: number; width: number; height: number }>
+    layerTileData: Map<number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }>
   ): void {
     if (!layerTileset.image || gid <= 0) return;
     
     // Check if we have variable-sized tile data for this gid in this layer
     const tileData = layerTileData.get(gid);
     
-    let sourceX: number, sourceY: number, tileWidth: number, tileHeight: number;
+  let sourceX: number, sourceY: number, tileWidth: number, tileHeight: number;
+  let originX: number | undefined, originY: number | undefined;
     
     if (tileData) {
       // Use variable-sized tile data
@@ -1948,6 +1968,8 @@ export class TileMapEditor {
       sourceY = tileData.sourceY;
       tileWidth = tileData.width;
       tileHeight = tileData.height;
+      originX = (tileData as { originX?: number; originY?: number }).originX;
+      originY = (tileData as { originX?: number; originY?: number }).originY;
     } else {
       // Fallback to fixed grid layout using layer's tileset properties
       const tileIndex = gid - 1;
@@ -1969,9 +1991,13 @@ export class TileMapEditor {
   const halfTileY = (this.tileSizeY / 2) * this.zoom;
   const groundY = screenPos.y + halfTileY;
 
-  // Draw image so its bottom-center aligns to groundY and center X
-  const destX = screenPos.x - (scaledTileX / 2);
-  const destY = groundY - scaledTileY;
+  // Determine origin (fallback to center-bottom behavior if not present)
+  const finalOriginX = (typeof originX === 'number') ? originX : Math.floor(tileWidth / 2);
+  const finalOriginY = (typeof originY === 'number') ? originY : tileHeight; // default to bottom
+
+  // Draw image so its origin point aligns to the tile ground anchor
+  const destX = screenPos.x - (finalOriginX * this.zoom);
+  const destY = groundY - (finalOriginY * this.zoom);
     
     this.ctx.drawImage(
       layerTileset.image,
@@ -1986,7 +2012,8 @@ export class TileMapEditor {
     // Check if we have variable-sized tile data for this gid
     const tileData = this.detectedTileData.get(gid);
     
-    let sourceX: number, sourceY: number, tileWidth: number, tileHeight: number;
+  let sourceX: number, sourceY: number, tileWidth: number, tileHeight: number;
+  let originX: number | undefined, originY: number | undefined;
     
     if (tileData) {
       // Use variable-sized tile data
@@ -1994,6 +2021,8 @@ export class TileMapEditor {
       sourceY = tileData.sourceY;
       tileWidth = tileData.width;
       tileHeight = tileData.height;
+      originX = (tileData as { originX?: number; originY?: number }).originX;
+      originY = (tileData as { originX?: number; originY?: number }).originY;
     } else {
       // Fallback to fixed grid layout
       const tileIndex = gid - 1;
@@ -2015,9 +2044,13 @@ export class TileMapEditor {
   const halfTileY = (this.tileSizeY / 2) * this.zoom;
   const groundY = screenPos.y + halfTileY;
 
-  // Draw image so its bottom-center aligns to groundY and center X
-  const destX = screenPos.x - (scaledTileX / 2);
-  const destY = groundY - scaledTileY;
+  // Determine origin (fallback to center-bottom behavior if not present)
+  const finalOriginX = (typeof originX === 'number') ? originX : Math.floor(tileWidth / 2);
+  const finalOriginY = (typeof originY === 'number') ? originY : tileHeight; // default to bottom
+
+  // Draw image so its origin point aligns to the tile ground anchor
+  const destX = screenPos.x - (finalOriginX * this.zoom);
+  const destY = groundY - (finalOriginY * this.zoom);
     
     this.ctx.drawImage(
       this.tilesetImage,
@@ -2636,7 +2669,9 @@ export class TileMapEditor {
           sourceX: tile.sourceX,
           sourceY: tile.sourceY,
           width: tile.width,
-          height: tile.height
+          height: tile.height,
+          originX: Math.floor(tile.width / 2),
+          originY: tile.height
         });
         return tile;
       });
@@ -2644,9 +2679,9 @@ export class TileMapEditor {
       // Also store the detected tiles in the current layer's data
       const activeLayer = this.tileLayers.find(l => l.id === this.activeLayerId);
       if (activeLayer) {
-        const layerTileMap = new Map<number, { sourceX: number; sourceY: number; width: number; height: number }>();
+        const layerTileMap = new Map<number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }>();
         for (const [gid, data] of this.detectedTileData.entries()) {
-          layerTileMap.set(gid, data);
+          layerTileMap.set(gid, { sourceX: data.sourceX, sourceY: data.sourceY, width: data.width, height: data.height, originX: data.originX, originY: data.originY });
         }
         this.layerTileData.set(activeLayer.type, layerTileMap);
         console.log(`Stored ${layerTileMap.size} newly detected tiles for layer type: ${activeLayer.type}`);
@@ -2679,6 +2714,20 @@ export class TileMapEditor {
           tile.sourceX, tile.sourceY, tile.width, tile.height,
           0, 0, tile.width, tile.height
         );
+
+        // Draw a small visual marker at the center of the sprite for palette preview
+        // (Note: exported game origin remains bottom-center so sprites align to ground;
+        // palette marker is purely visual and centered so tall sprites appear intuitively)
+        const originX = Math.floor(tile.width / 2);
+        const originY = Math.floor(tile.height / 2);
+        ctx.strokeStyle = 'rgba(255,0,0,0.8)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(originX - 3, originY);
+        ctx.lineTo(originX + 3, originY);
+        ctx.moveTo(originX, originY - 3);
+        ctx.lineTo(originX, originY + 3);
+        ctx.stroke();
       }
       
       // Create a wrapper div for brush management features
@@ -2782,34 +2831,56 @@ export class TileMapEditor {
         this.handleBrushRemove(tile.index);
       });
       
-      canvas.addEventListener('click', (e) => {
+      canvas.addEventListener('click', (e: MouseEvent) => {
         e.preventDefault();
 
-        // Read the brush tool state using a stable id when possible. This avoids
-        // flakiness when React re-renders the hidden tracking element.
         const brushToolElement = getBrushToolEl();
         const currentBrushTool = brushToolElement?.getAttribute('data-brush-tool') || 'none';
 
         console.log(`Tile clicked! Index: ${tile.index}, Current brush tool: ${currentBrushTool}`);
 
         if (currentBrushTool === 'merge') {
-          // Handle merge tool selection
-          console.log('Handling merge tool selection');
+          // Keep merge UI but do not auto-merge; allow manual merge via tool
+          console.log('Handling merge tool selection (no auto-merge)');
           this.handleBrushMerge(tile.index, wrapper);
-        } else if (currentBrushTool === 'separate') {
-          // Handle separate tool
+          return;
+        }
+
+        if (currentBrushTool === 'separate') {
           console.log('Handling separate tool');
           this.handleBrushSeparate(tile.index);
-        } else if (currentBrushTool === 'remove') {
-          // Handle remove tool
+          return;
+        }
+
+        if (currentBrushTool === 'remove') {
           console.log('Handling remove tool');
           this.handleBrushRemove(tile.index);
-        } else {
-          // Normal tile selection
-          console.log('Normal tile selection');
-          this.setCurrentLayerActiveGid(tile.index);
-          this.updateActiveTile();
+          return;
         }
+
+        // Normal tile selection - support Ctrl/Cmd multi-select of palette tiles
+        const isCtrl = (e.ctrlKey || e.metaKey);
+        if (isCtrl) {
+          // Toggle inclusion in multi-selected set
+          if (this.multiSelectedBrushes.has(tile.index)) {
+            this.multiSelectedBrushes.delete(tile.index);
+          } else {
+            this.multiSelectedBrushes.add(tile.index);
+          }
+
+          // If there's exactly one selected, set it active; otherwise keep active as first
+          if (this.multiSelectedBrushes.size === 1) {
+            const only = Array.from(this.multiSelectedBrushes.values())[0];
+            this.setCurrentLayerActiveGid(only);
+          }
+          this.updateActiveTile();
+          return;
+        }
+
+        // Single selection: clear multi-selection and select this tile
+        this.multiSelectedBrushes.clear();
+        this.setCurrentLayerActiveGid(tile.index);
+        this.updateActiveTile();
       });
       
       // Add drag and drop functionality for move tool
@@ -2922,12 +2993,16 @@ export class TileMapEditor {
         removeOverlay.style.display = 'none';
       });
       
-      // Add data attributes to track tile properties
-      canvas.setAttribute('data-tile-index', tile.index.toString());
-      canvas.setAttribute('data-tile-width', tile.width.toString());
-      canvas.setAttribute('data-tile-height', tile.height.toString());
-      canvas.setAttribute('data-source-x', tile.sourceX.toString());
-      canvas.setAttribute('data-source-y', tile.sourceY.toString());
+  // Add data attributes to track tile properties
+  canvas.setAttribute('data-tile-index', tile.index.toString());
+  canvas.setAttribute('data-tile-width', tile.width.toString());
+  canvas.setAttribute('data-tile-height', tile.height.toString());
+  canvas.setAttribute('data-source-x', tile.sourceX.toString());
+  canvas.setAttribute('data-source-y', tile.sourceY.toString());
+  // Expose origin info for later use
+  canvas.setAttribute('data-origin-x', Math.floor(tile.width / 2).toString());
+  // Expose the visual center for previews; note exporter uses bottom-center origin
+  canvas.setAttribute('data-origin-y', Math.floor(tile.height / 2).toString());
       
       wrapper.appendChild(canvas);
       wrapper.appendChild(selectionNumber);
@@ -2957,18 +3032,10 @@ export class TileMapEditor {
       // This is the first selection - add orange stroke
       wrapper.classList.add('merge-selected-first');
     } else if (!secondSelected) {
-      // This is the second selection - add orange fill and merge icon, then auto-merge
+      // This is the second selection - add orange fill and merge icon.
+      // Auto-merge disabled: user must explicitly trigger merge (e.g. via UI button).
       wrapper.classList.add('merge-selected-second');
-      
-      // Auto-merge after a short delay to show the visual feedback
-      setTimeout(() => {
-        const firstTileIndex = parseInt(firstSelected.getAttribute('data-tile-index') || '0');
-        this.performMerge(firstTileIndex, tileIndex);
-        
-        // Clear selections
-        firstSelected.classList.remove('merge-selected-first');
-        wrapper.classList.remove('merge-selected-second');
-      }, 300);
+      // Do not auto-merge here; keep both selections so user can confirm/adjust.
     } else {
       // Already have 2 selected, ignore further selections
       return;
@@ -3736,15 +3803,16 @@ export class TileMapEditor {
     
     // Update selected tile visual
     const tiles = document.querySelectorAll('.palette-tile');
-    tiles.forEach(tile => tile.classList.remove('selected'));
-    
-    if (this.activeGid > 0) {
-      // Find the tile with matching data-tile-index
-      const selectedTile = document.querySelector(`.palette-tile[data-tile-index="${this.activeGid}"]`);
-      if (selectedTile) {
-        selectedTile.classList.add('selected');
+    tiles.forEach(tile => {
+      tile.classList.remove('selected', 'multi-selected');
+      const idx = parseInt(tile.getAttribute('data-tile-index') || '0');
+      if (idx === this.activeGid && this.activeGid > 0) {
+        tile.classList.add('selected');
       }
-    }
+      if (this.multiSelectedBrushes.has(idx)) {
+        tile.classList.add('multi-selected');
+      }
+    });
   }
 
   public resizeMap(width: number, height: number): void {
@@ -4165,6 +4233,56 @@ export class TileMapEditor {
 
       if (targetLayer) {
         targetLayer.data[targetIndex] = stampTile.tileId;
+      }
+    }
+
+    this.saveState();
+    this.draw();
+  }
+
+  /**
+   * Build a simple stamp layout from the currently multi-selected brushes.
+   * This arranges selected tiles into a compact grid (row-major) where each
+   * cell corresponds to one map tile (using grid cell units). The tileIds
+   * are placed in the order they were selected.
+   */
+  private buildStampFromMultiSelection(): Stamp | null {
+    if (this.multiSelectedBrushes.size === 0) return null;
+    const gids = Array.from(this.multiSelectedBrushes.values());
+    const n = gids.length;
+    const cols = Math.ceil(Math.sqrt(n));
+    const rows = Math.ceil(n / cols);
+
+    const tiles: StampTile[] = [];
+    for (let i = 0; i < n; i++) {
+      const gid = gids[i];
+      const sx = i % cols;
+      const sy = Math.floor(i / cols);
+      tiles.push({ tileId: gid, layerId: this.activeLayerId ?? 0, x: sx, y: sy });
+    }
+
+    return {
+      id: `multiselection-${Date.now()}`,
+      name: 'MultiSelectStamp',
+      width: cols,
+      height: rows,
+      tiles
+    };
+  }
+
+  private placeMultiSelectionAt(gridX: number, gridY: number): void {
+    const stamp = this.buildStampFromMultiSelection();
+    if (!stamp) return;
+
+    // Place each tile relative to gridX/gridY
+    for (const t of stamp.tiles) {
+      const targetX = gridX + t.x;
+      const targetY = gridY + t.y;
+      if (targetX < 0 || targetY < 0 || targetX >= this.mapWidth || targetY >= this.mapHeight) continue;
+      const index = targetY * this.mapWidth + targetX;
+      const layer = this.tileLayers.find(l => l.id === (t.layerId || this.activeLayerId));
+      if (layer) {
+        layer.data[index] = t.tileId;
       }
     }
 
@@ -5092,8 +5210,11 @@ export class TileMapEditor {
       for (let i = 0; i < tileset.count; i++) {
         const globalId = tileset.offset + i;
 
-        // If we have detected (variable) tile data for this gid, prefer it.
-        const detected = detectedLookup.get(globalId);
+  // If we have detected (variable) tile data for this gid, prefer it.
+  // Note: detected tiles in the editor are often stored with a tileset-local
+  // 1-based index; the exporter uses a globalId (tileset.offset + i).
+  // Try both keys so we don't miss detected tiles and fallback to grid.
+  const detected = detectedLookup.get(globalId) || detectedLookup.get(i + 1);
         let left_x: number;
         let top_y: number;
         let width: number;
@@ -5106,15 +5227,17 @@ export class TileMapEditor {
           top_y = detected.sourceY;
           width = detected.width;
           height = detected.height;
+          // Use bottom-center anchor for detected sprites so they align to ground
           offset_x = Math.floor(width / 2);
-          offset_y = Math.floor(height / 2);
+          offset_y = height;
         } else {
           left_x = (i % columns) * tileWidth;
           top_y = Math.floor(i / columns) * tileHeight;
           width = tileWidth;
           height = tileHeight;
+          // For grid-based tiles default to bottom-center as well
           offset_x = Math.floor(width / 2);
-          offset_y = Math.floor(height / 2);
+          offset_y = height;
         }
 
         lines.push(`tile=${globalId},${left_x},${top_y},${width},${height},${offset_x},${offset_y}`);
@@ -5134,6 +5257,207 @@ export class TileMapEditor {
       spacing: tileset.spacing,
       margin: tileset.margin
     }));
+  }
+
+  /**
+   * Parse the contents of a Flare-style tilesetdefs TXT and populate
+   * the editor's detected tile data so rendering/export are consistent.
+   * If layerType is provided, tile entries will be stored in that layer's
+   * per-layer tile map; otherwise they will be applied to the active layer.
+   */
+  public parseTilesetDefContent(content: string, layerType?: string): void {
+    if (!content) return;
+
+    const lines = content.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+
+    const parsed: Map<number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }> = new Map();
+
+    for (const line of lines) {
+      if (line.startsWith('#')) continue;
+      if (line.startsWith('img=')) continue;
+
+      if (line.startsWith('tile=')) {
+        const rest = line.substring('tile='.length);
+        const parts = rest.split(',').map(p => p.trim());
+        // Expected: id,left,top,width,height,origin_x,origin_y (origin optional)
+        if (parts.length >= 5) {
+          const id = parseInt(parts[0], 10);
+          const left = parseInt(parts[1], 10);
+          const top = parseInt(parts[2], 10);
+          const width = parseInt(parts[3], 10);
+          const height = parseInt(parts[4], 10);
+          const originX = parts[5] !== undefined ? parseInt(parts[5], 10) : Math.floor(width / 2);
+          const originY = parts[6] !== undefined ? parseInt(parts[6], 10) : height;
+
+          if (!Number.isNaN(id) && !Number.isNaN(left) && !Number.isNaN(top) && !Number.isNaN(width) && !Number.isNaN(height)) {
+            parsed.set(id, { sourceX: left, sourceY: top, width, height, originX, originY });
+          }
+        }
+      }
+    }
+
+    // Merge into global detectedTileData and per-layer map
+    if (parsed.size > 0) {
+      // Clear current detected data for clarity
+      this.detectedTileData.clear();
+      for (const [id, data] of parsed.entries()) {
+        this.detectedTileData.set(id, data);
+      }
+
+      const targetLayer = layerType || this.getCurrentLayerType();
+      if (targetLayer) {
+        const layerTileMap = new Map<number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }>();
+        for (const [id, data] of parsed.entries()) {
+          layerTileMap.set(id, { sourceX: data.sourceX, sourceY: data.sourceY, width: data.width, height: data.height, originX: data.originX, originY: data.originY });
+        }
+        this.layerTileData.set(targetLayer, layerTileMap);
+      }
+
+      // Rebuild palette and redraw
+      this.createTilePalette(true);
+      this.draw();
+    }
+  }
+
+  /**
+   * Parse a PNG tileset image using a base grid (default 64x32) and generate
+   * Flare `tile=` definitions. Also populates the palette with generated tiles
+   * so they can be selected as brushes.
+   *
+   * This method slices the image by the provided grid and assigns sequential
+   * tile IDs starting at 1 (per-image). origin_x and origin_y are by default
+   * width/2 and height/2 so that the tile's visual center is used. For larger
+   * sprites that occupy multiple grid cells, callers may pass a custom grid or
+   * you can later merge/adjust brushes in the editor UI.
+   */
+  public parseAndExportTileset(img: HTMLImageElement, mapName: string, gridW: number = 64, gridH: number = 32): void {
+    if (!img) return;
+
+    const columns = Math.max(1, Math.floor(img.width / gridW));
+    const rows = Math.max(1, Math.floor(img.height / gridH));
+
+    const lines: string[] = [];
+
+    // Header with img path — exporter expects images/tilesets folder
+    const fileName = this.guessFileNameFromImage(img);
+    lines.push(`img=images/tilesets/${fileName}`);
+    lines.push('');
+
+    // Reset detected tile data for this tileset
+    this.detectedTileData.clear();
+
+    // Prefer automatic detection of actual sprite objects so we export the
+    // full non-transparent bounding boxes rather than fixed grid cells.
+    const detectedTiles = this.detectVariableSizedTiles();
+
+    if (detectedTiles.length > 0) {
+      let gid = 1;
+      for (const tile of detectedTiles) {
+        const left_x = tile.sourceX;
+        const top_y = tile.sourceY;
+        const width = tile.width;
+        const height = tile.height;
+        const origin_x = Math.floor(width / 2);
+        const origin_y = height; // bottom anchor
+
+        // Save to detectedTileData so the rest of the editor can use these
+        this.detectedTileData.set(gid, { sourceX: left_x, sourceY: top_y, width, height, originX: origin_x, originY: origin_y });
+
+        lines.push(`tile=${gid},${left_x},${top_y},${width},${height},${origin_x},${origin_y}`);
+        gid++;
+      }
+    } else {
+      // Fallback to grid slicing if detection returned nothing
+      let gid = 1;
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < columns; c++) {
+          const left_x = c * gridW;
+          const top_y = r * gridH;
+          const width = gridW;
+          const height = gridH;
+          const origin_x = Math.floor(width / 2);
+          const origin_y = height;
+
+          this.detectedTileData.set(gid, { sourceX: left_x, sourceY: top_y, width, height, originX: origin_x, originY: origin_y });
+
+          lines.push(`tile=${gid},${left_x},${top_y},${width},${height},${origin_x},${origin_y}`);
+          gid++;
+        }
+      }
+    }
+
+    // Compose filename for tilesetdefs file adjacent to image
+    const sanitized = (mapName || 'tileset').replace(/[<>:"/\\|?*]/g, '_').trim();
+    const tilesetDefName = `tileset_${sanitized}.txt`;
+
+    const content = lines.join('\n');
+    // Try to save next to the PNG when running inside Electron (fs available)
+    try {
+      const rq = (window as unknown as { require?: (name: string) => unknown }).require;
+      if (typeof rq === 'function') {
+        const fs = rq('fs') as { writeFileSync?: (p: string, d: string, enc?: string) => void };
+        const path = rq('path') as { dirname?: (p: string) => string; join?: (...parts: string[]) => string };
+        // Try to determine image source path
+        let imagePath: string | null = null;
+        if ((img as HTMLImageElement & { dataset?: DOMStringMap }).dataset && (img as HTMLImageElement & { dataset?: DOMStringMap }).dataset['sourcePath']) {
+          imagePath = (img as HTMLImageElement & { dataset?: DOMStringMap }).dataset['sourcePath'] as string;
+        } else if (typeof img.src === 'string' && img.src.startsWith('file://')) {
+          imagePath = img.src.replace('file://', '');
+        } else if (this.tilesetSourcePath) {
+          imagePath = this.tilesetSourcePath;
+        }
+
+        if (imagePath) {
+          if (path && typeof path.dirname === 'function' && typeof path.join === 'function' && fs && typeof fs.writeFileSync === 'function') {
+            const dir = path.dirname(imagePath);
+            const outPath = path.join(dir, tilesetDefName);
+            fs.writeFileSync(outPath, content, 'utf8');
+            console.log('Tileset defs saved to', outPath);
+          } else {
+            // Missing fs/path functions, fallback to download
+            this.downloadFile(content, tilesetDefName, 'text/plain');
+          }
+        } else {
+          // Fallback to download
+          this.downloadFile(content, tilesetDefName, 'text/plain');
+        }
+      } else {
+        this.downloadFile(content, tilesetDefName, 'text/plain');
+      }
+    } catch (err) {
+      console.warn('Could not write tilesetdefs to disk, falling back to download:', err);
+      this.downloadFile(content, tilesetDefName, 'text/plain');
+    }
+
+    // Now update the UI palette with newly detected tiles
+    // If there is an active layer, store per-layer tile data as well
+    const activeLayer = this.tileLayers.find(l => l.id === this.activeLayerId);
+    if (activeLayer) {
+      const layerTileMap = new Map<number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }>();
+      for (const [k, v] of this.detectedTileData.entries()) {
+        layerTileMap.set(k, { sourceX: v.sourceX, sourceY: v.sourceY, width: v.width, height: v.height, originX: v.originX, originY: v.originY });
+      }
+      this.layerTileData.set(activeLayer.type, layerTileMap);
+    }
+
+    // Rebuild palette UI using existing method
+    this.createTilePalette(true);
+  }
+
+  private guessFileNameFromImage(img: HTMLImageElement): string {
+    // Try to use dataset or src path to extract filename, fallback to timestamp
+    try {
+      const src = img.src || '';
+      // If consumer attached a filename in dataset, prefer it (loose check)
+      // Use index signature to avoid 'any' cast lint errors
+  const ds = (img as HTMLImageElement & { dataset?: DOMStringMap }).dataset;
+  if (ds && typeof ds['filename'] === 'string' && ds['filename']!.length > 0) return ds['filename'] as string;
+      const m = src.match(/[^/\\]+\.(png|jpg|jpeg|webp)$/i);
+      if (m) return m[0];
+      return `tileset_${Date.now()}.png`;
+    } catch (e) {
+      return `tileset_${Date.now()}.png`;
+    }
   }
 
   private downloadFile(content: string, filename: string, mimeType: string): void {
@@ -6180,9 +6504,10 @@ export class TileMapEditor {
                 
                 if (tilesetData.layerType) {
                   // Store tiles specifically for this layer type
-                  const layerTileMap = new Map<number, { sourceX: number; sourceY: number; width: number; height: number }>();
+                  const layerTileMap = new Map<number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }>();
                   for (const [gid, data] of tilesetData.detectedTiles) {
-                    layerTileMap.set(gid, data);
+                    const d = data as { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number };
+                    layerTileMap.set(gid, { sourceX: d.sourceX, sourceY: d.sourceY, width: d.width, height: d.height, originX: d.originX, originY: d.originY });
                   }
                   this.layerTileData.set(tilesetData.layerType, layerTileMap);
                   console.log(`Stored ${layerTileMap.size} tiles for layer type: ${tilesetData.layerType}`);
@@ -6190,15 +6515,17 @@ export class TileMapEditor {
                   // Legacy detected tiles - store in global and current active layer
                   this.detectedTileData.clear();
                   for (const [gid, data] of tilesetData.detectedTiles) {
-                    this.detectedTileData.set(gid, data);
+                    const d = data as { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number };
+                    this.detectedTileData.set(gid, { sourceX: d.sourceX, sourceY: d.sourceY, width: d.width, height: d.height, originX: d.originX, originY: d.originY });
                   }
                   
                   // Also store in the active layer's tile data
                   const activeLayer = this.tileLayers.find(l => l.id === this.activeLayerId);
                   if (activeLayer) {
-                    const layerTileMap = new Map<number, { sourceX: number; sourceY: number; width: number; height: number }>();
+                    const layerTileMap = new Map<number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }>();
                     for (const [gid, data] of tilesetData.detectedTiles) {
-                      layerTileMap.set(gid, data);
+                      const d = data as { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number };
+                      layerTileMap.set(gid, { sourceX: d.sourceX, sourceY: d.sourceY, width: d.width, height: d.height, originX: d.originX, originY: d.originY });
                     }
                     this.layerTileData.set(activeLayer.type, layerTileMap);
                   }

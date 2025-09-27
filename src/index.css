@@ -162,6 +162,11 @@
     border: 2px solid hsl(var(--primary));
 }
 
+.palette-tile.multi-selected {
+    outline: 3px dashed rgba(0, 122, 204, 0.6);
+    outline-offset: -3px;
+}
+
 /* Brush management styles */
 .brush-wrapper {
     position: relative;

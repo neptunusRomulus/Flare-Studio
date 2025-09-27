@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import Tooltip from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Upload, Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Blend, MapPin, Save, Scan, Link2, Scissors, Trash2, Check, HelpCircle, Folder, Shield, Plus, Image, Grid, Box, Users, Locate, Clock, Menu, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Upload, Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Blend, MapPin, Save, Scan, Link2, Check, HelpCircle, Folder, Shield, Plus, Image, Grid, Box, Users, Locate, Clock, Menu, ChevronLeft, ChevronRight } from 'lucide-react';
 import { TileMapEditor } from './editor/TileMapEditor';
 import type { EditorProjectData } from './editor/TileMapEditor';
 import { TileLayer, MapObject } from './types';
@@ -395,10 +395,7 @@ function App() {
     showBottomToolbarTemporarily();
   }, [showBottomToolbarTemporarily]);
 
-  const handleToggleBrushTool = useCallback((tool: 'move' | 'merge' | 'separate' | 'remove') => {
-    setBrushTool((current) => (current === tool ? 'none' : tool));
-    showBrushToolbarTemporarily();
-  }, [showBrushToolbarTemporarily]);
+  // Move/reorder brush removed — no UI toggle needed.
 
   const canUseTilesetDialog = useMemo(() => {
     return typeof window !== 'undefined' && !!window.electronAPI?.selectTilesetFile;
@@ -416,10 +413,6 @@ function App() {
   const [selectedShapeTool, setSelectedShapeTool] = useState('rectangle');
   
   // Brush management states
-  const [brushTool, setBrushTool] = useState<'none' | 'move' | 'merge' | 'separate' | 'remove'>('none');
-  // Removed unused state: selectedBrushes
-  const [showSeparateDialog, setShowSeparateDialog] = useState(false);
-  const [brushToSeparate, setBrushToSeparate] = useState<number | null>(null);
   
   // Stamp states
   const [stamps, setStamps] = useState<import('./types').Stamp[]>([]);
@@ -431,7 +424,7 @@ function App() {
   // Clear layer confirmation dialog state (replaces window.confirm)
   const [showClearLayerDialog, setShowClearLayerDialog] = useState(false);
   // Generic confirmation dialog for other destructive actions
-  const [confirmAction, setConfirmAction] = useState<null | { type: 'removeBrush' | 'removeTileset' | 'removeTab'; payload?: number | { layerType: string; tabId: number } }>(null);
+  const [confirmAction, setConfirmAction] = useState<null | { type: 'removeTileset' | 'removeTab'; payload?: number | { layerType: string; tabId: number } }>(null);
   // Keep a stable React state for the tab that was requested to be deleted so
   // the confirmation handler can use the exact intended tab (avoids stale refs).
   const [tabToDelete, setTabToDelete] = useState<null | { layerType: string; tabId: number }>(null);
@@ -1218,55 +1211,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     }
   };
 
-  // Brush management handlers
-  // Removed unused handlers: handleMergeBrushes, handleCancelMerge
-
-  const handleSeparateBrush = useCallback((brushId: number) => {
-    setBrushToSeparate(brushId);
-    setShowSeparateDialog(true);
-  }, []);
-
-  const confirmSeparateBrush = useCallback(() => {
-    if (!editor || brushToSeparate === null) return;
-    
-    try {
-      // Call the editor's separate brush method
-      editor.separateBrush(brushToSeparate);
-      console.log(`Separated brush with ID: ${brushToSeparate}`);
-    } catch (error) {
-      console.error('Failed to separate brush:', error);
-    }
-    
-    setShowSeparateDialog(false);
-    setBrushToSeparate(null);
-    setBrushTool('none'); // Exit separate mode after action
-  }, [editor, brushToSeparate]);
-
-  const handleRemoveBrush = useCallback((brushId: number) => {
-    if (!editor) return;
-    
-    console.log(`handleRemoveBrush called with brushId: ${brushId}`);
-  // Open generic confirm dialog
-  setConfirmAction({ type: 'removeBrush', payload: brushId });
-  }, [editor]);
-
-  const handleBrushReorder = useCallback((fromTileIndex: number, toTileIndex: number) => {
-    if (!editor) return;
-    
-    try {
-      // Get the current brush order to find array indices
-      const tileInfo = editor.getDetectedTileInfo();
-      const fromIndex = tileInfo.findIndex(tile => tile.gid === fromTileIndex);
-      const toIndex = tileInfo.findIndex(tile => tile.gid === toTileIndex);
-      
-      if (fromIndex !== -1 && toIndex !== -1) {
-        editor.reorderBrush(fromIndex, toIndex);
-        console.log(`Reordered brush ${fromTileIndex} to position of ${toTileIndex}`);
-      }
-    } catch (error) {
-      console.error('Failed to reorder brush:', error);
-    }
-  }, [editor]);
+  // Brush management handlers removed: separate/remove/reorder brushes are deprecated.
 
   // Object management handlers
   const handleEditObject = useCallback((objectId: number) => {
@@ -1534,51 +1479,9 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     };
   }, [editor, handleEditObject]);
 
-  // Effect to handle brush tool state changes
-  useEffect(() => {
-    console.log(`Brush tool changed to: ${brushTool}`);
-    const brushToolElement = document.querySelector('[data-brush-tool]');
-    if (brushToolElement) {
-      brushToolElement.setAttribute('data-brush-tool', brushTool);
-      console.log(`Updated existing data-brush-tool attribute to: ${brushTool}`);
-    } else {
-      // Create the brush tool state element if it doesn't exist
-      const stateElement = document.createElement('div');
-      stateElement.setAttribute('data-brush-tool', brushTool);
-      stateElement.style.display = 'none';
-      document.body.appendChild(stateElement);
-      console.log(`Created new data-brush-tool element with value: ${brushTool}`);
-    }
-  }, [brushTool]);
+  // Brush tool UI removed — no global data-brush-tool element maintained.
 
-  // Effect to listen for brush events from the editor
-  useEffect(() => {
-    const handleBrushAction = (event: CustomEvent) => {
-      const { action, tileIndex } = event.detail;
-      switch (action) {
-        // Removed select/deselect cases as selectedBrushes state is gone
-        case 'separate':
-          handleSeparateBrush(tileIndex);
-          break;
-        case 'remove':
-          handleRemoveBrush(tileIndex);
-          break;
-        case 'drop':
-          if (event.detail.from && event.detail.to) {
-            handleBrushReorder(event.detail.from, event.detail.to);
-          }
-          break;
-        default:
-          break;
-      }
-    };
-
-    document.addEventListener('brushAction', handleBrushAction as EventListener);
-    
-    return () => {
-      document.removeEventListener('brushAction', handleBrushAction as EventListener);
-    };
-  }, [handleSeparateBrush, handleRemoveBrush, handleBrushReorder]);
+  // brushAction events are no longer handled here since merge/separate/remove/reorder tools are deprecated
 
   // Helper function to load project data into editor
   const loadProjectData = useCallback(async (newEditor: TileMapEditor, mapConfig: EditorProjectData) => {
@@ -1943,10 +1846,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       setStamps([]);
       setSelectedStamp(null);
       setMapObjects([]);
-      setHoverCoords(null);
-      setBrushTool('none');
-      setShowSeparateDialog(false);
-      setBrushToSeparate(null);
+    setHoverCoords(null);
       setSaveStatus('saved');
       setHasUnsavedChanges(false);
 
@@ -2811,8 +2711,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                     }
                   }}
                 ></div>
-                {/* Hidden element to track brush tool state */}
-                <div data-brush-tool={brushTool} className="hidden"></div>
+                {/* brush tool tracking removed */}
               </div>
               {/* Active GID moved to canvas area (see Hover Coordinates Display) */}
             </div>
@@ -2932,62 +2831,8 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                       );
                     })()}
                   </div>
-                  <div
-                    className={`flex-shrink-0 overflow-visible transition-all duration-300 ease-out opacity-100 scale-100 max-w-[2.5rem] w-auto`}
-                  >
-                    <Tooltip content="Move/Reorder brushes">
-                      <Button
-                        variant={brushTool === 'move' ? 'default' : 'outline'}
-                        size="sm"
-                        className="text-xs px-1 py-1 h-6 shadow-sm"
-                        onClick={() => handleToggleBrushTool('move')}
-                      >
-                        <Scan className="w-3 h-3" />
-                      </Button>
-                    </Tooltip>
-                  </div>
-                  <div
-                    className={`flex-shrink-0 overflow-hidden transition-all duration-300 ease-out ${brushToolbarExpanded || brushTool === 'merge' ? 'opacity-100 scale-100 max-w-[2.5rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
-                  >
-                    <Tooltip content="Merge brushes">
-                      <Button
-                        variant={brushTool === 'merge' ? 'default' : 'outline'}
-                        size="sm"
-                        className="text-xs px-1 py-1 h-6 shadow-sm"
-                        onClick={() => handleToggleBrushTool('merge')}
-                      >
-                        <Link2 className="w-3 h-3" />
-                      </Button>
-                    </Tooltip>
-                  </div>
-                  <div
-                    className={`flex-shrink-0 overflow-hidden transition-all duration-300 ease-out ${brushToolbarExpanded || brushTool === 'separate' ? 'opacity-100 scale-100 max-w-[2.5rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
-                  >
-                    <Tooltip content="Separate brushes">
-                      <Button
-                        variant={brushTool === 'separate' ? 'default' : 'outline'}
-                        size="sm"
-                        className="text-xs px-1 py-1 h-6 shadow-sm"
-                        onClick={() => handleToggleBrushTool('separate')}
-                      >
-                        <Scissors className="w-3 h-3" />
-                      </Button>
-                    </Tooltip>
-                  </div>
-                  <div
-                    className={`flex-shrink-0 overflow-hidden transition-all duration-300 ease-out ${brushToolbarExpanded || brushTool === 'remove' ? 'opacity-100 scale-100 max-w-[2.5rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
-                  >
-                    <Tooltip content="Remove brushes">
-                      <Button
-                        variant={brushTool === 'remove' ? 'default' : 'outline'}
-                        size="sm"
-                        className="text-xs px-1 py-1 h-6 shadow-sm"
-                        onClick={() => handleToggleBrushTool('remove')}
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    </Tooltip>
-                  </div>
+                  {/* Move/Reorder brushes button removed */}
+                  {/* Merge/Separate/Remove buttons removed per request */}
                   <div
                     className={`flex-shrink-0 overflow-hidden transition-all duration-300 ease-out ${brushToolbarExpanded ? 'opacity-100 scale-100 max-w-[2.5rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
                   >
@@ -3644,7 +3489,6 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 </Button>
               </div>
               <div className="text-sm text-foreground mb-4">
-                {confirmAction.type === 'removeBrush' && 'Are you sure you want to remove this brush?'}
                 {confirmAction.type === 'removeTileset' && 'Are you sure you want to remove the tileset for this layer? This will clear the tileset but keep any placed tiles.'}
                 {confirmAction.type === 'removeTab' && 'Are you sure you want to remove this tileset tab?'}
               </div>
@@ -3653,10 +3497,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 <Button
                   onClick={() => {
                     try {
-                      if (confirmAction.type === 'removeBrush') {
-                        const brushId = confirmAction.payload as number;
-                        if (editor) editor.removeBrush(brushId);
-                      } else if (confirmAction.type === 'removeTileset') {
+                      if (confirmAction.type === 'removeTileset') {
                         if (editor) editor.removeLayerTileset();
                       } else if (confirmAction.type === 'removeTab') {
                         // Prefer the stable React state if present
@@ -4569,25 +4410,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       
       <Toaster />
       
-      {/* Separate Brush Confirmation Dialog */}
-      <Dialog open={showSeparateDialog} onOpenChange={setShowSeparateDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Separate Brush</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to separate this brush?
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowSeparateDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={confirmSeparateBrush}>
-              Separate
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Separate brush dialog removed - feature deprecated */}
 
       {/* NPC / Enemy Creation Dialog */}
       <Dialog open={actorDialogState !== null} onOpenChange={(open) => (open ? void 0 : handleCloseActorDialog())}>

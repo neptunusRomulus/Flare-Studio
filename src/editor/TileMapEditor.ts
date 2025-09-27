@@ -123,346 +123,9 @@ export class TileMapEditor {
   public tileCount: number = 0;
 
   // Stub: load a Flare-format TXT into the editor.
-  // Implementing a full parser is optional; this stub exists to provide a typed
-  // entry point so the renderer can call the loader without using `any`.
-  // Parameters: the raw text contents of the .txt map file.
-  public loadFlareMapTxt?(txt: string): void;
+  // Implementing a full parser is optional; this stub exists to provide a typed placeholder.
 
-  public getTileCount(): number {
-    return this.tileCount;
-  }
-
-  // Tile content detection settings
-  public setTileContentThreshold(threshold: number): void {
-    this.tileContentThreshold = Math.max(0, Math.min(255, threshold));
-  }
-
-  public getTileContentThreshold(): number {
-    return this.tileContentThreshold;
-  }
-
-  // Force regeneration of tile palette with current settings
-  public refreshTilePalette(preserveOrder: boolean = false): void {
-    if (this.tilesetImage) {
-      this.createTilePalette(preserveOrder);
-    }
-  }
-
-  // Get information about detected tiles for debugging
-  public getDetectedTileInfo(): Array<{gid: number, width: number, height: number, sourceX: number, sourceY: number}> {
-    const tileInfo: Array<{gid: number, width: number, height: number, sourceX: number, sourceY: number}> = [];
-    this.detectedTileData.forEach((data, gid) => {
-      tileInfo.push({
-        gid,
-        width: data.width,
-        height: data.height,
-        sourceX: data.sourceX,
-        sourceY: data.sourceY
-      });
-    });
-    return tileInfo.sort((a, b) => a.gid - b.gid);
-  }
-
-  // Get detected tiles for a specific layer (for per-layer save/load)
-  public getDetectedTilesForLayer(layerType: string): Array<[number, { sourceX: number; sourceY: number; width: number; height: number }]> {
-    const layerTiles = this.layerTileData.get(layerType);
-    if (layerTiles) {
-      return Array.from(layerTiles.entries());
-    }
-    return [];
-  }
-
-  // Get the active GID for the current layer
-  private getCurrentLayerActiveGid(): number {
-    const activeLayer = this.tileLayers.find(l => l.id === this.activeLayerId);
-    if (activeLayer) {
-      return this.layerActiveGid.get(activeLayer.type) || 0;
-    }
-    return 0;
-  }
-
-  // Set the active GID for the current layer
-  private setCurrentLayerActiveGid(gid: number): void {
-    const activeLayer = this.tileLayers.find(l => l.id === this.activeLayerId);
-    if (activeLayer) {
-      this.layerActiveGid.set(activeLayer.type, gid);
-      // Update global activeGid for UI consistency
-      this.activeGid = gid;
-      if (this.activeGidCallback) {
-        try {
-          this.activeGidCallback(this.activeGid);
-        } catch (e) {
-          console.warn('activeGidCallback error', e);
-        }
-      }
-    }
-  }
-
-  // Brush management methods
-  public mergeBrushes(brushIds: number[]): void {
-    if (brushIds.length < 2) return;
-    
-    // Get the tile data for all selected brushes
-    const brushesToMerge = brushIds
-      .map(id => this.detectedTileData.get(id))
-      .filter((brush): brush is NonNullable<typeof brush> => brush !== undefined);
-      
-    if (brushesToMerge.length !== brushIds.length) {
-      throw new Error('Some selected brushes not found');
-    }
-    
-    // Calculate the bounding box that encompasses all selected brushes
-    let minX = Number.MAX_SAFE_INTEGER;
-    let minY = Number.MAX_SAFE_INTEGER;
-    let maxX = Number.MIN_SAFE_INTEGER;
-    let maxY = Number.MIN_SAFE_INTEGER;
-    
-    for (const brush of brushesToMerge) {
-      minX = Math.min(minX, brush.sourceX);
-      minY = Math.min(minY, brush.sourceY);
-      maxX = Math.max(maxX, brush.sourceX + brush.width);
-      maxY = Math.max(maxY, brush.sourceY + brush.height);
-    }
-    
-    // Create merged brush data
-    const mergedBrushData = {
-      sourceX: minX,
-      sourceY: minY,
-      width: maxX - minX,
-      height: maxY - minY
-    };
-    
-    // Convert Map to array to work with positions
-    const brushArray = Array.from(this.detectedTileData.entries());
-    
-    // Find the position of the first selected brush (this will be where the merged brush goes)
-    const firstBrushIndex = brushArray.findIndex(([id]) => brushIds.includes(id));
-    
-    // Remove all selected brushes from the array
-    const filteredArray = brushArray.filter(([id]) => !brushIds.includes(id));
-    
-    // Insert the merged brush at the position of the first selected brush
-    filteredArray.splice(firstBrushIndex, 0, [brushIds[0], mergedBrushData]);
-    
-    // Rebuild the map with sequential IDs
-    this.detectedTileData.clear();
-    filteredArray.forEach(([_, data], index) => {
-      this.detectedTileData.set(index, data);
-    });
-    
-    // Rebuild the tile palette to show the changes
-    this.createTilePalette(true);
-    
-    // Mark as changed to trigger autosave
-    this.markAsChanged(true);
-    
-    console.log(`Merged ${brushIds.length} brushes into new brush at position ${firstBrushIndex}`);
-  }
-
-  public separateBrush(brushId: number): void {
-    console.log(`separateBrush called with brushId: ${brushId}`);
-    
-    const brushData = this.detectedTileData.get(brushId);
-    if (!brushData) {
-      console.error(`Brush ${brushId} not found`);
-      throw new Error(`Brush ${brushId} not found`);
-    }
-    
-    console.log(`Separating brush ${brushId} with data:`, brushData);
-    
-    // Convert Map to array to work with positions
-    const brushArray = Array.from(this.detectedTileData.entries());
-    
-    // Find the position of the brush to separate
-    const brushIndex = brushArray.findIndex(([id]) => id === brushId);
-    
-    // Remove the original brush from the array
-    const filteredArray = brushArray.filter(([id]) => id !== brushId);
-    
-    // Try to re-detect individual objects within this brush area
-    const newBrushes: Array<{sourceX: number, sourceY: number, width: number, height: number}> = [];
-    
-    if (this.tilesetImage) {
-      const tempCanvas = document.createElement('canvas');
-      tempCanvas.width = brushData.width;
-      tempCanvas.height = brushData.height;
-      const tempCtx = tempCanvas.getContext('2d');
-      
-      if (tempCtx) {
-        // Draw the brush area to analyze
-        tempCtx.drawImage(
-          this.tilesetImage,
-          brushData.sourceX, brushData.sourceY, brushData.width, brushData.height,
-          0, 0, brushData.width, brushData.height
-        );
-        
-        const imageData = tempCtx.getImageData(0, 0, brushData.width, brushData.height);
-        const data = imageData.data;
-        
-        console.log(`Analyzing brush area: ${brushData.width}x${brushData.height}`);
-        
-        // First, try to find vertical separation lines (gaps between objects)
-        const verticalGaps = this.findVerticalGaps(data, brushData.width, brushData.height);
-        console.log(`Found vertical gaps:`, verticalGaps);
-        
-        if (verticalGaps.length > 0) {
-          // Use vertical gaps to separate objects
-          let lastX = 0;
-          
-          for (const gapX of verticalGaps) {
-            if (gapX > lastX) {
-              const segmentWidth = gapX - lastX;
-              const bounds = this.findObjectBoundsInRegion(data, brushData.width, brushData.height, lastX, 0, segmentWidth, brushData.height);
-              
-              if (bounds && bounds.width > 0 && bounds.height > 0) {
-                newBrushes.push({
-                  sourceX: brushData.sourceX + bounds.x,
-                  sourceY: brushData.sourceY + bounds.y,
-                  width: bounds.width,
-                  height: bounds.height
-                });
-              }
-            }
-            lastX = gapX + 1; // Skip the gap pixel
-          }
-          
-          // Handle the last segment
-          if (lastX < brushData.width) {
-            const segmentWidth = brushData.width - lastX;
-            const bounds = this.findObjectBoundsInRegion(data, brushData.width, brushData.height, lastX, 0, segmentWidth, brushData.height);
-            
-            if (bounds && bounds.width > 0 && bounds.height > 0) {
-              newBrushes.push({
-                sourceX: brushData.sourceX + bounds.x,
-                sourceY: brushData.sourceY + bounds.y,
-                width: bounds.width,
-                height: bounds.height
-              });
-            }
-          }
-        } else {
-          // Fallback to flood fill if no clear vertical gaps
-          const visited = new Array(brushData.width * brushData.height).fill(false);
-          
-          for (let y = 0; y < brushData.height; y++) {
-            for (let x = 0; x < brushData.width; x++) {
-              const pixelIndex = y * brushData.width + x;
-              
-              if (visited[pixelIndex] || this.isPixelTransparent(data, x, y, brushData.width)) {
-                continue;
-              }
-              
-              console.log(`Starting flood fill at pixel (${x}, ${y})`);
-              const objectData = this.floodFillObjectDataInRegion(
-                data, brushData.width, brushData.height, x, y, visited
-              );
-              
-              if (objectData && this.isValidObjectSize(objectData.bounds)) {
-                console.log(`Found valid connected component:`, objectData);
-                // Adjust coordinates back to original image space
-                newBrushes.push({
-                  sourceX: brushData.sourceX + objectData.bounds.x,
-                  sourceY: brushData.sourceY + objectData.bounds.y,
-                  width: objectData.bounds.width,
-                  height: objectData.bounds.height
-                });
-              } else if (objectData) {
-                console.log(`Found invalid connected component (too small):`, objectData);
-              }
-            }
-          }
-        }
-      }
-    }
-    
-    console.log(`Found ${newBrushes.length} new brushes from separation:`, newBrushes);
-    
-    // Check if we actually found multiple objects
-    if (newBrushes.length <= 1) {
-      console.log(`No separation needed - only found ${newBrushes.length} component(s)`);
-      return; // Don't separate if we only found one component or none
-    }
-    
-    // Insert the new brushes at the position where the original brush was
-    newBrushes.forEach((brushData, index) => {
-      filteredArray.splice(brushIndex + index, 0, [brushIndex + index, brushData]);
-    });
-    
-    // Rebuild the map with sequential IDs
-    this.detectedTileData.clear();
-    filteredArray.forEach(([_, data], index) => {
-      this.detectedTileData.set(index, data);
-    });
-    
-    // Rebuild the tile palette to show the changes
-    this.createTilePalette(true);
-    
-    // Mark as changed to trigger autosave
-    this.markAsChanged(true);
-    
-    console.log(`Separated brush ${brushId} into ${newBrushes.length} new brushes`);
-  }
-
-  public removeBrush(brushId: number): void {
-    console.log(`removeBrush called with brushId: ${brushId}`);
-    console.log(`detectedTileData keys before removal:`, Array.from(this.detectedTileData.keys()));
-    
-    if (!this.detectedTileData.has(brushId)) {
-      console.error(`Brush ${brushId} not found in detectedTileData`);
-      throw new Error(`Brush ${brushId} not found`);
-    }
-    
-    // Convert Map to array to work with positions
-    const brushArray = Array.from(this.detectedTileData.entries());
-    console.log(`brushArray before filtering:`, brushArray.map(([id, _]) => id));
-    
-    // Remove the brush with the specified ID
-    const filteredArray = brushArray.filter(([id]) => id !== brushId);
-    console.log(`filteredArray after filtering:`, filteredArray.map(([id, _]) => id));
-    
-    // Rebuild the map with sequential IDs
-    this.detectedTileData.clear();
-    filteredArray.forEach(([_, data], index) => {
-      this.detectedTileData.set(index, data);
-    });
-    
-    console.log(`detectedTileData keys after rebuild:`, Array.from(this.detectedTileData.keys()));
-    
-    // Rebuild the tile palette to show the changes
-    this.createTilePalette(true);
-    
-    // Mark as changed to trigger autosave
-    this.markAsChanged(true);
-    
-    console.log(`Removed brush ${brushId}`);
-  }
-
-  public reorderBrush(fromIndex: number, toIndex: number): void {
-    // Convert Map to array, reorder, and convert back
-    const brushArray = Array.from(this.detectedTileData.entries());
-    
-    if (fromIndex < 0 || fromIndex >= brushArray.length || toIndex < 0 || toIndex >= brushArray.length) {
-      throw new Error('Invalid brush indices for reordering');
-    }
-    
-    const [movedBrush] = brushArray.splice(fromIndex, 1);
-    brushArray.splice(toIndex, 0, movedBrush);
-    
-    // Rebuild the map with new order and reassign IDs sequentially
-    this.detectedTileData.clear();
-    brushArray.forEach(([_oldId, data], newIndex) => {
-      // Use newIndex as the new ID to maintain sequential order
-      this.detectedTileData.set(newIndex, data);
-    });
-    
-    // Rebuild the tile palette to reflect the new order
-    this.createTilePalette(true);
-    
-    // Mark as changed to trigger autosave
-    this.markAsChanged(true);
-    
-    console.log(`Reordered brush from index ${fromIndex} to ${toIndex}`);
-  }
+  // removeBrush and reorderBrush methods removed — brush merge/separate/remove/reorder features deprecated
 
   private findVerticalGaps(data: Uint8ClampedArray, width: number, height: number): number[] {
     const gaps: number[] = [];
@@ -2737,23 +2400,10 @@ export class TileMapEditor {
       wrapper.style.display = 'inline-block';
       wrapper.style.margin = '2px';
       
-      // Add selection number overlay for merge tool
-      const selectionNumber = document.createElement('div');
-      selectionNumber.className = 'selection-number';
-      selectionNumber.style.position = 'absolute';
-      selectionNumber.style.top = '2px';
-      selectionNumber.style.left = '2px';
-      selectionNumber.style.background = 'red';
-      selectionNumber.style.color = 'white';
-      selectionNumber.style.borderRadius = '50%';
-      selectionNumber.style.width = '16px';
-      selectionNumber.style.height = '16px';
-      selectionNumber.style.fontSize = '10px';
-      selectionNumber.style.display = 'none';
-      selectionNumber.style.alignItems = 'center';
-      selectionNumber.style.justifyContent = 'center';
-      selectionNumber.style.fontWeight = 'bold';
-      selectionNumber.style.zIndex = '10';
+  // Selection number overlay removed (merge UI deprecated)
+  const selectionNumber = document.createElement('div');
+  selectionNumber.className = 'selection-number';
+  selectionNumber.style.display = 'none';
       
       // Add remove overlay for remove tool
       const removeOverlay = document.createElement('div');
@@ -2773,63 +2423,7 @@ export class TileMapEditor {
       removeOverlay.style.zIndex = '10';
       removeOverlay.textContent = '✕';
       
-      // Add separate icon for separate tool
-      const separateIcon = document.createElement('div');
-      separateIcon.className = 'separate-icon';
-      separateIcon.style.position = 'absolute';
-      separateIcon.style.top = '50%';
-      separateIcon.style.left = '50%';
-      separateIcon.style.transform = 'translate(-50%, -50%)';
-      separateIcon.style.display = 'none';
-      separateIcon.style.alignItems = 'center';
-      separateIcon.style.justifyContent = 'center';
-      separateIcon.style.background = 'none';
-      separateIcon.style.color = 'white';
-      separateIcon.style.zIndex = '2';
-      separateIcon.style.pointerEvents = 'none';
-      separateIcon.style.width = '24px';
-      separateIcon.style.height = '24px';
-      separateIcon.innerHTML = `
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="6" cy="6" r="3"></circle>
-          <circle cx="6" cy="18" r="3"></circle>
-          <line x1="20" y1="4" x2="8.12" y2="15.88"></line>
-          <line x1="14.47" y1="14.48" x2="20" y2="20"></line>
-          <line x1="8.12" y1="8.12" x2="12" y2="12"></line>
-        </svg>
-      `;
-      
-      // Add merge icon for merge tool
-      const mergeIcon = document.createElement('div');
-      mergeIcon.className = 'merge-icon';
-      mergeIcon.style.position = 'absolute';
-      mergeIcon.style.top = '50%';
-      mergeIcon.style.left = '50%';
-      mergeIcon.style.transform = 'translate(-50%, -50%)';
-      mergeIcon.style.display = 'none';
-      mergeIcon.style.alignItems = 'center';
-      mergeIcon.style.justifyContent = 'center';
-      mergeIcon.style.background = 'none';
-      mergeIcon.style.color = 'white';
-      mergeIcon.style.zIndex = '2';
-      mergeIcon.style.pointerEvents = 'none';
-      mergeIcon.style.width = '24px';
-      mergeIcon.style.height = '24px';
-      mergeIcon.innerHTML = `
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="m8 6 4-4 4 4"></path>
-          <path d="M12 2v10.3a4 4 0 0 1-1.172 2.872L4 22"></path>
-          <path d="m20 22-6.828-6.828A4 4 0 0 1 12 12.3"></path>
-        </svg>
-      `;
-      
-      // Add click handler to the remove overlay
-      removeOverlay.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        console.log(`Remove overlay clicked for tile index: ${tile.index}`);
-        this.handleBrushRemove(tile.index);
-      });
+      // Removed merge/separate/remove overlay UI per user request.
       
       canvas.addEventListener('click', (e: MouseEvent) => {
         e.preventDefault();
@@ -2839,24 +2433,7 @@ export class TileMapEditor {
 
         console.log(`Tile clicked! Index: ${tile.index}, Current brush tool: ${currentBrushTool}`);
 
-        if (currentBrushTool === 'merge') {
-          // Keep merge UI but do not auto-merge; allow manual merge via tool
-          console.log('Handling merge tool selection (no auto-merge)');
-          this.handleBrushMerge(tile.index, wrapper);
-          return;
-        }
-
-        if (currentBrushTool === 'separate') {
-          console.log('Handling separate tool');
-          this.handleBrushSeparate(tile.index);
-          return;
-        }
-
-        if (currentBrushTool === 'remove') {
-          console.log('Handling remove tool');
-          this.handleBrushRemove(tile.index);
-          return;
-        }
+        // brush merge/separate/remove tools removed; fall through to selection logic
 
         // Normal tile selection - support Ctrl/Cmd multi-select of palette tiles
         const isCtrl = (e.ctrlKey || e.metaKey);
@@ -2869,10 +2446,10 @@ export class TileMapEditor {
           }
 
           // If there's exactly one selected, set it active; otherwise keep active as first
-          if (this.multiSelectedBrushes.size === 1) {
-            const only = Array.from(this.multiSelectedBrushes.values())[0];
-            this.setCurrentLayerActiveGid(only);
-          }
+            if (this.multiSelectedBrushes.size === 1) {
+              const only = Array.from(this.multiSelectedBrushes.values())[0];
+              this.setCurrentLayerActiveGid(only);
+            }
           this.updateActiveTile();
           return;
         }
@@ -2883,117 +2460,11 @@ export class TileMapEditor {
         this.updateActiveTile();
       });
       
-      // Add drag and drop functionality for move tool
-      wrapper.draggable = false; // Will be set to true when move tool is active
+      // Drag/reorder functionality removed — palette items are not draggable.
+      wrapper.draggable = false;
+      wrapper.setAttribute('data-tile-index', tile.index.toString());
       
-      wrapper.addEventListener('dragstart', (e) => {
-        const brushToolElement = getBrushToolEl();
-        const currentBrushTool = brushToolElement?.getAttribute('data-brush-tool') || 'none';
-
-        if (currentBrushTool === 'move') {
-          wrapper.style.opacity = '0.5';
-          e.dataTransfer!.effectAllowed = 'move';
-          e.dataTransfer!.setData('text/plain', tile.index.toString());
-          this.dispatchBrushEvent('dragstart', tile.index);
-        } else {
-          e.preventDefault();
-        }
-      });
-      
-      wrapper.addEventListener('dragend', (_e) => {
-        wrapper.style.opacity = '1';
-        this.dispatchBrushEvent('dragend', tile.index);
-      });
-      
-      wrapper.addEventListener('dragover', (e) => {
-        const brushToolElement = getBrushToolEl();
-        const currentBrushTool = brushToolElement?.getAttribute('data-brush-tool') || 'none';
-
-        if (currentBrushTool === 'move') {
-          e.preventDefault();
-          e.dataTransfer!.dropEffect = 'move';
-          wrapper.style.borderTop = '3px solid #007acc';
-        }
-      });
-      
-      wrapper.addEventListener('dragleave', (_e) => {
-        wrapper.style.borderTop = '';
-      });
-      
-      wrapper.addEventListener('drop', (e) => {
-        e.preventDefault();
-        wrapper.style.borderTop = '';
-
-        const brushToolElement = getBrushToolEl();
-        const currentBrushTool = brushToolElement?.getAttribute('data-brush-tool') || 'none';
-
-        if (currentBrushTool === 'move') {
-          const draggedTileIndex = parseInt(e.dataTransfer!.getData('text/plain'));
-          const targetTileIndex = tile.index;
-
-          if (draggedTileIndex !== targetTileIndex) {
-            this.dispatchBrushEvent('drop', { from: draggedTileIndex, to: targetTileIndex });
-          }
-        }
-      });
-      
-      // Update draggable property and classes when brush tool changes
-      const updateBrushToolState = () => {
-        const brushToolElement = getBrushToolEl();
-        const currentBrushTool = brushToolElement?.getAttribute('data-brush-tool') || 'none';
-
-        // Reset all tool-specific classes
-        wrapper.classList.remove('separate-mode', 'merge-mode', 'merge-selected-first', 'merge-selected-second');
-        wrapper.draggable = false;
-        wrapper.style.cursor = '';
-        wrapper.title = '';
-
-        // Add tile index for tracking
-        wrapper.setAttribute('data-tile-index', tile.index.toString());
-
-        if (currentBrushTool === 'move') {
-          wrapper.draggable = true;
-          wrapper.style.cursor = 'move';
-          wrapper.title = 'Drag to reorder';
-        } else if (currentBrushTool === 'separate') {
-          wrapper.classList.add('separate-mode');
-          wrapper.style.cursor = 'pointer';
-          wrapper.title = 'Click to separate';
-        } else if (currentBrushTool === 'merge') {
-          wrapper.classList.add('merge-mode');
-          wrapper.style.cursor = 'pointer';
-          wrapper.title = 'Click to merge (max 2 brushes)';
-        }
-      };
-      
-      // Initial setup
-      updateBrushToolState();
-      
-      // Listen for brush tool changes
-      const observer = new MutationObserver(() => {
-        updateBrushToolState();
-      });
-      
-      const brushToolElement = getBrushToolEl();
-      if (brushToolElement) {
-        observer.observe(brushToolElement, { attributes: true, attributeFilter: ['data-brush-tool'] });
-      }
-      
-      // Add hover effects for remove tool
-      wrapper.addEventListener('mouseenter', () => {
-        const brushToolElement = document.querySelector('[data-brush-tool]');
-        const currentBrushTool = brushToolElement?.getAttribute('data-brush-tool') || 'none';
-        
-        if (currentBrushTool === 'remove') {
-          removeOverlay.style.display = 'flex';
-        }
-      });
-      
-      wrapper.addEventListener('mouseleave', () => {
-        removeOverlay.style.display = 'none';
-      });
-      
-  // Add data attributes to track tile properties
+      // Add data attributes to track tile properties
   canvas.setAttribute('data-tile-index', tile.index.toString());
   canvas.setAttribute('data-tile-width', tile.width.toString());
   canvas.setAttribute('data-tile-height', tile.height.toString());
@@ -3005,10 +2476,6 @@ export class TileMapEditor {
   canvas.setAttribute('data-origin-y', Math.floor(tile.height / 2).toString());
       
       wrapper.appendChild(canvas);
-      wrapper.appendChild(selectionNumber);
-      wrapper.appendChild(removeOverlay);
-      wrapper.appendChild(separateIcon);
-      wrapper.appendChild(mergeIcon);
       container.appendChild(wrapper);
       validTileIndex++;
     }
@@ -3016,58 +2483,51 @@ export class TileMapEditor {
     console.log(`Created ${validTileIndex} variable-sized tiles from tileset`);
   }
 
-  // Brush management interaction handlers
-  private handleBrushMerge(tileIndex: number, wrapper: HTMLElement): void {
-    // Get all currently selected brushes for merge
-    const firstSelected = document.querySelector('.merge-selected-first');
-    const secondSelected = document.querySelector('.merge-selected-second');
-    
-    // If this brush is already selected, deselect it
-    if (wrapper.classList.contains('merge-selected-first') || wrapper.classList.contains('merge-selected-second')) {
-      wrapper.classList.remove('merge-selected-first', 'merge-selected-second');
-      return;
-    }
-    
-    if (!firstSelected) {
-      // This is the first selection - add orange stroke
-      wrapper.classList.add('merge-selected-first');
-    } else if (!secondSelected) {
-      // This is the second selection - add orange fill and merge icon.
-      // Auto-merge disabled: user must explicitly trigger merge (e.g. via UI button).
-      wrapper.classList.add('merge-selected-second');
-      // Do not auto-merge here; keep both selections so user can confirm/adjust.
-    } else {
-      // Already have 2 selected, ignore further selections
-      return;
-    }
-  }
-
-  private performMerge(firstTileIndex: number, secondTileIndex: number): void {
-    console.log(`Merging tiles ${firstTileIndex} and ${secondTileIndex}`);
-    
-    try {
-      // Call the editor's merge brush method
-      this.mergeBrushes([firstTileIndex, secondTileIndex]);
-      console.log(`Successfully merged brushes ${firstTileIndex} and ${secondTileIndex}`);
-    } catch (error) {
-      console.error('Failed to merge brushes:', error);
-    }
-  }
-
-  private handleBrushSeparate(tileIndex: number): void {
-    this.dispatchBrushEvent('separate', tileIndex);
-  }
-
-  private handleBrushRemove(tileIndex: number): void {
-    console.log(`handleBrushRemove called with tileIndex: ${tileIndex}`);
-    this.dispatchBrushEvent('remove', tileIndex);
-  }
+  // Brush management interaction handlers removed: merge/separate/remove not supported anymore.
 
   private dispatchBrushEvent(action: string, data: number | { from: number; to: number }): void {
     const event = new CustomEvent('brushAction', {
       detail: typeof data === 'number' ? { action, tileIndex: data } : { action, ...data }
     });
     document.dispatchEvent(event);
+  }
+
+  // Helper APIs retained for compatibility with App.tsx and other callers
+  public refreshTilePalette(force: boolean = false): void {
+    if (this.tilesetImage) this.createTilePalette(force);
+  }
+
+  public getDetectedTilesForLayer(layerType: string): Array<[number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }]> {
+    const map = this.layerTileData.get(layerType);
+    return map ? Array.from(map.entries()) : [];
+  }
+
+  public getDetectedTileInfo(): Array<{ gid: number; width: number; height: number; sourceX: number; sourceY: number }> {
+    const out: Array<{ gid: number; width: number; height: number; sourceX: number; sourceY: number }> = [];
+    this.detectedTileData.forEach((v, k) => {
+      out.push({ gid: k, width: v.width, height: v.height, sourceX: v.sourceX, sourceY: v.sourceY });
+    });
+    return out.sort((a, b) => a.gid - b.gid);
+  }
+
+  public getCurrentLayerActiveGid(): number {
+    const layer = this.tileLayers.find(l => l.id === this.activeLayerId);
+    return layer ? (this.layerActiveGid.get(layer.type) || 0) : 0;
+  }
+
+  public setCurrentLayerActiveGid(gid: number): void {
+    const layer = this.tileLayers.find(l => l.id === this.activeLayerId);
+    if (layer) {
+      this.layerActiveGid.set(layer.type, gid);
+      this.activeGid = gid;
+      if (this.activeGidCallback) {
+        try {
+          this.activeGidCallback(this.activeGid);
+        } catch (err) {
+          console.warn('activeGidCallback error', err);
+        }
+      }
+    }
   }
 
   private detectVariableSizedTiles(): Array<{
@@ -6614,6 +6074,25 @@ export class TileMapEditor {
     } catch (error) {
       console.error('Error loading project data:', error);
     }
+  }
+
+  /**
+   * Return the current known tile count for legacy tileset grids.
+   */
+  public getTileCount(): number {
+    return this.tileCount;
+  }
+
+  /**
+   * Stub loader for Flare-format TXT maps. A full parser is optional.
+   * For now this will log the action and leave a placeholder for future
+   * implementations. Calling code should still update UI state after this
+   * call.
+   */
+  public loadFlareMapTxt(_content: string): void {
+    console.warn('loadFlareMapTxt called but no parser is implemented.');
+    // Future: implement a parser to convert Flare TXT into EditorProjectData
+    // and call this.loadProjectData(parsedData) when available.
   }
 
   // Load tileset from data URL

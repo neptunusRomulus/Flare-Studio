@@ -124,10 +124,8 @@
             
             // Test the markAsChanged behavior by simulating what happens after brush operations
             const operations = [
-                'mergeBrushes([0, 1])',
-                'separateBrush(2)',
-                'removeBrush(1)',
-                'reorderBrush(0, 2)'
+                '// merge/separate/remove/reorder brush ops removed in upstream code',
+                '// Only move/reorder is supported now via the Move tool'
             ];
             
             operations.forEach((op, index) => {

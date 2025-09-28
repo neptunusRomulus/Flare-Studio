@@ -94,6 +94,14 @@ export interface EditorProjectData {
 }
 
 const INTERNAL_TILESET_FILENAMES = new Set<string>(['collision_tileset.png']);
+const COLLISION_LAYER_TYPE = 'collision';
+const INTERNAL_COLLISION_TILESET = 'collision_tileset.png';
+const COLLISION_BRUSH_TOOLTIPS: Record<number, string> = {
+  1: 'Blocks all, very visible at minimap',
+  2: 'Blocks ground units, less visible at minimap',
+  3: 'Blocks all, not visible at minimap',
+  4: 'Blocks ground units, not visible at minimap'
+};
 
 export class TileMapEditor {
   /**
@@ -652,6 +660,9 @@ export class TileMapEditor {
 
   // Layer-specific tileset management
   private layerTilesets: Map<string, LayerTilesetEntry> = new Map();
+  private collisionTilesetLoading: boolean = false;
+  private collisionTooltipEl: HTMLDivElement | null = null;
+  private collisionTooltipHideTimeout: number | null = null;
   
   // Layer tab system: each layer type may have multiple tabs, each with its own tileset and detected tiles/brushes
   private nextLayerTabId: number = 1;
@@ -784,6 +795,186 @@ export class TileMapEditor {
   private readonly AUTO_SAVE_DELAY = 8000; // 8 seconds for tile changes
   private readonly IMMEDIATE_SAVE_DELAY = 2000; // 2 seconds for critical changes
   private autoSaveEnabled: boolean = true;
+
+  private ensureCollisionTileset(): void {
+    if (this.layerTilesets.has(COLLISION_LAYER_TYPE) || this.collisionTilesetLoading) {
+      return;
+    }
+
+    const resolvedPath = this.resolveInternalAssetPath(INTERNAL_COLLISION_TILESET);
+    if (!resolvedPath) {
+      console.warn('Unable to resolve collision tileset asset path');
+      return;
+    }
+
+    this.collisionTilesetLoading = true;
+
+    const image = new Image();
+    image.onload = () => {
+      const columns = Math.max(1, Math.floor(image.width / this.tileSizeX));
+      const rows = Math.max(1, Math.floor(image.height / this.tileSizeY));
+      const count = Math.max(1, columns * rows);
+
+      this.layerTilesets.set(COLLISION_LAYER_TYPE, {
+        image,
+        fileName: INTERNAL_COLLISION_TILESET,
+        columns,
+        rows,
+        count,
+        tileWidth: this.tileSizeX,
+        tileHeight: this.tileSizeY,
+        spacing: 0,
+        margin: 0,
+        sourcePath: resolvedPath
+      });
+
+      this.collisionTilesetLoading = false;
+
+      if (this.getCurrentLayerType() === COLLISION_LAYER_TYPE) {
+        this.updateCurrentTileset(COLLISION_LAYER_TYPE);
+        this.draw();
+      }
+    };
+
+    image.onerror = (error) => {
+      console.warn('Failed to load default collision tileset.', error);
+      this.collisionTilesetLoading = false;
+    };
+
+    image.src = resolvedPath;
+  }
+
+
+  private clearCollisionBrushTooltipHideTimeout(): void {
+    if (this.collisionTooltipHideTimeout !== null) {
+      window.clearTimeout(this.collisionTooltipHideTimeout);
+      this.collisionTooltipHideTimeout = null;
+    }
+  }
+
+  private getCollisionTooltipElement(): HTMLDivElement | null {
+    if (typeof document === 'undefined') {
+      return null;
+    }
+
+    if (!this.collisionTooltipEl) {
+      const el = document.createElement('div');
+      el.dataset.collisionTooltip = 'true';
+      el.setAttribute('role', 'tooltip');
+      el.setAttribute('aria-hidden', 'true');
+      el.style.position = 'fixed';
+      el.style.pointerEvents = 'none';
+      el.style.zIndex = '9999';
+      el.style.maxWidth = '260px';
+      el.style.padding = '6px 10px';
+      el.style.fontSize = '12px';
+      el.style.lineHeight = '1.2';
+      el.style.fontWeight = '500';
+      el.style.color = '#f5f5f5';
+      el.style.background = 'rgba(15, 15, 16, 0.92)';
+      el.style.border = '1px solid rgba(255, 255, 255, 0.08)';
+      el.style.borderRadius = '8px';
+      el.style.boxShadow = '0 12px 32px rgba(0, 0, 0, 0.35)';
+      el.style.backdropFilter = 'blur(4px)';
+      el.style.opacity = '0';
+      el.style.transform = 'translateY(0)';
+      el.style.transition = 'opacity 120ms ease, transform 120ms ease';
+      el.style.whiteSpace = 'nowrap';
+      el.style.display = 'none';
+      document.body.appendChild(el);
+      this.collisionTooltipEl = el;
+    }
+
+    return this.collisionTooltipEl;
+  }
+
+  private positionCollisionBrushTooltip(tooltipEl: HTMLDivElement, wrapper: HTMLElement, event?: MouseEvent): boolean {
+    const margin = 12;
+    const rect = wrapper.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    const cursorX = event ? event.clientX : rect.left + rect.width / 2;
+    let top = (event ? event.clientY : rect.top) - tooltipEl.offsetHeight - margin;
+    let below = false;
+
+    if (top < margin) {
+      below = true;
+      top = (event ? event.clientY : rect.bottom) + margin;
+    }
+
+    let left = cursorX - tooltipEl.offsetWidth / 2;
+    if (left < margin) {
+      left = margin;
+    } else if (left + tooltipEl.offsetWidth > vw - margin) {
+      left = vw - margin - tooltipEl.offsetWidth;
+    }
+
+    if (top + tooltipEl.offsetHeight > vh - margin) {
+      top = Math.max(margin, vh - margin - tooltipEl.offsetHeight);
+    }
+
+    tooltipEl.style.left = `${Math.round(left)}px`;
+    tooltipEl.style.top = `${Math.round(top)}px`;
+
+    return below;
+  }
+
+  private showCollisionBrushTooltip(wrapper: HTMLElement, text: string, event: MouseEvent): void {
+    const tooltipEl = this.getCollisionTooltipElement();
+    if (!tooltipEl) {
+      return;
+    }
+
+    this.clearCollisionBrushTooltipHideTimeout();
+    tooltipEl.textContent = text;
+    tooltipEl.setAttribute('aria-hidden', 'false');
+    tooltipEl.style.display = 'block';
+    tooltipEl.style.opacity = '0';
+
+    const below = this.positionCollisionBrushTooltip(tooltipEl, wrapper, event);
+    tooltipEl.style.transform = `translateY(${below ? '6px' : '-6px'})`;
+
+    requestAnimationFrame(() => {
+      tooltipEl.style.opacity = '1';
+      tooltipEl.style.transform = 'translateY(0)';
+    });
+  }
+
+  private updateCollisionBrushTooltipPosition(wrapper: HTMLElement, event: MouseEvent): void {
+    const tooltipEl = this.collisionTooltipEl;
+    if (!tooltipEl || tooltipEl.style.display === 'none') {
+      return;
+    }
+
+    this.clearCollisionBrushTooltipHideTimeout();
+    this.positionCollisionBrushTooltip(tooltipEl, wrapper, event);
+    tooltipEl.style.transform = 'translateY(0)';
+  }
+
+  private hideCollisionBrushTooltip(immediate: boolean = false): void {
+    const tooltipEl = this.collisionTooltipEl;
+    if (!tooltipEl) {
+      return;
+    }
+
+    this.clearCollisionBrushTooltipHideTimeout();
+
+    tooltipEl.setAttribute('aria-hidden', 'true');
+    tooltipEl.style.opacity = '0';
+
+    if (immediate) {
+      tooltipEl.style.display = 'none';
+      return;
+    }
+
+    this.collisionTooltipHideTimeout = window.setTimeout(() => {
+      if (this.collisionTooltipEl === tooltipEl) {
+        tooltipEl.style.display = 'none';
+      }
+      this.collisionTooltipHideTimeout = null;
+    }, 150);
+  }
 
   constructor(mapCanvas: HTMLCanvasElement) {
     this.mapCanvas = mapCanvas;
@@ -1036,6 +1227,8 @@ export class TileMapEditor {
     } catch (e) {
       console.warn('Failed to initialize default layer tabs', e);
     }
+
+    this.ensureCollisionTileset();
   }
 
   private getDraggableActorAt(x: number, y: number): MapObject | null {
@@ -2646,6 +2839,11 @@ export class TileMapEditor {
     
     container.innerHTML = '';
     
+    this.hideCollisionBrushTooltip(true);
+
+    const activePaletteLayer = this.tileLayers.find(l => l.id === this.activeLayerId);
+    const isCollisionPalette = activePaletteLayer?.type === COLLISION_LAYER_TYPE;
+
     let tilesToRender: Array<{index: number, sourceX: number, sourceY: number, width: number, height: number}>;
     
     if (preserveOrder && this.detectedTileData.size > 0) {
@@ -2737,6 +2935,8 @@ export class TileMapEditor {
       wrapper.style.position = 'relative';
       wrapper.style.display = 'inline-block';
       wrapper.style.margin = '2px';
+      
+      const tooltipText = isCollisionPalette ? COLLISION_BRUSH_TOOLTIPS[tile.index] : undefined;
       
       // Add selection number overlay for merge tool
       const selectionNumber = document.createElement('div');
@@ -2981,18 +3181,31 @@ export class TileMapEditor {
       }
       
       // Add hover effects for remove tool
-      wrapper.addEventListener('mouseenter', () => {
+      wrapper.addEventListener('mouseenter', (event) => {
         const brushToolElement = document.querySelector('[data-brush-tool]');
         const currentBrushTool = brushToolElement?.getAttribute('data-brush-tool') || 'none';
         
         if (currentBrushTool === 'remove') {
           removeOverlay.style.display = 'flex';
         }
+        
+        if (tooltipText) {
+          this.showCollisionBrushTooltip(wrapper, tooltipText, event as MouseEvent);
+        }
       });
       
       wrapper.addEventListener('mouseleave', () => {
         removeOverlay.style.display = 'none';
+        if (tooltipText) {
+          this.hideCollisionBrushTooltip();
+        }
       });
+      
+      if (tooltipText) {
+        wrapper.addEventListener('mousemove', (event) => {
+          this.updateCollisionBrushTooltipPosition(wrapper, event as MouseEvent);
+        });
+      }
       
   // Add data attributes to track tile properties
   canvas.setAttribute('data-tile-index', tile.index.toString());
@@ -4568,6 +4781,19 @@ export class TileMapEditor {
     return points;
   }
 
+  private resolveInternalAssetPath(fileName: string): string {
+    if (typeof window === 'undefined') {
+      return fileName;
+    }
+
+    try {
+      const url = new URL(fileName, window.location.href);
+      return url.toString();
+    } catch {
+      return fileName;
+    }
+  }
+
   private normalizePath(input: string): string {
     return input.replace(/\\/g, '/');
   }
@@ -4824,6 +5050,7 @@ export class TileMapEditor {
     if (container) {
       container.innerHTML = '';
     }
+    this.hideCollisionBrushTooltip(true);
   }
 
   public clearLayer(): void {
@@ -4975,7 +5202,7 @@ export class TileMapEditor {
       added.add(uniqueKey);
     };
 
-    if (this.tilesetFileName && this.tileCount > 0) {
+    if (this.tilesetFileName && this.tileCount > 0 && !this.isInternalTilesetFile(this.tilesetFileName)) {
       const columns = this.tilesetColumns || (this.tilesetImage ? Math.max(1, Math.floor(this.tilesetImage.width / this.tileSizeX)) : 1);
       const rows = this.tilesetRows || (this.tilesetImage ? Math.max(1, Math.floor(this.tilesetImage.height / this.tileSizeY)) : 1);
       const tileWidth = this.tilesetTileWidth ?? (this.tilesetImage ? Math.round(this.tilesetImage.width / Math.max(columns, 1)) : this.tileSizeX);
@@ -4997,7 +5224,7 @@ export class TileMapEditor {
     }
 
     for (const [layerType, tileset] of this.layerTilesets.entries()) {
-      if (!tileset.fileName) {
+      if (!tileset.fileName || this.isInternalTilesetFile(tileset.fileName)) {
         continue;
       }
       const columns = tileset.columns ?? (tileset.image ? Math.max(1, Math.floor(tileset.image.width / this.tileSizeX)) : 1);
@@ -5834,6 +6061,7 @@ export class TileMapEditor {
         img.src = data.tilesetImage;
       }
 
+      this.ensureCollisionTileset();
       this.draw();
       return true;
     } catch (error) {
@@ -5859,31 +6087,35 @@ export class TileMapEditor {
       // Save all layer-specific tilesets
       console.log('=== SAVING LAYER TILESETS ===');
       for (const [layerType, tileset] of this.layerTilesets.entries()) {
-        if (tileset.image && tileset.fileName) {
-          console.log(`Saving tileset for layer ${layerType}: ${tileset.fileName}`);
-          const dataURL = this.canvasToDataURL(tileset.image);
-          tilesetImages[tileset.fileName] = dataURL;
-          
-          tilesets.push({
-            layerType: layerType,
-            fileName: tileset.fileName,
-            name: tileset.fileName.replace(/\.[^/.]+$/, ''),
-            columns: tileset.columns,
-            rows: tileset.rows,
-            count: tileset.count,
-            tileWidth: tileset.tileWidth ?? this.tileSizeX,
-            tileHeight: tileset.tileHeight ?? this.tileSizeY,
-            spacing: tileset.spacing ?? 0,
-            margin: tileset.margin ?? 0,
-            sourcePath: tileset.sourcePath ?? null,
-            // Save per-layer detected tile data
-            detectedTiles: this.getDetectedTilesForLayer(layerType)
-          });
-          
-          console.log(`Saved tileset: ${tileset.fileName} (${dataURL.length} bytes)`);
-        } else {
+        if (!tileset.image || !tileset.fileName) {
           console.log(`No tileset image for layer ${layerType}`);
+          continue;
         }
+        if (this.isInternalTilesetFile(tileset.fileName)) {
+          console.log(`Skipping internal tileset for layer ${layerType}: ${tileset.fileName}`);
+          continue;
+        }
+        console.log(`Saving tileset for layer ${layerType}: ${tileset.fileName}`);
+        const dataURL = this.canvasToDataURL(tileset.image);
+        tilesetImages[tileset.fileName] = dataURL;
+        
+        tilesets.push({
+          layerType: layerType,
+          fileName: tileset.fileName,
+          name: tileset.fileName.replace(/\.[^/.]+$/, ''),
+          columns: tileset.columns,
+          rows: tileset.rows,
+          count: tileset.count,
+          tileWidth: tileset.tileWidth ?? this.tileSizeX,
+          tileHeight: tileset.tileHeight ?? this.tileSizeY,
+          spacing: tileset.spacing ?? 0,
+          margin: tileset.margin ?? 0,
+          sourcePath: tileset.sourcePath ?? null,
+          // Save per-layer detected tile data
+          detectedTiles: this.getDetectedTilesForLayer(layerType)
+        });
+        
+        console.log(`Saved tileset: ${tileset.fileName} (${dataURL.length} bytes)`);
       }
       
       // Fallback: save legacy tileset if no layer tilesets exist but main tileset does
@@ -6654,6 +6886,7 @@ export class TileMapEditor {
         this.heroY = 0;
       }
       
+      this.ensureCollisionTileset();
       console.log('Project data loaded successfully');
       this.draw();
     } catch (error) {

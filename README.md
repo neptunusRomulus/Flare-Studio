@@ -29,7 +29,12 @@ Flare studio is a graphical user interface for Flare Engine which aims to improv
 
 ## Screenshots;
 
-**Coming Soon**...
+<img src="https://github.com/user-attachments/assets/8663e7c5-920f-478e-b2b1-d41cf672eaae" width="600" />
+<img src="https://github.com/user-attachments/assets/544c61f1-dc8f-48c9-8339-249782f6176f" width="600" />
+<img src="https://github.com/user-attachments/assets/45bcdfbb-7bdf-4d78-b8a3-4ce2f1a0973d" width="300" />
+<img src="https://github.com/user-attachments/assets/8528aaca-fa83-483f-8a72-d8cfbefdf298" width="300" />
+<img src="https://github.com/user-attachments/assets/9a91cd54-38a3-4941-893f-2365f186a245" width="400" />
+
 
 ## Video
 

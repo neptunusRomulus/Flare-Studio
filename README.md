@@ -1,177 +1,169 @@
-# Advanced Flare Map Editor (TypeScript + React + Electron)
+# Isometric Tile Editor - TypeScript + Vite + Electron
 
-**Professional isometric tile map editor** built with modern web technologies for generating **Flare / Tiled TMX** compatible maps. Features a modern UI with TypeScript safety, React components, Tailwind CSS styling, and Electron desktop app integration.
+## 🚀 Quick Start
 
-## 🚀 Tech Stack
+Run this single command to start development:
 
-- **TypeScript** - Type safety and enhanced developer experience
-- **React** - Component-based UI architecture  
-- **Tailwind CSS** - Modern utility-first styling
-- **shadcn/ui** - Beautiful, accessible UI components
-- **Vite** - Fast development server and build tool
-- **Electron** - Cross-platform desktop application
-- **ESLint** - Code quality and consistency
-
-## ✨ Features
-
-### Core Tile Editing:
-- PNG tileset loading & slicing (fixed 64x32 isometric tiles)
-- Multiple tile layers (create, reorder, rename, toggle visibility)
-- Professional layer management system
-- Left click paint, right click erase (tile tool)
-- Real-time preview with isometric rendering
-
-### Collision System:
-- Collision tool with visual overlay
-- Exported as `<layer name="Collision">` in TMX
-
-### Object Management:
-- Object placement tool for doors, NPCs, events, obstacles
-- Drag to move, resize with handles
-- Properties editor with key/value pairs
-- Type-safe object system
-- Exported in `<objectgroup name="Objects">`
-
-### Modern UI:
-- Professional dark theme interface
-- Responsive layout with sidebar panels
-- Beautiful icons from Lucide React
-- Modern buttons, inputs, and dropdowns
-- Mini-map preview with real-time updates
-
-### Export System:
-- TMX (`map.tmx`) with all layers, collision, and objects
-- TSX (`tileset.tsx`) with Base64 embedded tilesets
-- Flare-compatible TXT format
-- Undo/Redo system with state management
-
-## 📁 Project Structure
-```
-src/
-├── components/ui/          # shadcn/ui component library
-│   ├── button.tsx         # Button component
-│   ├── input.tsx          # Input component  
-│   └── select.tsx         # Select component
-├── editor/                # Core editor logic
-│   └── TileMapEditor.ts   # Main editor class
-├── lib/
-│   └── utils.ts           # Utility functions
-├── App.tsx                # Main React application
-├── main.tsx               # React entry point
-├── index.css              # Tailwind CSS + custom styles
-└── types.ts               # TypeScript type definitions
-
-electron/
-└── main.cjs               # Electron main process
-
-index.html                 # HTML entry point
-vite.config.js            # Vite configuration
-tailwind.config.js        # Tailwind CSS configuration
-tsconfig.json             # TypeScript configuration
-```
-
-## 🛠️ Development Setup
-
-### Prerequisites
-- Node.js (v16 or higher)
-- npm or yarn
-
-### Installation & Running
 ```bash
-# Install dependencies
-npm install
-
-# Start development server with Electron
 npm run go
-
-# Build for production  
-npm run build
-
-# Run linting
-npm run lint
 ```
 
-### Windows Quick Start
-```bash
-# Use provided batch file
+Or use the Windows batch file:
+```batch
 start.bat
 ```
 
-## 🎮 How To Use
+This will:
+- ✅ Install dependencies (if needed)
+- ✅ Start Vite dev server (http://localhost:5173)
+- ✅ Launch Electron app automatically
+- ✅ Enable hot reload for both web and Electron
 
-1. **Launch Application**: Run `npm run go` or use `start.bat`
-2. **Load Tileset**: Click "Tileset PNG" to load your tileset image
-3. **Create Layers**: Use the layer panel to manage tile layers
-4. **Paint Tiles**: Select tiles from palette, paint with left click
-5. **Add Collision**: Switch to collision tool to mark blocking areas
-6. **Place Objects**: Use object tool to add interactive elements
-7. **Configure Properties**: Select objects to edit their properties
-8. **Adjust Map Size**: Use width/height inputs to resize canvas
-9. **Export Files**: Generate TMX, TSX, or Flare TXT formats
+## 🏗️ Project Structure
 
-## 📤 Export Formats
-
-### TMX Format (Tiled Compatible)
-```xml
-<map orientation="orthogonal" tilewidth="64" tileheight="32" width="20" height="15">
-  <tileset firstgid="1" name="main" tilewidth="64" tileheight="32" source="tileset.tsx"/>
-  <layer name="Base">
-    <data encoding="csv">1,2,3,...</data>
-  </layer>
-  <layer name="Collision">
-    <data encoding="csv">0,1,0,...</data>  
-  </layer>
-  <objectgroup name="Objects">
-    <object id="1" type="door" x="128" y="64" width="64" height="32">
-      <properties>
-        <property name="target" value="next_map"/>
-      </properties>
-    </object>
-  </objectgroup>
-</map>
+```
+ism-tile/
+├── src/
+│   ├── types.ts              # Complete type definitions
+│   └── main.ts               # Full TypeScript application
+├── electron/
+│   └── main.js               # Electron main process
+├── dist/                     # Vite build output
+├── package.json              # Dependencies & scripts
+├── vite.config.js            # Vite configuration
+├── tsconfig.json             # TypeScript config
+├── start.bat                 # Quick start script
+└── index.html                # Main HTML file
 ```
 
-## 🔧 Development Features
+## 📦 Features Completed
 
-- **Hot Reload**: Instant updates during development
-- **Type Safety**: Full TypeScript coverage with strict mode
-- **Code Quality**: ESLint rules for consistent code style
-- **Modern Build**: Optimized production builds with Vite
-- **Cross Platform**: Runs on Windows, macOS, and Linux via Electron
+### ✅ **Full TypeScript Conversion**
+- **Complete type safety** with interfaces for all data structures
+- **Strict TypeScript** configuration with comprehensive error checking
+- **Class-based architecture** with proper encapsulation
+- **Type-safe DOM manipulation** with proper element casting
 
-## 🚀 Future Enhancements
+### ✅ **Modern Development Stack**
+- **Vite** - Lightning fast dev server with hot reload
+- **Electron** - Native desktop app with system integration
+- **Concurrent development** - Both web and Electron run simultaneously
 
-- Advanced autotiling systems
-- Multiple tileset support
-- TMX import functionality  
-- Advanced object shapes (polygons, circles)
-- Brush patterns and flood fill
-- Camera panning for large maps
-- Plugin system for extensibility
-- Collaborative editing features
+### ✅ **Enhanced Electron Integration**
+- **Native menus** with keyboard shortcuts
+- **File system dialogs** for import/export
+- **Window management** with proper sizing
+- **Development vs production** build handling
 
-## 🤝 Contributing
+### ✅ **Advanced Type System**
+```typescript
+interface TileLayer {
+  id: number;
+  name: string;
+  data: number[];
+  visible: boolean;
+}
 
-This project uses modern development practices:
-- TypeScript for type safety
-- ESLint for code quality
-- React for UI components
-- Tailwind for styling
+interface ExportFlareTXTParams {
+  mapWidth: number;
+  mapHeight: number;
+  layers: TileLayer[];
+  // ... complete type safety
+}
+```
 
-All contributions should maintain these standards and include proper type definitions.
+## 🎯 Available Commands
 
-## 📜 License
+```json
+{
+  "dev": "vite",                    // Web development server only
+  "build": "tsc && vite build",     // Production build
+  "electron": "electron .",         // Electron only
+  "go": "npm run electron-dev",     // 🔥 MAIN COMMAND - Everything
+  "electron-dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
+  "pack": "electron-builder --dir", // Package for testing
+  "dist": "electron-builder"        // Full distribution build
+}
+```
 
-Open source project - check license file for details.
+## 🔧 Development Workflow
 
----
+### Daily Development:
+```bash
+npm run go
+```
 
-**Built with modern web technologies for professional game development workflows.**
-- Empty tile = 0 in CSV data.
-- Collision layer uses 0/1 values (0 passable, 1 blocked).
-- Mini map is approximate (samples each tile's center pixel).
-- TSX uses embedded Base64; replace with relative `source="tileset.png"` for large assets.
-- No compression; Tiled supports base64+gzip/zlib if needed.
+### Building for Distribution:
+```bash
+npm run build  # Build web assets
+npm run dist   # Create installers
+```
 
-## License
-Public Domain / Unlicense. Do whatever you want. Attribution appreciated but not required.
+### Features:
+- **Hot Reload**: Changes instantly reflect in both web and Electron
+- **TypeScript Compilation**: Real-time error checking and IntelliSense
+- **Concurrent Servers**: Vite and Electron run together seamlessly
+
+## 🎨 Application Features
+
+### Core Functionality:
+- **Isometric Tile Editor** with 64x32 fixed tile size
+- **Multi-layer Support** (Ground, Wall, Decor)
+- **Collision Layer** editing
+- **Object Placement** with properties
+- **Import/Export** (TMX, TSX, Flare TXT formats)
+
+### TypeScript Enhancements:
+- **Type-safe exports** with parameter validation
+- **Compile-time error detection**
+- **Enhanced IDE support** with autocomplete
+- **Refactoring safety** with proper type relationships
+
+### Electron Features:
+- **Native File Dialogs** for better UX
+- **Keyboard Shortcuts** (Ctrl+S, Ctrl+Z, etc.)
+- **Menu Integration** with native OS menus
+- **Cross-platform Builds** (Windows, Mac, Linux)
+
+## 🔨 Technical Details
+
+### TypeScript Configuration:
+- **Target**: ES2020 for modern JavaScript features
+- **Strict Mode**: Maximum type safety
+- **Module System**: ESNext with Vite bundling
+- **Source Maps**: Full debugging support
+
+### Vite Configuration:
+- **Port**: 5173 (configurable)
+- **Hot Reload**: Enabled for all file types
+- **Build Output**: Optimized for production
+
+### Electron Configuration:
+- **Main Process**: Node.js with full system access
+- **Renderer**: Chromium with TypeScript/Vite
+- **Security**: Proper isolation between processes
+
+## � Development Notes
+
+- **Single Command**: `npm run go` handles everything
+- **Auto-install**: Dependencies install automatically if missing
+- **Hot Reload**: Both TypeScript compilation and Electron refresh automatically
+- **Error Handling**: TypeScript catches errors before runtime
+- **Production Ready**: Full build pipeline for distribution
+
+## 📋 Migration Status
+
+### ✅ Completed:
+- Full TypeScript conversion with comprehensive types
+- Vite integration with hot reload
+- Electron desktop app with native features
+- Single command development workflow
+- Production build pipeline
+
+### 🎯 Architecture:
+- **Class-based**: Clean OOP design with proper encapsulation
+- **Type-safe**: Every function and data structure properly typed
+- **Modern**: ES2020+ features with proper polyfills
+- **Maintainable**: Clear separation of concerns
+
+This setup provides a professional-grade development environment for the isometric tile editor with the full power of TypeScript, modern tooling, and native desktop integration.

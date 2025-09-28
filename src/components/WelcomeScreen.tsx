@@ -263,10 +263,10 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
           <div className="flex items-center gap-2">
             <img 
               src="/flare-ico.png" 
-              alt="Flarism Logo" 
+              alt="Flare Studio Logo" 
               className="w-6 h-6"
             />
-            <span className="text-sm font-semibold">Flarism</span>
+            <span className="text-sm font-semibold">Flare Studio</span>
           </div>
           <div className="flex no-drag">
             <Tooltip content="Minimize">
@@ -367,10 +367,10 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
         <div className="flex items-center gap-1">
           <img 
             src="/flare-ico.png" 
-            alt="Flarism Logo" 
+            alt="Flare Studio Logo" 
             className="w-4 h-6"
           />
-          <span className="text-sm font-semibold">Flarism</span>
+          <span className="text-sm font-semibold">Flare Studio</span>
         </div>
         <div className="flex no-drag">
           <Tooltip content="Minimize">
@@ -452,7 +452,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
               <div className="inline-flex items-center justify-center w-50 h-20">
                 <img src="/flare-logo.png" alt="Flare Logo" className="w-100 h-100 object-contain"/>
               </div>
-              <p className="text-gray-600 dark:text-gray-300 text-lg">Flarism is an unofficial, community-made editor inspired by the Flare engine. It is not affiliated with the official Flare developers.</p>
+              <p className="text-gray-600 dark:text-gray-300 text-lg">Flare Studio is an unofficial, community-made editor inspired by the Flare engine. It is not affiliated with the official Flare developers.</p>
             </div>
 
             {/* Action Buttons */}

@@ -976,6 +976,70 @@ export class TileMapEditor {
     }, 150);
   }
 
+  private snapshotLayerGids(): Map<string, { unique: number[]; nonZeroCount: number }> {
+    const snapshot = new Map<string, { unique: number[]; nonZeroCount: number }>();
+    for (const layer of this.tileLayers) {
+      const uniqueSet = new Set<number>();
+      let nonZeroCount = 0;
+      for (const gid of layer.data) {
+        if (gid > 0) {
+          nonZeroCount++;
+          uniqueSet.add(gid);
+        }
+      }
+      snapshot.set(layer.type, { unique: Array.from(uniqueSet).sort((a, b) => a - b), nonZeroCount });
+    }
+    return snapshot;
+  }
+
+  private logLayerGidChanges(
+    before: Map<string, { unique: number[]; nonZeroCount: number }>,
+    after: Map<string, { unique: number[]; nonZeroCount: number }>,
+    sourceLayerType: string
+  ): void {
+    for (const [layerType, afterInfo] of after.entries()) {
+      if (layerType === sourceLayerType) {
+        continue;
+      }
+      const beforeInfo = before.get(layerType);
+      if (!beforeInfo) {
+        continue;
+      }
+      const uniqueChanged =
+        beforeInfo.unique.length !== afterInfo.unique.length ||
+        beforeInfo.unique.some((value, index) => value !== afterInfo.unique[index]);
+      const countChanged = beforeInfo.nonZeroCount !== afterInfo.nonZeroCount;
+
+      if (uniqueChanged || countChanged) {
+        console.warn('[GID DEBUG]', {
+          sourceLayerType,
+          layerType,
+          before: beforeInfo,
+          after: afterInfo
+        });
+      }
+    }
+  }
+
+
+    this.clearCollisionBrushTooltipHideTimeout();
+
+    tooltipEl.setAttribute('aria-hidden', 'true');
+    tooltipEl.style.opacity = '0';
+
+    if (immediate) {
+      tooltipEl.style.display = 'none';
+      return;
+    }
+
+    this.collisionTooltipHideTimeout = window.setTimeout(() => {
+      if (this.collisionTooltipEl === tooltipEl) {
+        tooltipEl.style.display = 'none';
+      }
+      this.collisionTooltipHideTimeout = null;
+    }, 150);
+  }
+
   constructor(mapCanvas: HTMLCanvasElement) {
     this.mapCanvas = mapCanvas;
     this.initializeCanvas();
@@ -4815,6 +4879,7 @@ export class TileMapEditor {
 
   // Layer-specific tileset management
   public setLayerTileset(layerType: string, file: File): void {
+    const gidSnapshotBefore = this.snapshotLayerGids();
     const image = new Image();
     image.onload = () => {
       const columns = Math.max(1, Math.floor(image.width / this.tileSizeX));
@@ -4842,6 +4907,9 @@ export class TileMapEditor {
       if (activeLayer && activeLayer.type === layerType) {
         this.updateCurrentTileset(layerType);
       }
+
+      const gidSnapshotAfter = this.snapshotLayerGids();
+      this.logLayerGidChanges(gidSnapshotBefore, gidSnapshotAfter, layerType);
     };
     image.src = URL.createObjectURL(file);
   }

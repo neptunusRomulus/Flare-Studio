@@ -2576,6 +2576,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     return layers.find((layer) => layer.id === activeLayerId) ?? null;
   }, [layers, activeLayerId]);
 
+  const isCollisionLayer = activeLayer?.type === 'collision';
   const isNpcLayer = activeLayer?.type === 'npc';
   const isEnemyLayer = activeLayer?.type === 'enemy';
 
@@ -2609,10 +2610,10 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           <div className="flex items-center gap-1">
             <img 
               src="/flare-ico.png" 
-              alt="Flarism Logo" 
+              alt="Flare Studio Logo" 
               className="w-4 h-6"
             />
-            <span className="text-sm font-semibold text-orange-600 dark:text-orange-400">Flarism</span>
+            <span className="text-sm font-semibold text-orange-600 dark:text-orange-400">Flare Studio</span>
           </div>
           <div className="text-sm font-medium"></div>
           {/* Save Status Indicator */}
@@ -2855,6 +2856,8 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                   ref={setBrushToolbarNode}
                   className={`flex items-center transition-all duration-300 ease-in-out gap-1 transform -translate-x-1 mt-2 mb-2`}
                 >
+                  {!isCollisionLayer && (
+                    <>
                   <div className="flex-shrink-0 flex items-center gap-1">
                     {/* Add Tab button (visible for background/object) */}
                     { (activeLayer?.type === 'background' || activeLayer?.type === 'object') && (
@@ -3054,6 +3057,8 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                       </Button>
                     </Tooltip>
                   </div>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
@@ -4038,7 +4043,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
 
                 <div className="pt-4 border-t border-gray-200 text-center">
                   <p className="text-sm text-gray-600 dark:text-gray-400">
-                    Flarism | GUI for Flare Engine by ism.
+                    Flare Studio | GUI for Flare Engine by ism.
                   </p>
                 </div>
               </div>

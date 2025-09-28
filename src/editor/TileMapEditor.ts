@@ -952,6 +952,36 @@ export class TileMapEditor {
     tooltipEl.style.transform = 'translateY(0)';
   }
 
+  private getLayerTilesetOrFallback(layerType: string): LayerTilesetEntry | null {
+    const existing = this.layerTilesets.get(layerType);
+    if (existing && existing.image) {
+      return existing;
+    }
+
+    if (layerType === 'background' && this.tilesetImage && this.tilesetFileName) {
+      const columns = this.tilesetColumns || Math.max(1, Math.floor(this.tilesetImage.width / this.tileSizeX));
+      const rows = this.tilesetRows || Math.max(1, Math.floor(this.tilesetImage.height / this.tileSizeY));
+      const count = this.tileCount || Math.max(1, columns * rows);
+      const tileWidth = this.tilesetTileWidth ?? Math.round(this.tilesetImage.width / Math.max(columns, 1));
+      const tileHeight = this.tilesetTileHeight ?? Math.round(this.tilesetImage.height / Math.max(rows, 1));
+
+      return {
+        image: this.tilesetImage,
+        fileName: this.tilesetFileName,
+        columns,
+        rows,
+        count,
+        tileWidth,
+        tileHeight,
+        spacing: this.tilesetSpacing ?? 0,
+        margin: this.tilesetMargin ?? 0,
+        sourcePath: this.tilesetSourcePath ?? null
+      };
+    }
+
+    return existing ?? null;
+  }
+
   private hideCollisionBrushTooltip(immediate: boolean = false): void {
     const tooltipEl = this.collisionTooltipEl;
     if (!tooltipEl) {
@@ -1022,23 +1052,6 @@ export class TileMapEditor {
   }
 
 
-    this.clearCollisionBrushTooltipHideTimeout();
-
-    tooltipEl.setAttribute('aria-hidden', 'true');
-    tooltipEl.style.opacity = '0';
-
-    if (immediate) {
-      tooltipEl.style.display = 'none';
-      return;
-    }
-
-    this.collisionTooltipHideTimeout = window.setTimeout(() => {
-      if (this.collisionTooltipEl === tooltipEl) {
-        tooltipEl.style.display = 'none';
-      }
-      this.collisionTooltipHideTimeout = null;
-    }, 150);
-  }
 
   constructor(mapCanvas: HTMLCanvasElement) {
     this.mapCanvas = mapCanvas;
@@ -2176,8 +2189,9 @@ export class TileMapEditor {
     for (const layer of layersReversed) {
       if (!layer.visible) continue;
       
-      // Get the tileset for this layer type
-      const layerTileset = this.layerTilesets.get(layer.type);
+      // Get the tileset for this layer type (falling back to the primary tileset for background)
+      const layerTileset = this.getLayerTilesetOrFallback(layer.type);
+
       if (!layerTileset || !layerTileset.image) {
         // Skip this layer if it has no tileset
         continue;
@@ -5073,7 +5087,7 @@ export class TileMapEditor {
   }
 
   public updateCurrentTileset(layerType: string): void {
-    const tileset = this.layerTilesets.get(layerType);
+    const tileset = this.getLayerTilesetOrFallback(layerType);
     if (tileset) {
       this.tilesetImage = tileset.image;
       this.tilesetFileName = tileset.fileName;
@@ -5239,6 +5253,10 @@ export class TileMapEditor {
       if (!entry.fileName) {
         return;
       }
+
+      if (this.isInternalTilesetFile(entry.fileName)) {
+        return;
+      }
       const uniqueKey = `${entry.fileName}:${entry.sourcePath ?? ''}`;
       if (added.has(uniqueKey)) {
         return;
@@ -5398,7 +5416,7 @@ export class TileMapEditor {
     lines.push('');
 
     const globalTilesets = this.collectGlobalTilesets();
-    const mapTilesets = globalTilesets.filter(t => t.fileName);
+    const mapTilesets = globalTilesets.filter(t => t.fileName && !this.isInternalTilesetFile(t.fileName));
     const tilesetOffsets = new Map<string, number>();
     for (const tileset of mapTilesets) {
       if (!tileset.fileName) continue;
@@ -5427,8 +5445,9 @@ export class TileMapEditor {
       lines.push(`type=${layer.type}`);
       lines.push(`data=`);
 
-      const layerTileset = this.layerTilesets.get(layerType);
-      const offsetKey = layerTileset?.fileName ?? null;
+      const layerTileset = this.getLayerTilesetOrFallback(layerType);
+      const isCollisionLayer = layerType === COLLISION_LAYER_TYPE;
+      const offsetKey = !isCollisionLayer ? layerTileset?.fileName ?? null : null;
       const tilesetOffset = offsetKey ? tilesetOffsets.get(offsetKey) : undefined;
 
       for (let y = 0; y < this.mapHeight; y++) {
@@ -5532,7 +5551,7 @@ export class TileMapEditor {
 
     // Per-layer detected tiles
     for (const [layerType, layerMap] of this.layerTileData.entries()) {
-      const layerTileset = this.layerTilesets.get(layerType);
+      const layerTileset = this.getLayerTilesetOrFallback(layerType);
       const fileName = layerTileset?.fileName ?? null;
       if (!fileName || this.isInternalTilesetFile(fileName)) {
         continue;

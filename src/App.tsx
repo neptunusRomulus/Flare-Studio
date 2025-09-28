@@ -2130,21 +2130,32 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         if (window.electronAPI?.saveExportFiles) {
           // Collect tileset images (data URLs) to include in the export so Electron can write PNGs
           const tilesetImages: Record<string, string> = {};
+          type MaybeTilesetEntry = { fileName?: string; image?: HTMLImageElement | null };
           try {
             const exportInfo = editor.getTilesetExportInfo();
             for (const info of exportInfo) {
               // Attempt to get the image element from the editor's layerTilesets by matching fileName
-              let tilesetEntry: unknown | undefined = undefined;
+              let matchedEntry: MaybeTilesetEntry | undefined;
               if (editor['layerTilesets'] && typeof editor['layerTilesets'].forEach === 'function') {
                 editor['layerTilesets'].forEach((val: unknown) => {
-                  const v = val as { fileName?: string; image?: HTMLImageElement } | undefined;
-                  if (v && v.fileName === info.fileName) tilesetEntry = v;
+                  const candidate = val as MaybeTilesetEntry | undefined;
+                  if (candidate?.fileName === info.fileName) {
+                    matchedEntry = candidate;
+                  }
                 });
               }
               // Fallback: try to access editor.tilesetImage when fileName matches
               let imgEl: HTMLImageElement | null = null;
-              if (tilesetEntry && tilesetEntry.image) imgEl = tilesetEntry.image as HTMLImageElement;
-              if (!imgEl && editor['tilesetFileName'] === info.fileName && editor['tilesetImage']) imgEl = editor['tilesetImage'];
+              const entryImage = matchedEntry?.image ?? null;
+              if (entryImage) {
+                imgEl = entryImage;
+              }
+              if (!imgEl && editor['tilesetFileName'] === info.fileName) {
+                const editorImage = editor['tilesetImage'] as HTMLImageElement | null | undefined;
+                if (editorImage) {
+                  imgEl = editorImage;
+                }
+              }
               if (imgEl) {
                 try {
                   const dataUrl = editor['canvasToDataURL'](imgEl);

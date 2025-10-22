@@ -1,7 +1,7 @@
 
 <img width="427" height="107" alt="flare-logo" src="https://github.com/user-attachments/assets/a01a6f21-3382-4b98-ac89-d6982e4d03c5" />
 
-Flare studio is a graphical user interface for Flare Engine which aims to improve the user experience of the engine and encourage users to make more games with Flare Engine. Flare Studio is at its the Alpha Stage — expect incomplete features and active development and use it with your own risk. 
+Flare studio is a graphical user interface for [Flare Engine](https://github.com/flareteam/flare-engine) which is a is a simple game engine built to handle single-player 2D action RPGs. This project aims to improve the user experience of the engine and encourage users to make more games with Flare Engine. Flare Studio is at its the Alpha Stage — expect incomplete features and active development and use it with your own risk. 
 
 ## Features
 - Creating isometrics maps

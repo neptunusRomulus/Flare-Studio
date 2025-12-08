@@ -1,138 +1,84 @@
 {
-  "name": "flare-studio",
-  "version": "0.0.1",
-  "description": "Flare studio is a graphical user interface for Flare Engine which aims to improve the user experience of the engine and encourage users to make more games with Flare Engine. Flare Studio is at its the Alpha Stage — expect incomplete features and active development and use it with your own risk.",
+  "name": "ism-tile",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Tile map editor (Flare Studio fork)",
   "main": "electron/main.cjs",
-  "homepage": "./",
-  "type": "module",
+  "author": "",
+  "license": "MIT",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview",
-    "electron": "electron .",
-    "electron-dev": "concurrently \"vite --port 5175\" \"wait-on http://localhost:5175 && electron .\"",
-    "electron-build": "npm run build && electron-builder",
-    "go": "concurrently \"vite --port 5179\" \"wait-on http://localhost:5179 && electron .\"",
-  "pack": "electron-builder --dir",
-  "dist": "npm run build && electron-builder --win",
-  "dist:win": "npm run build && electron-builder --win",
-  "dist:linux": "npm run build && electron-builder --linux",
-  "dist:mac": "npm run build && electron-builder --mac",
-    "electron-dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
-    "electron-build": "npm run build && electron-builder",
-    "go": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
-    "pack": "electron-builder --dir",
-    "dist": "electron-builder",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
+    "build": "vite build",
+    "preview": "vite preview --port 4173",
+    "start": "electron .",
+    "electron:build": "electron-builder",
+    "lint": "eslint . --ext .ts,.tsx,.js",
+    "test": "vitest"
   },
   "dependencies": {
-    "@radix-ui/react-label": "^2.1.7",
-    "@radix-ui/react-select": "^2.2.6",
-    "@radix-ui/react-slot": "^1.2.3",
-    "@radix-ui/react-switch": "^1.2.6",
-    "@radix-ui/react-toast": "^1.2.15",
-    "class-variance-authority": "^0.7.0",
-    "clsx": "^2.0.0",
-    "lucide-react": "^0.542.0",
-    "class-variance-authority": "^0.7.0",
-    "clsx": "^2.0.0",
-    "lucide-react": "^0.284.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "clsx": "^1.2.1",
     "tailwind-merge": "^1.14.0"
   },
   "devDependencies": {
-    "@tailwindcss/forms": "^0.5.10",
-    "@types/node": "^20.0.0",
-    "@types/react": "^18.2.43",
-    "@types/react-dom": "^18.2.17",
-    "@typescript-eslint/eslint-plugin": "^6.21.0",
-    "@typescript-eslint/parser": "^6.21.0",
-    "@typescript-eslint/eslint-plugin": "^6.14.0",
-    "@typescript-eslint/parser": "^6.14.0",
-    "@vitejs/plugin-react": "^4.2.1",
-    "autoprefixer": "^10.4.16",
-    "concurrently": "^8.2.0",
-    "electron": "^26.0.0",
-    "electron-builder": "^24.13.3",
-    "eslint": "^8.55.0",
-    "eslint-plugin-react": "^7.37.5",
-    "eslint-plugin-react-hooks": "^4.6.2",
-    "electron-builder": "^24.0.0",
-    "eslint": "^8.55.0",
-    "eslint-plugin-react-hooks": "^4.6.0",
-    "eslint-plugin-react-refresh": "^0.4.5",
-    "postcss": "^8.4.31",
-    "tailwindcss": "^3.3.0",
-    "typescript": "^5.2.0",
+    "typescript": "^5.2.2",
     "vite": "^5.0.0",
-    "wait-on": "^7.0.0"
-  },
-  "build": {
-    "appId": "com.ismtile.editor",
-    "productName": "Flare Studio",
-    "directories": {
-      "output": "release",
-      "buildResources": "build",
-    "productName": "Isometric Tile Editor",
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "dist/**/*",
-      "electron/**/*",
-      "package.json",
-      "!**/*.map"
-    ],
-    "win": {
-      "target": "nsis",
-      "icon": "build/icons/flare.ico"
-    },
-    "mac": {
-      "target": "dmg",
-      "icon": "build/icons/flare.icns"
-    },
-    "linux": {
-      "target": "AppImage",
-      "icon": "build/icons/flare.png"
-    },
-    "extraResources": [
-      {
-        "from": "public",
-        "to": "public",
-        "filter": [
-          "**/*"
-        ]
+    "electron": "^25.0.0",
+    "electron-builder": "^24.6.0",
+    "postcss": "^8.4.24",
+    "tailwindcss": "^3.5.2",
+    "@types/react": "^18.2.21",
+    "@types/react-dom": "^18.2.7",
+    {
+      "name": "ism-tile",
+      "version": "0.0.0",
+      "private": true,
+      "description": "Tile map editor (Flare Studio fork)",
+      "main": "electron/main.cjs",
+      "author": "",
+      "license": "MIT",
+      "scripts": {
+        "dev": "vite",
+        "build": "vite build",
+        "preview": "vite preview --port 4173",
+        "start": "electron .",
+        "electron:build": "electron-builder",
+        "lint": "eslint . --ext .ts,.tsx,.js",
+        "test": "vitest"
       },
-      {
-        "from": "build/icons",
-        "to": "icons",
-        "filter": [
-          "**/*"
-        ]
+      "dependencies": {
+        "react": "^18.2.0",
+        "react-dom": "^18.2.0",
+        "clsx": "^1.2.1",
+        "tailwind-merge": "^1.14.0"
+      },
+      "devDependencies": {
+        "typescript": "^5.2.2",
+        "vite": "^5.0.0",
+        "electron": "^25.0.0",
+        "electron-builder": "^24.6.0",
+        "postcss": "^8.4.24",
+        "tailwindcss": "^3.5.2",
+        "@types/react": "^18.2.21",
+        "@types/react-dom": "^18.2.7",
+        "vitest": "^1.3.0",
+        "eslint": "^8.47.0",
+        "@vitejs/plugin-react": "^4.0.0"
+      },
+      "build": {
+        "productName": "Flare Studio",
+        "files": [
+          "dist/**",
+          "electron/main.cjs",
+          "electron/preload.js"
+        ],
+        "directories": {
+          "buildResources": "public"
+        },
+        "win": {
+          "target": "nsis"
+        }
       }
-    ]
-      "package.json"
-    ],
-    "win": {
-      "target": "nsis"
-    },
-    "mac": {
-      "target": "dmg"
-    },
-    "linux": {
-      "target": "AppImage"
     }
-  },
-  "keywords": [
-    "tilemap",
-    "editor",
-    "isometric",
-    "typescript",
-    "react",
-    "tailwind",
-    "electron"
-  ],
-  "author": "",
-  "license": "MIT"
-}
+      "vite": "^5.0.0",

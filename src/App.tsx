@@ -1,0 +1,5871 @@
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import Tooltip from '@/components/ui/tooltip';
+import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Upload, Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Blend, MapPin, Save, Scan, Link2, Scissors, Trash2, Check, HelpCircle, Folder, Shield, Plus, Image, Grid, Box, Users, Locate, Clock, Menu, ChevronLeft, ChevronRight } from 'lucide-react';
+import { TileMapEditor } from './editor/TileMapEditor';
+import type { EditorProjectData } from './editor/TileMapEditor';
+import { TileLayer, MapObject } from './types';
+import { useToast } from '@/hooks/use-toast';
+import { Toaster } from '@/components/ui/toaster';
+import WelcomeScreen from './components/WelcomeScreen';
+import OverwriteExportDialog from './components/OverwriteExportDialog';
+import flareIconUrl from '/flare-ico.png?url';
+
+interface MapConfig {
+  name: string;
+  width: number;
+  height: number;
+  tileSize: number;
+  location: string;
+  isStartingMap?: boolean;
+}
+
+type PropertyType =
+  | 'string'
+  | 'int'
+  | 'float'
+  | 'bool'
+  | 'filename'
+  | 'duration'
+  | 'intPair'
+  | 'floatPair'
+  | 'direction'
+  | 'point'
+  | 'list'
+  | 'predefined';
+
+interface PropertySpec {
+  type: PropertyType;
+  min?: number;
+  max?: number;
+  options?: string[];
+}
+
+const ENEMY_PROPERTY_SPECS: Record<string, PropertySpec> = {
+  xp: { type: 'int', min: 0 },
+  xp_scaling: { type: 'filename' },
+  defeat_status: { type: 'string' },
+  convert_status: { type: 'string' },
+  first_defeat_loot: { type: 'int', min: 1 },
+  animations: { type: 'filename' },
+  loot: { type: 'list' },
+  loot_count: { type: 'intPair', min: 0 },
+  threat_range: { type: 'floatPair', min: 0 },
+  flee_range: { type: 'float', min: 0 },
+  chance_pursue: { type: 'float', min: 0 },
+  chance_flee: { type: 'float', min: 0 },
+  waypoint_pause: { type: 'duration' },
+  turn_delay: { type: 'duration' },
+  combat_style: { type: 'predefined', options: ['default', 'aggressive', 'passive'] },
+  power: { type: 'list' },
+  passive_powers: { type: 'list' },
+  quest_loot: { type: 'list' },
+  flee_duration: { type: 'duration' },
+  flee_cooldown: { type: 'duration' },
+  humanoid: { type: 'bool' },
+  lifeform: { type: 'bool' },
+  flying: { type: 'bool' },
+  intangible: { type: 'bool' },
+  };
+
+// Helper sets used by validation
+const CARDINAL_DIRECTIONS = new Set(['N','NE','E','SE','S','SW','W','NW']);
+const BOOLEAN_STRINGS = new Set(['true','false','1','0']);
+
+const STARTING_MAP_INVALID_NAMES = new Set(['', 'untitled map', 'map name', 'untitled_map']);
+
+const sanitizeMapFileBase = (rawName: string): string => {
+  const sanitized = rawName
+    .replace(/[<>:"/|?*]/g, '_')
+    .trim()
+    .replace(/\s+/g, '_')
+    .replace(/_{2,}/g, '_');
+  return sanitized || 'Untitled_Map';
+};
+
+const computeIntermapTarget = (starting: boolean, rawName: string | undefined | null): string | null => {
+  if (!starting) return null;
+  const name = (rawName ?? '').trim();
+  if (!name) return null;
+  if (STARTING_MAP_INVALID_NAMES.has(name.toLowerCase())) return null;
+  const sanitized = sanitizeMapFileBase(name);
+  return `maps/${sanitized}.txt`;
+};
+
+const buildSpawnContent = (intermapTarget: string | null): string => [
+  '# this file is automatically loaded when a New Game starts.',
+  "# it's a dummy map to send the player to the actual starting point.",
+  '',
+  '[header]',
+  'width=1',
+  'height=1',
+  'hero_pos=0,0',
+  '',
+  '[event]',
+  'type=event',
+  'location=0,0,1,1',
+  'activate=on_load',
+  `intermap=${intermapTarget ?? ''}`,
+  ''
+].join('\n');
+
+const extractSpawnIntermapValue = (content: string | null | undefined): string | null => {
+  if (!content) return null;
+  const match = content.match(/^\s*intermap\s*=\s*(.*)$/m);
+  if (!match) return null;
+  const value = match[1].trim();
+  return value ? value : null;
+};
+
+function validateValue(key: string, trimmed: string, spec: PropertySpec): string | null {
+  switch (spec.type) {
+    case 'int': {
+      const parsed = Number.parseInt(trimmed, 10);
+      if (Number.isNaN(parsed)) return `${key} must be an integer.`;
+      if (spec.min !== undefined && parsed < spec.min) return `${key} must be greater than or equal to ${spec.min}.`;
+      if (spec.max !== undefined && parsed > spec.max) return `${key} must be less than or equal to ${spec.max}.`;
+      return null;
+    }
+    case 'float': {
+      const parsed = Number.parseFloat(trimmed);
+      if (Number.isNaN(parsed)) return `${key} must be a number.`;
+      if (spec.min !== undefined && parsed < spec.min) return `${key} must be greater than or equal to ${spec.min}.`;
+      if (spec.max !== undefined && parsed > spec.max) return `${key} must be less than or equal to ${spec.max}.`;
+      return null;
+    }
+    case 'bool': {
+      if (!BOOLEAN_STRINGS.has(trimmed.toLowerCase())) return `${key} must be true or false.`;
+      return null;
+    }
+    case 'filename': {
+      if (!trimmed) return `${key} cannot be empty.`;
+      return null;
+    }
+    case 'duration': {
+      if (!/^\d+(ms|s)?$/i.test(trimmed)) return `${key} must be a duration such as 200ms or 2s.`;
+      return null;
+    }
+    case 'intPair': {
+      const parts = trimmed.split(',').map(p => p.trim()).filter(Boolean);
+      if (parts.length === 0 || parts.length > 2) return `${key} must contain one or two comma-separated integers.`;
+      for (const part of parts) {
+        if (!/^-?\d+$/.test(part)) return `${key} must contain valid integers.`;
+        const parsed = Number.parseInt(part, 10);
+        if (spec.min !== undefined && parsed < spec.min) return `${key} values must be greater than or equal to ${spec.min}.`;
+        if (spec.max !== undefined && parsed > spec.max) return `${key} values must be less than or equal to ${spec.max}.`;
+      }
+      return null;
+    }
+    case 'floatPair': {
+      const parts = trimmed.split(',').map(p => p.trim()).filter(Boolean);
+      if (parts.length === 0 || parts.length > 2) return `${key} must contain one or two comma-separated numbers.`;
+      for (const part of parts) {
+        const parsed = Number.parseFloat(part);
+        if (Number.isNaN(parsed)) return `${key} must contain valid numbers.`;
+        if (spec.min !== undefined && parsed < spec.min) return `${key} values must be greater than or equal to ${spec.min}.`;
+        if (spec.max !== undefined && parsed > spec.max) return `${key} values must be less than or equal to ${spec.max}.`;
+      }
+      return null;
+    }
+    case 'direction': {
+      const upper = trimmed.toUpperCase();
+      if (CARDINAL_DIRECTIONS.has(upper)) return null;
+      const parsed = Number.parseInt(trimmed, 10);
+      if (!Number.isNaN(parsed) && parsed >= 0 && parsed <= 7) return null;
+      return `${key} must be a direction (N, NE, ... , NW) or a number between 0 and 7.`;
+    }
+    case 'point': {
+      const parts = trimmed.split(',').map(p => p.trim());
+      if (parts.length !== 2 || !parts.every(part => /^-?\d+$/.test(part))) return `${key} must be two comma-separated integers.`;
+      return null;
+    }
+    case 'predefined': {
+      if (spec.options && !spec.options.includes(trimmed)) return `${key} must be one of: ${spec.options.join(', ')}.`;
+      return null;
+    }
+    case 'list':
+    case 'string':
+    default:
+      return null;
+  }
+}
+
+const NPC_PROPERTY_SPECS: Record<string, PropertySpec> = {};
+
+function validateAndSanitizeObject(object: MapObject): { errors: string[]; sanitized: Record<string, string> } {
+  const specs = object.type === 'enemy' ? ENEMY_PROPERTY_SPECS
+    : object.type === 'npc' ? NPC_PROPERTY_SPECS
+    : {};
+
+  const sanitized: Record<string, string> = {};
+  const errors: string[] = [];
+  const properties = object.properties || {};
+
+  for (const [key, rawValue] of Object.entries(properties)) {
+    const value = (rawValue ?? '').toString();
+    const trimmed = value.trim();
+    const spec = specs[key];
+
+    if (spec) {
+      const error = validateValue(key, trimmed, spec);
+      if (error) {
+        errors.push(error);
+      }
+      if (spec.type === 'bool') {
+        sanitized[key] = trimmed.toLowerCase();
+      } else if (spec.type === 'direction' && CARDINAL_DIRECTIONS.has(trimmed.toUpperCase())) {
+        sanitized[key] = trimmed.toUpperCase();
+      } else {
+        sanitized[key] = trimmed;
+      }
+    } else {
+      sanitized[key] = trimmed;
+    }
+  }
+
+  return { errors, sanitized };
+}
+
+function App() {
+  const [showWelcome, setShowWelcome] = useState(true);
+  const [editor, setEditor] = useState<TileMapEditor | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [mapWidth, setMapWidth] = useState(0);
+  const [mapHeight, setMapHeight] = useState(0);
+  const [mapInitialized, setMapInitialized] = useState(false);
+  const [showCreateMapDialog, setShowCreateMapDialog] = useState(false);
+  const [newMapWidth, setNewMapWidth] = useState(20);
+  const [newMapHeight, setNewMapHeight] = useState(15);
+  const [newMapName, setNewMapName] = useState('Untitled Map');
+  const [createMapError, setCreateMapError] = useState<string | null>(null);
+  const [reservedMapNames, setReservedMapNames] = useState<string[]>([]);
+  const [newMapStarting, setNewMapStarting] = useState(false);
+  const [activeGid, setActiveGid] = useState<string>('(none)');
+  const [showMinimap, setShowMinimap] = useState(true);
+  // Show/hide Active GID indicator (user preference)
+  const [showActiveGid, setShowActiveGid] = useState<boolean>(true);
+  // Left sidebar collapsed (icon-strip) state
+  // Start expanded by default; users can toggle during the session
+  const [leftCollapsed, setLeftCollapsed] = useState<boolean>(false);
+  // transient flag during sidebar open/close animation to reduce canvas flicker
+  const [leftTransitioning, setLeftTransitioning] = useState<boolean>(false);
+  const [layers, setLayers] = useState<TileLayer[]>([]);
+  const [activeLayerId, setActiveLayerId] = useState<number | null>(null);
+  const [showAddLayerDropdown, setShowAddLayerDropdown] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  // Layers panel expand/collapse state
+  const [layersPanelExpanded, setLayersPanelExpanded] = useState(false);
+  const [showHelp, setShowHelp] = useState(false);
+  const [activeHelpTab, setActiveHelpTab] = useState('engine');
+  const [showTooltip, setShowTooltip] = useState(true);
+  // Force refresh counter to trigger re-render when editor-managed tabs change
+  const [tabTick, setTabTick] = useState(0);
+  const [toolbarExpanded, setToolbarExpanded] = useState(true);
+  const toolbarCollapseTimer = useRef<number | null>(null);
+  const toolbarContainerRef = useRef<HTMLDivElement | null>(null);
+  const [bottomToolbarExpanded, setBottomToolbarExpanded] = useState(true);
+  const bottomToolbarCollapseTimer = useRef<number | null>(null);
+  const bottomToolbarContainerRef = useRef<HTMLDivElement | null>(null);
+  const [brushToolbarExpanded, setBrushToolbarExpanded] = useState(true);
+  const brushToolbarCollapseTimer = useRef<number | null>(null);
+  const brushToolbarContainerRef = useRef<HTMLDivElement | null>(null);
+  // Left sidebar buttons expand/collapse (independent)
+  // Left bottom action buttons are always expanded now; no local state required.
+  const [pendingMapConfig, setPendingMapConfig] = useState<EditorProjectData | null>(null);
+  const clearToolbarCollapseTimer = useCallback(() => {
+    if (toolbarCollapseTimer.current !== null) {
+      window.clearTimeout(toolbarCollapseTimer.current);
+      toolbarCollapseTimer.current = null;
+    }
+  }, []);
+
+  const scheduleToolbarCollapse = useCallback(() => {
+    clearToolbarCollapseTimer();
+    toolbarCollapseTimer.current = window.setTimeout(() => {
+      setToolbarExpanded(false);
+    }, 500);
+  }, [clearToolbarCollapseTimer]);
+
+  const showToolbarTemporarily = useCallback(() => {
+    setToolbarExpanded(true);
+    scheduleToolbarCollapse();
+  }, [scheduleToolbarCollapse]);
+
+  const handleToolbarMouseEnter = useCallback(() => {
+    clearToolbarCollapseTimer();
+    setToolbarExpanded(true);
+  }, [clearToolbarCollapseTimer]);
+
+  const handleToolbarMouseLeave = useCallback(() => {
+    const activeElement = typeof document !== 'undefined' ? document.activeElement : null;
+    if (activeElement && toolbarContainerRef.current?.contains(activeElement)) {
+      return;
+    }
+    scheduleToolbarCollapse();
+  }, [scheduleToolbarCollapse, toolbarContainerRef]);
+
+  const handleToolbarFocus = useCallback(() => {
+    clearToolbarCollapseTimer();
+    setToolbarExpanded(true);
+  }, [clearToolbarCollapseTimer]);
+
+  const handleToolbarBlur = useCallback((event: React.FocusEvent<HTMLDivElement>) => {
+    const nextTarget = event.relatedTarget as Node | null;
+    if (!event.currentTarget.contains(nextTarget)) {
+      scheduleToolbarCollapse();
+    }
+  }, [scheduleToolbarCollapse]);
+
+  // Left bottom action buttons are always expanded now; collapse behavior removed.
+
+  const clearBottomToolbarCollapseTimer = useCallback(() => {
+    if (bottomToolbarCollapseTimer.current !== null) {
+      window.clearTimeout(bottomToolbarCollapseTimer.current);
+      bottomToolbarCollapseTimer.current = null;
+    }
+  }, []);
+
+  const scheduleBottomToolbarCollapse = useCallback(() => {
+    clearBottomToolbarCollapseTimer();
+    bottomToolbarCollapseTimer.current = window.setTimeout(() => {
+      setBottomToolbarExpanded(false);
+    }, 500);
+  }, [clearBottomToolbarCollapseTimer]);
+
+  const showBottomToolbarTemporarily = useCallback(() => {
+    setBottomToolbarExpanded(true);
+    scheduleBottomToolbarCollapse();
+  }, [scheduleBottomToolbarCollapse]);
+
+  const handleBottomToolbarMouseEnter = useCallback(() => {
+    clearBottomToolbarCollapseTimer();
+    setBottomToolbarExpanded(true);
+  }, [clearBottomToolbarCollapseTimer]);
+
+  const handleBottomToolbarMouseLeave = useCallback(() => {
+    const activeElement = typeof document !== 'undefined' ? document.activeElement : null;
+    if (activeElement && bottomToolbarContainerRef.current?.contains(activeElement)) {
+      return;
+    }
+    scheduleBottomToolbarCollapse();
+  }, [scheduleBottomToolbarCollapse]);
+
+  const handleBottomToolbarFocus = useCallback(() => {
+    clearBottomToolbarCollapseTimer();
+    setBottomToolbarExpanded(true);
+  }, [clearBottomToolbarCollapseTimer]);
+
+  const handleBottomToolbarBlur = useCallback((event: React.FocusEvent<HTMLDivElement>) => {
+    const nextTarget = event.relatedTarget as Node | null;
+    if (!event.currentTarget.contains(nextTarget)) {
+      scheduleBottomToolbarCollapse();
+    }
+  }, [scheduleBottomToolbarCollapse]);
+
+  const clearBrushToolbarCollapseTimer = useCallback(() => {
+    if (brushToolbarCollapseTimer.current !== null) {
+      window.clearTimeout(brushToolbarCollapseTimer.current);
+      brushToolbarCollapseTimer.current = null;
+    }
+  }, []);
+
+  const scheduleBrushToolbarCollapse = useCallback(() => {
+    // Intentionally disabled: keep brush toolbar expanded permanently.
+    clearBrushToolbarCollapseTimer();
+  }, [clearBrushToolbarCollapseTimer]);
+
+  const showBrushToolbarTemporarily = useCallback(() => {
+    setBrushToolbarExpanded(true);
+    scheduleBrushToolbarCollapse();
+  }, [scheduleBrushToolbarCollapse]);
+  const setBrushToolbarNode = useCallback((node: HTMLDivElement | null) => {
+    brushToolbarContainerRef.current = node;
+  }, []);
+
+  const setBottomToolbarNode = useCallback((node: HTMLDivElement | null) => {
+    toolbarRef.current = node;
+    bottomToolbarContainerRef.current = node;
+  }, []);
+
+  const handleSelectTool = useCallback((tool: 'brush' | 'selection' | 'shape' | 'stamp' | 'eyedropper') => {
+    setSelectedTool(tool);
+    showBottomToolbarTemporarily();
+  }, [showBottomToolbarTemporarily]);
+
+  const handleToggleBrushTool = useCallback((tool: 'move' | 'merge' | 'separate' | 'remove') => {
+    setBrushTool((current) => (current === tool ? 'none' : tool));
+    showBrushToolbarTemporarily();
+  }, [showBrushToolbarTemporarily]);
+
+  const canUseTilesetDialog = useMemo(() => {
+    return typeof window !== 'undefined' && !!window.electronAPI?.selectTilesetFile;
+  }, []);
+  
+  // Toolbar states
+  const [selectedTool, setSelectedTool] = useState('brush');
+  const [showBrushOptions, setShowBrushOptions] = useState(false);
+  const [showSelectionOptions, setShowSelectionOptions] = useState(false);
+  const [showShapeOptions, setShowShapeOptions] = useState(false);
+  
+  // Sub-tool states
+  const [selectedBrushTool, setSelectedBrushTool] = useState('brush');
+  const [selectedSelectionTool, setSelectedSelectionTool] = useState('rectangular');
+  const [selectedShapeTool, setSelectedShapeTool] = useState('rectangle');
+  
+  // Brush management states
+  const [brushTool, setBrushTool] = useState<'none' | 'move' | 'merge' | 'separate' | 'remove'>('none');
+  // Removed unused state: selectedBrushes
+  const [showSeparateDialog, setShowSeparateDialog] = useState(false);
+  const [brushToSeparate, setBrushToSeparate] = useState<number | null>(null);
+  
+  // Stamp states
+  const [stamps, setStamps] = useState<import('./types').Stamp[]>([]);
+  const [selectedStamp, setSelectedStamp] = useState<string | null>(null);
+  const [stampMode, setStampMode] = useState<'select' | 'create' | 'place'>('select');
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [showStampDialog, setShowStampDialog] = useState(false);
+  const [newStampName, setNewStampName] = useState('');
+  // Clear layer confirmation dialog state (replaces window.confirm)
+  const [showClearLayerDialog, setShowClearLayerDialog] = useState(false);
+  // Generic confirmation dialog for other destructive actions
+  const [confirmAction, setConfirmAction] = useState<null | { type: 'removeBrush' | 'removeTileset' | 'removeTab'; payload?: number | { layerType: string; tabId: number } }>(null);
+  // Keep a stable React state for the tab that was requested to be deleted so
+  // the confirmation handler can use the exact intended tab (avoids stale refs).
+  const [tabToDelete, setTabToDelete] = useState<null | { layerType: string; tabId: number }>(null);
+  // Keep an optional ref as a fallback for older flows
+  const confirmPayloadRef = React.useRef<null | { layerType: string; tabId: number }>(null);
+  
+  // Settings states
+  const [mapName, setMapName] = useState('Untitled Map');
+  const [isStartingMap, setIsStartingMap] = useState(false);
+  const [currentProjectPath, setCurrentProjectPath] = useState<string | null>(null);
+  const [startingMapIntermap, setStartingMapIntermap] = useState<string | null>(null);
+  const previousMapNameRef = useRef(mapName);
+
+  const writeSpawnFile = useCallback(async (starting: boolean, mapNameOverride?: string) => {
+    const effectiveName = mapNameOverride ?? mapName;
+    const intermapTarget = computeIntermapTarget(starting, effectiveName);
+    if (!currentProjectPath || !window.electronAPI?.updateSpawnFile) {
+      setStartingMapIntermap(intermapTarget);
+      return;
+    }
+    const spawnContent = buildSpawnContent(intermapTarget);
+    try {
+      const success = await window.electronAPI.updateSpawnFile(currentProjectPath, spawnContent);
+      if (success) {
+        setStartingMapIntermap(intermapTarget);
+      }
+    } catch (error) {
+      console.error('Failed to update spawn file:', error);
+    }
+  }, [mapName, currentProjectPath]);
+
+  const updateStartingMap = useCallback(
+    (nextValue: boolean, options?: { propagate?: boolean; mapNameOverride?: string }) => {
+      setIsStartingMap(nextValue);
+      if (options?.propagate === false) return;
+      void writeSpawnFile(nextValue, options?.mapNameOverride);
+    },
+    [writeSpawnFile]
+  );
+
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    // Initialize from localStorage or default to false
+    const savedTheme = localStorage.getItem('isDarkMode');
+    return savedTheme ? JSON.parse(savedTheme) : false;
+  });
+
+  // Show/hide the left sidebar collapse toggle (user preference)
+  const [showSidebarToggle, setShowSidebarToggle] = useState(() => {
+    const saved = localStorage.getItem('showSidebarToggle');
+    return saved ? JSON.parse(saved) : true;
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('showSidebarToggle', JSON.stringify(showSidebarToggle));
+    } catch (e) {
+      // ignore storage errors
+    }
+  }, [showSidebarToggle]);
+  
+  // Auto-save states
+  const [saveStatus, setSaveStatus] = useState<'saving' | 'saved' | 'error' | 'unsaved'>('saved');
+  const [autoSaveEnabled, setAutoSaveEnabledState] = useState(true);
+  const [lastSaveTime, setLastSaveTime] = useState<number>(0);
+  const [isManuallySaving, setIsManuallySaving] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  // Reload spawn metadata whenever project selection changes
+  useEffect(() => {
+    let cancelled = false;
+    const loadSpawnFile = async () => {
+      if (!currentProjectPath || !window.electronAPI?.readSpawnFile) {
+        if (!cancelled) {
+          setStartingMapIntermap(null);
+        }
+        return;
+      }
+      try {
+        const content = await window.electronAPI.readSpawnFile(currentProjectPath);
+        if (!cancelled) {
+          setStartingMapIntermap(extractSpawnIntermapValue(content));
+        }
+      } catch (error) {
+        console.warn('Failed to read spawn file:', error);
+        if (!cancelled) {
+          setStartingMapIntermap(null);
+        }
+      }
+    };
+    loadSpawnFile();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentProjectPath]);
+
+  useEffect(() => {
+    const previous = previousMapNameRef.current;
+    if (previous === mapName) {
+      return;
+    }
+    previousMapNameRef.current = mapName;
+    if (!isStartingMap) {
+      return;
+    }
+    const previousTarget = computeIntermapTarget(true, previous);
+    const nextTarget = computeIntermapTarget(true, mapName);
+    if (previousTarget !== nextTarget) {
+      updateStartingMap(true, { mapNameOverride: mapName });
+    }
+  }, [mapName, isStartingMap, updateStartingMap]);
+
+  useEffect(() => {
+    if (editor) {
+      editor.setMapName(mapName);
+    }
+  }, [editor, mapName]);
+
+  // When true, we're in the middle of opening an existing project
+  // and should avoid creating a blank editor instance.
+  const [isOpeningProject, setIsOpeningProject] = useState(false);
+  
+  // Export loading state
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportProgress, setExportProgress] = useState(0);
+  const [showExportSuccess, setShowExportSuccess] = useState(false);
+  const [isPreparingNewMap, setIsPreparingNewMap] = useState(false);
+  
+  // Custom tooltip states
+  const [tooltip, setTooltip] = useState<{
+    content: React.ReactNode;
+    x: number;
+    y: number;
+    visible: boolean;
+    fadeOut: boolean;
+  } | null>(null);
+  const tooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Object management states  
+  const [showObjectDialog, setShowObjectDialog] = useState(false);
+  const [editingObject, setEditingObject] = useState<MapObject | null>(null);
+  const [objectValidationErrors, setObjectValidationErrors] = useState<string[]>([]);
+  const [mapObjects, setMapObjects] = useState<MapObject[]>([]);
+  const [actorDialogState, setActorDialogState] = useState<{
+    type: 'npc' | 'enemy';
+    name: string;
+    x: string;
+    y: string;
+    tilesetPath: string;
+  } | null>(null);
+  const [actorDialogError, setActorDialogError] = useState<string | null>(null);
+  
+  // Hero position edit dialog state
+  const [showHeroEditDialog, setShowHeroEditDialog] = useState(false);
+  const [heroEditData, setHeroEditData] = useState<{
+    currentX: number;
+    currentY: number;
+    mapWidth: number;
+    mapHeight: number;
+    onConfirm: (x: number, y: number) => void;
+  } | null>(null);
+  
+  // Tool dropdown timeout refs
+  const brushOptionsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const selectionOptionsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const shapeOptionsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Floating toolbar ref for anchored tooltip
+  const toolbarRef = useRef<HTMLDivElement | null>(null);
+
+  // Hover coordinates state
+  const [hoverCoords, setHoverCoords] = useState<{ x: number; y: number } | null>(null);
+
+  // Selection state
+  const [selectionCount, setSelectionCount] = useState(0);
+  const [hasSelection, setHasSelection] = useState(false);
+
+  const { toast } = useToast();
+
+  // Maps dropdown state (lists files from project/maps)
+  const [projectMaps, setProjectMaps] = useState<string[]>([]);
+  const [mapsDropdownOpen, setMapsDropdownOpen] = useState<boolean>(false);
+  const mapsButtonRef = useRef<HTMLButtonElement | null>(null);
+  const [mapsDropdownPos, setMapsDropdownPos] = useState<{ left: number; top: number } | null>(null);
+  const mapsPortalRef = useRef<HTMLDivElement | null>(null);
+  const mapsSubPortalRef = useRef<HTMLDivElement | null>(null);
+  const [mapsSubPos, setMapsSubPos] = useState<{ left: number; top: number } | null>(null);
+  const [mapsSubOpen, setMapsSubOpen] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!mapsDropdownOpen) return;
+    const computePos = () => {
+      const btn = mapsButtonRef.current as HTMLButtonElement | null;
+      if (!btn) return setMapsDropdownPos(null);
+      const rect = btn.getBoundingClientRect();
+      // position the menu to open upwards: set top to the button's top and use translateY(-100%) in CSS
+      setMapsDropdownPos({ left: rect.left, top: rect.top - 8 });
+    };
+    computePos();
+    window.addEventListener('resize', computePos);
+    window.addEventListener('scroll', computePos, true);
+    return () => {
+      window.removeEventListener('resize', computePos);
+      window.removeEventListener('scroll', computePos, true);
+    };
+  }, [mapsDropdownOpen]);
+
+  // Compute position for the nested maps submenu so it appears to the right of the main dropdown
+  useEffect(() => {
+    if (!mapsSubOpen) return;
+    const computeSubPos = () => {
+      const portal = mapsPortalRef.current;
+      if (!portal) return setMapsSubPos(null);
+      const rect = portal.getBoundingClientRect();
+      // place submenu to the right of the main portal with a small gap
+      setMapsSubPos({ left: rect.right + 8, top: rect.top });
+    };
+    computeSubPos();
+    window.addEventListener('resize', computeSubPos);
+    window.addEventListener('scroll', computeSubPos, true);
+    return () => {
+      window.removeEventListener('resize', computeSubPos);
+      window.removeEventListener('scroll', computeSubPos, true);
+    };
+  }, [mapsSubOpen]);
+
+  // Close maps dropdown on Escape or clicking outside
+  useEffect(() => {
+    if (!mapsDropdownOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setMapsDropdownOpen(false);
+        setMapsSubOpen(false);
+      }
+    };
+    const onMouse = (e: MouseEvent) => {
+      const portal = mapsPortalRef.current;
+      const subportal = mapsSubPortalRef.current;
+      const btn = mapsButtonRef.current;
+      const target = e.target as Node | null;
+      if (!portal) return;
+      if (portal.contains(target)) return;
+      if (subportal && subportal.contains(target)) return;
+      if (btn && btn.contains(target)) return; // clicking the button toggles; allow it
+      setMapsDropdownOpen(false);
+      setMapsSubOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('mousedown', onMouse);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('mousedown', onMouse);
+    };
+  }, [mapsDropdownOpen]);
+  // (selectedMapTxt removed — we call editor.loadFlareMapTxt when available)
+
+  // refreshProjectMaps and handleOpenMapFromMapsFolder are declared later (after helpers they depend on)
+
+  const syncMapObjects = useCallback(() => {
+    if (editor) {
+      setMapObjects(editor.getMapObjects());
+    } else {
+      setMapObjects([]);
+    }
+  }, [editor]);
+
+  // Keep 'toast' referenced to avoid unused variable errors while toasts are suppressed.
+  // This creates a stable noop reference that will never show UI.
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const _noopToast = toast;
+    return () => {
+      // no-op cleanup
+    };
+  }, [toast]);
+
+  // Handle dark mode toggle
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    
+    // Update editor dark mode if it exists
+    if (editor) {
+      editor.setDarkMode(isDarkMode);
+    }
+    
+    // Save to localStorage
+    localStorage.setItem('isDarkMode', JSON.stringify(isDarkMode));
+  }, [isDarkMode, editor]);
+
+  // Wire editor activeGid updates into React state
+  useEffect(() => {
+    if (!editor) return;
+    const cb = (gid: number) => {
+      setActiveGid(gid > 0 ? gid.toString() : '(none)');
+    };
+    editor.setActiveGidCallback(cb);
+    return () => {
+      // remove callback when editor changes/unmounts
+      editor.setActiveGidCallback(null);
+    };
+  }, [editor]);
+
+  // Helper function to set up auto-save for an editor instance
+const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
+    // Set up optional callback for additional auto-save actions
+    editorInstance.setAutoSaveCallback(async () => {
+      // Persist to disk automatically when running in Electron with a project path
+      try {
+        if (window.electronAPI && currentProjectPath) {
+          await editorInstance.saveProjectData(currentProjectPath);
+        }
+      } catch (e) {
+        console.warn('Auto-save to disk failed:', e);
+      }
+      setLastSaveTime(Date.now());
+    });
+
+    editorInstance.setSaveStatusCallback((status) => {
+      setSaveStatus(status);
+      setHasUnsavedChanges(status === 'unsaved' || status === 'error');
+    });
+
+    editorInstance.setAutoSaveEnabled(autoSaveEnabled);
+    
+    // Set up eyedropper callback to switch back to brush tool
+    editorInstance.setEyedropperCallback(() => {
+      handleSelectTool('brush');
+      setSelectedBrushTool('brush');
+    });
+
+    // Set up stamp callback to update stamps list
+    editorInstance.setStampCallback((stampsList) => {
+      setStamps(stampsList);
+    });
+
+    editorInstance.setObjectsChangedCallback((objects) => {
+      setMapObjects(objects);
+    });
+
+    // Set up hero edit callback to show dialog
+    editorInstance.setHeroEditCallback((currentX, currentY, mapWidth, mapHeight, onConfirm) => {
+      setHeroEditData({ currentX, currentY, mapWidth, mapHeight, onConfirm });
+      setShowHeroEditDialog(true);
+    });
+  }, [autoSaveEnabled, currentProjectPath, handleSelectTool]);
+
+  useEffect(() => {
+    return () => {
+      clearToolbarCollapseTimer();
+    };
+  }, [clearToolbarCollapseTimer]);
+
+  useEffect(() => {
+    if (!showWelcome && mapInitialized) {
+      showToolbarTemporarily();
+    }
+  }, [showWelcome, mapInitialized, showToolbarTemporarily]);
+
+  useEffect(() => {
+    if (showWelcome || !mapInitialized) {
+      setToolbarExpanded(true);
+      clearToolbarCollapseTimer();
+    }
+  }, [showWelcome, mapInitialized, clearToolbarCollapseTimer]);
+
+  useEffect(() => {
+    return () => {
+      clearBrushToolbarCollapseTimer();
+    };
+  }, [clearBrushToolbarCollapseTimer]);
+
+  useEffect(() => {
+    if (!showWelcome && mapInitialized) {
+      showBrushToolbarTemporarily();
+    }
+  }, [showWelcome, mapInitialized, showBrushToolbarTemporarily]);
+
+  useEffect(() => {
+    if (showWelcome || !mapInitialized) {
+      setBrushToolbarExpanded(true);
+      clearBrushToolbarCollapseTimer();
+    }
+  }, [showWelcome, mapInitialized, clearBrushToolbarCollapseTimer]);
+  useEffect(() => {
+    return () => {
+      clearBottomToolbarCollapseTimer();
+    };
+  }, [clearBottomToolbarCollapseTimer]);
+
+  useEffect(() => {
+    if (!showWelcome && mapInitialized) {
+      showBottomToolbarTemporarily();
+    }
+  }, [showWelcome, mapInitialized, showBottomToolbarTemporarily]);
+
+  useEffect(() => {
+    if (showWelcome || !mapInitialized) {
+      setBottomToolbarExpanded(true);
+      clearBottomToolbarCollapseTimer();
+    }
+  }, [showWelcome, mapInitialized, clearBottomToolbarCollapseTimer]);
+
+  // Wire Electron menu actions (Save/Open/New)
+  // Moved after function definitions
+
+  useEffect(() => {
+    // Prepare an editor instance when entering the workspace, unless a project load is in progress
+    if (
+      canvasRef.current &&
+      !showWelcome &&
+      !editor &&
+      !isOpeningProject &&
+      !pendingMapConfig
+    ) {
+      const tileEditor = new TileMapEditor(canvasRef.current);
+      tileEditor.setDarkMode(isDarkMode);
+      setupAutoSave(tileEditor);
+
+      tileEditor.resetForNewProject();
+      if (mapInitialized && mapWidth > 0 && mapHeight > 0) {
+        tileEditor.setMapSize(mapWidth, mapHeight);
+      } else {
+        tileEditor.setMapSize(0, 0);
+      }
+
+      setEditor(tileEditor);
+    }
+  }, [
+    showWelcome,
+    editor,
+    setupAutoSave,
+    isOpeningProject,
+    isDarkMode,
+    pendingMapConfig,
+    mapInitialized,
+    mapWidth,
+    mapHeight
+  ]);
+
+  // Track hover coordinates
+  useEffect(() => {
+    if (!editor) return;
+
+    const updateHoverCoords = () => {
+      const coords = editor.getHoverCoordinates();
+      setHoverCoords(coords);
+    };
+
+    // Update hover coordinates on animation frame for smooth updates
+    let animationFrameId: number;
+    const pollHoverCoords = () => {
+      updateHoverCoords();
+      animationFrameId = requestAnimationFrame(pollHoverCoords);
+    };
+
+    pollHoverCoords();
+
+    return () => {
+      if (animationFrameId) {
+        cancelAnimationFrame(animationFrameId);
+      }
+    };
+  }, [editor]);
+
+  // Sync tool selection with editor
+  useEffect(() => {
+    if (editor && selectedTool === 'brush') {
+      // Map selectedBrushTool to editor tool types
+      const toolMap: {[key: string]: 'brush' | 'eraser' | 'bucket'} = {
+        'brush': 'brush',
+        'bucket': 'bucket',
+        'eraser': 'eraser'
+      };
+      const editorTool = toolMap[selectedBrushTool] || 'brush';
+      editor.setCurrentTool(editorTool);
+    } else if (editor && selectedTool === 'selection') {
+      // Set the editor to selection mode and update selection tool
+      const selectionToolMap: {[key: string]: 'rectangular' | 'magic-wand' | 'same-tile' | 'circular'} = {
+        'rectangular': 'rectangular',
+        'magic-wand': 'magic-wand',
+        'same-tile': 'same-tile',
+        'circular': 'circular'
+      };
+      const editorSelectionTool = selectionToolMap[selectedSelectionTool] || 'rectangular';
+      editor.setCurrentSelectionTool(editorSelectionTool);
+    } else if (editor && selectedTool === 'shape') {
+      // Set the editor to shape mode and update shape tool
+      const shapeToolMap: {[key: string]: 'rectangle' | 'circle' | 'line'} = {
+        'rectangle': 'rectangle',
+        'circle': 'circle',
+        'line': 'line'
+      };
+      const editorShapeTool = shapeToolMap[selectedShapeTool] || 'rectangle';
+      editor.setCurrentShapeTool(editorShapeTool);
+    } else if (editor && selectedTool === 'eyedropper') {
+      // Set the editor to eyedropper mode
+      editor.setEyedropperTool();
+    } else if (editor && selectedTool === 'stamp') {
+      // Set the editor to stamp mode
+      editor.setStampTool();
+    }
+  }, [editor, selectedTool, selectedBrushTool, selectedSelectionTool, selectedShapeTool]);
+
+  // Stamp mode synchronization
+  useEffect(() => {
+    if (!editor || selectedTool !== 'stamp') return;
+    editor.setCurrentStampMode(stampMode);
+  }, [editor, selectedTool, stampMode]);
+
+  // Stamp selection synchronization
+  useEffect(() => {
+    if (!editor || selectedTool !== 'stamp') return;
+    editor.setActiveStamp(selectedStamp);
+  }, [editor, selectedTool, selectedStamp]);
+
+  // Track selection state
+  useEffect(() => {
+    if (!editor) return;
+
+    const updateSelection = () => {
+      const selection = editor.getSelection();
+      const hasActiveSelection = editor.hasActiveSelection();
+      setSelectionCount(selection.length);
+      setHasSelection(hasActiveSelection);
+    };
+
+    // Poll selection state (could be optimized with callbacks)
+    const intervalId = setInterval(updateSelection, 100);
+
+    return () => clearInterval(intervalId);
+  }, [editor]);
+
+  // Layer management functions
+  const updateLayersList = useCallback(() => {
+    if (editor) {
+      const currentLayers = editor.getLayers();
+      setLayers([...currentLayers]); // Create a new array to ensure React detects changes
+      const activeId = editor.getActiveLayerId();
+      setActiveLayerId(activeId);
+      syncMapObjects();
+    }
+  }, [editor, syncMapObjects]);
+
+  useEffect(() => {
+    if (editor) {
+      updateLayersList();
+    }
+  }, [editor, updateLayersList]);
+
+  useEffect(() => {
+    syncMapObjects();
+  }, [syncMapObjects]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (_event: MouseEvent) => {
+      if (showAddLayerDropdown) {
+        setShowAddLayerDropdown(false);
+      }
+    };
+
+    if (showAddLayerDropdown) {
+      document.addEventListener('click', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, [showAddLayerDropdown]);
+
+  // Custom tooltip handlers
+  const showTooltipWithDelay = useCallback((content: React.ReactNode, element: HTMLElement) => {
+    // If a toolbarRef exists, anchor the tooltip to the left of the floating toolbar
+    if (toolbarRef.current) {
+      const tb = toolbarRef.current.getBoundingClientRect();
+      // Place tooltip centered on screen and above the floating toolbar
+  // Center horizontally then nudge a bit to the right and higher above the toolbar
+      // Center horizontally to the canvas grid area if available, otherwise fall back to window center.
+      let x = window.innerWidth / 2;
+      if (canvasRef && canvasRef.current) {
+        const cr = canvasRef.current.getBoundingClientRect();
+        x = cr.left + cr.width / 2;
+      }
+  const y = Math.max(8, tb.top - 60); // 60px above the toolbar top (a little higher)
+
+      setTooltip({
+        content,
+        x,
+        y,
+        visible: true,
+        fadeOut: false
+      });
+    } else {
+      const rect = element.getBoundingClientRect();
+      const x = rect.left + rect.width / 2;
+      const y = rect.top - 10;
+
+      setTooltip({
+        content,
+        x,
+        y,
+        visible: true,
+        fadeOut: false
+      });
+    }
+
+    // Clear any existing timeout
+    if (tooltipTimeoutRef.current) {
+      clearTimeout(tooltipTimeoutRef.current);
+    }
+
+    // Set timeout to start fade out after 1 second
+    tooltipTimeoutRef.current = setTimeout(() => {
+      setTooltip(prev => prev ? { ...prev, fadeOut: true } : null);
+      
+      // Remove tooltip completely after fade animation
+      setTimeout(() => {
+        setTooltip(null);
+      }, 300); // Match CSS transition duration
+    }, 1000);
+  }, []);
+
+  const hideTooltip = useCallback(() => {
+    if (tooltipTimeoutRef.current) {
+      clearTimeout(tooltipTimeoutRef.current);
+    }
+    setTooltip(null);
+  }, []);
+
+  // Cleanup tooltip timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (tooltipTimeoutRef.current) {
+        clearTimeout(tooltipTimeoutRef.current);
+      }
+      // Cleanup dropdown timeouts
+      if (brushOptionsTimeoutRef.current) {
+        clearTimeout(brushOptionsTimeoutRef.current);
+      }
+      if (selectionOptionsTimeoutRef.current) {
+        clearTimeout(selectionOptionsTimeoutRef.current);
+      }
+      if (shapeOptionsTimeoutRef.current) {
+        clearTimeout(shapeOptionsTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Tool dropdown handlers
+  const handleShowBrushOptions = useCallback(() => {
+    // Clear all dropdown timeouts
+    if (brushOptionsTimeoutRef.current) {
+      clearTimeout(brushOptionsTimeoutRef.current);
+    }
+    if (selectionOptionsTimeoutRef.current) {
+      clearTimeout(selectionOptionsTimeoutRef.current);
+    }
+    if (shapeOptionsTimeoutRef.current) {
+      clearTimeout(shapeOptionsTimeoutRef.current);
+    }
+    
+    // Close other dropdowns and show brush options
+    setShowSelectionOptions(false);
+    setShowShapeOptions(false);
+    setShowStampDialog(false);
+    setShowBrushOptions(true);
+  }, []);
+
+  const handleHideBrushOptions = useCallback(() => {
+    brushOptionsTimeoutRef.current = setTimeout(() => {
+      setShowBrushOptions(false);
+    }, 1000);
+  }, []);
+
+  const handleShowSelectionOptions = useCallback(() => {
+    // Clear all dropdown timeouts
+    if (brushOptionsTimeoutRef.current) {
+      clearTimeout(brushOptionsTimeoutRef.current);
+    }
+    if (selectionOptionsTimeoutRef.current) {
+      clearTimeout(selectionOptionsTimeoutRef.current);
+    }
+    if (shapeOptionsTimeoutRef.current) {
+      clearTimeout(shapeOptionsTimeoutRef.current);
+    }
+    
+    // Close other dropdowns and show selection options
+    setShowBrushOptions(false);
+    setShowShapeOptions(false);
+    setShowStampDialog(false);
+    setShowSelectionOptions(true);
+  }, []);
+
+  const handleHideSelectionOptions = useCallback(() => {
+    selectionOptionsTimeoutRef.current = setTimeout(() => {
+      setShowSelectionOptions(false);
+    }, 1000);
+  }, []);
+
+  const handleShowShapeOptions = useCallback(() => {
+    // Clear all dropdown timeouts
+    if (brushOptionsTimeoutRef.current) {
+      clearTimeout(brushOptionsTimeoutRef.current);
+    }
+    if (selectionOptionsTimeoutRef.current) {
+      clearTimeout(selectionOptionsTimeoutRef.current);
+    }
+    if (shapeOptionsTimeoutRef.current) {
+      clearTimeout(shapeOptionsTimeoutRef.current);
+    }
+    
+    // Close other dropdowns and show shape options
+    setShowBrushOptions(false);
+    setShowSelectionOptions(false);
+    setShowShapeOptions(true);
+  }, []);
+
+  const handleHideShapeOptions = useCallback(() => {
+    shapeOptionsTimeoutRef.current = setTimeout(() => {
+      setShowShapeOptions(false);
+    }, 1000);
+  }, []);
+
+  // Stamp handlers
+  const handleCreateStamp = useCallback(() => {
+    if (!editor || !newStampName.trim()) return;
+    
+    const success = editor.createStampFromSelection(newStampName.trim());
+    if (success) {
+      setNewStampName('');
+      setShowStampDialog(false);
+      setStampMode('select');
+    }
+  }, [editor, newStampName]);
+
+  const handleStampSelect = useCallback((stampId: string) => {
+    setSelectedStamp(stampId);
+    setStampMode('place');
+  }, []);
+
+  const handleDeleteStamp = useCallback((stampId: string) => {
+    if (!editor) return;
+    editor.deleteStamp(stampId);
+    if (selectedStamp === stampId) {
+      setSelectedStamp(null);
+      setStampMode('select');
+    }
+  }, [editor, selectedStamp]);
+
+  // Icon helper functions
+  const getBrushIcon = () => {
+    switch (selectedBrushTool) {
+      case 'bucket':
+        return <PaintBucket className="w-4 h-4" />;
+      case 'eraser':
+        return <Eraser className="w-4 h-4" />;
+      default:
+        return <Paintbrush2 className="w-4 h-4" />;
+    }
+  };
+
+  const getSelectionIcon = () => {
+    switch (selectedSelectionTool) {
+      case 'magic-wand':
+        return <Wand2 className="w-4 h-4" />;
+      case 'same-tile':
+        return <Target className="w-4 h-4" />;
+      case 'circular':
+        return <Circle className="w-4 h-4" />;
+      default:
+        return <MousePointer className="w-4 h-4" />;
+    }
+  };
+
+  const getShapeIcon = () => {
+    switch (selectedShapeTool) {
+      case 'circle':
+        return <Circle className="w-4 h-4" />;
+      case 'line':
+        return <Pen className="w-4 h-4" />;
+      default:
+        return <Shapes className="w-4 h-4" />;
+    }
+  };
+
+  // Brush management handlers
+  // Removed unused handlers: handleMergeBrushes, handleCancelMerge
+
+  const handleSeparateBrush = useCallback((brushId: number) => {
+    setBrushToSeparate(brushId);
+    setShowSeparateDialog(true);
+  }, []);
+
+  const confirmSeparateBrush = useCallback(() => {
+    if (!editor || brushToSeparate === null) return;
+    
+    try {
+      // Call the editor's separate brush method
+      editor.separateBrush(brushToSeparate);
+      console.log(`Separated brush with ID: ${brushToSeparate}`);
+    } catch (error) {
+      console.error('Failed to separate brush:', error);
+    }
+    
+    setShowSeparateDialog(false);
+    setBrushToSeparate(null);
+    setBrushTool('none'); // Exit separate mode after action
+  }, [editor, brushToSeparate]);
+
+  const handleRemoveBrush = useCallback((brushId: number) => {
+    if (!editor) return;
+    
+    console.log(`handleRemoveBrush called with brushId: ${brushId}`);
+  // Open generic confirm dialog
+  setConfirmAction({ type: 'removeBrush', payload: brushId });
+  }, [editor]);
+
+  const handleBrushReorder = useCallback((fromTileIndex: number, toTileIndex: number) => {
+    if (!editor) return;
+    
+    try {
+      // Get the current brush order to find array indices
+      const tileInfo = editor.getDetectedTileInfo();
+      const fromIndex = tileInfo.findIndex(tile => tile.gid === fromTileIndex);
+      const toIndex = tileInfo.findIndex(tile => tile.gid === toTileIndex);
+      
+      if (fromIndex !== -1 && toIndex !== -1) {
+        editor.reorderBrush(fromIndex, toIndex);
+        console.log(`Reordered brush ${fromTileIndex} to position of ${toTileIndex}`);
+      }
+    } catch (error) {
+      console.error('Failed to reorder brush:', error);
+    }
+  }, [editor]);
+
+  // Object management handlers
+  const handleEditObject = useCallback((objectId: number) => {
+    if (!editor) return;
+
+    setObjectValidationErrors([]);
+    const obj = editor.getMapObjects().find((o: MapObject) => o.id === objectId);
+    if (obj) {
+      setEditingObject(obj);
+      setShowObjectDialog(true);
+    }
+  }, [editor]);
+
+  const handleUpdateObject = useCallback((updatedObject: MapObject) => {
+    if (!editor) return;
+
+    editor.updateMapObject(updatedObject.id, updatedObject);
+    setEditingObject(null);
+    setShowObjectDialog(false);
+    syncMapObjects();
+    setObjectValidationErrors([]);
+  }, [editor, syncMapObjects]);
+
+  const handleOpenActorDialog = useCallback((type: 'npc' | 'enemy') => {
+    const defaultX = hoverCoords?.x ?? 0;
+    const defaultY = hoverCoords?.y ?? 0;
+
+    setActorDialogState({
+      type,
+      name: '',
+      x: defaultX.toString(),
+      y: defaultY.toString(),
+      tilesetPath: ''
+    });
+    setActorDialogError(null);
+  }, [hoverCoords]);
+
+  const handleActorFieldChange = useCallback((field: 'name' | 'x' | 'y' | 'tilesetPath', value: string) => {
+    setActorDialogState((prev) => {
+      if (!prev) return prev;
+      return { ...prev, [field]: value };
+    });
+    setActorDialogError(null);
+  }, []);
+
+  const handleActorTilesetBrowse = useCallback(async () => {
+    if (typeof window === 'undefined' || !window.electronAPI?.selectTilesetFile) {
+      return;
+    }
+
+    try {
+      const selected = await window.electronAPI.selectTilesetFile();
+      if (selected) {
+        handleActorFieldChange('tilesetPath', selected);
+      }
+    } catch (error) {
+      console.error('Failed to select tileset file for actor:', error);
+    }
+  }, [handleActorFieldChange]);
+
+  const handleCloseActorDialog = useCallback(() => {
+    setActorDialogState(null);
+    setActorDialogError(null);
+  }, []);
+
+  const handleRemoveActor = useCallback((objectId: number) => {
+    if (!editor) return;
+    editor.removeMapObject(objectId);
+    syncMapObjects();
+  }, [editor, syncMapObjects]);
+
+  const handleActorSubmit = useCallback(() => {
+    if (!editor || !actorDialogState) {
+      return;
+    }
+
+    const parsedX = parseInt(actorDialogState.x, 10);
+    const parsedY = parseInt(actorDialogState.y, 10);
+
+    if (!actorDialogState.name.trim()) {
+      setActorDialogError('Name is required.');
+      return;
+    }
+
+    if (Number.isNaN(parsedX) || Number.isNaN(parsedY)) {
+      setActorDialogError('Position must be whole numbers.');
+      return;
+    }
+
+    if (
+      parsedX < 0 ||
+      parsedX >= editor.getMapWidth() ||
+      parsedY < 0 ||
+      parsedY >= editor.getMapHeight()
+    ) {
+      setActorDialogError('Position is outside of the map bounds.');
+      return;
+    }
+
+    if (!actorDialogState.tilesetPath.trim()) {
+      setActorDialogError('Tileset location is required.');
+      return;
+    }
+
+    const tilesetPath = actorDialogState.tilesetPath.trim();
+    const name = actorDialogState.name.trim();
+    const occupiedByType = editor
+      .getObjectsAtPosition(parsedX, parsedY)
+      .find((obj) => obj.type === actorDialogState.type);
+
+    if (occupiedByType) {
+      setActorDialogError(
+        `There is already a ${actorDialogState.type === 'npc' ? 'NPC' : 'enemy'} at that position.`
+      );
+      return;
+    }
+
+    const newObject = editor.addMapObject('enemy', parsedX, parsedY, 1, 1);
+    editor.updateMapObject(newObject.id, {
+      name,
+      x: parsedX,
+      y: parsedY,
+      type: actorDialogState.type,
+      category: actorDialogState.type === 'npc' ? 'npc' : 'enemy',
+      wander_radius: actorDialogState.type === 'npc' ? 0 : newObject.wander_radius,
+      properties: {
+        ...(newObject.properties || {}),
+        tilesetPath
+      }
+    });
+
+    syncMapObjects();
+    handleCloseActorDialog();
+  }, [actorDialogState, editor, handleCloseActorDialog, syncMapObjects]);
+
+  const handleObjectDialogClose = useCallback(() => {
+    setShowObjectDialog(false);
+    setEditingObject(null);
+    setObjectValidationErrors([]);
+  }, []);
+
+  const handleObjectDialogSave = useCallback(() => {
+    if (!editingObject) return;
+
+    const { errors, sanitized } = validateAndSanitizeObject(editingObject);
+    if (errors.length > 0) {
+      setObjectValidationErrors(errors);
+      return;
+    }
+
+    setObjectValidationErrors([]);
+    handleUpdateObject({ ...editingObject, properties: sanitized });
+  }, [editingObject, handleUpdateObject]);
+
+  const updateEditingObjectProperty = useCallback((key: string, value: string | null) => {
+    setEditingObject((prev) => {
+      if (!prev) return prev;
+      const properties = { ...(prev.properties || {}) };
+      if (value === null || value === '') {
+        delete properties[key];
+      } else {
+        properties[key] = value;
+      }
+      return { ...prev, properties };
+    });
+  }, []);
+
+  const updateEditingObjectBoolean = useCallback((key: string, checked: boolean) => {
+    setEditingObject((prev) => {
+      if (!prev) return prev;
+      const properties = { ...(prev.properties || {}) };
+      properties[key] = checked ? 'true' : 'false';
+      return { ...prev, properties };
+    });
+  }, []);
+
+  const getEditingObjectProperty = useCallback((key: string, fallback = '') => {
+    if (!editingObject || !editingObject.properties) return fallback;
+    return editingObject.properties[key] ?? fallback;
+  }, [editingObject]);
+
+  const handleEditingTilesetBrowse = useCallback(async () => {
+    if (typeof window === 'undefined' || !window.electronAPI?.selectTilesetFile) {
+      return;
+    }
+
+    try {
+      const selected = await window.electronAPI.selectTilesetFile();
+      if (selected) {
+        updateEditingObjectProperty('tilesetPath', selected);
+      }
+    } catch (error) {
+      console.error('Failed to select tileset for editing object:', error);
+    }
+  }, [updateEditingObjectProperty]);
+
+  // Hero position edit handlers
+  const handleHeroEditConfirm = useCallback((x: number, y: number) => {
+    if (heroEditData?.onConfirm) {
+      heroEditData.onConfirm(x, y);
+    }
+    setShowHeroEditDialog(false);
+    setHeroEditData(null);
+  }, [heroEditData]);
+
+  const handleHeroEditCancel = useCallback(() => {
+    setShowHeroEditDialog(false);
+    setHeroEditData(null);
+  }, []);
+
+  // Canvas double-click handler for editing objects
+  useEffect(() => {
+    if (!editor || !canvasRef.current) return;
+
+    const handleCanvasDoubleClick = (_event: MouseEvent) => {
+      console.log('Double-click detected on canvas');
+      
+      // Get current active layer to check if it's an interactive layer
+      const activeLayer = editor.getActiveLayer();
+      console.log('Active layer:', activeLayer);
+      
+      if (!activeLayer) {
+        console.log('No active layer found');
+        return;
+      }
+      
+      // Only allow double-click editing on interactive layers
+      const interactiveLayers = ['enemy', 'npc', 'object', 'event', 'background'];
+      if (!interactiveLayers.includes(activeLayer.type)) {
+        console.log(`Layer type '${activeLayer.type}' is not interactive, skipping double-click`);
+        return;
+      }
+      
+      // Get hover coordinates from editor
+      const hoverCoords = editor.getHoverCoordinates();
+      console.log('Hover coordinates:', hoverCoords);
+      
+      if (hoverCoords) {
+        // Check if there's an object at this position
+        const objects = editor.getMapObjects();
+        const objectsAtPosition = editor.getObjectsAtPosition(hoverCoords.x, hoverCoords.y);
+        console.log('All objects:', objects.length);
+        console.log('Objects at hover position:', objectsAtPosition);
+        
+        const objectAtPosition = objects.find(obj => 
+          obj.x === hoverCoords.x && obj.y === hoverCoords.y
+        );
+        
+        console.log('Object at position (find method):', objectAtPosition);
+        
+        if (objectAtPosition) {
+          console.log(`Opening edit dialog for object ID: ${objectAtPosition.id}`);
+          handleEditObject(objectAtPosition.id);
+        } else {
+          console.log('No object found at hover position');
+        }
+      }
+    };
+
+    const canvas = canvasRef.current;
+    canvas.addEventListener('dblclick', handleCanvasDoubleClick);
+
+    return () => {
+      canvas.removeEventListener('dblclick', handleCanvasDoubleClick);
+    };
+  }, [editor, handleEditObject]);
+
+  // Effect to handle brush tool state changes
+  useEffect(() => {
+    console.log(`Brush tool changed to: ${brushTool}`);
+    const brushToolElement = document.querySelector('[data-brush-tool]');
+    if (brushToolElement) {
+      brushToolElement.setAttribute('data-brush-tool', brushTool);
+      console.log(`Updated existing data-brush-tool attribute to: ${brushTool}`);
+    } else {
+      // Create the brush tool state element if it doesn't exist
+      const stateElement = document.createElement('div');
+      stateElement.setAttribute('data-brush-tool', brushTool);
+      stateElement.style.display = 'none';
+      document.body.appendChild(stateElement);
+      console.log(`Created new data-brush-tool element with value: ${brushTool}`);
+    }
+  }, [brushTool]);
+
+  // Effect to listen for brush events from the editor
+  useEffect(() => {
+    const handleBrushAction = (event: CustomEvent) => {
+      const { action, tileIndex } = event.detail;
+      switch (action) {
+        // Removed select/deselect cases as selectedBrushes state is gone
+        case 'separate':
+          handleSeparateBrush(tileIndex);
+          break;
+        case 'remove':
+          handleRemoveBrush(tileIndex);
+          break;
+        case 'drop':
+          if (event.detail.from && event.detail.to) {
+            handleBrushReorder(event.detail.from, event.detail.to);
+          }
+          break;
+        default:
+          break;
+      }
+    };
+
+    document.addEventListener('brushAction', handleBrushAction as EventListener);
+    
+    return () => {
+      document.removeEventListener('brushAction', handleBrushAction as EventListener);
+    };
+  }, [handleSeparateBrush, handleRemoveBrush, handleBrushReorder]);
+
+  // Helper function to load project data into editor
+  const loadProjectData = useCallback(async (newEditor: TileMapEditor, mapConfig: EditorProjectData) => {
+    try {
+      // Set projectName from loaded project data if available
+      if (mapConfig.name) {
+        newEditor.projectName = mapConfig.name;
+      }
+      console.log('=== LOAD PROJECT DATA DEBUG ===');
+      console.log('Map config received:', {
+        name: mapConfig.name,
+        tilesets: mapConfig.tilesets ? mapConfig.tilesets.length : 0,
+        tilesetImages: mapConfig.tilesetImages ? Object.keys(mapConfig.tilesetImages).length : 0,
+        layers: mapConfig.layers ? mapConfig.layers.length : 0
+      });
+
+      // Debug the map config structure in detail
+      console.log('Map config full structure:', mapConfig);
+      
+      // Create layers from the saved config
+      console.log('Creating layers from config...');
+      const layers = mapConfig.layers || [];
+      console.log('Layers from config:', layers);
+      
+      for (const layerData of layers) {
+        console.log('Processing layer:', layerData);
+        const layerAdded = newEditor.addLayer(layerData.name, layerData.type);
+        
+        if (layerAdded) {
+          console.log(`Created layer: ${layerData.type} - ${layerData.name}`);
+          
+          // Find the newly created layer and set its data
+          const createdLayer = newEditor.getLayers().find(l => l.type === layerData.type);
+          if (createdLayer && layerData.data && Array.isArray(layerData.data)) {
+            console.log(`Setting data for layer ${createdLayer.id} with ${layerData.data.length} tiles`);
+            createdLayer.data = layerData.data;
+          }
+        } else {
+          console.log(`Failed to create layer: ${layerData.type} - ${layerData.name}`);
+        }
+      }
+
+      // Load the complete project data into the editor
+      console.log('=== CALLING EDITOR loadProjectData ===');
+      newEditor.loadProjectData(mapConfig);
+      
+      console.log('Project data loading completed');
+      return true;
+    } catch (error) {
+      console.error('Error loading project data:', error);
+      return false;
+    }
+  }, []);
+
+  // Effect to handle pending map config when canvas becomes available
+  useEffect(() => {
+    if (pendingMapConfig && canvasRef.current && !showWelcome) {
+      console.log('Canvas available and map config pending, creating editor...');
+
+      const createEditorWithConfig = async () => {
+        try {
+          console.log('Creating new editor with pending config...');
+          const newEditor = new TileMapEditor(canvasRef.current!);
+          if (pendingMapConfig.name) {
+            newEditor.setMapName(pendingMapConfig.name);
+          } else {
+            newEditor.setMapName('Untitled Map');
+          }
+
+          // Clear auto-save backup to prevent old data from loading
+          console.log('Clearing local storage backup...');
+          newEditor.clearLocalStorageBackup();
+
+          console.log('Setting map size...');
+          newEditor.setMapSize(pendingMapConfig.width ?? 20, pendingMapConfig.height ?? 15);
+
+          // Load project data
+          console.log('Loading project data...');
+          const projectDataLoaded = await loadProjectData(newEditor, pendingMapConfig);
+          console.log('Project data loading result:', projectDataLoaded);
+
+          // Check editor state after loadProjectData
+          console.log('=== EDITOR STATE AFTER loadProjectData ===');
+          console.log('Tile count after loadProjectData:', newEditor.getTileCount());
+          console.log('Active layer after loadProjectData:', newEditor.getActiveLayerId());
+          console.log('Layers after loadProjectData:', newEditor.getLayers().map(l => ({ id: l.id, name: l.name, type: l.type })));
+
+          // Discover and assign tilesets - only for projects without per-layer tileset data
+          if (window.electronAPI?.discoverTilesetImages && currentProjectPath) {
+            console.log('Calling discoverTilesetImages for path:', currentProjectPath);
+            const found = await window.electronAPI.discoverTilesetImages(currentProjectPath);
+
+            const images = found?.tilesetImages || {};
+            const imageKeys = Object.keys(images);
+
+            // Check if the project already has per-layer tilesets loaded
+            const hasPerLayerTilesets = Array.isArray(pendingMapConfig.tilesets) &&
+              pendingMapConfig.tilesets.some((ts) => Boolean(ts?.layerType));
+
+            console.log('Has per-layer tilesets in project:', hasPerLayerTilesets);
+            console.log('Available discovered images:', imageKeys);
+
+            // Only use fallback tileset assignment if no per-layer tilesets exist
+            if (!hasPerLayerTilesets && imageKeys.length > 0) {
+              console.log('No per-layer tilesets found, using fallback assignment');
+              const normalize = (s: string) => (s || '')
+                .toLowerCase()
+                .replace(/\.[^/.]+$/, '') // drop extension
+                .replace(/[^a-z0-9]+/g, ' ') // non-alnum to space
+                .trim();
+
+              // Preserve the currently intended active layer to restore later
+              const intendedActive = newEditor.getActiveLayerId();
+              const layersToAssign = newEditor.getLayers();
+              let assignedAny = false;
+
+              for (const layer of layersToAssign) {
+                // Try exact and fuzzy matches by filename
+                const nameTargets = [normalize(layer.type), normalize(layer.name)];
+                let matchKey: string | null = null;
+
+                for (const key of imageKeys) {
+                  const keyNorm = normalize(key);
+                  if (nameTargets.includes(keyNorm)) {
+                    matchKey = key;
+                    break;
+                  }
+                }
+
+                if (!matchKey) {
+                  // Fallback: pick any key that contains layer type/name as substring
+                  const keyByIncludes = imageKeys.find(k => {
+                    const kn = normalize(k);
+                    return nameTargets.some(t => t && kn.includes(t));
+                  });
+                  if (keyByIncludes) matchKey = keyByIncludes;
+                }
+
+                if (!matchKey && imageKeys.length === 1) {
+                  // Final fallback: single image for the project
+                  matchKey = imageKeys[0];
+                }
+
+                if (matchKey) {
+                  console.log(`Assigning tileset '${matchKey}' to layer ${layer.id} (${layer.type})`);
+                  // Make this layer active to store tileset under its type
+                  newEditor.setActiveLayer(layer.id);
+                  await newEditor.loadTilesetFromDataURL(images[matchKey], matchKey);
+                  assignedAny = true;
+                } else {
+                  console.log(`No matching tileset found for layer ${layer.id} (${layer.type})`);
+                }
+              }
+
+              // Restore intended active layer selection
+              if (intendedActive !== null) {
+                newEditor.setActiveLayer(intendedActive);
+              }
+
+              if (assignedAny) {
+                // Trigger auto-save to preserve imported tilesets
+                newEditor.forceSave();
+              }
+            } else {
+              console.log('Per-layer tilesets already loaded, skipping fallback assignment');
+              // Just update UI state based on what was loaded
+            }
+          }
+
+          console.log('Setting up autosave and updating UI...');
+          // Set dark mode state
+          newEditor.setDarkMode(isDarkMode);
+          setupAutoSave(newEditor);
+          setEditor(newEditor);
+          setMapInitialized(true);
+          setShowCreateMapDialog(false);
+
+          // Update layers list and UI state after everything is loaded
+          setTimeout(() => {
+            updateLayersList();
+            // Force UI state update after loading - check current active layer
+            const activeLayerId = newEditor.getActiveLayerId();
+            const activeLayer = newEditor.getLayers().find(l => l.id === activeLayerId);
+            console.log('Final UI update - checking active layer:', activeLayerId, activeLayer?.type);
+
+            // Force a final redraw to ensure everything is visible
+            newEditor.redraw();
+          }, 150);
+
+          // Clear pending config
+          setPendingMapConfig(null);
+
+          // toast suppressed: Project loaded
+
+        } catch (error) {
+          console.error('Failed to create editor with pending config:', error);
+          setPendingMapConfig(null);
+          setMapInitialized(false);
+          if (typeof toast === 'function') {
+            const description = error instanceof Error ? error.message : 'An error occurred while loading the project.';
+            toast({ title: 'Failed to open project', description, variant: 'destructive' });
+          }
+        }
+      };
+
+      createEditorWithConfig();
+    }
+  }, [pendingMapConfig, showWelcome, currentProjectPath, setupAutoSave, updateLayersList]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>, type: 'tileset' | 'layerTileset') => {
+    const file = event.target.files?.[0];
+    if (file && editor?.handleFileUpload) {
+      editor.handleFileUpload(file, type);
+    }
+  };
+
+  const handleSetActiveLayer = (layerId: number) => {
+    if (editor) {
+      editor.setActiveLayer(layerId);
+      setActiveLayerId(layerId);
+      
+      // Update hasTileset state based on the new active layer
+    }
+  };
+
+  const handleToggleLayerVisibility = (layerId: number) => {
+    if (editor) {
+      editor.toggleLayerVisibility(layerId);
+      // Force a fresh state update by creating a new array
+      const currentLayers = editor.getLayers();
+      setLayers([...currentLayers]); // Create a new array to trigger re-render
+      
+      // Also update tileset status for the active layer
+    }
+  };
+
+  const handleLayerTransparencyChange = (layerId: number, delta: number) => {
+    if (editor) {
+      const layer = layers.find(l => l.id === layerId);
+      if (layer) {
+        const currentTransparency = layer.transparency || 0;
+        const newTransparency = Math.max(0, Math.min(1, currentTransparency + delta));
+        editor.setLayerTransparency(layerId, newTransparency);
+        updateLayersList(); // Update UI to reflect changes
+      }
+    }
+  };
+
+  const handleMapResize = () => {
+    if (editor?.resizeMap) {
+      editor.resizeMap(mapWidth, mapHeight);
+    }
+  };
+
+  const handleZoomIn = () => {
+    if (editor?.zoomIn) {
+      editor.zoomIn();
+    }
+  };
+
+  const handleZoomOut = () => {
+    if (editor?.zoomOut) {
+      editor.zoomOut();
+    }
+  };
+
+  const handleResetZoom = () => {
+    if (editor?.resetZoom) {
+      editor.resetZoom();
+    }
+  };
+
+  const isDuplicateMapName = useCallback((candidate: string) => {
+    const normalized = candidate.trim().toLowerCase();
+    if (!normalized) {
+      return false;
+    }
+
+    const knownNames = new Set<string>();
+
+    reservedMapNames.forEach((name) => {
+      if (name) {
+        knownNames.add(name);
+      }
+    });
+
+    if (mapName.trim()) {
+      knownNames.add(mapName.trim().toLowerCase());
+    }
+
+    try {
+      const stored = localStorage.getItem('recentMaps');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((entry) => {
+            if (entry && typeof entry.name === 'string') {
+              const name = entry.name.trim().toLowerCase();
+              if (name) {
+                knownNames.add(name);
+              }
+            }
+          });
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to read recent map names for duplicate check:', error);
+    }
+
+    return knownNames.has(normalized);
+  }, [mapName, reservedMapNames]);
+
+  const handleOpenCreateMapDialog = useCallback(() => {
+    setNewMapWidth(mapWidth > 0 ? mapWidth : 20);
+    setNewMapHeight(mapHeight > 0 ? mapHeight : 15);
+    setNewMapStarting(isStartingMap);
+    setCreateMapError(null);
+    setShowCreateMapDialog(true);
+  }, [mapWidth, mapHeight, isStartingMap]);
+
+  // Only reset newMapName the first time dialog is opened after mount
+  const hasOpenedCreateMapDialog = useRef(false);
+  useEffect(() => {
+    if (showCreateMapDialog && !hasOpenedCreateMapDialog.current) {
+      setNewMapName('Map Name');
+      hasOpenedCreateMapDialog.current = true;
+    }
+    if (!showCreateMapDialog) {
+      hasOpenedCreateMapDialog.current = false;
+    }
+  }, [showCreateMapDialog, mapName]);
+
+  const handleConfirmCreateMap = async () => {
+    if (isPreparingNewMap) return;
+
+    const width = Math.max(1, Math.floor(newMapWidth) || 0);
+    const height = Math.max(1, Math.floor(newMapHeight) || 0);
+    const trimmedName = newMapName.trim();
+    const resolvedName = trimmedName ? trimmedName : 'Untitled Map';
+
+    if (isDuplicateMapName(resolvedName)) {
+      setCreateMapError("There can't be maps that have the same name. Please type another name.");
+      return;
+    }
+
+    setCreateMapError(null);
+    setIsPreparingNewMap(true);
+
+    try {
+      // No export on map creation. Only set reserved map names.
+      setReservedMapNames((prev) => {
+        const normalized = resolvedName.trim().toLowerCase();
+        if (!normalized || prev.includes(normalized)) {
+          return prev;
+        }
+        return [...prev, normalized];
+      });
+
+
+      setLayers([]);
+      setActiveLayerId(null);
+      setStamps([]);
+      setSelectedStamp(null);
+      setMapObjects([]);
+      setHoverCoords(null);
+      setBrushTool('none');
+      setShowSeparateDialog(false);
+      setBrushToSeparate(null);
+      setSaveStatus('saved');
+      setHasUnsavedChanges(false);
+
+      let targetEditor = editor;
+
+
+      if (!targetEditor && canvasRef.current) {
+        targetEditor = new TileMapEditor(canvasRef.current);
+        targetEditor.setDarkMode(isDarkMode);
+        setupAutoSave(targetEditor);
+      }
+
+      if (targetEditor) {
+
+        // Set projectName to the user-typed project name at creation
+        targetEditor.projectName = resolvedName;
+
+        targetEditor.resetForNewProject();
+        targetEditor.setMapName(resolvedName);
+        targetEditor.setMapSize(width, height);
+        targetEditor.setDarkMode(isDarkMode);
+        if (!editor) {
+          setEditor(targetEditor);
+        }
+        updateLayersList();
+        syncMapObjects();
+      }
+
+      setMapWidth(width);
+      setMapHeight(height);
+      setMapInitialized(true);
+      showToolbarTemporarily();
+      showBottomToolbarTemporarily();
+      setMapName(resolvedName);
+      updateStartingMap(newMapStarting, { mapNameOverride: resolvedName });
+      setNewMapStarting(newMapStarting);
+      setHasSelection(false);
+      setSelectionCount(0);
+      setCreateMapError(null);
+      setShowCreateMapDialog(false);
+    } finally {
+      setIsPreparingNewMap(false);
+    }
+  };
+
+  const handleUndo = useCallback(() => {
+    if (editor?.undo) {
+      editor.undo();
+      updateLayersList(); // Update UI after undo
+      syncMapObjects();
+    }
+  }, [editor, updateLayersList, syncMapObjects]);
+
+  const handleRedo = useCallback(() => {
+    if (editor?.redo) {
+      editor.redo();
+      updateLayersList(); // Update UI after redo
+      syncMapObjects();
+    }
+  }, [editor, updateLayersList, syncMapObjects]);
+
+  const [showOverwriteDialog, setShowOverwriteDialog] = useState(false);
+  const [pendingExport, setPendingExport] = useState<null | (() => Promise<boolean>)>(null);
+
+  const checkExportFilesExist = useCallback(async (mapName: string) => {
+    if (!window.electronAPI?.resolvePathRelative || !currentProjectPath) return false;
+    const sanitizedMapName = mapName.replace(/[<>:"/\\|?*]/g, '_').trim().replace(/\s+/g, '_').replace(/_{2,}/g, '_') || 'Map_Name';
+    const mapFilePath = `${currentProjectPath}/maps/${sanitizedMapName}.txt`;
+    const tilesetFilePath = `${currentProjectPath}/tilesetdefs/tileset_${sanitizedMapName}.txt`;
+    try {
+      const mapExists = await window.electronAPI.fileExists?.(mapFilePath);
+      const tilesetExists = await window.electronAPI.fileExists?.(tilesetFilePath);
+      return !!mapExists || !!tilesetExists;
+    } catch {
+      return false;
+    }
+  }, [currentProjectPath]);
+
+  const performExport = useCallback(
+    async ({ silent = false, forceOverwrite = false }: { silent?: boolean, forceOverwrite?: boolean } = {}) => {
+      if (!editor || !currentProjectPath) {
+        toast({
+          title: "Export Failed",
+          description: "No project loaded or editor not initialized.",
+          variant: "destructive",
+        });
+        return false;
+      }
+      const trimmedName = mapName.trim();
+      if (!trimmedName || STARTING_MAP_INVALID_NAMES.has(trimmedName.toLowerCase())) {
+        if (!silent) {
+          toast({
+            title: "Export Skipped",
+            description: "Please create and name your map before exporting.",
+            variant: "destructive",
+          });
+        }
+        return false;
+      }
+
+      if (!startingMapIntermap) {
+        if (!silent) {
+          toast({
+            title: "Export Failed",
+            description: "No starting map selected.",
+            variant: "destructive",
+          });
+        }
+        return false;
+      }
+
+      if (!silent) {
+        setIsExporting(true);
+        setExportProgress(0);
+      }
+
+      const spawnContent = buildSpawnContent(startingMapIntermap);
+
+      const tilesetExportInfo = editor.getTilesetExportInfo();
+      let pathOverrides: Record<string, string> | undefined;
+      if (tilesetExportInfo.length > 0) {
+        const overrides: Record<string, string> = {};
+        for (const info of tilesetExportInfo) {
+          const keys = [info.id];
+          if (info.sourcePath) keys.push(info.sourcePath);
+          if (info.fileName) keys.push(info.fileName);
+          let candidate = info.sourcePath ?? null;
+          if (currentProjectPath && info.sourcePath && window.electronAPI?.resolvePathRelative) {
+            try {
+              const relative = await window.electronAPI.resolvePathRelative(currentProjectPath, info.sourcePath);
+              if (relative && relative.trim()) {
+                candidate = relative;
+              }
+            } catch (error) {
+              console.warn('Failed to resolve tileset path relative to project:', error);
+            }
+          }
+          if (!candidate && info.fileName) {
+            candidate = info.fileName;
+          }
+          if (candidate) {
+            const normalized = candidate.replace(/\\/g, '/');
+            for (const key of keys) {
+              if (key) {
+                overrides[key] = normalized;
+              }
+            }
+          }
+        }
+        if (Object.keys(overrides).length > 0) {
+          pathOverrides = overrides;
+        }
+      }
+
+      try {
+        // Overwrite confirmation logic
+        if (!forceOverwrite && !silent) {
+          const exists = await checkExportFilesExist(mapName);
+          if (exists) {
+            setPendingExport(() => () => performExport({ silent, forceOverwrite: true }));
+            setShowOverwriteDialog(true);
+            return false;
+          }
+        }
+        if (!silent) {
+          setExportProgress(25);
+        }
+
+        const mapTxt = editor.generateFlareMapTxt({ pathOverrides, mapName });
+
+        if (!silent) {
+          setExportProgress(50);
+        }
+
+        const tilesetDef = editor.generateFlareTilesetDef({ pathOverrides });
+
+        if (!silent) {
+          setExportProgress(75);
+        }
+
+        if (window.electronAPI?.saveExportFiles) {
+          // Collect tileset images (data URLs) to include in the export so Electron can write PNGs
+          const tilesetImages: Record<string, string> = {};
+          type MaybeTilesetEntry = { fileName?: string; image?: HTMLImageElement | null };
+          try {
+            const exportInfo = editor.getTilesetExportInfo();
+            for (const info of exportInfo) {
+              // Attempt to get the image element from the editor's layerTilesets by matching fileName
+              let matchedEntry: MaybeTilesetEntry | undefined;
+              if (editor['layerTilesets'] && typeof editor['layerTilesets'].forEach === 'function') {
+                editor['layerTilesets'].forEach((val: unknown) => {
+                  const candidate = val as MaybeTilesetEntry | undefined;
+                  if (candidate?.fileName === info.fileName) {
+                    matchedEntry = candidate;
+                  }
+                });
+              }
+              // Fallback: try to access editor.tilesetImage when fileName matches
+              let imgEl: HTMLImageElement | null = null;
+              const entryImage = matchedEntry?.image ?? null;
+              if (entryImage) {
+                imgEl = entryImage;
+              }
+              if (!imgEl && editor['tilesetFileName'] === info.fileName) {
+                const editorImage = editor['tilesetImage'] as HTMLImageElement | null | undefined;
+                if (editorImage) {
+                  imgEl = editorImage;
+                }
+              }
+              if (imgEl) {
+                try {
+                  const dataUrl = editor['canvasToDataURL'](imgEl);
+                  tilesetImages[info.fileName] = dataUrl;
+                } catch (imgErr) {
+                  console.warn('Failed to serialize tileset image', info.fileName, imgErr);
+                }
+              }
+            }
+          } catch (err) {
+            console.warn('Failed to collect tileset images for export:', err);
+          }
+
+          const success = await window.electronAPI.saveExportFiles(
+            currentProjectPath,
+            mapName,
+            mapTxt,
+            tilesetDef,
+            {
+              spawn: {
+                enabled: true,
+                content: spawnContent,
+                filename: 'spawn.txt'
+              },
+              tilesetImages
+            }
+          );
+
+          if (!success) {
+            throw new Error("Failed to save export files");
+          }
+
+          if (!silent) {
+            setExportProgress(100);
+            setTimeout(() => {
+              setShowExportSuccess(true);
+            }, 1500);
+          }
+        } else {
+          editor.exportFlareMap();
+          console.warn('Spawn file creation skipped: Electron API unavailable.');
+          if (!silent) {
+            setExportProgress(100);
+          }
+        }
+
+        return true;
+      } catch (error) {
+        console.error('Export failed:', error);
+        toast({
+          title: "Export Failed",
+          description: "An error occurred while exporting the map.",
+          variant: "destructive",
+        });
+        return false;
+      } finally {
+        if (!silent) {
+          setTimeout(() => {
+            setIsExporting(false);
+            setExportProgress(0);
+          }, 1000);
+        }
+      }
+    },
+  [editor, currentProjectPath, mapName, startingMapIntermap, toast, checkExportFilesExist]
+  );
+
+  const handleExportMap = useCallback(async () => {
+    await performExport();
+  }, [performExport]);
+
+  // Overwrite dialog handlers
+  const handleOverwriteConfirm = useCallback(() => {
+    setShowOverwriteDialog(false);
+    if (pendingExport) {
+      pendingExport();
+      setPendingExport(null);
+    }
+  }, [pendingExport]);
+
+  const handleOverwriteCancel = useCallback(() => {
+    setShowOverwriteDialog(false);
+    setPendingExport(null);
+  }, []);
+
+  const handleManualSave = useCallback(async () => {
+    if (!editor) return;
+    setIsManuallySaving(true);
+    try {
+      if (window.electronAPI && currentProjectPath) {
+        const success = await editor.saveProjectData(currentProjectPath);
+        await new Promise(resolve => setTimeout(resolve, 300));
+        if (success) {
+          setLastSaveTime(Date.now());
+          // toast suppressed: Project saved to disk
+        } else {
+          // toast suppressed: Failed to save the project to disk
+        }
+      } else {
+  editor.forceSave();
+  await new Promise(resolve => setTimeout(resolve, 500));
+  // toast suppressed: Saved to local backup
+      }
+    } catch (error) {
+      console.error('Save error:', error);
+      // toast suppressed: Failed to save your map
+    } finally {
+      setIsManuallySaving(false);
+    }
+  }, [editor, currentProjectPath]);
+
+  // Maps helpers (moved after performExport/handleManualSave to avoid forward ref issues)
+  const refreshProjectMaps = useCallback(async () => {
+    if (!currentProjectPath || !window.electronAPI?.listMaps) {
+      setProjectMaps([]);
+      return;
+    }
+    try {
+      const maps: string[] = await window.electronAPI.listMaps(currentProjectPath);
+      setProjectMaps([...maps]);
+    } catch (e) {
+      console.warn('Failed to list maps:', e);
+      setProjectMaps([]);
+    }
+  }, [currentProjectPath]);
+
+  const handleOpenMapFromMapsFolder = useCallback(async (filename: string) => {
+    if (!currentProjectPath) return;
+
+    try {
+      const exported = await performExport({ silent: true });
+      if (!exported) {
+        toast({ title: 'Export failed', description: 'Failed to export current map before opening a new one.', variant: 'destructive' });
+        return;
+      }
+
+      await handleManualSave();
+
+      const content = await window.electronAPI.readMapFile(currentProjectPath, filename);
+      if (!content) {
+        toast({ title: 'Open failed', description: `Failed to read map file ${filename}`, variant: 'destructive' });
+        return;
+      }
+
+      // If editor has a loader for Flare TXT, use it. Otherwise notify user.
+      if (editor && typeof editor.loadFlareMapTxt === 'function') {
+        editor.loadFlareMapTxt!(content);
+        editor.setMapName(filename.replace(/\.txt$/i, ''));
+        updateLayersList();
+        syncMapObjects();
+        setMapInitialized(true);
+        setMapName(filename.replace(/\.txt$/i, ''));
+        toast({ title: 'Map opened', description: `Opened ${filename}` });
+      } else {
+        // Editor does not implement a loader yet — notify user
+        toast({ title: 'Map loaded (raw)', description: 'Map content loaded but no parser available in the editor. Implement loadFlareMapTxt to parse it.' });
+      }
+    } catch (e) {
+      console.error('Open map error:', e);
+      toast({ title: 'Open failed', description: 'An unexpected error occurred while opening the map.', variant: 'destructive' });
+    }
+  }, [currentProjectPath, performExport, handleManualSave, editor, updateLayersList, syncMapObjects, toast]);
+
+  const handleToggleMinimap = () => {
+    if (editor?.toggleMinimap) {
+      editor.toggleMinimap();
+    }
+    setShowMinimap(!showMinimap);
+  };
+
+  const handleCreateNewMap = (config: MapConfig, newProjectPath?: string) => {
+    localStorage.removeItem('tilemap_autosave_backup');
+    setCurrentProjectPath(newProjectPath ?? null);
+
+  // Do not set mapName to project name here. Only set currentProjectPath and map config state.
+  updateStartingMap(Boolean(config.isStartingMap), { propagate: false });
+  setNewMapName('Map Name');
+  setNewMapStarting(Boolean(config.isStartingMap));
+    setMapWidth(0);
+    setMapHeight(0);
+    setNewMapWidth(config.width);
+    setNewMapHeight(config.height);
+    setMapInitialized(false);
+    setLayers([]);
+    setActiveLayerId(null);
+    setStamps([]);
+    setMapObjects([]);
+    setHoverCoords(null);
+    setHasSelection(false);
+    setSelectionCount(0);
+    setPendingMapConfig(null);
+    setEditor(null);
+    setCreateMapError(null);
+    setShowCreateMapDialog(false);
+    setShowWelcome(false);
+  };
+
+  const handleOpenMap = useCallback(async (projectDir: string) => {
+    console.log('=== HANDLE OPEN MAP CALLED ===', projectDir);
+    console.log('Project path details:', {
+      path: projectDir,
+      timestamp: new Date().toISOString()
+    });
+    
+    try {
+      // Block the default editor creation effect while we open
+      setIsOpeningProject(true);
+      // Remember project path for subsequent saves
+      setCurrentProjectPath(projectDir);
+
+      let spawnIntermapTarget = startingMapIntermap;
+      if (window.electronAPI?.readSpawnFile) {
+        try {
+          const spawnContent = await window.electronAPI.readSpawnFile(projectDir);
+          spawnIntermapTarget = extractSpawnIntermapValue(spawnContent);
+          setStartingMapIntermap(spawnIntermapTarget);
+        } catch (error) {
+          console.warn('Failed to read spawn file:', error);
+          spawnIntermapTarget = null;
+          setStartingMapIntermap(null);
+        }
+      } else {
+        spawnIntermapTarget = null;
+        setStartingMapIntermap(null);
+      }
+
+      // Check if there are any maps in the project
+      let maps: string[] = [];
+      if (window.electronAPI?.listMaps) {
+        try {
+          const listed: string[] = await window.electronAPI.listMaps(projectDir);
+          maps = [...listed];
+        } catch (e) {
+          console.warn('Failed to list maps:', e);
+          maps = [];
+        }
+      }
+      if (maps.length === 0) {
+        // No maps yet: switch to the editor shell and prompt for map creation
+        setProjectMaps([]);
+        setMapInitialized(false);
+        setEditor(null);
+        setPendingMapConfig(null);
+        setMapName('');
+        setNewMapName((prev) => (typeof prev === 'string' && prev.trim() ? prev : 'Map Name'));
+        updateStartingMap(false);
+        setNewMapStarting(false);
+        setMapWidth(0);
+        setMapHeight(0);
+        setActiveLayerId(null);
+        setLayers([]);
+        setStamps([]);
+        setMapObjects([]);
+        setHoverCoords(null);
+        setReservedMapNames([]);
+        setHasSelection(false);
+        setSelectionCount(0);
+        setHasUnsavedChanges(false);
+        setSaveStatus('saved');
+        setCreateMapError(null);
+        setNewMapWidth((prev) => (typeof prev === 'number' && prev > 0 ? prev : 20));
+        setNewMapHeight((prev) => (typeof prev === 'number' && prev > 0 ? prev : 15));
+        setShowWelcome(false);
+        setShowCreateMapDialog(true);
+        return;
+      }
+      setProjectMaps([...maps]);
+      // If there are maps, proceed to open the first map as before
+      if (window.electronAPI?.openMapProject) {
+        const mapConfig = await window.electronAPI.openMapProject(projectDir);
+        if (mapConfig) {
+          // ...existing code for setting up the map/editor...
+          const resolvedName = mapConfig.name?.trim() ? mapConfig.name.trim() : 'Untitled Map';
+          const starting = Boolean(mapConfig.isStartingMap);
+          setMapName(resolvedName);
+          setNewMapName(resolvedName);
+          const sanitizedTarget = computeIntermapTarget(true, resolvedName);
+          const mapIsStarting = spawnIntermapTarget ? sanitizedTarget === spawnIntermapTarget : starting;
+          updateStartingMap(mapIsStarting, { propagate: false });
+          setNewMapStarting(mapIsStarting);
+          if (mapIsStarting && sanitizedTarget && spawnIntermapTarget !== sanitizedTarget) {
+            setStartingMapIntermap(sanitizedTarget);
+            spawnIntermapTarget = sanitizedTarget;
+          }
+          setMapWidth(mapConfig.width ?? 20);
+          setMapHeight(mapConfig.height ?? 15);
+          setMapInitialized(true);
+          showToolbarTemporarily();
+          showBottomToolbarTemporarily();
+          setShowWelcome(false);
+          setShowCreateMapDialog(false);
+          if (editor) setEditor(null);
+          setPendingMapConfig(mapConfig);
+        }
+        } else {
+        // Fallback for web
+        console.log('Opening map project:', projectDir);
+        // toast suppressed: Feature Unavailable (requires desktop app)
+      }
+    } catch (error) {
+      console.error('Error opening map project:', error);
+      // toast suppressed: Failed to open map project
+    }
+    finally {
+      // Re-enable default editor creation for other flows
+      setIsOpeningProject(false);
+    }
+  }, [editor, setupAutoSave, updateLayersList, startingMapIntermap, updateStartingMap]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Wire Electron menu actions (Save/Open/New)
+  useEffect(() => {
+    if (!window.electronAPI) return;
+    // Save Map
+    window.electronAPI.onMenuSaveMap(async () => {
+      await handleManualSave();
+    });
+    // Open Map
+    window.electronAPI.onMenuOpenMap(async () => {
+      const selected = await window.electronAPI.selectDirectory();
+      if (selected) {
+        await handleOpenMap(selected);
+      }
+    });
+    // New Map
+    window.electronAPI.onMenuNewMap(() => {
+      setShowWelcome(true);
+      setMapInitialized(false);
+      setEditor(null);
+      setMapWidth(0);
+      setMapHeight(0);
+      setShowCreateMapDialog(false);
+    });
+    // Undo
+    window.electronAPI.onMenuUndo(() => {
+      handleUndo();
+    });
+    // Redo
+    window.electronAPI.onMenuRedo(() => {
+      handleRedo();
+    });
+    // No cleanup provided by preload; handlers are idempotent in this simple flow
+  }, [handleManualSave, handleOpenMap, handleUndo, handleRedo]);
+
+  // Handle close confirmation events
+  useEffect(() => {
+    if (!window.electronAPI) return;
+    
+    // Handle before close check
+    window.electronAPI.onBeforeClose(async () => {
+      await window.electronAPI.confirmClose(hasUnsavedChanges);
+      // The main process handles the actual close logic
+    });
+
+    // Handle save and close request
+    window.electronAPI.onSaveAndClose(async () => {
+      try {
+        await handleManualSave();
+        // After save is complete, tell main process to close
+        window.electronAPI.closeAfterSave();
+      } catch (error) {
+        console.error('Failed to save before close:', error);
+        // Even if save fails, we could show another dialog or just close
+        window.electronAPI.closeAfterSave();
+      }
+    });
+  }, [hasUnsavedChanges, handleManualSave]);
+
+  // Handle browser beforeunload event (for web version)
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        event.preventDefault();
+        event.returnValue = ''; // Required for Chrome
+        return ''; // Required for some browsers
+      }
+      return undefined;
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [hasUnsavedChanges]);
+
+  const handleMinimize = () => {
+    if (window.electronAPI?.minimize) {
+      window.electronAPI.minimize();
+    } else {
+      console.log('Minimize clicked - Electron API not available');
+    }
+  };
+
+  const handleMaximize = () => {
+    if (window.electronAPI?.maximize) {
+      window.electronAPI.maximize();
+    } else {
+      console.log('Maximize clicked - Electron API not available');
+    }
+  };
+
+  const handleClose = () => {
+    if (window.electronAPI?.close) {
+      window.electronAPI.close();
+    } else {
+      console.log('Close clicked - Electron API not available');
+    }
+  };
+
+  const handleFillSelection = () => {
+    if (editor) {
+      editor.fillSelection();
+    }
+  };
+
+  const handleClearSelection = () => {
+    if (editor) {
+      editor.clearSelection();
+    }
+  };
+
+  const handleDeleteSelection = () => {
+    if (editor) {
+      editor.deleteSelection();
+    }
+  };
+
+  const activeLayer = useMemo(() => {
+    return layers.find((layer) => layer.id === activeLayerId) ?? null;
+  }, [layers, activeLayerId]);
+
+  const isCollisionLayer = activeLayer?.type === 'collision';
+  const isNpcLayer = activeLayer?.type === 'npc';
+  const isEnemyLayer = activeLayer?.type === 'enemy';
+
+  const actorEntries = useMemo(() => {
+    if (isNpcLayer) {
+      return mapObjects.filter((obj) => obj.type === 'npc');
+    }
+    if (isEnemyLayer) {
+      return mapObjects.filter((obj) => obj.type === 'enemy');
+    }
+    return [];
+  }, [mapObjects, isNpcLayer, isEnemyLayer]);
+
+  // Settings modal tab state
+  const [settingsTab, setSettingsTab] = useState<'map' | 'other'>('map');
+
+  return (
+    <>
+      {showWelcome ? (
+        <WelcomeScreen 
+          onCreateNewMap={handleCreateNewMap}
+          onOpenMap={handleOpenMap}
+          isDarkMode={isDarkMode}
+        />
+      ) : (
+        <div className="h-screen bg-background text-foreground flex flex-col overflow-hidden">
+      {/* Custom Title Bar */}
+      <div className="bg-gray-100 dark:bg-neutral-900 text-orange-600 dark:text-orange-400 flex justify-between items-center px-4 py-1 select-none drag-region border-b border-gray-200 dark:border-neutral-700">
+        <div className="flex items-center gap-3">
+          {/* Logo and Brand */}
+          <div className="flex items-center gap-1">
+            <img 
+              src={flareIconUrl} 
+              alt="Flare Studio Logo" 
+              className="w-4 h-6"
+            />
+            <span className="text-sm font-semibold text-orange-600 dark:text-orange-400">Flare Studio</span>
+          </div>
+          <div className="text-sm font-medium"></div>
+          {/* Save Status Indicator */}
+          <div className="flex items-center gap-1 text-xs">
+            {saveStatus === 'saving' && (
+              <>
+                <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
+                <span className="text-orange-600">Saving...</span>
+              </>
+            )}
+            {saveStatus === 'saved' && lastSaveTime > 0 && (
+              <>
+                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                <span className="text-green-600">Saved</span>
+              </>
+            )}
+            {saveStatus === 'error' && (
+              <>
+                <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                <span className="text-red-600">Save Error</span>
+              </>
+            )}
+            {saveStatus === 'unsaved' && (
+              <>
+                <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                <span className="text-yellow-600">Unsaved</span>
+              </>
+            )}
+          </div>
+        </div>
+        <div className="flex no-drag">
+          <Tooltip content="Minimize">
+            <button 
+              onClick={handleMinimize}
+              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 p-1 rounded transition-colors"
+            >
+              <Minus className="w-4 h-4" />
+            </button>
+          </Tooltip>
+          <Tooltip content="Maximize">
+            <button 
+              onClick={handleMaximize}
+              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 p-1 rounded transition-colors"
+            >
+              <Square className="w-4 h-4" />
+            </button>
+          </Tooltip>
+          <Tooltip content="Close">
+            <button 
+              onClick={handleClose}
+              className="text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 hover:bg-gray-200 dark:hover:bg-gray-700 p-1 rounded transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </Tooltip>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      {/* Left-edge collapse/expand toggle - placed outside the aside so it remains clickable when the sidebar is hidden */}
+      {showSidebarToggle && (
+        <button
+          onClick={() => {
+            setLeftTransitioning(true);
+            if (editor && typeof editor.setSidebarTransitioning === 'function') {
+              try { editor.setSidebarTransitioning(true); } catch (e) { /* ignore */ }
+            }
+            setLeftCollapsed((s) => !s);
+            // keep the transitioning flag for slightly longer than the CSS transition
+            window.setTimeout(() => {
+              setLeftTransitioning(false);
+              if (editor && typeof editor.setSidebarTransitioning === 'function') {
+                try { editor.setSidebarTransitioning(false); } catch (e) { /* ignore */ }
+              }
+            }, 380);
+          }}
+          aria-label={leftCollapsed ? 'Show sidebar' : 'Hide sidebar'}
+          // Position the toggle at the outer right edge of the left sidebar.
+          // When expanded the sidebar width is 14rem (224px), otherwise it's 0.
+          style={{ left: leftCollapsed ? 0 : 224 }}
+          className="no-drag no-press-shift press-fill-effect fixed top-1/2 transform -translate-y-1/2 z-50 bg-white/90 dark:bg-neutral-900/90 border border-border rounded-l-md p-1 shadow-md hover:bg-white dark:hover:bg-neutral-800"
+        >
+          {leftCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+        </button>
+      )}
+
+      <main className="flex flex-1 min-h-0">
+        {/* Left Sidebar */}
+        <aside
+          className={
+            `relative border-r border-border bg-muted/30 p-2 overflow-visible flex flex-col transition-all duration-200 ease-in-out app-sidebar ` +
+            (leftCollapsed ? 'sidebar-collapsed' : '')
+          }
+          aria-hidden={leftCollapsed}
+        >
+          <div className="sidebar-inner flex flex-col h-full">
+          {/* Hover handle / visual affordance when collapsed (removed) */}
+          {/* collapse toggle is provided on the outer edge (see edge button) */}
+          {/* Tileset Brushes Section */}
+          <section className="flex flex-col flex-1">
+            {/* If this is an NPC, Enemy or Event layer render a header and actor controls (actors only for NPC/Enemy) */}
+            {(() => {
+              // Keep actor entries for NPC/Enemy layers but remove the header and its add-button.
+              const isEventLayer = activeLayer?.type === 'event';
+              if (isNpcLayer || isEnemyLayer || isEventLayer) {
+                return (
+                  <>
+                    {/* Actor entries shown only for NPC/Enemy layers (header removed per UX request) */}
+                    {(isNpcLayer || isEnemyLayer) && (
+                      <div className="flex-1 min-h-0">
+                        {actorEntries.length === 0 ? (
+                          <div className="h-full border border-dashed border-border rounded-md flex items-center justify-center text-sm text-muted-foreground px-4 text-center">
+                            {isNpcLayer ? 'No NPCs added yet. Use the Add control to place your first NPC.' : 'No enemies added yet. Use the Add control to place an enemy.'}
+                          </div>
+                        ) : (
+                          <div className="space-y-2 overflow-y-auto pr-1">
+                            {actorEntries.map((actor) => (
+                              <div
+                                key={actor.id}
+                                className="border border-border rounded-md px-3 py-2 bg-background/50 hover:bg-background transition-colors cursor-pointer"
+                                onClick={() => handleEditObject(actor.id)}
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                    <div className="space-y-1 text-sm">
+                                    <div className="font-medium text-foreground" title={actor.name || `${actor.type === 'npc' ? 'NPC' : 'Enemy'} #${actor.id}`}>
+                                      <span className={leftCollapsed ? 'sr-only' : ''}>{actor.name || `${actor.type === 'npc' ? 'NPC' : 'Enemy'} #${actor.id}`}</span>
+                                      {!actor.name && leftCollapsed && <span className="text-xs text-muted-foreground">#{actor.id}</span>}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                      <MapPin className="w-3 h-3" />
+                                      <span className={leftCollapsed ? 'sr-only' : ''}>({actor.x}, {actor.y})</span>
+                                    </div>
+                                    {actor.properties?.tilesetPath && (
+                                      <div className="text-xs text-muted-foreground break-all">
+                                        {actor.properties.tilesetPath}
+                                      </div>
+                                    )}
+                                  </div>
+                                  <Tooltip content="Remove">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="w-6 h-6 p-0 text-red-500 hover:text-red-600"
+                                      onClick={(event) => {
+                                        event.stopPropagation();
+                                        handleRemoveActor(actor.id);
+                                      }}
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </Button>
+                                  </Tooltip>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                );
+              }
+              return null;
+            })()}
+
+            {/* Tileset Brushes Window - render for all layers (including npc/enemy/event) */}
+            <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-0 m-0">
+              {/* Layer Tabs (background / object only) */}
+              {(() => {
+                const activeLayerType = activeLayer?.type;
+                const showTabs = activeLayerType === 'background' || activeLayerType === 'object';
+                if (!showTabs) return null;
+        return (
+          <div key={tabTick} className="flex items-center gap-2 px-2 pb-2">
+        <div
+          className={`flex-1 flex items-center gap-1 overflow-x-auto tabs-scroll ${(() => {
+            try {
+              const tabs = editor && activeLayerType ? (editor.getLayerTabs ? editor.getLayerTabs(activeLayerType) : []) : [];
+              return tabs && tabs.length > 7 ? 'tabs-limited' : '';
+            } catch (e) { return ''; }
+          })()}`}
+          onWheel={(e: React.WheelEvent<HTMLDivElement>) => {
+            const el = e.currentTarget as HTMLDivElement;
+            if (el.scrollWidth > el.clientWidth) {
+              e.preventDefault();
+              // vertical wheel scroll -> horizontal scroll
+              el.scrollLeft += e.deltaY;
+            }
+          }}
+        >
+                      {/* Render simple tabs using editor state when available (no import/add controls here) */}
+                      {editor ? (
+                        (editor.getLayerTabs ? editor.getLayerTabs(activeLayerType!) : []).map((tab: { id: number; name?: string; }, idx: number) => (
+                          <button
+                            key={tab.id}
+                            className={`w-5 h-5 flex items-center justify-center rounded-full text-white text-xs font-medium transition-colors shadow-sm ${editor && editor.getCurrentLayerType() === activeLayerType && editor.getActiveLayerTabId && editor.getActiveLayerTabId(activeLayerType) === tab.id ? 'opacity-100 scale-100 ring-2 ring-offset-1' : 'opacity-90 scale-95'}`}
+                            onClick={() => {
+                              if (!editor) return;
+                              editor.setActiveLayerTab(activeLayerType!, tab.id);
+                              try { editor.refreshTilePalette(true); } catch (err) { /* ignore */ }
+                              setTabTick(t => t + 1);
+                            }}
+                            style={{
+                              background: (editor && editor.getActiveLayerTabId && editor.getActiveLayerTabId(activeLayerType) === tab.id) ? '#ea580c' : '#f97316'
+                            }}
+                          >
+                            {idx + 1}
+                          </button>
+                        ))
+                      ) : (
+                        <div className="text-xs text-muted-foreground">No tabs</div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+              <div className="relative flex-1 min-h-0 overflow-auto flex flex-col">
+                <div
+                  id="tilesContainer"
+                  className="tile-palette flex flex-col flex-1 min-h-0 overflow-y-auto p-0 m-0 justify-start pb-12"
+                  onWheel={(e: React.WheelEvent<HTMLDivElement>) => {
+                    // If content overflows horizontally, use the vertical wheel to scroll left/right
+                    const el = e.currentTarget as HTMLDivElement;
+                    if (el.scrollWidth > el.clientWidth) {
+                      e.preventDefault();
+                      // deltaY positive -> scroll right, negative -> scroll left
+                      el.scrollLeft += e.deltaY;
+                    }
+                  }}
+                ></div>
+                {/* Hidden element to track brush tool state */}
+                <div data-brush-tool={brushTool} className="hidden"></div>
+              </div>
+              {/* Active GID moved to canvas area (see Hover Coordinates Display) */}
+            </div>
+            {/* Brush Tools - stick to bottom so palette can fill remaining space */}
+            <div className="sticky bottom-0 z-10 bg-transparent py-2">
+              <div className="text-xs text-muted-foreground"></div>
+              <div className="w-full flex justify-center">
+                <div
+                  ref={setBrushToolbarNode}
+                  className={`flex items-center transition-all duration-300 ease-in-out gap-1 transform -translate-x-1 mt-2 mb-2`}
+                >
+                  {!isCollisionLayer && (
+                    <>
+                  <div className="flex-shrink-0 flex items-center gap-1">
+                    {/* Add Tab button (visible for background/object) */}
+                    { (activeLayer?.type === 'background' || activeLayer?.type === 'object') && (
+                      <Tooltip content="Add tab" side="bottom">
+                          <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-xs px-1 py-1 h-6"
+                          onClick={() => {
+                            if (!editor || !activeLayer) return;
+                            const tabs = editor.getLayerTabs ? editor.getLayerTabs(activeLayer.type) : [];
+                            if (tabs && tabs.length >= 8) {
+                              toast({ title: 'Maximum tabs reached', description: 'You can have up to 8 tabs per layer.', variant: 'destructive' });
+                              return;
+                            }
+                            const newId = editor.createLayerTab(activeLayer.type);
+                            editor.setActiveLayerTab(activeLayer.type, newId);
+                            // Trigger React render so tabs appear immediately
+                            setTabTick(t => t + 1);
+                          }}
+                        >
+                          +
+                        </Button>
+                      </Tooltip>
+                    )}
+
+                    {/* Existing Import button: now imports into active tab for background/object layers, falls back to existing layer tileset behavior for actor layers */}
+                    {(() => {
+                      const isNpc = activeLayer?.type === 'npc';
+                      const isEnemy = activeLayer?.type === 'enemy';
+                      const isEventLayer = activeLayer?.type === 'event';
+                      const isActorLayer = isNpc || isEnemy || isEventLayer;
+                      const tooltip = isActorLayer ? `Add ${isEventLayer ? 'Event' : isNpc ? 'NPC' : 'Enemy'}` : 'Import a PNG tileset or brush for the active layer tab';
+                      if (isNpc || isEnemy || isEventLayer) {
+                        return (
+                          <Tooltip content={tooltip} side="bottom">
+                            <Button
+                              variant="default"
+                              size="sm"
+                              aria-label={tooltip}
+                              className="relative z-20 text-xs px-1 py-1 h-6 shadow-sm bg-orange-500 hover:bg-orange-600 text-white border-orange-500"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                if (isNpc || isEnemy) {
+                                  handleOpenActorDialog(isNpc ? 'npc' : 'enemy');
+                                } else {
+                                  toast({ title: 'Not implemented', description: 'Create Event will be implemented later.' });
+                                }
+                              }}
+                              role="button"
+                            >
+                              <Upload className="w-3 h-3 text-white" />
+                            </Button>
+                          </Tooltip>
+                        );
+                      }
+
+                      return (
+                        <Tooltip content={tooltip} side="bottom">
+                          <Button
+                            variant="default"
+                            size="sm"
+                            aria-label={tooltip}
+                            className="relative text-xs px-1 py-1 h-6 shadow-sm bg-orange-500 hover:bg-orange-600 text-white border-orange-500"
+                          >
+                            <Upload className="w-3 h-3 text-white" />
+                            <input
+                              type="file"
+                              accept="image/png"
+                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                              onChange={async (e) => {
+                                // For background/object: import into active tab; otherwise fall back to layer tileset import
+                                if (!editor || !activeLayer) return;
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                const layerType = activeLayer.type;
+                                if (layerType === 'background' || layerType === 'object') {
+                                  // Import into the currently active tab if available. If there is
+                                  // no active tab yet, create one (respect the 8-tab limit).
+                                  const tabs = editor.getLayerTabs ? editor.getLayerTabs(layerType) : [];
+                                  let targetTabId = editor.getActiveLayerTabId ? editor.getActiveLayerTabId(layerType) : null;
+                                  if (typeof targetTabId !== 'number' || targetTabId === null) {
+                                    // No active tab -> create one, but respect the limit
+                                    if (tabs && tabs.length >= 8) {
+                                      toast({ title: 'Maximum tabs reached', description: 'You can have up to 8 tabs per layer.', variant: 'destructive' });
+                                      return;
+                                    }
+                                    targetTabId = editor.createLayerTab(layerType);
+                                    editor.setActiveLayerTab(layerType, targetTabId);
+                                  }
+                                  // Import into the active/target tab
+                                  await editor.importBrushImageToLayerTab(layerType, targetTabId, file);
+                                  // Refresh palette to show newly-added brush/tiles
+                                  editor.refreshTilePalette(true);
+                                  // Trigger UI update so changes appear immediately
+                                  setTabTick(t => t + 1);
+                                } else {
+                                  // Non-tab layers: keep legacy behavior
+                                  handleFileUpload(e as React.ChangeEvent<HTMLInputElement>, 'layerTileset');
+                                }
+                              }}
+                            />
+                          </Button>
+                        </Tooltip>
+                      );
+                    })()}
+                  </div>
+                  <div
+                    className={`flex-shrink-0 overflow-visible transition-all duration-300 ease-out opacity-100 scale-100 max-w-[2.5rem] w-auto`}
+                  >
+                    <Tooltip content="Move/Reorder brushes">
+                      <Button
+                        variant={brushTool === 'move' ? 'default' : 'outline'}
+                        size="sm"
+                        className="text-xs px-1 py-1 h-6 shadow-sm"
+                        onClick={() => handleToggleBrushTool('move')}
+                      >
+                        <Scan className="w-3 h-3" />
+                      </Button>
+                    </Tooltip>
+                  </div>
+                  <div
+                    className={`flex-shrink-0 overflow-hidden transition-all duration-300 ease-out ${brushToolbarExpanded || brushTool === 'merge' ? 'opacity-100 scale-100 max-w-[2.5rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
+                  >
+                    <Tooltip content="Merge brushes">
+                      <Button
+                        variant={brushTool === 'merge' ? 'default' : 'outline'}
+                        size="sm"
+                        className="text-xs px-1 py-1 h-6 shadow-sm"
+                        onClick={() => handleToggleBrushTool('merge')}
+                      >
+                        <Link2 className="w-3 h-3" />
+                      </Button>
+                    </Tooltip>
+                  </div>
+                  <div
+                    className={`flex-shrink-0 overflow-hidden transition-all duration-300 ease-out ${brushToolbarExpanded || brushTool === 'separate' ? 'opacity-100 scale-100 max-w-[2.5rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
+                  >
+                    <Tooltip content="Separate brushes">
+                      <Button
+                        variant={brushTool === 'separate' ? 'default' : 'outline'}
+                        size="sm"
+                        className="text-xs px-1 py-1 h-6 shadow-sm"
+                        onClick={() => handleToggleBrushTool('separate')}
+                      >
+                        <Scissors className="w-3 h-3" />
+                      </Button>
+                    </Tooltip>
+                  </div>
+                  <div
+                    className={`flex-shrink-0 overflow-hidden transition-all duration-300 ease-out ${brushToolbarExpanded || brushTool === 'remove' ? 'opacity-100 scale-100 max-w-[2.5rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
+                  >
+                    <Tooltip content="Remove brushes">
+                      <Button
+                        variant={brushTool === 'remove' ? 'default' : 'outline'}
+                        size="sm"
+                        className="text-xs px-1 py-1 h-6 shadow-sm"
+                        onClick={() => handleToggleBrushTool('remove')}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </Tooltip>
+                  </div>
+                  <div
+                    className={`flex-shrink-0 overflow-hidden transition-all duration-300 ease-out ${brushToolbarExpanded ? 'opacity-100 scale-100 max-w-[2.5rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
+                  >
+                    <Tooltip content="Delete tileset tab">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs px-1 py-1 h-6 border-red-500 hover:border-red-600 hover:bg-red-50 shadow-sm"
+                        onClick={() => {
+                          showBrushToolbarTemporarily();
+                          if (!editor) {
+                            toast({ title: 'No editor', description: 'Editor is not initialized yet.', variant: 'destructive' });
+                            return;
+                          }
+                          const layerType = activeLayer?.type;
+                          if (!layerType) {
+                            toast({ title: 'No active layer', description: 'Please select a layer first.', variant: 'destructive' });
+                            return;
+                          }
+                          const activeTabId = editor.getActiveLayerTabId ? editor.getActiveLayerTabId(layerType) : null;
+                          if (typeof activeTabId !== 'number' || activeTabId === null) {
+                            toast({ title: 'No tab selected', description: 'There is no active tileset tab to delete for this layer.', variant: 'destructive' });
+                            return;
+                          }
+                          // Prompt confirmation to remove the active tab
+                          const payload = { layerType, tabId: activeTabId };
+                          confirmPayloadRef.current = payload;
+                          setTabToDelete(payload);
+                          setConfirmAction({ type: 'removeTab', payload });
+                        }}
+                      >
+                        <X className="w-3 h-3 text-red-500" />
+                      </Button>
+                    </Tooltip>
+                  </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* Layers Section */}
+          <section
+            className="mb-0 flex-shrink-0 flex flex-col justify-center h-40" // reduced margin and height for less space below
+            onMouseEnter={() => setLayersPanelExpanded(true)}
+            onMouseLeave={() => setLayersPanelExpanded(false)}
+            tabIndex={0}
+          >
+            {/* Layers List - reserve height to avoid layout shifts */}
+            <div className="mb-2 w-full flex flex-col justify-center h-full">
+              <div className="h-48 overflow-hidden flex flex-col justify-center w-full">
+                <div className="space-y-0.5 h-full overflow-y-auto flex flex-col justify-center w-full">
+                  {layers.map((layer) => {
+                    const isActive = activeLayerId === layer.id;
+                    const visible = layersPanelExpanded || isActive;
+                    return (
+                      <div
+                        key={layer.id}
+                        className={`block w-full max-w-xs px-2 py-1 rounded transition-all text-xs transform-gpu ${
+                          isActive
+                            ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-400'
+                            : 'bg-transparent border-transparent'
+                        }`}
+                        style={{
+                          opacity: visible ? 1 : 0.65,
+                          transform: visible ? 'scaleY(1) translateY(0)' : 'scaleY(0.98) translateY(0)',
+                          transformOrigin: 'top',
+                          pointerEvents: visible ? 'auto' : 'none',
+                          transition: 'transform 400ms cubic-bezier(.2,.9,.2,1), opacity 400ms ease, box-shadow 300ms ease',
+                          boxShadow: isActive ? '0 6px 12px rgba(15,23,42,0.06)' : 'none',
+                          zIndex: isActive ? 30 : 10,
+                        }}
+                      >
+                        <div
+                          className="cursor-pointer w-full flex items-center"
+                          onClick={() => handleSetActiveLayer(layer.id)}
+                        >
+                          <div className={`flex items-center gap-2 w-full ${isActive ? 'opacity-100' : 'opacity-80'}`}> 
+                            <Tooltip content={layer.visible ? 'Hide layer' : 'Show layer'}>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleToggleLayerVisibility(layer.id);
+                                }}
+                                className="w-4 h-4 p-0 hover:bg-gray-200 dark:hover:bg-gray-700"
+                              >
+                                {layer.visible ? <Eye className="w-2.5 h-2.5" /> : <EyeOff className="w-2.5 h-2.5 text-gray-400 dark:text-gray-500" />}
+                              </Button>
+                            </Tooltip>
+
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="w-4 h-4 p-0 hover:bg-gray-200 dark:hover:bg-gray-700"
+                              onMouseEnter={(e) => {
+                                const transparencyPercent = Math.round((layer.transparency || 0) * 100);
+                                showTooltipWithDelay(
+                                  <div className="flex items-center gap-1">
+                                    <Mouse className="w-3 h-3" />
+                                    Transparency ({transparencyPercent}%)
+                                  </div>,
+                                  e.currentTarget
+                                );
+                              }}
+                              onMouseLeave={hideTooltip}
+                              onWheel={(e) => {
+                                e.preventDefault();
+                                const delta = e.deltaY > 0 ? 0.1 : -0.1;
+                                handleLayerTransparencyChange(layer.id, delta);
+                                const currentTransparency = layer.transparency || 0;
+                                const newTransparency = Math.max(0, Math.min(1, currentTransparency + delta));
+                                const newPercent = Math.round(newTransparency * 100);
+                                showTooltipWithDelay(
+                                  <div className="flex items-center gap-1">
+                                    <Mouse className="w-3 h-3" />
+                                    Transparency ({newPercent}%)
+                                  </div>,
+                                  e.currentTarget
+                                );
+                              }}
+                            >
+                              <Blend className="w-2.5 h-2.5" />
+                            </Button>
+
+                            <div className="flex items-center gap-2">
+                              <Tooltip content={layer.name}>
+                                <span className="text-xs font-medium truncate flex items-center gap-2">
+                                  {(() => {
+                                    switch ((layer.type || '').toLowerCase()) {
+                                      case 'background':
+                                      case 'bg':
+                                        return <Image className="w-4 h-4" />;
+                                      case 'collision':
+                                      case 'collision layer':
+                                        return <Grid className="w-4 h-4" />;
+                                      case 'objects':
+                                      case 'object':
+                                        return <Box className="w-4 h-4" />;
+                                      case 'npc':
+                                        return <Users className="w-4 h-4" />;
+                                      case 'enemy':
+                                        return <Locate className="w-4 h-4" />;
+                                      case 'event':
+                                        return <Clock className="w-4 h-4" />;
+                                      default:
+                                        return <Map className="w-4 h-4" />;
+                                    }
+                                  })()}
+                                </span>
+                              </Tooltip>
+                              <span className={leftCollapsed ? 'sr-only text-xs font-medium' : 'text-xs font-medium truncate'} title={layer.name}>
+                                {layer.name}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </section>
+          </div>
+
+          {/* Bottom Action Buttons */}
+          <section className="flex-shrink-0 mt-auto mb-2">
+            {/* Export Loading Bar - reserve space */}
+            <div className="w-full h-1.5 mb-2">
+              {isExporting ? (
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-full overflow-hidden">
+                  <div
+                    className="bg-gradient-to-r from-orange-500 to-orange-600 h-full transition-all duration-1000 ease-out rounded-full"
+                    style={{ width: `${exportProgress}%` }}
+                  />
+                </div>
+              ) : (
+                <div className="w-full h-full" />
+              )}
+            </div>
+
+            <div className={`flex gap-2 justify-center`}>
+              <div>
+                <Button
+                  ref={mapsButtonRef}
+                  size="sm"
+                  className="w-7 h-7 p-0 shadow-sm"
+                  onClick={async () => {
+                    if (!mapsDropdownOpen) await refreshProjectMaps();
+                    setMapsDropdownOpen((s) => !s);
+                  }}
+                  disabled={isExporting || isPreparingNewMap}
+                >
+                  <Menu className="w-3 h-3" />
+                </Button>
+
+                {mapsDropdownOpen && mapsDropdownPos && createPortal(
+                  <div
+                    ref={mapsPortalRef}
+                    style={{ left: mapsDropdownPos.left, top: mapsDropdownPos.top, position: 'absolute', transform: 'translateY(-100%)' }}
+                    className="w-56 bg-background border border-border rounded shadow-lg z-[9999]"
+                  >
+                    {/* Actions header removed per UX request */}
+                    <div className="max-h-60 overflow-y-auto minimal-scroll">
+                      {currentProjectPath ? (
+                        <>
+                          <div className="relative">
+                            <button
+                              className="w-full text-left p-2 hover:bg-gray-100 dark:hover:bg-neutral-800 text-xs flex items-center justify-between gap-2"
+                              onClick={() => setMapsSubOpen((s) => !s)}
+                            >
+                              <span className="flex items-center gap-2"><Folder className="w-3 h-3" /><span>Open map</span></span>
+                              <svg className={`w-3 h-3 transition-transform ${mapsSubOpen ? 'transform rotate-90' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+                            </button>
+
+                            {/* nested maps list: render into a separate portal to appear to the right */}
+                            {mapsSubOpen && mapsSubPos && createPortal(
+                              <div
+                                ref={mapsSubPortalRef}
+                                style={{ left: mapsSubPos.left, top: mapsSubPos.top, position: 'absolute' }}
+                                className="w-48 bg-background border border-border rounded shadow-md z-[10000] max-h-60 overflow-y-auto minimal-scroll"
+                              >
+                                {projectMaps.length === 0 ? (
+                                  <div className="p-2 text-xs text-muted-foreground">No maps found</div>
+                                ) : (
+                                  projectMaps.map((f) => (
+                                    <button
+                                      key={f}
+                                      className="w-full text-left p-2 hover:bg-gray-100 dark:hover:bg-neutral-800 text-xs"
+                                      onClick={() => {
+                                        setMapsDropdownOpen(false);
+                                        setMapsSubOpen(false);
+                                        handleOpenMapFromMapsFolder(f);
+                                      }}
+                                    >
+                                      {f}
+                                    </button>
+                                  ))
+                                )}
+                              </div>, document.body
+                            )}
+                          </div>
+
+                          <div className="border-t border-border" />
+
+                          <button
+                            className="w-full text-left p-2 hover:bg-gray-100 dark:hover:bg-neutral-800 text-xs flex items-center gap-2"
+                            onClick={async () => {
+                              setMapsDropdownOpen(false);
+                              await handleExportMap();
+                            }}
+                          >
+                            <Download className="w-3 h-3" />
+                            <span>Export map</span>
+                          </button>
+
+                          <div className="border-t border-border" />
+
+                          <button
+                            className="w-full text-left p-2 hover:bg-gray-100 dark:hover:bg-neutral-800 text-xs flex items-center gap-2"
+                            onClick={() => {
+                              setMapsDropdownOpen(false);
+                              handleOpenCreateMapDialog();
+                            }}
+                          >
+                            <Plus className="w-3 h-3" />
+                            <span>Create new map</span>
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            className="w-full text-left p-2 hover:bg-gray-100 dark:hover:bg-neutral-800 text-xs flex items-center gap-2"
+                            onClick={async () => {
+                              setMapsDropdownOpen(false);
+                              if (window.electronAPI?.selectDirectory) {
+                                try {
+                                  const selected = await window.electronAPI.selectDirectory();
+                                  if (selected) {
+                                    await handleOpenMap(selected);
+                                  }
+                                } catch (err) {
+                                  console.error('Failed to select directory:', err);
+                                  toast({ title: 'Open failed', description: 'Unable to open project directory.', variant: 'destructive' });
+                                }
+                              } else {
+                                toast({ title: 'Open unavailable', description: 'Open project requires the desktop app.', variant: 'destructive' });
+                              }
+                            }}
+                          >
+                            <Folder className="w-3 h-3" />
+                            <span>Open project...</span>
+                          </button>
+
+                          <div className="border-t border-border" />
+
+                          <div className="p-2 text-xs">No project is currently open. Open a project to list maps and enable Export.</div>
+
+                          <div className="border-t border-border" />
+
+                          <button
+                            className="w-full text-left p-2 hover:bg-gray-100 dark:hover:bg-neutral-800 text-xs flex items-center gap-2"
+                            onClick={() => {
+                              setMapsDropdownOpen(false);
+                              // Open the create map dialog in-app as fallback for creating a new map without an existing project
+                              handleOpenCreateMapDialog();
+                            }}
+                          >
+                            <Plus className="w-3 h-3" />
+                            <span>Create new map</span>
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>, document.body
+                )}
+              </div>
+
+              <Tooltip content={hasUnsavedChanges ? 'Save changes' : 'All changes saved'}>
+                <Button
+                  onClick={handleManualSave}
+                  className={`w-7 h-7 p-0 shadow-sm transition-colors ${
+                    isManuallySaving ? 'bg-blue-500 hover:bg-blue-600' : hasUnsavedChanges ? 'bg-orange-500 hover:bg-orange-600 text-white' : 'bg-green-500 hover:bg-green-600 text-white'
+                  }`}
+                  disabled={isManuallySaving || isPreparingNewMap}
+                  size="sm"
+                >
+                  {isManuallySaving ? (
+                    <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Save className="w-3 h-3" />
+                  )}
+                </Button>
+              </Tooltip>
+
+              {/* Help button moved into Settings > Other Options */}
+
+              <Tooltip content="Map Settings">
+                <Button onClick={() => setShowSettings(true)} className="w-7 h-7 p-0 shadow-sm" variant="outline" size="sm">
+                  <Settings className="w-3 h-3" />
+                </Button>
+              </Tooltip>
+            </div>
+          </section>
+        </aside>
+
+        {/* Settings Modal */}
+        {showSettings && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-background border border-border rounded-lg p-6 w-96">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold">Settings</h3>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setShowSettings(false)}
+                  className="w-8 h-8 p-0"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+              <div className="flex border-b mb-4">
+                <button
+                  className={`flex-1 py-2 text-sm font-medium border-b-2 transition-colors ${settingsTab === 'map' ? 'border-orange-500 text-orange-600' : 'border-transparent text-gray-500'}`}
+                  onClick={() => setSettingsTab('map')}
+                >
+                  Current Map Settings
+                </button>
+                <button
+                  className={`flex-1 py-2 text-sm font-medium border-b-2 transition-colors ${settingsTab === 'other' ? 'border-orange-500 text-orange-600' : 'border-transparent text-gray-500'}`}
+                  onClick={() => setSettingsTab('other')}
+                >
+                  Other Options
+                </button>
+              </div>
+              {settingsTab === 'map' ? (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Map Name</label>
+                    <Input
+                      type="text"
+                      value={mapName}
+                      onChange={(e) => setMapName(e.target.value)}
+                      placeholder="Enter map name"
+                      className="w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Map Width</label>
+                    <Input
+                      type="number"
+                      value={mapWidth}
+                      onChange={(e) => setMapWidth(Number(e.target.value))}
+                      min="1"
+                      max="100"
+                      className="w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Map Height</label>
+                    <Input
+                      type="number"
+                      value={mapHeight}
+                      onChange={(e) => setMapHeight(Number(e.target.value))}
+                      min="1"
+                      max="100"
+                      className="w-full"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <label htmlFor="starting-map-checkbox" className="text-sm font-medium text-muted-foreground">
+                        Starting Map
+                      </label>
+                      <Tooltip content="If this map is the map that players will start the game then mark this option">
+                        <HelpCircle className="h-4 w-4 text-muted-foreground" aria-hidden />
+                      </Tooltip>
+                    </div>
+                    <input
+                      id="starting-map-checkbox"
+                      type="checkbox"
+                      className="h-4 w-4 rounded border border-border accent-orange-500"
+                      checked={isStartingMap}
+                      onChange={(e) => updateStartingMap(e.target.checked)}
+                      aria-checked={isStartingMap}
+                      aria-label="Set this map as the starting map"
+                    />
+                  </div>
+                  <div className="flex gap-2 mt-6">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setShowSettings(false)}
+                      className="flex-1"
+                    >
+                      Cancel
+                    </Button>
+                    <Button 
+                      onClick={() => {
+                        handleMapResize();
+                        setShowSettings(false);
+                      }}
+                      className="flex-1"
+                    >
+                      Apply Changes
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Theme (Experimental)</label>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Light Mode</span>
+                      <button
+                        onClick={() => setIsDarkMode(!isDarkMode)}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          isDarkMode ? 'bg-orange-600' : 'bg-gray-200'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            isDarkMode ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                        <span className="sr-only">Toggle dark mode</span>
+                      </button>
+                      <span className="text-sm flex items-center gap-1">
+                        {isDarkMode ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+                        Dark Mode
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Debug Mode</label>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Disabled</span>
+                      <button
+                        onClick={() => {
+                          if (editor) {
+                            editor.toggleDebugMode();
+                          }
+                        }}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          editor?.getDebugMode() ? 'bg-orange-600' : 'bg-gray-200'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            editor?.getDebugMode() ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                        <span className="sr-only">Toggle debug mode</span>
+                      </button>
+                      <span className="text-sm flex items-center gap-1">
+                        <Target className="w-4 h-4" />
+                        Debug Tiles
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Shows tile boundaries and coordinates for debugging
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Auto-Save</label>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Disabled</span>
+                      <button
+                        onClick={() => {
+                          const newEnabled = !autoSaveEnabled;
+                          setAutoSaveEnabledState(newEnabled);
+                          if (editor) {
+                            editor.setAutoSaveEnabled(newEnabled);
+                          }
+                        }}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          autoSaveEnabled ? 'bg-orange-600' : 'bg-gray-200'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            autoSaveEnabled ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                        <span className="sr-only">Toggle auto-save</span>
+                      </button>
+                      <span className="text-sm">
+                        Enabled
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Automatically saves your work every 8 seconds
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Active GID Indicator</label>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Show</span>
+                      <button
+                        onClick={() => {
+                          const newVal = !showActiveGid;
+                          setShowActiveGid(newVal);
+                        }}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          showActiveGid ? 'bg-orange-600' : 'bg-gray-200'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            showActiveGid ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                        <span className="sr-only">Toggle Active GID Indicator</span>
+                      </button>
+                      <span className="text-sm">{showActiveGid ? 'Shown' : 'Hidden'}</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Toggle whether the Active GID badge is visible next to the hover coordinates.</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Sidebar Collapse Button</label>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Show toggle</span>
+                      <button
+                        onClick={() => setShowSidebarToggle((s: boolean) => !s)}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          showSidebarToggle ? 'bg-orange-600' : 'bg-gray-200'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            showSidebarToggle ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                        <span className="sr-only">Toggle sidebar collapse button</span>
+                      </button>
+                      <span className="text-sm">{showSidebarToggle ? 'Shown' : 'Hidden'}</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Show or hide the left-edge sidebar collapse/expand toggle.</p>
+                  </div>
+                  <div className="flex gap-2 mt-6">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setShowSettings(false)}
+                      className="flex-1"
+                    >
+                      Close
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setShowHelp(true);
+                        setShowSettings(false);
+                      }}
+                      className="flex-1 flex items-center justify-center gap-2"
+                    >
+                      <HelpCircle className="w-4 h-4" />
+                      <span>Help & Docs</span>
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Clear Layer Confirmation Dialog (replaces native confirm) */}
+        {showClearLayerDialog && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-background border border-border rounded-lg p-6 w-80">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold">Clear Layer</h3>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setShowClearLayerDialog(false)}
+                  className="w-8 h-8 p-0"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+              <div className="text-sm text-foreground mb-4">Are you sure you want to clear all tiles from the current layer? This action cannot be undone.</div>
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" onClick={() => setShowClearLayerDialog(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (editor) {
+                      editor.clearLayer();
+                    }
+                    setSelectedBrushTool('brush'); // Reset to brush tool after clearing
+                    setShowClearLayerDialog(false);
+                  }}
+                >
+                  Clear
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Generic Confirmation Dialog for destructive actions */}
+        {confirmAction && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-background border border-border rounded-lg p-6 w-80">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold">Confirm</h3>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setConfirmAction(null)}
+                  className="w-8 h-8 p-0"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+              <div className="text-sm text-foreground mb-4">
+                {confirmAction.type === 'removeBrush' && 'Are you sure you want to remove this brush?'}
+                {confirmAction.type === 'removeTileset' && 'Are you sure you want to remove the tileset for this layer? This will clear the tileset but keep any placed tiles.'}
+                {confirmAction.type === 'removeTab' && 'Are you sure you want to remove this tileset tab?'}
+              </div>
+              <div className="flex gap-2 justify-end">
+                <Button variant="outline" onClick={() => setConfirmAction(null)}>Cancel</Button>
+                <Button
+                  onClick={() => {
+                    try {
+                      if (confirmAction.type === 'removeBrush') {
+                        const brushId = confirmAction.payload as number;
+                        if (editor) editor.removeBrush(brushId);
+                      } else if (confirmAction.type === 'removeTileset') {
+                        if (editor) editor.removeLayerTileset();
+                      } else if (confirmAction.type === 'removeTab') {
+                        // Prefer the stable React state if present
+                        const payload = tabToDelete ?? confirmPayloadRef.current ?? (confirmAction.payload as { layerType: string; tabId: number } | undefined);
+                        if (editor && payload && payload.layerType) {
+                          // At confirmation time prefer the editor's current active tab for that layer
+                          const liveActive = editor.getActiveLayerTabId ? editor.getActiveLayerTabId(payload.layerType) : null;
+                          const finalTabId = (typeof liveActive === 'number' && liveActive !== null) ? liveActive : payload.tabId;
+                          console.info('Confirm removeTab: requested=', payload, 'liveActive=', liveActive, 'using=', finalTabId);
+                          if (typeof finalTabId === 'number') {
+                            editor.removeLayerTab(payload.layerType, finalTabId);
+                            // Force UI update and refresh palette
+                            setTabTick(t => t + 1);
+                            try { editor.refreshTilePalette(true); } catch (err) { console.warn('refreshTilePalette failed', err); }
+
+                            // Extra safeguard: explicitly set the editor's active tab to the new live active
+                            try {
+                              const newActive = editor.getActiveLayerTabId ? editor.getActiveLayerTabId(payload.layerType) : null;
+                              if (typeof newActive === 'number') {
+                                editor.setActiveLayerTab(payload.layerType, newActive);
+                                // one more refresh to ensure palette content is synced
+                                setTabTick(t => t + 1);
+                                try { editor.refreshTilePalette(true); } catch (err) { console.warn('refreshTilePalette failed', err); }
+                              }
+                            } catch (e) {
+                              console.warn('Post-remove setActiveLayerTab safeguard failed', e);
+                            }
+                          } else {
+                            console.warn('Confirm removeTab: no finalTabId available, aborting', payload);
+                          }
+                        }
+                        // Clear the state/ref after handling
+                        setTabToDelete(null);
+                        confirmPayloadRef.current = null;
+                      }
+                    } catch (error) {
+                      console.error('Confirm action failed:', error);
+                    } finally {
+                      setConfirmAction(null);
+                    }
+                  }}
+                >
+                  Confirm
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Help Modal */}
+        {showHelp && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-background border border-border rounded-lg p-0 w-[800px] max-h-[80vh] overflow-y-auto help-modal relative">
+              {/* Modal-local header that stays visible while the modal body scrolls */}
+              <div className="sticky top-0 z-20 bg-background/95 backdrop-blur-sm border-b border-border py-3 px-4 rounded-t-lg">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-2xl font-bold text-gray-800 dark:text-gray-100">Help & Documentation</h3>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowHelp(false)}
+                    className="w-8 h-8 p-0 rounded-full"
+                    aria-label="Close Help"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+                {/* Tab Navigation */}
+                <div className="flex space-x-1 mt-3 bg-gray-100 dark:bg-neutral-800 rounded-lg p-1">
+                  <button
+                    onClick={() => setActiveHelpTab('engine')}
+                    className={`px-3 py-2 rounded-md text-sm font-medium transition-all ${
+                      activeHelpTab === 'engine'
+                        ? 'bg-white dark:bg-neutral-700 text-gray-900 dark:text-gray-100 shadow-sm'
+                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                    }`}
+                  >
+                    <Target className="w-4 h-4 inline mr-2" />
+                    Engine
+                  </button>
+                  <button
+                    onClick={() => setActiveHelpTab('collisions')}
+                    className={`px-3 py-2 rounded-md text-sm font-medium transition-all ${
+                      activeHelpTab === 'collisions'
+                        ? 'bg-white dark:bg-neutral-700 text-gray-900 dark:text-gray-100 shadow-sm'
+                        : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                    }`}
+                  >
+                    <Shield className="w-4 h-4 inline mr-2" />
+                    Collisions
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-6 space-y-6">
+                {/* Engine Tab Content */}
+                {activeHelpTab === 'engine' && (
+                  <>
+                    <section>
+                      <h4 className="text-xl font-semibold mb-3 flex items-center gap-2 text-gray-800 dark:text-gray-100">
+                        <Target className="w-5 h-5 text-orange-500" />
+                        Getting Started
+                      </h4>
+                      <div className="space-y-2 text-gray-700 dark:text-gray-400">
+                        <p>Welcome to the Isometric Tile Map Editor! This tool allows you to create beautiful isometric tile-based maps.</p>
+                        <ul className="list-disc list-inside space-y-1 ml-4 text-gray-700 dark:text-gray-400">
+                          <li>Start by creating a new map or loading an existing one</li>
+                          <li>Import tilesets to begin designing</li>
+                          <li>Use layers to organize different elements of your map</li>
+                          <li>Export your finished map for use in your projects</li>
+                        </ul>
+                      </div>
+                    </section>
+
+                    <section>
+                      <h4 className="text-xl font-semibold mb-3 flex items-center gap-2 text-gray-800 dark:text-gray-100">
+                        <Map className="w-5 h-5 text-orange-500" />
+                        Map Management
+                      </h4>
+                      <div className="space-y-3">
+                        <p className="text-gray-700 dark:text-gray-400">Layers help organize your map content. Each layer can have its own tileset and transparency.</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="flex items-start gap-3">
+                            <Save className="w-4 h-4 mt-1 text-orange-500" />
+                            <div>
+                              <h5 className="font-medium text-gray-800 dark:text-gray-100">Save/Export</h5>
+                              <p className="text-sm text-gray-600 dark:text-gray-400">Save your map as JSON or export as PNG image</p>
+                            </div>
+                          </div>
+                          <div className="flex items-start gap-3">
+                            <Upload className="w-4 h-4 mt-1 text-orange-500" />
+                            <div>
+                              <h5 className="font-medium text-gray-800 dark:text-gray-100">Load Map</h5>
+                              <p className="text-sm text-gray-600 dark:text-gray-400">Load previously saved JSON map files</p>
+                            </div>
+                          </div>
+                          <div className="flex items-start gap-3">
+                            <Settings className="w-4 h-4 mt-1 text-orange-500" />
+                            <div>
+                              <h5 className="font-medium text-gray-800 dark:text-gray-100">Map Settings</h5>
+                              <p className="text-sm text-gray-600 dark:text-gray-400">Configure map dimensions, tile size, and other properties</p>
+                            </div>
+                          </div>
+                          <div className="flex items-start gap-3">
+                            <Link2 className="w-4 h-4 mt-1 text-orange-500" />
+                            <div>
+                              <h5 className="font-medium text-gray-800 dark:text-gray-100">Lock/Unlock</h5>
+                              <p className="text-sm text-gray-600 dark:text-gray-400">Prevent accidental edits to completed layers</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </section>
+
+                    <section>
+                      <h4 className="text-xl font-semibold mb-3 flex items-center gap-2 text-gray-800 dark:text-gray-100">
+                        <Paintbrush2 className="w-5 h-5 text-orange-500" />
+                        Drawing Tools
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div className="flex items-start gap-3">
+                          <Paintbrush2 className="w-4 h-4 mt-1 text-orange-500" />
+                          <div>
+                            <h5 className="font-medium text-gray-800 dark:text-gray-100">Brush Tool</h5>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">Paint individual tiles by clicking</p>
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-3">
+                          <PaintBucket className="w-4 h-4 mt-1 text-orange-500" />
+                          <div>
+                            <h5 className="font-medium text-gray-800 dark:text-gray-100">Bucket Fill</h5>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">Fill connected areas with the same tile</p>
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-3">
+                          <Eraser className="w-4 h-4 mt-1 text-orange-500" />
+                          <div>
+                            <h5 className="font-medium text-gray-800 dark:text-gray-100">Eraser</h5>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">Remove tiles from the map</p>
+                          </div>
+                        </div>
+                        <div className="flex items-start gap-3">
+                          <Pipette className="w-4 h-4 mt-1 text-orange-500" />
+                          <div>
+                            <h5 className="font-medium text-gray-800 dark:text-gray-100">Eyedropper</h5>
+                            <p className="text-sm text-gray-600 dark:text-gray-400">Select a tile from the map to use as brush</p>
+                          </div>
+                        </div>
+                      </div>
+                    </section>
+
+                    <section>
+                      <h4 className="text-xl font-semibold mb-3 flex items-center gap-2 text-gray-800 dark:text-gray-100">
+                        <Square className="w-5 h-5 text-orange-500" />
+                        Tileset Management
+                      </h4>
+                      <div className="space-y-3">
+                        <p className="text-gray-700 dark:text-gray-400">Each layer can have its own tileset. Import PNG images to use as tilesets.</p>
+                        <div className="space-y-3">
+                          <div className="flex items-start gap-3">
+                            <Upload className="w-4 h-4 mt-1 text-orange-500" />
+                            <div>
+                              <h5 className="font-medium text-gray-800 dark:text-gray-100">Import Tileset</h5>
+                              <p className="text-sm text-gray-600 dark:text-gray-400">Click the upload button for each layer to import a tileset image</p>
+                            </div>
+                          </div>
+                          <div className="flex items-start gap-3">
+                            <X className="w-4 h-4 mt-1 text-orange-500" />
+                            <div>
+                              <h5 className="font-medium text-gray-800 dark:text-gray-100">Remove Tileset</h5>
+                              <p className="text-sm text-gray-600 dark:text-gray-400">Use the red X button to remove a tileset from a layer</p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </section>
+
+                    <section>
+                      <h4 className="text-xl font-semibold mb-3 flex items-center gap-2">
+                        <Target className="w-5 h-5 text-orange-500" />
+                        Keyboard Shortcuts
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-gray-50 dark:bg-neutral-900 p-4 rounded-lg">
+                        <div className="space-y-2">
+                          <div className="flex justify-between">
+                            <span className="font-mono text-sm bg-gray-200 dark:bg-neutral-800 px-2 py-1 rounded">Ctrl+Z</span>
+                            <span className="text-sm text-gray-400">Undo</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="font-mono text-sm bg-gray-200 dark:bg-neutral-800 px-2 py-1 rounded">Ctrl+Y</span>
+                            <span className="text-sm text-gray-400">Redo</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="font-mono text-sm bg-gray-200 dark:bg-neutral-800 px-2 py-1 rounded">Ctrl+S</span>
+                            <span className="text-sm text-gray-400">Save Map</span>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex justify-between">
+                            <span className="font-mono text-sm bg-gray-200 dark:bg-neutral-800 px-2 py-1 rounded">Mouse Wheel</span>
+                            <span className="text-sm text-gray-400">Zoom</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="font-mono text-sm bg-gray-200 dark:bg-neutral-800 px-2 py-1 rounded">Middle Click + Drag</span>
+                            <span className="text-sm text-gray-400">Pan</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="font-mono text-sm bg-gray-200 dark:bg-neutral-800 px-2 py-1 rounded">Hover + Wheel</span>
+                            <span className="text-sm text-gray-400">Layer Transparency</span>
+                          </div>
+                        </div>
+                      </div>
+                    </section>
+
+                    <section>
+                      <h4 className="text-xl font-semibold mb-3 flex items-center gap-2">
+                        <Wand2 className="w-5 h-5 text-orange-500" />
+                        Tips & Best Practices
+                      </h4>
+                      <div className="space-y-2 text-gray-700 dark:text-gray-400">
+                        <ul className="list-disc list-inside space-y-1 ml-4 text-gray-700 dark:text-gray-400">
+                          <li>Use separate layers for different map elements (background, objects, decorations)</li>
+                          <li>Name your layers descriptively for better organization</li>
+                          <li>Lock completed layers to prevent accidental changes</li>
+                          <li>Adjust layer transparency to see underlying elements while editing</li>
+                          <li>Use the eyedropper tool to quickly select tiles from existing map areas</li>
+                          <li>Save frequently to avoid losing work</li>
+                          <li>Test your map export to ensure it looks correct in your target application</li>
+                        </ul>
+                      </div>
+                    </section>
+                  </>
+                )}
+
+                {/* Collisions Tab Content */}
+                {activeHelpTab === 'collisions' && (
+                  <>
+                    <section>
+                      <h4 className="text-xl font-semibold mb-3 flex items-center gap-2 text-gray-800 dark:text-gray-100">
+                        <Shield className="w-5 h-5 text-orange-500" />
+                        Summary of Collision Values for Flare
+                      </h4>
+                      <div className="space-y-4">
+                        <p className="text-gray-700 dark:text-gray-400">
+                          Collision values in Flare Engine determine how entities interact with map tiles. Each value has specific behavior that affects movement and visibility.
+                        </p>
+                        
+                        <div className="overflow-x-auto">
+                          <table className="w-full border-collapse border border-gray-300 dark:border-gray-600">
+                            <thead className="bg-gray-100 dark:bg-gray-800">
+                              <tr>
+                                <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-left font-semibold text-gray-800 dark:text-gray-100">Value</th>
+                                <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-left font-semibold text-gray-800 dark:text-gray-100">Type</th>
+                                <th className="border border-gray-300 dark:border-gray-600 px-4 py-2 text-left font-semibold text-gray-800 dark:text-gray-100">Behavior</th>
+                              </tr>
+                            </thead>
+                            <tbody className="text-gray-700 dark:text-gray-300">
+                              <tr>
+                                <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 font-mono bg-red-50 dark:bg-red-900/20">1</td>
+                                <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 font-medium text-red-600 dark:text-red-400">Red Block</td>
+                                <td className="border border-gray-300 dark:border-gray-600 px-4 py-2">Impassable wall, visible on minimap</td>
+                              </tr>
+                              <tr>
+                                <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 font-mono bg-red-50 dark:bg-red-900/20">2</td>
+                                <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 font-medium text-red-600 dark:text-red-400">Dithered Red</td>
+                                <td className="border border-gray-300 dark:border-gray-600 px-4 py-2">Still blocks entities, minimap shows dithered tile</td>
+                              </tr>
+                              <tr>
+                                <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 font-mono bg-blue-50 dark:bg-blue-900/20">3</td>
+                                <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 font-medium text-blue-600 dark:text-blue-400">Pit (Blue)</td>
+                                <td className="border border-gray-300 dark:border-gray-600 px-4 py-2">Ground entities blocked; air can pass</td>
+                              </tr>
+                              <tr>
+                                <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 font-mono bg-blue-50 dark:bg-blue-900/20">4</td>
+                                <td className="border border-gray-300 dark:border-gray-600 px-4 py-2 font-medium text-blue-600 dark:text-blue-400">Dithered Pit</td>
+                                <td className="border border-gray-300 dark:border-gray-600 px-4 py-2">Same as 3, but minimap shows dithered</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+
+                        <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+                          <h5 className="font-medium text-blue-800 dark:text-blue-200 mb-2 flex items-center gap-2">
+                            <Shield className="w-4 h-4" />
+                            Usage Guidelines
+                          </h5>
+                          <ul className="text-blue-700 dark:text-blue-300 text-sm space-y-1 list-disc list-inside">
+                            <li><strong>Value 1 (Red Block):</strong> Use for walls, buildings, and solid obstacles that should be clearly visible on the minimap</li>
+                            <li><strong>Value 2 (Dithered Red):</strong> Use for partial barriers or decorative walls that still block movement</li>
+                            <li><strong>Value 3 (Pit):</strong> Use for water, lava, or ground hazards that flying entities can cross</li>
+                            <li><strong>Value 4 (Dithered Pit):</strong> Use for shallow water or transitional pit areas</li>
+                          </ul>
+                        </div>
+
+                        <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-lg border border-amber-200 dark:border-amber-800">
+                          <h5 className="font-medium text-amber-800 dark:text-amber-200 mb-2">⚠️ Important Notes</h5>
+                          <ul className="text-amber-700 dark:text-amber-300 text-sm space-y-1 list-disc list-inside">
+                            <li>Collision values are set in the <strong>Collision Layer</strong> of your map</li>
+                            <li>Each tile position can only have one collision value</li>
+                            <li>Collision affects AI pathfinding and player movement</li>
+                            <li>Minimap visualization helps players understand map layout</li>
+                          </ul>
+                        </div>
+                      </div>
+                    </section>
+                  </>
+                )}
+
+                <div className="pt-4 border-t border-gray-200 text-center">
+                  <p className="text-sm text-gray-600 dark:text-gray-400">
+                    Flare Studio | GUI for Flare Engine by ism.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Center Area */}
+        <section className="flex-1 min-w-0 flex flex-col relative">
+          {/* Zoom Controls & Undo/Redo */}
+          <div
+            ref={toolbarContainerRef}
+            className="absolute top-2 right-2 z-10"
+            onMouseEnter={handleToolbarMouseEnter}
+            onMouseLeave={handleToolbarMouseLeave}
+            onFocus={handleToolbarFocus}
+            onBlur={handleToolbarBlur}
+            tabIndex={toolbarExpanded ? -1 : 0}
+            aria-label="Map controls"
+          >
+            <div
+              className={`flex items-center bg-white/90 dark:bg-neutral-900/90 border border-border rounded-full shadow-lg transition-all duration-300 ease-in-out ${toolbarExpanded ? 'px-2 py-1' : 'px-1 py-1'}`}
+            >
+              <div
+                className={`flex items-center gap-1 overflow-hidden transition-all duration-300 ease-out ${toolbarExpanded ? 'opacity-100 scale-100 max-w-[420px]' : 'opacity-0 scale-95 max-w-0 pointer-events-none'}`}
+              >
+                <Tooltip content="Undo (Ctrl+Z)" side="bottom">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-8 h-8 p-0 rounded-full"
+                    onClick={handleUndo}
+                  >
+                    <Undo2 className="w-4 h-4" />
+                  </Button>
+                </Tooltip>
+                <Tooltip content="Redo (Ctrl+Y)" side="bottom">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-8 h-8 p-0 rounded-full"
+                    onClick={handleRedo}
+                  >
+                    <Redo2 className="w-4 h-4" />
+                  </Button>
+                </Tooltip>
+                <Tooltip content="Zoom In" side="bottom">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-8 h-8 p-0 rounded-full"
+                    onClick={handleZoomIn}
+                  >
+                    <ZoomIn className="w-4 h-4" />
+                  </Button>
+                </Tooltip>
+                <Tooltip content="Zoom Out" side="bottom">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-8 h-8 p-0 rounded-full"
+                    onClick={handleZoomOut}
+                  >
+                    <ZoomOut className="w-4 h-4" />
+                  </Button>
+                </Tooltip>
+                <Tooltip content="Reset View" side="bottom">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-8 h-8 p-0 rounded-full"
+                    onClick={handleResetZoom}
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                  </Button>
+                </Tooltip>
+                <Tooltip content="Toggle Minimap" side="bottom">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="w-8 h-8 p-0 rounded-full"
+                    onClick={handleToggleMinimap}
+                  >
+                    <Map className="w-4 h-4" />
+                  </Button>
+                </Tooltip>
+              </div>
+              <div
+                className={`flex items-center justify-center w-8 h-8 transition-all duration-300 ease-out ${toolbarExpanded ? 'opacity-50 scale-90' : 'opacity-100 scale-100'}`}
+                aria-hidden
+              >
+                <Scan className="w-4 h-4 text-muted-foreground" />
+              </div>
+            </div>
+          </div>
+          <div className="bg-gray-100 flex-1 min-h-0 flex items-center justify-center overflow-hidden relative">
+            {/* Canvas Tooltip Panel - always mounted; visibility via classes */}
+            <div
+              className={`absolute top-4 left-4 z-20 p-3 bg-white/90 dark:bg-neutral-900/90 backdrop-blur-sm rounded-lg border border-border shadow-lg transition-opacity duration-300 ${showTooltip ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+              aria-hidden={!showTooltip}
+            >
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute top-1 right-1 w-6 h-6 p-0"
+                onClick={() => setShowTooltip(false)}
+              >
+                <X className="w-3 h-3" />
+              </Button>
+
+              <div className="space-y-2 pr-6">
+                <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
+                  <MousePointer2 className="w-4 h-4" />
+                  <span>Left Click to Paint</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
+                  <Mouse className="w-4 h-4" />
+                  <span>Right Click to Delete</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
+                  <Move className="w-4 h-4" />
+                  <span>Spacebar + Mouse to Pan</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
+                  <div className="relative">
+                    <Mouse className="w-4 h-4" />
+                    <Circle className="w-2 h-2 absolute top-1 left-1.5 opacity-60" />
+                  </div>
+                  <span>Mouse Wheel to Zoom In-Out</span>
+                </div>
+              </div>
+            </div>
+
+            <canvas
+              ref={canvasRef}
+              id="mapCanvas"
+              className={`tile-canvas w-full h-full max-w-full max-h-full canvas-fade ${leftTransitioning ? 'during-sidebar-transition' : ''}`}
+            />
+
+            {/* Map initialization overlay - always mounted for smooth transitions */}
+            <div
+              className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${!mapInitialized ? 'opacity-100 pointer-events-auto bg-background/80 backdrop-blur-sm' : 'opacity-0 pointer-events-none'}`}
+              aria-hidden={mapInitialized}
+            >
+              <div className={`flex items-center gap-3 px-4 py-2 rounded-full border-2 border-orange-500/80 bg-background/95 shadow-lg backdrop-blur-sm transition-opacity duration-200 ${!mapInitialized ? 'opacity-100' : 'opacity-0'}`}>
+                <span className="text-sm font-medium text-muted-foreground">Create a map</span>
+                <Button
+                  size="sm"
+                  variant="default"
+                  className="w-9 h-9 p-0 rounded-full bg-orange-500 text-white shadow-sm transition-all duration-150 hover:bg-orange-600 hover:shadow-md hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
+                  onClick={handleOpenCreateMapDialog}
+                  disabled={isPreparingNewMap}
+                >
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Hover Coordinates Display - always mounted to allow transitions */}
+            <div
+              className={`absolute bottom-4 left-4 z-10 p-2 rounded-md text-xs font-mono flex items-center gap-2 transition-opacity duration-200 ${hoverCoords ? 'opacity-100 pointer-events-auto bg-white/90 dark:bg-neutral-900/90 border border-gray-200 dark:border-neutral-600 text-gray-800 dark:text-white shadow-sm' : 'opacity-0 pointer-events-none'}`}
+              aria-hidden={!hoverCoords}
+            >
+              <MapPin className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+              <span>{hoverCoords ? `${hoverCoords.x}, ${hoverCoords.y}` : ''}</span>
+              {/* Active GID Indicator - keep mounted but toggle visibility */}
+              <div className={`ml-2 transition-opacity duration-200 ${hoverCoords && showActiveGid ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+                <Tooltip content="Active GID number of selected tilebrush">
+                  <Badge variant="secondary" className="text-xs px-2 py-1 bg-black/80 text-white border-gray-600 hover:bg-black/90">
+                    <span id="activeGid">{activeGid}</span>
+                  </Badge>
+                </Tooltip>
+              </div>
+            </div>
+
+            {/* Selection Info Display - keep mounted to avoid reflows */}
+            <div className={`absolute bottom-4 left-32 z-10 p-2 rounded-md text-xs flex items-center gap-3 transition-opacity duration-200 ${hasSelection ? 'opacity-100 pointer-events-auto bg-orange-600/90 border border-orange-500 text-white' : 'opacity-0 pointer-events-none'}`}>
+              <div className="flex items-center gap-2 font-mono">
+                <Square className="w-4 h-4 text-orange-200" />
+                <span>{hasSelection ? `${selectionCount} tiles selected` : ''}</span>
+              </div>
+              <div className={`flex items-center gap-1 ${hasSelection ? '' : 'pointer-events-none'}`}>
+                <Tooltip content="Fill selection with active tile">
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    className="h-6 px-2 text-xs text-white hover:bg-orange-500/50"
+                    onClick={handleFillSelection}
+                  >
+                    Fill
+                  </Button>
+                </Tooltip>
+                <Tooltip content="Delete selected tiles (DEL)">
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    className="h-6 px-2 text-xs text-white hover:bg-orange-500/50"
+                    onClick={handleDeleteSelection}
+                  >
+                    Delete
+                  </Button>
+                </Tooltip>
+                <Tooltip content="Clear selection (ESC)">
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    className="h-6 px-2 text-xs text-white hover:bg-orange-500/50"
+                    onClick={handleClearSelection}
+                  >
+                    Clear
+                  </Button>
+                </Tooltip>
+              </div>
+            </div>
+            {/* Floating Toolbar (inside canvas, centered, pill-sized) */}
+            <div
+              ref={setBottomToolbarNode}
+              className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-30"
+              onMouseEnter={handleBottomToolbarMouseEnter}
+              onMouseLeave={handleBottomToolbarMouseLeave}
+              onFocus={handleBottomToolbarFocus}
+              onBlur={handleBottomToolbarBlur}
+              tabIndex={bottomToolbarExpanded ? -1 : 0}
+              aria-label="Tool selection"
+            >
+              <div
+                className={`flex items-center bg-white/90 dark:bg-neutral-900/90 border border-border rounded-full shadow-md transition-all duration-300 ease-in-out ${bottomToolbarExpanded ? 'gap-1 px-2 py-1' : 'gap-0 px-1 py-1'}`}
+              >
+                {/* Brush Tool */}
+                <div
+                  className={`relative flex-shrink-0 transition-all duration-300 ease-out ${bottomToolbarExpanded || selectedTool === 'brush' ? 'opacity-100 scale-100 max-w-[3rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
+                >
+                  <Button
+                        variant={selectedTool === 'brush' ? 'default' : 'ghost'}
+                        size="sm"
+                        className="w-7 h-7 p-1 rounded-full tool-button"
+                        onClick={() => handleSelectTool('brush')}
+                        onMouseEnter={(e) => {
+                          handleShowBrushOptions();
+                          showTooltipWithDelay('Brush Tool', e.currentTarget);
+                        }}
+                        onMouseLeave={() => {
+                          handleHideBrushOptions();
+                          hideTooltip();
+                        }}
+                      >
+                        {getBrushIcon()}
+                      </Button>
+
+                  {showBrushOptions && (
+                    <div
+                      className="absolute bottom-full left-0 mb-1 bg-white dark:bg-neutral-900 border border-border rounded shadow-lg p-1 flex gap-1 min-w-max z-50"
+                      onMouseEnter={handleShowBrushOptions}
+                      onMouseLeave={handleHideBrushOptions}
+                    >
+                      <Button
+                        variant={selectedBrushTool === 'brush' ? 'default' : 'ghost'}
+                        size="sm"
+                        className="w-6 h-6 p-1 rounded-full sub-tool-button"
+                        onClick={() => setSelectedBrushTool('brush')}
+                        onMouseEnter={(e) => showTooltipWithDelay('Brush Tool', e.currentTarget)}
+                        onMouseLeave={hideTooltip}
+                      >
+                        <Paintbrush2 className="w-3 h-3" />
+                      </Button>
+                      <Button
+                        variant={selectedBrushTool === 'bucket' ? 'default' : 'ghost'}
+                        size="sm"
+                        className="w-6 h-6 p-1 rounded-full sub-tool-button"
+                        onClick={() => setSelectedBrushTool('bucket')}
+                        onMouseEnter={(e) => showTooltipWithDelay('Bucket Fill', e.currentTarget)}
+                        onMouseLeave={hideTooltip}
+                      >
+                        <PaintBucket className="w-3 h-3" />
+                      </Button>
+                      <Button
+                        variant={selectedBrushTool === 'eraser' ? 'default' : 'ghost'}
+                        size="sm"
+                        className="w-6 h-6 p-1 rounded-full sub-tool-button"
+                        onClick={() => setSelectedBrushTool('eraser')}
+                        onMouseEnter={(e) => showTooltipWithDelay('Eraser', e.currentTarget)}
+                        onMouseLeave={hideTooltip}
+                      >
+                        <Eraser className="w-3 h-3" />
+                      </Button>
+                      <Button
+                        variant={selectedBrushTool === 'clear' ? 'default' : 'ghost'}
+                        size="sm"
+                        className="w-6 h-6 p-1 rounded-full sub-tool-button border-red-500 hover:border-red-600 hover:bg-red-50"
+                        onClick={() => setShowClearLayerDialog(true)}
+                        onMouseEnter={(e) => showTooltipWithDelay('Clear Layer', e.currentTarget)}
+                        onMouseLeave={hideTooltip}
+                      >
+                        <X className="w-3 h-3 text-red-500" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Selection Tool */}
+                <div
+                  className={`relative flex-shrink-0 transition-all duration-300 ease-out ${bottomToolbarExpanded || selectedTool === 'selection' ? 'opacity-100 scale-100 max-w-[3rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
+                >
+                  <Button
+                      variant={selectedTool === 'selection' ? 'default' : 'ghost'}
+                      size="sm"
+                      className="w-7 h-7 p-1 rounded-full tool-button"
+                      onClick={() => handleSelectTool('selection')}
+                      onMouseEnter={(e) => {
+                        handleShowSelectionOptions();
+                        showTooltipWithDelay('Selection Tool', e.currentTarget);
+                      }}
+                      onMouseLeave={() => {
+                        handleHideSelectionOptions();
+                        hideTooltip();
+                      }}
+                    >
+                      {getSelectionIcon()}
+                    </Button>
+
+                  {showSelectionOptions && (
+                    <div
+                      className="absolute bottom-full left-0 mb-1 bg-white dark:bg-neutral-900 border border-border rounded shadow-lg p-1 flex gap-1 min-w-max z-50"
+                      onMouseEnter={handleShowSelectionOptions}
+                      onMouseLeave={handleHideSelectionOptions}
+                    >
+                      <Button
+                        variant={selectedSelectionTool === 'rectangular' ? 'default' : 'ghost'}
+                        size="sm"
+                        className="w-6 h-6 p-1 rounded-full sub-tool-button"
+                        onClick={() => setSelectedSelectionTool('rectangular')}
+                        onMouseEnter={(e) => showTooltipWithDelay('Rectangular Selection', e.currentTarget)}
+                        onMouseLeave={hideTooltip}
+                      >
+                        <Square className="w-3 h-3" />
+                      </Button>
+                      <Button
+                        variant={selectedSelectionTool === 'magic-wand' ? 'default' : 'ghost'}
+                        size="sm"
+                        className="w-6 h-6 p-1 rounded-full sub-tool-button"
+                        onClick={() => setSelectedSelectionTool('magic-wand')}
+                        onMouseEnter={(e) => showTooltipWithDelay('Magic Wand', e.currentTarget)}
+                        onMouseLeave={hideTooltip}
+                      >
+                        <Wand2 className="w-3 h-3" />
+                      </Button>
+                      <Button
+                        variant={selectedSelectionTool === 'same-tile' ? 'default' : 'ghost'}
+                        size="sm"
+                        className="w-6 h-6 p-1 rounded-full sub-tool-button"
+                        onClick={() => setSelectedSelectionTool('same-tile')}
+                        onMouseEnter={(e) => showTooltipWithDelay('Select Same Tile', e.currentTarget)}
+                        onMouseLeave={hideTooltip}
+                      >
+                        <Target className="w-3 h-3" />
+                      </Button>
+                      <Button
+                        variant={selectedSelectionTool === 'circular' ? 'default' : 'ghost'}
+                        size="sm"
+                        className="w-6 h-6 p-1 rounded-full sub-tool-button"
+                        onClick={() => setSelectedSelectionTool('circular')}
+                        onMouseEnter={(e) => showTooltipWithDelay('Circular Select', e.currentTarget)}
+                        onMouseLeave={hideTooltip}
+                      >
+                        <Circle className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Shape Tool */}
+                <div
+                  className={`relative flex-shrink-0 transition-all duration-300 ease-out ${bottomToolbarExpanded || selectedTool === 'shape' ? 'opacity-100 scale-100 max-w-[3rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
+                >
+                  <Button
+                      variant={selectedTool === 'shape' ? 'default' : 'ghost'}
+                      size="sm"
+                      className="w-7 h-7 p-1 rounded-full tool-button"
+                      onClick={() => handleSelectTool('shape')}
+                      onMouseEnter={(e) => { handleShowShapeOptions(); showTooltipWithDelay('Shape Tool', e.currentTarget); }}
+                      onMouseLeave={() => { handleHideShapeOptions(); hideTooltip(); }}
+                    >
+                      {getShapeIcon()}
+                    </Button>
+
+                  {showShapeOptions && (
+                    <div
+                      className="absolute bottom-full left-0 mb-1 bg-white dark:bg-neutral-900 border border-border rounded shadow-lg p-1 flex gap-1 min-w-max z-50"
+                      onMouseEnter={handleShowShapeOptions}
+                      onMouseLeave={handleHideShapeOptions}
+                    >
+                      <Tooltip content="Rectangle Shape">
+                        <Button
+                          variant={selectedShapeTool === 'rectangle' ? 'default' : 'ghost'}
+                          size="sm"
+                          className="w-6 h-6 p-1 rounded-full sub-tool-button"
+                          onClick={() => setSelectedShapeTool('rectangle')}
+                        >
+                          <Square className="w-3 h-3" />
+                        </Button>
+                      </Tooltip>
+                      <Tooltip content="Circle Shape">
+                        <Button
+                          variant={selectedShapeTool === 'circle' ? 'default' : 'ghost'}
+                          size="sm"
+                          className="w-6 h-6 p-1 rounded-full sub-tool-button"
+                          onClick={() => setSelectedShapeTool('circle')}
+                        >
+                          <Circle className="w-3 h-3" />
+                        </Button>
+                      </Tooltip>
+                      <Tooltip content="Line Shape">
+                        <Button
+                          variant={selectedShapeTool === 'line' ? 'default' : 'ghost'}
+                          size="sm"
+                          className="w-6 h-6 p-1 rounded-full sub-tool-button"
+                          onClick={() => setSelectedShapeTool('line')}
+                        >
+                          <Pen className="w-3 h-3" />
+                        </Button>
+                      </Tooltip>
+                    </div>
+                  )}
+                </div>
+
+                {/* Stamp Tool */}
+                <div
+                  className={`relative flex-shrink-0 transition-all duration-300 ease-out ${bottomToolbarExpanded || selectedTool === 'stamp' ? 'opacity-100 scale-100 max-w-[3rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
+                >
+                  <Button
+                      variant={selectedTool === 'stamp' ? 'default' : 'ghost'}
+                      size="sm"
+                      className="w-7 h-7 p-1 rounded-full tool-button"
+                      onClick={() => handleSelectTool('stamp')}
+                      onMouseEnter={(e) => showTooltipWithDelay('Stamp Tool - Group tiles into a stamp and place them together', e.currentTarget)}
+                      onMouseLeave={hideTooltip}
+                    >
+                      <Stamp className="w-3 h-3" />
+                    </Button>
+
+                  {selectedTool === 'stamp' && (
+                    <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-2 min-w-[200px] z-10">
+                      <div className="flex flex-col gap-2">
+                        {/* Stamp Mode Controls */}
+                        <div className="flex gap-1">
+                          <Tooltip content="Select and place existing stamps">
+                            <Button
+                              variant={stampMode === 'select' ? 'default' : 'ghost'}
+                              size="sm"
+                              className="flex-1 text-xs"
+                              onClick={() => setStampMode('select')}
+                            >
+                              Select
+                            </Button>
+                          </Tooltip>
+                          <Tooltip content="Create stamp from selection">
+                            <Button
+                              variant={stampMode === 'create' ? 'default' : 'ghost'}
+                              size="sm"
+                              className="flex-1 text-xs"
+                              onClick={() => setStampMode('create')}
+                            >
+                              Create
+                            </Button>
+                          </Tooltip>
+                        </div>
+
+                        {/* Create Stamp Section */}
+                        {stampMode === 'create' && (
+                          <div className="border-t pt-2">
+                            <div className="text-xs font-medium mb-1">Create New Stamp</div>
+                            <div className="flex gap-1">
+                              <input
+                                type="text"
+                                placeholder="Stamp name"
+                                value={newStampName}
+                                onChange={(e) => setNewStampName(e.target.value)}
+                                className="flex-1 text-xs px-2 py-1 border rounded"
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    handleCreateStamp();
+                                  }
+                                }}
+                              />
+                              <Button
+                                size="sm"
+                                className="text-xs"
+                                onClick={handleCreateStamp}
+                                disabled={!newStampName.trim()}
+                              >
+                                Create
+                              </Button>
+                            </div>
+                            <div className="text-xs text-gray-500 mt-1">First select tiles, then create stamp</div>
+                          </div>
+                        )}
+
+                        {/* Stamps List */}
+                        {stampMode === 'select' && (
+                          <div className="border-t pt-2 max-h-32 overflow-y-auto">
+                            <div className="text-xs font-medium mb-1">Available Stamps</div>
+                            {stamps.length === 0 ? (
+                              <div className="text-xs text-gray-500">No stamps created yet</div>
+                            ) : (
+                              <div className="flex flex-col gap-1">
+                                {stamps.map((stamp) => (
+                                  <div key={stamp.id} className="flex items-center gap-1">
+                                    <Tooltip content={`${stamp.name} (${stamp.width}x${stamp.height})`}>
+                                      <Button
+                                        variant={selectedStamp === stamp.id ? 'default' : 'ghost'}
+                                        size="sm"
+                                        className="flex-1 text-xs justify-start"
+                                        onClick={() => handleStampSelect(stamp.id)}
+                                      >
+                                        {stamp.name}
+                                      </Button>
+                                    </Tooltip>
+                                    <Tooltip content="Delete stamp">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="w-6 h-6 p-0 text-red-500"
+                                        onClick={() => handleDeleteStamp(stamp.id)}
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </Button>
+                                    </Tooltip>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Eyedropper Tool */}
+                <div
+                  className={`flex-shrink-0 transition-all duration-300 ease-out ${bottomToolbarExpanded || selectedTool === 'eyedropper' ? 'opacity-100 scale-100 max-w-[3rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
+                >
+                  <Button
+                    variant={selectedTool === 'eyedropper' ? 'default' : 'ghost'}
+                    size="sm"
+                    className="w-7 h-7 p-1 rounded-full tool-button"
+                    onClick={() => handleSelectTool('eyedropper')}
+                    onMouseEnter={(e) => showTooltipWithDelay('Eyedropper Tool - Pick a tile from the map to reuse', e.currentTarget)}
+                    onMouseLeave={hideTooltip}
+                  >
+                    <Pipette className="w-3 h-3" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+      
+      <Toaster />
+      
+      {/* Separate Brush Confirmation Dialog */}
+      <Dialog open={showSeparateDialog} onOpenChange={setShowSeparateDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Separate Brush</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to separate this brush?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSeparateDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={confirmSeparateBrush}>
+              Separate
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* NPC / Enemy Creation Dialog */}
+      <Dialog open={actorDialogState !== null} onOpenChange={(open) => (open ? void 0 : handleCloseActorDialog())}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {actorDialogState?.type === 'npc' ? 'Add NPC' : 'Add Enemy'}
+            </DialogTitle>
+            <DialogDescription>
+              Define the placement details for this {actorDialogState?.type === 'npc' ? 'NPC' : 'enemy'}.
+            </DialogDescription>
+          </DialogHeader>
+          {actorDialogState && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Name</label>
+                  <Input
+                    value={actorDialogState.name}
+                    onChange={(event) => handleActorFieldChange('name', event.target.value)}
+                    placeholder={actorDialogState.type === 'npc' ? 'Village Elder' : 'Goblin Scout'}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">X Position</label>
+                  <Input
+                    type="number"
+                    value={actorDialogState.x}
+                    onChange={(event) => handleActorFieldChange('x', event.target.value)}
+                    min={0}
+                    max={editor?.getMapWidth() ?? undefined}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Y Position</label>
+                  <Input
+                    type="number"
+                    value={actorDialogState.y}
+                    onChange={(event) => handleActorFieldChange('y', event.target.value)}
+                    min={0}
+                    max={editor?.getMapHeight() ?? undefined}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Tileset Location</label>
+                <div className="flex gap-2">
+                  <Input
+                    className="flex-1"
+                    value={actorDialogState.tilesetPath}
+                    onChange={(event) => handleActorFieldChange('tilesetPath', event.target.value)}
+                    placeholder="Desktop/mytilesets/npcs/mynpc.png"
+                    readOnly={canUseTilesetDialog}
+                    onClick={canUseTilesetDialog ? () => { void handleActorTilesetBrowse(); } : undefined}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => { void handleActorTilesetBrowse(); }}
+                    disabled={!canUseTilesetDialog}
+                  >
+                    Browse
+                  </Button>
+                </div>
+              </div>
+              {actorDialogError && (
+                <div className="text-sm text-red-500">
+                  {actorDialogError}
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={handleCloseActorDialog}>
+              Cancel
+            </Button>
+            <Button onClick={handleActorSubmit}>
+              {actorDialogState?.type === 'npc' ? 'Add NPC' : 'Add Enemy'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Object Management Dialog */}
+      <Dialog
+        open={showObjectDialog}
+        onOpenChange={(open) => {
+          if (!open) {
+            handleObjectDialogClose();
+          } else {
+            setShowObjectDialog(true);
+          }
+        }}
+      >
+        <DialogContent className="max-w-5xl w-full h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>
+              {editingObject ? `Edit ${editingObject.type}` : 'Add Object'}
+            </DialogTitle>
+            <DialogDescription>
+              Configure {editingObject?.type || 'object'} properties for Flare engine compatibility.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {objectValidationErrors.length > 0 && (
+            <div className="mb-3 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+              <p className="font-semibold mb-1">Please fix the following:</p>
+              <ul className="ml-4 list-disc space-y-1">
+                {objectValidationErrors.map((error, index) => (
+                  <li key={`${error}-${index}`}>{error}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          <div className="flex-1 overflow-y-auto pr-2 minimal-scroll">
+            {editingObject && (
+            <div className="space-y-4 pb-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Name</label>
+                  <Input
+                    value={editingObject.name || ''}
+                    onChange={(e) => setEditingObject({...editingObject, name: e.target.value})}
+                    placeholder="Object name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Category</label>
+                  <Input
+                    value={editingObject.category || ''}
+                    onChange={(e) => setEditingObject({...editingObject, category: e.target.value})}
+                    placeholder={editingObject.type === 'enemy' ? 'creature' : 'block'}
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">X Position</label>
+                  <Input
+                    type="number"
+                    value={editingObject.x}
+                    onChange={(e) => setEditingObject({...editingObject, x: Number(e.target.value)})}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Y Position</label>
+                  <Input
+                    type="number"
+                    value={editingObject.y}
+                    onChange={(e) => setEditingObject({...editingObject, y: Number(e.target.value)})}
+                  />
+                </div>
+              </div>
+
+              {(editingObject.type === 'npc' || editingObject.type === 'enemy') && (
+                <div>
+                  <label className="block text-sm font-medium mb-1">Tileset Location</label>
+                  <div className="flex gap-2">
+                    <Input
+                      className="flex-1"
+                      value={getEditingObjectProperty('tilesetPath', '')}
+                      onChange={(e) => updateEditingObjectProperty('tilesetPath', e.target.value)}
+                      placeholder="Desktop/mytilesets/npcs/mynpc.png"
+                      readOnly={canUseTilesetDialog}
+                      onClick={canUseTilesetDialog ? () => { void handleEditingTilesetBrowse(); } : undefined}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => { void handleEditingTilesetBrowse(); }}
+                      disabled={!canUseTilesetDialog}
+                    >
+                      Browse
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {editingObject.type === 'enemy' && (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Level</label>
+                      <Input
+                        type="number"
+                        value={editingObject.level || 1}
+                        onChange={(e) => setEditingObject({...editingObject, level: Number(e.target.value)})}
+                        min="1"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Number</label>
+                      <Input
+                        type="number"
+                        value={editingObject.number || 1}
+                        onChange={(e) => setEditingObject({...editingObject, number: Number(e.target.value)})}
+                        min="1"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Wander Radius</label>
+                    <Input
+                      type="number"
+                      value={editingObject.wander_radius || 4}
+                      onChange={(e) => setEditingObject({...editingObject, wander_radius: Number(e.target.value)})}
+                      min="0"
+                    />
+                  </div>
+
+                  <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
+                    <div>
+                      <h4 className="text-sm font-semibold">Enemy Specifications</h4>
+                      <p className="text-xs text-muted-foreground">Configure Flare StatBlock-compatible values.</p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">XP</label>
+                        <Input
+                          type="number"
+                          value={getEditingObjectProperty('xp', '')}
+                          onChange={(e) => updateEditingObjectProperty('xp', e.target.value)}
+                          min="0"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">XP Scaling Table</label>
+                        <Input
+                          value={getEditingObjectProperty('xp_scaling', '')}
+                          onChange={(e) => updateEditingObjectProperty('xp_scaling', e.target.value)}
+                          placeholder="tables/xp_scaling.txt"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Defeat Status</label>
+                        <Input
+                          value={getEditingObjectProperty('defeat_status', '')}
+                          onChange={(e) => updateEditingObjectProperty('defeat_status', e.target.value)}
+                          placeholder="campaign_status_id"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Convert Status</label>
+                        <Input
+                          value={getEditingObjectProperty('convert_status', '')}
+                          onChange={(e) => updateEditingObjectProperty('convert_status', e.target.value)}
+                          placeholder="campaign_status_id"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">First Defeat Loot</label>
+                        <Input
+                          value={getEditingObjectProperty('first_defeat_loot', '')}
+                          onChange={(e) => updateEditingObjectProperty('first_defeat_loot', e.target.value)}
+                          placeholder="items/id.txt"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Animations Definition</label>
+                        <Input
+                          value={getEditingObjectProperty('animations', '')}
+                          onChange={(e) => updateEditingObjectProperty('animations', e.target.value)}
+                          placeholder="animations/enemies/foo.txt"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Loot Entries (one per line)</label>
+                      <textarea
+                        className="w-full min-h-[80px] text-sm rounded-md border border-border bg-background px-2 py-1"
+                        value={getEditingObjectProperty('loot', '')}
+                        onChange={(e) => updateEditingObjectProperty('loot', e.target.value)}
+                        placeholder="item_id, chance"
+                      />
+                    </div>
+
+                    {(() => {
+                      const lootCountRaw = getEditingObjectProperty('loot_count', '');
+                      const [lootCountMin = '', lootCountMax = ''] = lootCountRaw.split(',').map((part) => part.trim());
+                      return (
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium mb-1">Loot Count Min</label>
+                            <Input
+                              type="number"
+                              value={lootCountMin}
+                              min="0"
+                              onChange={(e) => {
+                                const newMin = e.target.value;
+                                if (!newMin) {
+                                  updateEditingObjectProperty('loot_count', '');
+                                } else {
+                                  updateEditingObjectProperty('loot_count', lootCountMax ? `${newMin},${lootCountMax}` : newMin);
+                                }
+                              }}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium mb-1">Loot Count Max</label>
+                            <Input
+                              type="number"
+                              value={lootCountMax}
+                              min="0"
+                              onChange={(e) => {
+                                const newMax = e.target.value;
+                                if (!lootCountMin) {
+                                  updateEditingObjectProperty('loot_count', '');
+                                } else {
+                                  updateEditingObjectProperty('loot_count', newMax ? `${lootCountMin},${newMax}` : lootCountMin);
+                                }
+                              }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Threat Range (engage, stop)</label>
+                        {(() => {
+                          const raw = getEditingObjectProperty('threat_range', '');
+                          const [engage = '', stop = ''] = raw.split(',').map((part) => part.trim());
+                          return (
+                            <div className="grid grid-cols-2 gap-2">
+                              <Input
+                                type="number"
+                                value={engage}
+                                onChange={(e) => {
+                                  const newEngage = e.target.value;
+                                  if (!newEngage) {
+                                    updateEditingObjectProperty('threat_range', stop ? `0,${stop}` : '');
+                                  } else {
+                                    updateEditingObjectProperty('threat_range', stop ? `${newEngage},${stop}` : newEngage);
+                                  }
+                                }}
+                              />
+                              <Input
+                                type="number"
+                                value={stop}
+                                onChange={(e) => {
+                                  const newStop = e.target.value;
+                                  if (!engage) {
+                                    updateEditingObjectProperty('threat_range', '');
+                                  } else {
+                                    updateEditingObjectProperty('threat_range', newStop ? `${engage},${newStop}` : engage);
+                                  }
+                                }}
+                              />
+                            </div>
+                          );
+                        })()}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Flee Range</label>
+                        <Input
+                          type="number"
+                          value={getEditingObjectProperty('flee_range', '')}
+                          onChange={(e) => updateEditingObjectProperty('flee_range', e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Chance Pursue (%)</label>
+                        <Input
+                          type="number"
+                          value={getEditingObjectProperty('chance_pursue', '')}
+                          onChange={(e) => updateEditingObjectProperty('chance_pursue', e.target.value)}
+                          min="0"
+                          max="100"
+                          step="0.1"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Chance Flee (%)</label>
+                        <Input
+                          type="number"
+                          value={getEditingObjectProperty('chance_flee', '')}
+                          onChange={(e) => updateEditingObjectProperty('chance_flee', e.target.value)}
+                          min="0"
+                          max="100"
+                          step="0.1"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Waypoint Pause</label>
+                        <Input
+                          value={getEditingObjectProperty('waypoint_pause', '')}
+                          onChange={(e) => updateEditingObjectProperty('waypoint_pause', e.target.value)}
+                          placeholder="250ms"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Turn Delay</label>
+                        <Input
+                          value={getEditingObjectProperty('turn_delay', '')}
+                          onChange={(e) => updateEditingObjectProperty('turn_delay', e.target.value)}
+                          placeholder="100ms"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Combat Style</label>
+                      <select
+                        className="w-full rounded-md border border-border bg-background px-2 py-1 text-sm"
+                        value={getEditingObjectProperty('combat_style', '')}
+                        onChange={(e) => updateEditingObjectProperty('combat_style', e.target.value)}
+                      >
+                        <option value="">Default</option>
+                        <option value="default">default</option>
+                        <option value="aggressive">aggressive</option>
+                        <option value="passive">passive</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Triggered Powers (state,power,chance per line)</label>
+                      <textarea
+                        className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
+                        value={getEditingObjectProperty('power', '')}
+                        onChange={(e) => updateEditingObjectProperty('power', e.target.value)}
+                        placeholder="melee,power/melee_slash,25"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Passive Powers (one power id per line)</label>
+                      <textarea
+                        className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
+                        value={getEditingObjectProperty('passive_powers', '')}
+                        onChange={(e) => updateEditingObjectProperty('passive_powers', e.target.value)}
+                        placeholder="power_id"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Quest Loot (one per line: status,not_status,item_id)</label>
+                      <textarea
+                        className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
+                        value={getEditingObjectProperty('quest_loot', '')}
+                        onChange={(e) => updateEditingObjectProperty('quest_loot', e.target.value)}
+                        placeholder="status_required,status_block,item_id"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Flee Duration</label>
+                        <Input
+                          value={getEditingObjectProperty('flee_duration', '')}
+                          onChange={(e) => updateEditingObjectProperty('flee_duration', e.target.value)}
+                          placeholder="1.5s"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Flee Cooldown</label>
+                        <Input
+                          value={getEditingObjectProperty('flee_cooldown', '')}
+                          onChange={(e) => updateEditingObjectProperty('flee_cooldown', e.target.value)}
+                          placeholder="5s"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3">
+                      {[
+                        { key: 'humanoid', label: 'Humanoid' },
+                        { key: 'lifeform', label: 'Lifeform' },
+                        { key: 'flying', label: 'Flying' },
+                        { key: 'intangible', label: 'Intangible' },
+                        { key: 'facing', label: 'Facing' },
+                        { key: 'suppress_hp', label: 'Hide HP Bar' }
+                      ].map((field) => (
+                        <label key={field.key} className="flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            className="w-4 h-4"
+                            checked={getEditingObjectProperty(field.key, 'false') === 'true'}
+                            onChange={(e) => updateEditingObjectBoolean(field.key, e.target.checked)}
+                          />
+                          {field.label}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {editingObject.type === 'npc' && (
+                <>
+                  <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
+                    <div>
+                      <h4 className="text-sm font-semibold">Dialog</h4>
+                      <p className="text-xs text-muted-foreground">Configure dialog tree content and metadata.</p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Dialog ID</label>
+                        <Input
+                          value={getEditingObjectProperty('dialog.id', '')}
+                          onChange={(e) => updateEditingObjectProperty('dialog.id', e.target.value)}
+                          placeholder="villager_intro"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Topic</label>
+                        <Input
+                          value={getEditingObjectProperty('dialog.topic', '')}
+                          onChange={(e) => updateEditingObjectProperty('dialog.topic', e.target.value)}
+                          placeholder="Greetings"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Group</label>
+                        <Input
+                          value={getEditingObjectProperty('dialog.group', '')}
+                          onChange={(e) => updateEditingObjectProperty('dialog.group', e.target.value)}
+                          placeholder="main_story"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Voice File(s)</label>
+                        <textarea
+                          className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
+                          value={getEditingObjectProperty('dialog.voice', '')}
+                          onChange={(e) => updateEditingObjectProperty('dialog.voice', e.target.value)}
+                          placeholder="voice/npcs/intro.ogg"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Lines (Him)</label>
+                        <textarea
+                          className="w-full min-h-[80px] text-sm rounded-md border border-border bg-background px-2 py-1"
+                          value={getEditingObjectProperty('dialog.him', '')}
+                          onChange={(e) => updateEditingObjectProperty('dialog.him', e.target.value)}
+                          placeholder="Hello there!"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Lines (Her)</label>
+                        <textarea
+                          className="w-full min-h-[80px] text-sm rounded-md border border-border bg-background px-2 py-1"
+                          value={getEditingObjectProperty('dialog.her', '')}
+                          onChange={(e) => updateEditingObjectProperty('dialog.her', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Lines (You)</label>
+                        <textarea
+                          className="w-full min-h-[80px] text-sm rounded-md border border-border bg-background px-2 py-1"
+                          value={getEditingObjectProperty('dialog.you', '')}
+                          onChange={(e) => updateEditingObjectProperty('dialog.you', e.target.value)}
+                          placeholder="What brings you here?"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Portrait (Him)</label>
+                        <textarea
+                          className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
+                          value={getEditingObjectProperty('dialog.portrait_him', '')}
+                          onChange={(e) => updateEditingObjectProperty('dialog.portrait_him', e.target.value)}
+                          placeholder="portraits/npcs/villager.png"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Portrait (Her)</label>
+                        <textarea
+                          className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
+                          value={getEditingObjectProperty('dialog.portrait_her', '')}
+                          onChange={(e) => updateEditingObjectProperty('dialog.portrait_her', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Portrait (You)</label>
+                        <textarea
+                          className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
+                          value={getEditingObjectProperty('dialog.portrait_you', '')}
+                          onChange={(e) => updateEditingObjectProperty('dialog.portrait_you', e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Response IDs (one per line, must precede dialog text)</label>
+                      <textarea
+                        className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
+                        value={getEditingObjectProperty('dialog.response', '')}
+                        onChange={(e) => updateEditingObjectProperty('dialog.response', e.target.value)}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3">
+                      {[
+                        { key: 'dialog.allow_movement', label: 'Allow Movement', defaultValue: 'false' },
+                        { key: 'dialog.take_a_party', label: 'Take/Release Party', defaultValue: 'false' },
+                        { key: 'dialog.response_only', label: 'Response Only', defaultValue: 'false' }
+                      ].map((field) => (
+                        <label key={field.key} className="flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            className="w-4 h-4"
+                            checked={getEditingObjectProperty(field.key, field.defaultValue || 'false') === 'true'}
+                            onChange={(e) => updateEditingObjectBoolean(field.key, e.target.checked)}
+                          />
+                          {field.label}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
+                    <div>
+                      <h4 className="text-sm font-semibold">NPC Details</h4>
+                      <p className="text-xs text-muted-foreground">Configure appearance, behavior, and requirements.</p>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">NPC Name</label>
+                        <Input
+                          value={getEditingObjectProperty('npc.name', editingObject.name || '')}
+                          onChange={(e) => updateEditingObjectProperty('npc.name', e.target.value)}
+                          placeholder="Villager"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Portrait</label>
+                        <Input
+                          value={getEditingObjectProperty('npc.portrait', '')}
+                          onChange={(e) => updateEditingObjectProperty('npc.portrait', e.target.value)}
+                          placeholder="portraits/npcs/villager.png"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Definition File</label>
+                        <Input
+                          value={getEditingObjectProperty('npc.filename', '')}
+                          onChange={(e) => updateEditingObjectProperty('npc.filename', e.target.value)}
+                          placeholder="npcs/villager.txt"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Direction</label>
+                        <Input
+                          value={getEditingObjectProperty('npc.direction', '')}
+                          onChange={(e) => updateEditingObjectProperty('npc.direction', e.target.value)}
+                          placeholder="south"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Waypoints (x,y per line)</label>
+                        <textarea
+                          className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
+                          value={getEditingObjectProperty('npc.waypoints', '')}
+                          onChange={(e) => updateEditingObjectProperty('npc.waypoints', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Wander Radius</label>
+                        <Input
+                          type="number"
+                          value={getEditingObjectProperty('npc.wander_radius', '')}
+                          onChange={(e) => updateEditingObjectProperty('npc.wander_radius', e.target.value)}
+                          min="0"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-4 gap-3">
+                      {[
+                        { key: 'npc.show_on_minimap', label: 'Show on Minimap', defaultValue: 'true' },
+                        { key: 'npc.talker', label: 'Talkable', defaultValue: 'true' },
+                        { key: 'npc.vendor', label: 'Vendor', defaultValue: 'false' }
+                      ].map((field) => (
+                        <label key={field.key} className="flex items-center gap-2 text-sm">
+                          <input
+                            type="checkbox"
+                            className="w-4 h-4"
+                            checked={getEditingObjectProperty(field.key, field.defaultValue || 'false') === 'true'}
+                            onChange={(e) => updateEditingObjectBoolean(field.key, e.target.checked)}
+                          />
+                          {field.label}
+                        </label>
+                      ))}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Requires Status (one per line)</label>
+                        <textarea
+                          className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
+                          value={getEditingObjectProperty('npc.requires_status', '')}
+                          onChange={(e) => updateEditingObjectProperty('npc.requires_status', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Requires Not Status</label>
+                        <textarea
+                          className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
+                          value={getEditingObjectProperty('npc.requires_not_status', '')}
+                          onChange={(e) => updateEditingObjectProperty('npc.requires_not_status', e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Requires Item (one per line)</label>
+                        <textarea
+                          className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
+                          value={getEditingObjectProperty('npc.requires_item', '')}
+                          onChange={(e) => updateEditingObjectProperty('npc.requires_item', e.target.value)}
+                          placeholder="items/potion:2"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Requires Not Item</label>
+                        <textarea
+                          className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
+                          value={getEditingObjectProperty('npc.requires_not_item', '')}
+                          onChange={(e) => updateEditingObjectProperty('npc.requires_not_item', e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Requires Level ≥</label>
+                        <Input
+                          type="number"
+                          value={getEditingObjectProperty('npc.requires_level', '')}
+                          onChange={(e) => updateEditingObjectProperty('npc.requires_level', e.target.value)}
+                          min="0"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Requires Level &lt;</label>
+                        <Input
+                          type="number"
+                          value={getEditingObjectProperty('npc.requires_not_level', '')}
+                          onChange={(e) => updateEditingObjectProperty('npc.requires_not_level', e.target.value)}
+                          min="0"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Requires Class</label>
+                        <Input
+                          value={getEditingObjectProperty('npc.requires_class', '')}
+                          onChange={(e) => updateEditingObjectProperty('npc.requires_class', e.target.value)}
+                          placeholder="warrior"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Requires Currency ≥</label>
+                        <Input
+                          type="number"
+                          value={getEditingObjectProperty('npc.requires_currency', '')}
+                          onChange={(e) => updateEditingObjectProperty('npc.requires_currency', e.target.value)}
+                          min="0"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Requires Currency &lt;</label>
+                        <Input
+                          type="number"
+                          value={getEditingObjectProperty('npc.requires_not_currency', '')}
+                          onChange={(e) => updateEditingObjectProperty('npc.requires_not_currency', e.target.value)}
+                          min="0"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Requires Not Class</label>
+                        <Input
+                          value={getEditingObjectProperty('npc.requires_not_class', '')}
+                          onChange={(e) => updateEditingObjectProperty('npc.requires_not_class', e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <h5 className="text-sm font-semibold">Vendor Options</h5>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Vendor Requires Status</label>
+                          <textarea
+                            className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
+                            value={getEditingObjectProperty('npc.vendor_requires_status', '')}
+                            onChange={(e) => updateEditingObjectProperty('npc.vendor_requires_status', e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Vendor Requires Not Status</label>
+                          <textarea
+                            className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
+                            value={getEditingObjectProperty('npc.vendor_requires_not_status', '')}
+                            onChange={(e) => updateEditingObjectProperty('npc.vendor_requires_not_status', e.target.value)}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Constant Stock (items per line)</label>
+                          <textarea
+                            className="w-full min-h-[80px] text-sm rounded-md border border-border bg-background px-2 py-1"
+                            value={getEditingObjectProperty('npc.constant_stock', '')}
+                            onChange={(e) => updateEditingObjectProperty('npc.constant_stock', e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Status Stock (status: items)</label>
+                          <textarea
+                            className="w-full min-h-[80px] text-sm rounded-md border border-border bg-background px-2 py-1"
+                            value={getEditingObjectProperty('npc.status_stock', '')}
+                            onChange={(e) => updateEditingObjectProperty('npc.status_stock', e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Random Stock (loot definitions)</label>
+                          <textarea
+                            className="w-full min-h-[80px] text-sm rounded-md border border-border bg-background px-2 py-1"
+                            value={getEditingObjectProperty('npc.random_stock', '')}
+                            onChange={(e) => updateEditingObjectProperty('npc.random_stock', e.target.value)}
+                          />
+                        </div>
+                      </div>
+
+                      {(() => {
+                        const raw = getEditingObjectProperty('npc.random_stock_count', '');
+                        const [minCount = '', maxCount = ''] = raw.split(',').map((part) => part.trim());
+                        return (
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-sm font-medium mb-1">Random Stock Min</label>
+                              <Input
+                                type="number"
+                                value={minCount}
+                                min="0"
+                                onChange={(e) => {
+                                  const newMin = e.target.value;
+                                  if (!newMin) {
+                                    updateEditingObjectProperty('npc.random_stock_count', maxCount ? `0,${maxCount}` : '');
+                                  } else {
+                                    updateEditingObjectProperty('npc.random_stock_count', maxCount ? `${newMin},${maxCount}` : newMin);
+                                  }
+                                }}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium mb-1">Random Stock Max</label>
+                              <Input
+                                type="number"
+                                value={maxCount}
+                                min="0"
+                                onChange={(e) => {
+                                  const newMax = e.target.value;
+                                  if (!minCount) {
+                                    updateEditingObjectProperty('npc.random_stock_count', '');
+                                  } else {
+                                    updateEditingObjectProperty('npc.random_stock_count', newMax ? `${minCount},${newMax}` : minCount);
+                                  }
+                                }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Buy Ratio</label>
+                          <Input
+                            type="number"
+                            value={getEditingObjectProperty('npc.vendor_ratio_buy', '')}
+                            onChange={(e) => updateEditingObjectProperty('npc.vendor_ratio_buy', e.target.value)}
+                            step="0.01"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Sell Ratio</label>
+                          <Input
+                            type="number"
+                            value={getEditingObjectProperty('npc.vendor_ratio_sell', '')}
+                            onChange={(e) => updateEditingObjectProperty('npc.vendor_ratio_sell', e.target.value)}
+                            step="0.01"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Sell Ratio (Old)</label>
+                          <Input
+                            type="number"
+                            value={getEditingObjectProperty('npc.vendor_ratio_sell_old', '')}
+                            onChange={(e) => updateEditingObjectProperty('npc.vendor_ratio_sell_old', e.target.value)}
+                            step="0.01"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Vox Intro (one file per line)</label>
+                      <textarea
+                        className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
+                        value={getEditingObjectProperty('npc.vox_intro', '')}
+                        onChange={(e) => updateEditingObjectProperty('npc.vox_intro', e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {editingObject.type === 'event' && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Activate</label>
+                    <Input
+                      value={editingObject.activate || 'on_trigger'}
+                      onChange={(e) => setEditingObject({...editingObject, activate: e.target.value})}
+                      placeholder="on_trigger, on_load, etc."
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Hotspot</label>
+                    <Input
+                      value={editingObject.hotspot || '0,0,1,1'}
+                      onChange={(e) => setEditingObject({...editingObject, hotspot: e.target.value})}
+                      placeholder="x,y,width,height"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Tooltip</label>
+                    <Input
+                      value={editingObject.tooltip || ''}
+                      onChange={(e) => setEditingObject({...editingObject, tooltip: e.target.value})}
+                      placeholder="Hover text"
+                    />
+                  </div>
+                </>
+              )}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="mt-4 flex-shrink-0">
+            <Button variant="outline" onClick={handleObjectDialogClose}>
+              Cancel
+            </Button>
+            <Button onClick={handleObjectDialogSave}>
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showCreateMapDialog}
+        onOpenChange={(open) => {
+          setShowCreateMapDialog(open);
+          if (!open) {
+            setCreateMapError(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Create Map</DialogTitle>
+            <DialogDescription>
+              Set the name, dimensions, and starting status for your new map.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <label className="block text-sm font-medium text-muted-foreground mb-1">
+                Map Name
+              </label>
+              <Input
+                value={newMapName}
+                onChange={(e) => {
+                  setNewMapName(e.target.value);
+                  if (createMapError) {
+                    setCreateMapError(null);
+                  }
+                }}
+                onKeyDown={(e) => {
+                  // Allow editing keys to work even if parent handlers exist
+                  e.stopPropagation();
+                }}
+                placeholder="Enter map name"
+                autoFocus
+              />
+              {createMapError && (
+                <p className="mt-1 text-xs text-red-500">{createMapError}</p>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-muted-foreground mb-1">
+                  Width (tiles)
+                </label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={newMapWidth}
+                  onChange={(e) => setNewMapWidth(Math.max(1, Number.parseInt(e.target.value, 10) || 0))}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-muted-foreground mb-1">
+                  Height (tiles)
+                </label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={newMapHeight}
+                  onChange={(e) => setNewMapHeight(Math.max(1, Number.parseInt(e.target.value, 10) || 0))}
+                />
+              </div>
+            </div>
+            <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
+              <div className="flex items-center gap-2">
+                <label htmlFor="starting-map-checkbox" className="text-sm font-medium text-muted-foreground">
+                  Starting Map
+                </label>
+                <Tooltip content="If this map is the map that players will start the game then mark this option">
+                  <HelpCircle className="h-4 w-4 text-muted-foreground" aria-hidden />
+                </Tooltip>
+              </div>
+              <input
+                id="starting-map-checkbox"
+                type="checkbox"
+                className="h-4 w-4 rounded border border-border accent-orange-500"
+                checked={newMapStarting}
+                onChange={(e) => setNewMapStarting(e.target.checked)}
+                aria-checked={newMapStarting}
+                aria-label="Set this map as the starting map"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowCreateMapDialog(false);
+                setCreateMapError(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmCreateMap}
+              disabled={isPreparingNewMap}
+              className="flex items-center gap-2"
+            >
+              {isPreparingNewMap ? (
+                <>
+                  <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <span>Creating...</span>
+                </>
+              ) : (
+                <span>Create</span>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Hero Position Edit Dialog */}
+      <Dialog open={showHeroEditDialog} onOpenChange={setShowHeroEditDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Hero Position</DialogTitle>
+            <DialogDescription>
+              Set the hero spawn position on the map.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {heroEditData && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">X Position</label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={heroEditData.mapWidth - 1}
+                    defaultValue={heroEditData.currentX}
+                    onChange={(e) => {
+                      const newX = parseInt(e.target.value);
+                      if (!isNaN(newX)) {
+                        setHeroEditData({
+                          ...heroEditData,
+                          currentX: newX
+                        });
+                      }
+                    }}
+                  />
+                  <span className="text-xs text-gray-500">
+                    (0 - {heroEditData.mapWidth - 1})
+                  </span>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Y Position</label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={heroEditData.mapHeight - 1}
+                    defaultValue={heroEditData.currentY}
+                    onChange={(e) => {
+                      const newY = parseInt(e.target.value);
+                      if (!isNaN(newY)) {
+                        setHeroEditData({
+                          ...heroEditData,
+                          currentY: newY
+                        });
+                      }
+                    }}
+                  />
+                  <span className="text-xs text-gray-500">
+                    (0 - {heroEditData.mapHeight - 1})
+                  </span>
+                </div>
+              </div>
+              <div className="text-sm text-gray-600">
+                Current position: ({heroEditData.currentX}, {heroEditData.currentY})
+              </div>
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={handleHeroEditCancel}>
+              Cancel
+            </Button>
+            <Button onClick={() => heroEditData && handleHeroEditConfirm(heroEditData.currentX, heroEditData.currentY)}>
+              Confirm
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Overwrite Export Confirmation Dialog */}
+      <OverwriteExportDialog
+        open={showOverwriteDialog}
+        onConfirm={handleOverwriteConfirm}
+        onCancel={handleOverwriteCancel}
+      />
+
+      {/* Export Success Modal */}
+      {showExportSuccess && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-black rounded-lg shadow-xl p-6 max-w-md mx-4 relative">
+            {/* Close button */}
+            <button
+              onClick={() => setShowExportSuccess(false)}
+              className="absolute top-3 right-3 text-gray-400 hover:text-gray-200 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            
+            {/* Content */}
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
+                <Check className="w-5 h-5 text-green-600 dark:text-green-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-white">
+                Export Successful
+              </h3>
+            </div>
+            
+            <p className="text-gray-300 flex items-center gap-2">
+              <span className="inline-flex items-center gap-1 font-medium text-white">
+                <Folder className="w-4 h-4" />
+              </span>
+              Project exported to project folder.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Tooltip */}
+      {tooltip && (
+        <div
+          className={`custom-tooltip ${tooltip.visible ? 'visible' : ''} ${tooltip.fadeOut ? 'fade-out' : ''}`}
+          style={{
+            left: tooltip.x,
+            top: tooltip.y,
+          }}
+        >
+          {tooltip.content}
+        </div>
+      )}
+        </div>
+      )}
+    </>
+  );
+}
+
+export default App;

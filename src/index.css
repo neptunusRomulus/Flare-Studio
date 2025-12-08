@@ -1,0 +1,575 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 25 95% 53%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222.2 84% 4.9%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222.2 84% 4.9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 25 95% 53%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 0 0% 11%;
+    --foreground: 0 0% 95%;
+    --card: 0 0% 9%;
+    --card-foreground: 0 0% 95%;
+    --popover: 0 0% 9%;
+    --popover-foreground: 0 0% 95%;
+    --primary: 30 90% 55%;
+    --primary-foreground: 0 0% 11%;
+    --secondary: 0 0% 14%;
+    --secondary-foreground: 0 0% 95%;
+    --muted: 0 0% 14%;
+    --muted-foreground: 0 0% 65%;
+    --accent: 0 0% 14%;
+    --accent-foreground: 0 0% 95%;
+    --destructive: 0 62% 45%;
+    --destructive-foreground: 0 0% 95%;
+    --border: 0 0% 25%;
+    --input: 0 0% 14%;
+    --ring: 30 90% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+  }
+  
+  /* Remove focus outlines that cause orange-yellow strokes */
+  *:focus {
+    outline: none !important;
+  }
+  
+  *:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+  }
+  
+  /* Remove focus states on buttons and interactive elements */
+  button:focus,
+  button:focus-visible,
+  input:focus,
+  input:focus-visible,
+  select:focus,
+  select:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+  }
+  
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Keep existing tile editor specific styles */
+.tile-canvas {
+    background: #f0f0f0;
+    cursor: crosshair;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+.dark .tile-canvas {
+    background: #2a2a2a;
+}
+
+.tile-palette {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    padding: 8px;
+    background: hsl(var(--background));
+    border: 1px solid hsl(var(--border));
+    /* Fixed, unchanging palette height to avoid layout shifts when content changes */
+    height: 520px; /* fixed size — adjust if you prefer a different constant */
+    overflow-y: auto;
+    
+    /* Modern minimal scrollbar */
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+}
+
+/* Webkit scrollbar styling for modern browsers */
+.tile-palette::-webkit-scrollbar {
+    width: 10px; /* Increased to accommodate margins */
+}
+
+.tile-palette::-webkit-scrollbar-track {
+    background: transparent;
+    margin: 4px 0; /* Top and bottom margin */
+}
+
+.tile-palette::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--muted-foreground) / 0.3);
+    border-radius: 3px;
+    border: 2px solid transparent; /* Creates spacing from edges */
+    background-clip: content-box; /* Ensures background doesn't show in border area */
+    transition: background-color 0.2s ease;
+    margin: 2px; /* Additional margin for spacing */
+}
+
+.tile-palette::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--muted-foreground) / 0.5);
+}
+
+.tile-palette::-webkit-scrollbar-corner {
+    background: transparent;
+}
+
+.palette-tile {
+    min-width: 32px;
+    min-height: 32px;
+    max-width: 128px;
+    max-height: 128px;
+    border: 1px solid hsl(var(--border));
+    cursor: pointer;
+    image-rendering: pixelated;
+    display: inline-block;
+    margin: 2px;
+    vertical-align: top;
+    object-fit: contain;
+}
+
+.palette-tile:hover {
+    border-color: hsl(var(--foreground));
+}
+
+.palette-tile.selected {
+    border: 2px solid hsl(var(--primary));
+}
+
+.palette-tile.multi-selected {
+    outline: 3px dashed rgba(0, 122, 204, 0.6);
+    outline-offset: -3px;
+}
+
+/* Brush management styles */
+.brush-wrapper {
+    position: relative;
+    display: inline-block;
+    margin: 2px;
+}
+
+.brush-wrapper.brush-selected .palette-tile {
+    border: 2px solid #ff6b6b;
+    box-shadow: 0 0 8px rgba(255, 107, 107, 0.5);
+}
+
+.selection-number {
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    background: #ff6b6b;
+    color: white;
+    border-radius: 50%;
+    width: 16px;
+    height: 16px;
+    font-size: 10px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    z-index: 10;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.remove-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 0, 0, 0.7);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    color: white;
+    cursor: pointer;
+    z-index: 10;
+    border-radius: 4px;
+}
+
+.remove-overlay:hover {
+    background: rgba(255, 0, 0, 0.9);
+}
+
+/* Drag and drop styles for move tool */
+.brush-wrapper[draggable="true"] {
+    cursor: move !important;
+    position: relative;
+}
+
+.brush-wrapper[draggable="true"]:hover::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    pointer-events: none;
+    z-index: 1;
+}
+
+.brush-wrapper.drag-over {
+    border-top: 3px solid #007acc !important;
+    background: rgba(0, 122, 204, 0.1);
+}
+
+/* Separate tool styles */
+.brush-wrapper.separate-mode {
+    position: relative;
+    cursor: pointer;
+}
+
+.brush-wrapper.separate-mode:hover::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 165, 0, 0.5);
+    pointer-events: none;
+    z-index: 1;
+}
+
+.brush-wrapper.separate-mode:hover .separate-icon {
+    display: flex;
+}
+
+.separate-icon {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    color: white;
+    z-index: 2;
+    pointer-events: none;
+    width: 24px;
+    height: 24px;
+}
+
+/* Merge tool styles */
+.brush-wrapper.merge-mode {
+    position: relative;
+    cursor: pointer;
+}
+
+.brush-wrapper.merge-selected-first .palette-tile {
+    border: 2px solid hsl(var(--primary)) !important;
+    box-shadow: 0 0 0 1px hsl(var(--primary));
+}
+
+.brush-wrapper.merge-selected-second::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 165, 0, 0.5);
+    pointer-events: none;
+    z-index: 1;
+}
+
+.brush-wrapper.merge-selected-second .merge-icon {
+    display: flex;
+}
+
+.merge-icon {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    color: white;
+    z-index: 2;
+    pointer-events: none;
+    width: 24px;
+    height: 24px;
+}
+
+.tool-active {
+    background: hsl(var(--primary)) !important;
+    color: hsl(var(--primary-foreground)) !important;
+}
+
+/* Electron window drag regions */
+.drag-region {
+    -webkit-app-region: drag;
+}
+
+.no-drag {
+    -webkit-app-region: no-drag;
+}
+
+/* Custom tooltip styles */
+.custom-tooltip {
+    position: absolute;
+    z-index: 1000;
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    white-space: normal;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease-in-out;
+    transform-origin: center bottom;
+    transform: translateX(-50%) translateY(-6px);
+}
+
+.custom-tooltip.visible {
+    opacity: 1;
+}
+
+.custom-tooltip.fade-out {
+    opacity: 0;
+}
+
+/* Limit tooltip to 2 lines for the anchored left tooltip */
+.custom-tooltip > * {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    max-width: 12rem;
+}
+
+/* Tool button click effects */
+.tool-button {
+    transition: all 0.1s ease-in-out;
+    transform-origin: center;
+}
+
+.tool-button:active {
+    transform: scale(0.95);
+    background-color: hsl(var(--primary) / 0.9) !important;
+}
+
+.tool-button:active * {
+    color: hsl(222.2 84% 4.9%) !important;
+}
+
+/* Sub-tool button click effects */
+.sub-tool-button {
+    transition: all 0.1s ease-in-out;
+    transform-origin: center;
+}
+
+.sub-tool-button:active {
+    transform: scale(0.9);
+    background-color: hsl(var(--primary) / 0.8) !important;
+}
+
+.sub-tool-button:active * {
+    color: hsl(222.2 84% 4.9%) !important;
+}
+
+/* Ensure SVG icons maintain proper colors during click */
+.tool-button:active svg,
+.sub-tool-button:active svg {
+    color: hsl(222.2 84% 4.9%) !important;
+}
+
+/* Ensure all inline SVG icons inherit the current text color and use currentColor for stroke/fill
+   This prevents icons from becoming invisible if a parent sets unexpected colors. */
+svg {
+    color: inherit !important;
+    stroke: currentColor !important;
+    /* Use outline style for lucide icons (no fill) so they render as strokes */
+    fill: none !important;
+}
+
+/* Ensure inner svg elements inherit stroke and do not fill */
+svg path, svg circle, svg rect, svg line, svg polyline, svg polygon {
+    stroke: currentColor !important;
+    fill: none !important;
+}
+
+/* General button click effect for better feedback */
+button:active:not(.no-click-effect) {
+    transform: scale(0.98);
+    transition: transform 0.1s ease-in-out;
+}
+
+/* Allow specific controls to opt out of the press-shift effect (useful for fixed-position UI over drag regions) */
+.no-press-shift:active {
+    /* Preserve the vertical centering translation the button uses
+       (Tailwind class -translate-y-1/2). We avoid applying scale on
+       active so the element doesn't visually shift. */
+    transform: translateY(-50%) !important;
+}
+
+/* Press fill effect: lighten the control on press using filter so it works in both light/dark themes */
+.press-fill-effect {
+    transition: filter 120ms ease, background-color 120ms ease, box-shadow 120ms ease;
+}
+.press-fill-effect:active {
+    filter: brightness(1.08);
+}
+
+/* Modern scrollbar for help modal */
+.help-modal {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+}
+
+.help-modal::-webkit-scrollbar {
+    width: 8px;
+}
+
+.help-modal::-webkit-scrollbar-track {
+    background: transparent;
+    margin: 8px 0;
+}
+
+.help-modal::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 6px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+    transition: background-color 0.2s ease;
+}
+
+.help-modal::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+    background-clip: content-box;
+}
+
+.help-modal::-webkit-scrollbar-corner {
+    background: transparent;
+}
+
+/* Minimal modern scrollbar reusable utility */
+.minimal-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(100,100,100,0.35) transparent;
+}
+.minimal-scroll::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+.minimal-scroll::-webkit-scrollbar-track {
+    background: transparent;
+    margin: 6px 0;
+}
+.minimal-scroll::-webkit-scrollbar-thumb {
+    background: rgba(100,100,100,0.35);
+    border-radius: 6px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+}
+.minimal-scroll::-webkit-scrollbar-thumb:hover {
+    background: rgba(100,100,100,0.55);
+}
+.minimal-scroll::-webkit-scrollbar-corner { background: transparent; }
+
+/* Tabs area scrollbar: minimalist and modern, small thumb that becomes slightly more visible on hover */
+.tabs-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(100,100,100,0.25) transparent;
+}
+.tabs-scroll::-webkit-scrollbar {
+    height: 8px; /* horizontal scrollbar height */
+    width: 8px;  /* vertical if needed */
+}
+.tabs-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+.tabs-scroll::-webkit-scrollbar-thumb {
+    background: linear-gradient(90deg, rgba(120,120,120,0.18), rgba(245,127,23,0.18));
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+    transition: background-color 160ms ease, opacity 160ms ease;
+    opacity: 0.6;
+}
+.tabs-scroll:hover::-webkit-scrollbar-thumb {
+    opacity: 1;
+    background: linear-gradient(90deg, rgba(120,120,120,0.35), rgba(249,115,22,0.35));
+}
+.tabs-scroll::-webkit-scrollbar-corner { background: transparent; }
+
+/* Limit visible tabs to 7 items — when .tabs-limited is applied the container
+   will show a scrollbar even on wide screens so users can horizontally scroll
+   through additional tabs. Assumes each tab ~1.25rem wide + 0.25rem gap = 1.5rem.
+   7 * 1.5rem = 10.5rem */
+.tabs-scroll.tabs-limited {
+    max-width: 10.5rem; /* show ~7 tabs worth of width */
+}
+
+/* Smooth sidebar collapse: animate width and inner content opacity to avoid sudden layout jumps */
+.app-sidebar {
+    transition: width 300ms cubic-bezier(.2,.9,.2,1), opacity 220ms ease, transform 300ms cubic-bezier(.2,.9,.2,1);
+    width: 14rem; /* default matching w-56 */
+    min-width: 0;
+    overflow: visible;
+    transform: translateX(0);
+}
+.app-sidebar .sidebar-inner {
+    transition: opacity 220ms ease, transform 300ms cubic-bezier(.2,.9,.2,1);
+    opacity: 1;
+    transform: translateX(0);
+}
+.app-sidebar.sidebar-collapsed {
+    width: 0 !important;
+    min-width: 0 !important;
+    opacity: 0 !important; /* fully transparent when collapsed */
+    padding: 0 !important; /* remove padding so inner background doesn't show */
+    background: transparent !important;
+    border-right-width: 0 !important; /* remove visible border */
+    box-shadow: none !important;
+    pointer-events: none; /* prevent interactions while collapsed */
+    overflow: hidden !important; /* ensure no inner content protrudes */
+    transform: translateX(-1px) !important; /* hide fractional-pixel slivers */
+}
+.app-sidebar.sidebar-collapsed .sidebar-inner {
+    opacity: 0;
+    transform: translateX(-6px);
+    pointer-events: none;
+}
+
+/* Canvas smoothing: slightly fade canvas during layout transitions to hide redraw flicker */
+.canvas-fade {
+    transition: opacity 260ms ease, transform 260ms ease;
+    will-change: opacity, transform;
+}
+.canvas-fade.during-sidebar-transition {
+    opacity: 0.97;
+    transform: translateZ(0);
+}

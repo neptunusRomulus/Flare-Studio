@@ -13,10 +13,7 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-<<<<<<< HEAD
     "jsx": "react-jsx",
-=======
->>>>>>> 7bd82e7 (typescript transfer succelfully finished.)
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
@@ -27,7 +24,6 @@
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedIndexedAccess": false,
-<<<<<<< HEAD
     "exactOptionalPropertyTypes": false,
     "baseUrl": ".",
     "paths": {
@@ -36,13 +32,6 @@
   },
   "include": [
     "src"
-  ]
-=======
-    "exactOptionalPropertyTypes": false
-  },
-  "include": [
-    "src"
   ],
   "references": [{ "path": "./tsconfig.node.json" }]
->>>>>>> 7bd82e7 (typescript transfer succelfully finished.)
 }

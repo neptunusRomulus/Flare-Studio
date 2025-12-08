@@ -23,6 +23,9 @@ import {
   Orientation,
   EditorElements
 } from './types.js';
+// Declarations for functions implemented in main.ts to satisfy type checking
+declare function drawMiniMap(): void;
+declare function updateExportButtonStates(): void;
 
 (function(): void {
   // DOM Elements with proper typing

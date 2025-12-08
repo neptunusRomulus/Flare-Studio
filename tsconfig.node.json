@@ -1,22 +1,12 @@
 {
   "compilerOptions": {
-<<<<<<< HEAD
-    "skipLibCheck": true,
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "allowSyntheticDefaultImports": true,
-    "allowJs": true,
-    "noEmit": true
-  },
-  "include": ["vite.config.js"],
-  "exclude": ["node_modules", "dist", "electron", "src"]
-=======
     "composite": true,
     "skipLibCheck": true,
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "allowSyntheticDefaultImports": true
+    "allowSyntheticDefaultImports": true,
+    "allowJs": true
   },
-  "include": ["vite.config.js", "electron"]
->>>>>>> 7bd82e7 (typescript transfer succelfully finished.)
+  "include": ["vite.config.js", "electron"],
+  "exclude": ["node_modules", "dist"]
 }

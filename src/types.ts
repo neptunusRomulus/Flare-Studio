@@ -3,15 +3,10 @@
 export interface TileLayer {
   id: number;
   name: string;
-<<<<<<< HEAD
   type: 'background' | 'object' | 'collision' | 'event' | 'enemy' | 'npc';
   data: number[];
   visible: boolean;
   transparency?: number; // 0-1, where 1 is fully opaque
-=======
-  data: number[];
-  visible: boolean;
->>>>>>> 7bd82e7 (typescript transfer succelfully finished.)
 }
 
 export interface TilesetInfo {
@@ -32,7 +27,6 @@ export interface MapObject {
   width: number;
   height: number;
   properties: Record<string, string>;
-<<<<<<< HEAD
   // Flare-specific extensions
   category?: string;      // For enemies: antlion, antlion_hatchling, etc.
   level?: number;         // For enemies: difficulty level
@@ -46,8 +40,6 @@ export interface MapObject {
   mapmod?: string;        // For events: map modifications
   repeat?: boolean;       // For events: can be triggered multiple times
   tooltip?: string;       // For events: hover text
-=======
->>>>>>> 7bd82e7 (typescript transfer succelfully finished.)
 }
 
 export interface ExportTMXParams {
@@ -80,10 +72,7 @@ export interface ExportFlareTXTParams {
   heroPos?: string;
   music?: string;
   title?: string;
-<<<<<<< HEAD
   tilesetDefs?: string[]; // For [tilesets] section
-=======
->>>>>>> 7bd82e7 (typescript transfer succelfully finished.)
 }
 
 export interface FlareEvent {
@@ -110,11 +99,8 @@ export interface UndoRedoState {
   timestamp: number;
 }
 
-<<<<<<< HEAD
-export type Tool = 'tiles' | 'brush' | 'eraser' | 'bucket' | 'selection' | 'shape' | 'eyedropper' | 'stamp';
-=======
-export type Tool = 'tiles' | 'collision' | 'objects';
->>>>>>> 7bd82e7 (typescript transfer succelfully finished.)
+
+export type Tool = 'tiles' | 'brush' | 'eraser' | 'bucket' | 'selection' | 'shape' | 'eyedropper' | 'stamp' | 'collision' | 'objects';
 
 export type Orientation = 'isometric';
 
@@ -146,7 +132,6 @@ export interface EditorElements {
   addPropertyBtn: HTMLButtonElement;
   miniMapCanvas: HTMLCanvasElement;
 }
-<<<<<<< HEAD
 
 // Stamp-related types
 export interface StampTile {
@@ -166,5 +151,3 @@ export interface Stamp {
 }
 
 export type StampMode = 'select' | 'create' | 'place';
-=======
->>>>>>> 7bd82e7 (typescript transfer succelfully finished.)

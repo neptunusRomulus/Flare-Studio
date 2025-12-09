@@ -687,6 +687,10 @@ export class TileMapEditor {
     originY?: number;
   }>> = new Map();
 
+  // Per-layer, per-cell tileset key (stores the tileset fileName used for each cell)
+  // Key: layerType -> Array of length mapWidth*mapHeight with fileName or null
+  private layerCellTilesetKey: Map<string, Array<string | null>> = new Map();
+
   // Per-layer active tile selection
   private layerActiveGid: Map<string, number> = new Map();
   
@@ -1306,6 +1310,12 @@ export class TileMapEditor {
     }
 
     this.ensureCollisionTileset();
+
+    // Initialize per-layer cell tileset key arrays
+    for (const l of this.tileLayers) {
+      const arr = new Array(this.mapWidth * this.mapHeight).fill(null);
+      this.layerCellTilesetKey.set(l.type, arr);
+    }
   }
 
   private getDraggableActorAt(x: number, y: number): MapObject | null {
@@ -1652,6 +1662,32 @@ export class TileMapEditor {
           console.log(`Active GID for this layer: ${currentLayerActiveGid}`);
           
           layer.data[index] = newValue;
+          // Record which tileset (tab) this painted cell came from so tabs don't collide
+          try {
+            const layerType = layer.type;
+            let arr = this.layerCellTilesetKey.get(layerType);
+            if (!arr) {
+              arr = new Array(this.mapWidth * this.mapHeight).fill(null);
+              this.layerCellTilesetKey.set(layerType, arr);
+            }
+            // Determine current active tab tileset fileName if available
+            let tilesetFileName: string | null = null;
+            const activeTabId = this.layerActiveTabId.get(layerType);
+            const tabs = this.layerTabs.get(layerType) || [];
+            if (activeTabId) {
+              const tab = tabs.find(t => t.id === activeTabId);
+              if (tab && tab.tileset && tab.tileset.fileName) tilesetFileName = tab.tileset.fileName;
+            }
+            // Fallback to layer tileset or global tileset
+            if (!tilesetFileName) {
+              const lt = this.layerTilesets.get(layerType);
+              if (lt && lt.fileName) tilesetFileName = lt.fileName;
+            }
+            if (!tilesetFileName && this.tilesetFileName) tilesetFileName = this.tilesetFileName;
+            arr[index] = tilesetFileName;
+          } catch (e) {
+            console.warn('Failed to set layerCellTilesetKey for painted tile', e);
+          }
           
           // Handle object creation/removal based on layer type
           if (layer.type === 'event' || layer.type === 'enemy' || layer.type === 'npc' || layer.type === 'object') {
@@ -2189,28 +2225,47 @@ export class TileMapEditor {
     for (const layer of layersReversed) {
       if (!layer.visible) continue;
       
-      // Get the tileset for this layer type (falling back to the primary tileset for background)
-      const layerTileset = this.getLayerTilesetOrFallback(layer.type);
+      // Get the default tileset for this layer type (used as a fallback)
+      const layerTilesetFallback = this.getLayerTilesetOrFallback(layer.type) || { image: null, fileName: null, columns: 1, rows: 1, count: 1 };
 
-      if (!layerTileset || !layerTileset.image) {
-        // Skip this layer if it has no tileset
-        continue;
-      }
-      
       // Set layer transparency
       this.ctx.globalAlpha = layer.transparency || 1.0;
-      
-      // Get layer-specific tile data
-      const layerTileData = this.layerTileData.get(layer.type) || new Map();
-      
+
       for (let y = 0; y < this.mapHeight; y++) {
         for (let x = 0; x < this.mapWidth; x++) {
           const index = y * this.mapWidth + x;
           const gid = layer.data[index];
-          
-          if (gid > 0) {
-            this.drawTileFromLayer(x, y, gid, layerTileset, layerTileData);
+          if (gid <= 0) continue;
+
+          // Determine per-cell tileset key if any (fileName stored when painting)
+          const keyArr = this.layerCellTilesetKey.get(layer.type);
+          const cellTilesetKey = keyArr ? keyArr[index] : null;
+
+          // Resolve tileset info for this specific cell
+          let tilesetForCell = layerTilesetFallback;
+          let layerTileDataForCell = this.layerTileData.get(layer.type) || new Map();
+
+          if (cellTilesetKey) {
+            const tabs = this.layerTabs.get(layer.type) || [];
+            const tab = tabs.find(t => t.tileset && t.tileset.fileName === cellTilesetKey);
+            if (tab && tab.tileset) {
+              tilesetForCell = {
+                image: tab.tileset.image ?? null,
+                fileName: tab.tileset.fileName ?? null,
+                columns: tab.tileset.columns ?? Math.max(1, Math.floor((tab.tileset.image ? tab.tileset.image.width : this.tileSizeX) / this.tileSizeX)),
+                rows: tab.tileset.rows ?? Math.max(1, Math.floor((tab.tileset.image ? tab.tileset.image.height : this.tileSizeY) / this.tileSizeY)),
+                count: tab.tileset.count ?? Math.max(1, (tab.tileset.columns ?? 1) * (tab.tileset.rows ?? 1))
+              };
+              if (tab.detectedTiles) {
+                layerTileDataForCell = tab.detectedTiles as Map<number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }>;
+              }
+            } else {
+              // If we can't find tab metadata, fall back to layer fallback
+              layerTileDataForCell = this.layerTileData.get(layer.type) || new Map();
+            }
           }
+
+          this.drawTileFromLayer(x, y, gid, tilesetForCell, layerTileDataForCell);
         }
       }
     }
@@ -2961,6 +3016,15 @@ export class TileMapEditor {
           layerTileMap.set(gid, { sourceX: data.sourceX, sourceY: data.sourceY, width: data.width, height: data.height, originX: data.originX, originY: data.originY });
         }
         this.layerTileData.set(activeLayer.type, layerTileMap);
+        // Persist detected tiles into the active tab if present so switching tabs preserves them
+        const tabs = this.layerTabs.get(activeLayer.type) || [];
+        const activeTabId = this.layerActiveTabId.get(activeLayer.type);
+        if (activeTabId) {
+          const tab = tabs.find(t => t.id === activeTabId);
+          if (tab) {
+            tab.detectedTiles = new Map(layerTileMap);
+          }
+        }
         console.log(`Stored ${layerTileMap.size} newly detected tiles for layer type: ${activeLayer.type}`);
       }
     }
@@ -4941,9 +5005,16 @@ export class TileMapEditor {
   public createLayerTab(layerType: string, name?: string): number {
   const tabs = this.layerTabs.get(layerType) || [];
   const id = this.nextLayerTabId++;
-  const tab = { id, name: name || `Tab ${tabs.length + 1}` };
-    tabs.push(tab);
-    this.layerTabs.set(layerType, tabs);
+  // Initialize new tab with empty tileset/brush/detectedTiles to avoid inheriting previous tab data
+  const tab: { id: number; name: string; tileset?: LayerTilesetEntry; detectedTiles?: Map<number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }>; brushes?: Array<{ image: HTMLImageElement; fileName: string; width: number; height: number }>; } = {
+    id,
+    name: name || `Tab ${tabs.length + 1}`,
+    // explicit empty structures so setActiveLayerTab clears palette when switching to this tab
+    detectedTiles: new Map(),
+    brushes: []
+  };
+  tabs.push(tab as any);
+  this.layerTabs.set(layerType, tabs);
     // If no active tab set for this layer, set this one
     if (!this.layerActiveTabId.has(layerType)) {
       this.layerActiveTabId.set(layerType, id);
@@ -4979,18 +5050,52 @@ export class TileMapEditor {
           margin: tab.tileset.margin ?? 0,
           sourcePath: tab.tileset.sourcePath ?? null
         });
-        // Load detected tiles from tab if present
+        // Load detected tiles from tab into per-layer map if present (don't clear global detected map)
         if (tab.detectedTiles) {
+          const layerTileMap = new Map<number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }>();
+          for (const [gid, data] of tab.detectedTiles.entries()) {
+            layerTileMap.set(gid, { sourceX: data.sourceX, sourceY: data.sourceY, width: data.width, height: data.height, originX: data.originX, originY: data.originY });
+          }
+          this.layerTileData.set(layerType, layerTileMap);
+        }
+        this.updateCurrentTileset(layerType);
+      } else {
+        // No tileset for this tab -> explicitly clear current tileset and palette
+        // Delete any per-layer tileset so fallback isn't applied
+        this.layerTilesets.delete(layerType);
+
+        // Clear current display/state so new tab appears empty
+        this.tilesetImage = null;
+        this.tilesetFileName = null;
+        this.tilesetColumns = 0;
+        this.tilesetRows = 0;
+        this.tileCount = 0;
+        this.tilesetTileWidth = undefined;
+        this.tilesetTileHeight = undefined;
+        this.tilesetSpacing = undefined;
+        this.tilesetMargin = undefined;
+
+        // Load detected tiles from tab if present (may be empty Map)
+        if (tab && tab.detectedTiles) {
           this.detectedTileData.clear();
           for (const [gid, data] of tab.detectedTiles.entries()) {
             this.detectedTileData.set(gid, data);
           }
+          // Also ensure per-layer map is set
+          const layerTileMap = new Map<number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }>();
+          for (const [gid, data] of tab.detectedTiles.entries()) {
+            layerTileMap.set(gid, { sourceX: data.sourceX, sourceY: data.sourceY, width: data.width, height: data.height, originX: data.originX, originY: data.originY });
+          }
+          this.layerTileData.set(layerType, layerTileMap);
+        } else {
+          this.detectedTileData.clear();
+          this.layerTileData.delete(layerType);
         }
-        this.updateCurrentTileset(layerType);
-      } else {
-        // No tileset for this tab -> clear current tileset
-        this.layerTilesets.delete(layerType);
-        this.updateCurrentTileset(layerType);
+
+        // Reset active gid and palette UI
+        this.updateActiveGid(0);
+        this.clearTilePalette();
+        this.draw();
       }
     }
   }
@@ -5057,6 +5162,22 @@ export class TileMapEditor {
       const removed = tabs.splice(idx, 1);
       console.info('removeLayerTab removed:', removed);
       this.layerTabs.set(layerType, tabs);
+      // Remap any painted cells that referenced the removed tab's tileset
+      try {
+        const removedTilesetFile = removed[0] && removed[0].tileset ? removed[0].tileset.fileName : null;
+        if (removedTilesetFile) {
+          const arr = this.layerCellTilesetKey.get(layerType) || new Array(this.mapWidth * this.mapHeight).fill(null);
+          for (let i = 0; i < arr.length; i++) {
+            if (arr[i] === removedTilesetFile) {
+              // Clear cell reference - painting remains but will fallback to layer default or be treated as empty
+              arr[i] = null;
+            }
+          }
+          this.layerCellTilesetKey.set(layerType, arr);
+        }
+      } catch (e) {
+        console.warn('Failed to remap layerCellTilesetKey after removing tab', e);
+      }
       // If removed active tab, set another as active
       const active = this.layerActiveTabId.get(layerType);
       if (active === tabId) {
@@ -5155,6 +5276,12 @@ export class TileMapEditor {
       
       // Remove layer tile data
       this.layerTileData.delete(layerType);
+      // Clear any per-cell tileset references for this layer
+      try {
+        this.layerCellTilesetKey.set(layerType, new Array(this.mapWidth * this.mapHeight).fill(null));
+      } catch (e) {
+        console.warn('Failed to clear layerCellTilesetKey during removeLayerTileset', e);
+      }
       
       // Clear current tileset display if this was the active layer
       this.tilesetImage = null;
@@ -5447,8 +5574,6 @@ export class TileMapEditor {
 
       const layerTileset = this.getLayerTilesetOrFallback(layerType);
       const isCollisionLayer = layerType === COLLISION_LAYER_TYPE;
-      const offsetKey = !isCollisionLayer ? layerTileset?.fileName ?? null : null;
-      const tilesetOffset = offsetKey ? tilesetOffsets.get(offsetKey) : undefined;
 
       for (let y = 0; y < this.mapHeight; y++) {
         const row: string[] = [];
@@ -5457,9 +5582,18 @@ export class TileMapEditor {
           const localTileId = layer.data[index];
           let globalTileId = 0;
           if (localTileId > 0) {
+            // Determine which tileset this specific cell belongs to (per-cell key set at paint time)
+            const keyArr = this.layerCellTilesetKey.get(layerType);
+            const cellTilesetKey = keyArr ? keyArr[index] : (layerTileset ? layerTileset.fileName ?? null : null);
+            let tilesetOffset = undefined as number | undefined;
+            if (!isCollisionLayer && cellTilesetKey) {
+              tilesetOffset = tilesetOffsets.get(cellTilesetKey);
+            }
+
             if (tilesetOffset !== undefined && tilesetOffset >= 1) {
               globalTileId = tilesetOffset + (localTileId - 1);
             } else {
+              // Fallback: if no tileset offset, write the local id directly
               globalTileId = localTileId;
             }
           }
@@ -6946,6 +7080,13 @@ export class TileMapEditor {
       } else {
         console.log('No layers found in project data, creating default layers');
         this.createDefaultLayers();
+      }
+
+      // Ensure per-layer cell tileset key arrays exist after loading layers
+      for (const l of this.tileLayers) {
+        if (!this.layerCellTilesetKey.has(l.type)) {
+          this.layerCellTilesetKey.set(l.type, new Array(this.mapWidth * this.mapHeight).fill(null));
+        }
       }
       
       // Load object data if available

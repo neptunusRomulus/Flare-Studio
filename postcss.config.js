@@ -1,8 +1,5 @@
-<<<<<<< HEAD
-export default {
-=======
+// Use CommonJS export for PostCSS config to ensure compatibility
 module.exports = {
->>>>>>> 7bd82e7 (typescript transfer succelfully finished.)
   plugins: {
     tailwindcss: {},
     autoprefixer: {},

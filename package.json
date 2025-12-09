@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview --port 4173",
+    "preview": "vite preview --port 5173",
     "start": "electron .",
     "electron:build": "electron-builder",
     "electron-dev": "concurrently \"vite --port 5173\" \"wait-on http://localhost:5173 && electron .\"",
@@ -17,29 +17,34 @@
     "test": "vitest"
   },
   "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
+    "@radix-ui/react-select": "^2.2.6",
+    "@radix-ui/react-slot": "^1.2.4",
+    "@radix-ui/react-switch": "^1.2.6",
+    "@radix-ui/react-toast": "^1.2.15",
+    "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
     "lucide-react": "^0.542.0",
-    "class-variance-authority": "^0.7.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
     "tailwind-merge": "^1.14.0"
   },
   "devDependencies": {
-    "typescript": "^5.2.2",
-    "vite": "^5.0.0",
-    "@vitejs/plugin-react": "^4.2.1",
-    "electron": "^25.0.0",
-    "electron-builder": "^24.13.3",
-    "postcss": "^8.4.31",
-    "tailwindcss": "^3.3.0",
-    "autoprefixer": "^10.4.16",
-    "concurrently": "^8.2.0",
-    "wait-on": "^7.0.0",
-    "eslint": "^8.55.0",
+    "@tailwindcss/forms": "^0.5.10",
     "@types/node": "^20.0.0",
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",
-    "vitest": "^1.3.0"
+    "@vitejs/plugin-react": "^4.2.1",
+    "autoprefixer": "^10.4.16",
+    "concurrently": "^8.2.0",
+    "electron": "^25.0.0",
+    "electron-builder": "^24.13.3",
+    "eslint": "^8.55.0",
+    "postcss": "^8.4.31",
+    "tailwindcss": "^3.3.0",
+    "typescript": "^5.2.2",
+    "vite": "^5.0.0",
+    "vitest": "^1.3.0",
+    "wait-on": "^7.0.0"
   },
   "build": {
     "appId": "com.ismtile.editor",
@@ -70,12 +75,16 @@
       {
         "from": "public",
         "to": "public",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "build/icons",
         "to": "icons",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ]
   }

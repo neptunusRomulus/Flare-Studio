@@ -15,11 +15,8 @@ export default defineConfig({
     }
   },
   server: {
-<<<<<<< HEAD
-    port: 5175
-=======
+    // choose 5173 which matches the project's other scripts
     port: 5173
->>>>>>> 7bd82e7 (typescript transfer succelfully finished.)
   },
   base: './',
   resolve: {

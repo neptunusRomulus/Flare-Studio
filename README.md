@@ -64,8 +64,9 @@ Coming Soon...
 - [ ] 10- Skills
 - [ ] 12- Stats
 - [ ] 13- Shaders (with injection method)
-- [ ] 14- Particles
-- [ ] 15- **You name it. I will check on it. Promise.**
+- [ ] 14- Translations/localization editor
+- [ ] 15- Particles
+- [ ] 16- **You name it. I will check on it. Promise.**
   
 
 

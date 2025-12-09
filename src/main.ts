@@ -169,10 +169,11 @@ export class TileMapEditor {
     this.refreshLayersUI();
   }
 
-  private createLayer(name: string): void {
+  private createLayer(name: string, type: 'background' | 'object' | 'collision' | 'event' | 'enemy' | 'npc' = 'background'): void {
     const layer: TileLayer = {
       id: this.nextLayerId++,
       name,
+      type,
       data: new Array(this.mapWidth * this.mapHeight).fill(0),
       visible: true
     };
@@ -900,12 +901,13 @@ ${csvData}
     layerNames.forEach(name => {
       let layer = this.tileLayers.find(l => l.name === name);
       if (!layer) {
-        layer = {
-          id: this.nextLayerId++,
-          name: name,
-          data: new Array(this.mapWidth * this.mapHeight).fill(0),
-          visible: true
-        };
+            layer = {
+              id: this.nextLayerId++,
+              name: name,
+              type: 'background',
+              data: new Array(this.mapWidth * this.mapHeight).fill(0),
+              visible: true
+            };
         this.tileLayers.push(layer);
       }
       orderedLayers.push(layer);

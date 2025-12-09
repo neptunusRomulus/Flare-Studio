@@ -53,7 +53,8 @@ function createWindow() {
 
   // Load the app
   if (isDev) {
-  mainWindow.loadURL('http://localhost:5179');
+    // Vite dev server runs on 5173 (configured in vite.config.js)
+    mainWindow.loadURL('http://localhost:5173');
     mainWindow.webContents.openDevTools();
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));

@@ -438,6 +438,29 @@ function App() {
   const [startingMapIntermap, setStartingMapIntermap] = useState<string | null>(null);
   const previousMapNameRef = useRef(mapName);
 
+  // Ensure a tab is always selected when tabs exist but activeTabId is null
+  // This handles the case where the UI shows tabs but none appears selected
+  useEffect(() => {
+    if (tabs.length > 0 && !activeTabId) {
+      // Find tabs for the current project
+      if (currentProjectPath) {
+        const normalizedProjectPath = currentProjectPath.replace(/\\/g, '/').toLowerCase();
+        const projectTabs = tabs.filter(t => {
+          const normalizedTabPath = t.projectPath?.replace(/\\/g, '/').toLowerCase() || '';
+          return normalizedTabPath === normalizedProjectPath;
+        });
+        if (projectTabs.length > 0) {
+          console.log('Auto-selecting first project tab:', projectTabs[0].name);
+          setActiveTabId(projectTabs[0].id);
+        }
+      } else if (tabs.length > 0) {
+        // Fallback: select first available tab
+        console.log('Auto-selecting first available tab:', tabs[0].name);
+        setActiveTabId(tabs[0].id);
+      }
+    }
+  }, [tabs, activeTabId, currentProjectPath]);
+
   // Auto-save session to project folder when tabs or activeTabId changes
   useEffect(() => {
     const saveSession = async () => {
@@ -472,9 +495,15 @@ function App() {
           return true;
         });
         
+        // Only save activeTabId if it's a valid tab in this project
+        // This prevents saving null during the brief moment between setTabs and setActiveTabId
+        const validActiveTabId = activeTabId && uniqueTabs.some(t => t.id === activeTabId) 
+          ? activeTabId 
+          : (uniqueTabs.length > 0 ? uniqueTabs[0].id : null);
+        
         const sessionData = {
           tabs: uniqueTabs,
-          activeTabId: activeTabId,
+          activeTabId: validActiveTabId,
           lastOpened: new Date().toISOString()
         };
         
@@ -2267,6 +2296,13 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             const safeSnapshot = JSON.parse(JSON.stringify(snapshot));
             setTabs((prev) => prev.map(t => t.id === activeTabId ? { ...t, config: safeSnapshot } : t));
             console.log('Snapshot saved into activeTab.config before resetForNewProject:', { activeTabId, snapshotKeys: Object.keys(safeSnapshot || {}) });
+            
+            // ALSO save to disk so the map data persists across app restarts
+            // Without this, switching maps or restarting would lose the previous map's data
+            if (currentProjectPath) {
+              await editor.saveProjectData(currentProjectPath);
+              console.log('Previous map saved to disk before creating new map');
+            }
           } catch (err) {
             console.warn('Failed to snapshot current tab before creating a new map:', err);
           }

@@ -271,30 +271,27 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
             <span className="text-sm font-semibold">Flare Studio</span>
           </div>
           <div className="flex no-drag">
-            <Tooltip content="Minimize">
-              <button 
-                onClick={handleMinimize}
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
-              >
-                <Minus className="w-4 h-4" />
-              </button>
-            </Tooltip>
-            <Tooltip content="Maximize">
-              <button 
-                onClick={handleMaximize}
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
-              >
-                <Square className="w-4 h-4" />
-              </button>
-            </Tooltip>
-            <Tooltip content="Close">
-              <button 
-                onClick={handleClose}
-                className="text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </Tooltip>
+            <button 
+              onClick={handleMinimize}
+              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
+              aria-label="Minimize"
+            >
+              <Minus className="w-4 h-4" />
+            </button>
+            <button 
+              onClick={handleMaximize}
+              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
+              aria-label="Maximize"
+            >
+              <Square className="w-4 h-4" />
+            </button>
+            <button 
+              onClick={handleClose}
+              className="text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
+              aria-label="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
         </div>
         
@@ -374,32 +371,29 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
           />
           <span className="text-sm font-semibold">Flare Studio</span>
         </div>
-        <div className="flex no-drag">
-          <Tooltip content="Minimize">
+          <div className="flex no-drag">
             <button 
               onClick={handleMinimize}
               className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
+              aria-label="Minimize"
             >
               <Minus className="w-4 h-4" />
             </button>
-          </Tooltip>
-          <Tooltip content="Maximize">
             <button 
               onClick={handleMaximize}
               className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
+              aria-label="Maximize"
             >
               <Square className="w-4 h-4" />
             </button>
-          </Tooltip>
-          <Tooltip content="Close">
             <button 
               onClick={handleClose}
               className="text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
+              aria-label="Close"
             >
               <X className="w-4 h-4" />
             </button>
-          </Tooltip>
-        </div>
+          </div>
       </div>
       
       <div className="flex flex-1 min-h-0 overflow-hidden">

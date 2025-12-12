@@ -257,19 +257,29 @@ ipcMainLocal.handle('create-map-project', async (event, config) => {
   }
 });
 
-ipcMainLocal.handle('open-map-project', async (event, projectPath) => {
+ipcMainLocal.handle('open-map-project', async (event, projectPath, mapName) => {
   try {
     console.log('=== ELECTRON LOAD DEBUG ===');
     console.log('Loading project from:', projectPath);
     
-    // Look for map configuration file
+    // Look for map configuration file. If a specific mapName is provided
+    // prefer a file named `${mapName}.json` inside the project root. Otherwise
+    // fall back to the first .json file found.
     const files = fs.readdirSync(projectPath);
-    const mapFile = files.find(file => file.endsWith('.json'));
-    
+    let mapFile = null;
+    if (mapName && typeof mapName === 'string') {
+      const candidate = `${mapName}.json`;
+      if (files.includes(candidate)) {
+        mapFile = candidate;
+      }
+    }
+    if (!mapFile) {
+      mapFile = files.find(file => file.endsWith('.json')) || null;
+    }
+
     if (mapFile) {
       const mapConfigPath = path.join(projectPath, mapFile);
       console.log('Loading map file:', mapConfigPath);
-      
       const mapData = JSON.parse(fs.readFileSync(mapConfigPath, 'utf8'));
       console.log('Loaded map data:', {
         name: mapData.name,
@@ -598,6 +608,21 @@ ipcMainLocal.handle('discover-tileset-images', async (event, projectPath) => {
   } catch (e) {
     console.warn('discover-tileset-images failed:', e);
     return { tilesetImages: {}, tilesets: [] };
+  }
+});
+
+// Read an arbitrary image file and return as data URL (for renderer use)
+ipcMainLocal.handle('read-file-dataurl', async (_event, filePath) => {
+  try {
+    if (!filePath || !fs.existsSync(filePath)) return null;
+    const ext = (filePath.split('.').pop() || 'png').toLowerCase();
+    const normalizedExt = ext === 'jpg' ? 'jpeg' : ext;
+    const buf = fs.readFileSync(filePath);
+    const b64 = buf.toString('base64');
+    return `data:image/${normalizedExt};base64,${b64}`;
+  } catch (e) {
+    console.warn('read-file-dataurl failed for', filePath, e);
+    return null;
   }
 });
 

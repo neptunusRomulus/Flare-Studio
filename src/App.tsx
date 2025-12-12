@@ -24,8 +24,14 @@ interface MapConfig {
   isStartingMap?: boolean;
 }
 
+interface EditorTab {
+  id: string;
+  name: string;
+  projectPath?: string | null;
+  config?: EditorProjectData | MapConfig | null;
+}
+
 type PropertyType =
-  | 'string'
   | 'int'
   | 'float'
   | 'bool'
@@ -35,8 +41,9 @@ type PropertyType =
   | 'floatPair'
   | 'direction'
   | 'point'
+  | 'predefined'
   | 'list'
-  | 'predefined';
+  | 'string';
 
 interface PropertySpec {
   type: PropertyType;
@@ -44,33 +51,6 @@ interface PropertySpec {
   max?: number;
   options?: string[];
 }
-
-const ENEMY_PROPERTY_SPECS: Record<string, PropertySpec> = {
-  xp: { type: 'int', min: 0 },
-  xp_scaling: { type: 'filename' },
-  defeat_status: { type: 'string' },
-  convert_status: { type: 'string' },
-  first_defeat_loot: { type: 'int', min: 1 },
-  animations: { type: 'filename' },
-  loot: { type: 'list' },
-  loot_count: { type: 'intPair', min: 0 },
-  threat_range: { type: 'floatPair', min: 0 },
-  flee_range: { type: 'float', min: 0 },
-  chance_pursue: { type: 'float', min: 0 },
-  chance_flee: { type: 'float', min: 0 },
-  waypoint_pause: { type: 'duration' },
-  turn_delay: { type: 'duration' },
-  combat_style: { type: 'predefined', options: ['default', 'aggressive', 'passive'] },
-  power: { type: 'list' },
-  passive_powers: { type: 'list' },
-  quest_loot: { type: 'list' },
-  flee_duration: { type: 'duration' },
-  flee_cooldown: { type: 'duration' },
-  humanoid: { type: 'bool' },
-  lifeform: { type: 'bool' },
-  flying: { type: 'bool' },
-  intangible: { type: 'bool' },
-  };
 
 // Helper sets used by validation
 const CARDINAL_DIRECTIONS = new Set(['N','NE','E','SE','S','SW','W','NW']);
@@ -194,6 +174,8 @@ function validateValue(key: string, trimmed: string, spec: PropertySpec): string
   }
 }
 
+// Property specs for NPCs and enemies (left empty for now).
+const ENEMY_PROPERTY_SPECS: Record<string, PropertySpec> = {};
 const NPC_PROPERTY_SPECS: Record<string, PropertySpec> = {};
 
 function validateAndSanitizeObject(object: MapObject): { errors: string[]; sanitized: Record<string, string> } {
@@ -244,6 +226,64 @@ function App() {
   const [createMapError, setCreateMapError] = useState<string | null>(null);
   const [reservedMapNames, setReservedMapNames] = useState<string[]>([]);
   const [newMapStarting, setNewMapStarting] = useState(false);
+  // Editor tabs
+  const [tabs, setTabs] = useState<EditorTab[]>([]);
+  const [activeTabId, setActiveTabId] = useState<string | null>(null);
+  const TABS_STORAGE_KEY = 'flare_tabs_v1';
+
+  // Load persisted tabs and active tab on startup
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(TABS_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as { tabs?: EditorTab[]; activeTabId?: string | null };
+        if (Array.isArray(parsed.tabs)) {
+          setTabs(parsed.tabs as EditorTab[]);
+        }
+        if (parsed.activeTabId) {
+          setActiveTabId(parsed.activeTabId as string);
+        }
+
+        // If the active tab we restored carries an in-memory config, load it
+        // into pendingMapConfig so the editor will initialize from it.
+        try {
+          const restoredTabs = parsed.tabs as EditorTab[] | undefined;
+          const actId = parsed.activeTabId;
+          if (restoredTabs && actId) {
+            const act = restoredTabs.find(t => t.id === actId);
+            if (act && act.config) {
+              setPendingMapConfig(act.config as EditorProjectData);
+            }
+          }
+        } catch (e) {
+          // ignore restore config errors
+        }
+      }
+    } catch (e) {
+      console.warn('Failed to load persisted tabs:', e);
+    }
+  }, []);
+
+  // Persist tabs + activeTabId whenever they change
+  // Note: We strip tilesetImages from config to avoid localStorage size limits
+  useEffect(() => {
+    try {
+      // Create a lightweight version of tabs for persistence
+      const lightTabs = tabs.map(tab => {
+        if (!tab.config) return tab;
+        // Strip large data (tilesetImages can be several MB)
+        const lightConfig = { ...tab.config };
+        if ('tilesetImages' in lightConfig) {
+          delete (lightConfig as any).tilesetImages;
+        }
+        return { ...tab, config: lightConfig };
+      });
+      const payload = JSON.stringify({ tabs: lightTabs, activeTabId });
+      localStorage.setItem(TABS_STORAGE_KEY, payload);
+    } catch (e) {
+      console.warn('Failed to persist tabs:', e);
+    }
+  }, [tabs, activeTabId]);
   const [activeGid, setActiveGid] = useState<string>('(none)');
   const [showMinimap, setShowMinimap] = useState(true);
   // Show/hide Active GID indicator (user preference)
@@ -472,6 +512,285 @@ function App() {
     },
     [writeSpawnFile]
   );
+  
+  // Tab helpers
+  const createTabFor = (name: string, projectPath?: string | null, config?: EditorProjectData | MapConfig | null) => {
+    const id = Date.now().toString();
+    const safeConfig = config ? JSON.parse(JSON.stringify(config)) : null;
+    const tab: EditorTab = { id, name, projectPath: projectPath ?? null, config: safeConfig };
+    console.log('Creating tab:', { id, name, projectPath, hasConfig: !!safeConfig });
+    setTabs((prev) => [...prev, tab]);
+    setActiveTabId(id);
+    setCurrentProjectPath(projectPath ?? null);
+    return tab;
+  };
+  
+  const switchToTab = async (tabId: string) => {
+    if (tabId === activeTabId) return;
+    const prevTab = tabs.find(t => t.id === activeTabId);
+    const nextTab = tabs.find(t => t.id === tabId);
+    try {
+      if (editor && prevTab) {
+        // Always save a snapshot to the tab's config for quick restoration
+        try {
+          await editor.ensureTilesetsLoaded();
+          const snapshot = await editor.getProjectData();
+          const safeSnapshot = JSON.parse(JSON.stringify(snapshot));
+          setTabs((prev) => prev.map(t => t.id === prevTab.id ? { ...t, config: safeSnapshot } : t));
+          console.log('Snapshot saved into prevTab.config during tab switch:', { tabId: prevTab.id, snapshotKeys: Object.keys(safeSnapshot || {}) });
+        } catch (err) {
+          console.warn('Failed to snapshot tab before switching:', err);
+        }
+        
+        // Also save to disk if it's a disk-based project
+        if (prevTab.projectPath) {
+          try {
+            await editor.saveProjectData(prevTab.projectPath);
+          } catch (e) {
+            console.warn('Failed to save to disk before switching tabs:', e);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Error during tab switch save:', e);
+    }
+
+    if (!nextTab) {
+      setActiveTabId(null);
+      return;
+    }
+
+    setActiveTabId(tabId);
+    setCurrentProjectPath(nextTab.projectPath ?? null);
+
+    // If the tab contains a preloaded in-memory config, prefer restoring it
+    // (this can include tileset images that haven't been written to disk yet).
+    // However, if this tab belongs to a project on disk and the in-memory
+    // config does not include any tileset images, and we DON'T have an editor
+    // instance yet, prefer opening the map file from disk (pass the map name)
+    // so embedded project map files that have tileset images are used instead.
+    // NOTE: If editor already exists, skip this and use the in-memory restore path below.
+    if (nextTab.config && !editor) {
+      try {
+        const cfgCheck = nextTab.config as EditorProjectData;
+        if (nextTab.projectPath && (!cfgCheck.tilesetImages || Object.keys(cfgCheck.tilesetImages || {}).length === 0) && nextTab.name) {
+          console.log('In-memory config missing tileset images and no editor; preferring disk open for tab', tabId, nextTab.name);
+          await handleOpenMap(nextTab.projectPath, false, nextTab.name);
+          if (editor) setupAutoSave(editor);
+          return;
+        }
+      } catch (e) {
+        // ignore and fall back to normal restore
+      }
+
+    }
+
+    
+    // If the tab contains a preloaded in-memory config, prefer restoring it
+    // (this can include tileset images that haven't been written to disk yet).
+    if (nextTab.config) {
+      console.log('Switching to tab with in-memory config, attempting to restore for tab:', tabId, { hasProjectPath: !!nextTab.projectPath, configKeys: Object.keys(nextTab.config || {}) });
+      // If an editor instance exists, restore directly into it for a more
+      // immediate and reliable update (avoids race conditions creating a new editor).
+          try {
+            if (editor) {
+              console.log('Restoring config into existing editor for tab:', tabId);
+              // DON'T call resetForNewProject - just load the new project data directly
+              // The editor's loadProjectData will replace layers, tilesets etc.
+              // Just clear localStorage backup to prevent old data loading
+              editor.clearLocalStorageBackup();
+              
+              if (nextTab.config.name) {
+                editor.setMapName((nextTab.config as any).name);
+                setMapName((nextTab.config as any).name);
+              }
+              if ((nextTab.config as any).width && (nextTab.config as any).height) {
+                editor.setMapSize((nextTab.config as any).width ?? 20, (nextTab.config as any).height ?? 15);
+                setMapWidth((nextTab.config as any).width ?? 20);
+                setMapHeight((nextTab.config as any).height ?? 15);
+              }
+              const cfg = nextTab.config as EditorProjectData;
+
+              // If the in-memory config includes tileset images, apply them into
+              // the live editor first so loadProjectData can make use of them.
+              try {
+                if (cfg.tilesetImages && Object.keys(cfg.tilesetImages).length > 0) {
+                  if (typeof (editor as any).setTilesetImages === 'function') {
+                    (editor as any).setTilesetImages(cfg.tilesetImages);
+                  } else {
+                    // best-effort fallback: attach to editor for later use
+                    // @ts-ignore
+                    editor.tilesetImages = JSON.parse(JSON.stringify(cfg.tilesetImages));
+                  }
+                  console.log('Applied tilesetImages to editor for tab', tabId, Object.keys(cfg.tilesetImages));
+                } else {
+                  console.log('No tilesetImages present in config for tab', tabId);
+                }
+              } catch (e) {
+                console.warn('Failed to apply tilesetImages into editor:', e);
+              }
+
+              // After a short delay, attempt to discover tileset images from the
+              // project folder and apply any matching images. This handles the
+              // case where the original import referenced a file saved inside
+              // the project (images/tilesets or assets) and the in-memory
+              // snapshot didn't include the image data URL.
+              try {
+                await new Promise(r => setTimeout(r, 150));
+                if (currentProjectPath && window.electronAPI?.discoverTilesetImages) {
+                  const discovered = await window.electronAPI.discoverTilesetImages(currentProjectPath);
+                  const discoveredImages = discovered?.tilesetImages || {};
+                  if (Object.keys(discoveredImages).length > 0) {
+                    // Determine which filenames we care about from the config
+                    const cfgNames = new Set<string>();
+                    if (cfg.tilesets && Array.isArray(cfg.tilesets)) {
+                      for (const t of cfg.tilesets) {
+                        if (t.fileName) cfgNames.add(t.fileName);
+                        if ((t as any).sourcePath) {
+                          const s = (t as any).sourcePath as string;
+                          const parts = s.split(/[\\/]/);
+                          const maybe = parts[parts.length - 1];
+                          if (maybe) cfgNames.add(maybe);
+                        }
+                      }
+                    }
+
+                    // Merge discovered images for matching names
+                    const toApply: Record<string, string> = {};
+                    for (const name of Object.keys(discoveredImages)) {
+                      if (cfgNames.has(name)) {
+                        toApply[name] = discoveredImages[name];
+                      }
+                    }
+                    if (Object.keys(toApply).length > 0) {
+                      if (typeof (editor as any).setTilesetImages === 'function') {
+                        (editor as any).setTilesetImages(toApply);
+                        console.log('Applied discovered project tileset images for tab', tabId, Object.keys(toApply));
+                      } else {
+                        // attach to editor as fallback
+                        // @ts-ignore
+                        editor.tilesetImages = { ...(editor as any).tilesetImages || {}, ...toApply };
+                        console.log('Attached discovered project tileset images to editor.tilesetImages for tab', tabId, Object.keys(toApply));
+                      }
+                    }
+                    
+                    // If some tilesets still missing, attempt to read sourcePath files
+                    // referenced in the config directly from disk (supports absolute
+                    // or external paths). This uses the new preload IPC
+                    // `readFileAsDataURL` implemented in the main process.
+                    const stillMissing = (cfg.tilesets || []).filter((t: any) => {
+                      const name = t.fileName || (t.sourcePath ? t.sourcePath.split(/[\\/]/).pop() : null);
+                      return name && !((editor as any).tilesetImages || {}).hasOwnProperty(name) && !toApply[name];
+                    });
+                    const electronAPIAny = window.electronAPI as any;
+                    if (stillMissing.length > 0 && electronAPIAny?.readFileAsDataURL) {
+                      for (const t of stillMissing) {
+                        try {
+                          let candidatePath: string | null = t.sourcePath ?? null;
+                          if (candidatePath && currentProjectPath && window.electronAPI?.resolvePathRelative) {
+                            try {
+                              const rel = await window.electronAPI.resolvePathRelative(currentProjectPath, candidatePath);
+                              if (rel && rel.trim()) candidatePath = rel;
+                            } catch {}
+                          }
+                          if (!candidatePath) continue;
+                          const exists = await window.electronAPI.fileExists?.(candidatePath);
+                          if (!exists) continue;
+                          const dataUrl = await electronAPIAny.readFileAsDataURL(candidatePath);
+                          if (!dataUrl) continue;
+                          const key = t.fileName || candidatePath.split(/[\\/]/).pop();
+                          if (key) toApply[key] = dataUrl;
+                          console.log('Loaded tileset from sourcePath for tab', tabId, key);
+                        } catch (e) {
+                          console.warn('Failed to load tileset from sourcePath for', t, e);
+                        }
+                      }
+                      if (Object.keys(toApply).length > 0) {
+                        if (typeof (editor as any).setTilesetImages === 'function') {
+                          (editor as any).setTilesetImages(toApply);
+                          console.log('Applied discovered/project-source tileset images for tab', tabId, Object.keys(toApply));
+                        } else {
+                          // @ts-ignore
+                          editor.tilesetImages = { ...(editor as any).tilesetImages || {}, ...toApply };
+                        }
+                      }
+                    }
+                  }
+                }
+              } catch (e) {
+                console.warn('Failed to discover/apply project tileset images:', e);
+              }
+
+              // Wait for any in-flight image loads then load the rest of the project data
+              try {
+                if (typeof (editor as any).ensureTilesetsLoaded === 'function') {
+                  await (editor as any).ensureTilesetsLoaded(2000);
+                } else {
+                  await new Promise((r) => setTimeout(r, 50));
+                }
+              } catch (e) {
+                console.warn('ensureTilesetsLoaded failed or timed out:', e);
+              }
+
+              const loaded = await loadProjectData(editor, nextTab.config as EditorProjectData);
+
+              // Force palette rebuild after images and layers settle
+              try {
+                const activeLayerType = typeof (editor as any).getActiveLayerType === 'function'
+                  ? (editor as any).getActiveLayerType()
+                  : null;
+                if (activeLayerType && typeof (editor as any).updateCurrentTileset === 'function') {
+                  (editor as any).updateCurrentTileset(activeLayerType);
+                }
+                if (typeof (editor as any).refreshTilePalette === 'function') {
+                  (editor as any).refreshTilePalette(true);
+                }
+                console.log('Forced palette rebuild after restoring tab', tabId);
+              } catch (e) {
+                console.warn('Palette rebuild after restore failed', e);
+              }
+
+              console.log('Loaded tab config into editor, result:', loaded);
+              setupAutoSave(editor);
+              updateLayersList();
+              syncMapObjects();
+              setPendingMapConfig(null);
+              setMapInitialized(true);
+              
+              // Force canvas redraw after loading
+              try {
+                if (typeof (editor as any).draw === 'function') {
+                  (editor as any).draw();
+                  console.log('Forced canvas redraw after tab switch');
+                }
+              } catch (e) {
+                console.warn('Failed to force redraw:', e);
+              }
+              return;
+            }
+          } catch (err) {
+            console.warn('Failed to restore tab.config into existing editor, falling back to pendingMapConfig:', err);
+          }
+
+      // Fall back to pendingMapConfig which triggers editor creation/restoration
+      setPendingMapConfig(nextTab.config);
+      return;
+    }
+
+    // If the tab references a project path, open it from disk. Pass the
+    // tab's map name when available so the main process can open the
+    // specific map file (e.g. `MyMap.json`) instead of the project's
+    // default/first JSON file.
+    if (nextTab.projectPath) {
+      // If the tab has a cached config (from previous switch), prefer using that
+      // This is handled above in the nextTab.config block, so we only reach here
+      // if there's no cached config (first time opening this tab in this session)
+      
+      // Fallback: use handleOpenMap to load from disk (will create new editor via pendingMapConfig)
+      await handleOpenMap(nextTab.projectPath, false, nextTab.name);
+      if (editor) setupAutoSave(editor);
+    }
+  };
 
   const [isDarkMode, setIsDarkMode] = useState(() => {
     // Initialize from localStorage or default to false
@@ -1599,30 +1918,18 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       // Debug the map config structure in detail
       console.log('Map config full structure:', mapConfig);
       
-      // Create layers from the saved config
-      console.log('Creating layers from config...');
+      // Debug layer data
       const layers = mapConfig.layers || [];
-      console.log('Layers from config:', layers);
-      
-      for (const layerData of layers) {
-        console.log('Processing layer:', layerData);
-        const layerAdded = newEditor.addLayer(layerData.name, layerData.type);
-        
-        if (layerAdded) {
-          console.log(`Created layer: ${layerData.type} - ${layerData.name}`);
-          
-          // Find the newly created layer and set its data
-          const createdLayer = newEditor.getLayers().find(l => l.type === layerData.type);
-          if (createdLayer && layerData.data && Array.isArray(layerData.data)) {
-            console.log(`Setting data for layer ${createdLayer.id} with ${layerData.data.length} tiles`);
-            createdLayer.data = layerData.data;
-          }
-        } else {
-          console.log(`Failed to create layer: ${layerData.type} - ${layerData.name}`);
-        }
-      }
+      console.log('Layers from config:', layers.map(l => ({
+        type: l.type,
+        name: l.name,
+        dataLength: l.data?.length || 0,
+        hasNonZeroData: l.data?.some((d: any) => d !== 0) || false
+      })));
 
       // Load the complete project data into the editor
+      // The editor's loadProjectData handles everything: it sets this.tileLayers directly
+      // from projectData.layers, so we don't need to manually create layers with addLayer()
       console.log('=== CALLING EDITOR loadProjectData ===');
       newEditor.loadProjectData(mapConfig);
       
@@ -1682,70 +1989,13 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             console.log('Has per-layer tilesets in project:', hasPerLayerTilesets);
             console.log('Available discovered images:', imageKeys);
 
-            // Only use fallback tileset assignment if no per-layer tilesets exist
+            // Do NOT auto-assign discovered project tileset images when loading a map.
+            // Auto-assigning can cause tilesets imported in one map to appear in other maps
+            // unexpectedly. Tilesets should be per-map and restored only from saved
+            // project/map data. If you want automatic assignment in the future we can
+            // add an explicit opt-in setting.
             if (!hasPerLayerTilesets && imageKeys.length > 0) {
-              console.log('No per-layer tilesets found, using fallback assignment');
-              const normalize = (s: string) => (s || '')
-                .toLowerCase()
-                .replace(/\.[^/.]+$/, '') // drop extension
-                .replace(/[^a-z0-9]+/g, ' ') // non-alnum to space
-                .trim();
-
-              // Preserve the currently intended active layer to restore later
-              const intendedActive = newEditor.getActiveLayerId();
-              const layersToAssign = newEditor.getLayers();
-              let assignedAny = false;
-
-              for (const layer of layersToAssign) {
-                // Try exact and fuzzy matches by filename
-                const nameTargets = [normalize(layer.type), normalize(layer.name)];
-                let matchKey: string | null = null;
-
-                for (const key of imageKeys) {
-                  const keyNorm = normalize(key);
-                  if (nameTargets.includes(keyNorm)) {
-                    matchKey = key;
-                    break;
-                  }
-                }
-
-                if (!matchKey) {
-                  // Fallback: pick any key that contains layer type/name as substring
-                  const keyByIncludes = imageKeys.find(k => {
-                    const kn = normalize(k);
-                    return nameTargets.some(t => t && kn.includes(t));
-                  });
-                  if (keyByIncludes) matchKey = keyByIncludes;
-                }
-
-                if (!matchKey && imageKeys.length === 1) {
-                  // Final fallback: single image for the project
-                  matchKey = imageKeys[0];
-                }
-
-                if (matchKey) {
-                  console.log(`Assigning tileset '${matchKey}' to layer ${layer.id} (${layer.type})`);
-                  // Make this layer active to store tileset under its type
-                  newEditor.setActiveLayer(layer.id);
-                  await newEditor.loadTilesetFromDataURL(images[matchKey], matchKey);
-                  assignedAny = true;
-                } else {
-                  console.log(`No matching tileset found for layer ${layer.id} (${layer.type})`);
-                }
-              }
-
-              // Restore intended active layer selection
-              if (intendedActive !== null) {
-                newEditor.setActiveLayer(intendedActive);
-              }
-
-              if (assignedAny) {
-                // Trigger auto-save to preserve imported tilesets
-                newEditor.forceSave();
-              }
-            } else {
-              console.log('Per-layer tilesets already loaded, skipping fallback assignment');
-              // Just update UI state based on what was loaded
+              console.log('Discovered project tileset images are available but auto-assignment is disabled to preserve per-map tileset isolation.');
             }
           }
 
@@ -1962,6 +2212,22 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
 
       if (targetEditor) {
 
+        // Before resetting the editor for the new map, persist the current
+        // editor state into the active tab's config so the current map's
+        // tilesets/brushes are preserved when the shared editor instance is
+        // reused. This avoids losing the uploaded tileset from the previous map.
+        if (editor && activeTabId) {
+          try {
+            await editor.ensureTilesetsLoaded();
+            const snapshot = await editor.getProjectData();
+            const safeSnapshot = JSON.parse(JSON.stringify(snapshot));
+            setTabs((prev) => prev.map(t => t.id === activeTabId ? { ...t, config: safeSnapshot } : t));
+            console.log('Snapshot saved into activeTab.config before resetForNewProject:', { activeTabId, snapshotKeys: Object.keys(safeSnapshot || {}) });
+          } catch (err) {
+            console.warn('Failed to snapshot current tab before creating a new map:', err);
+          }
+        }
+
         // Set projectName to the user-typed project name at creation
         targetEditor.projectName = resolvedName;
 
@@ -1987,6 +2253,12 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       setHasSelection(false);
       setSelectionCount(0);
       setCreateMapError(null);
+      // Create a tab for this newly created map inside the current project
+      try {
+        createTabFor(resolvedName, currentProjectPath ?? null, { name: resolvedName, width, height, tileSize: 64, location: currentProjectPath ?? '' });
+      } catch (e) {
+        console.warn('Failed to create tab for new in-project map:', e);
+      }
       setShowCreateMapDialog(false);
     } finally {
       setIsPreparingNewMap(false);
@@ -2268,6 +2540,17 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     }
   }, [editor, currentProjectPath]);
 
+  // Keep stable refs to the handlers so we can register IPC listeners once
+  // and still call the latest handler implementations without re-registering.
+  const handleManualSaveRef = useRef(handleManualSave);
+  const handleOpenMapRef = useRef<typeof handleOpenMap | null>(null);
+  const handleUndoRef = useRef(handleUndo);
+  const handleRedoRef = useRef(handleRedo);
+
+  useEffect(() => { handleManualSaveRef.current = handleManualSave; }, [handleManualSave]);
+  useEffect(() => { handleUndoRef.current = handleUndo; }, [handleUndo]);
+  useEffect(() => { handleRedoRef.current = handleRedo; }, [handleRedo]);
+
   // Maps helpers (moved after performExport/handleManualSave to avoid forward ref issues)
   const refreshProjectMaps = useCallback(async () => {
     if (!currentProjectPath || !window.electronAPI?.listMaps) {
@@ -2330,11 +2613,10 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
   const handleCreateNewMap = (config: MapConfig, newProjectPath?: string) => {
     localStorage.removeItem('tilemap_autosave_backup');
     setCurrentProjectPath(newProjectPath ?? null);
-
-  // Do not set mapName to project name here. Only set currentProjectPath and map config state.
-  updateStartingMap(Boolean(config.isStartingMap), { propagate: false });
-  setNewMapName('Map Name');
-  setNewMapStarting(Boolean(config.isStartingMap));
+    // Do not set mapName to project name here. Only set currentProjectPath and map config state.
+    updateStartingMap(Boolean(config.isStartingMap), { propagate: false });
+    setNewMapName('Map Name');
+    setNewMapStarting(Boolean(config.isStartingMap));
     setMapWidth(0);
     setMapHeight(0);
     setNewMapWidth(config.width);
@@ -2352,9 +2634,12 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     setCreateMapError(null);
     setShowCreateMapDialog(false);
     setShowWelcome(false);
+
+    // For project creation we do not auto-create any tabs here.
+    // Tabs should only be created when the user creates an actual map inside the project.
   };
 
-  const handleOpenMap = useCallback(async (projectDir: string) => {
+  const handleOpenMap = useCallback(async (projectDir: string, createTab: boolean = false, mapName?: string) => {
     console.log('=== HANDLE OPEN MAP CALLED ===', projectDir);
     console.log('Project path details:', {
       path: projectDir,
@@ -2424,10 +2709,48 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         return;
       }
       setProjectMaps([...maps]);
+      
+      // Create tabs for ALL maps in the project that don't already have tabs
+      // This ensures all maps are visible in tabs when reopening a project
+      // Use functional update to get the latest tabs state and avoid stale closure issues
+      // Normalize paths for comparison (handle different slash styles)
+      const normalizedProjectDir = projectDir.replace(/\\/g, '/').toLowerCase();
+      setTabs(prevTabs => {
+        const existingTabNames = new Set(
+          prevTabs
+            .filter(t => t.projectPath && t.projectPath.replace(/\\/g, '/').toLowerCase() === normalizedProjectDir)
+            .map(t => t.name)
+        );
+        console.log('Existing tabs for project:', normalizedProjectDir, Array.from(existingTabNames));
+        const newTabs: EditorTab[] = [];
+        for (const mapFileName of maps) {
+          // Extract map name from filename (remove .json extension)
+          const mapNameFromFile = mapFileName.replace(/\.json$/i, '');
+          if (!existingTabNames.has(mapNameFromFile)) {
+            const tabId = Date.now().toString() + '_' + Math.random().toString(36).substr(2, 9) + '_' + mapNameFromFile;
+            newTabs.push({
+              id: tabId,
+              name: mapNameFromFile,
+              projectPath: projectDir,
+              config: null // Config will be loaded when tab is switched to
+            });
+            console.log('Creating tab for map in project:', mapNameFromFile);
+          } else {
+            console.log('Tab already exists for map:', mapNameFromFile);
+          }
+        }
+        if (newTabs.length > 0) {
+          console.log('Adding new tabs:', newTabs.map(t => t.name));
+          return [...prevTabs, ...newTabs];
+        }
+        return prevTabs;
+      });
+      
       // If there are maps, proceed to open the first map as before
       if (window.electronAPI?.openMapProject) {
-        const mapConfig = await window.electronAPI.openMapProject(projectDir);
-        if (mapConfig) {
+        // Use type assertion for optional mapName parameter (not in base type but supported)
+        const mapConfig = await (window.electronAPI.openMapProject as (path: string, mapName?: string) => Promise<EditorProjectData | null>)(projectDir, mapName);
+          if (mapConfig) {
           // ...existing code for setting up the map/editor...
           const resolvedName = mapConfig.name?.trim() ? mapConfig.name.trim() : 'Untitled Map';
           const starting = Boolean(mapConfig.isStartingMap);
@@ -2448,8 +2771,50 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           showBottomToolbarTemporarily();
           setShowWelcome(false);
           setShowCreateMapDialog(false);
-          if (editor) setEditor(null);
-          setPendingMapConfig(mapConfig);
+          if (editor) {
+            // Preserve current editor state before clearing the editor to open another project
+            if (activeTabId) {
+              const prevTab = tabs.find(t => t.id === activeTabId);
+              if (prevTab) {
+                try {
+                  if (prevTab.projectPath) {
+                    await editor.saveProjectData(prevTab.projectPath);
+                  } else {
+                            await editor.ensureTilesetsLoaded();
+                            const snapshot = await editor.getProjectData();
+                            const safeSnapshot = JSON.parse(JSON.stringify(snapshot));
+                            setTabs((prev) => prev.map(t => t.id === prevTab.id ? { ...t, config: safeSnapshot } : t));
+                            console.log('Snapshot saved into prevTab.config before opening project:', { prevTabId: prevTab.id, snapshotKeys: Object.keys(safeSnapshot || {}) });
+                  }
+                } catch (err) {
+                  console.warn('Failed to persist current editor before opening project:', err);
+                }
+              }
+            }
+            setEditor(null);
+          }
+          // Always create a tab for the map if one doesn't already exist
+          let tabAlreadyExists = false;
+          try {
+            const exists = tabs.some(t => (t.projectPath?.replace(/\\/g, '/').toLowerCase() || '') === normalizedProjectDir && t.name === resolvedName);
+            if (!exists) {
+              const tab = createTabFor(resolvedName, projectDir, mapConfig);
+              setActiveTabId(tab.id);
+            } else {
+              // If tab exists, just switch to it - don't trigger pendingMapConfig
+              tabAlreadyExists = true;
+              const existingTab = tabs.find(t => (t.projectPath?.replace(/\\/g, '/').toLowerCase() || '') === normalizedProjectDir && t.name === resolvedName);
+              if (existingTab) {
+                setActiveTabId(existingTab.id);
+              }
+            }
+          } catch (e) {
+            console.warn('Failed to create tab on open:', e);
+          }
+          // Only set pendingMapConfig if this is a new tab (not switching to existing)
+          if (!tabAlreadyExists) {
+            setPendingMapConfig(mapConfig);
+          }
         }
         } else {
         // Fallback for web
@@ -2466,21 +2831,30 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     }
   }, [editor, setupAutoSave, updateLayersList, startingMapIntermap, updateStartingMap]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Keep a ref to handleOpenMap so IPC listeners can call the latest implementation
+  useEffect(() => { handleOpenMapRef.current = handleOpenMap; }, [handleOpenMap]);
+
   // Wire Electron menu actions (Save/Open/New)
   useEffect(() => {
     if (!window.electronAPI) return;
-    // Save Map
+
+    // Register IPC listeners once and call the latest handler via refs.
     window.electronAPI.onMenuSaveMap(async () => {
-      await handleManualSave();
+      try { await handleManualSaveRef.current?.(); } catch (e) { console.error(e); }
     });
-    // Open Map
+
     window.electronAPI.onMenuOpenMap(async () => {
       const selected = await window.electronAPI.selectDirectory();
       if (selected) {
-        await handleOpenMap(selected);
+        try {
+          const fn = handleOpenMapRef.current;
+          if (fn) await fn(selected);
+        } catch (e) {
+          console.error(e);
+        }
       }
     });
-    // New Map
+
     window.electronAPI.onMenuNewMap(() => {
       setShowWelcome(true);
       setMapInitialized(false);
@@ -2489,40 +2863,42 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       setMapHeight(0);
       setShowCreateMapDialog(false);
     });
-    // Undo
-    window.electronAPI.onMenuUndo(() => {
-      handleUndo();
-    });
-    // Redo
-    window.electronAPI.onMenuRedo(() => {
-      handleRedo();
-    });
-    // No cleanup provided by preload; handlers are idempotent in this simple flow
-  }, [handleManualSave, handleOpenMap, handleUndo, handleRedo]);
 
-  // Handle close confirmation events
+    window.electronAPI.onMenuUndo(() => { try { handleUndoRef.current?.(); } catch (e) { console.error(e); } });
+    window.electronAPI.onMenuRedo(() => { try { handleRedoRef.current?.(); } catch (e) { console.error(e); } });
+
+    // We intentionally do not include dependencies so listeners are registered only once.
+  }, []);
+
+  // Handle close confirmation events. Register listeners once and use refs
+  // to access the latest handlers/state so we avoid adding multiple
+  // listeners (which caused MaxListenersExceededWarning).
+  const hasUnsavedChangesRef = useRef(hasUnsavedChanges);
+  useEffect(() => { hasUnsavedChangesRef.current = hasUnsavedChanges; }, [hasUnsavedChanges]);
+
   useEffect(() => {
     if (!window.electronAPI) return;
-    
-    // Handle before close check
+
     window.electronAPI.onBeforeClose(async () => {
-      await window.electronAPI.confirmClose(hasUnsavedChanges);
-      // The main process handles the actual close logic
+      try {
+        // Use ref to read the latest unsaved state
+        await window.electronAPI.confirmClose(hasUnsavedChangesRef.current);
+      } catch (err) {
+        console.error('onBeforeClose handler failed:', err);
+      }
     });
 
-    // Handle save and close request
     window.electronAPI.onSaveAndClose(async () => {
       try {
-        await handleManualSave();
-        // After save is complete, tell main process to close
+        await handleManualSaveRef.current?.();
         window.electronAPI.closeAfterSave();
       } catch (error) {
         console.error('Failed to save before close:', error);
-        // Even if save fails, we could show another dialog or just close
         window.electronAPI.closeAfterSave();
       }
     });
-  }, [hasUnsavedChanges, handleManualSave]);
+    // Intentionally no dependencies so listeners are registered only once.
+  }, []);
 
   // Handle browser beforeunload event (for web version)
   useEffect(() => {
@@ -2627,6 +3003,28 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             />
             <span className="text-sm font-semibold text-orange-600 dark:text-orange-400">Flare Studio</span>
           </div>
+          {/* Tabs */}
+          <div className="ml-4 flex items-center gap-2 overflow-x-auto max-w-[60vw] no-drag">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => { void switchToTab(tab.id); }}
+                className={`px-3 py-1 rounded-t-md border border-b-0 text-sm truncate max-w-xs no-drag transition-all duration-200 ${tab.id === activeTabId ? 'bg-orange-500 text-white border-orange-500' : 'bg-transparent text-gray-600 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-neutral-700'}`}
+                title={tab.name}
+              >
+                {tab.name}
+              </button>
+            ))}
+            <Tooltip content="Create a new map" side="right">
+              <button
+                onClick={() => setShowCreateMapDialog(true)}
+                className="ml-1 p-1 rounded-md hover:bg-slate-100 dark:hover:bg-neutral-800 no-drag"
+                aria-label="Create new map"
+              >
+                <Plus className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+              </button>
+            </Tooltip>
+          </div>
           <div className="text-sm font-medium"></div>
           {/* Save Status Indicator */}
           <div className="flex items-center gap-1 text-xs">
@@ -2657,30 +3055,27 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           </div>
         </div>
         <div className="flex no-drag">
-          <Tooltip content="Minimize">
-            <button 
-              onClick={handleMinimize}
-              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 p-1 rounded transition-colors"
-            >
-              <Minus className="w-4 h-4" />
-            </button>
-          </Tooltip>
-          <Tooltip content="Maximize">
-            <button 
-              onClick={handleMaximize}
-              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 p-1 rounded transition-colors"
-            >
-              <Square className="w-4 h-4" />
-            </button>
-          </Tooltip>
-          <Tooltip content="Close">
-            <button 
-              onClick={handleClose}
-              className="text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 hover:bg-gray-200 dark:hover:bg-gray-700 p-1 rounded transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </Tooltip>
+          <button 
+            onClick={handleMinimize}
+            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 p-1 rounded transition-colors"
+            aria-label="Minimize"
+          >
+            <Minus className="w-4 h-4" />
+          </button>
+          <button 
+            onClick={handleMaximize}
+            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 p-1 rounded transition-colors"
+            aria-label="Maximize"
+          >
+            <Square className="w-4 h-4" />
+          </button>
+          <button 
+            onClick={handleClose}
+            className="text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 hover:bg-gray-200 dark:hover:bg-gray-700 p-1 rounded transition-colors"
+            aria-label="Close"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
@@ -2796,9 +3191,17 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               {(() => {
                 const activeLayerType = activeLayer?.type;
                 const showTabs = activeLayerType === 'background' || activeLayerType === 'object';
+                console.log('[DEBUG UI] Rendering tabs - activeLayerType:', activeLayerType, 'showTabs:', showTabs);
+                if (editor && activeLayerType) {
+                  const tabs = editor.getLayerTabs ? editor.getLayerTabs(activeLayerType) : [];
+                  const activeTabId = editor.getActiveLayerTabId ? editor.getActiveLayerTabId(activeLayerType) : null;
+                  console.log('[DEBUG UI] tabs for', activeLayerType, ':', tabs.length, 'tabs', JSON.stringify(tabs.map((t: any) => ({ id: t.id, name: t.name }))));
+                  console.log('[DEBUG UI] activeTabId for', activeLayerType, ':', activeTabId);
+                  console.log('[DEBUG UI] Tab ID match check: tab IDs are', tabs.map((t: any) => t.id), 'and looking for active ID', activeTabId);
+                }
                 if (!showTabs) return null;
         return (
-          <div key={tabTick} className="flex items-center gap-2 px-2 pb-2">
+          <div key={tabTick} className="flex items-center gap-2 px-2 py-2">
         <div
           className={`flex-1 flex items-center gap-1 overflow-x-auto tabs-scroll ${(() => {
             try {
@@ -2817,7 +3220,9 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         >
                       {/* Render simple tabs using editor state when available (no import/add controls here) */}
                       {editor ? (
-                        (editor.getLayerTabs ? editor.getLayerTabs(activeLayerType!) : []).map((tab: { id: number; name?: string; }, idx: number) => (
+                        (editor.getLayerTabs ? editor.getLayerTabs(activeLayerType!) : []).map((tab: { id: number; name?: string; }, idx: number) => {
+                          console.log('[DEBUG UI] Rendering button for tab:', tab.id, 'index:', idx, 'isActive:', editor.getActiveLayerTabId && editor.getActiveLayerTabId(activeLayerType) === tab.id);
+                          return (
                           <button
                             key={tab.id}
                             className={`w-5 h-5 flex items-center justify-center rounded-full text-white text-xs font-medium transition-colors shadow-sm ${editor && editor.getCurrentLayerType() === activeLayerType && editor.getActiveLayerTabId && editor.getActiveLayerTabId(activeLayerType) === tab.id ? 'opacity-100 scale-100 ring-2 ring-offset-1' : 'opacity-90 scale-95'}`}
@@ -2833,7 +3238,8 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                           >
                             {idx + 1}
                           </button>
-                        ))
+                        );
+                        })
                       ) : (
                         <div className="text-xs text-muted-foreground">No tabs</div>
                       )}

@@ -1,6 +1,19 @@
 import type { EditorProjectData, SavedTilesetEntry } from './editor/TileMapEditor';
 import type { TileLayer, MapObject } from './types';
 
+// Session data stored per-project in .flare-session.json
+interface SessionTab {
+  id: string;
+  name: string;
+  projectPath?: string;
+}
+
+interface SessionData {
+  tabs: SessionTab[];
+  activeTabId: string | null;
+  lastOpened?: string; // ISO timestamp
+}
+
 interface MapConfig {
   name: string;
   width: number;
@@ -46,6 +59,10 @@ declare global {
       resolvePathRelative: (fromPath: string, toPath: string) => Promise<string>;
       getProjectThumbnail: (projectPath: string) => Promise<string | null>;
       checkProjectExists: (projectPath: string) => Promise<boolean>;
+      // Session management (per-project)
+      readSession: (projectPath: string) => Promise<SessionData | null>;
+      writeSession: (projectPath: string, sessionData: SessionData) => Promise<boolean>;
+      readFileAsDataURL: (filePath: string) => Promise<string | null>;
       // Menu event listeners
       onMenuNewMap: (callback: () => void) => void;
       onMenuOpenMap: (callback: () => void) => void;

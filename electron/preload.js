@@ -20,13 +20,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveExportFiles: (projectPath, projectName, mapTxt, tilesetDef, options) => ipcRenderer.invoke('save-export-files', projectPath, projectName, mapTxt, tilesetDef, options),
   discoverTilesetImages: (projectPath) => ipcRenderer.invoke('discover-tileset-images', projectPath),
   readFileAsDataURL: (filePath) => ipcRenderer.invoke('read-file-dataurl', filePath),
-    listMaps: (projectPath) => ipcRenderer.invoke('list-maps', projectPath),
-    readMapFile: (projectPath, filename) => ipcRenderer.invoke('read-map-file', projectPath, filename),
+  listMaps: (projectPath) => ipcRenderer.invoke('list-maps', projectPath),
+  readMapFile: (projectPath, filename) => ipcRenderer.invoke('read-map-file', projectPath, filename),
   updateSpawnFile: (projectPath, content) => ipcRenderer.invoke('update-spawn-file', projectPath, content),
   readSpawnFile: (projectPath) => ipcRenderer.invoke('read-spawn-file', projectPath),
   resolvePathRelative: (fromPath, toPath) => ipcRenderer.invoke('resolve-path-relative', fromPath, toPath),
   getProjectThumbnail: (projectPath) => ipcRenderer.invoke('get-project-thumbnail', projectPath),
   checkProjectExists: (projectPath) => ipcRenderer.invoke('check-project-exists', projectPath),
+  // Session management (per-project)
+  readSession: (projectPath) => ipcRenderer.invoke('read-session', projectPath),
+  writeSession: (projectPath, sessionData) => ipcRenderer.invoke('write-session', projectPath, sessionData),
   // Menu event listeners
   onMenuNewMap: (callback) => ipcRenderer.on('menu-new-map', (_e) => callback && callback()),
   onMenuOpenMap: (callback) => ipcRenderer.on('menu-open-map', (_e) => callback && callback()),

@@ -229,61 +229,11 @@ function App() {
   // Editor tabs
   const [tabs, setTabs] = useState<EditorTab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
-  const TABS_STORAGE_KEY = 'flare_tabs_v1';
 
-  // Load persisted tabs and active tab on startup
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(TABS_STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as { tabs?: EditorTab[]; activeTabId?: string | null };
-        if (Array.isArray(parsed.tabs)) {
-          setTabs(parsed.tabs as EditorTab[]);
-        }
-        if (parsed.activeTabId) {
-          setActiveTabId(parsed.activeTabId as string);
-        }
+  // Session is now stored per-project in .flare-session.json
+  // Load session when a project is opened (handled in handleOpenMap)
+  // Save session effect is defined after currentProjectPath state (see below)
 
-        // If the active tab we restored carries an in-memory config, load it
-        // into pendingMapConfig so the editor will initialize from it.
-        try {
-          const restoredTabs = parsed.tabs as EditorTab[] | undefined;
-          const actId = parsed.activeTabId;
-          if (restoredTabs && actId) {
-            const act = restoredTabs.find(t => t.id === actId);
-            if (act && act.config) {
-              setPendingMapConfig(act.config as EditorProjectData);
-            }
-          }
-        } catch (e) {
-          // ignore restore config errors
-        }
-      }
-    } catch (e) {
-      console.warn('Failed to load persisted tabs:', e);
-    }
-  }, []);
-
-  // Persist tabs + activeTabId whenever they change
-  // Note: We strip tilesetImages from config to avoid localStorage size limits
-  useEffect(() => {
-    try {
-      // Create a lightweight version of tabs for persistence
-      const lightTabs = tabs.map(tab => {
-        if (!tab.config) return tab;
-        // Strip large data (tilesetImages can be several MB)
-        const lightConfig = { ...tab.config };
-        if ('tilesetImages' in lightConfig) {
-          delete (lightConfig as any).tilesetImages;
-        }
-        return { ...tab, config: lightConfig };
-      });
-      const payload = JSON.stringify({ tabs: lightTabs, activeTabId });
-      localStorage.setItem(TABS_STORAGE_KEY, payload);
-    } catch (e) {
-      console.warn('Failed to persist tabs:', e);
-    }
-  }, [tabs, activeTabId]);
   const [activeGid, setActiveGid] = useState<string>('(none)');
   const [showMinimap, setShowMinimap] = useState(true);
   // Show/hide Active GID indicator (user preference)
@@ -485,6 +435,56 @@ function App() {
   const [currentProjectPath, setCurrentProjectPath] = useState<string | null>(null);
   const [startingMapIntermap, setStartingMapIntermap] = useState<string | null>(null);
   const previousMapNameRef = useRef(mapName);
+
+  // Auto-save session to project folder when tabs or activeTabId changes
+  useEffect(() => {
+    const saveSession = async () => {
+      if (!currentProjectPath || !window.electronAPI?.writeSession) return;
+      if (tabs.length === 0) return;
+      
+      try {
+        // Only save tabs that belong to this project
+        const normalizedProjectPath = currentProjectPath.replace(/\\/g, '/').toLowerCase();
+        const projectTabs = tabs
+          .filter(t => {
+            const normalizedTabPath = t.projectPath?.replace(/\\/g, '/').toLowerCase() || '';
+            return normalizedTabPath === normalizedProjectPath;
+          })
+          .map(t => ({
+            id: t.id,
+            name: t.name,
+            projectPath: t.projectPath ?? undefined // Convert null to undefined for type compatibility
+          }));
+        
+        if (projectTabs.length === 0) return;
+        
+        // Deduplicate tabs by name (keep only the first occurrence of each map name)
+        const seenNames = new Set<string>();
+        const uniqueTabs = projectTabs.filter(t => {
+          const lowerName = t.name.toLowerCase();
+          if (seenNames.has(lowerName)) {
+            console.log('Session save: removing duplicate tab:', t.name);
+            return false;
+          }
+          seenNames.add(lowerName);
+          return true;
+        });
+        
+        const sessionData = {
+          tabs: uniqueTabs,
+          activeTabId: activeTabId,
+          lastOpened: new Date().toISOString()
+        };
+        
+        await window.electronAPI.writeSession(currentProjectPath, sessionData);
+        console.log('Session saved to project:', currentProjectPath, uniqueTabs.length, 'tabs');
+      } catch (e) {
+        console.warn('Failed to save session to project:', e);
+      }
+    };
+    
+    saveSession();
+  }, [tabs, activeTabId, currentProjectPath]);
 
   const writeSpawnFile = useCallback(async (starting: boolean, mapNameOverride?: string) => {
     const effectiveName = mapNameOverride ?? mapName;
@@ -786,8 +786,31 @@ function App() {
       // This is handled above in the nextTab.config block, so we only reach here
       // if there's no cached config (first time opening this tab in this session)
       
-      // Fallback: use handleOpenMap to load from disk (will create new editor via pendingMapConfig)
-      await handleOpenMap(nextTab.projectPath, false, nextTab.name);
+      console.log('=== TAB SWITCH: Loading from disk ===');
+      console.log('Tab:', nextTab.name, 'Project:', nextTab.projectPath);
+      console.log('Current tabs before handleOpenMap:', tabs.map(t => t.name));
+      
+      // DON'T call handleOpenMap - it rebuilds tabs from scratch!
+      // Instead, just load the map config directly
+      if (window.electronAPI?.openMapProject) {
+        try {
+          const mapConfig = await (window.electronAPI.openMapProject as (path: string, mapName?: string) => Promise<EditorProjectData | null>)(nextTab.projectPath, nextTab.name);
+          if (mapConfig) {
+            console.log('Loaded map config for tab:', nextTab.name, Object.keys(mapConfig));
+            setPendingMapConfig(mapConfig);
+            setMapName(mapConfig.name || nextTab.name);
+            setMapWidth(mapConfig.width ?? 20);
+            setMapHeight(mapConfig.height ?? 15);
+            setMapInitialized(true);
+            setShowWelcome(false);
+            setShowCreateMapDialog(false);
+          } else {
+            console.warn('Failed to load map config for tab:', nextTab.name);
+          }
+        } catch (e) {
+          console.error('Error loading map for tab switch:', e);
+        }
+      }
       if (editor) setupAutoSave(editor);
     }
   };
@@ -2710,41 +2733,98 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       }
       setProjectMaps([...maps]);
       
+      // Load session from project folder (.flare-session.json)
+      // This restores tabs that were open when the project was last used
+      let savedSession: { tabs: { id: string; name: string; projectPath?: string }[]; activeTabId: string | null } | null = null;
+      if (window.electronAPI?.readSession) {
+        try {
+          savedSession = await window.electronAPI.readSession(projectDir);
+          console.log('Loaded session from project:', savedSession?.tabs?.length || 0, 'tabs');
+        } catch (e) {
+          console.warn('Failed to load session from project:', e);
+        }
+      }
+      
       // Create tabs for ALL maps in the project that don't already have tabs
-      // This ensures all maps are visible in tabs when reopening a project
+      // First, restore tabs from saved session, then add any new maps
       // Use functional update to get the latest tabs state and avoid stale closure issues
       // Normalize paths for comparison (handle different slash styles)
       const normalizedProjectDir = projectDir.replace(/\\/g, '/').toLowerCase();
+      
+      // Track which tab to activate after loading
+      let tabToActivate: string | null = null;
+      
       setTabs(prevTabs => {
+        // Get existing tab names for this project
         const existingTabNames = new Set(
           prevTabs
             .filter(t => t.projectPath && t.projectPath.replace(/\\/g, '/').toLowerCase() === normalizedProjectDir)
             .map(t => t.name)
         );
-        console.log('Existing tabs for project:', normalizedProjectDir, Array.from(existingTabNames));
+        
+        // Start with previous tabs (from other projects)
+        const otherProjectTabs = prevTabs.filter(t => {
+          const normalizedPath = t.projectPath?.replace(/\\/g, '/').toLowerCase() || '';
+          return normalizedPath !== normalizedProjectDir;
+        });
+        
+        // Restore tabs from saved session
+        const restoredTabs: EditorTab[] = [];
+        if (savedSession?.tabs) {
+          for (const savedTab of savedSession.tabs) {
+            // Only restore if the map still exists (check both .json and .txt)
+            const mapExists = maps.some(m => {
+              const mapBaseName = m.replace(/\.(txt|json)$/i, '').toLowerCase();
+              return mapBaseName === savedTab.name.toLowerCase();
+            });
+            if (mapExists && !existingTabNames.has(savedTab.name)) {
+              restoredTabs.push({
+                id: savedTab.id,
+                name: savedTab.name,
+                projectPath: projectDir,
+                config: null
+              });
+              existingTabNames.add(savedTab.name);
+              console.log('Restored tab from session:', savedTab.name);
+            }
+          }
+        }
+        
+        // Add tabs for any new maps not in session
         const newTabs: EditorTab[] = [];
         for (const mapFileName of maps) {
-          // Extract map name from filename (remove .json extension)
-          const mapNameFromFile = mapFileName.replace(/\.json$/i, '');
+          // Extract map name from filename (remove .txt or .json extension)
+          const mapNameFromFile = mapFileName.replace(/\.(txt|json)$/i, '');
           if (!existingTabNames.has(mapNameFromFile)) {
             const tabId = Date.now().toString() + '_' + Math.random().toString(36).substr(2, 9) + '_' + mapNameFromFile;
             newTabs.push({
               id: tabId,
               name: mapNameFromFile,
               projectPath: projectDir,
-              config: null // Config will be loaded when tab is switched to
+              config: null
             });
-            console.log('Creating tab for map in project:', mapNameFromFile);
-          } else {
-            console.log('Tab already exists for map:', mapNameFromFile);
+            console.log('Creating new tab for map:', mapNameFromFile);
           }
         }
-        if (newTabs.length > 0) {
-          console.log('Adding new tabs:', newTabs.map(t => t.name));
-          return [...prevTabs, ...newTabs];
+        
+        const allProjectTabs = [...restoredTabs, ...newTabs];
+        
+        // Determine which tab to activate
+        if (savedSession?.activeTabId && allProjectTabs.some(t => t.id === savedSession.activeTabId)) {
+          tabToActivate = savedSession.activeTabId;
+        } else if (allProjectTabs.length > 0) {
+          tabToActivate = allProjectTabs[0].id;
         }
-        return prevTabs;
+        
+        console.log('Final tabs for project:', allProjectTabs.map(t => t.name), 'activating:', tabToActivate);
+        
+        return [...otherProjectTabs, ...allProjectTabs];
       });
+      
+      // Set the active tab after state update
+      if (tabToActivate) {
+        setActiveTabId(tabToActivate);
+      }
       
       // If there are maps, proceed to open the first map as before
       if (window.electronAPI?.openMapProject) {
@@ -2793,28 +2873,10 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             }
             setEditor(null);
           }
-          // Always create a tab for the map if one doesn't already exist
-          let tabAlreadyExists = false;
-          try {
-            const exists = tabs.some(t => (t.projectPath?.replace(/\\/g, '/').toLowerCase() || '') === normalizedProjectDir && t.name === resolvedName);
-            if (!exists) {
-              const tab = createTabFor(resolvedName, projectDir, mapConfig);
-              setActiveTabId(tab.id);
-            } else {
-              // If tab exists, just switch to it - don't trigger pendingMapConfig
-              tabAlreadyExists = true;
-              const existingTab = tabs.find(t => (t.projectPath?.replace(/\\/g, '/').toLowerCase() || '') === normalizedProjectDir && t.name === resolvedName);
-              if (existingTab) {
-                setActiveTabId(existingTab.id);
-              }
-            }
-          } catch (e) {
-            console.warn('Failed to create tab on open:', e);
-          }
-          // Only set pendingMapConfig if this is a new tab (not switching to existing)
-          if (!tabAlreadyExists) {
-            setPendingMapConfig(mapConfig);
-          }
+          // Tab was already created in the setTabs call above (from session + maps list)
+          // We just need to set the pending map config to load this map into the editor
+          // The activeTabId was already set by setActiveTabId(tabToActivate) above
+          setPendingMapConfig(mapConfig);
         }
         } else {
         // Fallback for web

@@ -91,14 +91,97 @@ ipcMainLocal.on('window-close', () => {
 });
 
 // Handle file system operations
-// List map files in project/maps directory
+// Session file for storing tabs and editor state per project
+const SESSION_FILENAME = '.flare-session.json';
+
+// Read session data from project folder
+ipcMainLocal.handle('read-session', async (event, projectPath) => {
+  try {
+    if (!projectPath) return null;
+    const sessionFile = path.join(projectPath, SESSION_FILENAME);
+    if (!fs.existsSync(sessionFile)) return null;
+    const content = fs.readFileSync(sessionFile, 'utf8');
+    return JSON.parse(content);
+  } catch (e) {
+    console.error('read-session failed:', e);
+    return null;
+  }
+});
+
+// Write session data to project folder
+ipcMainLocal.handle('write-session', async (event, projectPath, sessionData) => {
+  try {
+    if (!projectPath || !sessionData) return false;
+    const sessionFile = path.join(projectPath, SESSION_FILENAME);
+    fs.writeFileSync(sessionFile, JSON.stringify(sessionData, null, 2), 'utf8');
+    return true;
+  } catch (e) {
+    console.error('write-session failed:', e);
+    return false;
+  }
+});
+
+// List map files in project
+// Looks for:
+// 1. .json map files in project root (editor format) - validated to have map structure
+// 2. .txt map files in maps/ folder (Flare export format)
 ipcMainLocal.handle('list-maps', async (event, projectPath) => {
   try {
     if (!projectPath) return [];
+    
+    const maps = [];
+    const projectFolderName = path.basename(projectPath).toLowerCase();
+    
+    // Check for .json map files in project root (exclude session file)
+    const rootFiles = fs.readdirSync(projectPath);
+    for (const f of rootFiles) {
+      const lower = f.toLowerCase();
+      if (lower.endsWith('.json') && lower !== '.flare-session.json') {
+        // Read the file to check if it's a valid map (has layers array with content)
+        try {
+          const filePath = path.join(projectPath, f);
+          const content = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+          const baseName = f.replace(/\.json$/i, '');
+          
+          // A valid map MUST have a layers array with at least one layer
+          const hasLayers = Array.isArray(content.layers) && content.layers.length > 0;
+          
+          // Skip files that match the project folder name and don't have layers
+          // This is the old project config file format
+          const isOldProjectConfig = baseName.toLowerCase() === projectFolderName && !hasLayers;
+          
+          if (hasLayers && !isOldProjectConfig) {
+            maps.push(f);
+            console.log('Found valid map file:', f, 'name:', content.name, 'layers:', content.layers?.length || 0);
+          } else {
+            console.log('Skipping non-map JSON file:', f, '(isOldProjectConfig:', isOldProjectConfig, 'hasLayers:', hasLayers, ')');
+          }
+        } catch (e) {
+          console.warn('Could not read/parse JSON file:', f, e.message);
+        }
+      }
+    }
+    
+    // Also check maps/ folder for .txt exports (these are Flare format)
     const mapsDir = path.join(projectPath, 'maps');
-    if (!fs.existsSync(mapsDir)) return [];
-    const files = fs.readdirSync(mapsDir).filter(f => f.toLowerCase().endsWith('.txt'));
-    return files;
+    if (fs.existsSync(mapsDir)) {
+      const mapsDirFiles = fs.readdirSync(mapsDir);
+      for (const f of mapsDirFiles) {
+        const lower = f.toLowerCase();
+        // Only include .txt files that are actual maps, exclude spawn.txt
+        if (lower.endsWith('.txt') && lower !== 'spawn.txt') {
+          // Check if we already have the .json version
+          const baseName = f.replace(/\.txt$/i, '');
+          const hasJsonVersion = maps.some(m => m.replace(/\.json$/i, '').toLowerCase() === baseName.toLowerCase());
+          if (!hasJsonVersion) {
+            maps.push(f);
+          }
+        }
+      }
+    }
+    
+    console.log('list-maps final result:', maps);
+    return maps;
   } catch (e) {
     console.error('list-maps failed:', e);
     return [];
@@ -264,7 +347,7 @@ ipcMainLocal.handle('open-map-project', async (event, projectPath, mapName) => {
     
     // Look for map configuration file. If a specific mapName is provided
     // prefer a file named `${mapName}.json` inside the project root. Otherwise
-    // fall back to the first .json file found.
+    // fall back to the first .json file found (excluding session file).
     const files = fs.readdirSync(projectPath);
     let mapFile = null;
     if (mapName && typeof mapName === 'string') {
@@ -274,7 +357,7 @@ ipcMainLocal.handle('open-map-project', async (event, projectPath, mapName) => {
       }
     }
     if (!mapFile) {
-      mapFile = files.find(file => file.endsWith('.json')) || null;
+      mapFile = files.find(file => file.endsWith('.json') && file !== SESSION_FILENAME) || null;
     }
 
     if (mapFile) {
@@ -383,22 +466,22 @@ ipcMainLocal.handle('save-map-project', async (event, projectPath, mapData) => {
     console.log('=== ELECTRON SAVE DEBUG ===');
     console.log('Project path:', projectPath);
     console.log('Map data received:', !!mapData);
+    console.log('Map name:', mapData?.name);
     
     if (!projectPath || !mapData) {
       console.error('Invalid save parameters:', { projectPath, hasMapData: !!mapData });
       return false;
     }
 
-    // Find existing map file
-    const files = fs.readdirSync(projectPath);
-    let mapFile = files.find(file => file.endsWith('.json'));
-    
-    // If no map file exists, create one based on project folder name
-    if (!mapFile) {
-      const projectName = path.basename(projectPath);
-      mapFile = `${projectName}.json`;
-      console.log('Creating new map file:', mapFile);
-    }
+    // Use the map name to create the file (each map gets its own .json file)
+    const mapName = mapData.name || 'Untitled Map';
+    // Sanitize the map name for use as filename
+    const sanitizedName = mapName
+      .replace(/[<>:"/\\|?*]/g, '_')
+      .replace(/\s+/g, '_')
+      .replace(/_{2,}/g, '_')
+      .trim() || 'map';
+    const mapFile = `${sanitizedName}.json`;
     
     const mapConfigPath = path.join(projectPath, mapFile);
     console.log('Saving to:', mapConfigPath);

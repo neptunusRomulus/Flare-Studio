@@ -344,19 +344,23 @@ ipcMainLocal.handle('open-map-project', async (event, projectPath, mapName) => {
   try {
     console.log('=== ELECTRON LOAD DEBUG ===');
     console.log('Loading project from:', projectPath);
+    console.log('Requested map name:', mapName);
     
     // Look for map configuration file. If a specific mapName is provided
-    // prefer a file named `${mapName}.json` inside the project root. Otherwise
-    // fall back to the first .json file found (excluding session file).
+    // ONLY load that specific file - do NOT fall back to a random JSON file.
     const files = fs.readdirSync(projectPath);
     let mapFile = null;
     if (mapName && typeof mapName === 'string') {
       const candidate = `${mapName}.json`;
       if (files.includes(candidate)) {
         mapFile = candidate;
+      } else {
+        console.log('Requested map file not found:', candidate);
+        // Return null instead of falling back to wrong file
+        return null;
       }
-    }
-    if (!mapFile) {
+    } else {
+      // No specific map requested - find the first valid map file
       mapFile = files.find(file => file.endsWith('.json') && file !== SESSION_FILENAME) || null;
     }
 

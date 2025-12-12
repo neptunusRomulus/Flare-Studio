@@ -249,6 +249,8 @@ function App() {
   const [showSettings, setShowSettings] = useState(false);
   // Layers panel expand/collapse state
   const [layersPanelExpanded, setLayersPanelExpanded] = useState(false);
+  // Individual layer hover state
+  const [hoveredLayerId, setHoveredLayerId] = useState<number | null>(null);
   const [showHelp, setShowHelp] = useState(false);
   const [activeHelpTab, setActiveHelpTab] = useState('engine');
   const [showTooltip, setShowTooltip] = useState(true);
@@ -805,7 +807,26 @@ function App() {
             setShowWelcome(false);
             setShowCreateMapDialog(false);
           } else {
-            console.warn('Failed to load map config for tab:', nextTab.name);
+            // Map file doesn't exist on disk - create a fresh empty map
+            console.warn('Map file not found for tab:', nextTab.name, '- creating fresh map');
+            const freshConfig: EditorProjectData = {
+              name: nextTab.name,
+              width: 20,
+              height: 15,
+              tileSize: 64,
+              layers: [],
+              version: '1.0'
+            };
+            setPendingMapConfig(freshConfig);
+            setMapName(nextTab.name);
+            setMapWidth(20);
+            setMapHeight(15);
+            setMapInitialized(true);
+            setShowWelcome(false);
+            setShowCreateMapDialog(false);
+            
+            // Also update the tab's config so it has something to work with
+            setTabs(prev => prev.map(t => t.id === nextTab.id ? { ...t, config: freshConfig } : t));
           }
         } catch (e) {
           console.error('Error loading map for tab switch:', e);
@@ -2282,6 +2303,19 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       } catch (e) {
         console.warn('Failed to create tab for new in-project map:', e);
       }
+      
+      // Immediately save the new map to disk to ensure it exists
+      // This prevents issues where switching tabs or restarting before autosave
+      // would cause the map to be "lost"
+      if (targetEditor && currentProjectPath) {
+        try {
+          await targetEditor.saveProjectData(currentProjectPath);
+          console.log('New map saved to disk immediately:', resolvedName);
+        } catch (e) {
+          console.warn('Failed to immediately save new map to disk:', e);
+        }
+      }
+      
       setShowCreateMapDialog(false);
     } finally {
       setIsPreparingNewMap(false);
@@ -3557,6 +3591,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 <div className="space-y-0.5 h-full overflow-y-auto flex flex-col justify-center w-full">
                   {layers.map((layer) => {
                     const isActive = activeLayerId === layer.id;
+                    const isHovered = hoveredLayerId === layer.id;
                     const visible = layersPanelExpanded || isActive;
                     return (
                       <div
@@ -3564,6 +3599,8 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                         className={`block w-full max-w-xs px-2 py-1 rounded transition-all text-xs transform-gpu ${
                           isActive
                             ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-400'
+                            : isHovered
+                            ? 'bg-orange-100/50 dark:bg-orange-800/15 border-orange-300/50'
                             : 'bg-transparent border-transparent'
                         }`}
                         style={{
@@ -3571,16 +3608,18 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                           transform: visible ? 'scaleY(1) translateY(0)' : 'scaleY(0.98) translateY(0)',
                           transformOrigin: 'top',
                           pointerEvents: visible ? 'auto' : 'none',
-                          transition: 'transform 400ms cubic-bezier(.2,.9,.2,1), opacity 400ms ease, box-shadow 300ms ease',
-                          boxShadow: isActive ? '0 6px 12px rgba(15,23,42,0.06)' : 'none',
-                          zIndex: isActive ? 30 : 10,
+                          transition: 'transform 400ms cubic-bezier(.2,.9,.2,1), opacity 400ms ease, box-shadow 300ms ease, background-color 150ms ease',
+                          boxShadow: isActive ? '0 6px 12px rgba(15,23,42,0.06)' : isHovered ? '0 2px 6px rgba(251,146,60,0.15)' : 'none',
+                          zIndex: isActive ? 30 : isHovered ? 20 : 10,
                         }}
+                        onMouseEnter={() => setHoveredLayerId(layer.id)}
+                        onMouseLeave={() => setHoveredLayerId(null)}
                       >
                         <div
                           className="cursor-pointer w-full flex items-center"
                           onClick={() => handleSetActiveLayer(layer.id)}
                         >
-                          <div className={`flex items-center gap-2 w-full ${isActive ? 'opacity-100' : 'opacity-80'}`}> 
+                          <div className={`flex items-center gap-2 w-full ${isActive ? 'opacity-100' : isHovered ? 'opacity-95' : 'opacity-80'}`}> 
                             <Tooltip content={layer.visible ? 'Hide layer' : 'Show layer'}>
                               <Button
                                 variant="ghost"

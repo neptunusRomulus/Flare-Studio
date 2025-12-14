@@ -121,6 +121,31 @@ ipcMainLocal.handle('write-session', async (event, projectPath, sessionData) => 
   }
 });
 
+// Write NPC file to project's npcs folder
+ipcMainLocal.handle('write-npc-file', async (event, projectPath, filename, content) => {
+  try {
+    if (!projectPath || !filename || !content) return false;
+    
+    // Ensure npcs folder exists
+    const npcsFolder = path.join(projectPath, 'npcs');
+    if (!fs.existsSync(npcsFolder)) {
+      fs.mkdirSync(npcsFolder, { recursive: true });
+    }
+    
+    // Get just the filename part (strip npcs/ prefix if present)
+    const npcFilename = filename.replace(/^npcs[\/\\]/, '');
+    const npcFilePath = path.join(npcsFolder, npcFilename);
+    
+    // Write the file
+    fs.writeFileSync(npcFilePath, content, 'utf8');
+    console.log('NPC file saved:', npcFilePath);
+    return true;
+  } catch (e) {
+    console.error('write-npc-file failed:', e);
+    return false;
+  }
+});
+
 // List map files in project
 // Looks for:
 // 1. .json map files in project root (editor format) - validated to have map structure

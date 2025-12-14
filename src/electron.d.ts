@@ -70,6 +70,7 @@ declare global {
         tilesetPath?: string;
         portraitPath?: string;
       }) => Promise<{ success: boolean; filePath?: string; filename?: string; error?: string }>;
+      writeNpcFile: (projectPath: string, filename: string, content: string) => Promise<boolean>;
       // Menu event listeners
       onMenuNewMap: (callback: () => void) => void;
       onMenuOpenMap: (callback: () => void) => void;

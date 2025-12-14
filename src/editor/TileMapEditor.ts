@@ -1256,10 +1256,18 @@ export class TileMapEditor {
   }
 
   private createDefaultLayers(): void {
-    // Create all 6 layers in the correct order (NPC -> Enemy -> Event -> Collision -> Object -> Background)
+    // Create all 7 layers in the correct order (Items -> NPC -> Enemy -> Event -> Collision -> Object -> Background)
     this.tileLayers = [
       {
         id: 1,
+        name: 'Items',
+        type: 'items',
+        data: new Array(this.mapWidth * this.mapHeight).fill(0),
+        visible: true,
+        transparency: 1.0
+      },
+      {
+        id: 2,
         name: 'NPC Layer',
         type: 'npc',
         data: new Array(this.mapWidth * this.mapHeight).fill(0),
@@ -1267,7 +1275,7 @@ export class TileMapEditor {
         transparency: 1.0
       },
       {
-        id: 2,
+        id: 3,
         name: 'Enemy Layer',
         type: 'enemy',
         data: new Array(this.mapWidth * this.mapHeight).fill(0),
@@ -1275,7 +1283,7 @@ export class TileMapEditor {
         transparency: 1.0
       },
       {
-        id: 3,
+        id: 4,
         name: 'Event Layer',
         type: 'event',
         data: new Array(this.mapWidth * this.mapHeight).fill(0),
@@ -1283,7 +1291,7 @@ export class TileMapEditor {
         transparency: 1.0
       },
       {
-        id: 4,
+        id: 5,
         name: 'Collision Layer',
         type: 'collision',
         data: new Array(this.mapWidth * this.mapHeight).fill(0),
@@ -1291,7 +1299,7 @@ export class TileMapEditor {
         transparency: 1.0
       },
       {
-        id: 5,
+        id: 6,
         name: 'Object Layer',
         type: 'object',
         data: new Array(this.mapWidth * this.mapHeight).fill(0),
@@ -1299,7 +1307,7 @@ export class TileMapEditor {
         transparency: 1.0
       },
       {
-        id: 6,
+        id: 7,
         name: 'Background Layer',
         type: 'background',
         data: new Array(this.mapWidth * this.mapHeight).fill(0),
@@ -1309,8 +1317,8 @@ export class TileMapEditor {
     ];
     
     // Set the background layer as active by default
-    this.activeLayerId = 6;
-    this.nextLayerId = 7;
+    this.activeLayerId = 7;
+    this.nextLayerId = 8;
     this.sortLayersByPriority();
     // Initialize layer tabs for background and object with one tab each
     try {

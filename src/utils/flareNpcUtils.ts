@@ -5,7 +5,7 @@
  * txt dosyalarını parse ederek FlareNPC modeline çevirir.
  */
 
-import { FlareNPC, FlareNPCExportResult } from '../types';
+import { FlareNPC, FlareNPCExportResult, DialogueTree, DialogueLine, DialogueRequirement, DialogueReward, DialogueWorldEffect } from '../types';
 
 /**
  * Varsayılan NPC değerleri ile yeni bir FlareNPC oluşturur.
@@ -111,24 +111,26 @@ function serializeNpcFile(npc: FlareNPC): string {
     lines.push(`name=${npc.name}`);
   }
   
-  // Görsel
-  if (npc.gfx) {
-    lines.push(`gfx=${npc.gfx}`);
-  }
+  // Boş satır
+  lines.push('');
+  
+  // Portrait
   if (npc.portrait) {
     lines.push(`portrait=${npc.portrait}`);
   }
   
-  // Davranış
-  if (npc.talker) {
-    lines.push(`talker=true`);
-  }
-  if (npc.vendor) {
-    lines.push(`vendor=true`);
+  // Animation (gfx/animations)
+  if (npc.gfx) {
+    // Flare'de "animations=" kullanılıyor
+    lines.push(`animations=${npc.gfx}`);
   }
   
-  // Vendor ayarları
+  // Boş satır
+  lines.push('');
+  
+  // Vendor ayarları (shop info) - vendor=true'dan önce
   if (npc.vendor) {
+    lines.push(`vendor=true`);
     if (npc.constant_stock) {
       lines.push(`constant_stock=${npc.constant_stock}`);
     }
@@ -144,6 +146,7 @@ function serializeNpcFile(npc: FlareNPC): string {
     if (npc.vendor_requires_not_status) {
       lines.push(`vendor_requires_not_status=${npc.vendor_requires_not_status}`);
     }
+    lines.push('');
   }
   
   // Hareket / AI
@@ -157,17 +160,175 @@ function serializeNpcFile(npc: FlareNPC): string {
     lines.push(`wander_radius=${npc.wander_radius}`);
   }
   
-  // Custom properties
+  // Custom properties (dialogue trees hariç)
   if (npc.customProperties) {
     for (const [key, value] of Object.entries(npc.customProperties)) {
+      // dialogueTrees JSON olarak saklanıyor, ayrıca serialize edilecek
+      if (key === 'dialogueTrees') continue;
       lines.push(`${key}=${value}`);
     }
   }
   
-  // TODO: Dialog includes - bunlar genellikle ayrı dialog dosyaları olarak tutulur
-  // ve NPC dosyasında include edilir. Şimdilik basit tutuyoruz.
+  // talker=true (diyaloglardan hemen önce)
+  if (npc.talker) {
+    lines.push('');
+    lines.push(`talker=true`);
+  }
   
-  return lines.join('\n');
+  // Dialogue Trees serialize
+  if (npc.customProperties?.dialogueTrees) {
+    try {
+      const dialogueTrees: DialogueTree[] = JSON.parse(npc.customProperties.dialogueTrees);
+      const dialogueBlocks = serializeDialogueTrees(dialogueTrees);
+      if (dialogueBlocks) {
+        lines.push(''); // Boş satır ayırıcı
+        lines.push(dialogueBlocks);
+      }
+    } catch (e) {
+      console.error('Failed to parse dialogueTrees:', e);
+    }
+  }
+  
+  // Boş satırları temizle (ardışık boş satırları tek satıra indir)
+  const cleanedLines = lines.reduce((acc: string[], line) => {
+    if (line === '' && acc.length > 0 && acc[acc.length - 1] === '') {
+      return acc; // ardışık boş satırları atla
+    }
+    acc.push(line);
+    return acc;
+  }, []);
+  
+  // Baştaki ve sondaki boş satırları sil
+  while (cleanedLines.length > 0 && cleanedLines[0] === '') cleanedLines.shift();
+  while (cleanedLines.length > 0 && cleanedLines[cleanedLines.length - 1] === '') cleanedLines.pop();
+  
+  return cleanedLines.join('\n');
+}
+
+/**
+ * DialogueTree array'ini Flare [dialog] bloklarına serialize eder.
+ * 
+ * Örnek çıktı:
+ * [dialog]
+ * topic=Talk
+ * requires_status=quest_started
+ * him=Hello adventurer!
+ * you=Tell me about the quest.
+ * set_status=quest_accepted
+ * reward_xp=100
+ */
+function serializeDialogueTrees(trees: DialogueTree[]): string {
+  const blocks: string[] = [];
+  
+  for (const tree of trees) {
+    // Boş topic'li tree'leri atla
+    if (!tree.topic && tree.dialogues.length === 0) continue;
+    
+    const dialogBlock: string[] = ['[dialog]'];
+    
+    // Topic
+    if (tree.topic) {
+      dialogBlock.push(`topic=${tree.topic}`);
+    }
+    
+    // Requirements
+    for (const req of tree.requirements) {
+      if (!req.value) continue;
+      switch (req.type) {
+        case 'status':
+          dialogBlock.push(`requires_status=${req.value}`);
+          break;
+        case 'not_status':
+          dialogBlock.push(`requires_not_status=${req.value}`);
+          break;
+        case 'item':
+          // Format: item_id:quantity veya sadece item_id
+          dialogBlock.push(`requires_item=${req.value}`);
+          break;
+        case 'level':
+          dialogBlock.push(`requires_level=${req.value}`);
+          break;
+        case 'class':
+          dialogBlock.push(`requires_class=${req.value}`);
+          break;
+      }
+    }
+    
+    // Dialogues (him/her/you)
+    for (const dlg of tree.dialogues) {
+      if (!dlg.text) continue;
+      if (dlg.speaker === 'npc') {
+        // Flare'de him veya her kullanılabilir, varsayılan him
+        dialogBlock.push(`him=${dlg.text}`);
+      } else {
+        dialogBlock.push(`you=${dlg.text}`);
+      }
+    }
+    
+    // World Effects (set_status, unset_status, teleport, etc.)
+    for (const wf of (tree.worldEffects || [])) {
+      if (!wf.value) continue;
+      switch (wf.type) {
+        case 'set_status':
+          dialogBlock.push(`set_status=${wf.value}`);
+          break;
+        case 'unset_status':
+          dialogBlock.push(`unset_status=${wf.value}`);
+          break;
+        case 'teleport':
+          // Format: map.txt,x,y
+          dialogBlock.push(`intermap=${wf.value}`);
+          break;
+        case 'spawn':
+          dialogBlock.push(`spawn=${wf.value}`);
+          break;
+        case 'cutscene':
+          dialogBlock.push(`cutscene=${wf.value}`);
+          break;
+        case 'sound':
+          dialogBlock.push(`soundfx=${wf.value}`);
+          break;
+        case 'npc':
+          dialogBlock.push(`npc=${wf.value}`);
+          break;
+      }
+    }
+    
+    // Rewards
+    for (const rew of (tree.rewards || [])) {
+      if (!rew.value && rew.type !== 'restore') continue;
+      switch (rew.type) {
+        case 'xp':
+          dialogBlock.push(`reward_xp=${rew.value}`);
+          break;
+        case 'gold':
+          dialogBlock.push(`reward_currency=1,${rew.value}`);
+          break;
+        case 'item':
+          // Format: reward_item=item_id,quantity
+          const qty = rew.quantity || 1;
+          dialogBlock.push(`reward_item=${rew.value},${qty}`);
+          break;
+        case 'remove_gold':
+          dialogBlock.push(`remove_currency=1,${rew.value}`);
+          break;
+        case 'remove_item':
+          // Format: remove_item=item_id veya remove_item=item_id:quantity
+          dialogBlock.push(`remove_item=${rew.value}`);
+          break;
+        case 'restore':
+          dialogBlock.push(`restore=${rew.value || 'all'}`);
+          break;
+      }
+    }
+    
+    // Sadece [dialog] ve topic varsa atla (içerik yok)
+    if (dialogBlock.length > 2 || (dialogBlock.length === 2 && tree.topic)) {
+      blocks.push(dialogBlock.join('\n'));
+    }
+  }
+  
+  return blocks.join('\n\n');
 }
 
 /**

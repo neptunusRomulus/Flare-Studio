@@ -3,7 +3,7 @@
 export interface TileLayer {
   id: number;
   name: string;
-  type: 'background' | 'object' | 'collision' | 'event' | 'enemy' | 'npc';
+  type: 'background' | 'object' | 'collision' | 'event' | 'enemy' | 'npc' | 'items';
   data: number[];
   visible: boolean;
   transparency?: number; // 0-1, where 1 is fully opaque
@@ -145,6 +145,47 @@ export interface FlareNPC {
   
   // Serbest key-value alanlar (bilinmeyen/yeni attribute'ler için)
   customProperties?: Record<string, string>;
+}
+
+/**
+ * Flare Engine Dialogue Types
+ */
+export interface DialogueLine {
+  id: string;
+  speaker: 'npc' | 'player';
+  text: string;
+}
+
+export interface DialogueRequirement {
+  id: string;
+  type: 'status' | 'not_status' | 'item' | 'level' | 'class';
+  value: string;
+}
+
+export interface DialogueReward {
+  id: string;
+  type: 'xp' | 'gold' | 'item' | 'remove_gold' | 'remove_item' | 'restore';
+  value: string;
+  quantity?: number;
+}
+
+export interface DialogueWorldEffect {
+  id: string;
+  type: 'set_status' | 'unset_status' | 'teleport' | 'spawn' | 'cutscene' | 'sound' | 'npc';
+  value: string;
+}
+
+export interface DialogueTree {
+  id: string;
+  topic: string;
+  requirements: DialogueRequirement[];
+  dialogues: DialogueLine[];
+  rewards: DialogueReward[];
+  worldEffects: DialogueWorldEffect[];
+  _reqExpanded?: boolean;
+  _dlgExpanded?: boolean;
+  _rewExpanded?: boolean;
+  _wfExpanded?: boolean;
 }
 
 /**

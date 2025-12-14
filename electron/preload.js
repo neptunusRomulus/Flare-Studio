@@ -33,6 +33,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // NPC file management
   createNpcFile: (projectPath, npcData) => ipcRenderer.invoke('create-npc-file', projectPath, npcData),
   writeNpcFile: (projectPath, filename, content) => ipcRenderer.invoke('write-npc-file', projectPath, filename, content),
+  // Item file management
+  createItemFile: (projectPath, itemData) => ipcRenderer.invoke('create-item-file', projectPath, itemData),
+  getItemCategories: (projectPath) => ipcRenderer.invoke('get-item-categories', projectPath),
+  createItemCategory: (projectPath, categoryName) => ipcRenderer.invoke('create-item-category', projectPath, categoryName),
+  ensureItemsFolders: (projectPath) => ipcRenderer.invoke('ensure-items-folders', projectPath),
+  getNextItemId: (projectPath) => ipcRenderer.invoke('get-next-item-id', projectPath),
+  listItems: (projectPath) => ipcRenderer.invoke('list-items', projectPath),
+  readItemFile: (filePath) => ipcRenderer.invoke('read-item-file', filePath),
+  writeItemFile: (filePath, itemData) => ipcRenderer.invoke('write-item-file', filePath, itemData),
   // Menu event listeners
   onMenuNewMap: (callback) => ipcRenderer.on('menu-new-map', (_e) => callback && callback()),
   onMenuOpenMap: (callback) => ipcRenderer.on('menu-open-map', (_e) => callback && callback()),

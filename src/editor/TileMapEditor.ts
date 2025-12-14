@@ -4497,12 +4497,13 @@ export class TileMapEditor {
 
   private sortLayersByPriority(): void {
     const typePriority: Record<string, number> = {
-      'npc': 1,
-      'enemy': 2,
-      'event': 3,
-      'collision': 4,
-      'object': 5,
-      'background': 6
+      'items': 1,
+      'npc': 2,
+      'enemy': 3,
+      'event': 4,
+      'collision': 5,
+      'object': 6,
+      'background': 7
     };
 
     this.tileLayers.sort((a, b) => {

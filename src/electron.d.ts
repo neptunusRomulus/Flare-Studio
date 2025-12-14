@@ -71,6 +71,24 @@ declare global {
         portraitPath?: string;
       }) => Promise<{ success: boolean; filePath?: string; filename?: string; error?: string }>;
       writeNpcFile: (projectPath: string, filename: string, content: string) => Promise<boolean>;
+      // Item file management
+      createItemFile: (projectPath: string, itemData: {
+        name: string;
+        id: number;
+        category?: string;
+      }) => Promise<{ success: boolean; filePath?: string; filename?: string; error?: string }>;
+      getItemCategories: (projectPath: string) => Promise<{ success: boolean; categories: string[]; error?: string }>;
+      createItemCategory: (projectPath: string, categoryName: string) => Promise<{ success: boolean; categoryName?: string; categoryPath?: string; error?: string }>;
+      ensureItemsFolders: (projectPath: string) => Promise<{ success: boolean; error?: string }>;
+      getNextItemId: (projectPath: string) => Promise<{ success: boolean; nextId: number; error?: string }>;
+      listItems: (projectPath: string) => Promise<{ success: boolean; items: Array<{ id: number; name: string; category: string; filePath: string; fileName: string }>; error?: string }>;
+      readItemFile: (filePath: string) => Promise<{ success: boolean; data?: Record<string, unknown>; error?: string }>;
+      writeItemFile: (filePath: string, itemData: Record<string, unknown>) => Promise<{ success: boolean; error?: string }>;
+      // Generic filesystem helpers for renderer
+      createFolderIfNotExists: (folderPath: string) => Promise<boolean>;
+      writeFile: (filePath: string, content: string) => Promise<boolean>;
+      readDir: (dirPath: string) => Promise<Array<{ name: string; isDirectory: boolean }>>;
+      getProjectFolder: () => Promise<string | null>;
       // Menu event listeners
       onMenuNewMap: (callback: () => void) => void;
       onMenuOpenMap: (callback: () => void) => void;

@@ -1006,6 +1006,419 @@ ipcMainLocal.handle('create-npc-file', async (event, projectPath, npcData) => {
   }
 });
 
+// Ensure items and items/categories folders exist
+ipcMainLocal.handle('ensure-items-folders', async (event, projectPath) => {
+  try {
+    if (!projectPath || !fs.existsSync(projectPath)) {
+      throw new Error('Project path is required and must exist');
+    }
+
+    const itemsDir = path.join(projectPath, 'items');
+    const categoriesDir = path.join(itemsDir, 'categories');
+
+    if (!fs.existsSync(itemsDir)) {
+      fs.mkdirSync(itemsDir, { recursive: true });
+      console.log('Created items directory:', itemsDir);
+    }
+
+    if (!fs.existsSync(categoriesDir)) {
+      fs.mkdirSync(categoriesDir, { recursive: true });
+      console.log('Created items/categories directory:', categoriesDir);
+    }
+
+    // Create qualities.txt file if it doesn't exist
+    const qualitiesFile = path.join(itemsDir, 'qualities.txt');
+    if (!fs.existsSync(qualitiesFile)) {
+      const qualitiesContent = `[quality]
+id=low
+name=Low
+color=127,127,127
+overlay_icon=1024
+
+[quality]
+id=normal
+name=Normal
+color=255,255,255
+overlay_icon=1025
+
+[quality]
+id=high
+name=High
+color=64,255,64
+overlay_icon=1026
+
+[quality]
+id=epic
+name=Epic
+color=64,128,255
+overlay_icon=1027
+
+[quality]
+id=rare
+name=Rare
+color=160,64,255
+overlay_icon=1028
+
+[quality]
+id=unique
+name=Unique
+color=255,192,64
+overlay_icon=1029
+
+[quality]
+id=one_time_use
+name=One-time Use
+color=64,255,255
+overlay_icon=1030
+
+[quality]
+id=currency
+name=Currency
+color=255,232,156
+overlay_icon=1031
+`;
+      fs.writeFileSync(qualitiesFile, qualitiesContent, 'utf8');
+      console.log('Created qualities.txt file:', qualitiesFile);
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('Error ensuring items folders:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Get item categories (subdirectories of items/categories)
+ipcMainLocal.handle('get-item-categories', async (event, projectPath) => {
+  try {
+    if (!projectPath || !fs.existsSync(projectPath)) {
+      return { success: true, categories: ['Default'] };
+    }
+
+    const categoriesDir = path.join(projectPath, 'items', 'categories');
+    const categories = ['Default']; // Default is always first
+
+    if (fs.existsSync(categoriesDir)) {
+      const entries = fs.readdirSync(categoriesDir, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isDirectory()) {
+          categories.push(entry.name);
+        }
+      }
+    }
+
+    return { success: true, categories };
+  } catch (error) {
+    console.error('Error getting item categories:', error);
+    return { success: false, error: error.message, categories: ['Default'] };
+  }
+});
+
+// Create a new item category folder
+ipcMainLocal.handle('create-item-category', async (event, projectPath, categoryName) => {
+  try {
+    if (!projectPath || !fs.existsSync(projectPath)) {
+      throw new Error('Project path is required and must exist');
+    }
+    if (!categoryName || !categoryName.trim()) {
+      throw new Error('Category name is required');
+    }
+
+    const sanitize = (input) => {
+      return String(input || '')
+        .replace(/[<>:"/\\|?*]/g, '_')
+        .trim()
+        .replace(/\s+/g, '_')
+        .replace(/_{2,}/g, '_')
+        || 'unnamed_category';
+    };
+
+    const sanitizedName = sanitize(categoryName);
+    const categoriesDir = path.join(projectPath, 'items', 'categories');
+    const categoryDir = path.join(categoriesDir, sanitizedName);
+
+    // Ensure items/categories exists
+    if (!fs.existsSync(categoriesDir)) {
+      fs.mkdirSync(categoriesDir, { recursive: true });
+    }
+
+    if (!fs.existsSync(categoryDir)) {
+      fs.mkdirSync(categoryDir, { recursive: true });
+      console.log('Created item category:', categoryDir);
+    }
+
+    return { success: true, categoryName: sanitizedName, categoryPath: categoryDir };
+  } catch (error) {
+    console.error('Error creating item category:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Get next item ID by scanning existing items
+ipcMainLocal.handle('get-next-item-id', async (event, projectPath) => {
+  try {
+    if (!projectPath || !fs.existsSync(projectPath)) {
+      return { success: true, nextId: 1 };
+    }
+
+    const itemsDir = path.join(projectPath, 'items');
+    let maxId = 0;
+
+    const scanDir = (dir) => {
+      if (!fs.existsSync(dir)) return;
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          scanDir(fullPath);
+        } else if (entry.name.endsWith('.txt')) {
+          // Read file and extract id
+          try {
+            const content = fs.readFileSync(fullPath, 'utf8');
+            const match = content.match(/^id=(\d+)/m);
+            if (match) {
+              const id = parseInt(match[1], 10);
+              if (id > maxId) maxId = id;
+            }
+          } catch (e) {
+            // Ignore read errors
+          }
+        }
+      }
+    };
+
+    scanDir(itemsDir);
+    return { success: true, nextId: maxId + 1 };
+  } catch (error) {
+    console.error('Error getting next item ID:', error);
+    return { success: true, nextId: 1 };
+  }
+});
+
+// Create item file
+ipcMainLocal.handle('create-item-file', async (event, projectPath, itemData) => {
+  try {
+    if (!projectPath || !fs.existsSync(projectPath)) {
+      throw new Error('Project path is required and must exist');
+    }
+    if (!itemData || !itemData.name) {
+      throw new Error('Item name is required');
+    }
+
+    const sanitize = (input) => {
+      return String(input || '')
+        .toLowerCase()
+        .replace(/[<>:"/\\|?*]/g, '_')
+        .trim()
+        .replace(/\s+/g, '_')
+        .replace(/_{2,}/g, '_')
+        || 'unnamed_item';
+    };
+
+    const sanitizedName = sanitize(itemData.name);
+    const category = itemData.category || 'Default';
+    
+    let targetDir;
+    if (category === 'Default') {
+      targetDir = path.join(projectPath, 'items');
+    } else {
+      targetDir = path.join(projectPath, 'items', 'categories', category);
+    }
+
+    // Ensure target directory exists
+    if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
+    }
+
+    const itemFilePath = path.join(targetDir, `${sanitizedName}.txt`);
+
+    // Build item file content
+    const lines = [];
+    lines.push('[item]');
+    lines.push(`id=${itemData.id}`);
+    lines.push(`name=${itemData.name}`);
+    lines.push('');
+
+    const itemContent = lines.join('\n');
+    fs.writeFileSync(itemFilePath, itemContent, 'utf8');
+
+    console.log('Item file created:', itemFilePath);
+    return { success: true, filePath: itemFilePath, filename: `${sanitizedName}.txt` };
+  } catch (error) {
+    console.error('Error creating item file:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// List all items in the project
+ipcMainLocal.handle('list-items', async (event, projectPath) => {
+  try {
+    if (!projectPath || !fs.existsSync(projectPath)) {
+      return { success: true, items: [] };
+    }
+
+    const itemsDir = path.join(projectPath, 'items');
+    const items = [];
+
+    const parseItemFile = (filePath, category) => {
+      try {
+        const content = fs.readFileSync(filePath, 'utf8');
+        const idMatch = content.match(/^id=(\d+)/m);
+        const nameMatch = content.match(/^name=(.+)$/m);
+        
+        return {
+          id: idMatch ? parseInt(idMatch[1], 10) : 0,
+          name: nameMatch ? nameMatch[1].trim() : path.basename(filePath, '.txt'),
+          category: category,
+          filePath: filePath,
+          fileName: path.basename(filePath)
+        };
+      } catch (e) {
+        return null;
+      }
+    };
+
+    const scanDir = (dir, category) => {
+      if (!fs.existsSync(dir)) return;
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          // Skip the 'categories' folder at root level, scan its subdirs instead
+          if (entry.name === 'categories' && dir === itemsDir) {
+            const catEntries = fs.readdirSync(fullPath, { withFileTypes: true });
+            for (const catEntry of catEntries) {
+              if (catEntry.isDirectory()) {
+                scanDir(path.join(fullPath, catEntry.name), catEntry.name);
+              }
+            }
+          }
+        } else if (entry.name.endsWith('.txt')) {
+          const item = parseItemFile(fullPath, category);
+          if (item) {
+            items.push(item);
+          }
+        }
+      }
+    };
+
+    scanDir(itemsDir, 'Default');
+    
+    // Sort by ID
+    items.sort((a, b) => a.id - b.id);
+
+    return { success: true, items };
+  } catch (error) {
+    console.error('Error listing items:', error);
+    return { success: false, error: error.message, items: [] };
+  }
+});
+
+// Read item file and parse all properties
+ipcMainLocal.handle('read-item-file', async (event, filePath) => {
+  try {
+    if (!filePath || !fs.existsSync(filePath)) {
+      return { success: false, error: 'Item file not found' };
+    }
+
+    const content = fs.readFileSync(filePath, 'utf8');
+    const lines = content.split('\n');
+    const data = {};
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith('[')) continue;
+      
+      const eqIndex = trimmed.indexOf('=');
+      if (eqIndex > 0) {
+        const key = trimmed.substring(0, eqIndex).trim();
+        const value = trimmed.substring(eqIndex + 1).trim();
+        data[key] = value;
+      }
+    }
+
+    // Convert numeric fields
+    if (data.id) data.id = parseInt(data.id, 10) || 0;
+    if (data.level) data.level = parseInt(data.level, 10) || 1;
+    if (data.max_quantity) data.max_quantity = parseInt(data.max_quantity, 10) || 1;
+    if (data.requires_level) data.requires_level = parseInt(data.requires_level, 10) || 0;
+    if (data.loot_drops_max) data.loot_drops_max = parseInt(data.loot_drops_max, 10) || 1;
+
+    return { success: true, data };
+  } catch (error) {
+    console.error('Error reading item file:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Write item file with all properties
+ipcMainLocal.handle('write-item-file', async (event, filePath, itemData) => {
+  try {
+    if (!filePath) {
+      return { success: false, error: 'File path is required' };
+    }
+
+    const lines = [];
+    lines.push('[item]');
+    
+    // Basic Identifier Properties
+    if (itemData.id !== undefined) lines.push(`id=${itemData.id}`);
+    if (itemData.name) lines.push(`name=${itemData.name}`);
+    if (itemData.flavor) lines.push(`flavor=${itemData.flavor}`);
+    if (itemData.level && itemData.level > 1) lines.push(`level=${itemData.level}`);
+    if (itemData.icon) lines.push(`icon=${itemData.icon}`);
+    if (itemData.quality) lines.push(`quality=${itemData.quality}`);
+    
+    // Trade and Inventory Properties
+    if (itemData.price) lines.push(`price=${itemData.price}`);
+    if (itemData.price_sell) lines.push(`price_sell=${itemData.price_sell}`);
+    if (itemData.max_quantity && itemData.max_quantity > 1) lines.push(`max_quantity=${itemData.max_quantity}`);
+    if (itemData.quest_item) lines.push(`quest_item=true`);
+    if (itemData.no_stash && itemData.no_stash !== 'ignore') lines.push(`no_stash=${itemData.no_stash}`);
+    
+    // Equipment and Requirement Properties
+    if (itemData.item_type) lines.push(`item_type=${itemData.item_type}`);
+    if (itemData.equip_flags) lines.push(`equip_flags=${itemData.equip_flags}`);
+    if (itemData.requires_level && itemData.requires_level > 0) lines.push(`requires_level=${itemData.requires_level}`);
+    if (itemData.requires_stat) lines.push(`requires_stat=${itemData.requires_stat}`);
+    if (itemData.requires_class) lines.push(`requires_class=${itemData.requires_class}`);
+    if (itemData.disable_slots) lines.push(`disable_slots=${itemData.disable_slots}`);
+    if (itemData.gfx) lines.push(`gfx=${itemData.gfx}`);
+    
+    // Status and Effect Properties (Bonuses)
+    if (itemData.bonus) lines.push(`bonus=${itemData.bonus}`);
+    if (itemData.bonus_power_level) lines.push(`bonus_power_level=${itemData.bonus_power_level}`);
+    
+    // Usage and Power Properties
+    if (itemData.dmg) lines.push(`dmg=${itemData.dmg}`);
+    if (itemData.abs) lines.push(`abs=${itemData.abs}`);
+    if (itemData.power) lines.push(`power=${itemData.power}`);
+    if (itemData.power_desc) lines.push(`power_desc=${itemData.power_desc}`);
+    if (itemData.replace_power) lines.push(`replace_power=${itemData.replace_power}`);
+    if (itemData.book) lines.push(`book=${itemData.book}`);
+    if (itemData.book_is_readable) lines.push(`book_is_readable=true`);
+    if (itemData.script) lines.push(`script=${itemData.script}`);
+    
+    // Visual and Audio Properties
+    if (itemData.soundfx) lines.push(`soundfx=${itemData.soundfx}`);
+    if (itemData.stepfx) lines.push(`stepfx=${itemData.stepfx}`);
+    if (itemData.loot_animation) lines.push(`loot_animation=${itemData.loot_animation}`);
+    
+    // Randomization and Loot Properties
+    if (itemData.randomizer_def) lines.push(`randomizer_def=${itemData.randomizer_def}`);
+    if (itemData.loot_drops_max && itemData.loot_drops_max > 1) lines.push(`loot_drops_max=${itemData.loot_drops_max}`);
+    if (itemData.pickup_status) lines.push(`pickup_status=${itemData.pickup_status}`);
+
+    lines.push('');
+    
+    fs.writeFileSync(filePath, lines.join('\n'), 'utf8');
+    return { success: true };
+  } catch (error) {
+    console.error('Error writing item file:', error);
+    return { success: false, error: error.message };
+  }
+});
+
 // Handle app protocol for development
 if (isDev) {
   if (process.platform === 'win32') {

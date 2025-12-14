@@ -49,7 +49,7 @@ declare global {
       createMapProject: (config: MapConfig) => Promise<boolean>;
       openMapProject: (projectPath: string) => Promise<EditorProjectData | null>;
       saveMapProject: (projectPath: string, mapData: ProjectMapData) => Promise<boolean>;
-      saveExportFiles: (projectPath: string, mapName: string, mapTxt: string, tilesetDef: string, options?: { spawn?: { enabled: boolean; content: string; filename?: string }; tilesetImages?: Record<string, string> }) => Promise<boolean>;
+      saveExportFiles: (projectPath: string, mapName: string, mapTxt: string, tilesetDef: string, options?: { spawn?: { enabled: boolean; content: string; filename?: string }; tilesetImages?: Record<string, string>; npcFiles?: Array<{ filename: string; content: string }> }) => Promise<boolean>;
   discoverTilesetImages: (projectPath: string) => Promise<{ tilesetImages: { [key: string]: string }; tilesets: { name: string; fileName: string }[] }>;
   fileExists: (filePath: string) => Promise<boolean>;
       listMaps: (projectPath: string) => Promise<string[]>;
@@ -63,6 +63,13 @@ declare global {
       readSession: (projectPath: string) => Promise<SessionData | null>;
       writeSession: (projectPath: string, sessionData: SessionData) => Promise<boolean>;
       readFileAsDataURL: (filePath: string) => Promise<string | null>;
+      // NPC file management
+      createNpcFile: (projectPath: string, npcData: {
+        name: string;
+        role: 'talker' | 'vendor' | 'quest' | 'static';
+        tilesetPath?: string;
+        portraitPath?: string;
+      }) => Promise<{ success: boolean; filePath?: string; filename?: string; error?: string }>;
       // Menu event listeners
       onMenuNewMap: (callback: () => void) => void;
       onMenuOpenMap: (callback: () => void) => void;

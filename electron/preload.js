@@ -30,6 +30,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Session management (per-project)
   readSession: (projectPath) => ipcRenderer.invoke('read-session', projectPath),
   writeSession: (projectPath, sessionData) => ipcRenderer.invoke('write-session', projectPath, sessionData),
+  // NPC file management
+  createNpcFile: (projectPath, npcData) => ipcRenderer.invoke('create-npc-file', projectPath, npcData),
   // Menu event listeners
   onMenuNewMap: (callback) => ipcRenderer.on('menu-new-map', (_e) => callback && callback()),
   onMenuOpenMap: (callback) => ipcRenderer.on('menu-open-map', (_e) => callback && callback()),

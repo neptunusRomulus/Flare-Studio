@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import Tooltip from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Upload, Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Blend, MapPin, Save, Scan, Link2, Scissors, Trash2, Check, HelpCircle, Folder, Shield, Plus, Image, Grid, Box, Users, Locate, Clock, Menu, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Upload, Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Blend, MapPin, MapPinOff, Save, Scan, Link2, Scissors, Trash2, Check, HelpCircle, Folder, Shield, Plus, Image, Grid, Box, Users, User, Locate, Clock, Menu, ChevronLeft, ChevronRight, GripVertical, MessageSquare, ChevronDown, ChevronUp, ArrowLeft } from 'lucide-react';
 import { TileMapEditor } from './editor/TileMapEditor';
 import type { EditorProjectData } from './editor/TileMapEditor';
 import { TileLayer, MapObject } from './types';
@@ -966,14 +966,54 @@ function App() {
   const [editingObject, setEditingObject] = useState<MapObject | null>(null);
   const [objectValidationErrors, setObjectValidationErrors] = useState<string[]>([]);
   const [mapObjects, setMapObjects] = useState<MapObject[]>([]);
+  const [showDeleteNpcConfirm, setShowDeleteNpcConfirm] = useState(false);
   const [actorDialogState, setActorDialogState] = useState<{
     type: 'npc' | 'enemy';
     name: string;
-    x: string;
-    y: string;
     tilesetPath: string;
+    portraitPath: string;
+    isTalker: boolean;
+    isVendor: boolean;
+    isQuestGiver: boolean;
   } | null>(null);
   const [actorDialogError, setActorDialogError] = useState<string | null>(null);
+  
+  // Dialogue Tree types and state
+  type DialogueLine = {
+    id: string;
+    speaker: 'npc' | 'player';
+    text: string;
+  };
+  type DialogueRequirement = {
+    id: string;
+    type: 'status' | 'not_status' | 'item' | 'level' | 'class';
+    value: string;
+  };
+  type DialogueTree = {
+    id: string;
+    topic: string;
+    requirements: DialogueRequirement[];
+    dialogues: DialogueLine[];
+    _reqExpanded?: boolean;
+    _dlgExpanded?: boolean;
+  };
+  const [showDialogueTreeDialog, setShowDialogueTreeDialog] = useState(false);
+  const [dialogueTrees, setDialogueTrees] = useState<DialogueTree[]>([]);
+  const [activeDialogueTab, setActiveDialogueTab] = useState(0);
+  const [dialogueTabToDelete, setDialogueTabToDelete] = useState<number | null>(null);
+  
+  // NPC drag-drop state
+  const [draggingNpcId, setDraggingNpcId] = useState<number | null>(null);
+  
+  // NPC hover tooltip state (follows cursor)
+  const [npcHoverTooltip, setNpcHoverTooltip] = useState<{ x: number; y: number } | null>(null);
+  
+  // NPC delete confirmation popup state
+  const [npcDeletePopup, setNpcDeletePopup] = useState<{
+    npcId: number;
+    screenX: number;
+    screenY: number;
+  } | null>(null);
   
   // Hero position edit dialog state
   const [showHeroEditDialog, setShowHeroEditDialog] = useState(false);
@@ -1163,6 +1203,11 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
 
     editorInstance.setObjectsChangedCallback((objects) => {
       setMapObjects(objects);
+    });
+
+    // Set up NPC right-click callback to show delete confirmation
+    editorInstance.setNpcRightClickCallback((npcId, screenX, screenY) => {
+      setNpcDeletePopup({ npcId, screenX, screenY });
     });
 
     // Set up hero edit callback to show dialog
@@ -1681,28 +1726,37 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     setShowObjectDialog(false);
     syncMapObjects();
     setObjectValidationErrors([]);
+    
+    // Trigger autosave after NPC attributes are edited
+    editor.triggerAutoSave(true);
   }, [editor, syncMapObjects]);
 
   const handleOpenActorDialog = useCallback((type: 'npc' | 'enemy') => {
-    const defaultX = hoverCoords?.x ?? 0;
-    const defaultY = hoverCoords?.y ?? 0;
-
     setActorDialogState({
       type,
       name: '',
-      x: defaultX.toString(),
-      y: defaultY.toString(),
-      tilesetPath: ''
+      tilesetPath: '',
+      portraitPath: '',
+      isTalker: true,
+      isVendor: false,
+      isQuestGiver: false
     });
     setActorDialogError(null);
-  }, [hoverCoords]);
+  }, []);
 
-  const handleActorFieldChange = useCallback((field: 'name' | 'x' | 'y' | 'tilesetPath', value: string) => {
+  const handleActorFieldChange = useCallback((field: 'name' | 'tilesetPath' | 'portraitPath', value: string) => {
     setActorDialogState((prev) => {
       if (!prev) return prev;
       return { ...prev, [field]: value };
     });
     setActorDialogError(null);
+  }, []);
+
+  const handleActorRoleToggle = useCallback((role: 'isTalker' | 'isVendor' | 'isQuestGiver') => {
+    setActorDialogState((prev) => {
+      if (!prev) return prev;
+      return { ...prev, [role]: !prev[role] };
+    });
   }, []);
 
   const handleActorTilesetBrowse = useCallback(async () => {
@@ -1720,6 +1774,31 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     }
   }, [handleActorFieldChange]);
 
+  const handleActorPortraitBrowse = useCallback(async () => {
+    if (typeof window === 'undefined' || !window.electronAPI?.selectTilesetFile) {
+      return;
+    }
+
+    try {
+      const selected = await window.electronAPI.selectTilesetFile();
+      if (selected) {
+        // Convert to data URL to avoid file:// protocol security restrictions
+        if (window.electronAPI.readFileAsDataURL) {
+          const dataUrl = await window.electronAPI.readFileAsDataURL(selected);
+          if (dataUrl) {
+            handleActorFieldChange('portraitPath', dataUrl);
+          } else {
+            handleActorFieldChange('portraitPath', selected);
+          }
+        } else {
+          handleActorFieldChange('portraitPath', selected);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to select portrait file for actor:', error);
+    }
+  }, [handleActorFieldChange]);
+
   const handleCloseActorDialog = useCallback(() => {
     setActorDialogState(null);
     setActorDialogError(null);
@@ -1731,74 +1810,127 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     syncMapObjects();
   }, [editor, syncMapObjects]);
 
-  const handleActorSubmit = useCallback(() => {
+  // NPC'yi haritaya belirli konuma yerleştir
+  const handlePlaceActorOnMap = useCallback((objectId: number, x?: number, y?: number) => {
+    if (!editor) return;
+    const spawnX = x !== undefined ? x : Math.floor(mapWidth / 2);
+    const spawnY = y !== undefined ? y : Math.floor(mapHeight / 2);
+    editor.updateMapObject(objectId, { x: spawnX, y: spawnY });
+    syncMapObjects();
+  }, [editor, mapWidth, mapHeight, syncMapObjects]);
+
+  // NPC'yi haritadan kaldır (database olarak tut)
+  const handleUnplaceActorFromMap = useCallback((objectId: number) => {
+    if (!editor) return;
+    editor.updateMapObject(objectId, { x: -1, y: -1 });
+    syncMapObjects();
+  }, [editor, syncMapObjects]);
+
+  // NPC drag start
+  const handleNpcDragStart = useCallback((e: React.DragEvent, npcId: number) => {
+    e.dataTransfer.setData('npc-id', npcId.toString());
+    e.dataTransfer.effectAllowed = 'move';
+    setDraggingNpcId(npcId);
+  }, []);
+
+  // NPC drag end
+  const handleNpcDragEnd = useCallback(() => {
+    if (editor) {
+      editor.clearNpcDragHover();
+    }
+    setDraggingNpcId(null);
+  }, [editor]);
+
+  const handleActorSubmit = useCallback(async () => {
     if (!editor || !actorDialogState) {
       return;
     }
 
-    const parsedX = parseInt(actorDialogState.x, 10);
-    const parsedY = parseInt(actorDialogState.y, 10);
-
+    // Zorunlu alanları kontrol et
     if (!actorDialogState.name.trim()) {
       setActorDialogError('Name is required.');
       return;
     }
 
-    if (Number.isNaN(parsedX) || Number.isNaN(parsedY)) {
-      setActorDialogError('Position must be whole numbers.');
-      return;
-    }
-
-    if (
-      parsedX < 0 ||
-      parsedX >= editor.getMapWidth() ||
-      parsedY < 0 ||
-      parsedY >= editor.getMapHeight()
-    ) {
-      setActorDialogError('Position is outside of the map bounds.');
-      return;
-    }
-
-    if (!actorDialogState.tilesetPath.trim()) {
-      setActorDialogError('Tileset location is required.');
-      return;
-    }
-
-    const tilesetPath = actorDialogState.tilesetPath.trim();
     const name = actorDialogState.name.trim();
-    const occupiedByType = editor
-      .getObjectsAtPosition(parsedX, parsedY)
-      .find((obj) => obj.type === actorDialogState.type);
+    const tilesetPath = actorDialogState.tilesetPath.trim();
+    const portraitPath = actorDialogState.portraitPath.trim();
+    const { isTalker, isVendor, isQuestGiver } = actorDialogState;
 
-    if (occupiedByType) {
-      setActorDialogError(
-        `There is already a ${actorDialogState.type === 'npc' ? 'NPC' : 'enemy'} at that position.`
-      );
-      return;
+    // Determine primary role for NPC file creation
+    const role = isVendor ? 'vendor' : isQuestGiver ? 'quest' : isTalker ? 'talker' : 'static';
+
+    // Proje klasöründe NPC dosyası oluştur (eğer electronAPI varsa)
+    let npcFilename: string | undefined;
+    if (currentProjectPath && window.electronAPI?.createNpcFile) {
+      try {
+        const result = await window.electronAPI.createNpcFile(currentProjectPath, {
+          name,
+          role,
+          tilesetPath: tilesetPath || undefined,
+          portraitPath: portraitPath || undefined,
+        });
+        if (result.success && result.filename) {
+          npcFilename = result.filename;
+          console.log('NPC file created:', result.filePath);
+        } else if (result.error) {
+          console.error('Failed to create NPC file:', result.error);
+          // Hata olsa bile NPC'yi listeye eklemeye devam et
+        }
+      } catch (err) {
+        console.error('Error creating NPC file:', err);
+      }
     }
 
-    const newObject = editor.addMapObject('enemy', parsedX, parsedY, 1, 1);
+    // Rol bazlı properties oluştur
+    const roleProperties: Record<string, string> = {};
+    if (isTalker) {
+      roleProperties.talker = 'true';
+    }
+    if (isVendor) {
+      roleProperties.vendor = 'true';
+    }
+    if (isQuestGiver) {
+      roleProperties.questGiver = 'true';
+    }
+    // if none are selected, it's a static NPC (no properties)
+
+    // NPC'yi harita dışında (-1, -1) konumunda oluştur
+    // Kullanıcı isterse sonra haritaya yerleştirebilir
+    const unplacedX = -1;
+    const unplacedY = -1;
+
+    // NPC'yi listeye ekle ama haritada görünmez (database olarak)
+    // Not: addMapObject 'enemy' | 'event' kabul ediyor, sonra type'ı güncelliyoruz
+    const newObject = editor.addMapObject('enemy', unplacedX, unplacedY, 1, 1);
     editor.updateMapObject(newObject.id, {
       name,
-      x: parsedX,
-      y: parsedY,
+      x: unplacedX,
+      y: unplacedY,
       type: actorDialogState.type,
       category: actorDialogState.type === 'npc' ? 'npc' : 'enemy',
-      wander_radius: actorDialogState.type === 'npc' ? 0 : newObject.wander_radius,
+      wander_radius: 0,
       properties: {
         ...(newObject.properties || {}),
-        tilesetPath
+        ...roleProperties,
+        ...(tilesetPath ? { tilesetPath } : {}),
+        ...(portraitPath ? { portraitPath } : {}),
+        ...(npcFilename ? { npcFilename: `npcs/${npcFilename}` } : {}),
       }
     });
 
     syncMapObjects();
     handleCloseActorDialog();
-  }, [actorDialogState, editor, handleCloseActorDialog, syncMapObjects]);
+    
+    // Trigger autosave after NPC is added
+    editor.triggerAutoSave(true);
+  }, [actorDialogState, editor, handleCloseActorDialog, syncMapObjects, currentProjectPath]);
 
   const handleObjectDialogClose = useCallback(() => {
     setShowObjectDialog(false);
     setEditingObject(null);
     setObjectValidationErrors([]);
+    setShowDeleteNpcConfirm(false);
   }, []);
 
   const handleObjectDialogSave = useCallback(() => {
@@ -1853,6 +1985,31 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       }
     } catch (error) {
       console.error('Failed to select tileset for editing object:', error);
+    }
+  }, [updateEditingObjectProperty]);
+
+  const handleEditingPortraitBrowse = useCallback(async () => {
+    if (typeof window === 'undefined' || !window.electronAPI?.selectTilesetFile) {
+      return;
+    }
+
+    try {
+      const selected = await window.electronAPI.selectTilesetFile();
+      if (selected) {
+        // Convert to data URL to avoid file:// protocol security restrictions
+        if (window.electronAPI.readFileAsDataURL) {
+          const dataUrl = await window.electronAPI.readFileAsDataURL(selected);
+          if (dataUrl) {
+            updateEditingObjectProperty('portraitPath', dataUrl);
+          } else {
+            updateEditingObjectProperty('portraitPath', selected);
+          }
+        } else {
+          updateEditingObjectProperty('portraitPath', selected);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to select portrait for editing object:', error);
     }
   }, [updateEditingObjectProperty]);
 
@@ -2535,6 +2692,91 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             console.warn('Failed to collect tileset images for export:', err);
           }
 
+          // Collect NPC files from mapObjects
+          const npcFiles: Array<{ filename: string; content: string }> = [];
+          try {
+            const npcObjects = mapObjects.filter(obj => obj.type === 'npc');
+            for (const npc of npcObjects) {
+              const npcName = npc.name || `npc_${npc.id}`;
+              // Sanitize filename
+              const sanitizedName = npcName
+                .toLowerCase()
+                .replace(/[<>:"/\\|?*]/g, '_')
+                .trim()
+                .replace(/\s+/g, '_')
+                .replace(/_{2,}/g, '_') || 'unnamed_npc';
+              
+              const filename = `${sanitizedName}.txt`;
+              
+              // Build NPC file content in Flare format
+              const lines: string[] = [];
+              
+              // Name
+              lines.push(`name=${npcName}`);
+              lines.push('');
+              
+              // Portrait (if provided)
+              if (npc.properties?.portraitPath) {
+                lines.push(`portrait=${npc.properties.portraitPath}`);
+                lines.push('');
+              }
+              
+              // Animation/Tileset (if provided)
+              if (npc.properties?.tilesetPath) {
+                lines.push(`# animation info`);
+                lines.push(`animations=${npc.properties.tilesetPath}`);
+                lines.push('');
+              }
+              
+              // Role-based attributes
+              const isTalker = npc.properties?.talker === 'true';
+              const isVendor = npc.properties?.vendor === 'true';
+              const isQuestGiver = npc.properties?.questGiver === 'true';
+              
+              if (isVendor) {
+                lines.push(`# shop info`);
+                lines.push(`vendor=true`);
+                lines.push(`# TODO: Add stock items`);
+                lines.push(`# constant_stock=item_id:count,item_id:count`);
+                lines.push('');
+              }
+              
+              if (isTalker || isVendor || isQuestGiver) {
+                lines.push(`talker=true`);
+                lines.push('');
+              }
+              
+              // Quest giver note
+              if (isQuestGiver) {
+                lines.push(`# This NPC is marked as a Quest Giver in the editor.`);
+                lines.push(`# Quest assignments are defined in quests/*.txt files with giver=npcs/${sanitizedName}.txt`);
+                lines.push('');
+              }
+              
+              // Static NPC note
+              if (!isTalker && !isVendor && !isQuestGiver) {
+                lines.push(`# This NPC is decorative and has no interaction.`);
+                lines.push('');
+              }
+              
+              // Placeholder for dialog
+              if (isTalker || isVendor || isQuestGiver) {
+                lines.push(`# Dialog sections`);
+                lines.push(`# [dialog]`);
+                lines.push(`# topic=Talk`);
+                lines.push(`# him=Hello, traveler!`);
+                lines.push('');
+              }
+              
+              npcFiles.push({ filename, content: lines.join('\n') });
+            }
+            if (npcFiles.length > 0) {
+              console.log(`Export: prepared ${npcFiles.length} NPC files`);
+            }
+          } catch (npcErr) {
+            console.warn('Failed to collect NPC files for export:', npcErr);
+          }
+
           const success = await window.electronAPI.saveExportFiles(
             currentProjectPath,
             mapName,
@@ -2546,7 +2788,8 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 content: spawnContent,
                 filename: 'spawn.txt'
               },
-              tilesetImages
+              tilesetImages,
+              npcFiles
             }
           );
 
@@ -3265,50 +3508,126 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                       <div className="flex-1 min-h-0">
                         {actorEntries.length === 0 ? (
                           <div className="h-full border border-dashed border-border rounded-md flex items-center justify-center text-sm text-muted-foreground px-4 text-center">
-                            {isNpcLayer ? 'No NPCs added yet. Use the Add control to place your first NPC.' : 'No enemies added yet. Use the Add control to place an enemy.'}
+                            {isNpcLayer ? 'No NPCs added yet. Use the Add control to create your first NPC.' : 'No enemies added yet. Use the Add control to place an enemy.'}
                           </div>
                         ) : (
                           <div className="space-y-2 overflow-y-auto pr-1">
-                            {actorEntries.map((actor) => (
+                            {actorEntries.map((actor) => {
+                              // NPC rol tag'lerini hesapla
+                              const isTalker = actor.properties?.talker === 'true' || actor.properties?.talker === '1';
+                              const isVendor = actor.properties?.vendor === 'true' || actor.properties?.vendor === '1';
+                              const isQuestGiver = actor.properties?.questGiver === 'true' || actor.properties?.questGiver === '1';
+                              // Static = hiçbir rol atanmamış
+                              const isStatic = !isTalker && !isVendor && !isQuestGiver;
+                              // Portrait path
+                              const portraitPath = actor.properties?.portraitPath;
+                              // Haritada yerleştirilmiş mi?
+                              const isPlacedOnMap = actor.x >= 0 && actor.y >= 0;
+                              
+                              return (
                               <div
                                 key={actor.id}
-                                className="border border-border rounded-md px-3 py-2 bg-background/50 hover:bg-background transition-colors cursor-pointer"
+                                className={`rounded-md px-2 py-2 hover:bg-background transition-colors cursor-pointer ${
+                                  isPlacedOnMap 
+                                    ? 'border-2 border-orange-500 bg-background/50' 
+                                    : 'border border-dashed border-gray-400 dark:border-gray-600 bg-muted/20'
+                                } ${draggingNpcId === actor.id ? 'opacity-50' : ''}`}
                                 onClick={() => handleEditObject(actor.id)}
+                                onMouseMove={(e) => setNpcHoverTooltip({ x: e.clientX, y: e.clientY })}
+                                onMouseLeave={() => setNpcHoverTooltip(null)}
                               >
-                                <div className="flex items-start justify-between gap-2">
-                                    <div className="space-y-1 text-sm">
-                                    <div className="font-medium text-foreground" title={actor.name || `${actor.type === 'npc' ? 'NPC' : 'Enemy'} #${actor.id}`}>
+                                <div className="flex items-center gap-2">
+                                    {/* Portrait thumbnail */}
+                                    <div className={`flex-shrink-0 w-10 h-10 rounded border bg-muted/50 flex items-center justify-center overflow-hidden ${
+                                      isPlacedOnMap ? 'border-border' : 'border-dashed border-muted-foreground/40'
+                                    }`}>
+                                      {portraitPath ? (
+                                        <img
+                                          src={portraitPath}
+                                          alt={actor.name || 'NPC portrait'}
+                                          className={`w-full h-full object-cover ${!isPlacedOnMap ? 'opacity-50' : ''}`}
+                                          onError={(e) => {
+                                            // Resim yüklenemezse soru işareti göster
+                                            e.currentTarget.style.display = 'none';
+                                            e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                                          }}
+                                        />
+                                      ) : null}
+                                      <HelpCircle className={`w-5 h-5 text-muted-foreground ${portraitPath ? 'hidden' : ''} ${!isPlacedOnMap ? 'opacity-50' : ''}`} />
+                                    </div>
+                                    {/* NPC bilgileri */}
+                                    <div className="space-y-1 text-sm flex-1 min-w-0">
+                                    <div className={`font-medium ${isPlacedOnMap ? 'text-foreground' : 'text-muted-foreground'}`} title={actor.name || `${actor.type === 'npc' ? 'NPC' : 'Enemy'} #${actor.id}`}>
                                       <span className={leftCollapsed ? 'sr-only' : ''}>{actor.name || `${actor.type === 'npc' ? 'NPC' : 'Enemy'} #${actor.id}`}</span>
                                       {!actor.name && leftCollapsed && <span className="text-xs text-muted-foreground">#{actor.id}</span>}
                                     </div>
-                                    <div className="text-xs text-muted-foreground flex items-center gap-1">
-                                      <MapPin className="w-3 h-3" />
-                                      <span className={leftCollapsed ? 'sr-only' : ''}>({actor.x}, {actor.y})</span>
-                                    </div>
-                                    {actor.properties?.tilesetPath && (
-                                      <div className="text-xs text-muted-foreground break-all">
-                                        {actor.properties.tilesetPath}
+                                    {/* NPC Rol Tag'leri */}
+                                    {isNpcLayer && !leftCollapsed && (
+                                      <div className="flex flex-wrap gap-1 mt-1">
+                                        {isTalker && (
+                                          <span className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/30">
+                                            Talker
+                                          </span>
+                                        )}
+                                        {isVendor && (
+                                          <span className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                                            Vendor
+                                          </span>
+                                        )}
+                                        {isQuestGiver && (
+                                          <span className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                                            Quest
+                                          </span>
+                                        )}
+                                        {isStatic && (
+                                          <span className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-gray-500/20 text-gray-600 dark:text-gray-400 border border-gray-500/30">
+                                            Static
+                                          </span>
+                                        )}
                                       </div>
                                     )}
                                   </div>
-                                  <Tooltip content="Remove">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      className="w-6 h-6 p-0 text-red-500 hover:text-red-600"
-                                      onClick={(event) => {
-                                        event.stopPropagation();
-                                        handleRemoveActor(actor.id);
-                                      }}
-                                    >
-                                      <X className="w-3 h-3" />
-                                    </Button>
-                                  </Tooltip>
+                                  {/* Drag handle for NPC - centered vertically */}
+                                  {isNpcLayer && (
+                                    <Tooltip content="Drag and drop to place NPC on map">
+                                      <div
+                                        draggable
+                                        onDragStart={(e) => handleNpcDragStart(e, actor.id)}
+                                        onDragEnd={handleNpcDragEnd}
+                                        className="w-8 h-8 flex items-center justify-center cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        <GripVertical className="w-5 h-5" />
+                                      </div>
+                                    </Tooltip>
+                                  )}
                                 </div>
                               </div>
-                            ))}
+                            );
+                            })}
                           </div>
                         )}
+                      </div>
+                    )}
+                    {/* Add NPC/Enemy button for actor layers - placed below the list, above layers */}
+                    {(isNpcLayer || isEnemyLayer) && (
+                      <div className="flex justify-center py-2">
+                        <Tooltip content={isNpcLayer ? 'Add NPC' : 'Add Enemy'} side="bottom">
+                          <Button
+                            variant="default"
+                            size="sm"
+                            aria-label={isNpcLayer ? 'Add NPC' : 'Add Enemy'}
+                            className="text-xs px-3 py-1 h-7 shadow-sm bg-orange-500 hover:bg-orange-600 text-white border-orange-500"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              handleOpenActorDialog(isNpcLayer ? 'npc' : 'enemy');
+                            }}
+                          >
+                            <Plus className="w-3 h-3 mr-1" />
+                            {isNpcLayer ? 'Add NPC' : 'Add Enemy'}
+                          </Button>
+                        </Tooltip>
                       </div>
                     )}
                   </>
@@ -3317,7 +3636,8 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               return null;
             })()}
 
-            {/* Tileset Brushes Window - render for all layers (including npc/enemy/event) */}
+            {/* Tileset Brushes Window - render for all layers except NPC */}
+            {!isNpcLayer && (
             <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-0 m-0">
               {/* Layer Tabs (background / object only) */}
               {(() => {
@@ -3398,7 +3718,9 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               </div>
               {/* Active GID moved to canvas area (see Hover Coordinates Display) */}
             </div>
+            )}
             {/* Brush Tools - stick to bottom so palette can fill remaining space */}
+            {!isNpcLayer && (
             <div className="sticky bottom-0 z-10 bg-transparent py-2">
               <div className="text-xs text-muted-foreground"></div>
               <div className="w-full flex justify-center">
@@ -3612,6 +3934,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 </div>
               </div>
             </div>
+            )}
           </section>
 
           {/* Layers Section */}
@@ -4694,7 +5017,56 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               </div>
             </div>
           </div>
-          <div className="bg-gray-100 flex-1 min-h-0 flex items-center justify-center overflow-hidden relative">
+          <div 
+            className={`bg-gray-100 flex-1 min-h-0 flex items-center justify-center overflow-hidden relative ${draggingNpcId ? 'ring-2 ring-orange-500 ring-inset' : ''}`}
+            onDragOver={(e) => {
+              if (draggingNpcId && editor) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                
+                // Update NPC drag hover highlight on map
+                const canvas = canvasRef.current;
+                if (canvas) {
+                  const rect = canvas.getBoundingClientRect();
+                  const canvasX = e.clientX - rect.left;
+                  const canvasY = e.clientY - rect.top;
+                  editor.setNpcDragHover(canvasX, canvasY);
+                }
+              }
+            }}
+            onDragLeave={(e) => {
+              // Clear hover when leaving the canvas area
+              if (draggingNpcId && editor) {
+                editor.clearNpcDragHover();
+              }
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              const npcIdStr = e.dataTransfer.getData('npc-id');
+              if (!npcIdStr || !editor) return;
+              
+              const npcId = parseInt(npcIdStr, 10);
+              if (isNaN(npcId)) return;
+              
+              // Canvas üzerindeki koordinatları hesapla
+              const canvas = canvasRef.current;
+              if (!canvas) return;
+              
+              const rect = canvas.getBoundingClientRect();
+              const canvasX = e.clientX - rect.left;
+              const canvasY = e.clientY - rect.top;
+              
+              // Screen koordinatlarını map koordinatlarına çevir (aynı fonksiyon hover'da kullanılan)
+              const mapCoords = editor.screenToTile(canvasX, canvasY);
+              if (mapCoords && mapCoords.x >= 0 && mapCoords.x < mapWidth && mapCoords.y >= 0 && mapCoords.y < mapHeight) {
+                handlePlaceActorOnMap(npcId, mapCoords.x, mapCoords.y);
+              }
+              
+              // Clear the hover highlight
+              editor.clearNpcDragHover();
+              setDraggingNpcId(null);
+            }}
+          >
             {/* Canvas Tooltip Panel - always mounted; visibility via classes */}
             <div
               className={`absolute top-4 left-4 z-20 p-3 bg-white/90 dark:bg-neutral-900/90 backdrop-blur-sm rounded-lg border border-border shadow-lg transition-opacity duration-300 ${showTooltip ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
@@ -4773,6 +5145,51 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 </Tooltip>
               </div>
             </div>
+
+            {/* NPC Delete Confirmation Popup */}
+            {npcDeletePopup && (
+              <div
+                className="fixed z-50 flex items-center gap-1 px-2 py-1.5 bg-black rounded-lg shadow-xl border border-neutral-700"
+                style={{
+                  left: npcDeletePopup.screenX,
+                  top: npcDeletePopup.screenY,
+                  transform: 'translate(-50%, -120%)'
+                }}
+              >
+                <span className="text-white text-xs font-medium mr-1">Remove NPC?</span>
+                <button
+                  className="w-6 h-6 flex items-center justify-center rounded hover:bg-neutral-700 transition-colors"
+                  onClick={() => {
+                    handleUnplaceActorFromMap(npcDeletePopup.npcId);
+                    setNpcDeletePopup(null);
+                  }}
+                  title="Confirm"
+                >
+                  <Check className="w-4 h-4 text-emerald-500" />
+                </button>
+                <button
+                  className="w-6 h-6 flex items-center justify-center rounded hover:bg-neutral-700 transition-colors"
+                  onClick={() => setNpcDeletePopup(null)}
+                  title="Cancel"
+                >
+                  <X className="w-4 h-4 text-red-500" />
+                </button>
+              </div>
+            )}
+
+            {/* NPC Hover Tooltip - follows cursor */}
+            {npcHoverTooltip && (
+              <div
+                className="fixed z-50 px-2 py-1 bg-black/90 text-white text-xs rounded shadow-lg pointer-events-none flex items-center gap-1.5"
+                style={{
+                  left: npcHoverTooltip.x + 12,
+                  top: npcHoverTooltip.y + 12
+                }}
+              >
+                <MousePointer className="w-3 h-3" />
+                <span>Click to Edit</span>
+              </div>
+            )}
 
             {/* Selection Info Display - keep mounted to avoid reflows */}
             <div className={`absolute bottom-4 left-32 z-10 p-2 rounded-md text-xs flex items-center gap-3 transition-opacity duration-200 ${hasSelection ? 'opacity-100 pointer-events-auto bg-orange-600/90 border border-orange-500 text-white' : 'opacity-0 pointer-events-none'}`}>
@@ -5188,41 +5605,69 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               {actorDialogState?.type === 'npc' ? 'Add NPC' : 'Add Enemy'}
             </DialogTitle>
             <DialogDescription>
-              Define the placement details for this {actorDialogState?.type === 'npc' ? 'NPC' : 'enemy'}.
+              Define the details for this {actorDialogState?.type === 'npc' ? 'NPC' : 'enemy'}.
             </DialogDescription>
           </DialogHeader>
           {actorDialogState && (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Name</label>
-                  <Input
-                    value={actorDialogState.name}
-                    onChange={(event) => handleActorFieldChange('name', event.target.value)}
-                    placeholder={actorDialogState.type === 'npc' ? 'Village Elder' : 'Goblin Scout'}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">X Position</label>
-                  <Input
-                    type="number"
-                    value={actorDialogState.x}
-                    onChange={(event) => handleActorFieldChange('x', event.target.value)}
-                    min={0}
-                    max={editor?.getMapWidth() ?? undefined}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Y Position</label>
-                  <Input
-                    type="number"
-                    value={actorDialogState.y}
-                    onChange={(event) => handleActorFieldChange('y', event.target.value)}
-                    min={0}
-                    max={editor?.getMapHeight() ?? undefined}
-                  />
-                </div>
+              {/* Name (zorunlu) */}
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Name <span className="text-red-500">*</span>
+                </label>
+                <Input
+                  value={actorDialogState.name}
+                  onChange={(event) => handleActorFieldChange('name', event.target.value)}
+                  placeholder={actorDialogState.type === 'npc' ? 'Village Elder' : 'Goblin Scout'}
+                />
               </div>
+
+              {/* Role (toggle buttons) */}
+              <div>
+                <label className="block text-sm font-medium mb-1">Roles</label>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleActorRoleToggle('isTalker')}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                      actorDialogState.isTalker
+                        ? 'bg-blue-500/20 text-blue-600 dark:text-blue-400 border-blue-500/50'
+                        : 'bg-muted/50 text-muted-foreground border-transparent hover:bg-muted'
+                    }`}
+                  >
+                    Talker
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleActorRoleToggle('isVendor')}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                      actorDialogState.isVendor
+                        ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/50'
+                        : 'bg-muted/50 text-muted-foreground border-transparent hover:bg-muted'
+                    }`}
+                  >
+                    Vendor
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleActorRoleToggle('isQuestGiver')}
+                    className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                      actorDialogState.isQuestGiver
+                        ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/50'
+                        : 'bg-muted/50 text-muted-foreground border-transparent hover:bg-muted'
+                    }`}
+                  >
+                    Quest
+                  </button>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {!actorDialogState.isTalker && !actorDialogState.isVendor && !actorDialogState.isQuestGiver
+                    ? 'Static NPC with no interaction.'
+                    : 'Select one or more roles for this NPC.'}
+                </p>
+              </div>
+
+              {/* Tileset Location (opsiyonel) */}
               <div>
                 <label className="block text-sm font-medium mb-1">Tileset Location</label>
                 <div className="flex gap-2">
@@ -5230,7 +5675,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                     className="flex-1"
                     value={actorDialogState.tilesetPath}
                     onChange={(event) => handleActorFieldChange('tilesetPath', event.target.value)}
-                    placeholder="Desktop/mytilesets/npcs/mynpc.png"
+                    placeholder="npcs/merchant.png (optional)"
                     readOnly={canUseTilesetDialog}
                     onClick={canUseTilesetDialog ? () => { void handleActorTilesetBrowse(); } : undefined}
                   />
@@ -5245,6 +5690,31 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                   </Button>
                 </div>
               </div>
+
+              {/* Portrait Location (opsiyonel) */}
+              <div>
+                <label className="block text-sm font-medium mb-1">Portrait Location</label>
+                <div className="flex gap-2">
+                  <Input
+                    className="flex-1"
+                    value={actorDialogState.portraitPath}
+                    onChange={(event) => handleActorFieldChange('portraitPath', event.target.value)}
+                    placeholder="portraits/merchant.png (optional)"
+                    readOnly={canUseTilesetDialog}
+                    onClick={canUseTilesetDialog ? () => { void handleActorPortraitBrowse(); } : undefined}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => { void handleActorPortraitBrowse(); }}
+                    disabled={!canUseTilesetDialog}
+                  >
+                    Browse
+                  </Button>
+                </div>
+              </div>
+
               {actorDialogError && (
                 <div className="text-sm text-red-500">
                   {actorDialogError}
@@ -5275,13 +5745,13 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         }}
       >
         <DialogContent className="max-w-5xl w-full h-[90vh] flex flex-col">
-          <DialogHeader>
-            <DialogTitle>
-              {editingObject ? `Edit ${editingObject.type}` : 'Add Object'}
+          <DialogHeader className="mb-4">
+            <DialogTitle className="flex items-center gap-2">
+              {editingObject?.type === 'npc' && (
+                <User className="w-5 h-5 text-orange-500" />
+              )}
+              {editingObject ? `Edit ${editingObject.type.toUpperCase()}` : 'Add Object'}
             </DialogTitle>
-            <DialogDescription>
-              Configure {editingObject?.type || 'object'} properties for Flare engine compatibility.
-            </DialogDescription>
           </DialogHeader>
           
           {objectValidationErrors.length > 0 && (
@@ -5297,54 +5767,96 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
 
           <div className="flex-1 overflow-y-auto pr-2 minimal-scroll">
             {editingObject && (
-            <div className="space-y-4 pb-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Name</label>
+            <div className="space-y-3 pb-4">
+              {/* Basic Info Row */}
+              <div className="flex gap-3 items-end">
+                <div className="flex-1">
+                  <label className="text-xs text-muted-foreground">Name</label>
                   <Input
                     value={editingObject.name || ''}
                     onChange={(e) => setEditingObject({...editingObject, name: e.target.value})}
                     placeholder="Object name"
+                    className="h-8"
                   />
                 </div>
+                <div className="w-24">
+                  <label className="text-xs text-muted-foreground">Position</label>
+                  <div className="flex items-center gap-1">
+                    <Input
+                      type="number"
+                      value={editingObject.x}
+                      onChange={(e) => setEditingObject({...editingObject, x: Number(e.target.value)})}
+                      disabled={editingObject.type === 'npc'}
+                      className={`h-8 w-11 px-1 text-center ${editingObject.type === 'npc' ? 'opacity-50' : ''}`}
+                    />
+                    <span className="text-muted-foreground text-xs">,</span>
+                    <Input
+                      type="number"
+                      value={editingObject.y}
+                      onChange={(e) => setEditingObject({...editingObject, y: Number(e.target.value)})}
+                      disabled={editingObject.type === 'npc'}
+                      className={`h-8 w-11 px-1 text-center ${editingObject.type === 'npc' ? 'opacity-50' : ''}`}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* NPC Roles */}
+              {editingObject.type === 'npc' && (
+                <div className="flex gap-1.5">
+                  {[
+                    { key: 'talker', label: 'Talker', color: 'blue' },
+                    { key: 'vendor', label: 'Vendor', color: 'emerald' },
+                    { key: 'questGiver', label: 'Quest', color: 'amber' }
+                  ].map(role => (
+                    <button
+                      key={role.key}
+                      type="button"
+                      onClick={() => {
+                        const newProps = { ...editingObject.properties };
+                        if (newProps[role.key] === 'true') {
+                          delete newProps[role.key];
+                        } else {
+                          newProps[role.key] = 'true';
+                        }
+                        setEditingObject({ ...editingObject, properties: newProps });
+                      }}
+                      className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
+                        editingObject.properties?.[role.key] === 'true'
+                          ? role.color === 'blue' ? 'bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/50'
+                          : role.color === 'emerald' ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/50'
+                          : 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/50'
+                          : 'bg-muted/50 text-muted-foreground border border-transparent hover:bg-muted'
+                      }`}
+                    >
+                      {role.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Category for non-NPC */}
+              {editingObject.type !== 'npc' && (
                 <div>
-                  <label className="block text-sm font-medium mb-1">Category</label>
+                  <label className="text-xs text-muted-foreground">Category</label>
                   <Input
                     value={editingObject.category || ''}
                     onChange={(e) => setEditingObject({...editingObject, category: e.target.value})}
                     placeholder={editingObject.type === 'enemy' ? 'creature' : 'block'}
+                    className="h-8"
                   />
                 </div>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">X Position</label>
-                  <Input
-                    type="number"
-                    value={editingObject.x}
-                    onChange={(e) => setEditingObject({...editingObject, x: Number(e.target.value)})}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Y Position</label>
-                  <Input
-                    type="number"
-                    value={editingObject.y}
-                    onChange={(e) => setEditingObject({...editingObject, y: Number(e.target.value)})}
-                  />
-                </div>
-              </div>
+              )}
 
+              {/* Tileset & Portrait for NPC/Enemy */}
               {(editingObject.type === 'npc' || editingObject.type === 'enemy') && (
-                <div>
-                  <label className="block text-sm font-medium mb-1">Tileset Location</label>
+                <div className="space-y-2">
                   <div className="flex gap-2">
                     <Input
-                      className="flex-1"
+                      className="h-8 flex-1 text-xs"
                       value={getEditingObjectProperty('tilesetPath', '')}
                       onChange={(e) => updateEditingObjectProperty('tilesetPath', e.target.value)}
-                      placeholder="Desktop/mytilesets/npcs/mynpc.png"
+                      placeholder="Tileset path..."
                       readOnly={canUseTilesetDialog}
                       onClick={canUseTilesetDialog ? () => { void handleEditingTilesetBrowse(); } : undefined}
                     />
@@ -5352,12 +5864,99 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                       type="button"
                       variant="outline"
                       size="sm"
+                      className="h-8 px-2"
                       onClick={() => { void handleEditingTilesetBrowse(); }}
                       disabled={!canUseTilesetDialog}
                     >
-                      Browse
+                      Tileset
                     </Button>
                   </div>
+                  {editingObject.type === 'npc' && (
+                    <div className="flex gap-2">
+                      <Input
+                        className="h-8 flex-1 text-xs"
+                        value={getEditingObjectProperty('portraitPath', '')}
+                        onChange={(e) => updateEditingObjectProperty('portraitPath', e.target.value)}
+                        placeholder="Portrait path..."
+                        readOnly={canUseTilesetDialog}
+                        onClick={canUseTilesetDialog ? () => { void handleEditingPortraitBrowse(); } : undefined}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8 px-2"
+                        onClick={() => { void handleEditingPortraitBrowse(); }}
+                        disabled={!canUseTilesetDialog}
+                      >
+                        Portrait
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Role-specific compact options */}
+              {editingObject.type === 'npc' && editingObject.properties?.talker === 'true' && (
+                <div className="pl-2 border-l-2 border-blue-500/50">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-8 w-full text-xs gap-2"
+                    onClick={() => {
+                      // Load existing dialogue trees from properties if any
+                      const existingTrees = editingObject.properties?.dialogueTrees;
+                      if (existingTrees) {
+                        try {
+                          setDialogueTrees(JSON.parse(existingTrees as string));
+                        } catch {
+                          setDialogueTrees([{ id: '1', topic: '', requirements: [], dialogues: [] }]);
+                        }
+                      } else {
+                        setDialogueTrees([{ id: '1', topic: '', requirements: [], dialogues: [] }]);
+                      }
+                      setActiveDialogueTab(0);
+                      setShowDialogueTreeDialog(true);
+                    }}
+                  >
+                    <MessageSquare className="w-3.5 h-3.5" />
+                    Edit Dialogue Tree
+                  </Button>
+                </div>
+              )}
+
+              {editingObject.type === 'npc' && editingObject.properties?.vendor === 'true' && (
+                <div className="pl-2 border-l-2 border-emerald-500/50 space-y-1.5">
+                  <Input
+                    className="h-7 text-xs"
+                    value={getEditingObjectProperty('vendorRequiresStatus', '')}
+                    onChange={(e) => updateEditingObjectProperty('vendorRequiresStatus', e.target.value)}
+                    placeholder="Requires status..."
+                  />
+                  <Input
+                    className="h-7 text-xs"
+                    value={getEditingObjectProperty('vendorRequiresNotStatus', '')}
+                    onChange={(e) => updateEditingObjectProperty('vendorRequiresNotStatus', e.target.value)}
+                    placeholder="Requires NOT status..."
+                  />
+                </div>
+              )}
+
+              {editingObject.type === 'npc' && editingObject.properties?.questGiver === 'true' && (
+                <div className="pl-2 border-l-2 border-amber-500/50 space-y-1.5">
+                  <Input
+                    className="h-7 text-xs"
+                    value={getEditingObjectProperty('questRequiresStatus', '')}
+                    onChange={(e) => updateEditingObjectProperty('questRequiresStatus', e.target.value)}
+                    placeholder="Requires status..."
+                  />
+                  <Input
+                    className="h-7 text-xs"
+                    value={getEditingObjectProperty('questSetStatus', '')}
+                    onChange={(e) => updateEditingObjectProperty('questSetStatus', e.target.value)}
+                    placeholder="Set status on accept..."
+                  />
                 </div>
               )}
 
@@ -5686,445 +6285,6 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 </>
               )}
 
-              {editingObject.type === 'npc' && (
-                <>
-                  <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
-                    <div>
-                      <h4 className="text-sm font-semibold">Dialog</h4>
-                      <p className="text-xs text-muted-foreground">Configure dialog tree content and metadata.</p>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Dialog ID</label>
-                        <Input
-                          value={getEditingObjectProperty('dialog.id', '')}
-                          onChange={(e) => updateEditingObjectProperty('dialog.id', e.target.value)}
-                          placeholder="villager_intro"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Topic</label>
-                        <Input
-                          value={getEditingObjectProperty('dialog.topic', '')}
-                          onChange={(e) => updateEditingObjectProperty('dialog.topic', e.target.value)}
-                          placeholder="Greetings"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Group</label>
-                        <Input
-                          value={getEditingObjectProperty('dialog.group', '')}
-                          onChange={(e) => updateEditingObjectProperty('dialog.group', e.target.value)}
-                          placeholder="main_story"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Voice File(s)</label>
-                        <textarea
-                          className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
-                          value={getEditingObjectProperty('dialog.voice', '')}
-                          onChange={(e) => updateEditingObjectProperty('dialog.voice', e.target.value)}
-                          placeholder="voice/npcs/intro.ogg"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Lines (Him)</label>
-                        <textarea
-                          className="w-full min-h-[80px] text-sm rounded-md border border-border bg-background px-2 py-1"
-                          value={getEditingObjectProperty('dialog.him', '')}
-                          onChange={(e) => updateEditingObjectProperty('dialog.him', e.target.value)}
-                          placeholder="Hello there!"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Lines (Her)</label>
-                        <textarea
-                          className="w-full min-h-[80px] text-sm rounded-md border border-border bg-background px-2 py-1"
-                          value={getEditingObjectProperty('dialog.her', '')}
-                          onChange={(e) => updateEditingObjectProperty('dialog.her', e.target.value)}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Lines (You)</label>
-                        <textarea
-                          className="w-full min-h-[80px] text-sm rounded-md border border-border bg-background px-2 py-1"
-                          value={getEditingObjectProperty('dialog.you', '')}
-                          onChange={(e) => updateEditingObjectProperty('dialog.you', e.target.value)}
-                          placeholder="What brings you here?"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Portrait (Him)</label>
-                        <textarea
-                          className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
-                          value={getEditingObjectProperty('dialog.portrait_him', '')}
-                          onChange={(e) => updateEditingObjectProperty('dialog.portrait_him', e.target.value)}
-                          placeholder="portraits/npcs/villager.png"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Portrait (Her)</label>
-                        <textarea
-                          className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
-                          value={getEditingObjectProperty('dialog.portrait_her', '')}
-                          onChange={(e) => updateEditingObjectProperty('dialog.portrait_her', e.target.value)}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Portrait (You)</label>
-                        <textarea
-                          className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
-                          value={getEditingObjectProperty('dialog.portrait_you', '')}
-                          onChange={(e) => updateEditingObjectProperty('dialog.portrait_you', e.target.value)}
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Response IDs (one per line, must precede dialog text)</label>
-                      <textarea
-                        className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
-                        value={getEditingObjectProperty('dialog.response', '')}
-                        onChange={(e) => updateEditingObjectProperty('dialog.response', e.target.value)}
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-3">
-                      {[
-                        { key: 'dialog.allow_movement', label: 'Allow Movement', defaultValue: 'false' },
-                        { key: 'dialog.take_a_party', label: 'Take/Release Party', defaultValue: 'false' },
-                        { key: 'dialog.response_only', label: 'Response Only', defaultValue: 'false' }
-                      ].map((field) => (
-                        <label key={field.key} className="flex items-center gap-2 text-sm">
-                          <input
-                            type="checkbox"
-                            className="w-4 h-4"
-                            checked={getEditingObjectProperty(field.key, field.defaultValue || 'false') === 'true'}
-                            onChange={(e) => updateEditingObjectBoolean(field.key, e.target.checked)}
-                          />
-                          {field.label}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
-                    <div>
-                      <h4 className="text-sm font-semibold">NPC Details</h4>
-                      <p className="text-xs text-muted-foreground">Configure appearance, behavior, and requirements.</p>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium mb-1">NPC Name</label>
-                        <Input
-                          value={getEditingObjectProperty('npc.name', editingObject.name || '')}
-                          onChange={(e) => updateEditingObjectProperty('npc.name', e.target.value)}
-                          placeholder="Villager"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Portrait</label>
-                        <Input
-                          value={getEditingObjectProperty('npc.portrait', '')}
-                          onChange={(e) => updateEditingObjectProperty('npc.portrait', e.target.value)}
-                          placeholder="portraits/npcs/villager.png"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Definition File</label>
-                        <Input
-                          value={getEditingObjectProperty('npc.filename', '')}
-                          onChange={(e) => updateEditingObjectProperty('npc.filename', e.target.value)}
-                          placeholder="npcs/villager.txt"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Direction</label>
-                        <Input
-                          value={getEditingObjectProperty('npc.direction', '')}
-                          onChange={(e) => updateEditingObjectProperty('npc.direction', e.target.value)}
-                          placeholder="south"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Waypoints (x,y per line)</label>
-                        <textarea
-                          className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
-                          value={getEditingObjectProperty('npc.waypoints', '')}
-                          onChange={(e) => updateEditingObjectProperty('npc.waypoints', e.target.value)}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Wander Radius</label>
-                        <Input
-                          type="number"
-                          value={getEditingObjectProperty('npc.wander_radius', '')}
-                          onChange={(e) => updateEditingObjectProperty('npc.wander_radius', e.target.value)}
-                          min="0"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-4 gap-3">
-                      {[
-                        { key: 'npc.show_on_minimap', label: 'Show on Minimap', defaultValue: 'true' },
-                        { key: 'npc.talker', label: 'Talkable', defaultValue: 'true' },
-                        { key: 'npc.vendor', label: 'Vendor', defaultValue: 'false' }
-                      ].map((field) => (
-                        <label key={field.key} className="flex items-center gap-2 text-sm">
-                          <input
-                            type="checkbox"
-                            className="w-4 h-4"
-                            checked={getEditingObjectProperty(field.key, field.defaultValue || 'false') === 'true'}
-                            onChange={(e) => updateEditingObjectBoolean(field.key, e.target.checked)}
-                          />
-                          {field.label}
-                        </label>
-                      ))}
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Requires Status (one per line)</label>
-                        <textarea
-                          className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
-                          value={getEditingObjectProperty('npc.requires_status', '')}
-                          onChange={(e) => updateEditingObjectProperty('npc.requires_status', e.target.value)}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Requires Not Status</label>
-                        <textarea
-                          className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
-                          value={getEditingObjectProperty('npc.requires_not_status', '')}
-                          onChange={(e) => updateEditingObjectProperty('npc.requires_not_status', e.target.value)}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Requires Item (one per line)</label>
-                        <textarea
-                          className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
-                          value={getEditingObjectProperty('npc.requires_item', '')}
-                          onChange={(e) => updateEditingObjectProperty('npc.requires_item', e.target.value)}
-                          placeholder="items/potion:2"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Requires Not Item</label>
-                        <textarea
-                          className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
-                          value={getEditingObjectProperty('npc.requires_not_item', '')}
-                          onChange={(e) => updateEditingObjectProperty('npc.requires_not_item', e.target.value)}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Requires Level ≥</label>
-                        <Input
-                          type="number"
-                          value={getEditingObjectProperty('npc.requires_level', '')}
-                          onChange={(e) => updateEditingObjectProperty('npc.requires_level', e.target.value)}
-                          min="0"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Requires Level &lt;</label>
-                        <Input
-                          type="number"
-                          value={getEditingObjectProperty('npc.requires_not_level', '')}
-                          onChange={(e) => updateEditingObjectProperty('npc.requires_not_level', e.target.value)}
-                          min="0"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Requires Class</label>
-                        <Input
-                          value={getEditingObjectProperty('npc.requires_class', '')}
-                          onChange={(e) => updateEditingObjectProperty('npc.requires_class', e.target.value)}
-                          placeholder="warrior"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Requires Currency ≥</label>
-                        <Input
-                          type="number"
-                          value={getEditingObjectProperty('npc.requires_currency', '')}
-                          onChange={(e) => updateEditingObjectProperty('npc.requires_currency', e.target.value)}
-                          min="0"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Requires Currency &lt;</label>
-                        <Input
-                          type="number"
-                          value={getEditingObjectProperty('npc.requires_not_currency', '')}
-                          onChange={(e) => updateEditingObjectProperty('npc.requires_not_currency', e.target.value)}
-                          min="0"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Requires Not Class</label>
-                        <Input
-                          value={getEditingObjectProperty('npc.requires_not_class', '')}
-                          onChange={(e) => updateEditingObjectProperty('npc.requires_not_class', e.target.value)}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <h5 className="text-sm font-semibold">Vendor Options</h5>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Vendor Requires Status</label>
-                          <textarea
-                            className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
-                            value={getEditingObjectProperty('npc.vendor_requires_status', '')}
-                            onChange={(e) => updateEditingObjectProperty('npc.vendor_requires_status', e.target.value)}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Vendor Requires Not Status</label>
-                          <textarea
-                            className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
-                            value={getEditingObjectProperty('npc.vendor_requires_not_status', '')}
-                            onChange={(e) => updateEditingObjectProperty('npc.vendor_requires_not_status', e.target.value)}
-                          />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-3 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Constant Stock (items per line)</label>
-                          <textarea
-                            className="w-full min-h-[80px] text-sm rounded-md border border-border bg-background px-2 py-1"
-                            value={getEditingObjectProperty('npc.constant_stock', '')}
-                            onChange={(e) => updateEditingObjectProperty('npc.constant_stock', e.target.value)}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Status Stock (status: items)</label>
-                          <textarea
-                            className="w-full min-h-[80px] text-sm rounded-md border border-border bg-background px-2 py-1"
-                            value={getEditingObjectProperty('npc.status_stock', '')}
-                            onChange={(e) => updateEditingObjectProperty('npc.status_stock', e.target.value)}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Random Stock (loot definitions)</label>
-                          <textarea
-                            className="w-full min-h-[80px] text-sm rounded-md border border-border bg-background px-2 py-1"
-                            value={getEditingObjectProperty('npc.random_stock', '')}
-                            onChange={(e) => updateEditingObjectProperty('npc.random_stock', e.target.value)}
-                          />
-                        </div>
-                      </div>
-
-                      {(() => {
-                        const raw = getEditingObjectProperty('npc.random_stock_count', '');
-                        const [minCount = '', maxCount = ''] = raw.split(',').map((part) => part.trim());
-                        return (
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <label className="block text-sm font-medium mb-1">Random Stock Min</label>
-                              <Input
-                                type="number"
-                                value={minCount}
-                                min="0"
-                                onChange={(e) => {
-                                  const newMin = e.target.value;
-                                  if (!newMin) {
-                                    updateEditingObjectProperty('npc.random_stock_count', maxCount ? `0,${maxCount}` : '');
-                                  } else {
-                                    updateEditingObjectProperty('npc.random_stock_count', maxCount ? `${newMin},${maxCount}` : newMin);
-                                  }
-                                }}
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-sm font-medium mb-1">Random Stock Max</label>
-                              <Input
-                                type="number"
-                                value={maxCount}
-                                min="0"
-                                onChange={(e) => {
-                                  const newMax = e.target.value;
-                                  if (!minCount) {
-                                    updateEditingObjectProperty('npc.random_stock_count', '');
-                                  } else {
-                                    updateEditingObjectProperty('npc.random_stock_count', newMax ? `${minCount},${newMax}` : minCount);
-                                  }
-                                }}
-                              />
-                            </div>
-                          </div>
-                        );
-                      })()}
-
-                      <div className="grid grid-cols-3 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Buy Ratio</label>
-                          <Input
-                            type="number"
-                            value={getEditingObjectProperty('npc.vendor_ratio_buy', '')}
-                            onChange={(e) => updateEditingObjectProperty('npc.vendor_ratio_buy', e.target.value)}
-                            step="0.01"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Sell Ratio</label>
-                          <Input
-                            type="number"
-                            value={getEditingObjectProperty('npc.vendor_ratio_sell', '')}
-                            onChange={(e) => updateEditingObjectProperty('npc.vendor_ratio_sell', e.target.value)}
-                            step="0.01"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium mb-1">Sell Ratio (Old)</label>
-                          <Input
-                            type="number"
-                            value={getEditingObjectProperty('npc.vendor_ratio_sell_old', '')}
-                            onChange={(e) => updateEditingObjectProperty('npc.vendor_ratio_sell_old', e.target.value)}
-                            step="0.01"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Vox Intro (one file per line)</label>
-                      <textarea
-                        className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
-                        value={getEditingObjectProperty('npc.vox_intro', '')}
-                        onChange={(e) => updateEditingObjectProperty('npc.vox_intro', e.target.value)}
-                      />
-                    </div>
-                  </div>
-                </>
-              )}
-
               {editingObject.type === 'event' && (
                 <>
                   <div>
@@ -6158,11 +6318,408 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           </div>
 
           <DialogFooter className="mt-4 flex-shrink-0">
-            <Button variant="outline" onClick={handleObjectDialogClose}>
-              Cancel
+            <div className="flex w-full justify-between">
+              {/* Delete button - only for NPC */}
+              {editingObject?.type === 'npc' && (
+                <div className="flex items-center gap-2">
+                  {showDeleteNpcConfirm ? (
+                    <>
+                      <span className="text-xs text-muted-foreground">Delete?</span>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        className="h-8 px-2"
+                        onClick={() => {
+                          if (editingObject) {
+                            editor?.removeMapObject(editingObject.id);
+                            syncMapObjects();
+                            setShowObjectDialog(false);
+                            setEditingObject(null);
+                            setShowDeleteNpcConfirm(false);
+                          }
+                        }}
+                      >
+                        Yes
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 px-2"
+                        onClick={() => setShowDeleteNpcConfirm(false)}
+                      >
+                        No
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 px-2 text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => setShowDeleteNpcConfirm(true)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+              )}
+              {editingObject?.type !== 'npc' && <div />}
+              
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={handleObjectDialogClose}>
+                  Cancel
+                </Button>
+                <Button onClick={handleObjectDialogSave}>
+                  Save
+                </Button>
+              </div>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialogue Tree Dialog */}
+      <Dialog
+        open={showDialogueTreeDialog}
+        onOpenChange={(open) => {
+          if (!open) {
+            setShowDialogueTreeDialog(false);
+            setDialogueTabToDelete(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-4xl w-full h-[80vh] flex flex-col">
+          <DialogHeader className="mb-4">
+            <DialogTitle className="flex items-center gap-2">
+              <MessageSquare className="w-5 h-5 text-blue-500" />
+              Dialogue Trees
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="flex-1 flex gap-4 overflow-hidden">
+            {/* Tab sidebar */}
+            <div className="w-48 flex flex-col border-r pr-4">
+              <div className="flex-1 space-y-1 overflow-y-auto minimal-scroll">
+                {dialogueTrees.map((tree, index) => (
+                  <button
+                    key={tree.id}
+                    type="button"
+                    onContextMenu={(e) => {
+                      e.preventDefault();
+                      if (dialogueTrees.length > 1) {
+                        setDialogueTabToDelete(index);
+                      }
+                    }}
+                    onClick={() => {
+                      if (dialogueTabToDelete === index) {
+                        setDialogueTabToDelete(null);
+                      } else {
+                        setActiveDialogueTab(index);
+                      }
+                    }}
+                    className={`w-full px-3 py-2 text-left text-sm rounded-md transition-colors ${
+                      dialogueTabToDelete === index
+                        ? 'bg-red-500/20 border border-red-500/50 text-red-600 dark:text-red-400'
+                        : activeDialogueTab === index
+                        ? 'bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/50'
+                        : 'hover:bg-muted border border-transparent'
+                    }`}
+                  >
+                    {dialogueTabToDelete === index ? (
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs">Delete?</span>
+                        <div className="flex gap-1">
+                          <button
+                            type="button"
+                            className="p-0.5 rounded hover:bg-red-500/30"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const newTrees = dialogueTrees.filter((_, i) => i !== index);
+                              setDialogueTrees(newTrees);
+                              setDialogueTabToDelete(null);
+                              if (activeDialogueTab >= newTrees.length) {
+                                setActiveDialogueTab(Math.max(0, newTrees.length - 1));
+                              }
+                            }}
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            className="p-0.5 rounded hover:bg-muted"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDialogueTabToDelete(null);
+                            }}
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <span>Dialogue {index + 1}</span>
+                    )}
+                  </button>
+                ))}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-1 w-full gap-1"
+                  onClick={() => {
+                    const newTree: DialogueTree = {
+                      id: String(Date.now()),
+                      topic: '',
+                      requirements: [],
+                      dialogues: []
+                    };
+                    setDialogueTrees([...dialogueTrees, newTree]);
+                    setActiveDialogueTab(dialogueTrees.length);
+                  }}
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  Add
+                </Button>
+              </div>
+            </div>
+            
+            {/* Tab content */}
+            <div className="flex-1 overflow-y-auto minimal-scroll pr-2">
+              {dialogueTrees[activeDialogueTab] && (
+                <div className="space-y-4">
+                  {/* Topic */}
+                  <div>
+                    <label className="text-xs text-muted-foreground font-medium">Topic</label>
+                    <Input
+                      value={dialogueTrees[activeDialogueTab].topic}
+                      onChange={(e) => {
+                        const newTrees = [...dialogueTrees];
+                        newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], topic: e.target.value };
+                        setDialogueTrees(newTrees);
+                      }}
+                      placeholder="Enter dialogue topic..."
+                      className="h-8"
+                    />
+                  </div>
+                  
+                  {/* Requirements - Expandable */}
+                  <div className="border rounded-md">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const tree = dialogueTrees[activeDialogueTab];
+                        const newTrees = [...dialogueTrees];
+                        newTrees[activeDialogueTab] = {
+                          ...tree,
+                          _reqExpanded: !tree._reqExpanded
+                        };
+                        setDialogueTrees(newTrees);
+                      }}
+                      className="w-full px-3 py-2 flex items-center justify-between text-sm font-medium hover:bg-muted/50 rounded-t-md"
+                    >
+                      <span>Requirements ({dialogueTrees[activeDialogueTab].requirements.length})</span>
+                      {dialogueTrees[activeDialogueTab]._reqExpanded 
+                        ? <ChevronUp className="w-4 h-4" /> 
+                        : <ChevronDown className="w-4 h-4" />}
+                    </button>
+                    {dialogueTrees[activeDialogueTab]._reqExpanded && (
+                      <div className="px-3 pb-3 space-y-2">
+                        {dialogueTrees[activeDialogueTab].requirements.map((req, reqIndex) => (
+                          <div key={req.id} className="flex gap-2 items-center">
+                            <select
+                              value={req.type}
+                              onChange={(e) => {
+                                const newTrees = [...dialogueTrees];
+                                const newReqs = [...newTrees[activeDialogueTab].requirements];
+                                newReqs[reqIndex] = { ...newReqs[reqIndex], type: e.target.value as DialogueRequirement['type'] };
+                                newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], requirements: newReqs };
+                                setDialogueTrees(newTrees);
+                              }}
+                              className="h-7 px-2 rounded-md border text-xs bg-background"
+                            >
+                              <option value="status">Status</option>
+                              <option value="not_status">Not Status</option>
+                              <option value="item">Item</option>
+                              <option value="level">Level</option>
+                              <option value="class">Class</option>
+                            </select>
+                            <Input
+                              value={req.value}
+                              onChange={(e) => {
+                                const newTrees = [...dialogueTrees];
+                                const newReqs = [...newTrees[activeDialogueTab].requirements];
+                                newReqs[reqIndex] = { ...newReqs[reqIndex], value: e.target.value };
+                                newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], requirements: newReqs };
+                                setDialogueTrees(newTrees);
+                              }}
+                              placeholder="Value..."
+                              className="h-7 text-xs flex-1"
+                            />
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0"
+                              onClick={() => {
+                                const newTrees = [...dialogueTrees];
+                                const newReqs = dialogueTrees[activeDialogueTab].requirements.filter((_, i) => i !== reqIndex);
+                                newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], requirements: newReqs };
+                                setDialogueTrees(newTrees);
+                              }}
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        ))}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs gap-1"
+                          onClick={() => {
+                            const newTrees = [...dialogueTrees];
+                            const newReq: DialogueRequirement = { id: String(Date.now()), type: 'status', value: '' };
+                            newTrees[activeDialogueTab] = {
+                              ...newTrees[activeDialogueTab],
+                              requirements: [...newTrees[activeDialogueTab].requirements, newReq]
+                            };
+                            setDialogueTrees(newTrees);
+                          }}
+                        >
+                          <Plus className="w-3 h-3" />
+                          Add Requirement
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Dialogues - Expandable */}
+                  <div className="border rounded-md">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const tree = dialogueTrees[activeDialogueTab];
+                        const newTrees = [...dialogueTrees];
+                        newTrees[activeDialogueTab] = {
+                          ...tree,
+                          _dlgExpanded: !tree._dlgExpanded
+                        };
+                        setDialogueTrees(newTrees);
+                      }}
+                      className="w-full px-3 py-2 flex items-center justify-between text-sm font-medium hover:bg-muted/50 rounded-t-md"
+                    >
+                      <span>Dialogues ({dialogueTrees[activeDialogueTab].dialogues.length})</span>
+                      {dialogueTrees[activeDialogueTab]._dlgExpanded 
+                        ? <ChevronUp className="w-4 h-4" /> 
+                        : <ChevronDown className="w-4 h-4" />}
+                    </button>
+                    {dialogueTrees[activeDialogueTab]._dlgExpanded && (
+                      <div className="px-3 pb-3 space-y-2">
+                        {dialogueTrees[activeDialogueTab].dialogues.map((dlg, dlgIndex) => (
+                          <div key={dlg.id} className="flex gap-2 items-start">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newTrees = [...dialogueTrees];
+                                const newDlgs = [...newTrees[activeDialogueTab].dialogues];
+                                newDlgs[dlgIndex] = { ...newDlgs[dlgIndex], speaker: dlg.speaker === 'npc' ? 'player' : 'npc' };
+                                newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], dialogues: newDlgs };
+                                setDialogueTrees(newTrees);
+                              }}
+                              className={`px-2 py-1 rounded text-xs font-medium shrink-0 ${
+                                dlg.speaker === 'npc'
+                                  ? 'bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/50'
+                                  : 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/50'
+                              }`}
+                            >
+                              {dlg.speaker === 'npc' ? 'NPC' : 'Player'}
+                            </button>
+                            <Input
+                              value={dlg.text}
+                              onChange={(e) => {
+                                const newTrees = [...dialogueTrees];
+                                const newDlgs = [...newTrees[activeDialogueTab].dialogues];
+                                newDlgs[dlgIndex] = { ...newDlgs[dlgIndex], text: e.target.value };
+                                newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], dialogues: newDlgs };
+                                setDialogueTrees(newTrees);
+                              }}
+                              placeholder={dlg.speaker === 'npc' ? 'NPC says...' : 'Player says...'}
+                              className="h-7 text-xs flex-1"
+                            />
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0 shrink-0"
+                              onClick={() => {
+                                const newTrees = [...dialogueTrees];
+                                const newDlgs = dialogueTrees[activeDialogueTab].dialogues.filter((_, i) => i !== dlgIndex);
+                                newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], dialogues: newDlgs };
+                                setDialogueTrees(newTrees);
+                              }}
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
+                        ))}
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs gap-1 flex-1"
+                            onClick={() => {
+                              const newTrees = [...dialogueTrees];
+                              const newDlg: DialogueLine = { id: String(Date.now()), speaker: 'npc', text: '' };
+                              newTrees[activeDialogueTab] = {
+                                ...newTrees[activeDialogueTab],
+                                dialogues: [...newTrees[activeDialogueTab].dialogues, newDlg]
+                              };
+                              setDialogueTrees(newTrees);
+                            }}
+                          >
+                            <Plus className="w-3 h-3" />
+                            NPC Line
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs gap-1 flex-1"
+                            onClick={() => {
+                              const newTrees = [...dialogueTrees];
+                              const newDlg: DialogueLine = { id: String(Date.now()) + 1, speaker: 'player', text: '' };
+                              newTrees[activeDialogueTab] = {
+                                ...newTrees[activeDialogueTab],
+                                dialogues: [...newTrees[activeDialogueTab].dialogues, newDlg]
+                              };
+                              setDialogueTrees(newTrees);
+                            }}
+                          >
+                            <Plus className="w-3 h-3" />
+                            Player Line
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          <DialogFooter className="mt-4">
+            <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => setShowDialogueTreeDialog(false)}>
+              <ArrowLeft className="w-4 h-4" />
             </Button>
-            <Button onClick={handleObjectDialogSave}>
-              Save
+            <Button size="icon" className="h-9 w-9" onClick={() => {
+              // Save dialogue trees to editing object properties
+              if (editingObject) {
+                // Clean up expanded state before saving
+                const cleanTrees = dialogueTrees.map(tree => ({
+                  id: tree.id,
+                  topic: tree.topic,
+                  requirements: tree.requirements,
+                  dialogues: tree.dialogues
+                }));
+                updateEditingObjectProperty('dialogueTrees', JSON.stringify(cleanTrees));
+              }
+              setShowDialogueTreeDialog(false);
+            }}>
+              <Save className="w-4 h-4" />
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -46,14 +46,14 @@ Coming Soon...
 
 ---
 #### ⚡ **Beta Version** 
-- [ ] 0- Multi-tileset use with "Tabs" (I'm working on it)
+- [x] 0- Multi-tileset use with "Tabs"
 - [ ] 1- Objects (In progress)
-- [ ] 2- Events (In progress) 
+- [ ] 2- Events 
 - [ ] 3- NPCs (In progress)
-- [ ] 4- Enemies (In progress)
-- [ ] 5- Dialogue
+- [ ] 4- Enemies
+- [ ] 5- Dialogue (In progress)
 - [ ] 6- Sounds
-- [ ] 7- Quest  
+- [ ] 7- Quest (In progress)
 - [ ] 8- Cutscenes  
 - [ ] 9- **You name it. I will check on it. Promise.**
 

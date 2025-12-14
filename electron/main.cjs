@@ -646,6 +646,27 @@ ipcMainLocal.handle('save-export-files', async (event, projectPath, mapName, map
       console.warn('Failed to save exported tileset images:', imgErr);
     }
 
+    // If exporter provided NPC files, save them to npcs/ folder
+    try {
+      if (options.npcFiles && Array.isArray(options.npcFiles) && options.npcFiles.length > 0) {
+        const npcsDir = path.join(projectPath, 'npcs');
+        if (!fs.existsSync(npcsDir)) {
+          fs.mkdirSync(npcsDir, { recursive: true });
+          console.log('Created npcs directory:', npcsDir);
+        }
+
+        for (const npcFile of options.npcFiles) {
+          if (npcFile && npcFile.filename && npcFile.content) {
+            const npcFilePath = path.join(npcsDir, npcFile.filename);
+            fs.writeFileSync(npcFilePath, npcFile.content, 'utf8');
+            console.log('Export: saved NPC file to', npcFilePath);
+          }
+        }
+      }
+    } catch (npcErr) {
+      console.warn('Failed to save NPC files:', npcErr);
+    }
+
   console.log('Export files saved successfully:');
   console.log('- Map:', mapFilePath);
   console.log('- Tileset:', tilesetFilePath);
@@ -854,6 +875,109 @@ app.on('window-all-closed', () => {
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
+  }
+});
+
+// Create NPC file in project's npcs/ folder
+ipcMainLocal.handle('create-npc-file', async (event, projectPath, npcData) => {
+  try {
+    if (!projectPath) {
+      throw new Error('Project path is required');
+    }
+    if (!fs.existsSync(projectPath)) {
+      throw new Error('Project path does not exist');
+    }
+    if (!npcData || !npcData.name) {
+      throw new Error('NPC name is required');
+    }
+
+    // Create npcs directory if it doesn't exist
+    const npcsDir = path.join(projectPath, 'npcs');
+    if (!fs.existsSync(npcsDir)) {
+      fs.mkdirSync(npcsDir, { recursive: true });
+      console.log('Created npcs directory:', npcsDir);
+    }
+
+    // Sanitize NPC name for filename
+    const sanitize = (input) => {
+      return String(input || '')
+        .toLowerCase()
+        .replace(/[<>:"/\\|?*]/g, '_')
+        .trim()
+        .replace(/\s+/g, '_')
+        .replace(/_{2,}/g, '_')
+        || 'unnamed_npc';
+    };
+
+    const sanitizedName = sanitize(npcData.name);
+    const npcFilePath = path.join(npcsDir, `${sanitizedName}.txt`);
+
+    // Build NPC file content in Flare format
+    const lines = [];
+    
+    // Name
+    lines.push(`name=${npcData.name}`);
+    lines.push('');
+    
+    // Portrait (if provided)
+    if (npcData.portraitPath) {
+      lines.push(`portrait=${npcData.portraitPath}`);
+      lines.push('');
+    }
+    
+    // Animation/Tileset (if provided)
+    if (npcData.tilesetPath) {
+      lines.push(`# animation info`);
+      lines.push(`animations=${npcData.tilesetPath}`);
+      lines.push('');
+    }
+    
+    // Role-based attributes
+    const role = npcData.role || 'static';
+    
+    if (role === 'vendor') {
+      lines.push(`# shop info`);
+      lines.push(`vendor=true`);
+      lines.push(`# TODO: Add stock items`);
+      lines.push(`# constant_stock=item_id:count,item_id:count`);
+      lines.push('');
+    }
+    
+    if (role === 'talker' || role === 'vendor' || role === 'quest') {
+      lines.push(`talker=true`);
+      lines.push('');
+    }
+    
+    // Quest giver note (editor-only, as comment)
+    if (role === 'quest') {
+      lines.push(`# This NPC is marked as a Quest Giver in the editor.`);
+      lines.push(`# Quest assignments are defined in quests/*.txt files with giver=npcs/${sanitizedName}.txt`);
+      lines.push('');
+    }
+    
+    // Static NPC note
+    if (role === 'static') {
+      lines.push(`# This NPC is decorative and has no interaction.`);
+      lines.push('');
+    }
+    
+    // Placeholder for dialog (if talker)
+    if (role === 'talker' || role === 'vendor' || role === 'quest') {
+      lines.push(`# Dialog sections`);
+      lines.push(`# [dialog]`);
+      lines.push(`# topic=Talk`);
+      lines.push(`# him=Hello, traveler!`);
+      lines.push('');
+    }
+
+    const npcContent = lines.join('\n');
+    fs.writeFileSync(npcFilePath, npcContent, 'utf8');
+    
+    console.log('NPC file created:', npcFilePath);
+    return { success: true, filePath: npcFilePath, filename: `${sanitizedName}.txt` };
+  } catch (error) {
+    console.error('Error creating NPC file:', error);
+    return { success: false, error: error.message };
   }
 });
 

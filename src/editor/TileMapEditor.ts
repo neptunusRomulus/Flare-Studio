@@ -780,6 +780,10 @@ export class TileMapEditor {
   private hoverX: number = -1;
   private hoverY: number = -1;
 
+  // NPC drag hover state (for external drag-drop from NPC list)
+  private npcDragHoverX: number = -1;
+  private npcDragHoverY: number = -1;
+
   // Zoom and pan state
   private zoom: number = 1;
   private panX: number = 0;
@@ -1378,6 +1382,20 @@ export class TileMapEditor {
 
         const actorAtPosition = this.getDraggableActorAt(tileCoords.x, tileCoords.y);
         if (actorAtPosition) {
+          // Right-click on NPC/actor - show delete confirmation
+          if (event.button === 2 && actorAtPosition.type === 'npc' && this.npcRightClickCallback) {
+            this.isMouseDown = false;
+            // Get screen position of the actor for popup placement
+            const actorScreenPos = this.mapToScreen(actorAtPosition.x, actorAtPosition.y);
+            // Convert to canvas-relative screen coordinates
+            const canvasRect = this.mapCanvas.getBoundingClientRect();
+            const screenX = canvasRect.left + actorScreenPos.x;
+            const screenY = canvasRect.top + actorScreenPos.y;
+            this.npcRightClickCallback(actorAtPosition.id, screenX, screenY);
+            return;
+          }
+          
+          // Left-click - start dragging
           this.isDraggingActor = true;
           this.draggingActorId = actorAtPosition.id;
           this.selectedObject = actorAtPosition;
@@ -1525,6 +1543,12 @@ export class TileMapEditor {
   }
 
   private handleKeyDown(event: KeyboardEvent): void {
+    // Don't capture keyboard events if user is typing in an input/textarea
+    const target = event.target as HTMLElement;
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+      return;
+    }
+
     if (event.code === 'Space') {
       event.preventDefault();
       this.spacePressed = true;
@@ -1585,7 +1609,7 @@ export class TileMapEditor {
     }
   }
 
-  private screenToTile(screenX: number, screenY: number): { x: number, y: number } | null {
+  public screenToTile(screenX: number, screenY: number): { x: number, y: number } | null {
     // Convert screen coordinates to world coordinates first
     const worldCoords = this.screenToWorld(screenX, screenY);
     
@@ -1929,6 +1953,11 @@ export class TileMapEditor {
       this.drawHover();
     }
     
+    // Draw NPC drag hover (external drag-drop from NPC list)
+    if (this.npcDragHoverX >= 0 && this.npcDragHoverY >= 0) {
+      this.drawNpcDragHover();
+    }
+    
     // Draw selection
     this.drawSelection();
     
@@ -1970,7 +1999,7 @@ export class TileMapEditor {
     };
   }
 
-  private screenToMap(screenX: number, screenY: number): { x: number, y: number } {
+  public screenToMap(screenX: number, screenY: number): { x: number, y: number } {
     // Apply inverse transformations in reverse order
     // First, apply inverse zoom
     const unzoomedX = screenX / this.zoom;
@@ -1999,6 +2028,40 @@ export class TileMapEditor {
       x: Math.floor(mapX),
       y: Math.floor(mapY)
     };
+  }
+
+  // NPC drag hover methods for external drag-drop
+  public setNpcDragHover(screenX: number, screenY: number): { x: number, y: number } | null {
+    // Use the same tile detection as normal hover (screenToTile)
+    const mapCoords = this.screenToTile(screenX, screenY);
+    
+    // Check if coordinates are valid and within map bounds
+    if (mapCoords && mapCoords.x >= 0 && mapCoords.x < this.mapWidth && 
+        mapCoords.y >= 0 && mapCoords.y < this.mapHeight) {
+      // Only redraw if position changed
+      if (this.npcDragHoverX !== mapCoords.x || this.npcDragHoverY !== mapCoords.y) {
+        this.npcDragHoverX = mapCoords.x;
+        this.npcDragHoverY = mapCoords.y;
+        this.draw();
+      }
+      return mapCoords;
+    } else {
+      // Only redraw if was previously valid
+      if (this.npcDragHoverX !== -1 || this.npcDragHoverY !== -1) {
+        this.npcDragHoverX = -1;
+        this.npcDragHoverY = -1;
+        this.draw();
+      }
+      return null;
+    }
+  }
+
+  public clearNpcDragHover(): void {
+    if (this.npcDragHoverX !== -1 || this.npcDragHoverY !== -1) {
+      this.npcDragHoverX = -1;
+      this.npcDragHoverY = -1;
+      this.draw();
+    }
   }
 
   // Ray casting methods for accurate tile picking
@@ -2475,6 +2538,25 @@ export class TileMapEditor {
     }
   }
 
+  // Draw NPC drag hover highlight (same blue effect as regular hover)
+  private drawNpcDragHover(): void {
+    const screenPos = this.mapToScreen(this.npcDragHoverX, this.npcDragHoverY);
+    const halfTileX = (this.tileSizeX / 2) * this.zoom;
+    const halfTileY = (this.tileSizeY / 2) * this.zoom;
+    
+    // Blue hover outline - same as default hover
+    this.ctx.strokeStyle = '#007acc';
+    this.ctx.lineWidth = Math.max(1, Math.min(3, 2 / this.zoom));
+    
+    this.ctx.beginPath();
+    this.ctx.moveTo(screenPos.x, screenPos.y - halfTileY); // Top
+    this.ctx.lineTo(screenPos.x + halfTileX, screenPos.y); // Right
+    this.ctx.lineTo(screenPos.x, screenPos.y + halfTileY); // Bottom
+    this.ctx.lineTo(screenPos.x - halfTileX, screenPos.y); // Left
+    this.ctx.closePath();
+    this.ctx.stroke();
+  }
+
   private drawSelection(): void {
     // Draw selection preview for drag-based tools
     if (this.isSelecting && (this.currentSelectionTool === 'rectangular' || this.currentSelectionTool === 'circular')) {
@@ -2700,10 +2782,14 @@ export class TileMapEditor {
   private actorUsesPlaceholder(object: MapObject): boolean {
     const actorLayerType = this.getActorLayerType(object);
     if (!actorLayerType) return false;
+    // Don't show placeholder for unplaced actors (x < 0 or y < 0)
+    if (object.x < 0 || object.y < 0) return false;
     const layer = this.getActorLayerByType(actorLayerType);
-    if (!layer) return false;
+    // If no layer exists for this actor type, always show placeholder
+    if (!layer) return true;
     const index = object.y * this.mapWidth + object.x;
-    if (index < 0 || index >= layer.data.length) return false;
+    if (index < 0 || index >= layer.data.length) return true;
+    // Show placeholder if no tile is assigned at this position
     return layer.data[index] === 0;
   }
 
@@ -4601,6 +4687,7 @@ export class TileMapEditor {
   // Callback for when eyedropper switches back to brush tool
   private eyedropperCallback: (() => void) | null = null;
   private objectsChangedCallback: ((objects: MapObject[]) => void) | null = null;
+  private npcRightClickCallback: ((npcId: number, screenX: number, screenY: number) => void) | null = null;
 
   // Stamp tool state
   private stamps: Map<string, import('../types').Stamp> = new Map();
@@ -4618,6 +4705,10 @@ export class TileMapEditor {
     if (callback) {
       callback(this.getMapObjects());
     }
+  }
+
+  public setNpcRightClickCallback(callback: ((npcId: number, screenX: number, screenY: number) => void) | null): void {
+    this.npcRightClickCallback = callback;
   }
 
   // Stamp tool management methods
@@ -6248,6 +6339,10 @@ export class TileMapEditor {
       clearTimeout(this.autoSaveTimeout);
       this.autoSaveTimeout = null;
     }
+  }
+
+  public triggerAutoSave(immediate: boolean = false): void {
+    this.markAsChanged(immediate);
   }
 
   public setDarkMode(isDark: boolean): void {

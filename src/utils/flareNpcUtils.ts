@@ -119,20 +119,34 @@ function serializeNpcFile(npc: FlareNPC): string {
     lines.push(`portrait=${npc.portrait}`);
   }
   
-  // Animation (gfx/animations)
-  if (npc.gfx) {
-    // Flare'de "animations=" kullanılıyor
-    lines.push(`animations=${npc.gfx}`);
-  }
-  
   // Boş satır
   lines.push('');
   
-  // Vendor ayarları (shop info) - vendor=true'dan önce
+  // Vendor ayarları (shop info) - kimlik bilgileri sonrasında
   if (npc.vendor) {
     lines.push(`vendor=true`);
     if (npc.constant_stock) {
       lines.push(`constant_stock=${npc.constant_stock}`);
+    }
+    if (npc.customProperties?.status_stock_entries) {
+      try {
+        const entries = JSON.parse(npc.customProperties.status_stock_entries as string);
+        if (Array.isArray(entries)) {
+          for (const entry of entries) {
+            if (!entry?.requirement || !entry.items) continue;
+            const stockStr = Object.entries(entry.items)
+              .filter(([, qty]) => (qty as number) > 0)
+              .sort((a, b) => Number(a[0]) - Number(b[0]))
+              .map(([id, qty]) => `${id}:${qty}`)
+              .join(',');
+            if (stockStr) {
+              lines.push(`status_stock=${entry.requirement},${stockStr}`);
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to serialize status_stock_entries', e);
+      }
     }
     if (npc.random_stock) {
       lines.push(`random_stock=${npc.random_stock}`);
@@ -148,6 +162,15 @@ function serializeNpcFile(npc: FlareNPC): string {
     }
     lines.push('');
   }
+  
+  // Animation (gfx/animations)
+  if (npc.gfx) {
+    // Flare'de "animations=" kullanılıyor
+    lines.push(`animations=${npc.gfx}`);
+  }
+  
+  // Boş satır
+  lines.push('');
   
   // Hareket / AI
   if (npc.direction !== undefined) {

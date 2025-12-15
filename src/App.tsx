@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import Tooltip from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Upload, Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Blend, MapPin, MapPinOff, Save, Scan, Link2, Scissors, Trash2, Check, HelpCircle, Folder, Shield, Plus, Image, Grid, Box, Users, User, Locate, Clock, Menu, ChevronLeft, ChevronRight, GripVertical, MessageSquare, ChevronDown, ChevronUp, ArrowLeft, Gift, Coins, Sparkles, Heart, Zap, Volume2, Film, Tag, Package, AlignLeft, Sword, ChevronsUpDown } from 'lucide-react';
+import { Upload, Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Blend, MapPin, MapPinOff, Save, Scan, Link2, Scissors, Trash2, Check, HelpCircle, Folder, Shield, Plus, Image, Grid, Box, Users, User, Locate, Clock, Menu, ChevronLeft, ChevronRight, GripVertical, MessageSquare, ChevronDown, ChevronUp, ArrowLeft, Gift, Coins, Sparkles, Heart, Zap, Volume2, Film, Tag, Package, AlignLeft, Sword, ChevronsUpDown, AlertTriangle, Book } from 'lucide-react';
 import { TileMapEditor } from './editor/TileMapEditor';
 import type { EditorProjectData } from './editor/TileMapEditor';
 import { TileLayer, MapObject, DialogueLine, DialogueRequirement, DialogueReward, DialogueWorldEffect, DialogueTree, FlareNPC } from './types';
@@ -52,6 +52,31 @@ interface PropertySpec {
   max?: number;
   options?: string[];
 }
+
+type ItemRole = 'equipment' | 'consumable' | 'quest' | 'resource' | 'book' | 'unspecified';
+type ItemResourceSubtype = 'currency' | 'material' | '';
+
+const ITEM_ROLE_META: Record<ItemRole, { label: string; badgeClass: string; description?: string }> = {
+  equipment: { label: 'Equipment', badgeClass: 'bg-orange-500/20 text-orange-600 dark:text-orange-400 border-orange-500/30', description: 'Weapons, armor, wearable gear' },
+  consumable: { label: 'Consumable', badgeClass: 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30', description: 'Potions, scrolls, buffs' },
+  quest: { label: 'Quest / Key Item', badgeClass: 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30', description: 'Quest progression items' },
+  resource: { label: 'Resource', badgeClass: 'bg-purple-500/20 text-purple-600 dark:text-purple-400 border-purple-500/30', description: 'Currency or crafting mats' },
+  book: { label: 'Book / Lore', badgeClass: 'bg-blue-500/20 text-blue-600 dark:text-blue-400 border-blue-500/30', description: 'Readable lore items' },
+  unspecified: { label: 'Unspecified', badgeClass: 'bg-gray-500/20 text-gray-600 dark:text-gray-400 border-gray-500/30', description: 'No role set' }
+};
+
+const ITEM_ROLE_SELECTIONS: Array<{ id: ItemRole; label: string; description: string }> = [
+  { id: 'equipment', label: 'Equipment', description: 'Wearable gear with stats, damage/absorb, requirements' },
+  { id: 'consumable', label: 'Consumable', description: 'Usable items that trigger a power; can stack' },
+  { id: 'quest', label: 'Quest / Key Item', description: 'Progression items; usually unsellable and single stack' },
+  { id: 'resource', label: 'Resource (Currency / Material)', description: 'Currencies or crafting materials; stackable loot' },
+  { id: 'book', label: 'Book / Lore', description: 'Readable items that open a book file' }
+];
+
+const RESOURCE_SUBTYPE_META: Record<Exclude<ItemResourceSubtype, ''>, { label: string; hint: string; badgeClass: string }> = {
+  currency: { label: 'Currency', hint: 'Gold, coins; high stack, symmetric price', badgeClass: 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 border-yellow-500/30' },
+  material: { label: 'Material', hint: 'Crafting mats or generic loot', badgeClass: 'bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border-indigo-500/30' }
+};
 
 // Helper sets used by validation
 const CARDINAL_DIRECTIONS = new Set(['N','NE','E','SE','S','SW','W','NW']);
@@ -988,16 +1013,133 @@ function App() {
   // Item dialog state
   const [itemDialogState, setItemDialogState] = useState<{
     name: string;
-    category: string;
+    role: ItemRole;
+    resourceSubtype: ItemResourceSubtype;
   } | null>(null);
   const [itemDialogError, setItemDialogError] = useState<string | null>(null);
-  const [itemCategories, setItemCategories] = useState<string[]>(['Default']);
-  const [showNewCategoryInput, setShowNewCategoryInput] = useState(false);
-  const [newCategoryName, setNewCategoryName] = useState('');
+  const [pendingDuplicateItem, setPendingDuplicateItem] = useState<{
+    name: string;
+    targetRole: ItemRole;
+    conflictRole: ItemRole;
+    kind: 'same-role' | 'other-role';
+  } | null>(null);
   // Items list for display
-  const [itemsList, setItemsList] = useState<Array<{ id: number; name: string; category: string; filePath: string; fileName: string }>>([]);
+  const [itemsList, setItemsList] = useState<Array<{ id: number; name: string; category: string; filePath: string; fileName: string; role: ItemRole; resourceSubtype?: ItemResourceSubtype }>>([]);
   // Expanded item categories for accordion
   const [expandedItemCategories, setExpandedItemCategories] = useState<Set<string>>(new Set());
+  // Vendor stock dialog
+  const [showVendorStockDialog, setShowVendorStockDialog] = useState(false);
+  const [vendorStockSelection, setVendorStockSelection] = useState<Record<number, number>>({});
+  // Vendor unlockable stock dialog
+  const [showVendorUnlockDialog, setShowVendorUnlockDialog] = useState(false);
+  const [vendorUnlockEntries, setVendorUnlockEntries] = useState<Array<{ id: string; requirement: string; items: Record<number, number> }>>([]);
+  // Vendor random offers dialog
+  const [showVendorRandomDialog, setShowVendorRandomDialog] = useState(false);
+  const [vendorRandomSelection, setVendorRandomSelection] = useState<Record<number, { chance: number; min: number; max: number }>>({});
+  const [vendorRandomCount, setVendorRandomCount] = useState<{ min: number; max: number }>({ min: 1, max: 1 });
+
+  const normalizeItemsForState = useCallback((items: Array<{ id: number; name: string; category: string; filePath: string; fileName: string; role?: string; resourceSubtype?: string }>) => {
+    const toResourceSubtype = (value: string | undefined): ItemResourceSubtype => {
+      if (value === 'currency' || value === 'material' || value === '') return value;
+      return '';
+    };
+
+    return items.map((item) => ({
+      ...item,
+      role: (item.role as ItemRole) || 'unspecified',
+      resourceSubtype: toResourceSubtype(item.resourceSubtype)
+    }));
+  }, []);
+
+  const parseConstantStock = useCallback((value?: string): Record<number, number> => {
+    if (!value) return {};
+    return value
+      .split(',')
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .reduce<Record<number, number>>((acc, token) => {
+        const [idPart, qtyPart] = token.split(':').map((p) => p.trim());
+        const id = Number.parseInt(idPart, 10);
+        if (Number.isNaN(id)) return acc;
+        const qty = Math.max(1, Number.parseInt(qtyPart || '1', 10) || 1);
+        acc[id] = qty;
+        return acc;
+      }, {});
+  }, []);
+
+  const buildConstantStockString = useCallback((selection: Record<number, number>): string => {
+    const entries = Object.entries(selection)
+      .filter(([, qty]) => qty > 0)
+      .sort((a, b) => Number(a[0]) - Number(b[0]))
+      .map(([id, qty]) => `${id}:${qty}`);
+    return entries.join(',');
+  }, []);
+
+  const parseStatusStockEntries = useCallback((value?: string): Array<{ id: string; requirement: string; items: Record<number, number> }> => {
+    if (!value) return [];
+    try {
+      const parsed = JSON.parse(value);
+      if (!Array.isArray(parsed)) return [];
+      return parsed
+        .map((entry, idx) => {
+          if (!entry) return null;
+          const requirement = typeof entry.requirement === 'string' ? entry.requirement.trim() : '';
+          const itemsObj = typeof entry.items === 'object' && entry.items !== null ? entry.items : {};
+          return {
+            id: entry.id || `req-${idx}`,
+            requirement,
+            items: Object.entries(itemsObj).reduce<Record<number, number>>((acc, [k, v]) => {
+              const idNum = Number.parseInt(k, 10);
+              const qtyNum = Math.max(1, Number.parseInt(String(v), 10) || 1);
+              if (!Number.isNaN(idNum)) acc[idNum] = qtyNum;
+              return acc;
+            }, {})
+          };
+        })
+        .filter(Boolean) as Array<{ id: string; requirement: string; items: Record<number, number> }>;
+    } catch {
+      return [];
+    }
+  }, []);
+
+  const parseRandomStock = useCallback((value?: string): Record<number, { chance: number; min: number; max: number }> => {
+    if (!value) return {};
+    const tokens = value.split(',').map(t => t.trim()).filter(Boolean);
+    const result: Record<number, { chance: number; min: number; max: number }> = {};
+    for (let i = 0; i + 3 < tokens.length; i += 4) {
+      const id = parseInt(tokens[i], 10);
+      const chance = parseInt(tokens[i + 1], 10);
+      const min = parseInt(tokens[i + 2], 10);
+      const max = parseInt(tokens[i + 3], 10);
+      if (Number.isNaN(id)) continue;
+      result[id] = {
+        chance: Number.isNaN(chance) ? 100 : chance,
+        min: Number.isNaN(min) ? 1 : Math.max(1, min),
+        max: Number.isNaN(max) ? Math.max(1, Number.isNaN(min) ? 1 : min) : Math.max(1, max)
+      };
+    }
+    return result;
+  }, []);
+
+  const parseRandomStockCount = useCallback((value?: string): { min: number; max: number } => {
+    if (!value) return { min: 1, max: 1 };
+    const parts = value.split(',').map(p => p.trim()).filter(Boolean);
+    const min = parts[0] ? Math.max(1, parseInt(parts[0], 10) || 1) : 1;
+    const max = parts[1] ? Math.max(min, parseInt(parts[1], 10) || min) : min;
+    return { min, max };
+  }, []);
+
+  const buildRandomStockString = useCallback((selection: Record<number, { chance: number; min: number; max: number }>): string => {
+    const entries = Object.entries(selection)
+      .filter(([, val]) => val.min > 0 && val.max > 0 && val.chance > 0)
+      .sort((a, b) => Number(a[0]) - Number(b[0]))
+      .flatMap(([id, val]) => [id, val.chance.toString(), val.min.toString(), val.max.toString()]);
+    return entries.join(', ');
+  }, []);
+
+  const buildRandomStockCountString = useCallback((count: { min: number; max: number }) => {
+    return `${Math.max(1, count.min)},${Math.max(Math.max(1, count.min), count.max)}`;
+  }, []);
   
   // Item Edit Dialog state
   const [showItemEditDialog, setShowItemEditDialog] = useState(false);
@@ -1005,6 +1147,8 @@ function App() {
     // Basic Identifier Properties
     id: number;
     name: string;
+    role: ItemRole;
+    resourceSubtype: ItemResourceSubtype;
     flavor: string;
     level: number;
     icon: string;
@@ -1855,33 +1999,18 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
   const handleOpenItemDialog = useCallback(async () => {
     setItemDialogState({
       name: '',
-      category: 'Default'
+      role: 'equipment',
+      resourceSubtype: 'material'
     });
     setItemDialogError(null);
-    setShowNewCategoryInput(false);
-    setNewCategoryName('');
-    
-    // Load categories if project path exists
-    if (currentProjectPath && window.electronAPI?.getItemCategories) {
-      try {
-        const result = await window.electronAPI.getItemCategories(currentProjectPath);
-        if (result.success && result.categories) {
-          setItemCategories(result.categories);
-        }
-      } catch (err) {
-        console.error('Error loading item categories:', err);
-      }
-    }
-  }, [currentProjectPath]);
+  }, []);
 
   const handleCloseItemDialog = useCallback(() => {
     setItemDialogState(null);
     setItemDialogError(null);
-    setShowNewCategoryInput(false);
-    setNewCategoryName('');
   }, []);
 
-  const handleItemFieldChange = useCallback((field: 'name' | 'category', value: string) => {
+  const handleItemFieldChange = useCallback((field: 'name' | 'role' | 'resourceSubtype', value: string) => {
     setItemDialogState((prev) => {
       if (!prev) return prev;
       return { ...prev, [field]: value };
@@ -1889,31 +2018,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     setItemDialogError(null);
   }, []);
 
-  const handleCreateNewCategory = useCallback(async () => {
-    if (!newCategoryName.trim()) {
-      return;
-    }
-    
-    if (currentProjectPath && window.electronAPI?.createItemCategory) {
-      try {
-        const result = await window.electronAPI.createItemCategory(currentProjectPath, newCategoryName.trim());
-        if (result.success && result.categoryName) {
-          // Add to categories list and select it
-          setItemCategories(prev => [...prev, result.categoryName!]);
-          handleItemFieldChange('category', result.categoryName);
-          setShowNewCategoryInput(false);
-          setNewCategoryName('');
-        } else if (result.error) {
-          setItemDialogError(result.error);
-        }
-      } catch (err) {
-        console.error('Error creating category:', err);
-        setItemDialogError('Failed to create category');
-      }
-    }
-  }, [currentProjectPath, newCategoryName, handleItemFieldChange]);
-
-  const handleItemSubmit = useCallback(async () => {
+  const performCreateItem = useCallback(async (skipDuplicateCheck = false) => {
     if (!itemDialogState) return;
     
     if (!itemDialogState.name.trim()) {
@@ -1927,6 +2032,47 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     }
 
     try {
+      // Pull latest items for duplicate checks
+      let latestItems = itemsList;
+      if (window.electronAPI?.listItems) {
+        const itemsResult = await window.electronAPI.listItems(currentProjectPath);
+        if (itemsResult.success && itemsResult.items) {
+          latestItems = normalizeItemsForState(itemsResult.items);
+          setItemsList(latestItems);
+        }
+      }
+
+      const selectedCategory = 'Default';
+      const selectedRole = itemDialogState.role || 'unspecified';
+      const normalizedName = itemDialogState.name.trim().toLowerCase();
+      if (!skipDuplicateCheck) {
+        const sameCategory = latestItems.find(
+          (it) => (it.category || 'Default') === selectedCategory && (it.name || '').trim().toLowerCase() === normalizedName && (it.role || 'unspecified') === selectedRole
+        );
+        if (sameCategory) {
+          setItemDialogError(null);
+          setPendingDuplicateItem({
+            name: itemDialogState.name.trim(),
+            targetRole: selectedRole,
+            conflictRole: selectedRole,
+            kind: 'same-role'
+          });
+          return;
+        }
+        const otherRole = latestItems.find(
+          (it) => (it.category || 'Default') === selectedCategory && (it.name || '').trim().toLowerCase() === normalizedName && (it.role || 'unspecified') !== selectedRole
+        );
+        if (otherRole) {
+          setPendingDuplicateItem({
+            name: itemDialogState.name.trim(),
+            targetRole: selectedRole,
+            conflictRole: (otherRole.role as ItemRole) || 'unspecified',
+            kind: 'other-role'
+          });
+          return;
+        }
+      }
+
       // Get next item ID
       let itemId = 1;
       if (window.electronAPI?.getNextItemId) {
@@ -1941,8 +2087,10 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         const result = await window.electronAPI.createItemFile(currentProjectPath, {
           name: itemDialogState.name.trim(),
           id: itemId,
-          category: itemDialogState.category
-        });
+          category: selectedCategory,
+          role: itemDialogState.role,
+          resourceSubtype: itemDialogState.resourceSubtype
+        } as any);
         
         if (result.success) {
           console.log('Item file created:', result.filePath);
@@ -1952,7 +2100,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           if (window.electronAPI?.listItems) {
             const itemsResult = await window.electronAPI.listItems(currentProjectPath);
             if (itemsResult.success && itemsResult.items) {
-              setItemsList(itemsResult.items);
+              setItemsList(normalizeItemsForState(itemsResult.items));
             }
           }
           
@@ -1965,27 +2113,45 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       console.error('Error creating item:', err);
       setItemDialogError('Failed to create item file.');
     }
-  }, [itemDialogState, currentProjectPath, handleCloseItemDialog, toast]);
+  }, [itemDialogState, currentProjectPath, handleCloseItemDialog, toast, normalizeItemsForState, itemsList]);
+
+  const handleItemSubmit = useCallback(async () => {
+    await performCreateItem(false);
+  }, [performCreateItem]);
+
+  const handleConfirmDuplicateItem = useCallback(async () => {
+    setPendingDuplicateItem(null);
+    await performCreateItem(true);
+  }, [performCreateItem]);
 
   // Item Edit Dialog handlers
-  const handleOpenItemEdit = useCallback(async (item: { id: number; name: string; category: string; filePath: string; fileName: string }) => {
+  const handleOpenItemEdit = useCallback(async (item: { id: number; name: string; category: string; filePath: string; fileName: string; role?: ItemRole; resourceSubtype?: ItemResourceSubtype }) => {
     // Read item file and parse all properties
     if (window.electronAPI?.readItemFile) {
       try {
         const result = await window.electronAPI.readItemFile(item.filePath);
         if (result.success && result.data) {
           const d = result.data as Record<string, unknown>;
+          const itemRole = (typeof item.role === 'string' ? item.role : 'unspecified') as ItemRole;
+          const isQuestRole = itemRole === 'quest';
+          const roleDefaultMaxQuantity = (() => {
+            if (itemRole === 'consumable') return 10;
+            if (itemRole === 'resource') return 99;
+            return 1;
+          })();
           setEditingItem({
             id: (typeof d.id === 'number' ? d.id : item.id),
             name: (typeof d.name === 'string' ? d.name : item.name),
+            role: itemRole,
+            resourceSubtype: (typeof item.resourceSubtype === 'string' ? item.resourceSubtype : '') as ItemResourceSubtype,
             flavor: (typeof d.flavor === 'string' ? d.flavor : ''),
             level: (typeof d.level === 'number' ? d.level : 1),
             icon: (typeof d.icon === 'string' ? d.icon : ''),
             quality: (typeof d.quality === 'string' ? d.quality : ''),
-            price: (typeof d.price === 'string' ? d.price : ''),
-            price_sell: (typeof d.price_sell === 'string' ? d.price_sell : ''),
-            max_quantity: (typeof d.max_quantity === 'number' ? d.max_quantity : 1),
-            quest_item: d.quest_item === 'true' || d.quest_item === true,
+            price: (typeof d.price === 'string' ? d.price : (typeof d.price === 'number' ? String(d.price) : '0')),
+            price_sell: (typeof d.price_sell === 'string' ? d.price_sell : (typeof d.price_sell === 'number' ? String(d.price_sell) : '0')),
+            max_quantity: (typeof d.max_quantity === 'number' ? d.max_quantity : roleDefaultMaxQuantity),
+            quest_item: isQuestRole ? true : (d.quest_item === 'true' || d.quest_item === true),
             no_stash: (typeof d.no_stash === 'string' ? d.no_stash : 'ignore'),
             item_type: (typeof d.item_type === 'string' ? d.item_type : ''),
             equip_flags: (typeof d.equip_flags === 'string' ? d.equip_flags : ''),
@@ -2017,17 +2183,25 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           setShowItemEditDialog(true);
         } else {
           // Fallback if file can't be read
+          const fallbackRole = (typeof item.role === 'string' ? item.role : 'unspecified') as ItemRole;
+          const fallbackMaxQuantity = (() => {
+            if (fallbackRole === 'consumable') return 10;
+            if (fallbackRole === 'resource') return 99;
+            return 1;
+          })();
           setEditingItem({
             id: item.id,
             name: item.name,
+            role: fallbackRole,
+            resourceSubtype: (typeof item.resourceSubtype === 'string' ? item.resourceSubtype : '') as ItemResourceSubtype,
             flavor: '',
             level: 1,
             icon: '',
             quality: '',
-            price: '',
-            price_sell: '',
-            max_quantity: 1,
-            quest_item: false,
+            price: 0,
+            price_sell: 0,
+            max_quantity: fallbackMaxQuantity,
+            quest_item: item.role === 'quest',
             no_stash: 'ignore',
             item_type: '',
             equip_flags: '',
@@ -2073,15 +2247,18 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
   const handleSaveItemEdit = useCallback(async () => {
     if (!editingItem || !window.electronAPI?.writeItemFile) return;
     
+    // Ensure role is persisted as item_type in the saved file
+    const payload = { ...editingItem, item_type: editingItem.role || editingItem.item_type };
+
     try {
-      const result = await window.electronAPI.writeItemFile(editingItem.filePath, editingItem);
+      const result = await window.electronAPI.writeItemFile(editingItem.filePath, payload);
       if (result.success) {
         toast({ title: 'Item Saved', description: `${editingItem.name} has been updated.` });
         // Refresh items list
         if (window.electronAPI?.listItems && currentProjectPath) {
           const itemsResult = await window.electronAPI.listItems(currentProjectPath);
           if (itemsResult.success && itemsResult.items) {
-            setItemsList(itemsResult.items);
+            setItemsList(normalizeItemsForState(itemsResult.items));
           }
         }
         handleCloseItemEdit();
@@ -2092,7 +2269,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       console.error('Error saving item:', err);
       toast({ title: 'Error', description: 'Failed to save item file.', variant: 'destructive' });
     }
-  }, [editingItem, currentProjectPath, toast, handleCloseItemEdit]);
+  }, [editingItem, currentProjectPath, toast, handleCloseItemEdit, normalizeItemsForState]);
 
   const updateEditingItemField = useCallback(<K extends keyof NonNullable<typeof editingItem>>(key: K, value: NonNullable<typeof editingItem>[K]) => {
     setEditingItem(prev => prev ? { ...prev, [key]: value } : null);
@@ -2322,6 +2499,191 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     if (!editingObject || !editingObject.properties) return fallback;
     return editingObject.properties[key] ?? fallback;
   }, [editingObject]);
+
+  const handleOpenVendorStockDialog = useCallback(() => {
+    if (!editingObject) return;
+    const parsed = parseConstantStock(editingObject.properties?.constant_stock as string | undefined);
+    setVendorStockSelection(parsed);
+    setShowVendorStockDialog(true);
+  }, [editingObject, parseConstantStock]);
+
+  const handleOpenVendorUnlockDialog = useCallback(() => {
+    if (!editingObject) return;
+    const parsed = parseStatusStockEntries(editingObject.properties?.status_stock_entries as string | undefined);
+    if (parsed.length === 0) {
+      setVendorUnlockEntries([{ id: `req-${Date.now()}`, requirement: '', items: {} }]);
+    } else {
+      setVendorUnlockEntries(parsed);
+    }
+    setShowVendorUnlockDialog(true);
+  }, [editingObject, parseStatusStockEntries]);
+
+  const handleOpenVendorRandomDialog = useCallback(() => {
+    if (!editingObject) return;
+    const parsed = parseRandomStock(editingObject.properties?.random_stock as string | undefined);
+    setVendorRandomSelection(parsed);
+    const parsedCount = parseRandomStockCount(editingObject.properties?.random_stock_count as string | undefined);
+    setVendorRandomCount(parsedCount);
+    setShowVendorRandomDialog(true);
+  }, [editingObject, parseRandomStock, parseRandomStockCount]);
+
+  const handleToggleVendorStockItem = useCallback((id: number) => {
+    setVendorStockSelection((prev) => {
+      const next = { ...prev };
+      if (next[id] !== undefined) {
+        delete next[id];
+      } else {
+        next[id] = 1;
+      }
+      return next;
+    });
+  }, []);
+
+  const handleVendorStockQtyChange = useCallback((id: number, qty: number) => {
+    setVendorStockSelection((prev) => {
+      const next = { ...prev };
+      if (qty <= 0) qty = 1;
+      next[id] = qty;
+      return next;
+    });
+  }, []);
+
+  const handleSaveVendorStock = useCallback(() => {
+    if (!editingObject) return;
+    const constantStock = buildConstantStockString(vendorStockSelection);
+    setEditingObject((prev) => {
+      if (!prev) return prev;
+      const properties = { ...(prev.properties || {}) };
+      if (constantStock) {
+        properties.constant_stock = constantStock;
+      } else {
+        delete properties.constant_stock;
+      }
+      return { ...prev, properties };
+    });
+    setShowVendorStockDialog(false);
+  }, [editingObject, buildConstantStockString, vendorStockSelection]);
+
+  const handleAddVendorUnlockRequirement = useCallback(() => {
+    setVendorUnlockEntries((prev) => [...prev, { id: `req-${Date.now()}-${Math.random()}`, requirement: '', items: {} }]);
+  }, []);
+
+  const handleUpdateVendorUnlockRequirement = useCallback((id: string, requirement: string) => {
+    setVendorUnlockEntries((prev) => prev.map((entry) => entry.id === id ? { ...entry, requirement } : entry));
+  }, []);
+
+  const handleToggleVendorUnlockItem = useCallback((reqId: string, itemId: number) => {
+    setVendorUnlockEntries((prev) => prev.map((entry) => {
+      if (entry.id !== reqId) return entry;
+      const items = { ...entry.items };
+      if (items[itemId] !== undefined) {
+        delete items[itemId];
+      } else {
+        items[itemId] = 1;
+      }
+      return { ...entry, items };
+    }));
+  }, []);
+
+  const handleVendorUnlockQtyChange = useCallback((reqId: string, itemId: number, qty: number) => {
+    setVendorUnlockEntries((prev) => prev.map((entry) => {
+      if (entry.id !== reqId) return entry;
+      const items = { ...entry.items };
+      items[itemId] = Math.max(1, qty || 1);
+      return { ...entry, items };
+    }));
+  }, []);
+
+  const handleRemoveVendorUnlockRequirement = useCallback((id: string) => {
+    setVendorUnlockEntries((prev) => prev.filter((entry) => entry.id !== id));
+  }, []);
+
+  const handleSaveVendorUnlock = useCallback(() => {
+    if (!editingObject) return;
+    const cleaned = vendorUnlockEntries
+      .map((entry, idx) => ({
+        id: entry.id || `req-${idx}`,
+        requirement: entry.requirement.trim(),
+        items: Object.fromEntries(
+          Object.entries(entry.items || {}).filter(([, qty]) => qty > 0)
+        )
+      }))
+      .filter((entry) => entry.requirement && Object.keys(entry.items).length > 0);
+
+    setEditingObject((prev) => {
+      if (!prev) return prev;
+      const properties = { ...(prev.properties || {}) };
+      if (cleaned.length > 0) {
+        properties.status_stock_entries = JSON.stringify(cleaned);
+      } else {
+        delete properties.status_stock_entries;
+      }
+      return { ...prev, properties };
+    });
+    setShowVendorUnlockDialog(false);
+  }, [editingObject, vendorUnlockEntries]);
+
+  const handleToggleVendorRandomItem = useCallback((itemId: number) => {
+    setVendorRandomSelection((prev) => {
+      const next = { ...prev };
+      if (next[itemId]) {
+        delete next[itemId];
+      } else {
+        next[itemId] = { chance: 100, min: 1, max: 1 };
+      }
+      return next;
+    });
+  }, []);
+
+  const handleVendorRandomFieldChange = useCallback((itemId: number, field: 'chance' | 'min' | 'max', value: number) => {
+    setVendorRandomSelection((prev) => {
+      const next = { ...prev };
+      const current = next[itemId] || { chance: 100, min: 1, max: 1 };
+      const val = Math.max(1, value || 1);
+      if (field === 'chance') {
+        current.chance = val;
+      } else if (field === 'min') {
+        current.min = val;
+        if (current.max < val) current.max = val;
+      } else {
+        current.max = val < current.min ? current.min : val;
+      }
+      next[itemId] = current;
+      return next;
+    });
+  }, []);
+
+  const handleRandomCountChange = useCallback((field: 'min' | 'max', value: number) => {
+    setVendorRandomCount((prev) => {
+      const next = { ...prev };
+      if (field === 'min') {
+        next.min = Math.max(1, value || 1);
+        if (next.max < next.min) next.max = next.min;
+      } else {
+        next.max = Math.max(prev.min, value || prev.min);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleSaveVendorRandom = useCallback(() => {
+    if (!editingObject) return;
+    const randomStock = buildRandomStockString(vendorRandomSelection);
+    const randomStockCount = buildRandomStockCountString(vendorRandomCount);
+    setEditingObject((prev) => {
+      if (!prev) return prev;
+      const properties = { ...(prev.properties || {}) };
+      if (randomStock) {
+        properties.random_stock = randomStock;
+        properties.random_stock_count = randomStockCount;
+      } else {
+        delete properties.random_stock;
+        delete properties.random_stock_count;
+      }
+      return { ...prev, properties };
+    });
+    setShowVendorRandomDialog(false);
+  }, [editingObject, vendorRandomSelection, vendorRandomCount, buildRandomStockString, buildRandomStockCountString]);
 
   const handleEditingTilesetBrowse = useCallback(async () => {
     if (typeof window === 'undefined' || !window.electronAPI?.selectTilesetFile) {
@@ -2636,18 +2998,11 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       if (layer?.type === 'items' && currentProjectPath && window.electronAPI?.ensureItemsFolders) {
         try {
           await window.electronAPI.ensureItemsFolders(currentProjectPath);
-          // Also load item categories
-          if (window.electronAPI.getItemCategories) {
-            const result = await window.electronAPI.getItemCategories(currentProjectPath);
-            if (result.success && result.categories) {
-              setItemCategories(result.categories);
-            }
-          }
           // Load items list
           if (window.electronAPI.listItems) {
             const itemsResult = await window.electronAPI.listItems(currentProjectPath);
             if (itemsResult.success && itemsResult.items) {
-              setItemsList(itemsResult.items);
+              setItemsList(normalizeItemsForState(itemsResult.items));
             }
           }
         } catch (err) {
@@ -3095,13 +3450,6 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 lines.push('');
               }
               
-              // Animation/Tileset (if provided)
-              if (npc.properties?.tilesetPath) {
-                lines.push(`# animation info`);
-                lines.push(`animations=${npc.properties.tilesetPath}`);
-                lines.push('');
-              }
-              
               // Role-based attributes
               const isTalker = npc.properties?.talker === 'true';
               const isVendor = npc.properties?.vendor === 'true';
@@ -3110,8 +3458,40 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               if (isVendor) {
                 lines.push(`# shop info`);
                 lines.push(`vendor=true`);
+                if (npc.properties?.constant_stock) {
+                  lines.push(`constant_stock=${npc.properties.constant_stock}`);
+                }
+                if (npc.properties?.status_stock_entries) {
+                  try {
+                    const entries = JSON.parse(npc.properties.status_stock_entries as string);
+                    if (Array.isArray(entries)) {
+                      for (const entry of entries) {
+                        if (!entry?.requirement || !entry.items) continue;
+                        const stockStr = buildConstantStockString(entry.items);
+                        if (stockStr) {
+                          lines.push(`status_stock=${entry.requirement},${stockStr}`);
+                        }
+                      }
+                    }
+                  } catch (err) {
+                    console.warn('Failed to parse status_stock_entries for export', err);
+                  }
+                }
+                if (npc.properties?.random_stock) {
+                  lines.push(`random_stock=${npc.properties.random_stock}`);
+                }
+                if (npc.properties?.random_stock_count) {
+                  lines.push(`random_stock_count=${npc.properties.random_stock_count}`);
+                }
                 lines.push(`# TODO: Add stock items`);
                 lines.push(`# constant_stock=item_id:count,item_id:count`);
+                lines.push('');
+              }
+              
+              // Animation/Tileset (if provided)
+              if (npc.properties?.tilesetPath) {
+                lines.push(`# animation info`);
+                lines.push(`animations=${npc.properties.tilesetPath}`);
                 lines.push('');
               }
               
@@ -4021,42 +4401,43 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                     </div>
                   ) : (
                     <div className="flex flex-col gap-1 p-2">
-                      {/* Group items by category */}
+                      {/* Group items by role (mirroring Add Item roles) */}
                       {(() => {
-                        const categorizedItems = itemsList.reduce((acc, item) => {
-                          const cat = item.category || 'Default';
-                          if (!acc[cat]) acc[cat] = [];
-                          acc[cat].push(item);
-                          return acc;
-                        }, {} as Record<string, typeof itemsList>);
-                        
-                        return Object.entries(categorizedItems).map(([category, items]) => {
-                          const isExpanded = expandedItemCategories.has(category);
+                        const roleOrder = ITEM_ROLE_SELECTIONS.map(r => r.id).concat('unspecified' as ItemRole);
+                        const roleMetaLookup = ITEM_ROLE_SELECTIONS.reduce((acc, r) => ({ ...acc, [r.id]: ITEM_ROLE_META[r.id] }), {} as Record<ItemRole, { label: string; badgeClass: string }>);
+
+                        return roleOrder.map((roleId) => {
+                          const items = itemsList.filter((item) => item.role === roleId);
+                          if (items.length === 0) return null;
+                          const meta = roleMetaLookup[roleId] || ITEM_ROLE_META.unspecified;
+                          const isExpanded = expandedItemCategories.has(roleId) || (roleId === 'equipment' && expandedItemCategories.size === 0);
                           return (
-                            <div key={category} className="flex flex-col w-full">
-                              {/* Category Header */}
+                            <div key={roleId} className="flex flex-col w-full">
                               <Tooltip content="Click to expand" side="right">
                                 <div
                                   className="flex items-center gap-2 p-2 bg-muted/30 hover:bg-muted/50 rounded-md border border-border cursor-pointer transition-colors w-full"
                                   onClick={() => {
                                     setExpandedItemCategories(prev => {
                                       const newSet = new Set(prev);
-                                      if (newSet.has(category)) {
-                                        newSet.delete(category);
+                                      if (newSet.has(roleId)) {
+                                        newSet.delete(roleId);
                                       } else {
-                                        newSet.add(category);
+                                        newSet.add(roleId);
                                       }
                                       return newSet;
                                     });
                                   }}
                                 >
                                   <Folder className="w-4 h-4 text-orange-500 flex-shrink-0" />
-                                  <span className="flex-1 text-sm font-medium truncate">{category}</span>
+                                  <span className="flex items-center gap-2 flex-1 text-sm font-medium truncate">
+                                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold border ${meta.badgeClass}`}>
+                                      {meta.label}
+                                    </span>
+                                  </span>
                                   <span className="text-xs text-muted-foreground">({items.length})</span>
                                   <ChevronsUpDown className={`w-4 h-4 text-muted-foreground flex-shrink-0 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
                                 </div>
                               </Tooltip>
-                              {/* Items in this category with smooth animation */}
                               <div
                                 className={`grid transition-all duration-200 ease-in-out ${isExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}
                               >
@@ -4193,7 +4574,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             </div>
             )}
             {/* Brush Tools - stick to bottom so palette can fill remaining space */}
-            {!isNpcLayer && (
+            {!isNpcLayer && !isItemsLayer && (
             <div className="sticky bottom-0 z-10 bg-transparent py-2">
               <div className="text-xs text-muted-foreground"></div>
               <div className="w-full flex justify-center">
@@ -6072,6 +6453,245 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         </DialogContent>
       </Dialog>
 
+      {/* Vendor Unlockable Items Dialog */}
+      <Dialog open={showVendorUnlockDialog} onOpenChange={(open) => setShowVendorUnlockDialog(open)} zIndex={80}>
+        <DialogContent className="max-w-4xl w-full z-[9999]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Gift className="w-5 h-5 text-amber-500" />
+              Unlockable Items
+            </DialogTitle>
+            <DialogDescription>
+              Add status-based stock. Each requirement creates its own stock list.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-1">
+            {vendorUnlockEntries.length === 0 && (
+              <div className="text-sm text-muted-foreground">
+                No requirements yet. Use &quot;Add Requirement&quot; to start.
+              </div>
+            )}
+
+            {vendorUnlockEntries.map((entry) => (
+              <div key={entry.id} className="space-y-2 rounded-md border border-border p-3 bg-muted/20">
+                <div className="flex items-center gap-2">
+                  <Input
+                    className="flex-1 h-9 text-sm"
+                    placeholder="Requirement status (e.g., emp_perdition_trader1)"
+                    value={entry.requirement}
+                    onChange={(e) => handleUpdateVendorUnlockRequirement(entry.id, e.target.value)}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => handleRemoveVendorUnlockRequirement(entry.id)}
+                    aria-label="Remove requirement"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+
+                <div className="space-y-2">
+                  {itemsList.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                      No items found. Create items in the Items layer to add them here.
+                    </p>
+                  ) : (
+                    itemsList.map((item) => {
+                      const selected = entry.items[item.id] !== undefined;
+                      const qty = entry.items[item.id] ?? 1;
+                      return (
+                        <div
+                          key={item.id}
+                          className={`flex items-center gap-3 p-2 rounded-md border transition-all ${
+                            selected
+                              ? 'border-amber-500 ring-2 ring-amber-200 dark:ring-amber-900/60 bg-amber-50/40 dark:bg-amber-900/10'
+                              : 'border-border bg-muted/30 hover:bg-muted/50'
+                          }`}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => handleToggleVendorUnlockItem(entry.id, item.id)}
+                            className="flex-1 text-left"
+                          >
+                            <div className="flex items-center gap-2">
+                              <Badge className="text-[10px] font-semibold px-2 py-0.5">
+                                ID {item.id}
+                              </Badge>
+                              <span className="font-medium text-sm">{item.name || `Item ${item.id}`}</span>
+                              <span className="text-xs text-muted-foreground">({item.role})</span>
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-0.5">
+                              {item.category || 'Default'} • {item.fileName}
+                            </div>
+                          </button>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground">Qty</span>
+                            <Input
+                              type="number"
+                              className="h-8 w-20 text-xs"
+                              min={1}
+                              disabled={!selected}
+                              value={qty}
+                              onChange={(e) => handleVendorUnlockQtyChange(entry.id, item.id, Number.parseInt(e.target.value, 10) || 1)}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex items-center justify-between">
+            <Button type="button" variant="secondary" size="sm" onClick={handleAddVendorUnlockRequirement}>
+              Add Requirement
+            </Button>
+          <DialogFooter className="justify-between w-auto gap-2">
+            <Button variant="outline" size="icon" onClick={() => setShowVendorUnlockDialog(false)} aria-label="Cancel unlockable items">
+              <X className="w-4 h-4" />
+            </Button>
+            <Button size="icon" onClick={handleSaveVendorUnlock} aria-label="Save unlockable items">
+              <Save className="w-4 h-4" />
+            </Button>
+          </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Vendor Random Offers Dialog */}
+      <Dialog open={showVendorRandomDialog} onOpenChange={(open) => setShowVendorRandomDialog(open)} zIndex={80}>
+        <DialogContent className="max-w-4xl w-full z-[9999]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-purple-500" />
+              Random Offers
+            </DialogTitle>
+            <DialogDescription>
+              Pick random offer candidates with chance and quantity ranges.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-1">
+            {itemsList.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No items found. Create items in the Items layer to add them here.
+              </p>
+            ) : (
+              itemsList.map((item) => {
+                const selected = vendorRandomSelection[item.id] !== undefined;
+                const entry = vendorRandomSelection[item.id] || { chance: 100, min: 1, max: 1 };
+                return (
+                  <div
+                    key={item.id}
+                    className={`flex items-center gap-3 p-2 rounded-md border transition-all ${
+                      selected
+                        ? 'border-purple-500 ring-2 ring-purple-200 dark:ring-purple-900/60 bg-purple-50/40 dark:bg-purple-900/10'
+                        : 'border-border bg-muted/30 hover:bg-muted/50'
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => handleToggleVendorRandomItem(item.id)}
+                      className="flex-1 text-left"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Badge className="text-[10px] font-semibold px-2 py-0.5">
+                          ID {item.id}
+                        </Badge>
+                        <span className="font-medium text-sm">{item.name || `Item ${item.id}`}</span>
+                        <span className="text-xs text-muted-foreground">({item.role})</span>
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-0.5">
+                        {item.category || 'Default'} · {item.fileName}
+                      </div>
+                    </button>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">Chance</span>
+                      <select
+                        className="h-8 text-xs border rounded px-2 bg-background"
+                        disabled={!selected}
+                        value={entry.chance.toString()}
+                        onChange={(e) => handleVendorRandomFieldChange(item.id, 'chance', parseInt(e.target.value, 10) || 1)}
+                      >
+                        {[100, 50, 25, 10, 5].map((c) => (
+                          <option key={c} value={c}>{c}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">Min</span>
+                      <Input
+                        type="number"
+                        className="h-8 w-16 text-xs"
+                        min={1}
+                        disabled={!selected}
+                        value={entry.min}
+                        onChange={(e) => handleVendorRandomFieldChange(item.id, 'min', parseInt(e.target.value, 10) || 1)}
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">Max</span>
+                      <Input
+                        type="number"
+                        className="h-8 w-16 text-xs"
+                        min={1}
+                        disabled={!selected}
+                        value={entry.max}
+                        onChange={(e) => handleVendorRandomFieldChange(item.id, 'max', parseInt(e.target.value, 10) || 1)}
+                      />
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">Min item number</span>
+                <Tooltip content="How many of these items can appear in total?">
+                  <HelpCircle className="w-4 h-4 text-muted-foreground" />
+                </Tooltip>
+                <Input
+                  type="number"
+                  className="h-8 w-20 text-xs"
+                  min={1}
+                  value={vendorRandomCount.min}
+                  onChange={(e) => handleRandomCountChange('min', parseInt(e.target.value, 10) || 1)}
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">Max item number</span>
+                <Tooltip content="How many of these items can appear in total?">
+                  <HelpCircle className="w-4 h-4 text-muted-foreground" />
+                </Tooltip>
+                <Input
+                  type="number"
+                  className="h-8 w-20 text-xs"
+                  min={1}
+                  value={vendorRandomCount.max}
+                  onChange={(e) => handleRandomCountChange('max', parseInt(e.target.value, 10) || 1)}
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="icon" onClick={() => setShowVendorRandomDialog(false)} aria-label="Cancel random offers">
+                <X className="w-4 h-4" />
+              </Button>
+              <Button size="icon" onClick={handleSaveVendorRandom} aria-label="Save random offers">
+                <Save className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* NPC / Enemy Creation Dialog */}
       <Dialog open={actorDialogState !== null} onOpenChange={(open) => (open ? void 0 : handleCloseActorDialog())}>
         <DialogContent className="max-w-md">
@@ -6158,10 +6778,12 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                     type="button"
                     variant="outline"
                     size="sm"
+                    className="h-10 px-3 gap-2"
                     onClick={() => { void handleActorTilesetBrowse(); }}
                     disabled={!canUseTilesetDialog}
                   >
-                    Browse
+                    <Image className="w-4 h-4" />
+                    <span>Browse</span>
                   </Button>
                 </div>
               </div>
@@ -6182,10 +6804,12 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                     type="button"
                     variant="outline"
                     size="sm"
+                    className="h-10 px-3 gap-2"
                     onClick={() => { void handleActorPortraitBrowse(); }}
                     disabled={!canUseTilesetDialog}
                   >
-                    Browse
+                    <User className="w-4 h-4" />
+                    <span>Browse</span>
                   </Button>
                 </div>
               </div>
@@ -6223,9 +6847,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               <Sword className="w-5 h-5 text-orange-500" />
               Add Item
             </DialogTitle>
-            <DialogDescription>
-              Create a new item definition file.
-            </DialogDescription>
+            <DialogDescription>Create a new item definition.</DialogDescription>
           </DialogHeader>
           {itemDialogState && (
             <div className="space-y-4">
@@ -6241,72 +6863,68 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 />
               </div>
 
-              {/* Category Selection */}
+              {/* Item role presets (tagged like NPC roles) */}
               <div>
-                <label className="block text-sm font-medium mb-1">Category</label>
-                {!showNewCategoryInput ? (
-                  <div className="space-y-2">
-                    <select
-                      className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                      value={itemDialogState.category}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        if (value === '__new__') {
-                          setShowNewCategoryInput(true);
-                        } else {
-                          handleItemFieldChange('category', value);
-                        }
-                      }}
-                    >
-                      <option value="__new__">+ Create A New Item Category</option>
-                      {itemCategories.map((cat) => (
-                        <option key={cat} value={cat}>{cat}</option>
-                      ))}
-                    </select>
-                    <p className="text-xs text-muted-foreground">
-                      Items in "Default" category are saved directly in the items folder.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <div className="flex gap-2">
-                      <Input
-                        value={newCategoryName}
-                        onChange={(e) => setNewCategoryName(e.target.value)}
-                        placeholder="Category name..."
-                        className="flex-1"
-                      />
-                      <Button
+                <label className="block text-sm font-medium mb-1">What is this item for?</label>
+                <div className="grid sm:grid-cols-2 gap-2">
+                  {ITEM_ROLE_SELECTIONS.map((roleOption) => {
+                    const isActive = itemDialogState.role === roleOption.id;
+                    const roleMeta = ITEM_ROLE_META[roleOption.id];
+                    return (
+                      <button
+                        key={roleOption.id}
                         type="button"
-                        size="sm"
-                        onClick={handleCreateNewCategory}
-                        disabled={!newCategoryName.trim()}
-                      >
-                        Create
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
                         onClick={() => {
-                          setShowNewCategoryInput(false);
-                          setNewCategoryName('');
+                          handleItemFieldChange('role', roleOption.id);
+                          if (roleOption.id !== 'resource') {
+                            handleItemFieldChange('resourceSubtype', '');
+                          } else if (!itemDialogState.resourceSubtype) {
+                            handleItemFieldChange('resourceSubtype', 'material');
+                          }
                         }}
+                        className={`text-left border rounded-md px-3 py-2 transition-colors ${isActive ? 'border-orange-500 bg-orange-500/10 ring-1 ring-orange-500/30' : 'border-border hover:bg-muted/60'}`}
                       >
-                        Cancel
-                      </Button>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      A new folder will be created inside items/categories/
-                    </p>
-                  </div>
-                )}
+                        <div className="flex items-center justify-between gap-2">
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${roleMeta.badgeClass}`}>
+                            {roleMeta.label}
+                          </span>
+                          <Check className={`w-4 h-4 transition-opacity ${isActive ? 'opacity-100 text-orange-500' : 'opacity-0'}`} />
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1 leading-snug">{roleOption.description}</p>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
-              {/* ID Info */}
-              <div className="text-xs text-muted-foreground bg-muted/50 rounded-md p-2">
-                <strong>Note:</strong> Item ID will be assigned automatically starting from 1.
-              </div>
+              {/* Resource subtype helper */}
+              {itemDialogState.role === 'resource' && (
+                <div>
+                  <label className="block text-sm font-medium mb-1">Resource subtype</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(Object.keys(RESOURCE_SUBTYPE_META) as Array<Exclude<ItemResourceSubtype, ''>>).map((key) => {
+                      const meta = RESOURCE_SUBTYPE_META[key];
+                      const isActive = itemDialogState.resourceSubtype === key;
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => handleItemFieldChange('resourceSubtype', key)}
+                          className={`text-left border rounded-md px-3 py-2 transition-colors ${isActive ? 'border-purple-500 bg-purple-500/10 ring-1 ring-purple-500/30' : 'border-border hover:bg-muted/60'}`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${meta.badgeClass}`}>
+                              {meta.label}
+                            </span>
+                            <Check className={`w-4 h-4 transition-opacity ${isActive ? 'opacity-100 text-purple-500' : 'opacity-0'}`} />
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1 leading-snug">{meta.hint}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {itemDialogError && (
                 <div className="text-sm text-red-500">
@@ -6315,11 +6933,48 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               )}
             </div>
           )}
-          <DialogFooter>
+          <DialogFooter className="relative">
+            {pendingDuplicateItem && (
+              <div className="absolute -top-24 right-4 w-[280px]">
+                <div className="rounded-md border border-amber-500/50 bg-background shadow-lg text-xs p-2.5 flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5" />
+                  <div className="flex-1">
+                    <div className="text-[13px] font-semibold text-foreground text-left">Heads up</div>
+                    <div className="mt-1 space-y-1 text-left">
+                      {pendingDuplicateItem.kind === 'same-role' ? (
+                        <div className="text-[11px] text-muted-foreground">
+                          An item with this name already exists in this role.
+                        </div>
+                      ) : (
+                        <>
+                          <div className="text-[11px] text-muted-foreground leading-snug">
+                            Same name in another role. Create anyway?
+                          </div>
+                          <div className="text-[11px] text-muted-foreground leading-snug">
+                            Existing: {ITEM_ROLE_META[pendingDuplicateItem.conflictRole]?.label || pendingDuplicateItem.conflictRole}<br />
+                            New: {ITEM_ROLE_META[pendingDuplicateItem.targetRole]?.label || pendingDuplicateItem.targetRole}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-center gap-1">
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setPendingDuplicateItem(null)}>
+                      <X className="w-3.5 h-3.5" />
+                    </Button>
+                    {pendingDuplicateItem.kind === 'other-role' && (
+                      <Button size="icon" className="h-7 w-7 bg-amber-500 text-white hover:bg-amber-600" onClick={handleConfirmDuplicateItem}>
+                        <Check className="w-3.5 h-3.5" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
             <Button variant="outline" onClick={handleCloseItemDialog}>
               Cancel
             </Button>
-            <Button onClick={handleItemSubmit} disabled={showNewCategoryInput}>
+            <Button onClick={handleItemSubmit}>
               Add Item
             </Button>
           </DialogFooter>
@@ -6338,6 +6993,15 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           
           {editingItem && (
             <div className="flex-1 overflow-y-auto pr-2 minimal-scroll">
+              {(() => {
+                const role = editingItem.role || 'unspecified';
+                const isUnspecified = role === 'unspecified';
+                const isEquipment = role === 'equipment' || isUnspecified;
+                const isConsumable = role === 'consumable';
+                const isQuest = role === 'quest';
+                const isResource = role === 'resource';
+                const isBook = role === 'book';
+                return (
               <div className="space-y-4 pb-4">
                 {/* Basic Identifier Properties */}
                 <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
@@ -6345,133 +7009,279 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                     <Tag className="w-4 h-4 text-orange-500" />
                     Basic Identifier Properties
                   </h4>
-                  <div className="grid grid-cols-3 gap-3">
-                    <div>
-                      <label className="text-xs text-muted-foreground">ID</label>
-                      <Input
-                        type="number"
-                        value={editingItem.id}
-                        onChange={(e) => updateEditingItemField('id', parseInt(e.target.value) || 0)}
-                        className="h-8"
-                        disabled
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="text-xs text-muted-foreground">Name</label>
-                      <Input
-                        value={editingItem.name}
-                        onChange={(e) => updateEditingItemField('name', e.target.value)}
-                        placeholder="Item name"
-                        className="h-8"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground">Flavor (Description)</label>
-                    <Input
-                      value={editingItem.flavor}
-                      onChange={(e) => updateEditingItemField('flavor', e.target.value)}
-                      placeholder="Item description shown in tooltips"
-                      className="h-8"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs text-muted-foreground">Level</label>
-                      <Input
-                        type="number"
-                        value={editingItem.level}
-                        onChange={(e) => updateEditingItemField('level', parseInt(e.target.value) || 1)}
-                        min={1}
-                        className="h-8"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground">Quality</label>
-                      {/* TODO: let users define their own qualities */}
-                      <select
-                        value={editingItem.quality}
-                        onChange={(e) => updateEditingItemField('quality', e.target.value)}
-                        className="w-full h-8 px-2 text-sm border border-border rounded-md bg-background"
-                      >
-                        <option value="">-- Select Quality --</option>
-                        <option value="low" style={{ color: 'rgb(127,127,127)' }}>Low</option>
-                        <option value="normal" style={{ color: 'rgb(255,255,255)' }}>Normal</option>
-                        <option value="high" style={{ color: 'rgb(64,255,64)' }}>High</option>
-                        <option value="epic" style={{ color: 'rgb(64,128,255)' }}>Epic</option>
-                        <option value="rare" style={{ color: 'rgb(160,64,255)' }}>Rare</option>
-                        <option value="unique" style={{ color: 'rgb(255,192,64)' }}>Unique</option>
-                        <option value="one_time_use" style={{ color: 'rgb(64,255,255)' }}>One-time Use</option>
-                        <option value="currency" style={{ color: 'rgb(255,232,156)' }}>Currency</option>
-                      </select>
-                    </div>
-                  </div>
+                      <div className="grid grid-cols-2 gap-3 items-start">
+                        <div className="space-y-2">
+                          <div className="flex flex-col gap-1">
+                            <label className="text-xs text-muted-foreground">ID</label>
+                            <Badge variant="secondary" className="w-fit text-xs px-2 py-1 border border-border bg-muted/60">
+                              {editingItem.id}
+                            </Badge>
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <label className="text-xs text-muted-foreground">Name</label>
+                            <Input
+                              value={editingItem.name}
+                              onChange={(e) => updateEditingItemField('name', e.target.value)}
+                              placeholder="Item name"
+                              className="h-8"
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <label className="text-xs text-muted-foreground">Description</label>
+                            <Input
+                              value={editingItem.flavor}
+                              onChange={(e) => updateEditingItemField('flavor', e.target.value)}
+                              placeholder="Item description shown in tooltips"
+                              className="h-16"
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <div>
+                            <label className="text-xs text-muted-foreground">Level</label>
+                            <Input
+                              type="text"
+                              value={editingItem.level}
+                              onChange={(e) => updateEditingItemField('level', parseInt(e.target.value, 10) || 1)}
+                              className="h-8 w-24"
+                            />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-1">
+                              <label className="text-xs text-muted-foreground">Quality (Rarity)</label>
+                              <Tooltip content="Controls rarity color & overlay; does not affect stats." side="right">
+                                <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
+                              </Tooltip>
+                            </div>
+                            {(() => {
+                              const qualityOptions = [
+                                { value: '', label: 'None', swatch: '#d4d4d8' },
+                                { value: 'low', label: 'Low', swatch: 'rgb(127,127,127)' },
+                                { value: 'normal', label: 'Normal', swatch: 'rgb(255,255,255)' },
+                                { value: 'high', label: 'High', swatch: 'rgb(64,255,64)' },
+                                { value: 'epic', label: 'Epic', swatch: 'rgb(64,128,255)' },
+                                { value: 'rare', label: 'Rare', swatch: 'rgb(160,64,255)' },
+                                { value: 'unique', label: 'Unique', swatch: 'rgb(255,192,64)' },
+                                { value: 'one_time_use', label: 'One-time Use', swatch: 'rgb(64,255,255)' },
+                                { value: 'currency', label: 'Currency', swatch: 'rgb(255,232,156)' }
+                              ];
+                              const currentValue = editingItem.quality || '';
+                              return (
+                                <div className="space-y-2">
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {qualityOptions.map((opt) => {
+                                      const isActive = currentValue === opt.value;
+                                      return (
+                                        <Button
+                                          key={opt.value ?? 'none'}
+                                          type="button"
+                                          variant="outline"
+                                          size="sm"
+                                          className="h-8 px-2 text-xs flex items-center gap-2 border-border bg-card text-foreground hover:border-muted-foreground/60"
+                                          onClick={() => updateEditingItemField('quality', opt.value)}
+                                          style={isActive ? { borderColor: opt.swatch } : undefined}
+                                        >
+                                          <span
+                                            className="h-3 w-3 rounded-full border border-border"
+                                            style={{ backgroundColor: opt.swatch }}
+                                          ></span>
+                                          <span className="truncate">{opt.label}</span>
+                                        </Button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        </div>
+                      </div>
                 </div>
 
                 {/* Trade and Inventory Properties */}
                 <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
-                  <h4 className="text-sm font-semibold flex items-center gap-2">
-                    <Coins className="w-4 h-4 text-orange-500" />
-                    Trade and Inventory Properties
-                  </h4>
-                  <div className="grid grid-cols-3 gap-3">
-                    <div>
-                      <label className="text-xs text-muted-foreground">Price (Buy)</label>
-                      <Input
-                        value={editingItem.price}
-                        onChange={(e) => updateEditingItemField('price', e.target.value)}
-                        placeholder="gold,100"
-                        className="h-8"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground">Price (Sell)</label>
-                      <Input
-                        value={editingItem.price_sell}
-                        onChange={(e) => updateEditingItemField('price_sell', e.target.value)}
-                        placeholder="gold,50"
-                        className="h-8"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground">Max Quantity</label>
-                      <Input
-                        type="number"
-                        value={editingItem.max_quantity}
-                        onChange={(e) => updateEditingItemField('max_quantity', parseInt(e.target.value) || 1)}
-                        min={1}
-                        className="h-8"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        id="quest_item"
-                        checked={editingItem.quest_item}
-                        onChange={(e) => updateEditingItemField('quest_item', e.target.checked)}
-                        className="h-4 w-4"
-                      />
-                      <label htmlFor="quest_item" className="text-xs text-muted-foreground">Quest Item (cannot be sold/dropped)</label>
-                    </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground">No Stash</label>
-                      <select
-                        value={editingItem.no_stash}
-                        onChange={(e) => updateEditingItemField('no_stash', e.target.value)}
-                        className="w-full h-8 px-2 text-sm border border-border rounded-md bg-background"
-                      >
-                        <option value="ignore">Ignore (Default)</option>
-                        <option value="private">Private</option>
-                        <option value="shared">Shared</option>
-                        <option value="all">All</option>
-                      </select>
+              <h4 className="text-sm font-semibold flex items-center gap-2">
+                <Coins className="w-4 h-4 text-orange-500" />
+                Trade and Inventory Properties
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-start">
+                <div className="md:col-span-1">
+                  {(() => {
+                    const noStash = editingItem.no_stash || 'ignore';
+                    const allowPrivate = !(noStash === 'private' || noStash === 'all');
+                    const allowShared = !(noStash === 'shared' || noStash === 'all');
+                    const updateStash = (nextAllowPrivate: boolean, nextAllowShared: boolean) => {
+                      let next: 'ignore' | 'private' | 'shared' | 'all';
+                      if (nextAllowPrivate && nextAllowShared) next = 'ignore';
+                      else if (!nextAllowPrivate && nextAllowShared) next = 'private';
+                      else if (nextAllowPrivate && !nextAllowShared) next = 'shared';
+                      else next = 'all';
+                      updateEditingItemField('no_stash', next);
+                    };
+                    return (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-medium">Stash</span>
+                          <Tooltip content="Where this can be stored?" side="right">
+                            <HelpCircle className="w-4 h-4 text-muted-foreground" />
+                          </Tooltip>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <label className="flex items-center gap-2 text-xs text-foreground">
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4"
+                              checked={allowPrivate}
+                              onChange={(e) => updateStash(e.target.checked, allowShared)}
+                            />
+                            <span className="leading-tight">
+                              Private stash
+                              <span className="block text-muted-foreground text-[11px]">Character-only storage</span>
+                            </span>
+                          </label>
+                          <label className="flex items-center gap-2 text-xs text-foreground">
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4"
+                              checked={allowShared}
+                              onChange={(e) => updateStash(allowPrivate, e.target.checked)}
+                            />
+                            <span className="leading-tight">
+                              Shared stash
+                              <span className="block text-muted-foreground text-[11px]">Account-wide storage</span>
+                            </span>
+                          </label>
+                        </div>
+                        {editingItem.quest_item && (
+                          <div className="text-[11px] text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700 rounded px-2 py-1">
+                            Quest items are not stashable by default. Adjust the checkboxes above if you want to allow stashing this quest item.
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+                    <div className="md:col-span-2">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-2">
+                          <div>
+                            <div className="flex items-center gap-1">
+                              <label className="text-xs text-muted-foreground">Buy Price</label>
+                              <Tooltip content="0 = vendors won’t buy this item (unsellable)." side="right">
+                                <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
+                              </Tooltip>
+                            </div>
+                            <input
+                              type="text"
+                              value={editingItem.price ?? ''}
+                              onChange={(e) => updateEditingItemField('price', e.target.value)}
+                              placeholder="10"
+                              className="h-8 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                              inputMode="numeric"
+                              pattern="[0-9]*"
+                            />
+                          </div>
+                          <div>
+                            {(() => {
+                              const autoSell = editingItem.price_sell === '0' || editingItem.price_sell === '' || editingItem.price_sell === undefined;
+                              return (
+                                <>
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-1">
+                                      <label className="text-xs text-muted-foreground">Sell Price</label>
+                                      <Tooltip content="0 = use automatic sell price (price * vendor_ratio_sell)." side="right">
+                                        <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
+                                      </Tooltip>
+                                    </div>
+                                    <label className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                                      <input
+                                        type="checkbox"
+                                        className="h-3.5 w-3.5"
+                                        checked={autoSell}
+                                        onChange={(e) => {
+                                          if (e.target.checked) {
+                                            updateEditingItemField('price_sell', '0');
+                                          } else {
+                                            const fallbackValue = editingItem.price_sell && editingItem.price_sell !== '0'
+                                              ? editingItem.price_sell
+                                              : (editingItem.price && Number(editingItem.price) > 0 ? Math.max(1, Number(editingItem.price) / 2) : 1);
+                                            updateEditingItemField('price_sell', fallbackValue.toString());
+                                          }
+                                        }}
+                                      />
+                                      Use automatic sell price
+                                    </label>
+                                  </div>
+                                  <input
+                                    type="text"
+                                    value={editingItem.price_sell ?? ''}
+                                    onChange={(e) => updateEditingItemField('price_sell', e.target.value)}
+                                    placeholder="5"
+                                    className="h-8 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                                    inputMode="numeric"
+                                    pattern="[0-9]*"
+                                    disabled={autoSell}
+                                  />
+                                </>
+                              );
+                            })()}
+                          </div>
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-1">
+                            <label className="text-xs text-muted-foreground">Max stack size</label>
+                            <Tooltip content="Maximum items per stack. 1 = no stacking." side="right">
+                              <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
+                            </Tooltip>
+                          </div>
+                          <input
+                            type="text"
+                            value={editingItem.max_quantity}
+                            onChange={(e) => updateEditingItemField('max_quantity', parseInt(e.target.value, 10) || 1)}
+                            className="h-8 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
 
+                {/* Resource-specific */}
+                {isResource && (
+                  <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
+                    <h4 className="text-sm font-semibold flex items-center gap-2">
+                      <Box className="w-4 h-4 text-orange-500" />
+                      Resource
+                    </h4>
+                    <div className="grid sm:grid-cols-2 gap-2">
+                      {(Object.keys(RESOURCE_SUBTYPE_META) as Array<Exclude<ItemResourceSubtype, ''>>).map((key) => {
+                        const meta = RESOURCE_SUBTYPE_META[key];
+                        const isActive = editingItem.resourceSubtype === key;
+                        return (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => updateEditingItemField('resourceSubtype', key)}
+                            className={`text-left border rounded-md px-3 py-2 transition-colors ${isActive ? 'border-purple-500 bg-purple-500/10 ring-1 ring-purple-500/30' : 'border-border hover:bg-muted/60'}`}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${meta.badgeClass}`}>
+                                {meta.label}
+                              </span>
+                              <Check className={`w-4 h-4 transition-opacity ${isActive ? 'opacity-100 text-purple-500' : 'opacity-0'}`} />
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1 leading-snug">{meta.hint}</p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 {/* Equipment and Requirement Properties */}
+                {isEquipment && (
                 <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
                   <h4 className="text-sm font-semibold flex items-center gap-2">
                     <Shield className="w-4 h-4 text-orange-500" />
@@ -6548,8 +7358,10 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                     </div>
                   </div>
                 </div>
+                )}
 
                 {/* Status and Effect Properties (Bonuses) */}
+                {isEquipment && (
                 <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
                   <h4 className="text-sm font-semibold flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-orange-500" />
@@ -6574,13 +7386,16 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                     />
                   </div>
                 </div>
+                )}
 
-                {/* Usage and Power Properties */}
-                <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
+                    {/* Usage and Power Properties */}
+                    {(isEquipment || isConsumable) && (
+                    <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
                   <h4 className="text-sm font-semibold flex items-center gap-2">
                     <Zap className="w-4 h-4 text-orange-500" />
-                    Usage and Power
+                    Usage and Power (TODO IN FUTURE)
                   </h4>
+                  {isEquipment && (
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="text-xs text-muted-foreground">Damage (dmg)</label>
@@ -6601,55 +7416,36 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                       />
                     </div>
                   </div>
+                  )}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="text-xs text-muted-foreground">Power ID</label>
                       <Input
-                        value={editingItem.power}
-                        onChange={(e) => updateEditingItemField('power', e.target.value)}
-                        placeholder="power_id"
-                        className="h-8"
-                      />
+                            value={editingItem.power}
+                            onChange={(e) => updateEditingItemField('power', e.target.value)}
+                            placeholder="power_id"
+                            className="h-8"
+                          />
                     </div>
                     <div>
                       <label className="text-xs text-muted-foreground">Power Description</label>
                       <Input
                         value={editingItem.power_desc}
                         onChange={(e) => updateEditingItemField('power_desc', e.target.value)}
-                        placeholder="Description text"
-                        className="h-8"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground">Replace Power</label>
-                    <Input
+                            placeholder="Description text"
+                            className="h-8"
+                          />
+                        </div>
+                      </div>
+                      {/* TODO: When equipment power presets are finalized, add configuration controls here. */}
+                      <div>
+                        <label className="text-xs text-muted-foreground">Replace Power</label>
+                        <Input
                       value={editingItem.replace_power}
                       onChange={(e) => updateEditingItemField('replace_power', e.target.value)}
                       placeholder="old_power_id,new_power_id"
                       className="h-8"
                     />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs text-muted-foreground">Book File</label>
-                      <Input
-                        value={editingItem.book}
-                        onChange={(e) => updateEditingItemField('book', e.target.value)}
-                        placeholder="books/my_book.txt"
-                        className="h-8"
-                      />
-                    </div>
-                    <div className="flex items-center gap-2 pt-5">
-                      <input
-                        type="checkbox"
-                        id="book_is_readable"
-                        checked={editingItem.book_is_readable}
-                        onChange={(e) => updateEditingItemField('book_is_readable', e.target.checked)}
-                        className="h-4 w-4"
-                      />
-                      <label htmlFor="book_is_readable" className="text-xs text-muted-foreground">Book is Readable (show "read" instead of "use")</label>
-                    </div>
                   </div>
                   <div>
                     <label className="text-xs text-muted-foreground">Script</label>
@@ -6661,6 +7457,66 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                     />
                   </div>
                 </div>
+                )}
+
+                {/* Quest-only */}
+                {isQuest && (
+                  <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
+                    <h4 className="text-sm font-semibold flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 text-orange-500" />
+                      Quest Item Settings
+                    </h4>
+                    <div className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        id="quest_item_lock"
+                        checked={!!editingItem.quest_item}
+                        disabled
+                        className="h-4 w-4"
+                      />
+                      <label htmlFor="quest_item_lock" className="text-xs text-muted-foreground">Quest item (always on for this role)</label>
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground">Pickup Status</label>
+                      <Input
+                        value={editingItem.pickup_status}
+                        onChange={(e) => updateEditingItemField('pickup_status', e.target.value)}
+                        placeholder="campaign_status_id"
+                        className="h-8"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Book / Lore */}
+                {isBook && (
+                  <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
+                    <h4 className="text-sm font-semibold flex items-center gap-2">
+                      <Book className="w-4 h-4 text-orange-500" />
+                      Book / Lore
+                    </h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs text-muted-foreground">Book File</label>
+                        <Input
+                          value={editingItem.book}
+                          onChange={(e) => updateEditingItemField('book', e.target.value)}
+                          placeholder="books/lore.txt"
+                          className="h-8"
+                        />
+                      </div>
+                      <label className="flex items-center gap-2 text-xs text-foreground mt-6">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4"
+                          checked={editingItem.book_is_readable}
+                          onChange={(e) => updateEditingItemField('book_is_readable', e.target.checked)}
+                        />
+                        Show "Read" instead of "Use"
+                      </label>
+                    </div>
+                  </div>
+                )}
 
                 {/* Visual and Audio Properties */}
                 <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
@@ -6700,6 +7556,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 </div>
 
                 {/* Randomization and Loot Properties */}
+                {!isQuest && (
                 <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
                   <h4 className="text-sm font-semibold flex items-center gap-2">
                     <Gift className="w-4 h-4 text-orange-500" />
@@ -6726,26 +7583,12 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                       />
                     </div>
                   </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground">Pickup Status</label>
-                    <Input
-                      value={editingItem.pickup_status}
-                      onChange={(e) => updateEditingItemField('pickup_status', e.target.value)}
-                      placeholder="campaign_status_id"
-                      className="h-8"
-                    />
-                  </div>
                 </div>
+                )}
 
-                {/* File Info (read-only) */}
-                <div className="space-y-2 border border-border rounded-md p-3 bg-muted/10">
-                  <h4 className="text-xs font-medium text-muted-foreground">File Information</h4>
-                  <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-                    <div>Category: <span className="text-foreground">{editingItem.category}</span></div>
-                    <div>Filename: <span className="text-foreground">{editingItem.fileName}</span></div>
-                  </div>
-                </div>
               </div>
+                );
+              })()}
             </div>
           )}
           
@@ -6848,7 +7691,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                         }
                         setEditingObject({ ...editingObject, properties: newProps });
                       }}
-                      className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
+                      className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
                         editingObject.properties?.[role.key] === 'true'
                           ? role.color === 'blue' ? 'bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/50'
                           : role.color === 'emerald' ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/50'
@@ -6862,28 +7705,15 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 </div>
               )}
 
-              {/* Category for non-NPC */}
-              {editingObject.type !== 'npc' && (
-                <div>
-                  <label className="text-xs text-muted-foreground">Category</label>
-                  <Input
-                    value={editingObject.category || ''}
-                    onChange={(e) => setEditingObject({...editingObject, category: e.target.value})}
-                    placeholder={editingObject.type === 'enemy' ? 'creature' : 'block'}
-                    className="h-8"
-                  />
-                </div>
-              )}
-
               {/* Tileset & Portrait for NPC/Enemy */}
               {(editingObject.type === 'npc' || editingObject.type === 'enemy') && (
                 <div className="space-y-2">
                   <div className="flex gap-2">
-                    <Input
-                      className="h-8 flex-1 text-xs"
-                      value={getEditingObjectProperty('tilesetPath', '')}
-                      onChange={(e) => updateEditingObjectProperty('tilesetPath', e.target.value)}
-                      placeholder="Tileset path..."
+                  <Input
+                    className="h-8 flex-1 text-xs"
+                    value={getEditingObjectProperty('tilesetPath', '')}
+                    onChange={(e) => updateEditingObjectProperty('tilesetPath', e.target.value)}
+                    placeholder="Tileset path..."
                       readOnly={canUseTilesetDialog}
                       onClick={canUseTilesetDialog ? () => { void handleEditingTilesetBrowse(); } : undefined}
                     />
@@ -6891,11 +7721,12 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="h-8 px-2"
+                      className="h-8 px-2 gap-2"
                       onClick={() => { void handleEditingTilesetBrowse(); }}
                       disabled={!canUseTilesetDialog}
                     >
-                      Tileset
+                      <Image className="w-4 h-4" />
+                      <span className="text-xs">Tileset</span>
                     </Button>
                   </div>
                   {editingObject.type === 'npc' && (
@@ -6912,11 +7743,12 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                         type="button"
                         variant="outline"
                         size="sm"
-                        className="h-8 px-2"
+                        className="h-8 px-2 gap-2"
                         onClick={() => { void handleEditingPortraitBrowse(); }}
                         disabled={!canUseTilesetDialog}
                       >
-                        Portrait
+                        <User className="w-4 h-4" />
+                        <span className="text-xs">Portrait</span>
                       </Button>
                     </div>
                   )}
@@ -6961,19 +7793,51 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               )}
 
               {editingObject.type === 'npc' && editingObject.properties?.vendor === 'true' && (
-                <div className="pl-2 border-l-2 border-emerald-500/50 space-y-1.5">
-                  <Input
-                    className="h-7 text-xs"
-                    value={getEditingObjectProperty('vendorRequiresStatus', '')}
-                    onChange={(e) => updateEditingObjectProperty('vendorRequiresStatus', e.target.value)}
-                    placeholder="Requires status..."
-                  />
-                  <Input
-                    className="h-7 text-xs"
-                    value={getEditingObjectProperty('vendorRequiresNotStatus', '')}
-                    onChange={(e) => updateEditingObjectProperty('vendorRequiresNotStatus', e.target.value)}
-                    placeholder="Requires NOT status..."
-                  />
+                <div className="pl-2 border-l-2 border-emerald-500/50">
+                  <div className="space-y-1.5 flex flex-col">
+                    <div className="w-full">
+                      <Tooltip content="Items that are always in this vendor's shop.">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8 w-full text-xs gap-2 justify-start"
+                          onClick={handleOpenVendorStockDialog}
+                        >
+                          <Package className="w-3.5 h-3.5" />
+                          Edit Always Available Items
+                        </Button>
+                      </Tooltip>
+                    </div>
+                    <div className="w-full">
+                      <Tooltip content="Extra items that appear after certain quests or story steps.">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8 w-full text-xs gap-2 justify-start"
+                          onClick={handleOpenVendorUnlockDialog}
+                        >
+                          <Gift className="w-3.5 h-3.5" />
+                          Edit Unlockable Items
+                        </Button>
+                      </Tooltip>
+                    </div>
+                    <div className="w-full">
+                      <Tooltip content="Extra items randomly picked from a loot table each time.">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8 w-full text-xs gap-2 justify-start"
+                          onClick={handleOpenVendorRandomDialog}
+                        >
+                          <Sparkles className="w-3.5 h-3.5" />
+                          Edit Random Offers
+                        </Button>
+                      </Tooltip>
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -7820,12 +8684,12 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                                   min={1}
                                   value={rew.quantity || 1}
                                   onChange={(e) => {
-                                    const newTrees = [...dialogueTrees];
-                                    const newRews = [...(newTrees[activeDialogueTab].rewards || [])];
-                                    newRews[rewIndex] = { ...newRews[rewIndex], quantity: parseInt(e.target.value, 10) || 1 };
-                                    newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], rewards: newRews };
-                                    setDialogueTrees(newTrees);
-                                  }}
+                                const newTrees = [...dialogueTrees];
+                                const newRews = [...(newTrees[activeDialogueTab].rewards || [])];
+                                newRews[rewIndex] = { ...newRews[rewIndex], quantity: parseInt(e.target.value, 10) || 1 };
+                                newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], rewards: newRews };
+                                setDialogueTrees(newTrees);
+                              }}
                                   className="h-7 w-14 text-xs"
                                 />
                               </>
@@ -8010,6 +8874,80 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 setShowDialogueTreeDialog(false);
               }}
             >
+              <Save className="w-4 h-4" />
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Vendor Always-Available Items Dialog */}
+      <Dialog open={showVendorStockDialog} onOpenChange={(open) => setShowVendorStockDialog(open)} zIndex={80}>
+        <DialogContent className="max-w-3xl w-full z-[9999]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Package className="w-5 h-5 text-emerald-500" />
+              Always Available Items
+            </DialogTitle>
+            <DialogDescription>
+              Select items to keep in this vendor's shop and set their quantities.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+            {itemsList.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No items found. Create items in the Items layer to add them here.
+              </p>
+            ) : (
+              itemsList.map((item) => {
+                const selected = vendorStockSelection[item.id] !== undefined;
+                const qty = vendorStockSelection[item.id] ?? 1;
+                return (
+                  <div
+                    key={item.id}
+                    className={`flex items-center gap-3 p-2 rounded-md border transition-all ${selected
+                      ? 'border-emerald-500 ring-2 ring-emerald-200 dark:ring-emerald-900/60 bg-emerald-50/40 dark:bg-emerald-900/10'
+                      : 'border-border bg-muted/30 hover:bg-muted/50'
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => handleToggleVendorStockItem(item.id)}
+                      className="flex-1 text-left"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Badge className="text-[10px] font-semibold px-2 py-0.5">
+                          ID {item.id}
+                        </Badge>
+                        <span className="font-medium text-sm">{item.name || `Item ${item.id}`}</span>
+                        <span className="text-xs text-muted-foreground">({item.role})</span>
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-0.5">
+                        {item.category || 'Default'} • {item.fileName}
+                      </div>
+                    </button>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">Qty</span>
+                      <Input
+                        type="number"
+                        className="h-8 w-20 text-xs"
+                        min={1}
+                        disabled={!selected}
+                        value={qty}
+                        onChange={(e) => handleVendorStockQtyChange(item.id, Number.parseInt(e.target.value, 10) || 1)}
+                      />
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          <DialogFooter className="justify-between">
+            <Button variant="outline" size="icon" onClick={() => setShowVendorStockDialog(false)} aria-label="Cancel vendor items">
+              <X className="w-4 h-4" />
+            </Button>
+            <Button size="icon" onClick={handleSaveVendorStock} aria-label="Save vendor items">
               <Save className="w-4 h-4" />
             </Button>
           </DialogFooter>

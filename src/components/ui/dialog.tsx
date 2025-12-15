@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils"
 interface DialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  zIndex?: number
   children: React.ReactNode
 }
 
@@ -32,18 +33,18 @@ interface DialogFooterProps {
   children: React.ReactNode
 }
 
-function Dialog({ open, onOpenChange, children }: DialogProps) {
+function Dialog({ open, onOpenChange, zIndex = 50, children }: DialogProps) {
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 flex items-center justify-center" style={{ zIndex }}>
       {/* Backdrop */}
       <div 
-        className="fixed inset-0 bg-black/80" 
+        className="fixed inset-0 bg-black/80 z-0"
         onClick={() => onOpenChange(false)}
       />
       {/* Content */}
-      <div className="relative z-50">
+      <div className="relative z-10">
         {children}
       </div>
     </div>

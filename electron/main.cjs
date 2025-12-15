@@ -950,13 +950,6 @@ ipcMainLocal.handle('create-npc-file', async (event, projectPath, npcData) => {
       lines.push('');
     }
     
-    // Animation/Tileset (if provided)
-    if (npcData.tilesetPath) {
-      lines.push(`# animation info`);
-      lines.push(`animations=${npcData.tilesetPath}`);
-      lines.push('');
-    }
-    
     // Role-based attributes
     const role = npcData.role || 'static';
     
@@ -965,6 +958,13 @@ ipcMainLocal.handle('create-npc-file', async (event, projectPath, npcData) => {
       lines.push(`vendor=true`);
       lines.push(`# TODO: Add stock items`);
       lines.push(`# constant_stock=item_id:count,item_id:count`);
+      lines.push('');
+    }
+    
+    // Animation/Tileset (if provided)
+    if (npcData.tilesetPath) {
+      lines.push(`# animation info`);
+      lines.push(`animations=${npcData.tilesetPath}`);
       lines.push('');
     }
     
@@ -1230,10 +1230,18 @@ ipcMainLocal.handle('create-item-file', async (event, projectPath, itemData) => 
       fs.mkdirSync(targetDir, { recursive: true });
     }
 
-    const itemFilePath = path.join(targetDir, `${sanitizedName}.txt`);
+    // Build a unique filename to avoid overwriting items with the same name (e.g., different roles)
+    const baseFilename = `${sanitizedName}_${itemData.id}`;
+    const itemFilePath = path.join(targetDir, `${baseFilename}.txt`);
 
     // Build item file content
     const lines = [];
+    const role = (itemData.role || '').toLowerCase() || 'unspecified';
+    const resourceSubtype = (itemData.resourceSubtype || '').toLowerCase();
+    lines.push(`# role=${role}`);
+    if (role === 'resource' && resourceSubtype) {
+      lines.push(`# resource_subtype=${resourceSubtype}`);
+    }
     lines.push('[item]');
     lines.push(`id=${itemData.id}`);
     lines.push(`name=${itemData.name}`);
@@ -1262,16 +1270,25 @@ ipcMainLocal.handle('list-items', async (event, projectPath) => {
 
     const parseItemFile = (filePath, category) => {
       try {
+        // Only treat files with an [item] section as items (skip qualities.txt, etc.)
         const content = fs.readFileSync(filePath, 'utf8');
+        if (!/\[item\]/i.test(content)) {
+          return null;
+        }
+
         const idMatch = content.match(/^id=(\d+)/m);
         const nameMatch = content.match(/^name=(.+)$/m);
+        const roleMatch = content.match(/^\s*(?:#\s*)?(?:role|item_role)=([a-zA-Z_]+)/m);
+        const resourceSubtypeMatch = content.match(/^\s*(?:#\s*)?resource_subtype=([a-zA-Z_]+)/m);
         
         return {
           id: idMatch ? parseInt(idMatch[1], 10) : 0,
           name: nameMatch ? nameMatch[1].trim() : path.basename(filePath, '.txt'),
           category: category,
           filePath: filePath,
-          fileName: path.basename(filePath)
+          fileName: path.basename(filePath),
+          role: roleMatch ? roleMatch[1].toLowerCase() : 'unspecified',
+          resourceSubtype: resourceSubtypeMatch ? resourceSubtypeMatch[1].toLowerCase() : ''
         };
       } catch (e) {
         return null;
@@ -1358,7 +1375,29 @@ ipcMainLocal.handle('write-item-file', async (event, filePath, itemData) => {
       return { success: false, error: 'File path is required' };
     }
 
+    // Preserve role metadata if present, even if edit UI does not expose it yet
+    let role = typeof itemData.role === 'string' ? itemData.role : '';
+    let resourceSubtype = typeof itemData.resourceSubtype === 'string' ? itemData.resourceSubtype : '';
+    try {
+      if ((!role || !resourceSubtype) && fs.existsSync(filePath)) {
+        const existing = fs.readFileSync(filePath, 'utf8');
+        const roleMatch = existing.match(/^\s*(?:#\s*)?(?:role|item_role)=([a-zA-Z_]+)/m);
+        const resourceMatch = existing.match(/^\s*(?:#\s*)?resource_subtype=([a-zA-Z_]+)/m);
+        if (!role && roleMatch) role = roleMatch[1];
+        if (!resourceSubtype && resourceMatch) resourceSubtype = resourceMatch[1];
+      }
+    } catch {
+      // ignore preservation errors
+    }
+
+    const normalizedRole = (role || '').toLowerCase() || 'unspecified';
+    const normalizedResourceSubtype = (resourceSubtype || '').toLowerCase();
+
     const lines = [];
+    lines.push(`# role=${normalizedRole}`);
+    if (normalizedRole === 'resource' && normalizedResourceSubtype) {
+      lines.push(`# resource_subtype=${normalizedResourceSubtype}`);
+    }
     lines.push('[item]');
     
     // Basic Identifier Properties

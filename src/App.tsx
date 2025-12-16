@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import Tooltip from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Upload, Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Blend, MapPin, MapPinOff, Save, Scan, Link2, Scissors, Trash2, Check, HelpCircle, Folder, Shield, Plus, Image, Grid, Box, Users, User, Locate, Clock, Menu, ChevronLeft, ChevronRight, GripVertical, MessageSquare, ChevronDown, ChevronUp, ArrowLeft, Gift, Coins, Sparkles, Heart, Zap, Volume2, Film, Tag, Package, AlignLeft, Sword, ChevronsUpDown, AlertTriangle, Book } from 'lucide-react';
+import { Upload, Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Blend, MapPin, MapPinOff, Save, Scan, Link2, Scissors, Trash2, Check, HelpCircle, Folder, Shield, Plus, Image, Grid, Box, Users, User, Locate, Clock, Menu, ChevronLeft, ChevronRight, GripVertical, MessageSquare, ChevronDown, ChevronUp, ArrowLeft, Gift, Coins, Sparkles, Heart, Zap, Volume2, Film, Tag, Package, AlignLeft, Sword, ChevronsUpDown, AlertTriangle, Book, GitBranch, Apple, Skull, Swords, RefreshCw, Repeat, Dices, Timer, UserPlus } from 'lucide-react';
 import { TileMapEditor } from './editor/TileMapEditor';
 import type { EditorProjectData } from './editor/TileMapEditor';
 import { TileLayer, MapObject, DialogueLine, DialogueRequirement, DialogueReward, DialogueWorldEffect, DialogueTree, FlareNPC } from './types';
@@ -203,6 +203,86 @@ function validateValue(key: string, trimmed: string, spec: PropertySpec): string
 // Property specs for NPCs and enemies (left empty for now).
 const ENEMY_PROPERTY_SPECS: Record<string, PropertySpec> = {};
 const NPC_PROPERTY_SPECS: Record<string, PropertySpec> = {};
+
+type RuleStartType = 'player' | 'game';
+
+interface RuleTriggerOption {
+  id: string;
+  label: string;
+  tooltip: string;
+  icon: React.ComponentType<{ className?: string }>;
+  startType: RuleStartType;
+}
+
+const PLAYER_TRIGGER_OPTIONS: RuleTriggerOption[] = [
+  { id: 'item-used', label: 'Item Used', tooltip: 'When an item is used', icon: Apple, startType: 'player' },
+  { id: 'skill-used', label: 'Skill Used', tooltip: 'When a skill is used', icon: Zap, startType: 'player' },
+  { id: 'npc-interaction', label: 'NPC Interaction', tooltip: 'When an NPC option is chosen', icon: UserPlus, startType: 'player' }
+];
+
+const GAME_TRIGGER_OPTIONS: RuleTriggerOption[] = [
+  { id: 'enemy-dies', label: 'Enemy dies', tooltip: 'Enemy dies', icon: Skull, startType: 'game' },
+  { id: 'player-enters-area', label: 'Player enters area', tooltip: 'Player enters area', icon: MapPin, startType: 'game' },
+  { id: 'combat-starts', label: 'Combat starts', tooltip: 'Combat starts', icon: Swords, startType: 'game' },
+  { id: 'player-hit', label: 'Player is hit', tooltip: 'Player is hit', icon: Zap, startType: 'game' },
+  { id: 'health-low', label: 'Health very low', tooltip: 'Health very low', icon: Heart, startType: 'game' },
+  { id: 'effect-used', label: 'Another effect is used', tooltip: 'Another effect is used', icon: Repeat, startType: 'game' },
+  { id: 'after-delay', label: 'After a delay', tooltip: 'After a delay', icon: Clock, startType: 'game' },
+  { id: 'repeats-while-active', label: 'Repeats while active', tooltip: 'Repeats while active', icon: RefreshCw, startType: 'game' },
+  { id: 'random-chance', label: 'Random chance', tooltip: 'Random chance', icon: Dices, startType: 'game' },
+  { id: 'every-x-seconds', label: 'Every X seconds', tooltip: 'Every X seconds', icon: Timer, startType: 'game' }
+];
+
+const ALL_RULE_TRIGGER_OPTIONS: RuleTriggerOption[] = [...PLAYER_TRIGGER_OPTIONS, ...GAME_TRIGGER_OPTIONS];
+const RULE_TRIGGER_LOOKUP: Record<string, RuleTriggerOption> = ALL_RULE_TRIGGER_OPTIONS.reduce((acc, option) => {
+  acc[option.id] = option;
+  return acc;
+}, {} as Record<string, RuleTriggerOption>);
+
+interface RuleActionGroup {
+  id: string;
+  title: string;
+  subtitle?: string;
+  actions: Array<{ id: string; label: string }>;
+}
+
+const RULE_ACTION_GROUPS: RuleActionGroup[] = [
+  {
+    id: 'items',
+    title: 'Give or take items',
+    subtitle: 'Modify player inventory',
+    actions: [
+      { id: 'give-loot', label: 'Give loot' },
+      { id: 'remove-item', label: 'Remove item' }
+    ]
+  },
+  {
+    id: 'flags',
+    title: 'Change a game flag',
+    subtitle: 'Toggle world state',
+    actions: [
+      { id: 'set-flag', label: 'Set flag' },
+      { id: 'clear-flag', label: 'Clear flag' }
+    ]
+  },
+  {
+    id: 'quests',
+    title: 'Advance a quest',
+    subtitle: 'Progress quest state',
+    actions: [
+      { id: 'complete-quest', label: 'Complete quest' },
+      { id: 'next-step', label: 'Next step' }
+    ]
+  },
+  {
+    id: 'advanced',
+    title: '(Advanced) Run advanced logic',
+    subtitle: 'Custom or scripted logic',
+    actions: [
+      { id: 'advanced-logic', label: 'Run advanced logic' }
+    ]
+  }
+];
 
 function validateAndSanitizeObject(object: MapObject): { errors: string[]; sanitized: Record<string, string> } {
   const specs = object.type === 'enemy' ? ENEMY_PROPERTY_SPECS
@@ -1023,6 +1103,15 @@ function App() {
     conflictRole: ItemRole;
     kind: 'same-role' | 'other-role';
   } | null>(null);
+
+  // Rules list for the Rules layer (UI-only for now; persistence will be added later).
+  const [rulesList, setRulesList] = useState<Array<{ id: string; name: string; startType: RuleStartType; triggerId: string }>>([]);
+  const [showRuleDialog, setShowRuleDialog] = useState(false);
+  const [ruleNameInput, setRuleNameInput] = useState('');
+  const [ruleStartType, setRuleStartType] = useState<RuleStartType>('player');
+  const [ruleTriggerId, setRuleTriggerId] = useState<string>(PLAYER_TRIGGER_OPTIONS[0]?.id ?? '');
+  const [ruleDialogError, setRuleDialogError] = useState<string | null>(null);
+  const [ruleDialogStep, setRuleDialogStep] = useState<'start' | 'actions'>('start');
   // Items list for display
   const [itemsList, setItemsList] = useState<Array<{ id: number; name: string; category: string; filePath: string; fileName: string; role: ItemRole; resourceSubtype?: ItemResourceSubtype }>>([]);
   // Expanded item categories for accordion
@@ -1050,6 +1139,44 @@ function App() {
       resourceSubtype: toResourceSubtype(item.resourceSubtype)
     }));
   }, []);
+
+  const refreshItemsList = useCallback(async (projectPath: string | null) => {
+    if (!projectPath || !window.electronAPI?.listItems) {
+      setItemsList([]);
+      return;
+    }
+
+    try {
+      // Preload at project start so other UIs (dialogue/vendor/etc.) don't depend on selecting the Items layer first.
+      if (window.electronAPI.ensureItemsFolders) {
+        await window.electronAPI.ensureItemsFolders(projectPath);
+      }
+
+      const itemsResult = await window.electronAPI.listItems(projectPath);
+      if (itemsResult.success && itemsResult.items) {
+        setItemsList(normalizeItemsForState(itemsResult.items));
+      } else {
+        setItemsList([]);
+      }
+    } catch (error) {
+      console.error('Failed to load items list:', error);
+    }
+  }, [normalizeItemsForState]);
+
+  useEffect(() => {
+    void refreshItemsList(currentProjectPath);
+  }, [currentProjectPath, refreshItemsList]);
+
+  useEffect(() => {
+    setRulesList([]);
+  }, [currentProjectPath]);
+
+  useEffect(() => {
+    const availableOptions = ruleStartType === 'player' ? PLAYER_TRIGGER_OPTIONS : GAME_TRIGGER_OPTIONS;
+    if (!availableOptions.some(option => option.id === ruleTriggerId)) {
+      setRuleTriggerId(availableOptions[0]?.id ?? '');
+    }
+  }, [ruleStartType, ruleTriggerId]);
 
   const parseConstantStock = useCallback((value?: string): Record<number, number> => {
     if (!value) return {};
@@ -2009,6 +2136,43 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     setItemDialogState(null);
     setItemDialogError(null);
   }, []);
+
+  const handleAddRule = useCallback(() => {
+    setRuleDialogError(null);
+    setRuleStartType('player');
+    setRuleTriggerId(PLAYER_TRIGGER_OPTIONS[0]?.id ?? '');
+    setRuleNameInput(`Rule ${rulesList.length + 1}`);
+    setRuleDialogStep('start');
+    setShowRuleDialog(true);
+  }, [rulesList.length]);
+
+  const handleSaveRule = useCallback(() => {
+    const trimmedName = ruleNameInput.trim();
+    const availableOptions = ruleStartType === 'player' ? PLAYER_TRIGGER_OPTIONS : GAME_TRIGGER_OPTIONS;
+    if (!trimmedName) {
+      setRuleDialogError('Rule name is required.');
+      return;
+    }
+    if (!ruleTriggerId || !availableOptions.some(option => option.id === ruleTriggerId)) {
+      setRuleDialogError('Select a start trigger.');
+      return;
+    }
+
+    setRulesList((prev) => [
+      ...prev,
+      {
+        id: `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
+        name: trimmedName,
+        startType: ruleStartType,
+        triggerId: ruleTriggerId
+      }
+    ]);
+    setShowRuleDialog(false);
+    setRuleDialogError(null);
+    setRuleNameInput('');
+    setRuleStartType('player');
+    setRuleTriggerId(PLAYER_TRIGGER_OPTIONS[0]?.id ?? '');
+  }, [ruleNameInput, ruleStartType, ruleTriggerId]);
 
   const handleItemFieldChange = useCallback((field: 'name' | 'role' | 'resourceSubtype', value: string) => {
     setItemDialogState((prev) => {
@@ -4097,6 +4261,8 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
   const isNpcLayer = activeLayer?.type === 'npc';
   const isEnemyLayer = activeLayer?.type === 'enemy';
   const isItemsLayer = activeLayer?.type === 'items';
+  const isRulesLayer = activeLayer?.type === 'rules';
+  const availableRuleTriggers = ruleStartType === 'player' ? PLAYER_TRIGGER_OPTIONS : GAME_TRIGGER_OPTIONS;
 
   const actorEntries = useMemo(() => {
     if (isNpcLayer) {
@@ -4251,7 +4417,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           {/* collapse toggle is provided on the outer edge (see edge button) */}
           {/* Tileset Brushes Section */}
           <section className="flex flex-col flex-1">
-            {/* If this is an NPC, Enemy, Event, or Items layer render a header and controls */}
+            {/* If this is an NPC, Enemy, Event, Rules, or Items layer render a header and controls */}
             {(() => {
               // Keep actor entries for NPC/Enemy layers but remove the header and its add-button.
               const isEventLayer = activeLayer?.type === 'event';
@@ -4391,6 +4557,68 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               return null;
             })()}
 
+            {/* Rules Layer - list and add button (similar UX to NPC layer) */}
+            {isRulesLayer && (
+              <div className="flex flex-col flex-1">
+                <div className="flex-1 min-h-0 border border-dashed border-border rounded-md overflow-y-auto">
+                  {rulesList.length === 0 ? (
+                    <div className="flex items-center justify-center h-full text-sm text-muted-foreground px-4 text-center">
+                      Click &quot;+ Rule&quot; to create your first rule.
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-1 p-2">
+                      {rulesList.map((rule) => {
+                        const triggerMeta = RULE_TRIGGER_LOOKUP[rule.triggerId];
+                        const TriggerIcon = triggerMeta?.icon;
+                        return (
+                          <div
+                            key={rule.id}
+                            className="flex items-center gap-3 p-2 bg-muted/50 hover:bg-muted rounded-md border border-border cursor-pointer transition-colors w-full"
+                            title={rule.name}
+                          >
+                            <GitBranch className="w-4 h-4 text-orange-500 flex-shrink-0" />
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-medium truncate">{rule.name}</div>
+                              <div className="flex items-center gap-2 mt-1">
+                                <Badge className="text-[11px] px-2 py-0.5">
+                                  {rule.startType === 'player' ? 'Started by player' : 'Started by the game'}
+                                </Badge>
+                                {TriggerIcon && (
+                                  <Tooltip content={triggerMeta?.tooltip || triggerMeta?.label || 'Trigger'}>
+                                    <div className="w-7 h-7 rounded-md border border-border bg-background flex items-center justify-center text-muted-foreground hover:text-foreground">
+                                      <TriggerIcon className="w-4 h-4" />
+                                    </div>
+                                  </Tooltip>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+                <div className="flex justify-center py-2">
+                  <Tooltip content="Add Rule" side="bottom">
+                    <Button
+                      variant="default"
+                      size="sm"
+                      aria-label="Add Rule"
+                      className="text-xs px-3 py-1 h-7 shadow-sm bg-orange-500 hover:bg-orange-600 text-white border-orange-500"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        handleAddRule();
+                      }}
+                    >
+                      <Plus className="w-3 h-3 mr-1" />
+                      Rule
+                    </Button>
+                  </Tooltip>
+                </div>
+              </div>
+            )}
+
             {/* Items Layer - Add Item button only */}
             {isItemsLayer && (
               <div className="flex flex-col flex-1">
@@ -4491,7 +4719,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             )}
 
             {/* Tileset Brushes Window - render for all layers except NPC and Items */}
-            {!isNpcLayer && !isItemsLayer && (
+            {!isNpcLayer && !isItemsLayer && !isRulesLayer && (
             <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-0 m-0">
               {/* Layer Tabs (background / object only) */}
               {(() => {
@@ -4574,7 +4802,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             </div>
             )}
             {/* Brush Tools - stick to bottom so palette can fill remaining space */}
-            {!isNpcLayer && !isItemsLayer && (
+            {!isNpcLayer && !isItemsLayer && !isRulesLayer && (
             <div className="sticky bottom-0 z-10 bg-transparent py-2">
               <div className="text-xs text-muted-foreground"></div>
               <div className="w-full flex justify-center">
@@ -4882,7 +5110,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                             </Button>
 
                             <div className="flex items-center gap-2">
-                              <Tooltip content={layer.name}>
+                              <Tooltip content={layer.type === 'rules' ? 'When this happens → do this' : layer.name}>
                                 <span className="text-xs font-medium truncate flex items-center gap-2">
                                   {(() => {
                                     switch ((layer.type || '').toLowerCase()) {
@@ -4897,6 +5125,8 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                                         return <Box className="w-4 h-4" />;
                                       case 'items':
                                         return <Sword className="w-4 h-4" />;
+                                      case 'rules':
+                                        return <GitBranch className="w-4 h-4" />;
                                       case 'npc':
                                         return <Users className="w-4 h-4" />;
                                       case 'enemy':
@@ -6689,6 +6919,168 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rule Creation Dialog */}
+      <Dialog
+        open={showRuleDialog}
+        onOpenChange={(open) => {
+          if (!open) {
+            setShowRuleDialog(false);
+            setRuleDialogError(null);
+            setRuleDialogStep('start');
+          }
+        }}
+      >
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <GitBranch className="w-5 h-5 text-orange-500" />
+              Add Rule
+            </DialogTitle>
+            <DialogDescription>Give the rule a name and pick how it begins.</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {ruleDialogStep === 'start' ? (
+              <>
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Rule Name <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    value={ruleNameInput}
+                    onChange={(event) => setRuleNameInput(event.target.value)}
+                    placeholder="Rule name"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">How does this rule start?</label>
+                  <div className="grid sm:grid-cols-2 gap-2">
+                    {[
+                      { id: 'player', label: 'Started by player', hint: 'Triggered by player actions', icon: User },
+                      { id: 'game', label: 'Started by the game', hint: 'Triggered by world or system', icon: Shield }
+                    ].map((option) => {
+                      const IconComp = option.icon;
+                      const isActive = ruleStartType === option.id;
+                      return (
+                        <Tooltip
+                          key={option.id}
+                          content={
+                            <div className="flex flex-col gap-0.5">
+                              <span className="font-medium text-sm">{option.label}</span>
+                              <span className="text-xs text-muted-foreground">{option.hint}</span>
+                            </div>
+                          }
+                        >
+                          <button
+                            type="button"
+                            onClick={() => setRuleStartType(option.id as RuleStartType)}
+                            className={`flex items-center justify-center rounded-md border p-3 transition-all ${
+                              isActive
+                                ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 shadow-sm'
+                                : 'border-border hover:bg-muted/60'
+                            }`}
+                            aria-label={option.label}
+                          >
+                            <span className={`w-10 h-10 rounded-md flex items-center justify-center ${isActive ? 'bg-white dark:bg-orange-900/40' : 'bg-muted'}`}>
+                              <IconComp className="w-5 h-5" />
+                            </span>
+                            <span className="sr-only">{option.label}</span>
+                          </button>
+                        </Tooltip>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-medium">Pick a trigger</label>
+                    <span className="text-xs text-muted-foreground">
+                      {ruleStartType === 'player' ? 'Player driven events' : 'Game driven events'}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                    {availableRuleTriggers.map((option) => {
+                      const IconComp = option.icon;
+                      const isActive = ruleTriggerId === option.id;
+                      return (
+                        <Tooltip key={option.id} content={option.tooltip || option.label}>
+                          <button
+                            type="button"
+                            onClick={() => setRuleTriggerId(option.id)}
+                            className={`flex flex-col items-center gap-1 rounded-md border p-2 transition-colors ${
+                              isActive ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-200' : 'border-border hover:bg-muted/50'
+                            }`}
+                            aria-pressed={isActive}
+                            aria-label={option.label}
+                          >
+                            <span className="w-9 h-9 rounded-md flex items-center justify-center bg-background">
+                              <IconComp className="w-5 h-5" />
+                            </span>
+                            <span className="sr-only">{option.label}</span>
+                          </button>
+                        </Tooltip>
+                      );
+                    })}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="space-y-3">
+                <h4 className="text-sm font-semibold">What happens</h4>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  {RULE_ACTION_GROUPS.map((group) => (
+                    <div
+                      key={group.id}
+                      className="rounded-lg border border-border bg-muted/30 p-3 flex flex-col gap-2"
+                    >
+                      <div className="flex flex-col">
+                        <span className="text-sm font-semibold">{group.title}</span>
+                        {group.subtitle && <span className="text-xs text-muted-foreground">{group.subtitle}</span>}
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {group.actions.map((action) => (
+                          <button
+                            key={action.id}
+                            type="button"
+                            className="px-3 py-1.5 text-xs rounded-md border border-border bg-background hover:bg-muted/60 transition-colors"
+                            aria-label={action.label}
+                          >
+                            {action.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground flex items-center gap-3">
+              <span className="font-semibold text-foreground">Preview</span>
+              <span className="truncate">
+                When {RULE_TRIGGER_LOOKUP[ruleTriggerId]?.tooltip || RULE_TRIGGER_LOOKUP[ruleTriggerId]?.label || '...'} → // this will be filled later
+              </span>
+            </div>
+
+            {ruleDialogError && (
+              <div className="text-sm text-red-500">{ruleDialogError}</div>
+            )}
+          </div>
+
+          <DialogFooter className="justify-between">
+            <Button onClick={handleSaveRule}>Save Rule</Button>
+            <Button
+              variant="outline"
+              onClick={() => setRuleDialogStep('actions')}
+            >
+              Next &gt;
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

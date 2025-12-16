@@ -1256,10 +1256,18 @@ export class TileMapEditor {
   }
 
   private createDefaultLayers(): void {
-    // Create all 7 layers in the correct order (Items -> NPC -> Enemy -> Event -> Collision -> Object -> Background)
+    // Create all 8 layers in the correct order (Rules -> Items -> NPC -> Enemy -> Event -> Collision -> Object -> Background)
     this.tileLayers = [
       {
         id: 1,
+        name: 'Rules',
+        type: 'rules',
+        data: new Array(this.mapWidth * this.mapHeight).fill(0),
+        visible: true,
+        transparency: 1.0
+      },
+      {
+        id: 2,
         name: 'Items',
         type: 'items',
         data: new Array(this.mapWidth * this.mapHeight).fill(0),
@@ -1267,7 +1275,7 @@ export class TileMapEditor {
         transparency: 1.0
       },
       {
-        id: 2,
+        id: 3,
         name: 'NPC Layer',
         type: 'npc',
         data: new Array(this.mapWidth * this.mapHeight).fill(0),
@@ -1275,7 +1283,7 @@ export class TileMapEditor {
         transparency: 1.0
       },
       {
-        id: 3,
+        id: 4,
         name: 'Enemy Layer',
         type: 'enemy',
         data: new Array(this.mapWidth * this.mapHeight).fill(0),
@@ -1283,7 +1291,7 @@ export class TileMapEditor {
         transparency: 1.0
       },
       {
-        id: 4,
+        id: 5,
         name: 'Event Layer',
         type: 'event',
         data: new Array(this.mapWidth * this.mapHeight).fill(0),
@@ -1291,7 +1299,7 @@ export class TileMapEditor {
         transparency: 1.0
       },
       {
-        id: 5,
+        id: 6,
         name: 'Collision Layer',
         type: 'collision',
         data: new Array(this.mapWidth * this.mapHeight).fill(0),
@@ -1299,7 +1307,7 @@ export class TileMapEditor {
         transparency: 1.0
       },
       {
-        id: 6,
+        id: 7,
         name: 'Object Layer',
         type: 'object',
         data: new Array(this.mapWidth * this.mapHeight).fill(0),
@@ -1307,7 +1315,7 @@ export class TileMapEditor {
         transparency: 1.0
       },
       {
-        id: 7,
+        id: 8,
         name: 'Background Layer',
         type: 'background',
         data: new Array(this.mapWidth * this.mapHeight).fill(0),
@@ -1317,8 +1325,8 @@ export class TileMapEditor {
     ];
     
     // Set the background layer as active by default
-    this.activeLayerId = 7;
-    this.nextLayerId = 8;
+    this.activeLayerId = 8;
+    this.nextLayerId = 9;
     this.sortLayersByPriority();
     // Initialize layer tabs for background and object with one tab each
     try {
@@ -4497,6 +4505,7 @@ export class TileMapEditor {
 
   private sortLayersByPriority(): void {
     const typePriority: Record<string, number> = {
+      'rules': 0,
       'items': 1,
       'npc': 2,
       'enemy': 3,
@@ -7683,6 +7692,29 @@ export class TileMapEditor {
           }
         } catch (err) {
           console.warn('Failed to update current tileset after loading layers:', err);
+        }
+
+        // Backward compatibility: always keep a fixed "Rules" layer available in the UI.
+        // This layer is currently UI-focused and does not participate in Flare layer export.
+        if (!this.tileLayers.some(l => l.type === 'rules')) {
+          const maxId = this.tileLayers.reduce((max, l) => Math.max(max, l.id), 0);
+          const rulesLayer: TileLayer = {
+            id: maxId + 1,
+            name: 'Rules',
+            type: 'rules',
+            data: new Array(this.mapWidth * this.mapHeight).fill(0),
+            visible: true,
+            transparency: 1.0
+          };
+
+          const itemsIndex = this.tileLayers.findIndex(l => l.type === 'items');
+          if (itemsIndex >= 0) {
+            this.tileLayers.splice(itemsIndex, 0, rulesLayer);
+          } else {
+            this.tileLayers.unshift(rulesLayer);
+          }
+
+          this.nextLayerId = Math.max(this.nextLayerId, rulesLayer.id + 1);
         }
       } else {
         console.log('No layers found in project data, creating default layers');

@@ -5,7 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import Tooltip from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Upload, Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Blend, MapPin, MapPinOff, Save, Scan, Link2, Scissors, Trash2, Check, HelpCircle, Folder, Shield, Plus, Image, Grid, Box, Users, User, Locate, Clock, Menu, ChevronLeft, ChevronRight, GripVertical, MessageSquare, ChevronDown, ChevronUp, ArrowLeft, Gift, Coins, Sparkles, Heart, Zap, Volume2, Film, Tag, Package, AlignLeft, Sword, ChevronsUpDown, AlertTriangle, Book, GitBranch, Apple, Skull, Swords, RefreshCw, Repeat, Dices, Timer, UserPlus } from 'lucide-react';
+import { Upload, Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Blend, MapPin, MapPinOff, Save, Scan, Link2, Scissors, Trash2, Check, HelpCircle, Folder, Shield, Plus, Image, Grid, Box, Users, User, Locate, Clock, Menu, ChevronLeft, ChevronRight, GripVertical, MessageSquare, ChevronDown, ChevronUp, ArrowLeft, Gift, Coins, Sparkles, Heart, Zap, ZapOff, Volume2, Film, Tag, Package, AlignLeft, Sword, ChevronsUpDown, AlertTriangle, Book, GitBranch, Apple, Skull, Swords, RefreshCw, Repeat, Dices, Timer, UserPlus, Flag, CheckCircle, ArrowRight, Puzzle } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { TileMapEditor } from './editor/TileMapEditor';
 import type { EditorProjectData } from './editor/TileMapEditor';
 import { TileLayer, MapObject, DialogueLine, DialogueRequirement, DialogueReward, DialogueWorldEffect, DialogueTree, FlareNPC } from './types';
@@ -204,6 +205,100 @@ function validateValue(key: string, trimmed: string, spec: PropertySpec): string
 const ENEMY_PROPERTY_SPECS: Record<string, PropertySpec> = {};
 const NPC_PROPERTY_SPECS: Record<string, PropertySpec> = {};
 
+type NpcRoleKey = 'isTalker' | 'isVendor' | 'isQuestGiver';
+type EnemyRoleKey = 'isMelee' | 'isRanged' | 'isCaster' | 'isSummoner' | 'isBoss' | 'isPassive' | 'isStationary';
+type ActorRoleKey = NpcRoleKey | EnemyRoleKey;
+
+type ActorDialogState = {
+  type: 'npc' | 'enemy';
+  name: string;
+  tilesetPath: string;
+  portraitPath: string;
+} & Record<ActorRoleKey, boolean>;
+
+const NPC_ROLE_OPTIONS: Array<{ key: NpcRoleKey; label: string; badgeClass: string; description: string }> = [
+  { key: 'isTalker', label: 'Talker', badgeClass: 'bg-blue-500/20 text-blue-600 dark:text-blue-400 border-blue-500/30', description: 'Has dialogue interactions' },
+  { key: 'isVendor', label: 'Vendor', badgeClass: 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30', description: 'Sells items to the player' },
+  { key: 'isQuestGiver', label: 'Quest', badgeClass: 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30', description: 'Provides or tracks quests' }
+];
+
+const ENEMY_ROLE_OPTIONS: Array<{ key: EnemyRoleKey; label: string; badgeClass: string; description: string }> = [
+  { key: 'isMelee', label: 'Melee', badgeClass: 'bg-red-500/20 text-red-600 dark:text-red-400 border-red-500/40', description: 'Closes distance quickly and deals damage in close combat.' },
+  { key: 'isRanged', label: 'Ranged', badgeClass: 'bg-sky-500/20 text-sky-600 dark:text-sky-400 border-sky-500/40', description: 'Attacks from a distance and avoids close combat.' },
+  { key: 'isCaster', label: 'Caster', badgeClass: 'bg-purple-500/20 text-purple-600 dark:text-purple-400 border-purple-500/40', description: 'Uses spells with high impact but low durability.' },
+  { key: 'isSummoner', label: 'Summoner', badgeClass: 'bg-teal-500/20 text-teal-600 dark:text-teal-400 border-teal-500/40', description: 'Relies on summoned allies rather than direct damage.' },
+  { key: 'isBoss', label: 'Boss', badgeClass: 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/40', description: 'Powerful enemy with high durability and multiple attack patterns.' },
+  { key: 'isPassive', label: 'Passive / Neutral', badgeClass: 'bg-lime-500/20 text-lime-600 dark:text-lime-400 border-lime-500/40', description: 'Does not attack unless provoked or triggered.' },
+  { key: 'isStationary', label: 'Stationary', badgeClass: 'bg-slate-500/20 text-slate-600 dark:text-slate-400 border-slate-500/40', description: 'Immobile enemy that controls an area with ranged attacks.' }
+];
+
+const ENEMY_ROLE_META_LOOKUP: Record<EnemyRoleKey, { label: string; badgeClass: string; description: string }> =
+  ENEMY_ROLE_OPTIONS.reduce((acc, option) => {
+    acc[option.key] = option;
+    return acc;
+  }, {} as Record<EnemyRoleKey, { label: string; badgeClass: string; description: string }>);
+
+const ENEMY_FIELD_WEIGHTS: Record<string, { primary: string[]; secondary: string[]; rare: string[] }> = {
+  melee: {
+    primary: ['hp', 'poise', 'dmg_melee_min', 'dmg_melee_max', 'accuracy', 'speed', 'chance_pursue', 'melee_range'],
+    secondary: ['crit', 'avoidance', 'cooldown'],
+    rare: ['dmg_ranged_min', 'dmg_ranged_max', 'dmg_ment_min', 'dmg_ment_max', 'threat_range'],
+  },
+  ranged: {
+    primary: ['hp', 'dmg_ranged_min', 'dmg_ranged_max', 'accuracy', 'threat_range', 'cooldown', 'speed'],
+    secondary: ['avoidance', 'crit', 'melee_range'],
+    rare: ['poise', 'dmg_melee_min', 'dmg_melee_max'],
+  },
+  caster: {
+    primary: ['hp', 'dmg_ment_min', 'dmg_ment_max', 'cooldown', 'accuracy', 'threat_range'],
+    secondary: ['avoidance', 'speed', 'crit'],
+    rare: ['poise', 'dmg_melee_min', 'dmg_melee_max'],
+  },
+  summoner: {
+    primary: ['hp', 'cooldown', 'threat_range', 'speed'],
+    secondary: ['dmg_ment_min', 'dmg_ment_max', 'avoidance'],
+    rare: ['dmg_melee_min', 'dmg_melee_max', 'crit', 'poise'],
+  },
+  boss: {
+    primary: ['hp', 'poise', 'accuracy', 'cooldown', 'speed'],
+    secondary: [
+      'dmg_melee_min', 'dmg_melee_max',
+      'dmg_ranged_min', 'dmg_ranged_max',
+      'dmg_ment_min', 'dmg_ment_max',
+      'crit', 'avoidance', 'threat_range'
+    ],
+    rare: [],
+  },
+  passive: {
+    primary: ['hp', 'avoidance', 'speed'],
+    secondary: ['threat_range', 'cooldown'],
+    rare: [
+      'dmg_melee_min', 'dmg_melee_max',
+      'dmg_ranged_min', 'dmg_ranged_max',
+      'dmg_ment_min', 'dmg_ment_max',
+      'crit', 'poise'
+    ],
+  },
+  stationary: {
+    primary: ['hp', 'dmg_ranged_min', 'dmg_ranged_max', 'dmg_ment_min', 'dmg_ment_max', 'accuracy', 'threat_range', 'cooldown'],
+    secondary: ['poise'],
+    rare: ['speed', 'dmg_melee_min', 'dmg_melee_max'],
+  },
+};
+
+const EMPTY_ACTOR_ROLES: Record<ActorRoleKey, boolean> = {
+  isTalker: false,
+  isVendor: false,
+  isQuestGiver: false,
+  isMelee: false,
+  isRanged: false,
+  isCaster: false,
+  isSummoner: false,
+  isBoss: false,
+  isPassive: false,
+  isStationary: false
+};
+
 type RuleStartType = 'player' | 'game';
 
 interface RuleTriggerOption {
@@ -239,48 +334,53 @@ const RULE_TRIGGER_LOOKUP: Record<string, RuleTriggerOption> = ALL_RULE_TRIGGER_
   return acc;
 }, {} as Record<string, RuleTriggerOption>);
 
+type IconComponent = LucideIcon;
+
 interface RuleActionGroup {
   id: string;
   title: string;
-  subtitle?: string;
-  actions: Array<{ id: string; label: string }>;
+  tooltip?: string;
+  icon: IconComponent;
+  actions: Array<{ id: string; label: string; icon: IconComponent }>;
 }
 
 const RULE_ACTION_GROUPS: RuleActionGroup[] = [
   {
     id: 'items',
-    title: 'Give or take items',
-    subtitle: 'Modify player inventory',
+    title: 'Give or Take Items',
+    tooltip: 'Give or Take Items',
+    icon: Gift,
     actions: [
-      { id: 'give-loot', label: 'Give loot' },
-      { id: 'remove-item', label: 'Remove item' }
+      { id: 'give-item', label: 'Give Item', icon: Gift },
+      { id: 'remove-item', label: 'Remove Item', icon: Trash2 }
     ]
   },
   {
     id: 'flags',
     title: 'Change a game flag',
-    subtitle: 'Toggle world state',
+    tooltip: 'Conditions',
+    icon: Flag,
     actions: [
-      { id: 'set-flag', label: 'Set flag' },
-      { id: 'clear-flag', label: 'Clear flag' }
+      { id: 'set-flag', label: 'Set Condition', icon: Zap },
+      { id: 'clear-flag', label: 'Unset Condition', icon: ZapOff }
     ]
   },
   {
     id: 'quests',
     title: 'Advance a quest',
-    subtitle: 'Progress quest state',
+    tooltip: 'Quest progression',
+    icon: CheckCircle,
     actions: [
-      { id: 'complete-quest', label: 'Complete quest' },
-      { id: 'next-step', label: 'Next step' }
+      { id: 'complete-quest', label: 'Complete Quest', icon: Check },
+      { id: 'next-step', label: 'Next Step', icon: ArrowRight }
     ]
   },
   {
     id: 'advanced',
-    title: '(Advanced) Run advanced logic',
-    subtitle: 'Custom or scripted logic',
-    actions: [
-      { id: 'advanced-logic', label: 'Run advanced logic' }
-    ]
+    title: 'Advanced',
+    tooltip: 'Custom Action',
+    icon: Puzzle,
+    actions: []
   }
 ];
 
@@ -1073,15 +1173,8 @@ function App() {
   const [objectValidationErrors, setObjectValidationErrors] = useState<string[]>([]);
   const [mapObjects, setMapObjects] = useState<MapObject[]>([]);
   const [showDeleteNpcConfirm, setShowDeleteNpcConfirm] = useState(false);
-  const [actorDialogState, setActorDialogState] = useState<{
-    type: 'npc' | 'enemy';
-    name: string;
-    tilesetPath: string;
-    portraitPath: string;
-    isTalker: boolean;
-    isVendor: boolean;
-    isQuestGiver: boolean;
-  } | null>(null);
+  const [showDeleteEnemyConfirm, setShowDeleteEnemyConfirm] = useState(false);
+  const [actorDialogState, setActorDialogState] = useState<ActorDialogState | null>(null);
   const [actorDialogError, setActorDialogError] = useState<string | null>(null);
   
   // Dialogue Tree state
@@ -1104,12 +1197,56 @@ function App() {
     kind: 'same-role' | 'other-role';
   } | null>(null);
 
+  const getEnemyFieldCounts = useCallback((fieldKey: string): { primary: number; secondary: number; rare: number } => {
+    if (!editingObject || editingObject.type !== 'enemy') return { primary: 0, secondary: 0, rare: 0 };
+    const props = editingObject.properties || {};
+    let primary = 0;
+    let secondary = 0;
+    let rare = 0;
+    for (const [roleKey, weights] of Object.entries(ENEMY_FIELD_WEIGHTS)) {
+      if (props[roleKey] === 'true') {
+        if (weights.primary.includes(fieldKey)) primary += 1;
+        if (weights.secondary.includes(fieldKey)) secondary += 1;
+        if (weights.rare.includes(fieldKey)) rare += 1;
+      }
+    }
+    return { primary, secondary, rare };
+  }, [editingObject]);
+
+  const renderEnemyFieldWeight = useCallback((fieldKey: string) => {
+    const { primary, secondary, rare } = getEnemyFieldCounts(fieldKey);
+    if (primary + secondary + rare === 0) return null;
+    return (
+      <span className="flex items-center gap-0.5 text-amber-500 drop-shadow">
+        {Array.from({ length: primary }).map((_, idx) => (
+          <span
+            key={`full-${fieldKey}-${idx}`}
+            className="w-1.5 h-1.5 rounded-full bg-amber-300 border border-amber-500 shadow-[0_0_8px_rgba(251,191,36,0.95)]"
+          />
+        ))}
+        {Array.from({ length: secondary }).map((_, idx) => (
+          <span
+            key={`empty-${fieldKey}-${idx}`}
+            className="w-1.5 h-1.5 rounded-full border border-amber-400 bg-transparent"
+          />
+        ))}
+        {Array.from({ length: rare }).map((_, idx) => (
+          <span
+            key={`half-${fieldKey}-${idx}`}
+            className="w-1.5 h-1.5 rounded-full border border-amber-400 bg-[linear-gradient(90deg,rgba(251,191,36,0.85)_50%,transparent_50%)]"
+          />
+        ))}
+      </span>
+    );
+  }, [getEnemyFieldCounts]);
+
   // Rules list for the Rules layer (UI-only for now; persistence will be added later).
   const [rulesList, setRulesList] = useState<Array<{ id: string; name: string; startType: RuleStartType; triggerId: string }>>([]);
   const [showRuleDialog, setShowRuleDialog] = useState(false);
   const [ruleNameInput, setRuleNameInput] = useState('');
-  const [ruleStartType, setRuleStartType] = useState<RuleStartType>('player');
-  const [ruleTriggerId, setRuleTriggerId] = useState<string>(PLAYER_TRIGGER_OPTIONS[0]?.id ?? '');
+  const [ruleStartType, setRuleStartType] = useState<RuleStartType | null>(null);
+  const [ruleTriggerId, setRuleTriggerId] = useState<string>('');
+  const [ruleActionSelection, setRuleActionSelection] = useState<{ groupId: string; actionId: string } | null>(null);
   const [ruleDialogError, setRuleDialogError] = useState<string | null>(null);
   const [ruleDialogStep, setRuleDialogStep] = useState<'start' | 'actions'>('start');
   // Items list for display
@@ -1172,6 +1309,13 @@ function App() {
   }, [currentProjectPath]);
 
   useEffect(() => {
+    if (!ruleStartType) {
+      if (ruleTriggerId) {
+        setRuleTriggerId('');
+      }
+      return;
+    }
+
     const availableOptions = ruleStartType === 'player' ? PLAYER_TRIGGER_OPTIONS : GAME_TRIGGER_OPTIONS;
     if (!availableOptions.some(option => option.id === ruleTriggerId)) {
       setRuleTriggerId(availableOptions[0]?.id ?? '');
@@ -2055,9 +2199,10 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       name: '',
       tilesetPath: '',
       portraitPath: '',
-      isTalker: true,
-      isVendor: false,
-      isQuestGiver: false
+      ...EMPTY_ACTOR_ROLES,
+      ...(type === 'npc'
+        ? { isTalker: true }
+        : { isMelee: true })
     });
     setActorDialogError(null);
   }, []);
@@ -2070,7 +2215,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     setActorDialogError(null);
   }, []);
 
-  const handleActorRoleToggle = useCallback((role: 'isTalker' | 'isVendor' | 'isQuestGiver') => {
+  const handleActorRoleToggle = useCallback((role: ActorRoleKey) => {
     setActorDialogState((prev) => {
       if (!prev) return prev;
       return { ...prev, [role]: !prev[role] };
@@ -2139,8 +2284,9 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
 
   const handleAddRule = useCallback(() => {
     setRuleDialogError(null);
-    setRuleStartType('player');
-    setRuleTriggerId(PLAYER_TRIGGER_OPTIONS[0]?.id ?? '');
+    setRuleStartType(null);
+    setRuleTriggerId('');
+    setRuleActionSelection(null);
     setRuleNameInput(`Rule ${rulesList.length + 1}`);
     setRuleDialogStep('start');
     setShowRuleDialog(true);
@@ -2148,6 +2294,11 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
 
   const handleSaveRule = useCallback(() => {
     const trimmedName = ruleNameInput.trim();
+    if (!ruleStartType) {
+      setRuleDialogError('Select how this rule starts.');
+      return;
+    }
+
     const availableOptions = ruleStartType === 'player' ? PLAYER_TRIGGER_OPTIONS : GAME_TRIGGER_OPTIONS;
     if (!trimmedName) {
       setRuleDialogError('Rule name is required.');
@@ -2170,8 +2321,9 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     setShowRuleDialog(false);
     setRuleDialogError(null);
     setRuleNameInput('');
-    setRuleStartType('player');
-    setRuleTriggerId(PLAYER_TRIGGER_OPTIONS[0]?.id ?? '');
+    setRuleStartType(null);
+    setRuleTriggerId('');
+    setRuleActionSelection(null);
   }, [ruleNameInput, ruleStartType, ruleTriggerId]);
 
   const handleItemFieldChange = useCallback((field: 'name' | 'role' | 'resourceSubtype', value: string) => {
@@ -2481,7 +2633,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       return;
     }
 
-    // Zorunlu alanları kontrol et
+    // Required name field for both NPCs and enemies
     if (!actorDialogState.name.trim()) {
       setActorDialogError('Name is required.');
       return;
@@ -2490,14 +2642,24 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     const name = actorDialogState.name.trim();
     const tilesetPath = actorDialogState.tilesetPath.trim();
     const portraitPath = actorDialogState.portraitPath.trim();
-    const { isTalker, isVendor, isQuestGiver } = actorDialogState;
+    const {
+      isTalker,
+      isVendor,
+      isQuestGiver,
+      isMelee,
+      isRanged,
+      isCaster,
+      isSummoner,
+      isBoss,
+      isPassive,
+      isStationary
+    } = actorDialogState;
 
-    // Determine primary role for NPC file creation
-    const role = isVendor ? 'vendor' : isQuestGiver ? 'quest' : isTalker ? 'talker' : 'static';
-
-    // Proje klasöründe NPC dosyası oluştur (eğer electronAPI varsa)
     let npcFilename: string | undefined;
-    if (currentProjectPath && window.electronAPI?.createNpcFile) {
+    if (actorDialogState.type === 'npc' && currentProjectPath && window.electronAPI?.createNpcFile) {
+      // Determine primary role for NPC file creation
+      const role = isVendor ? 'vendor' : isQuestGiver ? 'quest' : isTalker ? 'talker' : 'static';
+      // Create NPC file inside the project folder when available
       try {
         const result = await window.electronAPI.createNpcFile(currentProjectPath, {
           name,
@@ -2517,26 +2679,49 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       }
     }
 
-    // Rol bazlı properties oluştur
+    // Role-based properties for either NPC or enemy
     const roleProperties: Record<string, string> = {};
-    if (isTalker) {
-      roleProperties.talker = 'true';
+    if (actorDialogState.type === 'npc') {
+      if (isTalker) {
+        roleProperties.talker = 'true';
+      }
+      if (isVendor) {
+        roleProperties.vendor = 'true';
+      }
+      if (isQuestGiver) {
+        roleProperties.questGiver = 'true';
+      }
+      // if none are selected, it's a static NPC (no properties)
+    } else {
+      if (isMelee) {
+        roleProperties.melee = 'true';
+      }
+      if (isRanged) {
+        roleProperties.ranged = 'true';
+      }
+      if (isCaster) {
+        roleProperties.caster = 'true';
+      }
+      if (isSummoner) {
+        roleProperties.summoner = 'true';
+      }
+      if (isBoss) {
+        roleProperties.boss = 'true';
+      }
+      if (isPassive) {
+        roleProperties.passive = 'true';
+      }
+      if (isStationary) {
+        roleProperties.stationary = 'true';
+      }
     }
-    if (isVendor) {
-      roleProperties.vendor = 'true';
-    }
-    if (isQuestGiver) {
-      roleProperties.questGiver = 'true';
-    }
-    // if none are selected, it's a static NPC (no properties)
 
-    // NPC'yi harita dışında (-1, -1) konumunda oluştur
-    // Kullanıcı isterse sonra haritaya yerleştirebilir
+    // Create the actor off-map (-1, -1) so it can be placed later
     const unplacedX = -1;
     const unplacedY = -1;
 
-    // NPC'yi listeye ekle ama haritada görünmez (database olarak)
-    // Not: addMapObject 'enemy' | 'event' kabul ediyor, sonra type'ı güncelliyoruz
+    // Keep the actor in the list but not on the map yet
+    // Note: addMapObject 'enemy' | 'event' is allowed; we update type afterwards
     const newObject = editor.addMapObject('enemy', unplacedX, unplacedY, 1, 1);
     editor.updateMapObject(newObject.id, {
       name,
@@ -2566,6 +2751,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     setEditingObject(null);
     setObjectValidationErrors([]);
     setShowDeleteNpcConfirm(false);
+    setShowDeleteEnemyConfirm(false);
   }, []);
 
   const handleObjectDialogSave = useCallback(async () => {
@@ -4262,7 +4448,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
   const isEnemyLayer = activeLayer?.type === 'enemy';
   const isItemsLayer = activeLayer?.type === 'items';
   const isRulesLayer = activeLayer?.type === 'rules';
-  const availableRuleTriggers = ruleStartType === 'player' ? PLAYER_TRIGGER_OPTIONS : GAME_TRIGGER_OPTIONS;
+  const availableRuleTriggers = ruleStartType ? (ruleStartType === 'player' ? PLAYER_TRIGGER_OPTIONS : GAME_TRIGGER_OPTIONS) : [];
 
   const actorEntries = useMemo(() => {
     if (isNpcLayer) {
@@ -4426,7 +4612,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                   <>
                     {/* Actor entries shown only for NPC/Enemy layers (header removed per UX request) */}
                     {(isNpcLayer || isEnemyLayer) && (
-                      <div className="flex-1 min-h-0">
+                      <div className="flex-1 min-h-0 flex flex-col gap-3">
                         {actorEntries.length === 0 ? (
                           <div className="h-full border border-dashed border-border rounded-md flex items-center justify-center text-sm text-muted-foreground px-4 text-center">
                             {isNpcLayer ? 'No NPCs added yet. Use the Add control to create your first NPC.' : 'No enemies added yet. Use the Add control to place an enemy.'}
@@ -4434,15 +4620,24 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                         ) : (
                           <div className="space-y-2 overflow-y-auto pr-1">
                             {actorEntries.map((actor) => {
-                              // NPC rol tag'lerini hesapla
+                              // NPC role tags
                               const isTalker = actor.properties?.talker === 'true' || actor.properties?.talker === '1';
                               const isVendor = actor.properties?.vendor === 'true' || actor.properties?.vendor === '1';
                               const isQuestGiver = actor.properties?.questGiver === 'true' || actor.properties?.questGiver === '1';
-                              // Static = hiçbir rol atanmamış
-                              const isStatic = !isTalker && !isVendor && !isQuestGiver;
+                              const hasNpcRole = isTalker || isVendor || isQuestGiver;
+                              // Enemy role tags
+                              const enemyRoles = {
+                                melee: actor.properties?.melee === 'true' || actor.properties?.melee === '1',
+                                ranged: actor.properties?.ranged === 'true' || actor.properties?.ranged === '1',
+                                caster: actor.properties?.caster === 'true' || actor.properties?.caster === '1',
+                                summoner: actor.properties?.summoner === 'true' || actor.properties?.summoner === '1',
+                                boss: actor.properties?.boss === 'true' || actor.properties?.boss === '1',
+                                passive: actor.properties?.passive === 'true' || actor.properties?.passive === '1',
+                                stationary: actor.properties?.stationary === 'true' || actor.properties?.stationary === '1',
+                              };
+                              const hasEnemyRole = Object.values(enemyRoles).some(Boolean);
                               // Portrait path
                               const portraitPath = actor.properties?.portraitPath;
-                              // Haritada yerleştirilmiş mi?
                               const isPlacedOnMap = actor.x >= 0 && actor.y >= 0;
                               
                               return (
@@ -4468,7 +4663,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                                           alt={actor.name || 'NPC portrait'}
                                           className={`w-full h-full object-cover ${!isPlacedOnMap ? 'opacity-50' : ''}`}
                                           onError={(e) => {
-                                            // Resim yüklenemezse soru işareti göster
+                                            // If portrait cannot load, show the fallback icon
                                             e.currentTarget.style.display = 'none';
                                             e.currentTarget.nextElementSibling?.classList.remove('hidden');
                                           }}
@@ -4476,13 +4671,13 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                                       ) : null}
                                       <HelpCircle className={`w-5 h-5 text-muted-foreground ${portraitPath ? 'hidden' : ''} ${!isPlacedOnMap ? 'opacity-50' : ''}`} />
                                     </div>
-                                    {/* NPC bilgileri */}
+                                    {/* Actor summary */}
                                     <div className="space-y-1 text-sm flex-1 min-w-0">
                                     <div className={`font-medium ${isPlacedOnMap ? 'text-foreground' : 'text-muted-foreground'}`} title={actor.name || `${actor.type === 'npc' ? 'NPC' : 'Enemy'} #${actor.id}`}>
                                       <span className={leftCollapsed ? 'sr-only' : ''}>{actor.name || `${actor.type === 'npc' ? 'NPC' : 'Enemy'} #${actor.id}`}</span>
                                       {!actor.name && leftCollapsed && <span className="text-xs text-muted-foreground">#{actor.id}</span>}
                                     </div>
-                                    {/* NPC Rol Tag'leri */}
+                                    {/* NPC Role Tags */}
                                     {isNpcLayer && !leftCollapsed && (
                                       <div className="flex flex-wrap gap-1 mt-1">
                                         {isTalker && (
@@ -4500,17 +4695,61 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                                             Quest
                                           </span>
                                         )}
-                                        {isStatic && (
+                                        {!hasNpcRole && (
                                           <span className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-gray-500/20 text-gray-600 dark:text-gray-400 border border-gray-500/30">
                                             Static
                                           </span>
                                         )}
                                       </div>
                                     )}
+                                    {isEnemyLayer && !leftCollapsed && (
+                                      <div className="flex flex-wrap gap-1 mt-1">
+                                        {enemyRoles.melee && (
+                                          <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium border ${ENEMY_ROLE_META_LOOKUP.isMelee.badgeClass}`}>
+                                            {ENEMY_ROLE_META_LOOKUP.isMelee.label}
+                                          </span>
+                                        )}
+                                        {enemyRoles.ranged && (
+                                          <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium border ${ENEMY_ROLE_META_LOOKUP.isRanged.badgeClass}`}>
+                                            {ENEMY_ROLE_META_LOOKUP.isRanged.label}
+                                          </span>
+                                        )}
+                                        {enemyRoles.caster && (
+                                          <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium border ${ENEMY_ROLE_META_LOOKUP.isCaster.badgeClass}`}>
+                                            {ENEMY_ROLE_META_LOOKUP.isCaster.label}
+                                          </span>
+                                        )}
+                                        {enemyRoles.summoner && (
+                                          <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium border ${ENEMY_ROLE_META_LOOKUP.isSummoner.badgeClass}`}>
+                                            {ENEMY_ROLE_META_LOOKUP.isSummoner.label}
+                                          </span>
+                                        )}
+                                        {enemyRoles.boss && (
+                                          <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium border ${ENEMY_ROLE_META_LOOKUP.isBoss.badgeClass}`}>
+                                            {ENEMY_ROLE_META_LOOKUP.isBoss.label}
+                                          </span>
+                                        )}
+                                        {enemyRoles.passive && (
+                                          <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium border ${ENEMY_ROLE_META_LOOKUP.isPassive.badgeClass}`}>
+                                            {ENEMY_ROLE_META_LOOKUP.isPassive.label}
+                                          </span>
+                                        )}
+                                        {enemyRoles.stationary && (
+                                          <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium border ${ENEMY_ROLE_META_LOOKUP.isStationary.badgeClass}`}>
+                                            {ENEMY_ROLE_META_LOOKUP.isStationary.label}
+                                          </span>
+                                        )}
+                                        {!hasEnemyRole && (
+                                          <span className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-gray-500/20 text-gray-600 dark:text-gray-400 border border-gray-500/30">
+                                            Unassigned
+                                          </span>
+                                        )}
+                                      </div>
+                                    )}
                                   </div>
-                                  {/* Drag handle for NPC - centered vertically */}
-                                  {isNpcLayer && (
-                                    <Tooltip content="Drag and drop to place NPC on map">
+                                  {/* Drag handle for NPC/Enemy - centered vertically */}
+                                  {(isNpcLayer || isEnemyLayer) && (
+                                    <Tooltip content={isNpcLayer ? 'Drag and drop to place NPC on map' : 'Drag and drop to place enemy on map'}>
                                       <div
                                         draggable
                                         onDragStart={(e) => handleNpcDragStart(e, actor.id)}
@@ -4526,27 +4765,48 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                               </div>
                             );
                             })}
+
                           </div>
                         )}
                       </div>
                     )}
-                    {/* Add NPC/Enemy button for actor layers - placed below the list, above layers */}
-                    {(isNpcLayer || isEnemyLayer) && (
+                    {/* Add actor buttons placed below the list */}
+                    {isNpcLayer && (
                       <div className="flex justify-center py-2">
-                        <Tooltip content={isNpcLayer ? 'Add NPC' : 'Add Enemy'} side="bottom">
+                        <Tooltip content="Add NPC" side="bottom">
                           <Button
                             variant="default"
                             size="sm"
-                            aria-label={isNpcLayer ? 'Add NPC' : 'Add Enemy'}
+                            aria-label="Add NPC"
                             className="text-xs px-3 py-1 h-7 shadow-sm bg-orange-500 hover:bg-orange-600 text-white border-orange-500"
                             onClick={(e) => {
                               e.stopPropagation();
                               e.preventDefault();
-                              handleOpenActorDialog(isNpcLayer ? 'npc' : 'enemy');
+                              handleOpenActorDialog('npc');
                             }}
                           >
                             <Plus className="w-3 h-3 mr-1" />
-                            {isNpcLayer ? 'Add NPC' : 'Add Enemy'}
+                            NPC
+                          </Button>
+                        </Tooltip>
+                      </div>
+                    )}
+                    {isEnemyLayer && (
+                      <div className="flex justify-center py-2">
+                        <Tooltip content="Add Enemy" side="bottom">
+                          <Button
+                            variant="default"
+                            size="sm"
+                            aria-label="Add Enemy"
+                            className="text-xs px-3 py-1 h-7 shadow-sm bg-orange-500 hover:bg-orange-600 text-white border-orange-500"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              handleOpenActorDialog('enemy');
+                            }}
+                          >
+                            <Plus className="w-3 h-3 mr-1" />
+                            Enemy
                           </Button>
                         </Tooltip>
                       </div>
@@ -4718,8 +4978,8 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               </div>
             )}
 
-            {/* Tileset Brushes Window - render for all layers except NPC and Items */}
-            {!isNpcLayer && !isItemsLayer && !isRulesLayer && (
+            {/* Tileset Brushes Window - render for all layers except NPC, Enemy, and Items */}
+            {!isNpcLayer && !isEnemyLayer && !isItemsLayer && !isRulesLayer && (
             <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-0 m-0">
               {/* Layer Tabs (background / object only) */}
               {(() => {
@@ -4802,7 +5062,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             </div>
             )}
             {/* Brush Tools - stick to bottom so palette can fill remaining space */}
-            {!isNpcLayer && !isItemsLayer && !isRulesLayer && (
+            {!isNpcLayer && !isEnemyLayer && !isItemsLayer && !isRulesLayer && (
             <div className="sticky bottom-0 z-10 bg-transparent py-2">
               <div className="text-xs text-muted-foreground"></div>
               <div className="w-full flex justify-center">
@@ -4843,9 +5103,9 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                       const isNpc = activeLayer?.type === 'npc';
                       const isEnemy = activeLayer?.type === 'enemy';
                       const isEventLayer = activeLayer?.type === 'event';
-                      const isActorLayer = isNpc || isEnemy || isEventLayer;
-                      const tooltip = isActorLayer ? `Add ${isEventLayer ? 'Event' : isNpc ? 'NPC' : 'Enemy'}` : 'Import a PNG tileset or brush for the active layer tab';
-                      if (isNpc || isEnemy || isEventLayer) {
+                      const isActorLayer = isNpc || isEventLayer; // enemy handled separately below the list
+                      const tooltip = isActorLayer ? `Add ${isEventLayer ? 'Event' : 'NPC'}` : 'Import a PNG tileset or brush for the active layer tab';
+                      if (isNpc || isEventLayer) {
                         return (
                           <Tooltip content={tooltip} side="bottom">
                             <Button
@@ -4856,8 +5116,8 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                               onClick={(e) => {
                                 e.stopPropagation();
                                 e.preventDefault();
-                                if (isNpc || isEnemy) {
-                                  handleOpenActorDialog(isNpc ? 'npc' : 'enemy');
+                                if (isNpc) {
+                                  handleOpenActorDialog('npc');
                                 } else {
                                   toast({ title: 'Not implemented', description: 'Create Event will be implemented later.' });
                                 }
@@ -5197,7 +5457,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                         <>
                           <div className="relative">
                             <button
-                              className="w-full text-left p-2 hover:bg-gray-100 dark:hover:bg-neutral-800 text-xs flex items-center justify-between gap-2"
+                              className="w-full text-left p-2 hover:bg-gray-100 dark:hover:bg-neutral-800 text-xs flex items-center gap-2 gap-2"
                               onClick={() => setMapsSubOpen((s) => !s)}
                             >
                               <span className="flex items-center gap-2"><Folder className="w-3 h-3" /><span>Open map</span></span>
@@ -5398,7 +5658,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                       className="w-full"
                     />
                   </div>
-                  <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
+                  <div className="flex items-center gap-2 rounded-md border border-border px-3 py-2">
                     <div className="flex items-center gap-2">
                       <label htmlFor="starting-map-checkbox" className="text-sm font-medium text-muted-foreground">
                         Starting Map
@@ -5440,7 +5700,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium mb-2">Theme (Experimental)</label>
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
                       <span className="text-sm">Light Mode</span>
                       <button
                         onClick={() => setIsDarkMode(!isDarkMode)}
@@ -5463,7 +5723,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-2">Debug Mode</label>
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
                       <span className="text-sm">Disabled</span>
                       <button
                         onClick={() => {
@@ -5493,7 +5753,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-2">Auto-Save</label>
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
                       <span className="text-sm">Disabled</span>
                       <button
                         onClick={() => {
@@ -5524,7 +5784,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-2">Active GID Indicator</label>
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
                       <span className="text-sm">Show</span>
                       <button
                         onClick={() => {
@@ -5548,7 +5808,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-2">Sidebar Collapse Button</label>
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
                       <span className="text-sm">Show toggle</span>
                       <button
                         onClick={() => setShowSidebarToggle((s: boolean) => !s)}
@@ -6777,7 +7037,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             ))}
           </div>
 
-          <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
             <Button type="button" variant="secondary" size="sm" onClick={handleAddVendorUnlockRequirement}>
               Add Requirement
             </Button>
@@ -6881,7 +7141,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             )}
           </div>
 
-          <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground">Min item number</span>
@@ -6930,10 +7190,13 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             setShowRuleDialog(false);
             setRuleDialogError(null);
             setRuleDialogStep('start');
+            setRuleStartType(null);
+            setRuleTriggerId('');
+            setRuleActionSelection(null);
           }
         }}
       >
-        <DialogContent className="max-w-xl">
+        <DialogContent className="max-w-xl w-[520px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <GitBranch className="w-5 h-5 text-orange-500" />
@@ -6978,14 +7241,14 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                           <button
                             type="button"
                             onClick={() => setRuleStartType(option.id as RuleStartType)}
-                            className={`flex items-center justify-center rounded-md border p-3 transition-all ${
+                            className={`flex items-center justify-center rounded-md p-1 transition-all border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                               isActive
-                                ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 shadow-sm'
-                                : 'border-border hover:bg-muted/60'
+                                ? 'bg-orange-50 dark:bg-orange-900/20 shadow-md border-orange-500'
+                                : 'hover:bg-muted/60 border-transparent'
                             }`}
                             aria-label={option.label}
                           >
-                            <span className={`w-10 h-10 rounded-md flex items-center justify-center ${isActive ? 'bg-white dark:bg-orange-900/40' : 'bg-muted'}`}>
+                            <span className={`w-10 h-10 rounded-md flex items-center justify-center ${isActive ? 'bg-white dark:bg-orange-900/40 text-orange-600 dark:text-orange-200' : 'bg-muted text-foreground/80'}`}>
                               <IconComp className="w-5 h-5" />
                             </span>
                             <span className="sr-only">{option.label}</span>
@@ -6997,74 +7260,127 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 </div>
 
                 <div>
-                  <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2 mb-2">
                     <label className="text-sm font-medium">Pick a trigger</label>
                     <span className="text-xs text-muted-foreground">
-                      {ruleStartType === 'player' ? 'Player driven events' : 'Game driven events'}
+                      {ruleStartType === 'player'
+                        ? 'Player driven events'
+                        : ruleStartType === 'game'
+                          ? 'Game driven events'
+                          : 'Select how the rule starts'}
                     </span>
                   </div>
-                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                    {availableRuleTriggers.map((option) => {
-                      const IconComp = option.icon;
-                      const isActive = ruleTriggerId === option.id;
-                      return (
-                        <Tooltip key={option.id} content={option.tooltip || option.label}>
-                          <button
-                            type="button"
-                            onClick={() => setRuleTriggerId(option.id)}
-                            className={`flex flex-col items-center gap-1 rounded-md border p-2 transition-colors ${
-                              isActive ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-200' : 'border-border hover:bg-muted/50'
-                            }`}
-                            aria-pressed={isActive}
-                            aria-label={option.label}
-                          >
-                            <span className="w-9 h-9 rounded-md flex items-center justify-center bg-background">
-                              <IconComp className="w-5 h-5" />
-                            </span>
-                            <span className="sr-only">{option.label}</span>
-                          </button>
-                        </Tooltip>
-                      );
-                    })}
+                  <div className="rounded-lg border border-border/60 bg-muted/30 p-3">
+                    {ruleStartType ? (
+                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 min-h-[140px] items-start">
+                        {availableRuleTriggers.map((option) => {
+                          const IconComp = option.icon;
+                          const isActive = ruleTriggerId === option.id;
+                          return (
+                            <Tooltip key={option.id} content={option.tooltip || option.label}>
+                              <button
+                                type="button"
+                                onClick={() => setRuleTriggerId(option.id)}
+                                className={`flex flex-col items-center gap-1 rounded-md p-0 transition-colors border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                                  isActive
+                                    ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-200 shadow-md border-orange-500'
+                                    : 'hover:bg-muted/50 border-transparent'
+                                }`}
+                                aria-pressed={isActive}
+                                aria-label={option.label}
+                              >
+                                <span className={`w-9 h-9 rounded-md flex items-center justify-center bg-background ${isActive ? 'text-orange-600 dark:text-orange-200' : 'text-foreground/80'}`}>
+                                  <IconComp className="w-5 h-5" />
+                                </span>
+                                <span className="sr-only">{option.label}</span>
+                              </button>
+                            </Tooltip>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="min-h-[140px] flex items-center justify-center text-xs text-muted-foreground text-center">
+                        Choose how this rule starts to see available triggers.
+                      </div>
+                    )}
                   </div>
                 </div>
               </>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <h4 className="text-sm font-semibold">What happens</h4>
                 <div className="grid sm:grid-cols-2 gap-3">
-                  {RULE_ACTION_GROUPS.map((group) => (
-                    <div
-                      key={group.id}
-                      className="rounded-lg border border-border bg-muted/30 p-3 flex flex-col gap-2"
-                    >
-                      <div className="flex flex-col">
-                        <span className="text-sm font-semibold">{group.title}</span>
-                        {group.subtitle && <span className="text-xs text-muted-foreground">{group.subtitle}</span>}
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {group.actions.map((action) => (
+                  {RULE_ACTION_GROUPS.map((group) => {
+                    const GroupIcon = group.icon;
+                    const isGroupActive = ruleActionSelection?.groupId === group.id;
+                    return (
+                      <div
+                        key={group.id}
+                        className={`rounded-lg border p-3 flex flex-col gap-3 transition-colors ${
+                          isGroupActive ? 'border-orange-500 bg-orange-50/50 dark:bg-orange-900/10' : 'border-border bg-muted/30'
+                        }`}
+                      >
+                        <Tooltip content={group.tooltip || group.title}>
                           <button
-                            key={action.id}
                             type="button"
-                            className="px-3 py-1.5 text-xs rounded-md border border-border bg-background hover:bg-muted/60 transition-colors"
-                            aria-label={action.label}
+                            className={`w-12 h-12 rounded-lg border bg-background transition-colors flex items-center justify-center ${
+                              isGroupActive ? 'border-orange-500 text-orange-600 dark:text-orange-200 shadow-md' : 'border-border hover:bg-muted/60'
+                            }`}
+                            aria-label={group.title}
+                            onClick={() => {
+                              setRuleActionSelection(prev => {
+                                const currentAction = prev?.groupId === group.id ? prev.actionId : group.actions[0]?.id ?? '';
+                                if (!currentAction) return null;
+                                return { groupId: group.id, actionId: currentAction };
+                              });
+                            }}
                           >
-                            {action.label}
+                            <GroupIcon className="w-6 h-6" />
                           </button>
-                        ))}
+                        </Tooltip>
+                        <div className="flex flex-wrap gap-2 min-h-[44px]">
+                          {group.actions.map((action) => {
+                            const ActionIcon = action.icon;
+                            const isActionActive = ruleActionSelection?.groupId === group.id && ruleActionSelection?.actionId === action.id;
+                            return (
+                              <Tooltip key={action.id} content={action.label}>
+                                <button
+                                  type="button"
+                                  className={`w-10 h-10 rounded-md border bg-background transition-colors flex items-center justify-center ${
+                                    isActionActive ? 'border-orange-500 text-orange-600 dark:text-orange-200 shadow-md' : 'border-border hover:bg-muted/60'
+                                  }`}
+                                  aria-label={action.label}
+                                  onClick={() => setRuleActionSelection({ groupId: group.id, actionId: action.id })}
+                                >
+                                  <ActionIcon className="w-5 h-5" />
+                                </button>
+                              </Tooltip>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
 
-            <div className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground flex items-center gap-3">
+            <div className="rounded-md border border-gray-300 dark:border-neutral-700 bg-neutral-900 px-3 py-3 text-xs flex items-center gap-3 shadow-inner">
               <span className="font-semibold text-foreground">Preview</span>
-              <span className="truncate">
-                When {RULE_TRIGGER_LOOKUP[ruleTriggerId]?.tooltip || RULE_TRIGGER_LOOKUP[ruleTriggerId]?.label || '...'} → // this will be filled later
-              </span>
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <span className="px-3 py-2 rounded-md bg-orange-500 text-white text-xs font-medium truncate">
+                  {ruleStartType ? (ruleStartType === 'player' ? 'Started by player' : 'Started by the game') : 'Pick a start type'}
+                </span>
+                <span className="px-3 py-2 rounded-md bg-orange-500 text-white text-xs font-medium truncate">
+                  {ruleTriggerId ? (RULE_TRIGGER_LOOKUP[ruleTriggerId]?.label || RULE_TRIGGER_LOOKUP[ruleTriggerId]?.tooltip || 'Trigger') : 'Pick a trigger'}
+                </span>
+                <span className="text-white font-extrabold text-lg px-1">→</span>
+                <span className="px-3 py-2 rounded-md bg-orange-500 text-white text-xs font-medium truncate">
+                  {ruleActionSelection
+                    ? RULE_ACTION_GROUPS.find((g) => g.id === ruleActionSelection.groupId)?.actions.find((a) => a.id === ruleActionSelection.actionId)?.label || 'Action'
+                    : 'Pick an action'}
+                </span>
+              </div>
             </div>
 
             {ruleDialogError && (
@@ -7073,13 +7389,27 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           </div>
 
           <DialogFooter className="justify-between">
-            <Button onClick={handleSaveRule}>Save Rule</Button>
-            <Button
-              variant="outline"
-              onClick={() => setRuleDialogStep('actions')}
-            >
-              Next &gt;
-            </Button>
+            {ruleDialogStep === 'actions' ? (
+              <>
+                <Button
+                  variant="outline"
+                  onClick={() => setRuleDialogStep('start')}
+                >
+                  Back
+                </Button>
+                <Button onClick={handleSaveRule}>Save Rule</Button>
+              </>
+            ) : (
+              <>
+                <Button onClick={handleSaveRule}>Save Rule</Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setRuleDialogStep('actions')}
+                >
+                  Next &gt;
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -7100,7 +7430,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               {/* Name (zorunlu) */}
               <div>
                 <label className="block text-sm font-medium mb-1">
-                  Name <span className="text-red-500">*</span>
+                  {actorDialogState.type === 'npc' ? 'NPC Name' : 'Enemy Name'} <span className="text-red-500">*</span>
                 </label>
                 <Input
                   value={actorDialogState.name}
@@ -7111,47 +7441,46 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
 
               {/* Role (toggle buttons) */}
               <div>
-                <label className="block text-sm font-medium mb-1">Roles</label>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleActorRoleToggle('isTalker')}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                      actorDialogState.isTalker
-                        ? 'bg-blue-500/20 text-blue-600 dark:text-blue-400 border-blue-500/50'
-                        : 'bg-muted/50 text-muted-foreground border-transparent hover:bg-muted'
-                    }`}
-                  >
-                    Talker
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleActorRoleToggle('isVendor')}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                      actorDialogState.isVendor
-                        ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/50'
-                        : 'bg-muted/50 text-muted-foreground border-transparent hover:bg-muted'
-                    }`}
-                  >
-                    Vendor
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleActorRoleToggle('isQuestGiver')}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                      actorDialogState.isQuestGiver
-                        ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/50'
-                        : 'bg-muted/50 text-muted-foreground border-transparent hover:bg-muted'
-                    }`}
-                  >
-                    Quest
-                  </button>
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {!actorDialogState.isTalker && !actorDialogState.isVendor && !actorDialogState.isQuestGiver
-                    ? 'Static NPC with no interaction.'
-                    : 'Select one or more roles for this NPC.'}
-                </p>
+                {(() => {
+                  const roleOptions = actorDialogState.type === 'npc' ? NPC_ROLE_OPTIONS : ENEMY_ROLE_OPTIONS;
+                  const hasRoleSelection = roleOptions.some((option) => actorDialogState[option.key]);
+                  return (
+                    <>
+                      <label className="block text-sm font-medium mb-1">
+                        {actorDialogState.type === 'npc' ? 'Roles' : 'Enemy Types'}
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        {roleOptions.map((option) => {
+                          const isActive = actorDialogState[option.key];
+                          return (
+                            <button
+                              key={option.key}
+                              type="button"
+                              onClick={() => handleActorRoleToggle(option.key)}
+                              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                                isActive
+                                  ? `border ${option.badgeClass} ring-1 ring-border/60`
+                                  : 'border-transparent bg-muted/50 text-muted-foreground hover:bg-muted'
+                              }`}
+                              title={option.description}
+                            >
+                              {option.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {actorDialogState.type === 'npc'
+                          ? hasRoleSelection
+                            ? 'Select one or more roles for this NPC.'
+                            : 'Static NPC with no interaction.'
+                          : hasRoleSelection
+                            ? 'Pick one or more enemy types.'
+                            : 'No behavior selected; enemy is unassigned.'}
+                      </p>
+                    </>
+                  );
+                })()}
               </div>
 
               {/* Tileset Location (opsiyonel) */}
@@ -7276,7 +7605,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                         }}
                         className={`text-left border rounded-md px-3 py-2 transition-colors ${isActive ? 'border-orange-500 bg-orange-500/10 ring-1 ring-orange-500/30' : 'border-border hover:bg-muted/60'}`}
                       >
-                        <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 gap-2">
                           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${roleMeta.badgeClass}`}>
                             {roleMeta.label}
                           </span>
@@ -7304,7 +7633,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                           onClick={() => handleItemFieldChange('resourceSubtype', key)}
                           className={`text-left border rounded-md px-3 py-2 transition-colors ${isActive ? 'border-purple-500 bg-purple-500/10 ring-1 ring-purple-500/30' : 'border-border hover:bg-muted/60'}`}
                         >
-                          <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 gap-2">
                             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${meta.badgeClass}`}>
                               {meta.label}
                             </span>
@@ -7578,7 +7907,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                               const autoSell = editingItem.price_sell === '0' || editingItem.price_sell === '' || editingItem.price_sell === undefined;
                               return (
                                 <>
-                                  <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2 gap-2">
                                     <div className="flex items-center gap-1">
                                       <label className="text-xs text-muted-foreground">Sell Price</label>
                                       <Tooltip content="0 = use automatic sell price (price * vendor_ratio_sell)." side="right">
@@ -7658,7 +7987,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                             onClick={() => updateEditingItemField('resourceSubtype', key)}
                             className={`text-left border rounded-md px-3 py-2 transition-colors ${isActive ? 'border-purple-500 bg-purple-500/10 ring-1 ring-purple-500/30' : 'border-border hover:bg-muted/60'}`}
                           >
-                            <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 gap-2">
                               <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${meta.badgeClass}`}>
                                 {meta.label}
                               </span>
@@ -8012,7 +8341,27 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               {editingObject?.type === 'npc' && (
                 <User className="w-5 h-5 text-orange-500" />
               )}
-              {editingObject ? `Edit ${editingObject.type.toUpperCase()}` : 'Add Object'}
+              {editingObject?.type === 'enemy' && (
+                <div className="flex items-center gap-2">
+                  <span>{editingObject ? `Edit ${editingObject.type.toUpperCase()}` : 'Add Object'}</span>
+                  <Tooltip
+                    content={
+                      <div
+                        className="max-w-lg whitespace-normal break-words text-sm text-foreground leading-snug p-2"
+                        style={{ whiteSpace: 'normal', overflow: 'visible', textOverflow: 'clip' }}
+                      >
+                        Enemy stats normally scale with level. Overriding a stat disables scaling for that stat.
+                      </div>
+                    }
+                    side="right"
+                  >
+                    <span className="inline-flex items-center text-orange-500 font-semibold">
+                      <HelpCircle className="w-4 h-4" strokeWidth={2.4} />
+                    </span>
+                  </Tooltip>
+                </div>
+              )}
+              {editingObject?.type !== 'enemy' && (editingObject ? `Edit ${editingObject.type.toUpperCase()}` : 'Add Object')}
             </DialogTitle>
           </DialogHeader>
           
@@ -8048,20 +8397,383 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                       type="number"
                       value={editingObject.x}
                       onChange={(e) => setEditingObject({...editingObject, x: Number(e.target.value)})}
-                      disabled={editingObject.type === 'npc'}
-                      className={`h-8 w-11 px-1 text-center ${editingObject.type === 'npc' ? 'opacity-50' : ''}`}
+                      disabled={editingObject.type === 'npc' || editingObject.type === 'enemy'}
+                      className={`h-8 w-11 px-1 text-center ${(editingObject.type === 'npc' || editingObject.type === 'enemy') ? 'opacity-50' : ''}`}
                     />
                     <span className="text-muted-foreground text-xs">,</span>
                     <Input
                       type="number"
                       value={editingObject.y}
                       onChange={(e) => setEditingObject({...editingObject, y: Number(e.target.value)})}
-                      disabled={editingObject.type === 'npc'}
-                      className={`h-8 w-11 px-1 text-center ${editingObject.type === 'npc' ? 'opacity-50' : ''}`}
+                      disabled={editingObject.type === 'npc' || editingObject.type === 'enemy'}
+                      className={`h-8 w-11 px-1 text-center ${(editingObject.type === 'npc' || editingObject.type === 'enemy') ? 'opacity-50' : ''}`}
                     />
                   </div>
                 </div>
               </div>
+
+              {editingObject.type === 'enemy' ? (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs text-muted-foreground mb-1">Enemy Types</label>
+                    <div className="flex flex-wrap gap-2">
+                      {ENEMY_ROLE_OPTIONS.map((option) => {
+                        const propKey = option.key.replace(/^is/, '').toLowerCase();
+                        const isActive = editingObject.properties?.[propKey] === 'true';
+                        return (
+                          <Tooltip key={option.key} content={option.description} side="top">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingObject((prev) => {
+                                  if (!prev) return prev;
+                                  const properties = { ...(prev.properties || {}) };
+                                  if (properties[propKey] === 'true') {
+                                    delete properties[propKey];
+                                  } else {
+                                    properties[propKey] = 'true';
+                                  }
+                                  return { ...prev, properties };
+                                });
+                              }}
+                              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${isActive ? `border ${option.badgeClass}` : 'border border-transparent bg-muted/50 text-muted-foreground hover:bg-muted'}`}
+                            >
+                              {option.label}
+                            </button>
+                          </Tooltip>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs text-muted-foreground">Tileset Location</label>
+                    <Input
+                      className="h-8 text-sm"
+                      value={getEditingObjectProperty('tilesetPath', '')}
+                      onChange={(e) => updateEditingObjectProperty('tilesetPath', e.target.value)}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs text-muted-foreground">Portrait Location</label>
+                    <Input
+                      className="h-8 text-sm"
+                      value={getEditingObjectProperty('portraitPath', '')}
+                      onChange={(e) => updateEditingObjectProperty('portraitPath', e.target.value)}
+                    />
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                      <Heart className="w-4 h-4 text-red-500" />
+                      <span>Core</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1">
+                        <label className="text-xs text-muted-foreground">HP</label>
+                        <Tooltip content="Total health of the enemy." side="top">
+                          <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                        </Tooltip>
+                      </div>
+                      {renderEnemyFieldWeight('hp')}
+                    </div>
+                    <Input
+                      className="h-8 text-sm"
+                      value={getEditingObjectProperty('hp', '')}
+                      onChange={(e) => updateEditingObjectProperty('hp', e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1">
+                        <label className="text-xs text-muted-foreground">Poise</label>
+                        <Tooltip content="Resistance to being staggered or interrupted." side="top">
+                          <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                        </Tooltip>
+                      </div>
+                      {renderEnemyFieldWeight('poise')}
+                    </div>
+                    <Input
+                      className="h-8 text-sm"
+                      value={getEditingObjectProperty('poise', '')}
+                      onChange={(e) => updateEditingObjectProperty('poise', e.target.value)}
+                    />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                      <Sword className="w-4 h-4 text-orange-500" />
+                      <span>Damage</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1">
+                            <label className="text-xs text-muted-foreground">Melee Min</label>
+                            <Tooltip content="Minimum damage dealt by melee attacks." side="top">
+                              <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                            </Tooltip>
+                          </div>
+                          {renderEnemyFieldWeight('dmg_melee_min')}
+                        </div>
+                        <Input
+                          className="h-8 text-sm"
+                          value={getEditingObjectProperty('dmg_melee_min', '')}
+                          onChange={(e) => updateEditingObjectProperty('dmg_melee_min', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1">
+                            <label className="text-xs text-muted-foreground">Melee Max</label>
+                            <Tooltip content="Maximum damage dealt by melee attacks." side="top">
+                              <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                            </Tooltip>
+                          </div>
+                          {renderEnemyFieldWeight('dmg_melee_max')}
+                        </div>
+                        <Input
+                          className="h-8 text-sm"
+                          value={getEditingObjectProperty('dmg_melee_max', '')}
+                          onChange={(e) => updateEditingObjectProperty('dmg_melee_max', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1">
+                            <label className="text-xs text-muted-foreground">Ranged Min</label>
+                            <Tooltip content="Minimum damage dealt by ranged attacks." side="top">
+                              <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                            </Tooltip>
+                          </div>
+                          {renderEnemyFieldWeight('dmg_ranged_min')}
+                        </div>
+                        <Input
+                          className="h-8 text-sm"
+                          value={getEditingObjectProperty('dmg_ranged_min', '')}
+                          onChange={(e) => updateEditingObjectProperty('dmg_ranged_min', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1">
+                            <label className="text-xs text-muted-foreground">Ranged Max</label>
+                            <Tooltip content="Maximum damage dealt by ranged attacks." side="top">
+                              <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                            </Tooltip>
+                          </div>
+                          {renderEnemyFieldWeight('dmg_ranged_max')}
+                        </div>
+                        <Input
+                          className="h-8 text-sm"
+                          value={getEditingObjectProperty('dmg_ranged_max', '')}
+                          onChange={(e) => updateEditingObjectProperty('dmg_ranged_max', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1">
+                            <label className="text-xs text-muted-foreground">Mental Min</label>
+                            <Tooltip content="Minimum damage dealt by spells or mental attacks." side="top">
+                              <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                            </Tooltip>
+                          </div>
+                          {renderEnemyFieldWeight('dmg_ment_min')}
+                        </div>
+                        <Input
+                          className="h-8 text-sm"
+                          value={getEditingObjectProperty('dmg_ment_min', '')}
+                          onChange={(e) => updateEditingObjectProperty('dmg_ment_min', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1">
+                            <label className="text-xs text-muted-foreground">Mental Max</label>
+                            <Tooltip content="Maximum damage dealt by spells or mental attacks." side="top">
+                              <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                            </Tooltip>
+                          </div>
+                          {renderEnemyFieldWeight('dmg_ment_max')}
+                        </div>
+                        <Input
+                          className="h-8 text-sm"
+                          value={getEditingObjectProperty('dmg_ment_max', '')}
+                          onChange={(e) => updateEditingObjectProperty('dmg_ment_max', e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                      <Target className="w-4 h-4 text-blue-500" />
+                      <span>Combat Utility</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1">
+                            <label className="text-xs text-muted-foreground">Accuracy</label>
+                            <Tooltip content="Chance for attacks to hit the target." side="top">
+                              <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                            </Tooltip>
+                          </div>
+                          {renderEnemyFieldWeight('accuracy')}
+                        </div>
+                        <Input
+                          className="h-8 text-sm"
+                          value={getEditingObjectProperty('accuracy', '')}
+                          onChange={(e) => updateEditingObjectProperty('accuracy', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1">
+                            <label className="text-xs text-muted-foreground">Crit</label>
+                            <Tooltip content="Chance to deal a critical hit." side="top">
+                              <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                            </Tooltip>
+                          </div>
+                          {renderEnemyFieldWeight('crit')}
+                        </div>
+                        <Input
+                          className="h-8 text-sm"
+                          value={getEditingObjectProperty('crit', '')}
+                          onChange={(e) => updateEditingObjectProperty('crit', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1">
+                            <label className="text-xs text-muted-foreground">Avoidance</label>
+                            <Tooltip content="Chance to evade incoming attacks." side="top">
+                              <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                            </Tooltip>
+                          </div>
+                          {renderEnemyFieldWeight('avoidance')}
+                        </div>
+                        <Input
+                          className="h-8 text-sm"
+                          value={getEditingObjectProperty('avoidance', '')}
+                          onChange={(e) => updateEditingObjectProperty('avoidance', e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                      <Timer className="w-4 h-4 text-purple-500" />
+                      <span>AI / Tempo</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1">
+                            <label className="text-xs text-muted-foreground">Speed</label>
+                            <Tooltip content="How fast the enemy moves." side="top">
+                              <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                            </Tooltip>
+                          </div>
+                          {renderEnemyFieldWeight('speed')}
+                        </div>
+                        <Input
+                          className="h-8 text-sm"
+                          value={getEditingObjectProperty('speed', '')}
+                          onChange={(e) => updateEditingObjectProperty('speed', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1">
+                            <label className="text-xs text-muted-foreground">Cooldown</label>
+                            <Tooltip content="Time between consecutive attacks or actions." side="top">
+                              <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                            </Tooltip>
+                          </div>
+                          {renderEnemyFieldWeight('cooldown')}
+                        </div>
+                        <Input
+                          className="h-8 text-sm"
+                          value={getEditingObjectProperty('cooldown', '')}
+                          onChange={(e) => updateEditingObjectProperty('cooldown', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1">
+                            <label className="text-xs text-muted-foreground">Turn Delay</label>
+                            <Tooltip content="Delay between decision/turn cycles." side="top">
+                              <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                            </Tooltip>
+                          </div>
+                          {renderEnemyFieldWeight('turn_delay')}
+                        </div>
+                        <Input
+                          className="h-8 text-sm"
+                          value={getEditingObjectProperty('turn_delay', '')}
+                          onChange={(e) => updateEditingObjectProperty('turn_delay', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1">
+                            <label className="text-xs text-muted-foreground">Chance Pursue</label>
+                            <Tooltip content="Likelihood to actively chase the player." side="top">
+                              <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                            </Tooltip>
+                          </div>
+                          {renderEnemyFieldWeight('chance_pursue')}
+                        </div>
+                        <Input
+                          className="h-8 text-sm"
+                          value={getEditingObjectProperty('chance_pursue', '')}
+                          onChange={(e) => updateEditingObjectProperty('chance_pursue', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1">
+                            <label className="text-xs text-muted-foreground">Threat Range</label>
+                            <Tooltip content="Distance at which the enemy detects the player." side="top">
+                              <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                            </Tooltip>
+                          </div>
+                          {renderEnemyFieldWeight('threat_range')}
+                        </div>
+                        <Input
+                          className="h-8 text-sm"
+                          value={getEditingObjectProperty('threat_range', '')}
+                          onChange={(e) => updateEditingObjectProperty('threat_range', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1">
+                            <label className="text-xs text-muted-foreground">Melee Range</label>
+                            <Tooltip content="Distance required to perform melee attacks." side="top">
+                              <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                            </Tooltip>
+                          </div>
+                          {renderEnemyFieldWeight('melee_range')}
+                        </div>
+                        <Input
+                          className="h-8 text-sm"
+                          value={getEditingObjectProperty('melee_range', '')}
+                          onChange={(e) => updateEditingObjectProperty('melee_range', e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <>
 
               {/* NPC Roles */}
               {editingObject.type === 'npc' && (
@@ -8603,63 +9315,110 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                   </div>
                 </>
               )}
+              </>
+              )}
               </div>
             )}
           </div>
 
           <DialogFooter className="mt-4 flex-shrink-0">
-            <div className="flex w-full justify-between">
-              {/* Delete button - only for NPC */}
-              {editingObject?.type === 'npc' && (
-                <div className="flex items-center gap-2">
-                  {showDeleteNpcConfirm ? (
-                    <>
-                      <span className="text-xs text-muted-foreground">Delete?</span>
+            <div className="flex w-full justify-between items-center">
+              {/* Delete buttons */}
+              <div className="flex items-center gap-2">
+                {editingObject?.type === 'npc' && (
+                  <>
+                    {showDeleteNpcConfirm ? (
+                      <>
+                        <span className="text-xs text-muted-foreground">Delete?</span>
+                        <Button
+                          variant="destructive"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => {
+                            if (editingObject) {
+                              editor?.removeMapObject(editingObject.id);
+                              syncMapObjects();
+                              setShowObjectDialog(false);
+                              setEditingObject(null);
+                              setShowDeleteNpcConfirm(false);
+                            }
+                          }}
+                        >
+                          <Check className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => setShowDeleteNpcConfirm(false)}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </>
+                    ) : (
                       <Button
-                        variant="destructive"
-                        size="sm"
-                        className="h-8 px-2"
-                        onClick={() => {
-                          if (editingObject) {
-                            editor?.removeMapObject(editingObject.id);
-                            syncMapObjects();
-                            setShowObjectDialog(false);
-                            setEditingObject(null);
-                            setShowDeleteNpcConfirm(false);
-                          }
-                        }}
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => setShowDeleteNpcConfirm(true)}
+                        aria-label="Delete NPC"
                       >
-                        Yes
+                        <Trash2 className="w-4 h-4" />
                       </Button>
+                    )}
+                  </>
+                )}
+                {editingObject?.type === 'enemy' && (
+                  <>
+                    {showDeleteEnemyConfirm ? (
+                      <>
+                        <span className="text-xs text-muted-foreground">Delete?</span>
+                        <Button
+                          variant="destructive"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => {
+                            if (editingObject) {
+                              editor?.removeMapObject(editingObject.id);
+                              syncMapObjects();
+                              setShowObjectDialog(false);
+                              setEditingObject(null);
+                              setShowDeleteEnemyConfirm(false);
+                            }
+                          }}
+                        >
+                          <Check className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => setShowDeleteEnemyConfirm(false)}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </>
+                    ) : (
                       <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 px-2"
-                        onClick={() => setShowDeleteNpcConfirm(false)}
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => setShowDeleteEnemyConfirm(true)}
+                        aria-label="Delete Enemy"
                       >
-                        No
+                        <Trash2 className="w-4 h-4" />
                       </Button>
-                    </>
-                  ) : (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 px-2 text-destructive hover:text-destructive hover:bg-destructive/10"
-                      onClick={() => setShowDeleteNpcConfirm(true)}
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  )}
-                </div>
-              )}
-              {editingObject?.type !== 'npc' && <div />}
+                    )}
+                  </>
+                )}
+              </div>
               
               <div className="flex gap-2">
-                <Button variant="outline" onClick={handleObjectDialogClose}>
-                  Cancel
+                <Button variant="outline" size="icon" onClick={handleObjectDialogClose} aria-label="Cancel edit">
+                  <X className="w-4 h-4" />
                 </Button>
-                <Button onClick={handleObjectDialogSave}>
-                  Save
+                <Button size="icon" onClick={handleObjectDialogSave} aria-label="Save">
+                  <Save className="w-4 h-4" />
                 </Button>
               </div>
             </div>
@@ -8715,7 +9474,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                     }`}
                   >
                     {dialogueTabToDelete === index ? (
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
                         <span className="text-xs">Delete?</span>
                         <div className="flex gap-1">
                           <button
@@ -8805,7 +9564,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                         };
                         setDialogueTrees(newTrees);
                       }}
-                      className="w-full px-3 py-2 flex items-center justify-between text-sm font-medium hover:bg-muted/50 rounded-t-md"
+                      className="w-full px-3 py-2 flex items-center gap-2 text-sm font-medium hover:bg-muted/50 rounded-t-md"
                     >
                       <div className="flex items-center gap-2">
                         <Eye className="w-4 h-4 text-blue-400" />
@@ -8910,7 +9669,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                         };
                         setDialogueTrees(newTrees);
                       }}
-                      className="w-full px-3 py-2 flex items-center justify-between text-sm font-medium hover:bg-muted/50 rounded-t-md"
+                      className="w-full px-3 py-2 flex items-center gap-2 text-sm font-medium hover:bg-muted/50 rounded-t-md"
                     >
                       <div className="flex items-center gap-2">
                         <AlignLeft className="w-4 h-4 text-blue-400" />
@@ -9021,7 +9780,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                         };
                         setDialogueTrees(newTrees);
                       }}
-                      className="w-full px-3 py-2 flex items-center justify-between text-sm font-medium hover:bg-muted/50 rounded-t-md"
+                      className="w-full px-3 py-2 flex items-center gap-2 text-sm font-medium hover:bg-muted/50 rounded-t-md"
                     >
                       <div className="flex items-center gap-2">
                         <Gift className="w-4 h-4 text-emerald-500" />
@@ -9135,7 +9894,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                         };
                         setDialogueTrees(newTrees);
                       }}
-                      className="w-full px-3 py-2 flex items-center justify-between text-sm font-medium hover:bg-muted/50 rounded-t-md"
+                      className="w-full px-3 py-2 flex items-center gap-2 text-sm font-medium hover:bg-muted/50 rounded-t-md"
                     >
                       <div className="flex items-center gap-2">
                         <Zap className="w-4 h-4 text-purple-500" />
@@ -9412,7 +10171,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 />
               </div>
             </div>
-            <div className="flex items-center justify-between rounded-md border border-border px-3 py-2">
+            <div className="flex items-center gap-2 rounded-md border border-border px-3 py-2">
               <div className="flex items-center gap-2">
                 <label htmlFor="starting-map-checkbox" className="text-sm font-medium text-muted-foreground">
                   Starting Map

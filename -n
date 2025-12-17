@@ -1,0 +1,28 @@
+
+src\App.tsx:90:    .replace(/[<>:"/|?*]/g, '_')
+src\App.tsx:3523:    const sanitizedMapName = mapName.replace(/[<>:"/\\|?*]/g, '_').trim().replace(/\s+/g, '_').replace(/_{2,}/g, '_') || 'Map_Name';
+src\App.tsx:3688:                .replace(/[<>:"/\\|?*]/g, '_')
+src\App.tsx:4372:    <>
+src\App.tsx:4419:              <>
+src\App.tsx:4425:              <>
+src\App.tsx:4431:              <>
+src\App.tsx:4437:              <>
+src\App.tsx:4517:                  <>
+src\App.tsx:4979:                    <>
+src\App.tsx:5362:                        <>
+src\App.tsx:5427:                        <>
+src\App.tsx:5922:                  <>
+src\App.tsx:6101:                  <>
+src\App.tsx:7115:              <>
+src\App.tsx:7298:              <>
+src\App.tsx:7308:              <>
+src\App.tsx:7353:                    <>
+src\App.tsx:7575:                        <>
+src\App.tsx:7814:                                <>
+src\App.tsx:8544:                <>
+src\App.tsx:8734:                <>
+src\App.tsx:9059:                <>
+src\App.tsx:9096:                    <>
+src\App.tsx:9552:                              <>
+src\App.tsx:9931:                <>
+

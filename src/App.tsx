@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Upload, Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Blend, MapPin, MapPinOff, Save, Scan, Link2, Scissors, Trash2, Check, HelpCircle, Folder, Shield, Plus, Image, Grid, Box, Users, User, Locate, Clock, Menu, ChevronLeft, ChevronRight, GripVertical, MessageSquare, ChevronDown, ChevronUp, ArrowLeft, Gift, Coins, Sparkles, Heart, Zap, ZapOff, Volume2, Film, Tag, Package, AlignLeft, Sword, ChevronsUpDown, AlertTriangle, Book, GitBranch, Apple, Skull, Swords, RefreshCw, Repeat, Dices, Timer, UserPlus, Flag, CheckCircle, ArrowRight, Puzzle } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { TileMapEditor } from './editor/TileMapEditor';
-import type { EditorProjectData } from './editor/TileMapEditor';
+import type { EditorProjectData, SavedTilesetEntry } from './editor/TileMapEditor';
 import { TileLayer, MapObject, DialogueLine, DialogueRequirement, DialogueReward, DialogueWorldEffect, DialogueTree, FlareNPC } from './types';
 import { serializeNpcToFlare } from './utils/flareNpcUtils';
 import { useToast } from '@/hooks/use-toast';
@@ -848,16 +848,28 @@ function App() {
               }
               const cfg = nextTab.config as EditorProjectData;
 
+              // Helper type for optional editor runtime extensions used by the UI
+              type EditorWithExtras = TileMapEditor & Partial<{
+                setTilesetImages: (images: Record<string, string>) => void;
+                tilesetImages: Record<string, string>;
+                ensureTilesetsLoaded: (timeout?: number) => Promise<void>;
+                getActiveLayerType: () => string | null;
+                updateCurrentTileset: (t: unknown) => void;
+                refreshTilePalette: (force?: boolean) => void;
+                draw: () => void;
+              }>;
+
+              const ed = editor as EditorWithExtras;
+
               // If the in-memory config includes tileset images, apply them into
               // the live editor first so loadProjectData can make use of them.
               try {
                 if (cfg.tilesetImages && Object.keys(cfg.tilesetImages).length > 0) {
-                  if (typeof (editor as any).setTilesetImages === 'function') {
-                    (editor as any).setTilesetImages(cfg.tilesetImages);
+                  if (typeof ed.setTilesetImages === 'function') {
+                    ed.setTilesetImages(cfg.tilesetImages);
                   } else {
                     // best-effort fallback: attach to editor for later use
-                    // @ts-ignore
-                    editor.tilesetImages = JSON.parse(JSON.stringify(cfg.tilesetImages));
+                    ed.tilesetImages = { ...(ed.tilesetImages || {}), ...JSON.parse(JSON.stringify(cfg.tilesetImages)) };
                   }
                   console.log('Applied tilesetImages to editor for tab', tabId, Object.keys(cfg.tilesetImages));
                 } else {
@@ -883,8 +895,8 @@ function App() {
                     if (cfg.tilesets && Array.isArray(cfg.tilesets)) {
                       for (const t of cfg.tilesets) {
                         if (t.fileName) cfgNames.add(t.fileName);
-                        if ((t as any).sourcePath) {
-                          const s = (t as any).sourcePath as string;
+                        if (t.sourcePath) {
+                          const s = String(t.sourcePath);
                           const parts = s.split(/[\\/]/);
                           const maybe = parts[parts.length - 1];
                           if (maybe) cfgNames.add(maybe);
@@ -905,8 +917,7 @@ function App() {
                         console.log('Applied discovered project tileset images for tab', tabId, Object.keys(toApply));
                       } else {
                         // attach to editor as fallback
-                        // @ts-ignore
-                        editor.tilesetImages = { ...(editor as any).tilesetImages || {}, ...toApply };
+                        ed.tilesetImages = { ...(ed.tilesetImages || {}), ...toApply };
                         console.log('Attached discovered project tileset images to editor.tilesetImages for tab', tabId, Object.keys(toApply));
                       }
                     }
@@ -915,25 +926,31 @@ function App() {
                     // referenced in the config directly from disk (supports absolute
                     // or external paths). This uses the new preload IPC
                     // `readFileAsDataURL` implemented in the main process.
-                    const stillMissing = (cfg.tilesets || []).filter((t: any) => {
-                      const name = t.fileName || (t.sourcePath ? t.sourcePath.split(/[\\/]/).pop() : null);
-                      return name && !((editor as any).tilesetImages || {}).hasOwnProperty(name) && !toApply[name];
+                    const stillMissing = (cfg.tilesets || []).filter((t: SavedTilesetEntry) => {
+                      const name = t.fileName || (t.sourcePath ? String(t.sourcePath).split(/[\\/]/).pop() : null);
+                      return name && !Object.prototype.hasOwnProperty.call(ed.tilesetImages || {}, name) && !toApply[name];
                     });
-                    const electronAPIAny = window.electronAPI as any;
-                    if (stillMissing.length > 0 && electronAPIAny?.readFileAsDataURL) {
+                    const electronAPI = window.electronAPI as unknown as {
+                      readFileAsDataURL?: (p: string) => Promise<string | null>;
+                      resolvePathRelative?: (a: string, b: string) => Promise<string | null>;
+                      fileExists?: (p: string) => Promise<boolean>;
+                    };
+                    if (stillMissing.length > 0 && electronAPI?.readFileAsDataURL) {
                       for (const t of stillMissing) {
                         try {
                           let candidatePath: string | null = t.sourcePath ?? null;
-                          if (candidatePath && currentProjectPath && window.electronAPI?.resolvePathRelative) {
+                          if (candidatePath && currentProjectPath && electronAPI.resolvePathRelative) {
                             try {
-                              const rel = await window.electronAPI.resolvePathRelative(currentProjectPath, candidatePath);
+                              const rel = await electronAPI.resolvePathRelative(currentProjectPath, candidatePath);
                               if (rel && rel.trim()) candidatePath = rel;
-                            } catch {}
+                            } catch {
+                              // ignore resolution errors
+                            }
                           }
                           if (!candidatePath) continue;
-                          const exists = await window.electronAPI.fileExists?.(candidatePath);
+                          const exists = await electronAPI.fileExists?.(candidatePath);
                           if (!exists) continue;
-                          const dataUrl = await electronAPIAny.readFileAsDataURL(candidatePath);
+                          const dataUrl = await electronAPI.readFileAsDataURL(candidatePath);
                           if (!dataUrl) continue;
                           const key = t.fileName || candidatePath.split(/[\\/]/).pop();
                           if (key) toApply[key] = dataUrl;
@@ -943,12 +960,11 @@ function App() {
                         }
                       }
                       if (Object.keys(toApply).length > 0) {
-                        if (typeof (editor as any).setTilesetImages === 'function') {
-                          (editor as any).setTilesetImages(toApply);
+                        if (typeof ed.setTilesetImages === 'function') {
+                          ed.setTilesetImages(toApply);
                           console.log('Applied discovered/project-source tileset images for tab', tabId, Object.keys(toApply));
                         } else {
-                          // @ts-ignore
-                          editor.tilesetImages = { ...(editor as any).tilesetImages || {}, ...toApply };
+                          ed.tilesetImages = { ...(ed.tilesetImages || {}), ...toApply };
                         }
                       }
                     }
@@ -2514,8 +2530,8 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             level: 1,
             icon: '',
             quality: '',
-            price: 0,
-            price_sell: 0,
+            price: '0',
+            price_sell: '0',
             max_quantity: fallbackMaxQuantity,
             quest_item: item.role === 'quest',
             no_stash: 'ignore',

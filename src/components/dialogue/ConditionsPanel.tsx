@@ -15,8 +15,7 @@ import {
   ItemCondition,
   StatusCondition,
   ClassCondition,
-  createCondition,
-  CONDITION_LABELS
+  createCondition
 } from '../../types/dialogueEditor';
 import { Plus, X, Shield, Coins, Package, Tag, Users, ChevronDown } from 'lucide-react';
 

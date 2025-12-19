@@ -7,10 +7,7 @@
 
 import React from 'react';
 import { Button } from '../ui/button';
-import {
-  DialogNode,
-  createDefaultDialogNode
-} from '../../types/dialogueEditor';
+import { DialogNode } from '../../types/dialogueEditor';
 import { generateRawAttributePreview, generateEffectSummary } from '../../utils/dialogueSerializer';
 import { DialogTextPanel } from './DialogTextPanel';
 import { DialogEffectsPanel } from './DialogEffectsPanel';

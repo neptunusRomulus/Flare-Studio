@@ -48,7 +48,7 @@ const Tooltip: React.FC<TooltipProps> = ({ content, side = 'top', className = ''
           const parsed = parseInt(ds.tooltipOffset, 10);
           if (!Number.isNaN(parsed)) localOffset = parsed;
         }
-      } catch (e) {
+      } catch {
         // ignore dataset parsing errors
       }
     }

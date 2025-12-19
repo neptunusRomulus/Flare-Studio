@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import Tooltip from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import { Plus, FolderOpen, Grid3X3, Folder, Minus, Square, X } from 'lucide-react';
 import flareIconUrl from '/flare-ico.png?url';
@@ -57,7 +56,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
             try {
               const exists = await api.checkProjectExists(m.path);
               return exists ? m : null;
-            } catch (e) {
+            } catch {
               // If check fails, keep the entry to avoid accidental deletion
               return m;
             }

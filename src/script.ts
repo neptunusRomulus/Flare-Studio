@@ -72,7 +72,7 @@ declare function updateExportButtonStates(): void;
   // Collision and object management
   const collisionData: number[] = new Array(mapWidth * mapHeight).fill(0);
   const objects: MapObject[] = []; 
-  let selectedObjectId: number | null = null;
+  const selectedObjectId: number | null = null;
 
   // Tool and interaction state
   const tool: Tool = 'tiles';

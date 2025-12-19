@@ -407,7 +407,7 @@ export const WorldFlowPanel: React.FC<WorldFlowPanelProps> = ({
             'Open Stash',
             config.stash.enabled,
             (enabled) => updateStash({ enabled }),
-            <p className="text-xs text-muted-foreground">Opens the player's stash/storage.</p>
+            <p className="text-xs text-muted-foreground">Opens the player&apos;s stash/storage.</p>
           )}
 
           {/* Map Mod */}

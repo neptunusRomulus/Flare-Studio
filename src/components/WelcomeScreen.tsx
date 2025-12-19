@@ -48,8 +48,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
 
       let maps: RecentMap[] = JSON.parse(savedRecentMaps);
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const api: any = (window as any).electronAPI;
+      const api = window.electronAPI;
       if (api && typeof api.checkProjectExists === 'function') {
         try {
           const checks = await Promise.all(maps.map(async (m) => {
@@ -87,18 +86,16 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
     const loadFor = async (map: RecentMap) => {
       // If recentMaps entry already contains a thumbnailDataUrl, use it
       // (Some flows might store it in localStorage)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const anyMap = map as any;
-      if (anyMap.thumbnailDataUrl) {
-        setThumbnails(prev => ({ ...prev, [map.id]: anyMap.thumbnailDataUrl }));
+      const maybeThumbnail = (map as unknown as { thumbnailDataUrl?: string }).thumbnailDataUrl;
+      if (maybeThumbnail) {
+        setThumbnails(prev => ({ ...prev, [map.id]: maybeThumbnail }));
         return;
       }
 
       try {
         // Preferred: ask preload/electron to return a data URL for the project's minimap
         // We check for a permissive API but gracefully continue if it doesn't exist
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const api: any = (window as any).electronAPI;
+          const api = window.electronAPI;
         if (api && typeof api.getProjectThumbnail === 'function') {
           const dataUrl = await api.getProjectThumbnail(map.path);
           if (dataUrl) {

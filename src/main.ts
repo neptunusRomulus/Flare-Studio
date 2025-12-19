@@ -1006,4 +1006,4 @@ ${csvData}
 const editor = new TileMapEditor();
 
 // Export for global access if needed
-(window as any).tileMapEditor = editor;
+(window as unknown as { tileMapEditor?: TileMapEditor }).tileMapEditor = editor;

@@ -5,7 +5,7 @@
  * txt dosyalarını parse ederek FlareNPC modeline çevirir.
  */
 
-import { FlareNPC, FlareNPCExportResult, DialogueTree, DialogueLine, DialogueRequirement, DialogueReward, DialogueWorldEffect } from '../types';
+import { FlareNPC, FlareNPCExportResult, DialogueTree } from '../types';
 
 /**
  * Varsayılan NPC değerleri ile yeni bir FlareNPC oluşturur.
@@ -327,11 +327,12 @@ function serializeDialogueTrees(trees: DialogueTree[]): string {
         case 'gold':
           dialogBlock.push(`reward_currency=1,${rew.value}`);
           break;
-        case 'item':
+        case 'item': {
           // Format: reward_item=item_id,quantity
           const qty = rew.quantity || 1;
           dialogBlock.push(`reward_item=${rew.value},${qty}`);
           break;
+        }
         case 'remove_gold':
           dialogBlock.push(`remove_currency=1,${rew.value}`);
           break;
@@ -421,12 +422,13 @@ export function parseNpcFile(
       case 'vendor_requires_not_status':
         npc.vendor_requires_not_status = value;
         break;
-      case 'direction':
+      case 'direction': {
         const dir = parseInt(value, 10);
         if (dir >= 0 && dir <= 7) {
           npc.direction = dir as 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
         }
         break;
+      }
       case 'waypoints':
         npc.waypoints = value;
         break;

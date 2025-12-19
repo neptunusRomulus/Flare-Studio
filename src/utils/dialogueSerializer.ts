@@ -9,8 +9,6 @@ import {
   DialogCondition,
   DialogRewardEffect,
   WorldFlowConfig,
-  ConditionType,
-  RewardEffectType,
   LevelCondition,
   CurrencyCondition,
   ItemCondition,

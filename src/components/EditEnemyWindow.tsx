@@ -70,7 +70,37 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave }: E
   const [statPerLevel, setStatPerLevel] = useState<string>(() => enemy?.properties?.stat_per_level || '');
   const [xpScaling, setXpScaling] = useState<string>(() => enemy?.properties?.xp_scaling || '');
   const [vulnerable, setVulnerable] = useState<string>(() => enemy?.properties?.vulnerable || '');
-  // ... (other advanced stats skipped for brevity) ...
+  // More advanced stats (resists, regen, utility)
+  const [resistDamageOverTime, setResistDamageOverTime] = useState<string>(() => enemy?.properties?.resist_damage_over_time || '');
+  const [resistSlow, setResistSlow] = useState<string>(() => enemy?.properties?.resist_slow || '');
+  const [resistStun, setResistStun] = useState<string>(() => enemy?.properties?.resist_stun || '');
+  const [resistKnockback, setResistKnockback] = useState<string>(() => enemy?.properties?.resist_knockback || '');
+  const [resistStatDebuff, setResistStatDebuff] = useState<string>(() => enemy?.properties?.resist_stat_debuff || '');
+  const [resistDamageReflect, setResistDamageReflect] = useState<string>(() => enemy?.properties?.resist_damage_reflect || '');
+  const [xpGain, setXpGain] = useState<string>(() => enemy?.properties?.xp_gain || '');
+  const [hpRegen, setHpRegen] = useState<string>(() => enemy?.properties?.hp_regen || '');
+  const [mpRegen, setMpRegen] = useState<string>(() => enemy?.properties?.mp_regen || '');
+  const [hpSteal, setHpSteal] = useState<string>(() => enemy?.properties?.hp_steal || '');
+  const [mpSteal, setMpSteal] = useState<string>(() => enemy?.properties?.mp_steal || '');
+  const [accuracy, setAccuracy] = useState<string>(() => enemy?.properties?.accuracy || '');
+  const [avoidance, setAvoidance] = useState<string>(() => enemy?.properties?.avoidance || '');
+  const [crit, setCrit] = useState<string>(() => enemy?.properties?.crit || '');
+  const [absorbMin, setAbsorbMin] = useState<string>(() => enemy?.properties?.absorb_min || '');
+  const [absorbMax, setAbsorbMax] = useState<string>(() => enemy?.properties?.absorb_max || '');
+  const [poise, setPoise] = useState<string>(() => enemy?.properties?.poise || '');
+  const [reflectChance, setReflectChance] = useState<string>(() => enemy?.properties?.reflect_chance || '');
+  const [returnDamage, setReturnDamage] = useState<string>(() => enemy?.properties?.return_damage || '');
+  const [currencyFind, setCurrencyFind] = useState<string>(() => enemy?.properties?.currency_find || '');
+  const [itemFind, setItemFind] = useState<string>(() => enemy?.properties?.item_find || '');
+  const [stealth, setStealth] = useState<string>(() => enemy?.properties?.stealth || '');
+
+  // Combat & powers
+  const [powers, setPowers] = useState<string>(() => enemy?.properties?.powers || '');
+  const [script, setScript] = useState<string>(() => enemy?.properties?.script || '');
+
+  // Loot
+  const [lootTable, setLootTable] = useState<string>(() => enemy?.properties?.loot || '');
+  const [dropChance, setDropChance] = useState<string>(() => enemy?.properties?.drop_chance || '');
 
   // Behavior flags
   const [isMelee, setIsMelee] = useState<boolean>(() => (enemy?.properties?.melee === 'true'));
@@ -412,12 +442,277 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave }: E
               </div>
             )}
 
-            {/* other tabs omitted for brevity in restored copy */}
+            {activeTab === 'visual' && (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Tileset</label>
+                  <div className="flex gap-2">
+                    <Input value={tilesetPath} onChange={(e) => setTilesetPath(e.target.value)} placeholder="Path to animation/tileset" />
+                    <Button variant="outline" onClick={async () => {
+                      try {
+                        type EAPI = { selectTilesetFile?: () => Promise<string | undefined> };
+                        const sel = await (window as unknown as { electronAPI?: EAPI })?.electronAPI?.selectTilesetFile?.();
+                        if (sel) setTilesetPath(sel);
+                      } catch {
+                        // ignore
+                      }
+                    }}>Browse</Button>
+                  </div>
+                </div>
 
+                <div>
+                  <label className="block text-sm font-medium mb-1">Portrait</label>
+                  <div className="flex gap-2">
+                    <Input value={portraitPath} onChange={(e) => setPortraitPath(e.target.value)} placeholder="Path to portrait image" />
+                    <Button variant="outline" onClick={async () => {
+                      try {
+                        type EAPI = { selectTilesetFile?: () => Promise<string | undefined> };
+                        const sel = await (window as unknown as { electronAPI?: EAPI })?.electronAPI?.selectTilesetFile?.();
+                        if (sel) setPortraitPath(sel);
+                      } catch {
+                        // ignore
+                      }
+                    }}>Browse</Button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">GFX</label>
+                  <Input value={gfx} onChange={(e) => setGfx(e.target.value)} placeholder="e.g. animations/enemy/antlion.txt" />
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'audio' && (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1">SFX: Attack</label>
+                  <Input value={sfxAttack} onChange={(e) => setSfxAttack(e.target.value)} placeholder="path/to/attack.wav" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">SFX: Hit</label>
+                  <Input value={sfxHit} onChange={(e) => setSfxHit(e.target.value)} placeholder="path/to/hit.wav" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">SFX: Die</label>
+                  <Input value={sfxDie} onChange={(e) => setSfxDie(e.target.value)} placeholder="path/to/die.wav" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">SFX: Critical Die</label>
+                  <Input value={sfxCritDie} onChange={(e) => setSfxCritDie(e.target.value)} placeholder="path/to/critdie.wav" />
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'stats' && (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">HP</label>
+                    <Input value={hp} onChange={(e) => setHp(e.target.value)} placeholder="Max hit points" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">MP</label>
+                    <Input value={mp} onChange={(e) => setMp(e.target.value)} placeholder="Magic points" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Attack</label>
+                    <Input value={attack} onChange={(e) => setAttack(e.target.value)} placeholder="Physical attack" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Defense</label>
+                    <Input value={defense} onChange={(e) => setDefense(e.target.value)} placeholder="Physical defense" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Speed</label>
+                    <Input value={speed} onChange={(e) => setSpeed(e.target.value)} placeholder="Movement / turn speed" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">XP</label>
+                    <Input value={xp} onChange={(e) => setXp(e.target.value)} placeholder="XP reward" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Gold</label>
+                    <Input value={gold} onChange={(e) => setGold(e.target.value)} placeholder="Gold reward" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Melee Range</label>
+                    <Input value={meleeRange} onChange={(e) => setMeleeRange(e.target.value)} placeholder="Melee range" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Thread Range</label>
+                    <Input value={threadRange} onChange={(e) => setThreadRange(e.target.value)} placeholder="Thread range" />
+                  </div>
+                </div>
+
+                <div className="border-t pt-3">
+                  <h4 className="text-sm font-semibold mb-2">Advanced Stats</h4>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Stat Per Level</label>
+                      <Input value={statPerLevel} onChange={(e) => setStatPerLevel(e.target.value)} placeholder="e.g. +1 per level" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">XP Scaling</label>
+                      <Input value={xpScaling} onChange={(e) => setXpScaling(e.target.value)} placeholder="e.g. 1.2" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Vulnerable</label>
+                      <Input value={vulnerable} onChange={(e) => setVulnerable(e.target.value)} placeholder="e.g. fire" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Resist Damage Over Time</label>
+                      <Input value={resistDamageOverTime} onChange={(e) => setResistDamageOverTime(e.target.value)} placeholder="% or value" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Resist Slow</label>
+                      <Input value={resistSlow} onChange={(e) => setResistSlow(e.target.value)} placeholder="% or value" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Resist Stun</label>
+                      <Input value={resistStun} onChange={(e) => setResistStun(e.target.value)} placeholder="% or value" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Resist Knockback</label>
+                      <Input value={resistKnockback} onChange={(e) => setResistKnockback(e.target.value)} placeholder="% or value" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Resist Stat Debuff</label>
+                      <Input value={resistStatDebuff} onChange={(e) => setResistStatDebuff(e.target.value)} placeholder="% or value" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Resist Damage Reflect</label>
+                      <Input value={resistDamageReflect} onChange={(e) => setResistDamageReflect(e.target.value)} placeholder="% or value" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">XP Gain</label>
+                      <Input value={xpGain} onChange={(e) => setXpGain(e.target.value)} placeholder="xp gain modifier" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">HP Regen</label>
+                      <Input value={hpRegen} onChange={(e) => setHpRegen(e.target.value)} placeholder="hp/sec" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">MP Regen</label>
+                      <Input value={mpRegen} onChange={(e) => setMpRegen(e.target.value)} placeholder="mp/sec" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">HP Steal</label>
+                      <Input value={hpSteal} onChange={(e) => setHpSteal(e.target.value)} placeholder="% or value" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">MP Steal</label>
+                      <Input value={mpSteal} onChange={(e) => setMpSteal(e.target.value)} placeholder="% or value" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Accuracy</label>
+                      <Input value={accuracy} onChange={(e) => setAccuracy(e.target.value)} placeholder="accuracy" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Avoidance</label>
+                      <Input value={avoidance} onChange={(e) => setAvoidance(e.target.value)} placeholder="avoidance" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Crit</label>
+                      <Input value={crit} onChange={(e) => setCrit(e.target.value)} placeholder="crit rate" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Absorb Min</label>
+                      <Input value={absorbMin} onChange={(e) => setAbsorbMin(e.target.value)} placeholder="min absorb" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Absorb Max</label>
+                      <Input value={absorbMax} onChange={(e) => setAbsorbMax(e.target.value)} placeholder="max absorb" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Poise</label>
+                      <Input value={poise} onChange={(e) => setPoise(e.target.value)} placeholder="poise" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Reflect Chance</label>
+                      <Input value={reflectChance} onChange={(e) => setReflectChance(e.target.value)} placeholder="% chance" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Return Damage</label>
+                      <Input value={returnDamage} onChange={(e) => setReturnDamage(e.target.value)} placeholder="damage returned" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Currency Find</label>
+                      <Input value={currencyFind} onChange={(e) => setCurrencyFind(e.target.value)} placeholder="currency find modifier" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Item Find</label>
+                      <Input value={itemFind} onChange={(e) => setItemFind(e.target.value)} placeholder="item find modifier" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Stealth</label>
+                      <Input value={stealth} onChange={(e) => setStealth(e.target.value)} placeholder="stealth" />
+                    </div>
+                  </div>
+
+                  <div className="text-xs text-muted-foreground mt-3">
+                    <p><strong>Damage Types:</strong> According to the types defined in <code>engine/damage_types.txt</code>, stats like <code>physical_min</code>, <code>physical_max</code> can be used.</p>
+                    <p className="mt-1"><strong>Elemental Resistances:</strong> You can define resistances to elements by appending <code>_resist</code> to an element id (for example: <code>fire_resist</code>).</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'behavior' && (
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold mb-2">Movement and AI Behaviors</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="flex items-center gap-2"><input type="checkbox" className="h-4 w-4" checked={isMelee} onChange={(e) => setIsMelee(e.target.checked)} /> Melee</label>
+                  <label className="flex items-center gap-2"><input type="checkbox" className="h-4 w-4" checked={isRanged} onChange={(e) => setIsRanged(e.target.checked)} /> Ranged</label>
+                  <label className="flex items-center gap-2"><input type="checkbox" className="h-4 w-4" checked={isCaster} onChange={(e) => setIsCaster(e.target.checked)} /> Caster</label>
+                  <label className="flex items-center gap-2"><input type="checkbox" className="h-4 w-4" checked={isSummoner} onChange={(e) => setIsSummoner(e.target.checked)} /> Summoner</label>
+                  <label className="flex items-center gap-2"><input type="checkbox" className="h-4 w-4" checked={isBoss} onChange={(e) => setIsBoss(e.target.checked)} /> Boss</label>
+                  <label className="flex items-center gap-2"><input type="checkbox" className="h-4 w-4" checked={isPassive} onChange={(e) => setIsPassive(e.target.checked)} /> Passive</label>
+                  <label className="flex items-center gap-2"><input type="checkbox" className="h-4 w-4" checked={isStationary} onChange={(e) => setIsStationary(e.target.checked)} /> Stationary</label>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'combat' && (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Powers / Abilities (comma-separated)</label>
+                  <Input value={powers} onChange={(e) => setPowers(e.target.value)} placeholder="e.g. slam,stomp,acid" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Script / Behavior</label>
+                  <textarea value={script} onChange={(e) => setScript(e.target.value)} className="w-full h-24 rounded-md border border-border p-2 text-sm" />
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'loot' && (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Loot Table</label>
+                  <Input value={lootTable} onChange={(e) => setLootTable(e.target.value)} placeholder="Name of loot table or comma-separated items" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Drop Chance (%)</label>
+                  <Input value={dropChance} onChange={(e) => setDropChance(e.target.value)} placeholder="e.g. 50" />
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'flags' && (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Custom Properties (one per line, KEY=VALUE)</label>
+                  <textarea value={customPropsRaw} onChange={(e) => setCustomPropsRaw(e.target.value)} className="w-full h-48 rounded-md border border-border p-2 text-sm" />
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
         <DialogFooter className="pt-2 border-t flex justify-end gap-2">
+          <Button variant="outline" onClick={handleClose}>Cancel</Button>
+          <Button onClick={handleSave} className="bg-orange-500 text-white">Save</Button>
           <Button variant="outline" onClick={handleClose}>Cancel</Button>
           <Button onClick={handleSave} className="bg-orange-500 text-white">Save</Button>
         </DialogFooter>

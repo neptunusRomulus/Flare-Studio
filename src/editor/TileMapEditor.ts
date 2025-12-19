@@ -111,6 +111,7 @@ const COLLISION_BRUSH_TOOLTIPS: Record<number, string> = {
 
 export class TileMapEditor {
   public isStartingMap: boolean = false;
+  private enemyCategories: string[] = [];
   /**
    * Creates a settings.txt file in the project root folder for Flare compatibility.
    * Call this after export. Updates description with project name.
@@ -146,6 +147,25 @@ export class TileMapEditor {
 
   public getTileCount(): number {
     return this.tileCount;
+  }
+
+  // Enemy categories (project-scoped, in-memory)
+  public getEnemyCategories(): string[] {
+    return [...this.enemyCategories];
+  }
+
+  public setEnemyCategories(categories: string[]): void {
+    const deduped = Array.from(new Set(categories.map((c) => c.trim()).filter(Boolean)));
+    this.enemyCategories = deduped;
+  }
+
+  public addEnemyCategory(name: string): string[] {
+    const trimmed = name.trim();
+    if (!trimmed) return this.getEnemyCategories();
+    if (!this.enemyCategories.includes(trimmed)) {
+      this.enemyCategories = [...this.enemyCategories, trimmed];
+    }
+    return this.getEnemyCategories();
   }
 
   // Tile content detection settings
@@ -3102,7 +3122,7 @@ export class TileMapEditor {
             // and rebuild the palette accordingly.
             try {
               this.updateCurrentTileset(activeLayer.type);
-            } catch (e) {
+            } catch {
               // Fallback: attempt to create the palette directly if update fails
               this.createTilePalette(hasLayerTileData);
             }
@@ -3139,8 +3159,6 @@ export class TileMapEditor {
   private createTilePalette(preserveOrder: boolean = false): void {
     const container = document.getElementById('tilesContainer');
     if (!container || !this.tilesetImage) return;
-    
-    const paletteStartTime = performance.now();
     
     container.innerHTML = '';
     
@@ -5312,7 +5330,7 @@ export class TileMapEditor {
     detectedTiles: new Map(),
     brushes: []
   };
-  tabs.push(tab as any);
+  tabs.push(tab);
   this.layerTabs.set(layerType, tabs);
     // If no active tab set for this layer, set this one
     if (!this.layerActiveTabId.has(layerType)) {
@@ -6250,7 +6268,7 @@ export class TileMapEditor {
       const m = src.match(/[^/\\]+\.(png|jpg|jpeg|webp)$/i);
       if (m) return m[0];
       return `tileset_${Date.now()}.png`;
-    } catch (e) {
+    } catch {
       return `tileset_${Date.now()}.png`;
     }
   }
@@ -6778,7 +6796,7 @@ export class TileMapEditor {
       for (const [layerType, tabs] of this.layerTabs.entries()) {
         console.log(`[DEBUG] Serializing tabs for ${layerType}:`, tabs.length, 'tabs');
         tabsObj[layerType] = tabs.map(t => {
-          const ser: any = { id: t.id, name: t.name };
+          const ser: { id: number; name?: string; tileset?: SavedTilesetEntry; detectedTiles?: SerializedDetectedTile[] } = { id: t.id, name: t.name };
           if (t.tileset) {
             // Embed the tab's tileset image into tilesetImages if available
             const fileName = t.tileset.fileName;
@@ -6788,8 +6806,8 @@ export class TileMapEditor {
                   tilesetImages[fileName] = this.canvasToDataURL(t.tileset.image as HTMLImageElement);
                   console.log('getProjectData: embedded tab tileset image', { layerType, tabId: t.id, fileName });
                 }
-              } catch (err) {
-                console.warn('getProjectData: failed to embed tab tileset image', fileName, err);
+              } catch {
+                console.warn('getProjectData: failed to embed tab tileset image', fileName);
               }
             }
 
@@ -6830,8 +6848,8 @@ export class TileMapEditor {
         projectData.layerActiveTabId = activeObj;
         console.log('[DEBUG] getProjectData: Serialized layerActiveTabId:', activeObj);
       }
-    } catch (e) {
-      console.warn('getProjectData: failed to serialize layerTabs', e);
+    } catch {
+      console.warn('getProjectData: failed to serialize layerTabs');
     }
 
     // Debug summary: don't print full data URLs (they're large). Log counts and filename sizes.
@@ -6871,14 +6889,14 @@ export class TileMapEditor {
       for (const [, ts] of this.layerTilesets.entries()) {
         pushIfLoading(ts.image as HTMLImageElement | undefined);
       }
-    } catch (e) {
+    } catch {
       // ignore
     }
 
     // Check single/global tileset image as fallback
     try {
       pushIfLoading(this.tilesetImage as HTMLImageElement | undefined);
-    } catch (e) {
+    } catch {
       // ignore
     }
 
@@ -6927,7 +6945,7 @@ export class TileMapEditor {
     try {
       const active = this.tileLayers.find(l => l.id === this.activeLayerId);
       return active ? active.type : null;
-    } catch (e) {
+    } catch {
       return null;
     }
   }
@@ -7499,17 +7517,29 @@ export class TileMapEditor {
           this.layerActiveTabId.clear();
           let maxTabId = this.nextLayerTabId || 1;
           for (const [layerType, tabs] of Object.entries(projectData.layerTabs)) {
-            const arr: Array<any> = [];
+            type RestoredTab = {
+              id: number;
+              name: string;
+              tileset?: LayerTilesetEntry;
+              detectedTiles?: Map<number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }>;
+              brushes?: Array<{ image: HTMLImageElement; fileName: string; width: number; height: number }>;
+            };
+
+            const arr: Array<RestoredTab> = [];
             for (const t of tabs || []) {
-              const tabObj: any = { id: t.id || (maxTabId++), name: t.name || `Tab` };
+              const tabId = typeof t.id === 'number' ? t.id : (maxTabId++);
+              const tabName = t.name || `Tab ${tabId}`;
+              const tabObj: RestoredTab = { id: tabId, name: tabName };
               console.log(`[DEBUG] loadProjectData: Restoring tab for ${layerType} - savedId: ${t.id}, assignedId: ${tabObj.id}, name: ${tabObj.name}`);
+
               // Rehydrate tileset metadata (do not embed large data URLs here)
               if (t.tileset && t.tileset.fileName) {
-                const ts: any = {
-                  fileName: t.tileset.fileName,
-                  columns: t.tileset.columns,
-                  rows: t.tileset.rows,
-                  count: t.tileset.count,
+                const ts: LayerTilesetEntry = {
+                  image: null,
+                  fileName: t.tileset.fileName ?? null,
+                  columns: t.tileset.columns ?? 0,
+                  rows: t.tileset.rows ?? 0,
+                  count: t.tileset.count ?? 0,
                   tileWidth: t.tileset.tileWidth,
                   tileHeight: t.tileset.tileHeight,
                   spacing: t.tileset.spacing ?? 0,
@@ -7520,22 +7550,31 @@ export class TileMapEditor {
                 // create an Image and attach to the tab so switching to the tab
                 // restores the palette without relying on global editor state.
                 try {
-                  if (projectData.tilesetImages && projectData.tilesetImages[ts.fileName]) {
+                  const fn = ts.fileName ?? '';
+                  if (fn && projectData.tilesetImages && projectData.tilesetImages[fn]) {
                     const img = new Image();
-                    img.src = projectData.tilesetImages[ts.fileName];
+                    img.src = projectData.tilesetImages[fn];
                     ts.image = img;
                   }
-                } catch (e) {
-                  console.warn('Failed to rehydrate tab tileset image for', ts.fileName, e);
+                } catch {
+                  console.warn('Failed to rehydrate tab tileset image for', ts.fileName);
                 }
                 tabObj.tileset = ts;
               }
 
               // Detected tiles serialized as arrays -> convert to Map for runtime use
               if (t.detectedTiles && Array.isArray(t.detectedTiles)) {
-                const m = new Map<number, any>();
-                for (const [gid, data] of t.detectedTiles) {
-                  m.set(gid, data as any);
+                const m = new Map<number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }>();
+                for (const pair of t.detectedTiles) {
+                  const [gid, data] = pair as SerializedDetectedTile;
+                  m.set(gid, {
+                    sourceX: data.sourceX,
+                    sourceY: data.sourceY,
+                    width: data.width,
+                    height: data.height,
+                    originX: data.originX,
+                    originY: data.originY
+                  });
                 }
                 tabObj.detectedTiles = m;
               }

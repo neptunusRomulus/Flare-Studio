@@ -102,6 +102,8 @@ export interface FlareNPC {
   // === Map spawn bilgileri (map dosyasına yazılır) ===
   x: number;
   y: number;
+  width?: number;
+  height?: number;
   // NPC dosyasının yolu (ör: "npcs/my_npc.txt")
   filename: string;
   // Opsiyonel spawn koşulları

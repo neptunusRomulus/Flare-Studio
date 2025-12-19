@@ -11,7 +11,7 @@ import { DialogNode } from '../../types/dialogueEditor';
 import { generateRawAttributePreview, generateEffectSummary } from '../../utils/dialogueSerializer';
 import { DialogTextPanel } from './DialogTextPanel';
 import { DialogEffectsPanel } from './DialogEffectsPanel';
-import { Code, Eye, EyeOff, Plus, Minus, Check, X } from 'lucide-react';
+import { Code, Plus, Minus, X } from 'lucide-react';
 
 interface DialogNodeEditorProps {
   node: DialogNode;

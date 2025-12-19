@@ -442,7 +442,7 @@ export class TileMapEditor {
     }
   }
 
-  private onMouseUp(e: MouseEvent): void {
+  private onMouseUp(_e: MouseEvent): void {
     this.isMouseDown = false;
   }
 
@@ -711,6 +711,10 @@ export class TileMapEditor {
         });
       } else if (obj.type === 'npc' || (obj.properties && obj.properties.type === 'npc')) {
         npcs.push({
+          id: 0,
+          name: '',
+          talker: false,
+          vendor: false,
           x: obj.x,
           y: obj.y,
           width: obj.width,

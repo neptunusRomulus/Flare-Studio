@@ -18,10 +18,9 @@ import {
   RestoreEffect,
   RestoreType,
   createRewardEffect,
-  REWARD_EFFECT_LABELS,
   RESTORE_TYPE_LABELS
 } from '../../types/dialogueEditor';
-import { Plus, X, Coins, Package, Sparkles, Heart, Gift, ChevronDown, Minus } from 'lucide-react';
+import { Plus, X, Coins, Package, Sparkles, Heart, Gift, ChevronDown } from 'lucide-react';
 
 interface RewardsPanelProps {
   rewards: DialogRewardEffect[];

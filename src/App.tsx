@@ -836,6 +836,7 @@ function App() {
               // The editor's loadProjectData will replace layers, tilesets etc.
               // Just clear localStorage backup to prevent old data loading
               editor.clearLocalStorageBackup();
+              const cfg = nextTab.config as EditorProjectData;
               
               if (cfg.name) {
                 editor.setMapName(cfg.name);
@@ -846,7 +847,6 @@ function App() {
                 setMapWidth(cfg.width ?? 20);
                 setMapHeight(cfg.height ?? 15);
               }
-              const cfg = nextTab.config as EditorProjectData;
 
               // Helper type for optional editor runtime extensions used by the UI
               type EditorWithExtras = TileMapEditor & Partial<{
@@ -856,7 +856,7 @@ function App() {
                 getActiveLayerType: () => string | null;
                 updateCurrentTileset: (t: unknown) => void;
                 refreshTilePalette: (force?: boolean) => void;
-                draw: () => void;
+                redraw: () => void;
               }>;
 
               const ed = editor as EditorWithExtras;
@@ -1012,8 +1012,8 @@ function App() {
               
               // Force canvas redraw after loading
               try {
-                if (typeof ed.draw === 'function') {
-                  ed.draw();
+                if (typeof ed.redraw === 'function') {
+                  ed.redraw();
                   console.log('Forced canvas redraw after tab switch');
                 }
               } catch (e) {
@@ -5017,7 +5017,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             try {
               const tabs = editor && activeLayerType ? (editor.getLayerTabs ? editor.getLayerTabs(activeLayerType) : []) : [];
               return tabs && tabs.length > 7 ? 'tabs-limited' : '';
-            } catch (e) { return ''; }
+            } catch { return ''; }
           })()}`}
           onWheel={(e: React.WheelEvent<HTMLDivElement>) => {
             const el = e.currentTarget as HTMLDivElement;
@@ -5039,7 +5039,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                             onClick={() => {
                               if (!editor) return;
                               editor.setActiveLayerTab(activeLayerType!, tab.id);
-                              try { editor.refreshTilePalette(true); } catch (err) { /* ignore */ }
+                              try { editor.refreshTilePalette(true); } catch { /* ignore */ }
                               setTabTick(t => t + 1);
                             }}
                             style={{
@@ -5117,7 +5117,6 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                     {/* Existing Import button: now imports into active tab for background/object layers, falls back to existing layer tileset behavior for actor layers */}
                     {(() => {
                       const isNpc = activeLayer?.type === 'npc';
-                      const isEnemy = activeLayer?.type === 'enemy';
                       const isEventLayer = activeLayer?.type === 'event';
                       const isActorLayer = isNpc || isEventLayer; // enemy handled separately below the list
                       const tooltip = isActorLayer ? `Add ${isEventLayer ? 'Event' : 'NPC'}` : 'Import a PNG tileset or brush for the active layer tab';
@@ -6396,7 +6395,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 }
               }
             }}
-            onDragLeave={(e) => {
+            onDragLeave={() => {
               // Clear hover when leaving the canvas area
               if (draggingNpcId && editor) {
                 editor.clearNpcDragHover();
@@ -10056,7 +10055,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               Always Available Items
             </DialogTitle>
             <DialogDescription>
-              Select items to keep in this vendor's shop and set their quantities.
+              Select items to keep in this vendor&apos;s shop and set their quantities.
             </DialogDescription>
           </DialogHeader>
 

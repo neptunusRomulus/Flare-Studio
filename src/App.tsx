@@ -15,6 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/toaster';
 import WelcomeScreen from './components/WelcomeScreen';
 import OverwriteExportDialog from './components/OverwriteExportDialog';
+import EditEnemyWindow from '@/components/EditEnemyWindow';
 import flareIconUrl from '/flare-ico.png?url';
 
 interface MapConfig {
@@ -8336,16 +8337,30 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       </Dialog>
 
       {/* Object Management Dialog */}
-      <Dialog
-        open={showObjectDialog}
-        onOpenChange={(open) => {
-          if (!open) {
-            handleObjectDialogClose();
-          } else {
-            setShowObjectDialog(true);
-          }
-        }}
-      >
+      {editingObject?.type === 'enemy' ? (
+        <EditEnemyWindow
+          open={showObjectDialog}
+          onOpenChange={(open) => {
+            if (!open) {
+              handleObjectDialogClose();
+            } else {
+              setShowObjectDialog(true);
+            }
+          }}
+          enemy={editingObject}
+          onSave={handleUpdateObject}
+        />
+      ) : (
+        <Dialog
+          open={showObjectDialog}
+          onOpenChange={(open) => {
+            if (!open) {
+              handleObjectDialogClose();
+            } else {
+              setShowObjectDialog(true);
+            }
+          }}
+        >
         <DialogContent className="max-w-5xl w-full h-[90vh] flex flex-col">
           <DialogHeader className="mb-4">
             <DialogTitle className="flex items-center gap-2">
@@ -9436,6 +9451,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      )}
 
       {/* Dialogue Tree Dialog */}
       <Dialog

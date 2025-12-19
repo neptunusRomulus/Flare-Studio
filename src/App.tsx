@@ -2416,13 +2416,13 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
 
       // Create item file
       if (window.electronAPI?.createItemFile) {
-        const result = await window.electronAPI.createItemFile(currentProjectPath, {
+        type CreateItemPayload = Parameters<NonNullable<Window['electronAPI']>['createItemFile']>[1];
+        const payload: CreateItemPayload = {
           name: itemDialogState.name.trim(),
           id: itemId,
           category: selectedCategory,
-          role: itemDialogState.role,
-          resourceSubtype: itemDialogState.resourceSubtype
-        } as any);
+        };
+        const result = await window.electronAPI.createItemFile(currentProjectPath, payload);
         
         if (result.success) {
           console.log('Item file created:', result.filePath);
@@ -3232,7 +3232,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         type: l.type,
         name: l.name,
         dataLength: l.data?.length || 0,
-        hasNonZeroData: l.data?.some((d: any) => d !== 0) || false
+        hasNonZeroData: l.data?.some((d) => d !== 0) || false
       })));
 
       // Load the complete project data into the editor
@@ -5005,9 +5005,9 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 if (editor && activeLayerType) {
                   const tabs = editor.getLayerTabs ? editor.getLayerTabs(activeLayerType) : [];
                   const activeTabId = editor.getActiveLayerTabId ? editor.getActiveLayerTabId(activeLayerType) : null;
-                  console.log('[DEBUG UI] tabs for', activeLayerType, ':', tabs.length, 'tabs', JSON.stringify(tabs.map((t: any) => ({ id: t.id, name: t.name }))));
+                  console.log('[DEBUG UI] tabs for', activeLayerType, ':', tabs.length, 'tabs', JSON.stringify(tabs.map((t: { id: number; name?: string }) => ({ id: t.id, name: t.name }))));
                   console.log('[DEBUG UI] activeTabId for', activeLayerType, ':', activeTabId);
-                  console.log('[DEBUG UI] Tab ID match check: tab IDs are', tabs.map((t: any) => t.id), 'and looking for active ID', activeTabId);
+                  console.log('[DEBUG UI] Tab ID match check: tab IDs are', tabs.map((t: { id: number; name?: string }) => t.id), 'and looking for active ID', activeTabId);
                 }
                 if (!showTabs) return null;
         return (

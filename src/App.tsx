@@ -837,14 +837,14 @@ function App() {
               // Just clear localStorage backup to prevent old data loading
               editor.clearLocalStorageBackup();
               
-              if (nextTab.config.name) {
-                editor.setMapName((nextTab.config as any).name);
-                setMapName((nextTab.config as any).name);
+              if (cfg.name) {
+                editor.setMapName(cfg.name);
+                setMapName(cfg.name);
               }
-              if ((nextTab.config as any).width && (nextTab.config as any).height) {
-                editor.setMapSize((nextTab.config as any).width ?? 20, (nextTab.config as any).height ?? 15);
-                setMapWidth((nextTab.config as any).width ?? 20);
-                setMapHeight((nextTab.config as any).height ?? 15);
+              if (cfg.width && cfg.height) {
+                editor.setMapSize(cfg.width ?? 20, cfg.height ?? 15);
+                setMapWidth(cfg.width ?? 20);
+                setMapHeight(cfg.height ?? 15);
               }
               const cfg = nextTab.config as EditorProjectData;
 
@@ -912,8 +912,8 @@ function App() {
                       }
                     }
                     if (Object.keys(toApply).length > 0) {
-                      if (typeof (editor as any).setTilesetImages === 'function') {
-                        (editor as any).setTilesetImages(toApply);
+                      if (typeof ed.setTilesetImages === 'function') {
+                        ed.setTilesetImages(toApply);
                         console.log('Applied discovered project tileset images for tab', tabId, Object.keys(toApply));
                       } else {
                         // attach to editor as fallback
@@ -976,8 +976,8 @@ function App() {
 
               // Wait for any in-flight image loads then load the rest of the project data
               try {
-                if (typeof (editor as any).ensureTilesetsLoaded === 'function') {
-                  await (editor as any).ensureTilesetsLoaded(2000);
+                if (typeof ed.ensureTilesetsLoaded === 'function') {
+                  await ed.ensureTilesetsLoaded(2000);
                 } else {
                   await new Promise((r) => setTimeout(r, 50));
                 }
@@ -989,14 +989,14 @@ function App() {
 
               // Force palette rebuild after images and layers settle
               try {
-                const activeLayerType = typeof (editor as any).getActiveLayerType === 'function'
-                  ? (editor as any).getActiveLayerType()
+                const activeLayerType = typeof ed.getActiveLayerType === 'function'
+                  ? ed.getActiveLayerType()
                   : null;
-                if (activeLayerType && typeof (editor as any).updateCurrentTileset === 'function') {
-                  (editor as any).updateCurrentTileset(activeLayerType);
+                if (activeLayerType && typeof ed.updateCurrentTileset === 'function') {
+                  ed.updateCurrentTileset(activeLayerType);
                 }
-                if (typeof (editor as any).refreshTilePalette === 'function') {
-                  (editor as any).refreshTilePalette(true);
+                if (typeof ed.refreshTilePalette === 'function') {
+                  ed.refreshTilePalette(true);
                 }
                 console.log('Forced palette rebuild after restoring tab', tabId);
               } catch (e) {
@@ -1012,8 +1012,8 @@ function App() {
               
               // Force canvas redraw after loading
               try {
-                if (typeof (editor as any).draw === 'function') {
-                  (editor as any).draw();
+                if (typeof ed.draw === 'function') {
+                  ed.draw();
                   console.log('Forced canvas redraw after tab switch');
                 }
               } catch (e) {

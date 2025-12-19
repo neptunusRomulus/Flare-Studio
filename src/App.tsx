@@ -816,7 +816,7 @@ function App() {
           if (editor) setupAutoSave(editor);
           return;
         }
-      } catch (e) {
+} catch {
         // ignore and fall back to normal restore
       }
 
@@ -1102,7 +1102,7 @@ function App() {
   useEffect(() => {
     try {
       localStorage.setItem('showSidebarToggle', JSON.stringify(showSidebarToggle));
-    } catch (e) {
+    } catch {
       // ignore storage errors
     }
   }, [showSidebarToggle]);
@@ -2607,7 +2607,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     setEditingItem(prev => prev ? { ...prev, [key]: value } : null);
   }, []);
 
-  const handleRemoveActor = useCallback((objectId: number) => {
+  const _handleRemoveActor = useCallback((objectId: number) => {
     if (!editor) return;
     editor.removeMapObject(objectId);
     syncMapObjects();
@@ -4584,14 +4584,14 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           onClick={() => {
             setLeftTransitioning(true);
             if (editor && typeof editor.setSidebarTransitioning === 'function') {
-              try { editor.setSidebarTransitioning(true); } catch (e) { /* ignore */ }
+              try { editor.setSidebarTransitioning(true); } catch { /* ignore */ }
             }
             setLeftCollapsed((s) => !s);
             // keep the transitioning flag for slightly longer than the CSS transition
             window.setTimeout(() => {
               setLeftTransitioning(false);
               if (editor && typeof editor.setSidebarTransitioning === 'function') {
-                try { editor.setSidebarTransitioning(false); } catch (e) { /* ignore */ }
+                try { editor.setSidebarTransitioning(false); } catch { /* ignore */ }
               }
             }, 380);
           }}
@@ -4901,7 +4901,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 <div className="flex-1 min-h-0 border border-dashed border-border rounded-md overflow-y-auto">
                   {itemsList.length === 0 ? (
                     <div className="flex items-center justify-center h-full text-sm text-muted-foreground px-4 text-center">
-                      Click "+ Item" to create a new item definition file.
+                      Click &quot;+ Item&quot; to create a new item definition file.
                     </div>
                   ) : (
                     <div className="flex flex-col gap-1 p-2">
@@ -8249,7 +8249,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                           checked={editingItem.book_is_readable}
                           onChange={(e) => updateEditingItemField('book_is_readable', e.target.checked)}
                         />
-                        Show "Read" instead of "Use"
+                        Show &quot;Read&quot; instead of &quot;Use&quot;
                       </label>
                     </div>
                   </div>

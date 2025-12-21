@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import Tooltip from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Upload, Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Blend, MapPin, Save, Scan, Link2, Scissors, Trash2, Check, HelpCircle, Folder, Shield, Plus, Image, Grid, Box, Users, User, Locate, Clock, Menu, ChevronLeft, ChevronRight, GripVertical, MessageSquare, ChevronDown, ChevronUp, ArrowLeft, Gift, Coins, Sparkles, Heart, Zap, ZapOff, Volume2, Tag, Package, AlignLeft, Sword, ChevronsUpDown, AlertTriangle, Book, GitBranch, Apple, Skull, Swords, RefreshCw, Repeat, Dices, Timer, UserPlus, Flag, CheckCircle, ArrowRight, Puzzle } from 'lucide-react';
+import { Upload, Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Blend, MapPin, Save, Edit2, Scan, Link2, Scissors, Trash2, Check, HelpCircle, Folder, Shield, Plus, Image, Grid, Box, Users, User, Locate, Clock, Menu, ChevronLeft, ChevronRight, GripVertical, MessageSquare, ChevronDown, ChevronUp, ArrowLeft, Gift, Coins, Sparkles, Heart, Zap, ZapOff, Volume2, Tag, Package, AlignLeft, Sword, ChevronsUpDown, AlertTriangle, Book, GitBranch, Apple, Skull, Swords, RefreshCw, Repeat, Dices, Timer, UserPlus, Flag, CheckCircle, ArrowRight, Puzzle } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { TileMapEditor } from './editor/TileMapEditor';
 import type { EditorProjectData, SavedTilesetEntry } from './editor/TileMapEditor';
@@ -454,13 +454,15 @@ function App() {
   const [activeLayerId, setActiveLayerId] = useState<number | null>(null);
   const [showAddLayerDropdown, setShowAddLayerDropdown] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showMapSettingsOnly, setShowMapSettingsOnly] = useState(false);
   // Layers panel expand/collapse state
   const [layersPanelExpanded, setLayersPanelExpanded] = useState(false);
   // Individual layer hover state
   const [hoveredLayerId, setHoveredLayerId] = useState<number | null>(null);
   const [showHelp, setShowHelp] = useState(false);
   const [activeHelpTab, setActiveHelpTab] = useState('engine');
-  const [showTooltip, setShowTooltip] = useState(true);
+  const [tipsMinimized, setTipsMinimized] = useState(false);
+  const [tipsClosing, setTipsClosing] = useState(false);
   // Force refresh counter to trigger re-render when editor-managed tabs change
   const [tabTick, setTabTick] = useState(0);
   const [toolbarExpanded, setToolbarExpanded] = useState(true);
@@ -1109,7 +1111,7 @@ function App() {
   }, [showSidebarToggle]);
   
   // Auto-save states
-  const [saveStatus, setSaveStatus] = useState<'saving' | 'saved' | 'error' | 'unsaved'>('saved');
+  const [saveStatus, setSaveStatus] = useState<'saving' | 'saved' | 'error' | 'unsaved'>('unsaved');
   const [autoSaveEnabled, setAutoSaveEnabledState] = useState(true);
   const [lastSaveTime, setLastSaveTime] = useState<number>(0);
   const [isManuallySaving, setIsManuallySaving] = useState(false);
@@ -1606,6 +1608,13 @@ function App() {
       setMapObjects([]);
     }
   }, [editor]);
+
+  const existingEnemyCategories = useMemo(() => {
+    const cats = mapObjects
+      .filter(obj => obj.type === 'enemy' && obj.category && obj.category !== 'enemy')
+      .map(o => o.category as string);
+    return Array.from(new Set(cats)).sort();
+  }, [mapObjects]);
 
   // Keep 'toast' referenced to avoid unused variable errors while toasts are suppressed.
   // This creates a stable noop reference that will never show UI.
@@ -2641,7 +2650,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     setDraggingNpcId(null);
   }, [editor]);
 
-  const handleActorSubmit = useCallback(async () => {
+  const handleActorSubmit = useCallback(async (editAfter = false) => {
     if (!editor || !actorDialogState) {
       return;
     }
@@ -2741,7 +2750,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       x: unplacedX,
       y: unplacedY,
       type: actorDialogState.type,
-      category: actorDialogState.type === 'npc' ? 'npc' : 'enemy',
+      category: actorDialogState.type === 'npc' ? 'npc' : '',
       wander_radius: 0,
       properties: {
         ...(newObject.properties || {}),
@@ -2753,11 +2762,16 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     });
 
     syncMapObjects();
+    const newObjectId = newObject.id;
     handleCloseActorDialog();
+    
+    if (editAfter) {
+      handleEditObject(newObjectId);
+    }
     
     // Trigger autosave after NPC is added
     editor.triggerAutoSave(true);
-  }, [actorDialogState, editor, handleCloseActorDialog, syncMapObjects, currentProjectPath]);
+  }, [actorDialogState, editor, handleCloseActorDialog, syncMapObjects, currentProjectPath, handleEditObject]);
 
   const handleObjectDialogClose = useCallback(() => {
     setShowObjectDialog(false);
@@ -4498,31 +4512,8 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             />
             <span className="text-sm font-semibold text-orange-600 dark:text-orange-400">Flare Studio</span>
           </div>
-          {/* Tabs */}
-          <div className="ml-4 flex items-center gap-2 overflow-x-auto max-w-[60vw] no-drag">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => { void switchToTab(tab.id); }}
-                className={`px-3 py-1 rounded-t-md border border-b-0 text-sm truncate max-w-xs no-drag transition-all duration-200 ${tab.id === activeTabId ? 'bg-orange-500 text-white border-orange-500' : 'bg-transparent text-gray-600 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-neutral-700'}`}
-                title={tab.name}
-              >
-                {tab.name}
-              </button>
-            ))}
-            <Tooltip content="Create a new map" side="right">
-              <button
-                onClick={() => setShowCreateMapDialog(true)}
-                className="ml-1 p-1 rounded-md hover:bg-slate-100 dark:hover:bg-neutral-800 no-drag"
-                aria-label="Create new map"
-              >
-                <Plus className="w-4 h-4 text-orange-600 dark:text-orange-400" />
-              </button>
-            </Tooltip>
-          </div>
-          <div className="text-sm font-medium"></div>
-          {/* Save Status Indicator */}
-          <div className="flex items-center gap-1 text-xs">
+          {/* Save Status Indicator - moved to be next to logo */}
+          <div className="flex items-center gap-1 text-xs mx-4 min-w-[70px]">
             {saveStatus === 'saving' && (
               <>
                 <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
@@ -4543,11 +4534,52 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             )}
             {saveStatus === 'unsaved' && (
               <>
-                <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                <span className="text-yellow-600">Unsaved</span>
+                <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                <span className="text-gray-500">Unsaved</span>
               </>
             )}
           </div>
+          {/* Tabs - come after the save status */}
+          <div className="ml-2 flex items-center gap-2 overflow-x-auto max-w-[60vw] no-drag">
+            {tabs.map((tab) => (
+              <div
+                key={tab.id}
+                className={`flex items-center gap-1 px-3 py-1 rounded-t-md border border-b-0 text-sm truncate max-w-xs no-drag transition-all duration-200 ${tab.id === activeTabId ? 'bg-orange-500 text-white border-orange-500' : 'bg-transparent text-gray-600 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-neutral-700'}`}
+              >
+                <button
+                  onClick={() => { void switchToTab(tab.id); }}
+                  className="truncate"
+                  title={tab.name}
+                >
+                  {tab.name}
+                </button>
+                {tab.id === activeTabId && (
+                  <Tooltip content="Edit Map Settings" side="bottom">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowMapSettingsOnly(true);
+                      }}
+                      className="flex-shrink-0 w-4 h-4 flex items-center justify-center rounded"
+                      aria-label="Edit Map Settings"
+                    >
+                      <Settings className="w-3 h-3" />
+                    </button>
+                  </Tooltip>
+                )}
+              </div>
+            ))}
+            <Tooltip content="Create a new map" side="right">
+              <button
+                onClick={() => setShowCreateMapDialog(true)}
+                className="ml-1 p-1 rounded-md hover:bg-slate-100 dark:hover:bg-neutral-800 no-drag"
+                aria-label="Create new map"
+              >
+                <Plus className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+              </button>
+            </Tooltip>
+          </div>
+          <div className="text-sm font-medium"></div>
         </div>
         <div className="flex no-drag">
           <button 
@@ -5598,7 +5630,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
 
               {/* Help button moved into Settings > Other Options */}
 
-              <Tooltip content="Map Settings">
+              <Tooltip content="Engine Settings">
                 <Button onClick={() => setShowSettings(true)} className="w-7 h-7 p-0 shadow-sm" variant="outline" size="sm">
                   <Settings className="w-3 h-3" />
                 </Button>
@@ -5607,12 +5639,12 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           </section>
         </aside>
 
-        {/* Settings Modal */}
+        {/* Engine Settings Modal */}
         {showSettings && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-background border border-border rounded-lg p-6 w-96">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold">Settings</h3>
+                <h3 className="text-lg font-semibold">Engine Settings</h3>
                 <Button 
                   variant="ghost" 
                   size="sm" 
@@ -5622,248 +5654,230 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                   <X className="w-4 h-4" />
                 </Button>
               </div>
-              <div className="flex border-b mb-4">
-                <button
-                  className={`flex-1 py-2 text-sm font-medium border-b-2 transition-colors ${settingsTab === 'map' ? 'border-orange-500 text-orange-600' : 'border-transparent text-gray-500'}`}
-                  onClick={() => setSettingsTab('map')}
-                >
-                  Current Map Settings
-                </button>
-                <button
-                  className={`flex-1 py-2 text-sm font-medium border-b-2 transition-colors ${settingsTab === 'other' ? 'border-orange-500 text-orange-600' : 'border-transparent text-gray-500'}`}
-                  onClick={() => setSettingsTab('other')}
-                >
-                  Other Options
-                </button>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Theme (Experimental)</label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">Light Mode</span>
+                    <button
+                      onClick={() => setIsDarkMode(!isDarkMode)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        isDarkMode ? 'bg-orange-600' : 'bg-gray-200'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          isDarkMode ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                      <span className="sr-only">Toggle dark mode</span>
+                    </button>
+                    <span className="text-sm flex items-center gap-1">
+                      {isDarkMode ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+                      Dark Mode
+                    </span>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Debug Mode</label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">Disabled</span>
+                    <button
+                      onClick={() => {
+                        if (editor) {
+                          editor.toggleDebugMode();
+                        }
+                      }}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        editor?.getDebugMode() ? 'bg-orange-600' : 'bg-gray-200'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          editor?.getDebugMode() ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                      <span className="sr-only">Toggle debug mode</span>
+                    </button>
+                    <span className="text-sm flex items-center gap-1">
+                      <Target className="w-4 h-4" />
+                      Debug Tiles
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Shows tile boundaries and coordinates for debugging
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Auto-Save</label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">Disabled</span>
+                    <button
+                      onClick={() => {
+                        const newEnabled = !autoSaveEnabled;
+                        setAutoSaveEnabledState(newEnabled);
+                        if (editor) {
+                          editor.setAutoSaveEnabled(newEnabled);
+                        }
+                      }}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        autoSaveEnabled ? 'bg-orange-600' : 'bg-gray-200'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          autoSaveEnabled ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                      <span className="sr-only">Toggle auto-save</span>
+                    </button>
+                    <span className="text-sm">
+                      Enabled
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Automatically saves your work every 8 seconds
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Active GID Indicator</label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">Show</span>
+                    <button
+                      onClick={() => {
+                        const newVal = !showActiveGid;
+                        setShowActiveGid(newVal);
+                      }}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        showActiveGid ? 'bg-orange-600' : 'bg-gray-200'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          showActiveGid ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                      <span className="sr-only">Toggle Active GID Indicator</span>
+                    </button>
+                    <span className="text-sm">{showActiveGid ? 'Shown' : 'Hidden'}</span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">Toggle whether the Active GID badge is visible next to the hover coordinates.</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Sidebar Collapse Button</label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">Show toggle</span>
+                    <button
+                      onClick={() => setShowSidebarToggle((s: boolean) => !s)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        showSidebarToggle ? 'bg-orange-600' : 'bg-gray-200'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          showSidebarToggle ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                      <span className="sr-only">Toggle sidebar collapse button</span>
+                    </button>
+                    <span className="text-sm">{showSidebarToggle ? 'Shown' : 'Hidden'}</span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">Show or hide the left-edge sidebar collapse/expand toggle.</p>
+                </div>
               </div>
-              {settingsTab === 'map' ? (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Map Name</label>
-                    <Input
-                      type="text"
-                      value={mapName}
-                      onChange={(e) => setMapName(e.target.value)}
-                      placeholder="Enter map name"
-                      className="w-full"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Map Width</label>
-                    <Input
-                      type="number"
-                      value={mapWidth}
-                      onChange={(e) => setMapWidth(Number(e.target.value))}
-                      min="1"
-                      max="100"
-                      className="w-full"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Map Height</label>
-                    <Input
-                      type="number"
-                      value={mapHeight}
-                      onChange={(e) => setMapHeight(Number(e.target.value))}
-                      min="1"
-                      max="100"
-                      className="w-full"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2 rounded-md border border-border px-3 py-2">
-                    <div className="flex items-center gap-2">
-                      <label htmlFor="starting-map-checkbox" className="text-sm font-medium text-muted-foreground">
-                        Starting Map
-                      </label>
-                      <Tooltip content="If this map is the map that players will start the game then mark this option">
-                        <HelpCircle className="h-4 w-4 text-muted-foreground" aria-hidden />
-                      </Tooltip>
-                    </div>
-                    <input
-                      id="starting-map-checkbox"
-                      type="checkbox"
-                      className="h-4 w-4 rounded border border-border accent-orange-500"
-                      checked={isStartingMap}
-                      onChange={(e) => updateStartingMap(e.target.checked)}
-                      aria-checked={isStartingMap}
-                      aria-label="Set this map as the starting map"
-                    />
-                  </div>
-                  <div className="flex gap-2 mt-6">
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setShowSettings(false)}
-                      className="flex-1"
-                    >
-                      Cancel
-                    </Button>
-                    <Button 
-                      onClick={() => {
-                        handleMapResize();
-                        setShowSettings(false);
-                      }}
-                      className="flex-1"
-                    >
-                      Apply Changes
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Theme (Experimental)</label>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm">Light Mode</span>
-                      <button
-                        onClick={() => setIsDarkMode(!isDarkMode)}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                          isDarkMode ? 'bg-orange-600' : 'bg-gray-200'
-                        }`}
-                      >
-                        <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                            isDarkMode ? 'translate-x-6' : 'translate-x-1'
-                          }`}
-                        />
-                        <span className="sr-only">Toggle dark mode</span>
-                      </button>
-                      <span className="text-sm flex items-center gap-1">
-                        {isDarkMode ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
-                        Dark Mode
-                      </span>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Debug Mode</label>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm">Disabled</span>
-                      <button
-                        onClick={() => {
-                          if (editor) {
-                            editor.toggleDebugMode();
-                          }
-                        }}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                          editor?.getDebugMode() ? 'bg-orange-600' : 'bg-gray-200'
-                        }`}
-                      >
-                        <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                            editor?.getDebugMode() ? 'translate-x-6' : 'translate-x-1'
-                          }`}
-                        />
-                        <span className="sr-only">Toggle debug mode</span>
-                      </button>
-                      <span className="text-sm flex items-center gap-1">
-                        <Target className="w-4 h-4" />
-                        Debug Tiles
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Shows tile boundaries and coordinates for debugging
-                    </p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Auto-Save</label>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm">Disabled</span>
-                      <button
-                        onClick={() => {
-                          const newEnabled = !autoSaveEnabled;
-                          setAutoSaveEnabledState(newEnabled);
-                          if (editor) {
-                            editor.setAutoSaveEnabled(newEnabled);
-                          }
-                        }}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                          autoSaveEnabled ? 'bg-orange-600' : 'bg-gray-200'
-                        }`}
-                      >
-                        <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                            autoSaveEnabled ? 'translate-x-6' : 'translate-x-1'
-                          }`}
-                        />
-                        <span className="sr-only">Toggle auto-save</span>
-                      </button>
-                      <span className="text-sm">
-                        Enabled
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Automatically saves your work every 8 seconds
-                    </p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Active GID Indicator</label>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm">Show</span>
-                      <button
-                        onClick={() => {
-                          const newVal = !showActiveGid;
-                          setShowActiveGid(newVal);
-                        }}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                          showActiveGid ? 'bg-orange-600' : 'bg-gray-200'
-                        }`}
-                      >
-                        <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                            showActiveGid ? 'translate-x-6' : 'translate-x-1'
-                          }`}
-                        />
-                        <span className="sr-only">Toggle Active GID Indicator</span>
-                      </button>
-                      <span className="text-sm">{showActiveGid ? 'Shown' : 'Hidden'}</span>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">Toggle whether the Active GID badge is visible next to the hover coordinates.</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Sidebar Collapse Button</label>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm">Show toggle</span>
-                      <button
-                        onClick={() => setShowSidebarToggle((s: boolean) => !s)}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                          showSidebarToggle ? 'bg-orange-600' : 'bg-gray-200'
-                        }`}
-                      >
-                        <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                            showSidebarToggle ? 'translate-x-6' : 'translate-x-1'
-                          }`}
-                        />
-                        <span className="sr-only">Toggle sidebar collapse button</span>
-                      </button>
-                      <span className="text-sm">{showSidebarToggle ? 'Shown' : 'Hidden'}</span>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1">Show or hide the left-edge sidebar collapse/expand toggle.</p>
-                  </div>
-                  <div className="flex gap-2 mt-6">
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setShowSettings(false)}
-                      className="flex-1"
-                    >
-                      Close
-                    </Button>
-                    <Button
-                      onClick={() => {
-                        setShowHelp(true);
-                        setShowSettings(false);
-                      }}
-                      className="flex-1 flex items-center justify-center gap-2"
-                    >
-                      <HelpCircle className="w-4 h-4" />
-                      <span>Help & Docs</span>
-                    </Button>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         )}
 
+        {/* Map Settings Only Modal (opens from tab settings button) */}
+        {showMapSettingsOnly && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-background border border-border rounded-lg p-6 w-96">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold">Map Settings — {mapName}</h3>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setShowMapSettingsOnly(false)}
+                  className="w-8 h-8 p-0"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Map Name</label>
+                  <Input
+                    type="text"
+                    value={mapName}
+                    onChange={(e) => setMapName(e.target.value)}
+                    placeholder="Enter map name"
+                    className="w-full"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Map Width</label>
+                  <Input
+                    type="number"
+                    value={mapWidth}
+                    onChange={(e) => setMapWidth(Number(e.target.value))}
+                    min="1"
+                    max="100"
+                    className="w-full"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Map Height</label>
+                  <Input
+                    type="number"
+                    value={mapHeight}
+                    onChange={(e) => setMapHeight(Number(e.target.value))}
+                    min="1"
+                    max="100"
+                    className="w-full"
+                  />
+                </div>
+                <div className="flex items-center gap-2 rounded-md border border-border px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <label htmlFor="starting-map-checkbox-modal" className="text-sm font-medium text-muted-foreground">
+                      Starting Map
+                    </label>
+                    <Tooltip content="If this map is the map that players will start the game then mark this option">
+                      <HelpCircle className="h-4 w-4 text-muted-foreground" aria-hidden />
+                    </Tooltip>
+                  </div>
+                  <input
+                    id="starting-map-checkbox-modal"
+                    type="checkbox"
+                    className="h-4 w-4 rounded border border-border accent-orange-500"
+                    checked={isStartingMap}
+                    onChange={(e) => updateStartingMap(e.target.checked)}
+                    aria-checked={isStartingMap}
+                    aria-label="Set this map as the starting map"
+                  />
+                </div>
+                <div className="flex gap-2 mt-6">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setShowMapSettingsOnly(false)}
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={() => {
+                      handleMapResize();
+                      setShowMapSettingsOnly(false);
+                    }}
+                    className="flex-1"
+                  >
+                    Apply Changes
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         {/* Clear Layer Confirmation Dialog (replaces native confirm) */}
         {showClearLayerDialog && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -6425,39 +6439,63 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               setDraggingNpcId(null);
             }}
           >
-            {/* Canvas Tooltip Panel - always mounted; visibility via classes */}
-            <div
-              className={`absolute top-4 left-4 z-20 p-3 bg-white/90 dark:bg-neutral-900/90 backdrop-blur-sm rounded-lg border border-border shadow-lg transition-opacity duration-300 ${showTooltip ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
-              aria-hidden={!showTooltip}
-            >
-              <Button
-                variant="ghost"
-                size="sm"
-                className="absolute top-1 right-1 w-6 h-6 p-0"
-                onClick={() => setShowTooltip(false)}
+            {/* Canvas Tips Panel - minimizes to question mark icon with animation */}
+            <div className="absolute top-4 left-4 z-20">
+              {/* Minimized state: Question mark icon in a circle */}
+              <div 
+                className={`absolute inset-0 transition-all duration-300 ${tipsMinimized ? 'opacity-100 scale-100 pointer-events-auto' : 'opacity-0 scale-75 pointer-events-none'}`}
               >
-                <X className="w-3 h-3" />
-              </Button>
+                <Tooltip content="Click to see help" side="right">
+                  <button
+                    className="w-8 h-8 flex items-center justify-center bg-white dark:bg-neutral-900 rounded-full border border-border shadow-lg hover:bg-gray-100 dark:hover:bg-neutral-800 transition-all duration-200 hover:scale-105"
+                    onClick={() => setTipsMinimized(false)}
+                    aria-label="Show help tips"
+                  >
+                    <HelpCircle className="w-4 h-4 text-gray-600 dark:text-gray-300" />
+                  </button>
+                </Tooltip>
+              </div>
 
-              <div className="space-y-2 pr-6">
-                <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
-                  <MousePointer2 className="w-4 h-4" />
-                  <span>Left Click to Paint</span>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
-                  <Mouse className="w-4 h-4" />
-                  <span>Right Click to Delete</span>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
-                  <Move className="w-4 h-4" />
-                  <span>Spacebar + Mouse to Pan</span>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
-                  <div className="relative">
-                    <Mouse className="w-4 h-4" />
-                    <Circle className="w-2 h-2 absolute top-1 left-1.5 opacity-60" />
+              {/* Expanded state: Full tips panel */}
+              <div
+                className={`p-3 bg-white/90 dark:bg-neutral-900/90 backdrop-blur-sm rounded-lg border border-border shadow-lg transition-all duration-300 origin-top-left ${tipsMinimized ? 'opacity-0 scale-75 pointer-events-none' : 'opacity-100 scale-100 pointer-events-auto'}`}
+              >
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="absolute top-1 right-1 w-6 h-6 p-0"
+                  onClick={() => setTipsMinimized(true)}
+                >
+                  <X className="w-3 h-3" />
+                </Button>
+
+                <div className="space-y-2 pr-6">
+                  <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
+                    <MousePointer2 className="w-4 h-4" />
+                    <span>Left Click to Paint</span>
                   </div>
-                  <span>Mouse Wheel to Zoom In-Out</span>
+                  <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
+                    <Mouse className="w-4 h-4" />
+                    <span>Right Click to Delete</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
+                    <Move className="w-4 h-4" />
+                    <span>Spacebar + Mouse to Pan</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
+                    <div className="relative">
+                      <Mouse className="w-4 h-4" />
+                      <Circle className="w-2 h-2 absolute top-1 left-1.5 opacity-60" />
+                    </div>
+                    <span>Mouse Wheel to Zoom In-Out</span>
+                  </div>
+                  <button
+                    className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300 hover:text-orange-500 transition-colors w-full text-left mt-1 pt-1 border-t border-gray-100 dark:border-neutral-800"
+                    onClick={() => setShowHelp(true)}
+                  >
+                    <HelpCircle className="w-4 h-4 text-orange-400" />
+                    <span className="font-medium">Help and Documentation</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -7429,10 +7467,18 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       {/* NPC / Enemy Creation Dialog */}
       <Dialog open={actorDialogState !== null} onOpenChange={(open) => (open ? void 0 : handleCloseActorDialog())}>
         <DialogContent className="max-w-md">
-          <DialogHeader>
+          <DialogHeader className="relative">
             <DialogTitle>
               {actorDialogState?.type === 'npc' ? 'Add NPC' : 'Add Enemy'}
             </DialogTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="absolute top-0 right-0 w-6 h-6 p-0 hover:bg-transparent"
+              onClick={handleCloseActorDialog}
+            >
+              <X className="w-4 h-4 text-muted-foreground" />
+            </Button>
             <DialogDescription>
               Define the details for this {actorDialogState?.type === 'npc' ? 'NPC' : 'enemy'}.
             </DialogDescription>
@@ -7554,13 +7600,25 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               )}
             </div>
           )}
-          <DialogFooter>
-            <Button variant="outline" onClick={handleCloseActorDialog}>
-              Cancel
-            </Button>
-            <Button onClick={handleActorSubmit}>
-              {actorDialogState?.type === 'npc' ? 'Add NPC' : 'Add Enemy'}
-            </Button>
+          <DialogFooter className="mt-4">
+            <div className="flex gap-0 divide-x divide-white/20 rounded-md overflow-hidden shadow-sm">
+              <Tooltip content={actorDialogState?.type === 'npc' ? 'Add NPC' : 'Add Enemy'} side="top">
+                <Button 
+                  onClick={() => handleActorSubmit(false)} 
+                  className="rounded-r-none h-8 px-3 bg-orange-500 hover:bg-orange-600 border-none"
+                >
+                  <Save className="w-4 h-4" />
+                </Button>
+              </Tooltip>
+              <Tooltip content={actorDialogState?.type === 'npc' ? 'Add and Edit NPC' : 'Add and Edit Enemy'} side="top">
+                <Button 
+                  onClick={() => handleActorSubmit(true)} 
+                  className="rounded-l-none h-8 px-3 bg-orange-500 hover:bg-orange-600 border-none"
+                >
+                  <Edit2 className="w-4 h-4" />
+                </Button>
+              </Tooltip>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -8349,6 +8407,8 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           }}
           enemy={editingObject}
           onSave={handleUpdateObject}
+          existingCategories={existingEnemyCategories}
+          projectPath={currentProjectPath || ''}
         />
       ) : (
         <Dialog

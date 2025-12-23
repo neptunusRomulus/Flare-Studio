@@ -191,29 +191,32 @@ ipcMainLocal.handle(
 );
 
 // NPC file management
-ipcMainLocal.handle("create-npc-file", async (event, projectPath, npcData) => {
-  try {
-    if (!projectPath || !filename || !content) return false;
+ipcMainLocal.handle(
+  "write-npc-file",
+  async (event, projectPath, filename, content) => {
+    try {
+      if (!projectPath || !filename || !content) return false;
 
-    // Ensure npcs folder exists
-    const npcsFolder = path.join(projectPath, "npcs");
-    if (!fs.existsSync(npcsFolder)) {
-      fs.mkdirSync(npcsFolder, { recursive: true });
+      // Ensure npcs folder exists
+      const npcsFolder = path.join(projectPath, "npcs");
+      if (!fs.existsSync(npcsFolder)) {
+        fs.mkdirSync(npcsFolder, { recursive: true });
+      }
+
+      // Get just the filename part (strip npcs/ prefix if present)
+      const npcFilename = filename.replace(/^npcs[\/\\]/, "");
+      const npcFilePath = path.join(npcsFolder, npcFilename);
+
+      // Write the file
+      fs.writeFileSync(npcFilePath, content, "utf8");
+      console.log("NPC file saved:", npcFilePath);
+      return true;
+    } catch (e) {
+      console.error("write-npc-file failed:", e);
+      return false;
     }
-
-    // Get just the filename part (strip npcs/ prefix if present)
-    const npcFilename = filename.replace(/^npcs[\/\\]/, "");
-    const npcFilePath = path.join(npcsFolder, npcFilename);
-
-    // Write the file
-    fs.writeFileSync(npcFilePath, content, "utf8");
-    console.log("NPC file saved:", npcFilePath);
-    return true;
-  } catch (e) {
-    console.error("write-npc-file failed:", e);
-    return false;
   }
-});
+);
 
 // List map files in project
 // Looks for:

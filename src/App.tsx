@@ -1261,7 +1261,10 @@ function App() {
 
   // Rules list for the Rules layer (UI-only for now; persistence will be added later).
   const [rulesList, setRulesList] = useState<Array<{ id: string; name: string; startType: RuleStartType; triggerId: string }>>([]);
+  const [abilitiesList, setAbilitiesList] = useState<Array<{ id: string; name: string; type: string }>>([]);
   const [showRuleDialog, setShowRuleDialog] = useState(false);
+  const [showAbilityDialog, setShowAbilityDialog] = useState(false);
+  const [abilityNameInput, setAbilityNameInput] = useState('');
   const [ruleNameInput, setRuleNameInput] = useState('');
   const [ruleStartType, setRuleStartType] = useState<RuleStartType | null>(null);
   const [ruleTriggerId, setRuleTriggerId] = useState<string>('');
@@ -4475,6 +4478,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
   const isEnemyLayer = activeLayer?.type === 'enemy';
   const isItemsLayer = activeLayer?.type === 'items';
   const isRulesLayer = activeLayer?.type === 'rules';
+  const isActionsLayer = activeLayer?.type === 'actions';
   const availableRuleTriggers = ruleStartType ? (ruleStartType === 'player' ? PLAYER_TRIGGER_OPTIONS : GAME_TRIGGER_OPTIONS) : [];
 
   const actorEntries = useMemo(() => {
@@ -4862,6 +4866,57 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               return null;
             })()}
 
+            {/* Actions / Abilities Layer - list and add button (same visual style as Rules) */}
+            {isActionsLayer && (
+              <div className="flex flex-col flex-1">
+                <div className="flex-1 min-h-0 border border-dashed border-border rounded-md overflow-y-auto">
+                  {abilitiesList.length === 0 ? (
+                    <div className="flex items-center justify-center h-full text-sm text-muted-foreground px-4 text-center">
+                      Click &quot;+ Ability&quot; to create your first ability.
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-1 p-2">
+                      {abilitiesList.map((ability) => (
+                        <div
+                          key={ability.id}
+                          className="flex items-center gap-3 p-2 bg-muted/50 hover:bg-muted rounded-md border border-border cursor-pointer transition-colors w-full"
+                          title={ability.name}
+                        >
+                          <Zap className="w-4 h-4 text-orange-500 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium truncate">{ability.name}</div>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Badge className="text-[10px] px-1.5 py-0 bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800/50">
+                                {ability.type || 'Standard'}
+                              </Badge>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="flex justify-center py-2">
+                  <Tooltip content="Add Ability" side="bottom">
+                    <Button
+                      variant="default"
+                      size="sm"
+                      aria-label="Add Ability"
+                      className="text-xs px-3 py-1 h-7 shadow-sm bg-orange-500 hover:bg-orange-600 text-white border-orange-500"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        e.preventDefault();
+                        setShowAbilityDialog(true);
+                      }}
+                    >
+                      <Plus className="w-3 h-3 mr-1" />
+                      Ability
+                    </Button>
+                  </Tooltip>
+                </div>
+              </div>
+            )}
+
             {/* Rules Layer - list and add button (similar UX to NPC layer) */}
             {isRulesLayer && (
               <div className="flex flex-col flex-1">
@@ -5023,8 +5078,8 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               </div>
             )}
 
-            {/* Tileset Brushes Window - render for all layers except NPC, Enemy, and Items */}
-            {!isNpcLayer && !isEnemyLayer && !isItemsLayer && !isRulesLayer && (
+            {/* Tileset Brushes Window - render for all layers except NPC, Enemy, Items, Rules, and Actions */}
+            {!isNpcLayer && !isEnemyLayer && !isItemsLayer && !isRulesLayer && !isActionsLayer && (
             <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-0 m-0">
               {/* Layer Tabs (background / object only) */}
               {(() => {
@@ -5107,7 +5162,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             </div>
             )}
             {/* Brush Tools - stick to bottom so palette can fill remaining space */}
-            {!isNpcLayer && !isEnemyLayer && !isItemsLayer && !isRulesLayer && (
+            {!isNpcLayer && !isEnemyLayer && !isItemsLayer && !isRulesLayer && !isActionsLayer && (
             <div className="sticky bottom-0 z-10 bg-transparent py-2">
               <div className="text-xs text-muted-foreground"></div>
               <div className="w-full flex justify-center">
@@ -7460,6 +7515,78 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 </Button>
               </>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Ability Creation Dialog */}
+      <Dialog
+        open={showAbilityDialog}
+        onOpenChange={(open) => {
+          if (!open) {
+            setShowAbilityDialog(false);
+            setAbilityNameInput('');
+          }
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Zap className="w-5 h-5 text-orange-500" />
+              Add Ability
+            </DialogTitle>
+            <DialogDescription>Create a new ability for the Actions layer.</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Ability Name <span className="text-red-500">*</span>
+              </label>
+              <Input
+                value={abilityNameInput}
+                onChange={(e) => setAbilityNameInput(e.target.value)}
+                placeholder="e.g. Fireball"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && abilityNameInput.trim()) {
+                    setAbilitiesList((prev) => [
+                      ...prev,
+                      {
+                        id: `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
+                        name: abilityNameInput.trim(),
+                        type: 'Standard'
+                      }
+                    ]);
+                    setShowAbilityDialog(false);
+                    setAbilityNameInput('');
+                  }
+                }}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAbilityDialog(false)}>
+              Cancel
+            </Button>
+            <Button
+              disabled={!abilityNameInput.trim()}
+              onClick={() => {
+                setAbilitiesList((prev) => [
+                  ...prev,
+                  {
+                    id: `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
+                    name: abilityNameInput.trim(),
+                    type: 'Standard'
+                  }
+                ]);
+                setShowAbilityDialog(false);
+                setAbilityNameInput('');
+              }}
+            >
+              Create Ability
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

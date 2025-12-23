@@ -1287,6 +1287,14 @@ export class TileMapEditor {
         transparency: 1.0
       },
       {
+        id: 9,
+        name: 'Actions',
+        type: 'actions',
+        data: new Array(this.mapWidth * this.mapHeight).fill(0),
+        visible: true,
+        transparency: 1.0
+      },
+      {
         id: 2,
         name: 'Items',
         type: 'items',
@@ -1346,7 +1354,7 @@ export class TileMapEditor {
     
     // Set the background layer as active by default
     this.activeLayerId = 8;
-    this.nextLayerId = 9;
+    this.nextLayerId = 10;
     this.sortLayersByPriority();
     // Initialize layer tabs for background and object with one tab each
     try {
@@ -4524,13 +4532,14 @@ export class TileMapEditor {
   private sortLayersByPriority(): void {
     const typePriority: Record<string, number> = {
       'rules': 0,
-      'items': 1,
-      'npc': 2,
-      'enemy': 3,
-      'event': 4,
-      'collision': 5,
-      'object': 6,
-      'background': 7
+      'actions': 1,
+      'items': 2,
+      'npc': 3,
+      'enemy': 4,
+      'event': 5,
+      'collision': 6,
+      'object': 7,
+      'background': 8
     };
 
     this.tileLayers.sort((a, b) => {

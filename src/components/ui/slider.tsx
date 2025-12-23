@@ -69,6 +69,13 @@ export const Slider = ({
       >
         {value}%
       </div>
+
+      {/* Range Labels */}
+      <div className="flex justify-between w-full mt-2 text-[10px] text-muted-foreground font-medium pointer-events-none">
+        <span>0%</span>
+        <span>50%</span>
+        <span>100%</span>
+      </div>
     </div>
   );
 };

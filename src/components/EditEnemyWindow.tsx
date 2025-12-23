@@ -5,13 +5,13 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { User, Eye, BarChart2, Settings, Sword, Gift, Flag, MapPin, Volume2, HelpCircle, X, Save, Edit2, Plus, Check, Rabbit, Sigma } from 'lucide-react';
+import { User, Eye, BarChart2, Settings, Sword, Gift, Flag, MapPin, Volume2, HelpCircle, X, Save, Edit2, Plus, Check, Rabbit, Sigma, Zap } from 'lucide-react';
 import type { MapObject } from '@/types';
 import type { LucideIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Slider } from '@/components/ui/slider';
 
-type TabKey = 'identity' | 'visual' | 'audio' | 'stats' | 'behavior' | 'attack' | 'loot' | 'quest' | 'combat' | 'flags';
+type TabKey = 'identity' | 'visual' | 'audio' | 'stats' | 'behavior' | 'attack' | 'loot' | 'quest' | 'combat' | 'flags' | 'actions';
 
 const TAB_CONFIG: Array<{ key: TabKey; icon: LucideIcon; tooltip: string }> = [
   { key: 'identity', icon: User, tooltip: 'Identity' },
@@ -23,6 +23,7 @@ const TAB_CONFIG: Array<{ key: TabKey; icon: LucideIcon; tooltip: string }> = [
   { key: 'visual', icon: Eye, tooltip: 'Visual' },
   { key: 'audio', icon: Volume2, tooltip: 'Audio' },
   { key: 'combat', icon: Sword, tooltip: 'Combat / Powers' },
+  { key: 'actions', icon: Zap, tooltip: 'Actions' },
   { key: 'flags', icon: Flag, tooltip: 'Flags & Special' },
 ];
 
@@ -220,6 +221,17 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, exi
   const [passivePowers, setPassivePowers] = useState<string>(() => enemy?.properties?.passive_powers || '');
   const [cooldown, setCooldown] = useState<string>(() => enemy?.properties?.cooldown || '');
   const [cooldownHit, setCooldownHit] = useState<string>(() => enemy?.properties?.cooldown_hit || '');
+  const [powerFilter, setPowerFilter] = useState<string>(() => enemy?.properties?.power_filter || '');
+
+  // Actions / Abilities
+  const [abilitiesList, setAbilitiesList] = useState<Array<{ id: string; name: string; type: string }>>(() => {
+    try {
+      const abs = enemy?.properties?.abilities;
+      return abs ? JSON.parse(abs) : [];
+    } catch {
+      return [];
+    }
+  });
 
   // Loot
   const [loot, setLoot] = useState<string>(() => enemy?.properties?.loot || '');
@@ -236,7 +248,7 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, exi
     const pairs = Object.entries(enemy.properties).filter(([k]) => ![
       'tilesetPath','portraitPath','gfx','render_layers','animation_slots','suppress_hp','hp','mp','attack','defense','speed','xp','gold',
       'melee','ranged','caster','summoner','boss','passive','stationary','humanoid','lifeform',
-      'powers','passive_powers','cooldown','cooldown_hit','script','loot','loot_count','first_defeat_loot','quest_loot','defeat_status','categories','include'
+      'powers','passive_powers','cooldown','cooldown_hit','power_filter','script','loot','loot_count','first_defeat_loot','quest_loot','defeat_status','categories','include'
     ].includes(k));
     return pairs.map(([k,v]) => `${k}=${v}`).join('\n');
   });
@@ -297,6 +309,13 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, exi
       setChanceFlee(enemy?.properties?.chance_flee || '');
       setTurnDelay(enemy?.properties?.turn_delay || '');
       setWanderRadius(enemy?.properties?.wander_radius || '');
+
+      try {
+        const abs = enemy?.properties?.abilities;
+        setAbilitiesList(abs ? JSON.parse(abs) : []);
+      } catch {
+        setAbilitiesList([]);
+      }
       setWaypoints(enemy?.properties?.waypoints || '');
       setWaypointPause(enemy?.properties?.waypoint_pause || '');
       setIsFacing(enemy?.properties?.facing === 'true');
@@ -307,6 +326,7 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, exi
       setPassivePowers(enemy?.properties?.passive_powers || '');
       setCooldown(enemy?.properties?.cooldown || '');
       setCooldownHit(enemy?.properties?.cooldown_hit || '');
+      setPowerFilter(enemy?.properties?.power_filter || '');
 
       setLoot(enemy?.properties?.loot || '');
       setLootCount(enemy?.properties?.loot_count || '');
@@ -317,7 +337,7 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, exi
 
       setCustomPropsRaw(() => {
         if (!enemy?.properties) return '';
-        const pairs = Object.entries(enemy.properties).filter(([k]) => !['tilesetPath','portraitPath','gfx','render_layers','animation_slots','suppress_hp','hp','mp','attack','defense','speed','xp','gold','melee','ranged','caster','summoner','boss','passive','stationary','humanoid','lifeform','powers','passive_powers','cooldown','cooldown_hit','script','loot','loot_count','first_defeat_loot','quest_loot','defeat_status','categories','combat_style','threat_range','flee_range','flee_duration','flee_cooldown','chance_pursue','chance_flee','turn_delay','wander_radius','waypoints','waypoint_pause','facing','flying','intangible','include'].includes(k));
+        const pairs = Object.entries(enemy.properties).filter(([k]) => !['tilesetPath','portraitPath','gfx','render_layers','animation_slots','suppress_hp','hp','mp','attack','defense','speed','xp','gold','melee','ranged','caster','summoner','boss','passive','stationary','humanoid','lifeform','powers','passive_powers','cooldown','cooldown_hit','power_filter','script','loot','loot_count','first_defeat_loot','quest_loot','defeat_status','categories','combat_style','threat_range','flee_range','flee_duration','flee_cooldown','chance_pursue','chance_flee','turn_delay','wander_radius','waypoints','waypoint_pause','facing','flying','intangible','include'].includes(k));
         return pairs.map(([k,v]) => `${k}=${v}`).join('\n');
       });
 
@@ -342,7 +362,7 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, exi
     const knownKeys = [
       'tilesetPath','portraitPath','gfx','render_layers','animation_slots','suppress_hp','hp','mp','attack','defense','speed','xp','gold',
       'melee','ranged','caster','summoner','boss','passive','stationary','humanoid','lifeform',
-      'powers','passive_powers','cooldown','cooldown_hit','script','loot','loot_count','first_defeat_loot','quest_loot','defeat_status','categories','sfx_attack','sfx_hit','sfx_die','sfx_critdie','melee_range','thread_range','combat_style','threat_range','flee_range','flee_duration','flee_cooldown','chance_pursue','chance_flee','turn_delay','wander_radius','waypoints','flying','intangible','include'
+      'powers','passive_powers','cooldown','cooldown_hit','power_filter','script','loot','loot_count','first_defeat_loot','quest_loot','defeat_status','categories','sfx_attack','sfx_hit','sfx_die','sfx_critdie','melee_range','thread_range','combat_style','threat_range','flee_range','flee_duration','flee_cooldown','chance_pursue','chance_flee','turn_delay','wander_radius','waypoints','flying','intangible','include','abilities'
     ];
 
     if (rarity) newProps.rarity = rarity; else delete newProps.rarity;
@@ -404,6 +424,7 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, exi
     if (passivePowers) newProps.passive_powers = passivePowers; else delete newProps.passive_powers;
     if (cooldown) newProps.cooldown = cooldown; else delete newProps.cooldown;
     if (cooldownHit) newProps.cooldown_hit = cooldownHit; else delete newProps.cooldown_hit;
+    if (powerFilter) newProps.power_filter = powerFilter; else delete newProps.power_filter;
 
     if (loot) newProps.loot = loot; else delete newProps.loot;
     if (lootCount) newProps.loot_count = lootCount; else delete newProps.loot_count;
@@ -411,6 +432,7 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, exi
 
     if (questLoot) newProps.quest_loot = questLoot; else delete newProps.quest_loot;
     if (defeatStatus) newProps.defeat_status = defeatStatus; else delete newProps.defeat_status;
+    if (abilitiesList.length > 0) newProps.abilities = JSON.stringify(abilitiesList); else delete newProps.abilities;
 
     const customLines = (customPropsRaw || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean);
     for (const k of Object.keys(newProps)) {
@@ -444,7 +466,7 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, exi
     const knownKeys = [
       'tilesetPath','portraitPath','gfx','render_layers','animation_slots','suppress_hp','hp','mp','attack','defense','speed','xp','gold',
       'melee','ranged','caster','summoner','boss','passive','stationary','humanoid','lifeform',
-      'powers','passive_powers','cooldown','cooldown_hit','script','loot','loot_count','first_defeat_loot','quest_loot','defeat_status','categories','sfx_attack','sfx_hit','sfx_die','sfx_critdie','melee_range','thread_range','combat_style','threat_range','flee_range','flee_duration','flee_cooldown','chance_pursue','chance_flee','turn_delay','wander_radius','waypoints','waypoint_pause','facing','flying','intangible','include'
+      'powers','passive_powers','cooldown','cooldown_hit','power_filter','script','loot','loot_count','first_defeat_loot','quest_loot','defeat_status','categories','sfx_attack','sfx_hit','sfx_die','sfx_critdie','melee_range','thread_range','combat_style','threat_range','flee_range','flee_duration','flee_cooldown','chance_pursue','chance_flee','turn_delay','wander_radius','waypoints','waypoint_pause','facing','flying','intangible','include','abilities'
     ];
     if (rarity) newProps.rarity = rarity; else delete newProps.rarity;
     if (include) newProps.include = include; else delete newProps.include;
@@ -497,6 +519,8 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, exi
     if (passivePowers) newProps.passive_powers = passivePowers; else delete newProps.passive_powers;
     if (cooldown) newProps.cooldown = cooldown; else delete newProps.cooldown;
     if (cooldownHit) newProps.cooldown_hit = cooldownHit; else delete newProps.cooldown_hit;
+    if (powerFilter) newProps.power_filter = powerFilter; else delete newProps.power_filter;
+    if (abilitiesList.length > 0) newProps.abilities = JSON.stringify(abilitiesList); else delete newProps.abilities;
     if (loot) newProps.loot = loot; else delete newProps.loot;
     if (lootCount) newProps.loot_count = lootCount; else delete newProps.loot_count;
     if (firstDefeatLoot) newProps.first_defeat_loot = firstDefeatLoot; else delete newProps.first_defeat_loot;
@@ -1063,7 +1087,7 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, exi
                         onChange={(val) => setChancePursue(String(val))} 
                         min={0}
                         max={100}
-                        step={1}
+                        step={10}
                       />
                     </div>
                     <div>
@@ -1083,7 +1107,7 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, exi
                         onChange={(val) => setChanceFlee(String(val))} 
                         min={0}
                         max={100}
-                        step={1}
+                        step={10}
                       />
                     </div>
                   </div>
@@ -1240,6 +1264,110 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, exi
               </div>
             )}
 
+            {activeTab === 'attack' && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 gap-6">
+                  <div>
+                    <div className="flex items-center gap-1 mb-1">
+                      <label className="text-sm font-medium">Cooldown</label>
+                      <Tooltip content="It is the waiting period between attacks." side="top">
+                        <button type="button" className="text-muted-foreground hover:text-foreground">
+                          <HelpCircle className="w-3.5 h-3.5" />
+                        </button>
+                      </Tooltip>
+                    </div>
+                    <div className="flex gap-2">
+                       <Input 
+                         type="number" 
+                         value={cooldown.replace(/[a-z]/gi, '')} 
+                         onChange={(e) => {
+                           const val = e.target.value;
+                           const unit = cooldown.includes('ms') ? 'ms' : 's';
+                           setCooldown(val ? `${val}${unit}` : '');
+                         }}
+                         placeholder="0" 
+                       />
+                       <Select 
+                         value={cooldown.includes('ms') ? 'ms' : 's'} 
+                         onValueChange={(val) => {
+                           const num = cooldown.replace(/[a-z]/gi, '') || '0';
+                           setCooldown(`${num}${val}`);
+                         }}
+                       >
+                         <SelectTrigger className="w-[110px]">
+                            <SelectValue />
+                         </SelectTrigger>
+                         <SelectContent>
+                           <SelectItem value="s">second</SelectItem>
+                           <SelectItem value="ms">milisecond</SelectItem>
+                         </SelectContent>
+                       </Select>
+                    </div>
+                  </div>
+
+                  <div>
+                     <div className="flex items-center gap-1 mb-1">
+                      <label className="text-sm font-medium">Cooldown Hit</label>
+                      <Tooltip content="It is the pause time for the enemy to be able to attack after taking a hit." side="top">
+                        <button type="button" className="text-muted-foreground hover:text-foreground">
+                          <HelpCircle className="w-3.5 h-3.5" />
+                        </button>
+                      </Tooltip>
+                    </div>
+                    <div className="flex gap-2">
+                       <Input 
+                         type="number" 
+                         value={cooldownHit.replace(/[a-z]/gi, '')} 
+                         onChange={(e) => {
+                           const val = e.target.value;
+                           const unit = cooldownHit.includes('ms') ? 'ms' : 's';
+                           setCooldownHit(val ? `${val}${unit}` : '');
+                         }}
+                         placeholder="0" 
+                       />
+                       <Select 
+                         value={cooldownHit.includes('ms') ? 'ms' : 's'} 
+                         onValueChange={(val) => {
+                           const num = cooldownHit.replace(/[a-z]/gi, '') || '0';
+                           setCooldownHit(`${num}${val}`);
+                         }}
+                       >
+                         <SelectTrigger className="w-[110px]">
+                            <SelectValue />
+                         </SelectTrigger>
+                         <SelectContent>
+                           <SelectItem value="s">second</SelectItem>
+                           <SelectItem value="ms">milisecond</SelectItem>
+                         </SelectContent>
+                       </Select>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t pt-4">
+                  <div className="flex items-center gap-1 mb-1">
+                    <label className="text-sm font-medium">Power Filter</label>
+                    <Tooltip content="This is a list that ensures the enemy only takes damage from specific abilities. This is critical for designing enemies that are immune to certain attacks." side="top">
+                       <button type="button" className="text-muted-foreground hover:text-foreground">
+                         <HelpCircle className="w-3.5 h-3.5" />
+                       </button>
+                    </Tooltip>
+                  </div>
+                  <Select value={powerFilter} onValueChange={setPowerFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select abilities..." />
+                    </SelectTrigger>
+                     <SelectContent>
+                       <SelectItem value="todo" disabled>TODO: Abilities will be listed</SelectItem>
+                     </SelectContent>
+                  </Select>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Select the abilities that can damage this enemy.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {activeTab === 'combat' && (
               <div className="space-y-3">
                 <div>
@@ -1249,6 +1377,68 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, exi
                 <div>
                   <label className="block text-sm font-medium mb-1">Script / Behavior</label>
                   <textarea value={script} onChange={(e) => setScript(e.target.value)} className="w-full h-24 rounded-md border border-border p-2 text-sm" />
+                </div>
+              </div>
+            )}
+            
+            {activeTab === 'actions' && (
+              <div className="flex flex-col h-[400px]">
+                <div className="flex-1 min-h-0 border border-dashed border-border rounded-md overflow-y-auto">
+                  {abilitiesList.length === 0 ? (
+                    <div className="flex items-center justify-center h-full text-sm text-muted-foreground px-4 text-center">
+                      Click &quot;+ Ability&quot; to create your first ability for this enemy.
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-1 p-2">
+                      {abilitiesList.map((ability) => (
+                        <div
+                          key={ability.id}
+                          className="flex items-center gap-3 p-2 bg-muted/50 hover:bg-muted rounded-md border border-border cursor-pointer transition-colors w-full group"
+                        >
+                          <Zap className="w-4 h-4 text-orange-500 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium truncate">{ability.name}</div>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Badge className="text-[11px] px-2 py-0.5">
+                                {ability.type}
+                              </Badge>
+                            </div>
+                          </div>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="w-8 h-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setAbilitiesList(prev => prev.filter(a => a.id !== ability.id));
+                            }}
+                          >
+                            <X className="w-4 h-4 text-red-500" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="flex justify-center py-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs px-3 py-1 h-7 shadow-sm border-dashed"
+                    onClick={() => {
+                      const name = window.prompt("Enter ability name:");
+                      if (name && name.trim()) {
+                        setAbilitiesList(prev => [...prev, { 
+                          id: `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`, 
+                          name: name.trim(), 
+                          type: 'Standard' 
+                        }]);
+                      }
+                    }}
+                  >
+                    <Plus className="w-3 h-3 mr-1" />
+                    Ability
+                  </Button>
                 </div>
               </div>
             )}

@@ -34,9 +34,12 @@ interface EditEnemyWindowProps {
   onSave?: (obj: MapObject) => void;
   existingCategories?: string[];
   projectPath?: string;
+  inline?: boolean;
+  showCloseConfirm?: boolean;
+  onCloseDecision?: (decision: 'save' | 'discard' | 'cancel') => void;
 }
 
-export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, existingCategories = [], projectPath = '' }: EditEnemyWindowProps) {
+export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, existingCategories = [], projectPath = '', inline = false, showCloseConfirm = false, onCloseDecision }: EditEnemyWindowProps) {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<TabKey>('identity');
   const [name, setName] = useState(() => enemy?.name || '');
@@ -549,9 +552,16 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, exi
     onSave?.(updated);
   };
 
-  return (
-    <Dialog open={open} onOpenChange={(v) => onOpenChange?.(v)}>
-      <DialogContent className="w-[820px] max-w-[90vw] h-[680px] max-h-[90vh] p-0 overflow-hidden flex flex-col">
+  const handleCloseDecision = (decision: 'save' | 'discard' | 'cancel') => {
+    if (decision === 'save') {
+      handleSave();
+    }
+    onCloseDecision?.(decision);
+  };
+
+  
+  const panel = (
+    <>
         <DialogHeader className="px-6 py-3 flex flex-row items-center justify-between border-b relative">
           <div className="flex items-center gap-6">
             <DialogTitle className="whitespace-nowrap">Edit Enemy</DialogTitle>
@@ -585,6 +595,29 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, exi
             <X className="h-4 w-4" />
             <span className="sr-only">Close</span>
           </button>
+          {showCloseConfirm && (
+            <div className="absolute right-12 top-2 flex items-center gap-2 rounded-md border border-border bg-background/95 px-2 py-1 text-xs shadow-sm">
+              <span>Save the Enemy?</span>
+              <button
+                type="button"
+                onClick={() => handleCloseDecision('save')}
+                className="h-6 w-6 rounded-md border border-border/60 bg-muted/40 hover:bg-muted"
+                aria-label="Save and close"
+                title="Save"
+              >
+                <Check className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleCloseDecision('discard')}
+                className="h-6 w-6 rounded-md border border-border/60 bg-muted/40 hover:bg-muted"
+                aria-label="Discard and close"
+                title="Discard"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
         </DialogHeader>
 
         <div className="flex-1 overflow-hidden flex flex-col">
@@ -1474,7 +1507,38 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, exi
         >
           <Save className="w-4 h-4" />
         </Button>
-      </DialogContent>
-    </Dialog>
+      
+    </>
   );
+
+
+  if (inline) {
+
+    return (
+
+      <div className="w-full h-full p-0 overflow-hidden flex flex-col relative">
+
+        {panel}
+
+      </div>
+
+    );
+
+  }
+
+
+  return (
+
+    <Dialog open={open} onOpenChange={(v) => onOpenChange?.(v)}>
+
+      <DialogContent className="w-[820px] max-w-[90vw] h-[680px] max-h-[90vh] p-0 overflow-hidden flex flex-col">
+
+        {panel}
+
+      </DialogContent>
+
+    </Dialog>
+
+  );
+
 }

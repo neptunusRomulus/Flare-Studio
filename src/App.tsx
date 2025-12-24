@@ -15,7 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/toaster';
 import WelcomeScreen from './components/WelcomeScreen';
 import OverwriteExportDialog from './components/OverwriteExportDialog';
-import EditEnemyWindow from '@/components/EditEnemyWindow';
+import EnemyTabPanel from '@/components/EnemyTabPanel';
 import flareIconUrl from '/flare-ico.png?url';
 
 interface MapConfig {
@@ -31,8 +31,11 @@ interface EditorTab {
   id: string;
   name: string;
   projectPath?: string | null;
-  config?: EditorProjectData | MapConfig | null;
+  config?: EditorProjectData | MapConfig | { enemy: MapObject } | null;
+  tabType?: 'map' | 'enemy';
 }
+
+type EnemyTabConfig = { enemy: MapObject };
 
 type PropertyType =
   | 'int'
@@ -239,54 +242,6 @@ const ENEMY_ROLE_META_LOOKUP: Record<EnemyRoleKey, { label: string; badgeClass: 
     return acc;
   }, {} as Record<EnemyRoleKey, { label: string; badgeClass: string; description: string }>);
 
-const ENEMY_FIELD_WEIGHTS: Record<string, { primary: string[]; secondary: string[]; rare: string[] }> = {
-  melee: {
-    primary: ['hp', 'poise', 'dmg_melee_min', 'dmg_melee_max', 'accuracy', 'speed', 'chance_pursue', 'melee_range'],
-    secondary: ['crit', 'avoidance', 'cooldown'],
-    rare: ['dmg_ranged_min', 'dmg_ranged_max', 'dmg_ment_min', 'dmg_ment_max', 'threat_range'],
-  },
-  ranged: {
-    primary: ['hp', 'dmg_ranged_min', 'dmg_ranged_max', 'accuracy', 'threat_range', 'cooldown', 'speed'],
-    secondary: ['avoidance', 'crit', 'melee_range'],
-    rare: ['poise', 'dmg_melee_min', 'dmg_melee_max'],
-  },
-  caster: {
-    primary: ['hp', 'dmg_ment_min', 'dmg_ment_max', 'cooldown', 'accuracy', 'threat_range'],
-    secondary: ['avoidance', 'speed', 'crit'],
-    rare: ['poise', 'dmg_melee_min', 'dmg_melee_max'],
-  },
-  summoner: {
-    primary: ['hp', 'cooldown', 'threat_range', 'speed'],
-    secondary: ['dmg_ment_min', 'dmg_ment_max', 'avoidance'],
-    rare: ['dmg_melee_min', 'dmg_melee_max', 'crit', 'poise'],
-  },
-  boss: {
-    primary: ['hp', 'poise', 'accuracy', 'cooldown', 'speed'],
-    secondary: [
-      'dmg_melee_min', 'dmg_melee_max',
-      'dmg_ranged_min', 'dmg_ranged_max',
-      'dmg_ment_min', 'dmg_ment_max',
-      'crit', 'avoidance', 'threat_range'
-    ],
-    rare: [],
-  },
-  passive: {
-    primary: ['hp', 'avoidance', 'speed'],
-    secondary: ['threat_range', 'cooldown'],
-    rare: [
-      'dmg_melee_min', 'dmg_melee_max',
-      'dmg_ranged_min', 'dmg_ranged_max',
-      'dmg_ment_min', 'dmg_ment_max',
-      'crit', 'poise'
-    ],
-  },
-  stationary: {
-    primary: ['hp', 'dmg_ranged_min', 'dmg_ranged_max', 'dmg_ment_min', 'dmg_ment_max', 'accuracy', 'threat_range', 'cooldown'],
-    secondary: ['poise'],
-    rare: ['speed', 'dmg_melee_min', 'dmg_melee_max'],
-  },
-};
-
 const EMPTY_ACTOR_ROLES: Record<ActorRoleKey, boolean> = {
   isTalker: false,
   isVendor: false,
@@ -435,7 +390,18 @@ function App() {
   const [newMapStarting, setNewMapStarting] = useState(false);
   // Editor tabs
   const [tabs, setTabs] = useState<EditorTab[]>([]);
+  const [pendingEnemyTabCloseId, setPendingEnemyTabCloseId] = useState<string | null>(null);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
+  const switchToTabHelpersRef = useRef({
+    handleOpenMap: async (_projectDir: string, _createTab?: boolean, _mapName?: string) => {},
+    loadProjectData: async (_editor: TileMapEditor, _mapConfig: EditorProjectData) => false,
+    setupAutoSave: (_editor: TileMapEditor) => {},
+    syncMapObjects: () => {},
+    updateLayersList: () => {},
+  });
+  // Convenience accessors for tab-aware UI (used to hide map controls for enemy editor tabs)
+  const activeTab = tabs.find(t => t.id === activeTabId) || null;
+  const isEnemyTabActive = !!activeTab && activeTab.tabType === 'enemy';
 
   // Session is now stored per-project in .flare-session.json
   // Load session when a project is opened (handled in handleOpenMap)
@@ -462,7 +428,6 @@ function App() {
   const [showHelp, setShowHelp] = useState(false);
   const [activeHelpTab, setActiveHelpTab] = useState('engine');
   const [tipsMinimized, setTipsMinimized] = useState(false);
-  const [tipsClosing, setTipsClosing] = useState(false);
   // Force refresh counter to trigger re-render when editor-managed tabs change
   const [tabTick, setTabTick] = useState(0);
   const [toolbarExpanded, setToolbarExpanded] = useState(true);
@@ -754,7 +719,7 @@ function App() {
   );
   
   // Tab helpers
-  const createTabFor = (name: string, projectPath?: string | null, config?: EditorProjectData | MapConfig | null) => {
+  const createTabFor = useCallback((name: string, projectPath?: string | null, config?: EditorProjectData | MapConfig | { enemy: MapObject } | null) => {
     const id = Date.now().toString();
     const safeConfig = config ? JSON.parse(JSON.stringify(config)) : null;
     const tab: EditorTab = { id, name, projectPath: projectPath ?? null, config: safeConfig };
@@ -763,9 +728,24 @@ function App() {
     setActiveTabId(id);
     setCurrentProjectPath(projectPath ?? null);
     return tab;
-  };
+  }, []);
+
+  const closeEditorTab = useCallback((tabId: string) => {
+    setTabs((prev) => {
+      const index = prev.findIndex((tab) => tab.id === tabId);
+      if (index === -1) return prev;
+      const nextTabs = prev.filter((tab) => tab.id !== tabId);
+      if (activeTabId === tabId) {
+        const fallback = nextTabs[index] ?? nextTabs[index - 1] ?? nextTabs[0] ?? null;
+        const nextActiveId = fallback?.id ?? null;
+        setActiveTabId(nextActiveId);
+        setCurrentProjectPath(fallback?.projectPath ?? null);
+      }
+      return nextTabs;
+    });
+  }, [activeTabId]);
   
-  const switchToTab = async (tabId: string) => {
+  const switchToTab = useCallback(async (tabId: string) => {
     if (tabId === activeTabId) return;
     const prevTab = tabs.find(t => t.id === activeTabId);
     const nextTab = tabs.find(t => t.id === tabId);
@@ -803,6 +783,10 @@ function App() {
     setActiveTabId(tabId);
     setCurrentProjectPath(nextTab.projectPath ?? null);
 
+    if (nextTab.tabType === 'enemy') {
+      return;
+    }
+
     // If the tab contains a preloaded in-memory config, prefer restoring it
     // (this can include tileset images that haven't been written to disk yet).
     // However, if this tab belongs to a project on disk and the in-memory
@@ -815,8 +799,8 @@ function App() {
         const cfgCheck = nextTab.config as EditorProjectData;
         if (nextTab.projectPath && (!cfgCheck.tilesetImages || Object.keys(cfgCheck.tilesetImages || {}).length === 0) && nextTab.name) {
           console.log('In-memory config missing tileset images and no editor; preferring disk open for tab', tabId, nextTab.name);
-          await handleOpenMap(nextTab.projectPath, false, nextTab.name);
-          if (editor) setupAutoSave(editor);
+          await switchToTabHelpersRef.current.handleOpenMap(nextTab.projectPath, false, nextTab.name);
+          if (editor) switchToTabHelpersRef.current.setupAutoSave(editor);
           return;
         }
 } catch {
@@ -988,7 +972,10 @@ function App() {
                 console.warn('ensureTilesetsLoaded failed or timed out:', e);
               }
 
-              const loaded = await loadProjectData(editor, nextTab.config as EditorProjectData);
+              const loaded = await switchToTabHelpersRef.current.loadProjectData(
+                editor,
+                nextTab.config as EditorProjectData
+              );
 
               // Force palette rebuild after images and layers settle
               try {
@@ -1007,9 +994,9 @@ function App() {
               }
 
               console.log('Loaded tab config into editor, result:', loaded);
-              setupAutoSave(editor);
-              updateLayersList();
-              syncMapObjects();
+              switchToTabHelpersRef.current.setupAutoSave(editor);
+              switchToTabHelpersRef.current.updateLayersList();
+              switchToTabHelpersRef.current.syncMapObjects();
               setPendingMapConfig(null);
               setMapInitialized(true);
               
@@ -1029,7 +1016,10 @@ function App() {
           }
 
       // Fall back to pendingMapConfig which triggers editor creation/restoration
-      setPendingMapConfig(nextTab.config);
+      if (nextTab.config && 'enemy' in nextTab.config) {
+        return;
+      }
+      setPendingMapConfig(nextTab.config ?? null);
       return;
     }
 
@@ -1086,9 +1076,9 @@ function App() {
           console.error('Error loading map for tab switch:', e);
         }
       }
-      if (editor) setupAutoSave(editor);
+      if (editor) switchToTabHelpersRef.current.setupAutoSave(editor);
     }
-  };
+  }, [activeTabId, currentProjectPath, editor, tabs]);
 
   const [isDarkMode, setIsDarkMode] = useState(() => {
     // Initialize from localStorage or default to false
@@ -1216,55 +1206,12 @@ function App() {
     kind: 'same-role' | 'other-role';
   } | null>(null);
 
-  const getEnemyFieldCounts = useCallback((fieldKey: string): { primary: number; secondary: number; rare: number } => {
-    if (!editingObject || editingObject.type !== 'enemy') return { primary: 0, secondary: 0, rare: 0 };
-    const props = editingObject.properties || {};
-    let primary = 0;
-    let secondary = 0;
-    let rare = 0;
-    for (const [roleKey, weights] of Object.entries(ENEMY_FIELD_WEIGHTS)) {
-      if (props[roleKey] === 'true') {
-        if (weights.primary.includes(fieldKey)) primary += 1;
-        if (weights.secondary.includes(fieldKey)) secondary += 1;
-        if (weights.rare.includes(fieldKey)) rare += 1;
-      }
-    }
-    return { primary, secondary, rare };
-  }, [editingObject]);
-
-  const renderEnemyFieldWeight = useCallback((fieldKey: string) => {
-    const { primary, secondary, rare } = getEnemyFieldCounts(fieldKey);
-    if (primary + secondary + rare === 0) return null;
-    return (
-      <span className="flex items-center gap-0.5 text-amber-500 drop-shadow">
-        {Array.from({ length: primary }).map((_, idx) => (
-          <span
-            key={`full-${fieldKey}-${idx}`}
-            className="w-1.5 h-1.5 rounded-full bg-amber-300 border border-amber-500 shadow-[0_0_8px_rgba(251,191,36,0.95)]"
-          />
-        ))}
-        {Array.from({ length: secondary }).map((_, idx) => (
-          <span
-            key={`empty-${fieldKey}-${idx}`}
-            className="w-1.5 h-1.5 rounded-full border border-amber-400 bg-transparent"
-          />
-        ))}
-        {Array.from({ length: rare }).map((_, idx) => (
-          <span
-            key={`half-${fieldKey}-${idx}`}
-            className="w-1.5 h-1.5 rounded-full border border-amber-400 bg-[linear-gradient(90deg,rgba(251,191,36,0.85)_50%,transparent_50%)]"
-          />
-        ))}
-      </span>
-    );
-  }, [getEnemyFieldCounts]);
-
   // Rules list for the Rules layer (UI-only for now; persistence will be added later).
   const [rulesList, setRulesList] = useState<Array<{ id: string; name: string; startType: RuleStartType; triggerId: string }>>([]);
-  const [abilitiesList, setAbilitiesList] = useState<Array<{ id: string; name: string; type: string }>>([]);
   const [showRuleDialog, setShowRuleDialog] = useState(false);
   const [showAbilityDialog, setShowAbilityDialog] = useState(false);
   const [abilityNameInput, setAbilityNameInput] = useState('');
+  const [, setAbilitiesList] = useState<Array<{ id: string; name: string; type: string }>>([]);
   const [ruleNameInput, setRuleNameInput] = useState('');
   const [ruleStartType, setRuleStartType] = useState<RuleStartType | null>(null);
   const [ruleTriggerId, setRuleTriggerId] = useState<string>('');
@@ -1611,13 +1558,6 @@ function App() {
       setMapObjects([]);
     }
   }, [editor]);
-
-  const existingEnemyCategories = useMemo(() => {
-    const cats = mapObjects
-      .filter(obj => obj.type === 'enemy' && obj.category && obj.category !== 'enemy')
-      .map(o => o.category as string);
-    return Array.from(new Set(cats)).sort();
-  }, [mapObjects]);
 
   // Keep 'toast' referenced to avoid unused variable errors while toasts are suppressed.
   // This creates a stable noop reference that will never show UI.
@@ -2204,10 +2144,26 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     setObjectValidationErrors([]);
     const obj = editor.getMapObjects().find((o: MapObject) => o.id === objectId);
     if (obj) {
-      setEditingObject(obj);
-      setShowObjectDialog(true);
+      if (obj.type === 'enemy') {
+        const existingTab = tabs.find(
+          (tab) => tab.tabType === 'enemy' && (tab.config as { enemy?: MapObject } | null)?.enemy?.id === obj.id
+        );
+        if (existingTab) {
+          void switchToTab(existingTab.id);
+          return;
+        }
+
+        // Create tab for enemy editing
+        const tabName = obj.name || 'Enemy';
+        const tab = createTabFor(tabName, currentProjectPath, { enemy: obj });
+        setActiveTabId(tab.id);
+        setTabs(prev => prev.map(t => t.id === tab.id ? { ...t, tabType: 'enemy' } : t));
+      } else {
+        setEditingObject(obj);
+        setShowObjectDialog(true);
+      }
     }
-  }, [editor]);
+  }, [editor, currentProjectPath, createTabFor, setActiveTabId, tabs, switchToTab]);
 
   const handleUpdateObject = useCallback((updatedObject: MapObject) => {
     if (!editor) return;
@@ -4343,6 +4299,16 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
   // Keep a ref to handleOpenMap so IPC listeners can call the latest implementation
   useEffect(() => { handleOpenMapRef.current = handleOpenMap; }, [handleOpenMap]);
 
+  useEffect(() => {
+    switchToTabHelpersRef.current = {
+      handleOpenMap,
+      loadProjectData,
+      setupAutoSave,
+      syncMapObjects,
+      updateLayersList,
+    };
+  }, [handleOpenMap, loadProjectData, setupAutoSave, syncMapObjects, updateLayersList]);
+
   // Wire Electron menu actions (Save/Open/New)
   useEffect(() => {
     if (!window.electronAPI) return;
@@ -4491,9 +4457,6 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     return [];
   }, [mapObjects, isNpcLayer, isEnemyLayer]);
 
-  // Settings modal tab state
-  const [settingsTab, setSettingsTab] = useState<'map' | 'other'>('map');
-
   return (
     <>
       {showWelcome ? (
@@ -4557,7 +4520,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 >
                   {tab.name}
                 </button>
-                {tab.id === activeTabId && (
+                {tab.id === activeTabId && tab.tabType !== 'enemy' && (
                   <Tooltip content="Edit Map Settings" side="bottom">
                     <button
                       onClick={(e) => {
@@ -4570,6 +4533,22 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                       <Settings className="w-3 h-3" />
                     </button>
                   </Tooltip>
+                )}
+                {tab.tabType === 'enemy' && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (tab.id !== activeTabId) {
+                        void switchToTab(tab.id);
+                      }
+                      setPendingEnemyTabCloseId(tab.id);
+                    }}
+                    className="flex-shrink-0 w-4 h-4 flex items-center justify-center rounded hover:bg-black/10 dark:hover:bg-white/10"
+                    aria-label="Close enemy tab"
+                    title="Close"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
                 )}
               </div>
             ))}
@@ -5462,7 +5441,6 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               </div>
             </div>
           </section>
-          </div>
 
           {/* Bottom Action Buttons */}
           <section className="flex-shrink-0 mt-auto mb-2">
@@ -5643,6 +5621,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               </Tooltip>
             </div>
           </section>
+          </div>
         </aside>
 
         {/* Engine Settings Modal */}
@@ -6308,8 +6287,32 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         )}
 
         {/* Center Area */}
-        <section className="flex-1 min-w-0 flex flex-col relative">
+        {isEnemyTabActive ? (
+          <section className="flex-1 min-w-0 flex flex-col relative">
+            <div className="p-6 h-full overflow-auto">
+              <EnemyTabPanel
+                enemy={(activeTab?.config as EnemyTabConfig | null)?.enemy}
+                showCloseConfirm={pendingEnemyTabCloseId === activeTabId}
+                onCloseDecision={(decision) => {
+                  if (decision === 'cancel') {
+                    setPendingEnemyTabCloseId(null);
+                    return;
+                  }
+                  setPendingEnemyTabCloseId(null);
+                  closeEditorTab(activeTabId ?? '');
+                }}
+                onSave={(updated: MapObject) => {
+                  // Persist into the map/editor and also update the tab's cached config
+                  handleUpdateObject(updated);
+                  setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, config: { ...t.config, enemy: updated } } : t));
+                }}
+              />
+            </div>
+          </section>
+        ) : (
+          <section className="flex-1 min-w-0 flex flex-col relative">
           {/* Zoom Controls & Undo/Redo */}
+        {!isEnemyTabActive && (
           <div
             ref={toolbarContainerRef}
             className="absolute top-2 right-2 z-10"
@@ -6320,6 +6323,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             tabIndex={toolbarExpanded ? -1 : 0}
             aria-label="Map controls"
           >
+        )
             <div
               className={`flex items-center bg-white/90 dark:bg-neutral-900/90 border border-border rounded-full shadow-lg transition-all duration-300 ease-in-out ${toolbarExpanded ? 'px-2 py-1' : 'px-1 py-1'}`}
             >
@@ -6395,6 +6399,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               </div>
             </div>
           </div>
+        )}
           <div 
             className={`bg-gray-100 flex-1 min-h-0 flex items-center justify-center overflow-hidden relative ${draggingNpcId ? 'ring-2 ring-orange-500 ring-inset' : ''}`}
             onDragOver={(e) => {
@@ -6446,6 +6451,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             }}
           >
             {/* Canvas Tips Panel - minimizes to question mark icon with animation */}
+            {!isEnemyTabActive && (
             <div className="absolute top-4 left-4 z-20">
               {/* Minimized state: Question mark icon in a circle */}
               <div 
@@ -6505,6 +6511,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 </div>
               </div>
             </div>
+            )}
 
             <canvas
               ref={canvasRef}
@@ -6539,7 +6546,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               <MapPin className="w-4 h-4 text-gray-500 dark:text-gray-400" />
               <span>{hoverCoords ? `${hoverCoords.x}, ${hoverCoords.y}` : ''}</span>
               {/* Active GID Indicator - keep mounted but toggle visibility */}
-              <div className={`ml-2 transition-opacity duration-200 ${hoverCoords && showActiveGid ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+              <div className={`ml-2 transition-opacity duration-200 ${hoverCoords && showActiveGid && !isEnemyTabActive ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
                 <Tooltip content="Active GID number of selected tilebrush">
                   <Badge variant="secondary" className="text-xs px-2 py-1 bg-black/80 text-white border-gray-600 hover:bg-black/90">
                     <span id="activeGid">{activeGid}</span>
@@ -6975,6 +6982,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             </div>
           </div>
         </section>
+        )}
       </main>
       
       <Toaster />
@@ -8473,76 +8481,65 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       </Dialog>
 
       {/* Object Management Dialog */}
-      {editingObject?.type === 'enemy' ? (
-        <EditEnemyWindow
-          open={showObjectDialog}
-          onOpenChange={(open) => {
-            if (!open) {
-              handleObjectDialogClose();
-            } else {
-              setShowObjectDialog(true);
-            }
-          }}
-          enemy={editingObject}
-          onSave={handleUpdateObject}
-          existingCategories={existingEnemyCategories}
-          projectPath={currentProjectPath || ''}
-        />
-      ) : (
-        <Dialog
-          open={showObjectDialog}
-          onOpenChange={(open) => {
-            if (!open) {
-              handleObjectDialogClose();
-            } else {
-              setShowObjectDialog(true);
-            }
-          }}
-        >
+      <Dialog
+        open={showObjectDialog && editingObject?.type !== 'enemy'}
+        onOpenChange={(open) => {
+          if (!open) {
+            handleObjectDialogClose();
+          } else {
+            setShowObjectDialog(true);
+          }
+        }}
+      >
         <DialogContent className="max-w-5xl w-full h-[90vh] flex flex-col">
           <DialogHeader className="mb-4">
             <DialogTitle className="flex items-center gap-2">
-              {editingObject?.type === 'npc' && (
-                <User className="w-5 h-5 text-orange-500" />
-              )}
-              {editingObject?.type === 'enemy' && (
-                <div className="flex items-center gap-2">
-                  <span>{editingObject ? `Edit ${editingObject.type.toUpperCase()}` : 'Add Object'}</span>
-                  <Tooltip
-                    content={
-                      <div
-                        className="max-w-lg whitespace-normal break-words text-sm text-foreground leading-snug p-2"
-                        style={{ whiteSpace: 'normal', overflow: 'visible', textOverflow: 'clip' }}
+              {editingObject?.type === 'enemy' ? (
+                'Edit Enemy'
+              ) : (
+                <>
+                  {editingObject?.type === 'npc' && (
+                    <User className="w-5 h-5 text-orange-500" />
+                  )}
+                  {editingObject?.type === 'enemy' && (
+                    <div className="flex items-center gap-2">
+                      <span>{editingObject ? `Edit ${editingObject.type.toUpperCase()}` : 'Add Object'}</span>
+                      <Tooltip
+                        content={
+                          <div
+                            className="max-w-lg whitespace-normal break-words text-sm text-foreground leading-snug p-2"
+                            style={{ whiteSpace: 'normal', overflow: 'visible', textOverflow: 'clip' }}
+                          >
+                            Enemy stats normally scale with level. Overriding a stat disables scaling for that stat.
+                          </div>
+                        }
+                        side="right"
                       >
-                        Enemy stats normally scale with level. Overriding a stat disables scaling for that stat.
-                      </div>
-                    }
-                    side="right"
-                  >
-                    <span className="inline-flex items-center text-orange-500 font-semibold">
-                      <HelpCircle className="w-4 h-4" strokeWidth={2.4} />
-                    </span>
-                  </Tooltip>
-                </div>
+                        <span className="inline-flex items-center text-orange-500 font-semibold">
+                          <HelpCircle className="w-4 h-4" strokeWidth={2.4} />
+                        </span>
+                      </Tooltip>
+                    </div>
+                  )}
+                  {editingObject?.type !== 'enemy' && (editingObject ? `Edit ${editingObject.type.toUpperCase()}` : 'Add Object')}
+                </>
               )}
-              {editingObject?.type !== 'enemy' && (editingObject ? `Edit ${editingObject.type.toUpperCase()}` : 'Add Object')}
             </DialogTitle>
           </DialogHeader>
-          
           {objectValidationErrors.length > 0 && (
-            <div className="mb-3 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-              <p className="font-semibold mb-1">Please fix the following:</p>
-              <ul className="ml-4 list-disc space-y-1">
-                {objectValidationErrors.map((error, index) => (
-                  <li key={`${error}-${index}`}>{error}</li>
-                ))}
-              </ul>
-            </div>
-          )}
+                <div className="mb-3 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+                  <p className="font-semibold mb-1">Please fix the following:</p>
+                  <ul className="ml-4 list-disc space-y-1">
+                    {objectValidationErrors.map((error, index) => (
+                      <li key={`${error}-${index}`}>{error}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
-          <div className="flex-1 overflow-y-auto pr-2 minimal-scroll">
-            {editingObject && (
-            <div className="space-y-3 pb-4">
+              <div className="flex-1 overflow-y-auto pr-2 minimal-scroll">
+                {editingObject && (
+                  <div className="space-y-3 pb-4">
               {/* Basic Info Row */}
               <div className="flex gap-3 items-end">
                 <div className="flex-1">
@@ -8577,364 +8574,8 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               </div>
 
               {editingObject.type === 'enemy' ? (
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs text-muted-foreground mb-1">Enemy Types</label>
-                    <div className="flex flex-wrap gap-2">
-                      {ENEMY_ROLE_OPTIONS.map((option) => {
-                        const propKey = option.key.replace(/^is/, '').toLowerCase();
-                        const isActive = editingObject.properties?.[propKey] === 'true';
-                        return (
-                          <Tooltip key={option.key} content={option.description} side="top">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingObject((prev) => {
-                                  if (!prev) return prev;
-                                  const properties = { ...(prev.properties || {}) };
-                                  if (properties[propKey] === 'true') {
-                                    delete properties[propKey];
-                                  } else {
-                                    properties[propKey] = 'true';
-                                  }
-                                  return { ...prev, properties };
-                                });
-                              }}
-                              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${isActive ? `border ${option.badgeClass}` : 'border border-transparent bg-muted/50 text-muted-foreground hover:bg-muted'}`}
-                            >
-                              {option.label}
-                            </button>
-                          </Tooltip>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-xs text-muted-foreground">Tileset Location</label>
-                    <Input
-                      className="h-8 text-sm"
-                      value={getEditingObjectProperty('tilesetPath', '')}
-                      onChange={(e) => updateEditingObjectProperty('tilesetPath', e.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-xs text-muted-foreground">Portrait Location</label>
-                    <Input
-                      className="h-8 text-sm"
-                      value={getEditingObjectProperty('portraitPath', '')}
-                      onChange={(e) => updateEditingObjectProperty('portraitPath', e.target.value)}
-                    />
-                  </div>
-
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                      <Heart className="w-4 h-4 text-red-500" />
-                      <span>Core</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center gap-1">
-                        <label className="text-xs text-muted-foreground">HP</label>
-                        <Tooltip content="Total health of the enemy." side="top">
-                          <HelpCircle className="w-3 h-3 text-muted-foreground" />
-                        </Tooltip>
-                      </div>
-                      {renderEnemyFieldWeight('hp')}
-                    </div>
-                    <Input
-                      className="h-8 text-sm"
-                      value={getEditingObjectProperty('hp', '')}
-                      onChange={(e) => updateEditingObjectProperty('hp', e.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center gap-1">
-                        <label className="text-xs text-muted-foreground">Poise</label>
-                        <Tooltip content="Resistance to being staggered or interrupted." side="top">
-                          <HelpCircle className="w-3 h-3 text-muted-foreground" />
-                        </Tooltip>
-                      </div>
-                      {renderEnemyFieldWeight('poise')}
-                    </div>
-                    <Input
-                      className="h-8 text-sm"
-                      value={getEditingObjectProperty('poise', '')}
-                      onChange={(e) => updateEditingObjectProperty('poise', e.target.value)}
-                    />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                      <Sword className="w-4 h-4 text-orange-500" />
-                      <span>Damage</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center gap-1">
-                            <label className="text-xs text-muted-foreground">Melee Min</label>
-                            <Tooltip content="Minimum damage dealt by melee attacks." side="top">
-                              <HelpCircle className="w-3 h-3 text-muted-foreground" />
-                            </Tooltip>
-                          </div>
-                          {renderEnemyFieldWeight('dmg_melee_min')}
-                        </div>
-                        <Input
-                          className="h-8 text-sm"
-                          value={getEditingObjectProperty('dmg_melee_min', '')}
-                          onChange={(e) => updateEditingObjectProperty('dmg_melee_min', e.target.value)}
-                        />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center gap-1">
-                            <label className="text-xs text-muted-foreground">Melee Max</label>
-                            <Tooltip content="Maximum damage dealt by melee attacks." side="top">
-                              <HelpCircle className="w-3 h-3 text-muted-foreground" />
-                            </Tooltip>
-                          </div>
-                          {renderEnemyFieldWeight('dmg_melee_max')}
-                        </div>
-                        <Input
-                          className="h-8 text-sm"
-                          value={getEditingObjectProperty('dmg_melee_max', '')}
-                          onChange={(e) => updateEditingObjectProperty('dmg_melee_max', e.target.value)}
-                        />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center gap-1">
-                            <label className="text-xs text-muted-foreground">Ranged Min</label>
-                            <Tooltip content="Minimum damage dealt by ranged attacks." side="top">
-                              <HelpCircle className="w-3 h-3 text-muted-foreground" />
-                            </Tooltip>
-                          </div>
-                          {renderEnemyFieldWeight('dmg_ranged_min')}
-                        </div>
-                        <Input
-                          className="h-8 text-sm"
-                          value={getEditingObjectProperty('dmg_ranged_min', '')}
-                          onChange={(e) => updateEditingObjectProperty('dmg_ranged_min', e.target.value)}
-                        />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center gap-1">
-                            <label className="text-xs text-muted-foreground">Ranged Max</label>
-                            <Tooltip content="Maximum damage dealt by ranged attacks." side="top">
-                              <HelpCircle className="w-3 h-3 text-muted-foreground" />
-                            </Tooltip>
-                          </div>
-                          {renderEnemyFieldWeight('dmg_ranged_max')}
-                        </div>
-                        <Input
-                          className="h-8 text-sm"
-                          value={getEditingObjectProperty('dmg_ranged_max', '')}
-                          onChange={(e) => updateEditingObjectProperty('dmg_ranged_max', e.target.value)}
-                        />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center gap-1">
-                            <label className="text-xs text-muted-foreground">Mental Min</label>
-                            <Tooltip content="Minimum damage dealt by spells or mental attacks." side="top">
-                              <HelpCircle className="w-3 h-3 text-muted-foreground" />
-                            </Tooltip>
-                          </div>
-                          {renderEnemyFieldWeight('dmg_ment_min')}
-                        </div>
-                        <Input
-                          className="h-8 text-sm"
-                          value={getEditingObjectProperty('dmg_ment_min', '')}
-                          onChange={(e) => updateEditingObjectProperty('dmg_ment_min', e.target.value)}
-                        />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center gap-1">
-                            <label className="text-xs text-muted-foreground">Mental Max</label>
-                            <Tooltip content="Maximum damage dealt by spells or mental attacks." side="top">
-                              <HelpCircle className="w-3 h-3 text-muted-foreground" />
-                            </Tooltip>
-                          </div>
-                          {renderEnemyFieldWeight('dmg_ment_max')}
-                        </div>
-                        <Input
-                          className="h-8 text-sm"
-                          value={getEditingObjectProperty('dmg_ment_max', '')}
-                          onChange={(e) => updateEditingObjectProperty('dmg_ment_max', e.target.value)}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                      <Target className="w-4 h-4 text-blue-500" />
-                      <span>Combat Utility</span>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center gap-1">
-                            <label className="text-xs text-muted-foreground">Accuracy</label>
-                            <Tooltip content="Chance for attacks to hit the target." side="top">
-                              <HelpCircle className="w-3 h-3 text-muted-foreground" />
-                            </Tooltip>
-                          </div>
-                          {renderEnemyFieldWeight('accuracy')}
-                        </div>
-                        <Input
-                          className="h-8 text-sm"
-                          value={getEditingObjectProperty('accuracy', '')}
-                          onChange={(e) => updateEditingObjectProperty('accuracy', e.target.value)}
-                        />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center gap-1">
-                            <label className="text-xs text-muted-foreground">Crit</label>
-                            <Tooltip content="Chance to deal a critical hit." side="top">
-                              <HelpCircle className="w-3 h-3 text-muted-foreground" />
-                            </Tooltip>
-                          </div>
-                          {renderEnemyFieldWeight('crit')}
-                        </div>
-                        <Input
-                          className="h-8 text-sm"
-                          value={getEditingObjectProperty('crit', '')}
-                          onChange={(e) => updateEditingObjectProperty('crit', e.target.value)}
-                        />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center gap-1">
-                            <label className="text-xs text-muted-foreground">Avoidance</label>
-                            <Tooltip content="Chance to evade incoming attacks." side="top">
-                              <HelpCircle className="w-3 h-3 text-muted-foreground" />
-                            </Tooltip>
-                          </div>
-                          {renderEnemyFieldWeight('avoidance')}
-                        </div>
-                        <Input
-                          className="h-8 text-sm"
-                          value={getEditingObjectProperty('avoidance', '')}
-                          onChange={(e) => updateEditingObjectProperty('avoidance', e.target.value)}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                      <Timer className="w-4 h-4 text-purple-500" />
-                      <span>AI / Tempo</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center gap-1">
-                            <label className="text-xs text-muted-foreground">Speed</label>
-                            <Tooltip content="How fast the enemy moves." side="top">
-                              <HelpCircle className="w-3 h-3 text-muted-foreground" />
-                            </Tooltip>
-                          </div>
-                          {renderEnemyFieldWeight('speed')}
-                        </div>
-                        <Input
-                          className="h-8 text-sm"
-                          value={getEditingObjectProperty('speed', '')}
-                          onChange={(e) => updateEditingObjectProperty('speed', e.target.value)}
-                        />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center gap-1">
-                            <label className="text-xs text-muted-foreground">Cooldown</label>
-                            <Tooltip content="Time between consecutive attacks or actions." side="top">
-                              <HelpCircle className="w-3 h-3 text-muted-foreground" />
-                            </Tooltip>
-                          </div>
-                          {renderEnemyFieldWeight('cooldown')}
-                        </div>
-                        <Input
-                          className="h-8 text-sm"
-                          value={getEditingObjectProperty('cooldown', '')}
-                          onChange={(e) => updateEditingObjectProperty('cooldown', e.target.value)}
-                        />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center gap-1">
-                            <label className="text-xs text-muted-foreground">Turn Delay</label>
-                            <Tooltip content="Delay between decision/turn cycles." side="top">
-                              <HelpCircle className="w-3 h-3 text-muted-foreground" />
-                            </Tooltip>
-                          </div>
-                          {renderEnemyFieldWeight('turn_delay')}
-                        </div>
-                        <Input
-                          className="h-8 text-sm"
-                          value={getEditingObjectProperty('turn_delay', '')}
-                          onChange={(e) => updateEditingObjectProperty('turn_delay', e.target.value)}
-                        />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center gap-1">
-                            <label className="text-xs text-muted-foreground">Chance Pursue</label>
-                            <Tooltip content="Likelihood to actively chase the player." side="top">
-                              <HelpCircle className="w-3 h-3 text-muted-foreground" />
-                            </Tooltip>
-                          </div>
-                          {renderEnemyFieldWeight('chance_pursue')}
-                        </div>
-                        <Input
-                          className="h-8 text-sm"
-                          value={getEditingObjectProperty('chance_pursue', '')}
-                          onChange={(e) => updateEditingObjectProperty('chance_pursue', e.target.value)}
-                        />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center gap-1">
-                            <label className="text-xs text-muted-foreground">Threat Range</label>
-                            <Tooltip content="Distance at which the enemy detects the player." side="top">
-                              <HelpCircle className="w-3 h-3 text-muted-foreground" />
-                            </Tooltip>
-                          </div>
-                          {renderEnemyFieldWeight('threat_range')}
-                        </div>
-                        <Input
-                          className="h-8 text-sm"
-                          value={getEditingObjectProperty('threat_range', '')}
-                          onChange={(e) => updateEditingObjectProperty('threat_range', e.target.value)}
-                        />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center gap-1">
-                            <label className="text-xs text-muted-foreground">Melee Range</label>
-                            <Tooltip content="Distance required to perform melee attacks." side="top">
-                              <HelpCircle className="w-3 h-3 text-muted-foreground" />
-                            </Tooltip>
-                          </div>
-                          {renderEnemyFieldWeight('melee_range')}
-                        </div>
-                        <Input
-                          className="h-8 text-sm"
-                          value={getEditingObjectProperty('melee_range', '')}
-                          onChange={(e) => updateEditingObjectProperty('melee_range', e.target.value)}
-                        />
-                      </div>
-                    </div>
-                  </div>
+                <div className="rounded-md border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
+                  Enemy details are edited in the enemy tab.
                 </div>
               ) : (
                 <>
@@ -9481,8 +9122,8 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               )}
               </>
               )}
-              </div>
-            )}
+            </div>
+          )}
           </div>
 
           <DialogFooter className="mt-4 flex-shrink-0">
@@ -9589,7 +9230,6 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      )}
 
       {/* Dialogue Tree Dialog */}
       <Dialog

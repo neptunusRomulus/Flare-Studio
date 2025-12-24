@@ -4478,7 +4478,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
   const isEnemyLayer = activeLayer?.type === 'enemy';
   const isItemsLayer = activeLayer?.type === 'items';
   const isRulesLayer = activeLayer?.type === 'rules';
-  const isActionsLayer = activeLayer?.type === 'actions';
+
   const availableRuleTriggers = ruleStartType ? (ruleStartType === 'player' ? PLAYER_TRIGGER_OPTIONS : GAME_TRIGGER_OPTIONS) : [];
 
   const actorEntries = useMemo(() => {
@@ -4866,56 +4866,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               return null;
             })()}
 
-            {/* Actions / Abilities Layer - list and add button (same visual style as Rules) */}
-            {isActionsLayer && (
-              <div className="flex flex-col flex-1">
-                <div className="flex-1 min-h-0 border border-dashed border-border rounded-md overflow-y-auto">
-                  {abilitiesList.length === 0 ? (
-                    <div className="flex items-center justify-center h-full text-sm text-muted-foreground px-4 text-center">
-                      Click &quot;+ Ability&quot; to create your first ability.
-                    </div>
-                  ) : (
-                    <div className="flex flex-col gap-1 p-2">
-                      {abilitiesList.map((ability) => (
-                        <div
-                          key={ability.id}
-                          className="flex items-center gap-3 p-2 bg-muted/50 hover:bg-muted rounded-md border border-border cursor-pointer transition-colors w-full"
-                          title={ability.name}
-                        >
-                          <Zap className="w-4 h-4 text-orange-500 flex-shrink-0" />
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium truncate">{ability.name}</div>
-                            <div className="flex items-center gap-2 mt-1">
-                              <Badge className="text-[10px] px-1.5 py-0 bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800/50">
-                                {ability.type || 'Standard'}
-                              </Badge>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div className="flex justify-center py-2">
-                  <Tooltip content="Add Ability" side="bottom">
-                    <Button
-                      variant="default"
-                      size="sm"
-                      aria-label="Add Ability"
-                      className="text-xs px-3 py-1 h-7 shadow-sm bg-orange-500 hover:bg-orange-600 text-white border-orange-500"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        setShowAbilityDialog(true);
-                      }}
-                    >
-                      <Plus className="w-3 h-3 mr-1" />
-                      Ability
-                    </Button>
-                  </Tooltip>
-                </div>
-              </div>
-            )}
+
 
             {/* Rules Layer - list and add button (similar UX to NPC layer) */}
             {isRulesLayer && (
@@ -5079,7 +5030,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             )}
 
             {/* Tileset Brushes Window - render for all layers except NPC, Enemy, Items, Rules, and Actions */}
-            {!isNpcLayer && !isEnemyLayer && !isItemsLayer && !isRulesLayer && !isActionsLayer && (
+            {!isNpcLayer && !isEnemyLayer && !isItemsLayer && !isRulesLayer && (
             <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-0 m-0">
               {/* Layer Tabs (background / object only) */}
               {(() => {
@@ -5162,7 +5113,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             </div>
             )}
             {/* Brush Tools - stick to bottom so palette can fill remaining space */}
-            {!isNpcLayer && !isEnemyLayer && !isItemsLayer && !isRulesLayer && !isActionsLayer && (
+            {!isNpcLayer && !isEnemyLayer && !isItemsLayer && !isRulesLayer && (
             <div className="sticky bottom-0 z-10 bg-transparent py-2">
               <div className="text-xs text-muted-foreground"></div>
               <div className="w-full flex justify-center">
@@ -5389,7 +5340,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             <div className="mb-2 w-full flex flex-col justify-center h-full">
               <div className="h-auto overflow-hidden flex flex-col justify-center w-full">
                 <div className="space-y-0.5 h-auto overflow-y-visible flex flex-col justify-center w-full">
-                  {layers.map((layer) => {
+                  {layers.filter(layer => layer.type !== 'actions').map((layer) => {
                     const isActive = activeLayerId === layer.id;
                     const isHovered = hoveredLayerId === layer.id;
                     const visible = layersPanelExpanded || isActive;

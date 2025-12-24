@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import Tooltip from '@/components/ui/tooltip';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { User, Eye, BarChart2, Settings, Sword, Gift, Flag, MapPin, Volume2, HelpCircle, X, Save, Edit2, Plus, Check, Rabbit, Sigma, Zap } from 'lucide-react';
+import { User, Eye, Sword, Gift, Flag, MapPin, Volume2, HelpCircle, X, Save, Plus, Check, Rabbit, Sigma, Zap } from 'lucide-react';
 import type { MapObject } from '@/types';
 import type { LucideIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -32,14 +32,13 @@ interface EditEnemyWindowProps {
   onOpenChange?: (open: boolean) => void;
   enemy?: MapObject | null;
   onSave?: (obj: MapObject) => void;
-  existingCategories?: string[];
   projectPath?: string;
   inline?: boolean;
   showCloseConfirm?: boolean;
   onCloseDecision?: (decision: 'save' | 'discard' | 'cancel') => void;
 }
 
-export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, existingCategories = [], projectPath = '', inline = false, showCloseConfirm = false, onCloseDecision }: EditEnemyWindowProps) {
+export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, projectPath = '', inline = false, showCloseConfirm = false, onCloseDecision }: EditEnemyWindowProps) {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<TabKey>('identity');
   const [name, setName] = useState(() => enemy?.name || '');
@@ -463,95 +462,6 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, exi
     handleClose();
   };
 
-  const handleSaveAndEdit = () => {
-    if (!enemy) return;
-    const newProps: Record<string, string> = { ...(enemy.properties || {}) };
-    const knownKeys = [
-      'tilesetPath','portraitPath','gfx','render_layers','animation_slots','suppress_hp','hp','mp','attack','defense','speed','xp','gold',
-      'melee','ranged','caster','summoner','boss','passive','stationary','humanoid','lifeform',
-      'powers','passive_powers','cooldown','cooldown_hit','power_filter','script','loot','loot_count','first_defeat_loot','quest_loot','defeat_status','categories','sfx_attack','sfx_hit','sfx_die','sfx_critdie','melee_range','thread_range','combat_style','threat_range','flee_range','flee_duration','flee_cooldown','chance_pursue','chance_flee','turn_delay','wander_radius','waypoints','waypoint_pause','facing','flying','intangible','include','abilities'
-    ];
-    if (rarity) newProps.rarity = rarity; else delete newProps.rarity;
-    if (include) newProps.include = include; else delete newProps.include;
-    if (tilesetPath) newProps.tilesetPath = tilesetPath; else delete newProps.tilesetPath;
-    if (portraitPath) newProps.portraitPath = portraitPath; else delete newProps.portraitPath;
-    if (gfx) newProps.gfx = gfx; else delete newProps.gfx;
-    if (renderLayers) newProps.render_layers = renderLayers; else delete newProps.render_layers;
-    if (animationSlots) newProps.animation_slots = animationSlots; else delete newProps.animation_slots;
-    if (suppressHp) newProps.suppress_hp = 'true'; else delete newProps.suppress_hp;
-    if (sfxAttack) newProps.sfx_attack = sfxAttack; else delete newProps.sfx_attack;
-    if (sfxHit) newProps.sfx_hit = sfxHit; else delete newProps.sfx_hit;
-    if (sfxDie) newProps.sfx_die = sfxDie; else delete newProps.sfx_die;
-    if (sfxCritDie) newProps.sfx_critdie = sfxCritDie; else delete newProps.sfx_critdie;
-    if (hp) newProps.hp = hp; else delete newProps.hp;
-    if (mp) newProps.mp = mp; else delete newProps.mp;
-    if (attack) newProps.attack = attack; else delete newProps.attack;
-    if (defense) newProps.defense = defense; else delete newProps.defense;
-    if (speed) newProps.speed = speed; else delete newProps.speed;
-    if (xp) newProps.xp = xp; else delete newProps.xp;
-    if (gold) newProps.gold = gold; else delete newProps.gold;
-    if (statPerLevel) newProps.stat_per_level = statPerLevel; else delete newProps.stat_per_level;
-    if (xpScaling) newProps.xp_scaling = xpScaling; else delete newProps.xp_scaling;
-    if (vulnerable) newProps.vulnerable = vulnerable; else delete newProps.vulnerable;
-    if (meleeRange) newProps.melee_range = meleeRange; else delete newProps.melee_range;
-    if (threadRange) newProps.thread_range = threadRange; else delete newProps.thread_range;
-    if (isMelee) newProps.melee = 'true'; else delete newProps.melee;
-    if (isRanged) newProps.ranged = 'true'; else delete newProps.ranged;
-    if (isCaster) newProps.caster = 'true'; else delete newProps.caster;
-    if (isSummoner) newProps.summoner = 'true'; else delete newProps.summoner;
-    if (isBoss) newProps.boss = 'true'; else delete newProps.boss;
-    if (isPassive) newProps.passive = 'true'; else delete newProps.passive;
-    if (isStationary) newProps.stationary = 'true'; else delete newProps.stationary;
-    if (isHumanoid) newProps.humanoid = 'true'; else delete newProps.humanoid;
-    if (isLifeform) newProps.lifeform = 'true'; else delete newProps.lifeform;
-    if (combatStyle) newProps.combat_style = combatStyle; else delete newProps.combat_style;
-    if (threatRange) newProps.threat_range = threatRange; else delete newProps.threat_range;
-    if (fleeRange) newProps.flee_range = fleeRange; else delete newProps.flee_range;
-    if (fleeDuration) newProps.flee_duration = fleeDuration; else delete newProps.flee_duration;
-    if (fleeCooldown) newProps.flee_cooldown = fleeCooldown; else delete newProps.flee_cooldown;
-    if (chancePursue) newProps.chance_pursue = chancePursue; else delete newProps.chance_pursue;
-    if (chanceFlee) newProps.chance_flee = chanceFlee; else delete newProps.chance_flee;
-    if (turnDelay) newProps.turn_delay = turnDelay; else delete newProps.turn_delay;
-    if (wanderRadius) newProps.wander_radius = wanderRadius; else delete newProps.wander_radius;
-    if (waypoints) newProps.waypoints = waypoints; else delete newProps.waypoints;
-    if (waypointPause) newProps.waypoint_pause = waypointPause; else delete newProps.waypoint_pause;
-    if (isFacing) newProps.facing = 'true'; else delete newProps.facing;
-    if (isFlying) newProps.flying = 'true'; else delete newProps.flying;
-    if (isIntangible) newProps.intangible = 'true'; else delete newProps.intangible;
-    if (powersList) newProps.powers = powersList; else delete newProps.powers;
-    if (passivePowers) newProps.passive_powers = passivePowers; else delete newProps.passive_powers;
-    if (cooldown) newProps.cooldown = cooldown; else delete newProps.cooldown;
-    if (cooldownHit) newProps.cooldown_hit = cooldownHit; else delete newProps.cooldown_hit;
-    if (powerFilter) newProps.power_filter = powerFilter; else delete newProps.power_filter;
-    if (abilitiesList.length > 0) newProps.abilities = JSON.stringify(abilitiesList); else delete newProps.abilities;
-    if (loot) newProps.loot = loot; else delete newProps.loot;
-    if (lootCount) newProps.loot_count = lootCount; else delete newProps.loot_count;
-    if (firstDefeatLoot) newProps.first_defeat_loot = firstDefeatLoot; else delete newProps.first_defeat_loot;
-    if (questLoot) newProps.quest_loot = questLoot; else delete newProps.quest_loot;
-    if (defeatStatus) newProps.defeat_status = defeatStatus; else delete newProps.defeat_status;
-    const customLines = (customPropsRaw || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-    for (const k of Object.keys(newProps)) {
-      if (!knownKeys.includes(k)) delete newProps[k];
-    }
-    for (const line of customLines) {
-      const eq = line.indexOf('=');
-      if (eq > 0) {
-        const k = line.slice(0, eq).trim();
-        const v = line.slice(eq + 1).trim();
-        if (k) newProps[k] = v;
-      }
-    }
-    const updated: MapObject = {
-      ...enemy,
-      name,
-      level: Number.isFinite(Number(level)) ? Number(level) : enemy.level,
-      number: Number.isFinite(Number(count)) ? Number(count) : enemy.number,
-      category: category,
-      properties: newProps,
-    };
-    onSave?.(updated);
-  };
-
   const handleCloseDecision = (decision: 'save' | 'discard' | 'cancel') => {
     if (decision === 'save') {
       handleSave();
@@ -559,7 +469,12 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, exi
     onCloseDecision?.(decision);
   };
 
-  
+  const combatStyles: Array<{ id: 'default' | 'aggressive' | 'passive'; label: string }> = [
+    { id: 'default', label: 'Default' },
+    { id: 'aggressive', label: 'Aggressive' },
+    { id: 'passive', label: 'Passive' },
+  ];
+
   const panel = (
     <>
         <DialogHeader className="px-6 py-3 flex flex-row items-center justify-between border-b relative">
@@ -1009,15 +924,11 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, exi
                 <div>
                   <h3 className="text-sm font-semibold mb-3">Combat Style</h3>
                   <div className="flex gap-2 mb-4">
-                    {[
-                      { id: 'default', label: 'Default' },
-                      { id: 'aggressive', label: 'Aggressive' },
-                      { id: 'passive', label: 'Passive' }
-                    ].map((style) => (
+                    {combatStyles.map((style) => (
                       <button
                         key={style.id}
                         type="button"
-                        onClick={() => setCombatStyle(style.id as any)}
+                        onClick={() => setCombatStyle(style.id)}
                         className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all border ${
                           combatStyle === style.id
                             ? 'bg-orange-500 border-orange-600 text-white shadow-sm'
@@ -1031,9 +942,9 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, exi
                   
                   <div className="px-3 py-2.5 rounded-lg bg-muted/30 border border-border/50 min-h-[50px] flex items-center">
                     <p className="text-[11px] text-muted-foreground leading-normal">
-                      {combatStyle === 'default' && "Default: The enemy enters combat only when the hero comes into the threat range."}
+                      {combatStyle === 'default' && 'Default: The enemy enters combat only when the hero comes into the threat range.'}
                       {combatStyle === 'aggressive' && "Aggressive: The creature is always in a combat state regardless of the player's proximity."}
-                      {combatStyle === 'passive' && "Passive: The enemy is non-hostile by default and must be attacked by the player before it will enter a combat state and fight back."}
+                      {combatStyle === 'passive' && 'Passive: The enemy is non-hostile by default and must be attacked by the player before it will enter a combat state and fight back.'}
                     </p>
                   </div>
                 </div>
@@ -1043,8 +954,8 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, exi
                     <h3 className="text-sm font-semibold">Thread Range</h3>
                     <Tooltip content={
                       <>
-                        <p>If you do not specify the second value, the engine defaults the "stop distance" to double the initial engagement radius. For example, if you set the threat range to 5, the enemy will start chasing you at 5 units away and stop chasing you once you are 10 units away.</p>
-                        <p className="mt-2">You can think of threat_range as a "hostility bubble" surrounding the enemy. Once you step inside the first bubble, you have tripped their alarm; you must then move completely outside the second, larger bubble to "break the invisible tether" and make them give up the chase.</p>
+                        <p>If you do not specify the second value, the engine defaults the &quot;stop distance&quot; to double the initial engagement radius. For example, if you set the threat range to 5, the enemy will start chasing you at 5 units away and stop chasing you once you are 10 units away.</p>
+                        <p className="mt-2">You can think of threat_range as a &quot;hostility bubble&quot; surrounding the enemy. Once you step inside the first bubble, you have tripped their alarm; you must then move completely outside the second, larger bubble to &quot;break the invisible tether&quot; and make them give up the chase.</p>
                       </>
                     } side="top">
                       <button type="button" className="text-muted-foreground hover:text-foreground">

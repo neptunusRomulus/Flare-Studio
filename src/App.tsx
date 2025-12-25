@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import Tooltip from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
-import { Upload, Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Pipette, Sun, Moon, Blend, MapPin, Save, Scan, Check, HelpCircle, Folder, Plus, Image, Grid, Box, Users, Locate, Clock, Menu, Sword, GitBranch } from 'lucide-react';
+import { Upload, Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Pipette, Blend, MapPin, Save, Scan, Check, HelpCircle, Folder, Plus, Image, Grid, Box, Users, Locate, Clock, Menu, Sword, GitBranch } from 'lucide-react';
 import { TileMapEditor } from './editor/TileMapEditor';
 import type { EditorProjectData } from './editor/TileMapEditor';
 import { TileLayer, MapObject, DialogueTree, FlareNPC } from './types';
@@ -19,10 +19,12 @@ import ActorDialog from '@/components/ActorDialog';
 import BottomToolbar from '@/components/BottomToolbar';
 import BrushToolbar from '@/components/BrushToolbar';
 import ClearLayerDialog from '@/components/ClearLayerDialog';
+import EngineSettingsDialog from '@/components/EngineSettingsDialog';
 import HelpDialog from '@/components/HelpDialog';
 import ItemDialog from '@/components/ItemDialog';
 import ItemEditDialog from '@/components/ItemEditDialog';
 import MapDialogs from '@/components/MapDialogs';
+import MapSettingsDialog from '@/components/MapSettingsDialog';
 import RuleDialog from '@/components/RuleDialog';
 import DialogueTreeDialog from '@/components/dialogue/DialogueTreeDialog';
 import SeparateBrushDialog from '@/components/SeparateBrushDialog';
@@ -37,14 +39,20 @@ import SidebarRulesPanel from '@/components/SidebarRulesPanel';
 import { buildSpawnContent, computeIntermapTarget, extractSpawnIntermapValue, STARTING_MAP_INVALID_NAMES } from './editor/mapSpawnUtils';
 import { validateAndSanitizeObject } from './editor/objectValidation';
 import type { ItemResourceSubtype, ItemRole } from './editor/itemRoles';
-import { EMPTY_ACTOR_ROLES } from './editor/actorRoles';
-import type { ActorDialogState, ActorRoleKey } from './editor/actorRoles';
+import type { ActorRoleKey } from './editor/actorRoles';
 import { GAME_TRIGGER_OPTIONS, PLAYER_TRIGGER_OPTIONS } from './editor/ruleOptions';
 import type { RuleStartType } from './editor/ruleOptions';
+import useHelpState from './hooks/useHelpState';
+import useMapConfig from './hooks/useMapConfig';
+import useObjectEditing from './hooks/useObjectEditing';
+import useProjectSession from './hooks/useProjectSession';
+import useStampState from './hooks/useStampState';
 import useToolbarAutoCollapse from './hooks/useToolbarAutoCollapse';
+import useToolbarHandlers from './hooks/useToolbarHandlers';
 import useToolbarVisibility from './hooks/useToolbarVisibility';
 import useTooltip from './hooks/useTooltip';
 import useToolSelection from './hooks/useToolSelection';
+import useVendorState from './hooks/useVendorState';
 import useEditorTabs from './hooks/useEditorTabs';
 import flareIconUrl from '/flare-ico.png?url';
 import type { MapConfig } from './editor/mapConfig';
@@ -57,16 +65,9 @@ function App() {
   const [editor, setEditor] = useState<TileMapEditor | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const toolbarRef = useRef<HTMLDivElement | null>(null);
-  const [mapWidth, setMapWidth] = useState(0);
-  const [mapHeight, setMapHeight] = useState(0);
-  const [mapInitialized, setMapInitialized] = useState(false);
-  const [showCreateMapDialog, setShowCreateMapDialog] = useState(false);
-  const [newMapWidth, setNewMapWidth] = useState(20);
-  const [newMapHeight, setNewMapHeight] = useState(15);
-  const [newMapName, setNewMapName] = useState('Untitled Map');
-  const [createMapError, setCreateMapError] = useState<string | null>(null);
-  const [reservedMapNames, setReservedMapNames] = useState<string[]>([]);
-  const [newMapStarting, setNewMapStarting] = useState(false);
+  const setupAutoSaveRef = useRef<null | ((editor: TileMapEditor) => void)>(null);
+  const updateLayersListRef = useRef<null | (() => void)>(null);
+  const syncMapObjectsRef = useRef<null | (() => void)>(null);
   // Editor tabs
   const [pendingEnemyTabCloseId, setPendingEnemyTabCloseId] = useState<string | null>(null);
   const switchToTabHelpersRef = useRef({
@@ -99,8 +100,6 @@ function App() {
   const [layersPanelExpanded, setLayersPanelExpanded] = useState(false);
   // Individual layer hover state
   const [hoveredLayerId, setHoveredLayerId] = useState<number | null>(null);
-  const [showHelp, setShowHelp] = useState(false);
-  const [activeHelpTab, setActiveHelpTab] = useState('engine');
   const [tipsMinimized, setTipsMinimized] = useState(false);
   // Force refresh counter to trigger re-render when editor-managed tabs change
   const [tabTick, setTabTick] = useState(0);
@@ -143,16 +142,6 @@ function App() {
     bottomToolbarContainerRef.current = node;
   }, [bottomToolbarContainerRef, toolbarRef]);
 
-  const handleSelectTool = useCallback((tool: 'brush' | 'selection' | 'shape' | 'stamp' | 'eyedropper') => {
-    setSelectedTool(tool);
-    showBottomToolbarTemporarily();
-  }, [setSelectedTool, showBottomToolbarTemporarily]);
-
-  const handleToggleBrushTool = useCallback((tool: 'move' | 'merge' | 'separate' | 'remove') => {
-    setBrushTool((current) => (current === tool ? 'none' : tool));
-    showBrushToolbarTemporarily();
-  }, [setBrushTool, showBrushToolbarTemporarily]);
-
   const canUseTilesetDialog = useMemo(() => {
     return typeof window !== 'undefined' && !!window.electronAPI?.selectTilesetFile;
   }, []);
@@ -179,19 +168,48 @@ function App() {
     onCloseStampDialog: () => setShowStampDialog(false)
   });
   
-  // Brush management states
-  const [brushTool, setBrushTool] = useState<'none' | 'move' | 'merge' | 'separate' | 'remove'>('none');
-  // Removed unused state: selectedBrushes
-  const [showSeparateDialog, setShowSeparateDialog] = useState(false);
-  const [brushToSeparate, setBrushToSeparate] = useState<number | null>(null);
-  
-  // Stamp states
-  const [stamps, setStamps] = useState<import('./types').Stamp[]>([]);
-  const [selectedStamp, setSelectedStamp] = useState<string | null>(null);
-  const [stampMode, setStampMode] = useState<'select' | 'create' | 'place'>('select');
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [showStampDialog, setShowStampDialog] = useState(false);
-  const [newStampName, setNewStampName] = useState('');
+  const {
+    brushTool,
+    setBrushTool,
+    showSeparateDialog,
+    setShowSeparateDialog,
+    brushToSeparate,
+    setBrushToSeparate,
+    stamps,
+    setStamps,
+    selectedStamp,
+    setSelectedStamp,
+    stampMode,
+    setStampMode,
+    showStampDialog,
+    setShowStampDialog,
+    newStampName,
+    setNewStampName
+  } = useStampState();
+  const {
+    handleSelectTool,
+    handleToggleBrushTool,
+    handleCreateStamp,
+    handleStampSelect,
+    handleDeleteStamp,
+    handleSeparateBrush,
+    confirmSeparateBrush
+  } = useToolbarHandlers({
+    editor,
+    setSelectedTool,
+    showBottomToolbarTemporarily,
+    setBrushTool,
+    showBrushToolbarTemporarily,
+    newStampName,
+    setNewStampName,
+    setShowStampDialog,
+    setStampMode,
+    selectedStamp,
+    setSelectedStamp,
+    setBrushToSeparate,
+    setShowSeparateDialog,
+    brushToSeparate
+  });
   // Clear layer confirmation dialog state (replaces window.confirm)
   const [showClearLayerDialog, setShowClearLayerDialog] = useState(false);
   // Generic confirmation dialog for other destructive actions
@@ -202,12 +220,98 @@ function App() {
   // Keep an optional ref as a fallback for older flows
   const confirmPayloadRef = React.useRef<null | { layerType: string; tabId: number }>(null);
   
-  // Settings states
-  const [mapName, setMapName] = useState('Untitled Map');
-  const [isStartingMap, setIsStartingMap] = useState(false);
   const [currentProjectPath, setCurrentProjectPath] = useState<string | null>(null);
-  const [startingMapIntermap, setStartingMapIntermap] = useState<string | null>(null);
-  const previousMapNameRef = useRef(mapName);
+  const {
+    showHelp,
+    setShowHelp,
+    activeHelpTab,
+    setActiveHelpTab
+  } = useHelpState();
+  const {
+    showVendorStockDialog,
+    setShowVendorStockDialog,
+    vendorStockSelection,
+    setVendorStockSelection,
+    showVendorUnlockDialog,
+    setShowVendorUnlockDialog,
+    vendorUnlockEntries,
+    setVendorUnlockEntries,
+    showVendorRandomDialog,
+    setShowVendorRandomDialog,
+    vendorRandomSelection,
+    setVendorRandomSelection,
+    vendorRandomCount,
+    setVendorRandomCount
+  } = useVendorState();
+  const setupAutoSaveWrapper = useCallback((target: TileMapEditor) => {
+    setupAutoSaveRef.current?.(target);
+  }, []);
+  const updateLayersListWrapper = useCallback(() => {
+    updateLayersListRef.current?.();
+  }, []);
+  const syncMapObjectsWrapper = useCallback(() => {
+    syncMapObjectsRef.current?.();
+  }, []);
+  const createTabForRef = useRef<((name: string, projectPath: string | null, config: EditorProjectData) => void) | null>(null);
+  const beforeCreateMapRef = useRef<(() => Promise<void>) | null>(null);
+  const getCreateTabFor = useCallback(() => createTabForRef.current, []);
+  const getBeforeCreateMap = useCallback(() => beforeCreateMapRef.current, []);
+  const {
+    mapWidth,
+    setMapWidth,
+    mapHeight,
+    setMapHeight,
+    mapInitialized,
+    setMapInitialized,
+    showCreateMapDialog,
+    setShowCreateMapDialog,
+    newMapWidth,
+    setNewMapWidth,
+    newMapHeight,
+    setNewMapHeight,
+    newMapName,
+    setNewMapName,
+    createMapError,
+    setCreateMapError,
+    newMapStarting,
+    setNewMapStarting,
+    mapName,
+    setMapName,
+    isStartingMap,
+    startingMapIntermap,
+    setStartingMapIntermap,
+    isPreparingNewMap,
+    handleMapResize,
+    handleOpenCreateMapDialog,
+    handleConfirmCreateMap,
+    updateStartingMap
+  } = useMapConfig({
+    editor,
+    setEditor,
+    canvasRef,
+    isDarkMode,
+    setupAutoSave: setupAutoSaveWrapper,
+    updateLayersList: updateLayersListWrapper,
+    syncMapObjects: syncMapObjectsWrapper,
+    showToolbarTemporarily,
+    showBottomToolbarTemporarily,
+    getCreateTabFor,
+    getBeforeCreateMap,
+    currentProjectPath,
+    setLayers,
+    setActiveLayerId,
+    setStamps,
+    setSelectedStamp,
+    setMapObjects,
+    setHoverCoords,
+    setBrushTool,
+    setShowSeparateDialog,
+    setBrushToSeparate,
+    setSaveStatus,
+    setHasUnsavedChanges,
+    setHasSelection,
+    setSelectionCount
+  });
   const {
     tabs,
     setTabs,
@@ -227,6 +331,34 @@ function App() {
     setMapHeight,
     switchToTabHelpersRef
   });
+
+  useEffect(() => {
+    createTabForRef.current = createTabFor;
+  }, [createTabFor]);
+
+  const handleBeforeCreateMap = useCallback(async () => {
+    if (!editor || !activeTabId) {
+      return;
+    }
+
+    try {
+      await editor.ensureTilesetsLoaded();
+      const snapshot = await editor.getProjectData();
+      const safeSnapshot = JSON.parse(JSON.stringify(snapshot));
+      setTabs((prev) => prev.map(t => t.id === activeTabId ? { ...t, config: safeSnapshot } : t));
+      if (currentProjectPath) {
+        await editor.saveProjectData(currentProjectPath);
+      }
+    } catch (err) {
+      console.warn('Failed to snapshot current tab before creating a new map:', err);
+    }
+  }, [editor, activeTabId, setTabs, currentProjectPath]);
+
+  useEffect(() => {
+    beforeCreateMapRef.current = handleBeforeCreateMap;
+  }, [handleBeforeCreateMap]);
+
+  useProjectSession({ tabs, activeTabId, currentProjectPath });
 
   // Ensure a tab is always selected when tabs exist but activeTabId is null
   // This handles the case where the UI shows tabs but none appears selected
@@ -251,89 +383,7 @@ function App() {
     }
   }, [activeTabId, currentProjectPath, setActiveTabId, tabs]);
 
-  // Auto-save session to project folder when tabs or activeTabId changes
-  useEffect(() => {
-    const saveSession = async () => {
-      if (!currentProjectPath || !window.electronAPI?.writeSession) return;
-      if (tabs.length === 0) return;
-      
-      try {
-        // Only save tabs that belong to this project
-        const normalizedProjectPath = currentProjectPath.replace(/\\/g, '/').toLowerCase();
-        const projectTabs = tabs
-          .filter(t => {
-            const normalizedTabPath = t.projectPath?.replace(/\\/g, '/').toLowerCase() || '';
-            return normalizedTabPath === normalizedProjectPath;
-          })
-          .map(t => ({
-            id: t.id,
-            name: t.name,
-            projectPath: t.projectPath ?? undefined // Convert null to undefined for type compatibility
-          }));
-        
-        if (projectTabs.length === 0) return;
-        
-        // Deduplicate tabs by name (keep only the first occurrence of each map name)
-        const seenNames = new Set<string>();
-        const uniqueTabs = projectTabs.filter(t => {
-          const lowerName = t.name.toLowerCase();
-          if (seenNames.has(lowerName)) {
-            console.log('Session save: removing duplicate tab:', t.name);
-            return false;
-          }
-          seenNames.add(lowerName);
-          return true;
-        });
-        
-        // Only save activeTabId if it's a valid tab in this project
-        // This prevents saving null during the brief moment between setTabs and setActiveTabId
-        const validActiveTabId = activeTabId && uniqueTabs.some(t => t.id === activeTabId) 
-          ? activeTabId 
-          : (uniqueTabs.length > 0 ? uniqueTabs[0].id : null);
-        
-        const sessionData = {
-          tabs: uniqueTabs,
-          activeTabId: validActiveTabId,
-          lastOpened: new Date().toISOString()
-        };
-        
-        await window.electronAPI.writeSession(currentProjectPath, sessionData);
-        console.log('Session saved to project:', currentProjectPath, uniqueTabs.length, 'tabs');
-      } catch (e) {
-        console.warn('Failed to save session to project:', e);
-      }
-    };
-    
-    saveSession();
-  }, [tabs, activeTabId, currentProjectPath]);
 
-  const writeSpawnFile = useCallback(async (starting: boolean, mapNameOverride?: string) => {
-    const effectiveName = mapNameOverride ?? mapName;
-    const intermapTarget = computeIntermapTarget(starting, effectiveName);
-    if (!currentProjectPath || !window.electronAPI?.updateSpawnFile) {
-      setStartingMapIntermap(intermapTarget);
-      return;
-    }
-    const spawnContent = buildSpawnContent(intermapTarget);
-    try {
-      const success = await window.electronAPI.updateSpawnFile(currentProjectPath, spawnContent);
-      if (success) {
-        setStartingMapIntermap(intermapTarget);
-      }
-    } catch (error) {
-      console.error('Failed to update spawn file:', error);
-    }
-  }, [currentProjectPath, mapName, setStartingMapIntermap]);
-
-  const updateStartingMap = useCallback(
-    (nextValue: boolean, options?: { propagate?: boolean; mapNameOverride?: string }) => {
-      setIsStartingMap(nextValue);
-      if (options?.propagate === false) return;
-      void writeSpawnFile(nextValue, options?.mapNameOverride);
-    },
-    [setIsStartingMap, writeSpawnFile]
-  );
-  
   const [isDarkMode, setIsDarkMode] = useState(() => {
     // Initialize from localStorage or default to false
     const savedTheme = localStorage.getItem('isDarkMode');
@@ -360,55 +410,6 @@ function App() {
   const [lastSaveTime, setLastSaveTime] = useState<number>(0);
   const [isManuallySaving, setIsManuallySaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  // Reload spawn metadata whenever project selection changes
-  useEffect(() => {
-    let cancelled = false;
-    const loadSpawnFile = async () => {
-      if (!currentProjectPath || !window.electronAPI?.readSpawnFile) {
-        if (!cancelled) {
-          setStartingMapIntermap(null);
-        }
-        return;
-      }
-      try {
-        const content = await window.electronAPI.readSpawnFile(currentProjectPath);
-        if (!cancelled) {
-          setStartingMapIntermap(extractSpawnIntermapValue(content));
-        }
-      } catch (error) {
-        console.warn('Failed to read spawn file:', error);
-        if (!cancelled) {
-          setStartingMapIntermap(null);
-        }
-      }
-    };
-    loadSpawnFile();
-    return () => {
-      cancelled = true;
-    };
-  }, [currentProjectPath, setStartingMapIntermap]);
-
-  useEffect(() => {
-    const previous = previousMapNameRef.current;
-    if (previous === mapName) {
-      return;
-    }
-    previousMapNameRef.current = mapName;
-    if (!isStartingMap) {
-      return;
-    }
-    const previousTarget = computeIntermapTarget(true, previous);
-    const nextTarget = computeIntermapTarget(true, mapName);
-    if (previousTarget !== nextTarget) {
-      updateStartingMap(true, { mapNameOverride: mapName });
-    }
-  }, [mapName, isStartingMap, updateStartingMap]);
-
-  useEffect(() => {
-    if (editor) {
-      editor.setMapName(mapName);
-    }
-  }, [editor, mapName]);
 
   // When true, we're in the middle of opening an existing project
   // and should avoid creating a blank editor instance.
@@ -418,25 +419,37 @@ function App() {
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
   const [showExportSuccess, setShowExportSuccess] = useState(false);
-  const [isPreparingNewMap, setIsPreparingNewMap] = useState(false);
   
   const { tooltip, showTooltipWithDelay, hideTooltip } = useTooltip({ toolbarRef, canvasRef });
 
-  // Object management states  
-  const [showObjectDialog, setShowObjectDialog] = useState(false);
-  const [editingObject, setEditingObject] = useState<MapObject | null>(null);
-  const [objectValidationErrors, setObjectValidationErrors] = useState<string[]>([]);
-  const [mapObjects, setMapObjects] = useState<MapObject[]>([]);
-  const [showDeleteNpcConfirm, setShowDeleteNpcConfirm] = useState(false);
-  const [showDeleteEnemyConfirm, setShowDeleteEnemyConfirm] = useState(false);
-  const [actorDialogState, setActorDialogState] = useState<ActorDialogState | null>(null);
-  const [actorDialogError, setActorDialogError] = useState<string | null>(null);
-  
-  // Dialogue Tree state
-  const [showDialogueTreeDialog, setShowDialogueTreeDialog] = useState(false);
-  const [dialogueTrees, setDialogueTrees] = useState<DialogueTree[]>([]);
-  const [activeDialogueTab, setActiveDialogueTab] = useState(0);
-  const [dialogueTabToDelete, setDialogueTabToDelete] = useState<number | null>(null);
+  const {
+    showObjectDialog,
+    setShowObjectDialog,
+    editingObject,
+    setEditingObject,
+    objectValidationErrors,
+    setObjectValidationErrors,
+    mapObjects,
+    setMapObjects,
+    showDeleteNpcConfirm,
+    setShowDeleteNpcConfirm,
+    showDeleteEnemyConfirm,
+    setShowDeleteEnemyConfirm,
+    actorDialogState,
+    setActorDialogState,
+    actorDialogError,
+    setActorDialogError,
+    handleOpenActorDialog,
+    handleCloseActorDialog,
+    showDialogueTreeDialog,
+    setShowDialogueTreeDialog,
+    dialogueTrees,
+    setDialogueTrees,
+    activeDialogueTab,
+    setActiveDialogueTab,
+    dialogueTabToDelete,
+    setDialogueTabToDelete
+  } = useObjectEditing();
   
   // Item dialog state
   const [itemDialogState, setItemDialogState] = useState<{
@@ -468,16 +481,6 @@ function App() {
   const [itemsList, setItemsList] = useState<Array<{ id: number; name: string; category: string; filePath: string; fileName: string; role: ItemRole; resourceSubtype?: ItemResourceSubtype }>>([]);
   // Expanded item categories for accordion
   const [expandedItemCategories, setExpandedItemCategories] = useState<Set<ItemRole>>(new Set());
-  // Vendor stock dialog
-  const [showVendorStockDialog, setShowVendorStockDialog] = useState(false);
-  const [vendorStockSelection, setVendorStockSelection] = useState<Record<number, number>>({});
-  // Vendor unlockable stock dialog
-  const [showVendorUnlockDialog, setShowVendorUnlockDialog] = useState(false);
-  const [vendorUnlockEntries, setVendorUnlockEntries] = useState<Array<{ id: string; requirement: string; items: Record<number, number> }>>([]);
-  // Vendor random offers dialog
-  const [showVendorRandomDialog, setShowVendorRandomDialog] = useState(false);
-  const [vendorRandomSelection, setVendorRandomSelection] = useState<Record<number, { chance: number; min: number; max: number }>>({});
-  const [vendorRandomCount, setVendorRandomCount] = useState<{ min: number; max: number }>({ min: 1, max: 1 });
 
   const normalizeItemsForState = useCallback((items: Array<{ id: number; name: string; category: string; filePath: string; fileName: string; role?: string; resourceSubtype?: string }>) => {
     const toResourceSubtype = (value: string | undefined): ItemResourceSubtype => {
@@ -800,6 +803,10 @@ function App() {
     }
   }, [editor]);
 
+  useEffect(() => {
+    syncMapObjectsRef.current = syncMapObjects;
+  }, [syncMapObjects]);
+
   // Keep 'toast' referenced to avoid unused variable errors while toasts are suppressed.
   // This creates a stable noop reference that will never show UI.
   useEffect(() => {
@@ -887,7 +894,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       setHeroEditData({ currentX, currentY, mapWidth, mapHeight, onConfirm });
       setShowHeroEditDialog(true);
     });
-  }, [
+}, [
     autoSaveEnabled,
     currentProjectPath,
     handleSelectTool,
@@ -901,6 +908,10 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     setShowHeroEditDialog,
     setStamps
   ]);
+
+  useEffect(() => {
+    setupAutoSaveRef.current = setupAutoSave;
+  }, [setupAutoSave]);
 
   useToolbarVisibility({
     showWelcome,
@@ -1052,6 +1063,10 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
   }, [editor, syncMapObjects]);
 
   useEffect(() => {
+    updateLayersListRef.current = updateLayersList;
+  }, [updateLayersList]);
+
+  useEffect(() => {
     if (editor) {
       updateLayersList();
     }
@@ -1077,32 +1092,6 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       document.removeEventListener('click', handleClickOutside);
     };
   }, [showAddLayerDropdown]);
-
-  // Stamp handlers
-  const handleCreateStamp = useCallback(() => {
-    if (!editor || !newStampName.trim()) return;
-    
-    const success = editor.createStampFromSelection(newStampName.trim());
-    if (success) {
-      setNewStampName('');
-      setShowStampDialog(false);
-      setStampMode('select');
-    }
-  }, [editor, newStampName, setNewStampName, setShowStampDialog, setStampMode]);
-
-  const handleStampSelect = useCallback((stampId: string) => {
-    setSelectedStamp(stampId);
-    setStampMode('place');
-  }, [setSelectedStamp, setStampMode]);
-
-  const handleDeleteStamp = useCallback((stampId: string) => {
-    if (!editor) return;
-    editor.deleteStamp(stampId);
-    if (selectedStamp === stampId) {
-      setSelectedStamp(null);
-      setStampMode('select');
-    }
-  }, [editor, selectedStamp, setSelectedStamp, setStampMode]);
 
   // Icon helper functions
   const getBrushIcon = () => {
@@ -1143,26 +1132,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
   // Brush management handlers
   // Removed unused handlers: handleMergeBrushes, handleCancelMerge
 
-  const handleSeparateBrush = useCallback((brushId: number) => {
-    setBrushToSeparate(brushId);
-    setShowSeparateDialog(true);
-  }, [setBrushToSeparate, setShowSeparateDialog]);
-
-  const confirmSeparateBrush = useCallback(() => {
-    if (!editor || brushToSeparate === null) return;
-    
-    try {
-      // Call the editor's separate brush method
-      editor.separateBrush(brushToSeparate);
-      console.log(`Separated brush with ID: ${brushToSeparate}`);
-    } catch (error) {
-      console.error('Failed to separate brush:', error);
-    }
-    
-    setShowSeparateDialog(false);
-    setBrushToSeparate(null);
-    setBrushTool('none'); // Exit separate mode after action
-  }, [brushToSeparate, editor, setBrushTool, setBrushToSeparate, setShowSeparateDialog]);
+  // Brush management handlers are provided by useToolbarHandlers.
 
   const handleRemoveBrush = useCallback((brushId: number) => {
     if (!editor) return;
@@ -1231,20 +1201,6 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     editor.triggerAutoSave(true);
   }, [editor, syncMapObjects]);
 
-  const handleOpenActorDialog = useCallback((type: 'npc' | 'enemy') => {
-    setActorDialogState({
-      type,
-      name: '',
-      tilesetPath: '',
-      portraitPath: '',
-      ...EMPTY_ACTOR_ROLES,
-      ...(type === 'npc'
-        ? { isTalker: true }
-        : { isMelee: true })
-    });
-    setActorDialogError(null);
-  }, []);
-
   const handleActorFieldChange = useCallback((field: 'name' | 'tilesetPath' | 'portraitPath', value: string) => {
     setActorDialogState((prev) => {
       if (!prev) return prev;
@@ -1299,11 +1255,6 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       console.error('Failed to select portrait file for actor:', error);
     }
   }, [handleActorFieldChange]);
-
-  const handleCloseActorDialog = useCallback(() => {
-    setActorDialogState(null);
-    setActorDialogError(null);
-  }, []);
 
   // Item dialog handlers
   const handleOpenItemDialog = useCallback(async () => {
@@ -2444,12 +2395,6 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     }
   };
 
-  const handleMapResize = () => {
-    if (editor?.resizeMap) {
-      editor.resizeMap(mapWidth, mapHeight);
-    }
-  };
-
   const handleZoomIn = () => {
     if (editor?.zoomIn) {
       editor.zoomIn();
@@ -2465,189 +2410,6 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
   const handleResetZoom = () => {
     if (editor?.resetZoom) {
       editor.resetZoom();
-    }
-  };
-
-  const isDuplicateMapName = useCallback((candidate: string) => {
-    const normalized = candidate.trim().toLowerCase();
-    if (!normalized) {
-      return false;
-    }
-
-    const knownNames = new Set<string>();
-
-    reservedMapNames.forEach((name) => {
-      if (name) {
-        knownNames.add(name);
-      }
-    });
-
-    if (mapName.trim()) {
-      knownNames.add(mapName.trim().toLowerCase());
-    }
-
-    try {
-      const stored = localStorage.getItem('recentMaps');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          parsed.forEach((entry) => {
-            if (entry && typeof entry.name === 'string') {
-              const name = entry.name.trim().toLowerCase();
-              if (name) {
-                knownNames.add(name);
-              }
-            }
-          });
-        }
-      }
-    } catch (error) {
-      console.warn('Failed to read recent map names for duplicate check:', error);
-    }
-
-    return knownNames.has(normalized);
-  }, [mapName, reservedMapNames]);
-
-  const handleOpenCreateMapDialog = useCallback(() => {
-    setNewMapWidth(mapWidth > 0 ? mapWidth : 20);
-    setNewMapHeight(mapHeight > 0 ? mapHeight : 15);
-    setNewMapStarting(isStartingMap);
-    setCreateMapError(null);
-    setShowCreateMapDialog(true);
-  }, [mapWidth, mapHeight, isStartingMap]);
-
-  // Only reset newMapName the first time dialog is opened after mount
-  const hasOpenedCreateMapDialog = useRef(false);
-  useEffect(() => {
-    if (showCreateMapDialog && !hasOpenedCreateMapDialog.current) {
-      setNewMapName('Map Name');
-      hasOpenedCreateMapDialog.current = true;
-    }
-    if (!showCreateMapDialog) {
-      hasOpenedCreateMapDialog.current = false;
-    }
-  }, [showCreateMapDialog, mapName]);
-
-  const handleConfirmCreateMap = async () => {
-    if (isPreparingNewMap) return;
-
-    const width = Math.max(1, Math.floor(newMapWidth) || 0);
-    const height = Math.max(1, Math.floor(newMapHeight) || 0);
-    const trimmedName = newMapName.trim();
-    const resolvedName = trimmedName ? trimmedName : 'Untitled Map';
-
-    if (isDuplicateMapName(resolvedName)) {
-      setCreateMapError("There can't be maps that have the same name. Please type another name.");
-      return;
-    }
-
-    setCreateMapError(null);
-    setIsPreparingNewMap(true);
-
-    try {
-      // No export on map creation. Only set reserved map names.
-      setReservedMapNames((prev) => {
-        const normalized = resolvedName.trim().toLowerCase();
-        if (!normalized || prev.includes(normalized)) {
-          return prev;
-        }
-        return [...prev, normalized];
-      });
-
-
-      setLayers([]);
-      setActiveLayerId(null);
-      setStamps([]);
-      setSelectedStamp(null);
-      setMapObjects([]);
-      setHoverCoords(null);
-      setBrushTool('none');
-      setShowSeparateDialog(false);
-      setBrushToSeparate(null);
-      setSaveStatus('saved');
-      setHasUnsavedChanges(false);
-
-      let targetEditor = editor;
-
-
-      if (!targetEditor && canvasRef.current) {
-        targetEditor = new TileMapEditor(canvasRef.current);
-        targetEditor.setDarkMode(isDarkMode);
-        setupAutoSave(targetEditor);
-      }
-
-      if (targetEditor) {
-
-        // Before resetting the editor for the new map, persist the current
-        // editor state into the active tab's config so the current map's
-        // tilesets/brushes are preserved when the shared editor instance is
-        // reused. This avoids losing the uploaded tileset from the previous map.
-        if (editor && activeTabId) {
-          try {
-            await editor.ensureTilesetsLoaded();
-            const snapshot = await editor.getProjectData();
-            const safeSnapshot = JSON.parse(JSON.stringify(snapshot));
-            setTabs((prev) => prev.map(t => t.id === activeTabId ? { ...t, config: safeSnapshot } : t));
-            console.log('Snapshot saved into activeTab.config before resetForNewProject:', { activeTabId, snapshotKeys: Object.keys(safeSnapshot || {}) });
-            
-            // ALSO save to disk so the map data persists across app restarts
-            // Without this, switching maps or restarting would lose the previous map's data
-            if (currentProjectPath) {
-              await editor.saveProjectData(currentProjectPath);
-              console.log('Previous map saved to disk before creating new map');
-            }
-          } catch (err) {
-            console.warn('Failed to snapshot current tab before creating a new map:', err);
-          }
-        }
-
-        // Set projectName to the user-typed project name at creation
-        targetEditor.projectName = resolvedName;
-
-        targetEditor.resetForNewProject();
-        targetEditor.setMapName(resolvedName);
-        targetEditor.setMapSize(width, height);
-        targetEditor.setDarkMode(isDarkMode);
-        if (!editor) {
-          setEditor(targetEditor);
-        }
-        updateLayersList();
-        syncMapObjects();
-      }
-
-      setMapWidth(width);
-      setMapHeight(height);
-      setMapInitialized(true);
-      showToolbarTemporarily();
-      showBottomToolbarTemporarily();
-      setMapName(resolvedName);
-      updateStartingMap(newMapStarting, { mapNameOverride: resolvedName });
-      setNewMapStarting(newMapStarting);
-      setHasSelection(false);
-      setSelectionCount(0);
-      setCreateMapError(null);
-      // Create a tab for this newly created map inside the current project
-      try {
-        createTabFor(resolvedName, currentProjectPath ?? null, { name: resolvedName, width, height, tileSize: 64, location: currentProjectPath ?? '' });
-      } catch (e) {
-        console.warn('Failed to create tab for new in-project map:', e);
-      }
-      
-      // Immediately save the new map to disk to ensure it exists
-      // This prevents issues where switching tabs or restarting before autosave
-      // would cause the map to be "lost"
-      if (targetEditor && currentProjectPath) {
-        try {
-          await targetEditor.saveProjectData(currentProjectPath);
-          console.log('New map saved to disk immediately:', resolvedName);
-        } catch (e) {
-          console.warn('Failed to immediately save new map to disk:', e);
-        }
-      }
-      
-      setShowCreateMapDialog(false);
-    } finally {
-      setIsPreparingNewMap(false);
     }
   };
 
@@ -4022,245 +3784,33 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           </section>
         </SidebarLayout>
 
-        {/* Engine Settings Modal */}
-        {showSettings && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-background border border-border rounded-lg p-6 w-96">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold">Engine Settings</h3>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => setShowSettings(false)}
-                  className="w-8 h-8 p-0"
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">Theme (Experimental)</label>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm">Light Mode</span>
-                    <button
-                      onClick={() => setIsDarkMode(!isDarkMode)}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        isDarkMode ? 'bg-orange-600' : 'bg-gray-200'
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          isDarkMode ? 'translate-x-6' : 'translate-x-1'
-                        }`}
-                      />
-                      <span className="sr-only">Toggle dark mode</span>
-                    </button>
-                    <span className="text-sm flex items-center gap-1">
-                      {isDarkMode ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
-                      Dark Mode
-                    </span>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Debug Mode</label>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm">Disabled</span>
-                    <button
-                      onClick={() => {
-                        if (editor) {
-                          editor.toggleDebugMode();
-                        }
-                      }}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        editor?.getDebugMode() ? 'bg-orange-600' : 'bg-gray-200'
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          editor?.getDebugMode() ? 'translate-x-6' : 'translate-x-1'
-                        }`}
-                      />
-                      <span className="sr-only">Toggle debug mode</span>
-                    </button>
-                    <span className="text-sm flex items-center gap-1">
-                      <Target className="w-4 h-4" />
-                      Debug Tiles
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Shows tile boundaries and coordinates for debugging
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Auto-Save</label>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm">Disabled</span>
-                    <button
-                      onClick={() => {
-                        const newEnabled = !autoSaveEnabled;
-                        setAutoSaveEnabledState(newEnabled);
-                        if (editor) {
-                          editor.setAutoSaveEnabled(newEnabled);
-                        }
-                      }}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        autoSaveEnabled ? 'bg-orange-600' : 'bg-gray-200'
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          autoSaveEnabled ? 'translate-x-6' : 'translate-x-1'
-                        }`}
-                      />
-                      <span className="sr-only">Toggle auto-save</span>
-                    </button>
-                    <span className="text-sm">
-                      Enabled
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Automatically saves your work every 8 seconds
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Active GID Indicator</label>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm">Show</span>
-                    <button
-                      onClick={() => {
-                        const newVal = !showActiveGid;
-                        setShowActiveGid(newVal);
-                      }}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        showActiveGid ? 'bg-orange-600' : 'bg-gray-200'
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          showActiveGid ? 'translate-x-6' : 'translate-x-1'
-                        }`}
-                      />
-                      <span className="sr-only">Toggle Active GID Indicator</span>
-                    </button>
-                    <span className="text-sm">{showActiveGid ? 'Shown' : 'Hidden'}</span>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">Toggle whether the Active GID badge is visible next to the hover coordinates.</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Sidebar Collapse Button</label>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm">Show toggle</span>
-                    <button
-                      onClick={() => setShowSidebarToggle((s: boolean) => !s)}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        showSidebarToggle ? 'bg-orange-600' : 'bg-gray-200'
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          showSidebarToggle ? 'translate-x-6' : 'translate-x-1'
-                        }`}
-                      />
-                      <span className="sr-only">Toggle sidebar collapse button</span>
-                    </button>
-                    <span className="text-sm">{showSidebarToggle ? 'Shown' : 'Hidden'}</span>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">Show or hide the left-edge sidebar collapse/expand toggle.</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        <EngineSettingsDialog
+          open={showSettings}
+          onClose={() => setShowSettings(false)}
+          isDarkMode={isDarkMode}
+          setIsDarkMode={setIsDarkMode}
+          editor={editor}
+          autoSaveEnabled={autoSaveEnabled}
+          setAutoSaveEnabledState={setAutoSaveEnabledState}
+          showActiveGid={showActiveGid}
+          setShowActiveGid={setShowActiveGid}
+          showSidebarToggle={showSidebarToggle}
+          setShowSidebarToggle={setShowSidebarToggle}
+        />
 
-        {/* Map Settings Only Modal (opens from tab settings button) */}
-        {showMapSettingsOnly && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-background border border-border rounded-lg p-6 w-96">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold">Map Settings — {mapName}</h3>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => setShowMapSettingsOnly(false)}
-                  className="w-8 h-8 p-0"
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">Map Name</label>
-                  <Input
-                    type="text"
-                    value={mapName}
-                    onChange={(e) => setMapName(e.target.value)}
-                    placeholder="Enter map name"
-                    className="w-full"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Map Width</label>
-                  <Input
-                    type="number"
-                    value={mapWidth}
-                    onChange={(e) => setMapWidth(Number(e.target.value))}
-                    min="1"
-                    max="100"
-                    className="w-full"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Map Height</label>
-                  <Input
-                    type="number"
-                    value={mapHeight}
-                    onChange={(e) => setMapHeight(Number(e.target.value))}
-                    min="1"
-                    max="100"
-                    className="w-full"
-                  />
-                </div>
-                <div className="flex items-center gap-2 rounded-md border border-border px-3 py-2">
-                  <div className="flex items-center gap-2">
-                    <label htmlFor="starting-map-checkbox-modal" className="text-sm font-medium text-muted-foreground">
-                      Starting Map
-                    </label>
-                    <Tooltip content="If this map is the map that players will start the game then mark this option">
-                      <HelpCircle className="h-4 w-4 text-muted-foreground" aria-hidden />
-                    </Tooltip>
-                  </div>
-                  <input
-                    id="starting-map-checkbox-modal"
-                    type="checkbox"
-                    className="h-4 w-4 rounded border border-border accent-orange-500"
-                    checked={isStartingMap}
-                    onChange={(e) => updateStartingMap(e.target.checked)}
-                    aria-checked={isStartingMap}
-                    aria-label="Set this map as the starting map"
-                  />
-                </div>
-                <div className="flex gap-2 mt-6">
-                  <Button 
-                    variant="outline" 
-                    onClick={() => setShowMapSettingsOnly(false)}
-                    className="flex-1"
-                  >
-                    Cancel
-                  </Button>
-                  <Button 
-                    onClick={() => {
-                      handleMapResize();
-                      setShowMapSettingsOnly(false);
-                    }}
-                    className="flex-1"
-                  >
-                    Apply Changes
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+        <MapSettingsDialog
+          open={showMapSettingsOnly}
+          onClose={() => setShowMapSettingsOnly(false)}
+          mapName={mapName}
+          setMapName={setMapName}
+          mapWidth={mapWidth}
+          setMapWidth={setMapWidth}
+          mapHeight={mapHeight}
+          setMapHeight={setMapHeight}
+          isStartingMap={isStartingMap}
+          updateStartingMap={updateStartingMap}
+          handleMapResize={handleMapResize}
+        />
         <ClearLayerDialog
           open={showClearLayerDialog}
           onClose={() => setShowClearLayerDialog(false)}
@@ -4353,8 +3903,8 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
 
         <HelpDialog
           open={showHelp}
-          activeTab={activeHelpTab as 'engine' | 'collisions'}
-          setActiveTab={(tab) => setActiveHelpTab(tab)}
+          activeTab={activeHelpTab}
+          setActiveTab={setActiveHelpTab}
           onClose={() => setShowHelp(false)}
         />
 

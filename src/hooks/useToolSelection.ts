@@ -1,18 +1,23 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+type PrimaryTool = 'brush' | 'selection' | 'shape' | 'stamp' | 'eyedropper';
+type BrushTool = 'brush' | 'eraser' | 'bucket' | 'clear';
+type SelectionTool = 'rectangular' | 'magic-wand' | 'same-tile' | 'circular';
+type ShapeTool = 'rectangle' | 'circle' | 'line';
+
 type ToolSelectionOptions = {
   onCloseStampDialog: () => void;
 };
 
 const useToolSelection = ({ onCloseStampDialog }: ToolSelectionOptions) => {
-  const [selectedTool, setSelectedTool] = useState('brush');
+  const [selectedTool, setSelectedTool] = useState<PrimaryTool>('brush');
   const [showBrushOptions, setShowBrushOptions] = useState(false);
   const [showSelectionOptions, setShowSelectionOptions] = useState(false);
   const [showShapeOptions, setShowShapeOptions] = useState(false);
 
-  const [selectedBrushTool, setSelectedBrushTool] = useState('brush');
-  const [selectedSelectionTool, setSelectedSelectionTool] = useState('rectangular');
-  const [selectedShapeTool, setSelectedShapeTool] = useState('rectangle');
+  const [selectedBrushTool, setSelectedBrushTool] = useState<BrushTool>('brush');
+  const [selectedSelectionTool, setSelectedSelectionTool] = useState<SelectionTool>('rectangular');
+  const [selectedShapeTool, setSelectedShapeTool] = useState<ShapeTool>('rectangle');
 
   const brushOptionsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const selectionOptionsTimeoutRef = useRef<NodeJS.Timeout | null>(null);

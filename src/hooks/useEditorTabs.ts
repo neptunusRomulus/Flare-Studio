@@ -51,7 +51,7 @@ const useEditorTabs = ({
     setActiveTabId(id);
     setCurrentProjectPath(projectPath ?? null);
     return tab;
-  }, [setCurrentProjectPath]);
+  }, [setActiveTabId, setCurrentProjectPath, setTabs]);
 
   const closeEditorTab = useCallback((tabId: string) => {
     setTabs((prev) => {
@@ -66,7 +66,7 @@ const useEditorTabs = ({
       }
       return nextTabs;
     });
-  }, [activeTabId, setCurrentProjectPath]);
+  }, [activeTabId, setActiveTabId, setCurrentProjectPath, setTabs]);
 
   const switchToTab = useCallback(async (tabId: string) => {
     if (tabId === activeTabId) return;
@@ -254,7 +254,19 @@ const useEditorTabs = ({
         switchToTabHelpersRef.current.syncMapObjects();
       }
     }
-  }, [activeTabId, currentProjectPath, editor, setCurrentProjectPath, setMapHeight, setMapName, setMapWidth, switchToTabHelpersRef, tabs]);
+  }, [
+    activeTabId,
+    currentProjectPath,
+    editor,
+    setActiveTabId,
+    setCurrentProjectPath,
+    setMapHeight,
+    setMapName,
+    setMapWidth,
+    setTabs,
+    switchToTabHelpersRef,
+    tabs
+  ]);
 
   const activeTab = useMemo(() => tabs.find(t => t.id === activeTabId) || null, [tabs, activeTabId]);
   const isEnemyTabActive = !!activeTab && activeTab.tabType === 'enemy';

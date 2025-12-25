@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import Tooltip from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Upload, Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Blend, MapPin, Save, Edit2, Scan, Link2, Scissors, Trash2, Check, HelpCircle, Folder, Shield, Plus, Image, Grid, Box, Users, User, Locate, Clock, Menu, ChevronLeft, ChevronRight, MessageSquare, ChevronDown, ChevronUp, ArrowLeft, Gift, Coins, Sparkles, Zap, Volume2, Tag, Package, AlignLeft, Sword, ChevronsUpDown, AlertTriangle, Book, GitBranch } from 'lucide-react';
+import { Upload, Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Blend, MapPin, Save, Edit2, Scan, Link2, Scissors, Trash2, Check, HelpCircle, Folder, Shield, Plus, Image, Grid, Box, Users, User, Locate, Clock, Menu, MessageSquare, ChevronDown, ChevronUp, ArrowLeft, Gift, Coins, Sparkles, Zap, Volume2, Tag, Package, AlignLeft, Sword, ChevronsUpDown, AlertTriangle, Book, GitBranch } from 'lucide-react';
 import { TileMapEditor } from './editor/TileMapEditor';
 import type { EditorProjectData, SavedTilesetEntry } from './editor/TileMapEditor';
 import { TileLayer, MapObject, DialogueLine, DialogueRequirement, DialogueReward, DialogueWorldEffect, DialogueTree, FlareNPC } from './types';
@@ -15,6 +15,15 @@ import { Toaster } from '@/components/ui/toaster';
 import WelcomeScreen from './components/WelcomeScreen';
 import OverwriteExportDialog from './components/OverwriteExportDialog';
 import EnemyTabPanel from '@/components/EnemyTabPanel';
+import ActorDialog from '@/components/ActorDialog';
+import BottomToolbar from '@/components/BottomToolbar';
+import BrushToolbar from '@/components/BrushToolbar';
+import ItemDialog from '@/components/ItemDialog';
+import RuleDialog from '@/components/RuleDialog';
+import SidebarLayout from '@/components/SidebarLayout';
+import SidebarToggle from '@/components/SidebarToggle';
+import TilesetPalette from '@/components/TilesetPalette';
+import TitleBar from '@/components/TitleBar';
 import SidebarActorEntries from '@/components/SidebarActorEntries';
 import SidebarItemsPanel from '@/components/SidebarItemsPanel';
 import SidebarRulesPanel from '@/components/SidebarRulesPanel';
@@ -22,11 +31,12 @@ import { buildSpawnContent, computeIntermapTarget, extractSpawnIntermapValue, ST
 import { validateAndSanitizeObject } from './editor/objectValidation';
 import { ITEM_ROLE_META, ITEM_ROLE_SELECTIONS, RESOURCE_SUBTYPE_META } from './editor/itemRoles';
 import type { ItemResourceSubtype, ItemRole } from './editor/itemRoles';
-import { EMPTY_ACTOR_ROLES, ENEMY_ROLE_OPTIONS, NPC_ROLE_OPTIONS } from './editor/actorRoles';
+import { EMPTY_ACTOR_ROLES } from './editor/actorRoles';
 import type { ActorDialogState, ActorRoleKey } from './editor/actorRoles';
 import { GAME_TRIGGER_OPTIONS, PLAYER_TRIGGER_OPTIONS, RULE_ACTION_GROUPS, RULE_TRIGGER_LOOKUP } from './editor/ruleOptions';
 import type { RuleStartType } from './editor/ruleOptions';
 import useToolbarAutoCollapse from './hooks/useToolbarAutoCollapse';
+import useToolbarVisibility from './hooks/useToolbarVisibility';
 import flareIconUrl from '/flare-ico.png?url';
 
 interface MapConfig {
@@ -162,6 +172,27 @@ function App() {
     setBrushTool((current) => (current === tool ? 'none' : tool));
     showBrushToolbarTemporarily();
   }, [showBrushToolbarTemporarily]);
+
+  const handleDeleteActiveTab = useCallback(() => {
+    if (!editor) {
+      toast({ title: 'No editor', description: 'Editor is not initialized yet.', variant: 'destructive' });
+      return;
+    }
+    const layerType = activeLayer?.type;
+    if (!layerType) {
+      toast({ title: 'No active layer', description: 'Please select a layer first.', variant: 'destructive' });
+      return;
+    }
+    const activeTabId = editor.getActiveLayerTabId ? editor.getActiveLayerTabId(layerType) : null;
+    if (typeof activeTabId !== 'number' || activeTabId === null) {
+      toast({ title: 'No tab selected', description: 'There is no active tileset tab to delete for this layer.', variant: 'destructive' });
+      return;
+    }
+    const payload = { layerType, tabId: activeTabId };
+    confirmPayloadRef.current = payload;
+    setTabToDelete(payload);
+    setConfirmAction({ type: 'removeTab', payload });
+  }, [activeLayer?.type, editor, toast]);
 
   const canUseTilesetDialog = useMemo(() => {
     return typeof window !== 'undefined' && !!window.electronAPI?.selectTilesetFile;
@@ -1244,61 +1275,13 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     });
   }, [autoSaveEnabled, currentProjectPath, handleSelectTool]);
 
-  useEffect(() => {
-    return () => {
-      clearToolbarCollapseTimer();
-    };
-  }, [clearToolbarCollapseTimer]);
-
-  useEffect(() => {
-    if (!showWelcome && mapInitialized) {
-      showToolbarTemporarily();
-    }
-  }, [showWelcome, mapInitialized, showToolbarTemporarily]);
-
-  useEffect(() => {
-    if (showWelcome || !mapInitialized) {
-      setToolbarExpanded(true);
-      clearToolbarCollapseTimer();
-    }
-  }, [showWelcome, mapInitialized, clearToolbarCollapseTimer]);
-
-  useEffect(() => {
-    return () => {
-      clearBrushToolbarCollapseTimer();
-    };
-  }, [clearBrushToolbarCollapseTimer]);
-
-  useEffect(() => {
-    if (!showWelcome && mapInitialized) {
-      showBrushToolbarTemporarily();
-    }
-  }, [showWelcome, mapInitialized, showBrushToolbarTemporarily]);
-
-  useEffect(() => {
-    if (showWelcome || !mapInitialized) {
-      setBrushToolbarExpanded(true);
-      clearBrushToolbarCollapseTimer();
-    }
-  }, [showWelcome, mapInitialized, clearBrushToolbarCollapseTimer]);
-  useEffect(() => {
-    return () => {
-      clearBottomToolbarCollapseTimer();
-    };
-  }, [clearBottomToolbarCollapseTimer]);
-
-  useEffect(() => {
-    if (!showWelcome && mapInitialized) {
-      showBottomToolbarTemporarily();
-    }
-  }, [showWelcome, mapInitialized, showBottomToolbarTemporarily]);
-
-  useEffect(() => {
-    if (showWelcome || !mapInitialized) {
-      setBottomToolbarExpanded(true);
-      clearBottomToolbarCollapseTimer();
-    }
-  }, [showWelcome, mapInitialized, clearBottomToolbarCollapseTimer]);
+  useToolbarVisibility({
+    showWelcome,
+    mapInitialized,
+    toolbar,
+    brushToolbar,
+    bottomToolbar
+  });
 
   // Wire Electron menu actions (Save/Open/New)
   // Moved after function definitions
@@ -4063,166 +4046,44 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         />
       ) : (
         <div className="h-screen bg-background text-foreground flex flex-col overflow-hidden">
-      {/* Custom Title Bar */}
-      <div className="bg-gray-100 dark:bg-neutral-900 text-orange-600 dark:text-orange-400 flex justify-between items-center px-4 py-1 select-none drag-region border-b border-gray-200 dark:border-neutral-700">
-        <div className="flex items-center gap-3">
-          {/* Logo and Brand */}
-          <div className="flex items-center gap-1">
-            <img 
-              src={flareIconUrl} 
-              alt="Flare Studio Logo" 
-              className="w-4 h-6"
-            />
-            <span className="text-sm font-semibold text-orange-600 dark:text-orange-400">Flare Studio</span>
-          </div>
-          {/* Save Status Indicator - moved to be next to logo */}
-          <div className="flex items-center gap-1 text-xs mx-4 min-w-[70px]">
-            {saveStatus === 'saving' && (
-              <>
-                <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
-                <span className="text-orange-600">Saving...</span>
-              </>
-            )}
-            {saveStatus === 'saved' && lastSaveTime > 0 && (
-              <>
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                <span className="text-green-600">Saved</span>
-              </>
-            )}
-            {saveStatus === 'error' && (
-              <>
-                <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                <span className="text-red-600">Save Error</span>
-              </>
-            )}
-            {saveStatus === 'unsaved' && (
-              <>
-                <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                <span className="text-gray-500">Unsaved</span>
-              </>
-            )}
-          </div>
-          {/* Tabs - come after the save status */}
-          <div className="ml-2 flex items-center gap-2 overflow-x-auto max-w-[60vw] no-drag">
-            {tabs.map((tab) => (
-              <div
-                key={tab.id}
-                className={`flex items-center gap-1 px-3 py-1 rounded-t-md border border-b-0 text-sm truncate max-w-xs no-drag transition-all duration-200 ${tab.id === activeTabId ? 'bg-orange-500 text-white border-orange-500' : 'bg-transparent text-gray-600 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-neutral-700'}`}
-              >
-                <button
-                  onClick={() => { void switchToTab(tab.id); }}
-                  className="truncate"
-                  title={tab.name}
-                >
-                  {tab.name}
-                </button>
-                {tab.id === activeTabId && tab.tabType !== 'enemy' && (
-                  <Tooltip content="Edit Map Settings" side="bottom">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowMapSettingsOnly(true);
-                      }}
-                      className="flex-shrink-0 w-4 h-4 flex items-center justify-center rounded"
-                      aria-label="Edit Map Settings"
-                    >
-                      <Settings className="w-3 h-3" />
-                    </button>
-                  </Tooltip>
-                )}
-                {tab.tabType === 'enemy' && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (tab.id !== activeTabId) {
-                        void switchToTab(tab.id);
-                      }
-                      setPendingEnemyTabCloseId(tab.id);
-                    }}
-                    className="flex-shrink-0 w-4 h-4 flex items-center justify-center rounded hover:bg-black/10 dark:hover:bg-white/10"
-                    aria-label="Close enemy tab"
-                    title="Close"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                )}
-              </div>
-            ))}
-            <Tooltip content="Create a new map" side="right">
-              <button
-                onClick={() => setShowCreateMapDialog(true)}
-                className="ml-1 p-1 rounded-md hover:bg-slate-100 dark:hover:bg-neutral-800 no-drag"
-                aria-label="Create new map"
-              >
-                <Plus className="w-4 h-4 text-orange-600 dark:text-orange-400" />
-              </button>
-            </Tooltip>
-          </div>
-          <div className="text-sm font-medium"></div>
-        </div>
-        <div className="flex no-drag">
-          <button 
-            onClick={handleMinimize}
-            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 p-1 rounded transition-colors"
-            aria-label="Minimize"
-          >
-            <Minus className="w-4 h-4" />
-          </button>
-          <button 
-            onClick={handleMaximize}
-            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700 p-1 rounded transition-colors"
-            aria-label="Maximize"
-          >
-            <Square className="w-4 h-4" />
-          </button>
-          <button 
-            onClick={handleClose}
-            className="text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 hover:bg-gray-200 dark:hover:bg-gray-700 p-1 rounded transition-colors"
-            aria-label="Close"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
+      <TitleBar
+        tabs={tabs}
+        activeTabId={activeTabId}
+        onSwitchTab={(tabId) => { void switchToTab(tabId); }}
+        onOpenMapSettings={() => setShowMapSettingsOnly(true)}
+        onCloseEnemyTab={(tabId) => setPendingEnemyTabCloseId(tabId)}
+        onCreateNewMap={() => setShowCreateMapDialog(true)}
+        saveStatus={saveStatus}
+        lastSaveTime={lastSaveTime}
+        onMinimize={handleMinimize}
+        onMaximize={handleMaximize}
+        onClose={handleClose}
+        flareIconUrl={flareIconUrl}
+      />
 
       {/* Main Content */}
       {/* Left-edge collapse/expand toggle - placed outside the aside so it remains clickable when the sidebar is hidden */}
-      {showSidebarToggle && (
-        <button
-          onClick={() => {
-            setLeftTransitioning(true);
+      <SidebarToggle
+        show={showSidebarToggle}
+        leftCollapsed={leftCollapsed}
+        onToggle={() => {
+          setLeftTransitioning(true);
+          if (editor && typeof editor.setSidebarTransitioning === 'function') {
+            try { editor.setSidebarTransitioning(true); } catch { /* ignore */ }
+          }
+          setLeftCollapsed((s) => !s);
+          window.setTimeout(() => {
+            setLeftTransitioning(false);
             if (editor && typeof editor.setSidebarTransitioning === 'function') {
-              try { editor.setSidebarTransitioning(true); } catch { /* ignore */ }
+              try { editor.setSidebarTransitioning(false); } catch { /* ignore */ }
             }
-            setLeftCollapsed((s) => !s);
-            // keep the transitioning flag for slightly longer than the CSS transition
-            window.setTimeout(() => {
-              setLeftTransitioning(false);
-              if (editor && typeof editor.setSidebarTransitioning === 'function') {
-                try { editor.setSidebarTransitioning(false); } catch { /* ignore */ }
-              }
-            }, 380);
-          }}
-          aria-label={leftCollapsed ? 'Show sidebar' : 'Hide sidebar'}
-          // Position the toggle at the outer right edge of the left sidebar.
-          // When expanded the sidebar width is 14rem (224px), otherwise it's 0.
-          style={{ left: leftCollapsed ? 0 : 224 }}
-          className="no-drag no-press-shift press-fill-effect fixed top-1/2 transform -translate-y-1/2 z-50 bg-white/90 dark:bg-neutral-900/90 border border-border rounded-l-md p-1 shadow-md hover:bg-white dark:hover:bg-neutral-800"
-        >
-          {leftCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-        </button>
-      )}
+          }, 380);
+        }}
+      />
 
       <main className="flex flex-1 min-h-0">
         {/* Left Sidebar */}
-        <aside
-          className={
-            `relative border-r border-border bg-muted/30 p-2 overflow-visible flex flex-col transition-all duration-200 ease-in-out app-sidebar ` +
-            (leftCollapsed ? 'sidebar-collapsed' : '')
-          }
-          aria-hidden={leftCollapsed}
-        >
-          <div className="sidebar-inner flex flex-col h-full">
+        <SidebarLayout leftCollapsed={leftCollapsed}>
           {/* Hover handle / visual affordance when collapsed (removed) */}
           {/* collapse toggle is provided on the outer edge (see edge button) */}
           {/* Tileset Brushes Section */}
@@ -4268,301 +4129,31 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
 
             {/* Tileset Brushes Window - render for all layers except NPC, Enemy, Items, Rules, and Actions */}
             {!isNpcLayer && !isEnemyLayer && !isItemsLayer && !isRulesLayer && (
-            <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-0 m-0">
-              {/* Layer Tabs (background / object only) */}
-              {(() => {
-                const activeLayerType = activeLayer?.type;
-                const showTabs = activeLayerType === 'background' || activeLayerType === 'object';
-                console.log('[DEBUG UI] Rendering tabs - activeLayerType:', activeLayerType, 'showTabs:', showTabs);
-                if (editor && activeLayerType) {
-                  const tabs = editor.getLayerTabs ? editor.getLayerTabs(activeLayerType) : [];
-                  const activeTabId = editor.getActiveLayerTabId ? editor.getActiveLayerTabId(activeLayerType) : null;
-                  console.log('[DEBUG UI] tabs for', activeLayerType, ':', tabs.length, 'tabs', JSON.stringify(tabs.map((t: { id: number; name?: string }) => ({ id: t.id, name: t.name }))));
-                  console.log('[DEBUG UI] activeTabId for', activeLayerType, ':', activeTabId);
-                  console.log('[DEBUG UI] Tab ID match check: tab IDs are', tabs.map((t: { id: number; name?: string }) => t.id), 'and looking for active ID', activeTabId);
-                }
-                if (!showTabs) return null;
-        return (
-          <div key={tabTick} className="flex items-center gap-2 px-2 py-2">
-        <div
-          className={`flex-1 flex items-center gap-1 overflow-x-auto tabs-scroll ${(() => {
-            try {
-              const tabs = editor && activeLayerType ? (editor.getLayerTabs ? editor.getLayerTabs(activeLayerType) : []) : [];
-              return tabs && tabs.length > 7 ? 'tabs-limited' : '';
-            } catch { return ''; }
-          })()}`}
-          onWheel={(e: React.WheelEvent<HTMLDivElement>) => {
-            const el = e.currentTarget as HTMLDivElement;
-            if (el.scrollWidth > el.clientWidth) {
-              e.preventDefault();
-              // vertical wheel scroll -> horizontal scroll
-              el.scrollLeft += e.deltaY;
-            }
-          }}
-        >
-                      {/* Render simple tabs using editor state when available (no import/add controls here) */}
-                      {editor ? (
-                        (editor.getLayerTabs ? editor.getLayerTabs(activeLayerType!) : []).map((tab: { id: number; name?: string; }, idx: number) => {
-                          console.log('[DEBUG UI] Rendering button for tab:', tab.id, 'index:', idx, 'isActive:', editor.getActiveLayerTabId && editor.getActiveLayerTabId(activeLayerType) === tab.id);
-                          return (
-                          <button
-                            key={tab.id}
-                            className={`w-5 h-5 flex items-center justify-center rounded-full text-white text-xs font-medium transition-colors shadow-sm ${editor && editor.getCurrentLayerType() === activeLayerType && editor.getActiveLayerTabId && editor.getActiveLayerTabId(activeLayerType) === tab.id ? 'opacity-100 scale-100 ring-2 ring-offset-1' : 'opacity-90 scale-95'}`}
-                            onClick={() => {
-                              if (!editor) return;
-                              editor.setActiveLayerTab(activeLayerType!, tab.id);
-                              try { editor.refreshTilePalette(true); } catch { /* ignore */ }
-                              setTabTick(t => t + 1);
-                            }}
-                            style={{
-                              background: (editor && editor.getActiveLayerTabId && editor.getActiveLayerTabId(activeLayerType) === tab.id) ? '#ea580c' : '#f97316'
-                            }}
-                          >
-                            {idx + 1}
-                          </button>
-                        );
-                        })
-                      ) : (
-                        <div className="text-xs text-muted-foreground">No tabs</div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })()}
-              <div className="relative flex-1 min-h-0 overflow-auto flex flex-col">
-                <div
-                  id="tilesContainer"
-                  className="tile-palette flex flex-col flex-1 min-h-0 overflow-y-auto p-0 m-0 justify-start pb-12"
-                  onWheel={(e: React.WheelEvent<HTMLDivElement>) => {
-                    // If content overflows horizontally, use the vertical wheel to scroll left/right
-                    const el = e.currentTarget as HTMLDivElement;
-                    if (el.scrollWidth > el.clientWidth) {
-                      e.preventDefault();
-                      // deltaY positive -> scroll right, negative -> scroll left
-                      el.scrollLeft += e.deltaY;
-                    }
-                  }}
-                ></div>
-                {/* Hidden element to track brush tool state */}
-                <div data-brush-tool={brushTool} className="hidden"></div>
-              </div>
-              {/* Active GID moved to canvas area (see Hover Coordinates Display) */}
-            </div>
+              <TilesetPalette
+                editor={editor}
+                activeLayer={activeLayer}
+                tabTick={tabTick}
+                setTabTick={setTabTick}
+                brushTool={brushTool}
+              />
             )}
             {/* Brush Tools - stick to bottom so palette can fill remaining space */}
             {!isNpcLayer && !isEnemyLayer && !isItemsLayer && !isRulesLayer && (
-            <div className="sticky bottom-0 z-10 bg-transparent py-2">
-              <div className="text-xs text-muted-foreground"></div>
-              <div className="w-full flex justify-center">
-                <div
-                  ref={setBrushToolbarNode}
-                  className={`flex items-center transition-all duration-300 ease-in-out gap-1 transform -translate-x-1 mt-2 mb-2`}
-                >
-                  {!isCollisionLayer && (
-                    <>
-                  <div className="flex-shrink-0 flex items-center gap-1">
-                    {/* Add Tab button (visible for background/object) */}
-                    { (activeLayer?.type === 'background' || activeLayer?.type === 'object') && (
-                      <Tooltip content="Add tab" side="bottom">
-                          <Button
-                          variant="outline"
-                          size="sm"
-                          className="text-xs px-1 py-1 h-6"
-                          onClick={() => {
-                            if (!editor || !activeLayer) return;
-                            const tabs = editor.getLayerTabs ? editor.getLayerTabs(activeLayer.type) : [];
-                            if (tabs && tabs.length >= 8) {
-                              toast({ title: 'Maximum tabs reached', description: 'You can have up to 8 tabs per layer.', variant: 'destructive' });
-                              return;
-                            }
-                            const newId = editor.createLayerTab(activeLayer.type);
-                            editor.setActiveLayerTab(activeLayer.type, newId);
-                            // Trigger React render so tabs appear immediately
-                            setTabTick(t => t + 1);
-                          }}
-                        >
-                          +
-                        </Button>
-                      </Tooltip>
-                    )}
-
-                    {/* Existing Import button: now imports into active tab for background/object layers, falls back to existing layer tileset behavior for actor layers */}
-                    {(() => {
-                      const isNpc = activeLayer?.type === 'npc';
-                      const isEventLayer = activeLayer?.type === 'event';
-                      const isActorLayer = isNpc || isEventLayer; // enemy handled separately below the list
-                      const tooltip = isActorLayer ? `Add ${isEventLayer ? 'Event' : 'NPC'}` : 'Import a PNG tileset or brush for the active layer tab';
-                      if (isNpc || isEventLayer) {
-                        return (
-                          <Tooltip content={tooltip} side="bottom">
-                            <Button
-                              variant="default"
-                              size="sm"
-                              aria-label={tooltip}
-                              className="relative z-20 text-xs px-1 py-1 h-6 shadow-sm bg-orange-500 hover:bg-orange-600 text-white border-orange-500"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                e.preventDefault();
-                                if (isNpc) {
-                                  handleOpenActorDialog('npc');
-                                } else {
-                                  toast({ title: 'Not implemented', description: 'Create Event will be implemented later.' });
-                                }
-                              }}
-                              role="button"
-                            >
-                              <Upload className="w-3 h-3 text-white" />
-                            </Button>
-                          </Tooltip>
-                        );
-                      }
-
-                      return (
-                        <Tooltip content={tooltip} side="bottom">
-                          <Button
-                            variant="default"
-                            size="sm"
-                            aria-label={tooltip}
-                            className="relative text-xs px-1 py-1 h-6 shadow-sm bg-orange-500 hover:bg-orange-600 text-white border-orange-500"
-                          >
-                            <Upload className="w-3 h-3 text-white" />
-                            <input
-                              type="file"
-                              accept="image/png"
-                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                              onChange={async (e) => {
-                                // For background/object: import into active tab; otherwise fall back to layer tileset import
-                                if (!editor || !activeLayer) return;
-                                const file = e.target.files?.[0];
-                                if (!file) return;
-                                const layerType = activeLayer.type;
-                                if (layerType === 'background' || layerType === 'object') {
-                                  // Import into the currently active tab if available. If there is
-                                  // no active tab yet, create one (respect the 8-tab limit).
-                                  const tabs = editor.getLayerTabs ? editor.getLayerTabs(layerType) : [];
-                                  let targetTabId = editor.getActiveLayerTabId ? editor.getActiveLayerTabId(layerType) : null;
-                                  if (typeof targetTabId !== 'number' || targetTabId === null) {
-                                    // No active tab -> create one, but respect the limit
-                                    if (tabs && tabs.length >= 8) {
-                                      toast({ title: 'Maximum tabs reached', description: 'You can have up to 8 tabs per layer.', variant: 'destructive' });
-                                      return;
-                                    }
-                                    targetTabId = editor.createLayerTab(layerType);
-                                    editor.setActiveLayerTab(layerType, targetTabId);
-                                  }
-                                  // Import into the active/target tab
-                                  await editor.importBrushImageToLayerTab(layerType, targetTabId, file);
-                                  // Refresh palette to show newly-added brush/tiles
-                                  editor.refreshTilePalette(true);
-                                  // Trigger UI update so changes appear immediately
-                                  setTabTick(t => t + 1);
-                                } else {
-                                  // Non-tab layers: keep legacy behavior
-                                  handleFileUpload(e as React.ChangeEvent<HTMLInputElement>, 'layerTileset');
-                                }
-                              }}
-                            />
-                          </Button>
-                        </Tooltip>
-                      );
-                    })()}
-                  </div>
-                  <div
-                    className={`flex-shrink-0 overflow-visible transition-all duration-300 ease-out opacity-100 scale-100 max-w-[2.5rem] w-auto`}
-                  >
-                    <Tooltip content="Move/Reorder brushes">
-                      <Button
-                        variant={brushTool === 'move' ? 'default' : 'outline'}
-                        size="sm"
-                        className="text-xs px-1 py-1 h-6 shadow-sm"
-                        onClick={() => handleToggleBrushTool('move')}
-                      >
-                        <Scan className="w-3 h-3" />
-                      </Button>
-                    </Tooltip>
-                  </div>
-                  <div
-                    className={`flex-shrink-0 overflow-hidden transition-all duration-300 ease-out ${brushToolbarExpanded || brushTool === 'merge' ? 'opacity-100 scale-100 max-w-[2.5rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
-                  >
-                    <Tooltip content="Merge brushes">
-                      <Button
-                        variant={brushTool === 'merge' ? 'default' : 'outline'}
-                        size="sm"
-                        className="text-xs px-1 py-1 h-6 shadow-sm"
-                        onClick={() => handleToggleBrushTool('merge')}
-                      >
-                        <Link2 className="w-3 h-3" />
-                      </Button>
-                    </Tooltip>
-                  </div>
-                  <div
-                    className={`flex-shrink-0 overflow-hidden transition-all duration-300 ease-out ${brushToolbarExpanded || brushTool === 'separate' ? 'opacity-100 scale-100 max-w-[2.5rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
-                  >
-                    <Tooltip content="Separate brushes">
-                      <Button
-                        variant={brushTool === 'separate' ? 'default' : 'outline'}
-                        size="sm"
-                        className="text-xs px-1 py-1 h-6 shadow-sm"
-                        onClick={() => handleToggleBrushTool('separate')}
-                      >
-                        <Scissors className="w-3 h-3" />
-                      </Button>
-                    </Tooltip>
-                  </div>
-                  <div
-                    className={`flex-shrink-0 overflow-hidden transition-all duration-300 ease-out ${brushToolbarExpanded || brushTool === 'remove' ? 'opacity-100 scale-100 max-w-[2.5rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
-                  >
-                    <Tooltip content="Remove brushes">
-                      <Button
-                        variant={brushTool === 'remove' ? 'default' : 'outline'}
-                        size="sm"
-                        className="text-xs px-1 py-1 h-6 shadow-sm"
-                        onClick={() => handleToggleBrushTool('remove')}
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    </Tooltip>
-                  </div>
-                  <div
-                    className={`flex-shrink-0 overflow-hidden transition-all duration-300 ease-out ${brushToolbarExpanded ? 'opacity-100 scale-100 max-w-[2.5rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
-                  >
-                    <Tooltip content="Delete tileset tab">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="text-xs px-1 py-1 h-6 border-red-500 hover:border-red-600 hover:bg-red-50 shadow-sm"
-                        onClick={() => {
-                          showBrushToolbarTemporarily();
-                          if (!editor) {
-                            toast({ title: 'No editor', description: 'Editor is not initialized yet.', variant: 'destructive' });
-                            return;
-                          }
-                          const layerType = activeLayer?.type;
-                          if (!layerType) {
-                            toast({ title: 'No active layer', description: 'Please select a layer first.', variant: 'destructive' });
-                            return;
-                          }
-                          const activeTabId = editor.getActiveLayerTabId ? editor.getActiveLayerTabId(layerType) : null;
-                          if (typeof activeTabId !== 'number' || activeTabId === null) {
-                            toast({ title: 'No tab selected', description: 'There is no active tileset tab to delete for this layer.', variant: 'destructive' });
-                            return;
-                          }
-                          // Prompt confirmation to remove the active tab
-                          const payload = { layerType, tabId: activeTabId };
-                          confirmPayloadRef.current = payload;
-                          setTabToDelete(payload);
-                          setConfirmAction({ type: 'removeTab', payload });
-                        }}
-                      >
-                        <X className="w-3 h-3 text-red-500" />
-                      </Button>
-                    </Tooltip>
-                  </div>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
+              <BrushToolbar
+                editor={editor}
+                activeLayer={activeLayer}
+                isCollisionLayer={isCollisionLayer}
+                brushTool={brushTool}
+                brushToolbarExpanded={brushToolbarExpanded}
+                showBrushToolbarTemporarily={showBrushToolbarTemporarily}
+                setTabTick={setTabTick}
+                setBrushToolbarNode={setBrushToolbarNode}
+                onOpenActorDialog={handleOpenActorDialog}
+                onFileUpload={handleFileUpload}
+                onToggleBrushTool={handleToggleBrushTool}
+                onDeleteActiveTab={handleDeleteActiveTab}
+                toast={toast}
+              />
             )}
           </section>
 
@@ -4879,8 +4470,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               </Tooltip>
             </div>
           </section>
-          </div>
-        </aside>
+        </SidebarLayout>
 
         {/* Engine Settings Modal */}
         {showSettings && (
@@ -5897,346 +5487,46 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               </div>
             </div>
             {/* Floating Toolbar (inside canvas, centered, pill-sized) */}
-            <div
-              ref={setBottomToolbarNode}
-              className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-30"
+            <BottomToolbar
+              bottomToolbarExpanded={bottomToolbarExpanded}
+              setBottomToolbarNode={setBottomToolbarNode}
               onMouseEnter={handleBottomToolbarMouseEnter}
               onMouseLeave={handleBottomToolbarMouseLeave}
               onFocus={handleBottomToolbarFocus}
               onBlur={handleBottomToolbarBlur}
-              tabIndex={bottomToolbarExpanded ? -1 : 0}
-              aria-label="Tool selection"
-            >
-              <div
-                className={`flex items-center bg-white/90 dark:bg-neutral-900/90 border border-border rounded-full shadow-md transition-all duration-300 ease-in-out ${bottomToolbarExpanded ? 'gap-1 px-2 py-1' : 'gap-0 px-1 py-1'}`}
-              >
-                {/* Brush Tool */}
-                <div
-                  className={`relative flex-shrink-0 transition-all duration-300 ease-out ${bottomToolbarExpanded || selectedTool === 'brush' ? 'opacity-100 scale-100 max-w-[3rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
-                >
-                  <Button
-                        variant={selectedTool === 'brush' ? 'default' : 'ghost'}
-                        size="sm"
-                        className="w-7 h-7 p-1 rounded-full tool-button"
-                        onClick={() => handleSelectTool('brush')}
-                        onMouseEnter={(e) => {
-                          handleShowBrushOptions();
-                          showTooltipWithDelay('Brush Tool', e.currentTarget);
-                        }}
-                        onMouseLeave={() => {
-                          handleHideBrushOptions();
-                          hideTooltip();
-                        }}
-                      >
-                        {getBrushIcon()}
-                      </Button>
-
-                  {showBrushOptions && (
-                    <div
-                      className="absolute bottom-full left-0 mb-1 bg-white dark:bg-neutral-900 border border-border rounded shadow-lg p-1 flex gap-1 min-w-max z-50"
-                      onMouseEnter={handleShowBrushOptions}
-                      onMouseLeave={handleHideBrushOptions}
-                    >
-                      <Button
-                        variant={selectedBrushTool === 'brush' ? 'default' : 'ghost'}
-                        size="sm"
-                        className="w-6 h-6 p-1 rounded-full sub-tool-button"
-                        onClick={() => setSelectedBrushTool('brush')}
-                        onMouseEnter={(e) => showTooltipWithDelay('Brush Tool', e.currentTarget)}
-                        onMouseLeave={hideTooltip}
-                      >
-                        <Paintbrush2 className="w-3 h-3" />
-                      </Button>
-                      <Button
-                        variant={selectedBrushTool === 'bucket' ? 'default' : 'ghost'}
-                        size="sm"
-                        className="w-6 h-6 p-1 rounded-full sub-tool-button"
-                        onClick={() => setSelectedBrushTool('bucket')}
-                        onMouseEnter={(e) => showTooltipWithDelay('Bucket Fill', e.currentTarget)}
-                        onMouseLeave={hideTooltip}
-                      >
-                        <PaintBucket className="w-3 h-3" />
-                      </Button>
-                      <Button
-                        variant={selectedBrushTool === 'eraser' ? 'default' : 'ghost'}
-                        size="sm"
-                        className="w-6 h-6 p-1 rounded-full sub-tool-button"
-                        onClick={() => setSelectedBrushTool('eraser')}
-                        onMouseEnter={(e) => showTooltipWithDelay('Eraser', e.currentTarget)}
-                        onMouseLeave={hideTooltip}
-                      >
-                        <Eraser className="w-3 h-3" />
-                      </Button>
-                      <Button
-                        variant={selectedBrushTool === 'clear' ? 'default' : 'ghost'}
-                        size="sm"
-                        className="w-6 h-6 p-1 rounded-full sub-tool-button border-red-500 hover:border-red-600 hover:bg-red-50"
-                        onClick={() => setShowClearLayerDialog(true)}
-                        onMouseEnter={(e) => showTooltipWithDelay('Clear Layer', e.currentTarget)}
-                        onMouseLeave={hideTooltip}
-                      >
-                        <X className="w-3 h-3 text-red-500" />
-                      </Button>
-                    </div>
-                  )}
-                </div>
-
-                {/* Selection Tool */}
-                <div
-                  className={`relative flex-shrink-0 transition-all duration-300 ease-out ${bottomToolbarExpanded || selectedTool === 'selection' ? 'opacity-100 scale-100 max-w-[3rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
-                >
-                  <Button
-                      variant={selectedTool === 'selection' ? 'default' : 'ghost'}
-                      size="sm"
-                      className="w-7 h-7 p-1 rounded-full tool-button"
-                      onClick={() => handleSelectTool('selection')}
-                      onMouseEnter={(e) => {
-                        handleShowSelectionOptions();
-                        showTooltipWithDelay('Selection Tool', e.currentTarget);
-                      }}
-                      onMouseLeave={() => {
-                        handleHideSelectionOptions();
-                        hideTooltip();
-                      }}
-                    >
-                      {getSelectionIcon()}
-                    </Button>
-
-                  {showSelectionOptions && (
-                    <div
-                      className="absolute bottom-full left-0 mb-1 bg-white dark:bg-neutral-900 border border-border rounded shadow-lg p-1 flex gap-1 min-w-max z-50"
-                      onMouseEnter={handleShowSelectionOptions}
-                      onMouseLeave={handleHideSelectionOptions}
-                    >
-                      <Button
-                        variant={selectedSelectionTool === 'rectangular' ? 'default' : 'ghost'}
-                        size="sm"
-                        className="w-6 h-6 p-1 rounded-full sub-tool-button"
-                        onClick={() => setSelectedSelectionTool('rectangular')}
-                        onMouseEnter={(e) => showTooltipWithDelay('Rectangular Selection', e.currentTarget)}
-                        onMouseLeave={hideTooltip}
-                      >
-                        <Square className="w-3 h-3" />
-                      </Button>
-                      <Button
-                        variant={selectedSelectionTool === 'magic-wand' ? 'default' : 'ghost'}
-                        size="sm"
-                        className="w-6 h-6 p-1 rounded-full sub-tool-button"
-                        onClick={() => setSelectedSelectionTool('magic-wand')}
-                        onMouseEnter={(e) => showTooltipWithDelay('Magic Wand', e.currentTarget)}
-                        onMouseLeave={hideTooltip}
-                      >
-                        <Wand2 className="w-3 h-3" />
-                      </Button>
-                      <Button
-                        variant={selectedSelectionTool === 'same-tile' ? 'default' : 'ghost'}
-                        size="sm"
-                        className="w-6 h-6 p-1 rounded-full sub-tool-button"
-                        onClick={() => setSelectedSelectionTool('same-tile')}
-                        onMouseEnter={(e) => showTooltipWithDelay('Select Same Tile', e.currentTarget)}
-                        onMouseLeave={hideTooltip}
-                      >
-                        <Target className="w-3 h-3" />
-                      </Button>
-                      <Button
-                        variant={selectedSelectionTool === 'circular' ? 'default' : 'ghost'}
-                        size="sm"
-                        className="w-6 h-6 p-1 rounded-full sub-tool-button"
-                        onClick={() => setSelectedSelectionTool('circular')}
-                        onMouseEnter={(e) => showTooltipWithDelay('Circular Select', e.currentTarget)}
-                        onMouseLeave={hideTooltip}
-                      >
-                        <Circle className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  )}
-                </div>
-
-                {/* Shape Tool */}
-                <div
-                  className={`relative flex-shrink-0 transition-all duration-300 ease-out ${bottomToolbarExpanded || selectedTool === 'shape' ? 'opacity-100 scale-100 max-w-[3rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
-                >
-                  <Button
-                      variant={selectedTool === 'shape' ? 'default' : 'ghost'}
-                      size="sm"
-                      className="w-7 h-7 p-1 rounded-full tool-button"
-                      onClick={() => handleSelectTool('shape')}
-                      onMouseEnter={(e) => { handleShowShapeOptions(); showTooltipWithDelay('Shape Tool', e.currentTarget); }}
-                      onMouseLeave={() => { handleHideShapeOptions(); hideTooltip(); }}
-                    >
-                      {getShapeIcon()}
-                    </Button>
-
-                  {showShapeOptions && (
-                    <div
-                      className="absolute bottom-full left-0 mb-1 bg-white dark:bg-neutral-900 border border-border rounded shadow-lg p-1 flex gap-1 min-w-max z-50"
-                      onMouseEnter={handleShowShapeOptions}
-                      onMouseLeave={handleHideShapeOptions}
-                    >
-                      <Tooltip content="Rectangle Shape">
-                        <Button
-                          variant={selectedShapeTool === 'rectangle' ? 'default' : 'ghost'}
-                          size="sm"
-                          className="w-6 h-6 p-1 rounded-full sub-tool-button"
-                          onClick={() => setSelectedShapeTool('rectangle')}
-                        >
-                          <Square className="w-3 h-3" />
-                        </Button>
-                      </Tooltip>
-                      <Tooltip content="Circle Shape">
-                        <Button
-                          variant={selectedShapeTool === 'circle' ? 'default' : 'ghost'}
-                          size="sm"
-                          className="w-6 h-6 p-1 rounded-full sub-tool-button"
-                          onClick={() => setSelectedShapeTool('circle')}
-                        >
-                          <Circle className="w-3 h-3" />
-                        </Button>
-                      </Tooltip>
-                      <Tooltip content="Line Shape">
-                        <Button
-                          variant={selectedShapeTool === 'line' ? 'default' : 'ghost'}
-                          size="sm"
-                          className="w-6 h-6 p-1 rounded-full sub-tool-button"
-                          onClick={() => setSelectedShapeTool('line')}
-                        >
-                          <Pen className="w-3 h-3" />
-                        </Button>
-                      </Tooltip>
-                    </div>
-                  )}
-                </div>
-
-                {/* Stamp Tool */}
-                <div
-                  className={`relative flex-shrink-0 transition-all duration-300 ease-out ${bottomToolbarExpanded || selectedTool === 'stamp' ? 'opacity-100 scale-100 max-w-[3rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
-                >
-                  <Button
-                      variant={selectedTool === 'stamp' ? 'default' : 'ghost'}
-                      size="sm"
-                      className="w-7 h-7 p-1 rounded-full tool-button"
-                      onClick={() => handleSelectTool('stamp')}
-                      onMouseEnter={(e) => showTooltipWithDelay('Stamp Tool - Group tiles into a stamp and place them together', e.currentTarget)}
-                      onMouseLeave={hideTooltip}
-                    >
-                      <Stamp className="w-3 h-3" />
-                    </Button>
-
-                  {selectedTool === 'stamp' && (
-                    <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-2 min-w-[200px] z-10">
-                      <div className="flex flex-col gap-2">
-                        {/* Stamp Mode Controls */}
-                        <div className="flex gap-1">
-                          <Tooltip content="Select and place existing stamps">
-                            <Button
-                              variant={stampMode === 'select' ? 'default' : 'ghost'}
-                              size="sm"
-                              className="flex-1 text-xs"
-                              onClick={() => setStampMode('select')}
-                            >
-                              Select
-                            </Button>
-                          </Tooltip>
-                          <Tooltip content="Create stamp from selection">
-                            <Button
-                              variant={stampMode === 'create' ? 'default' : 'ghost'}
-                              size="sm"
-                              className="flex-1 text-xs"
-                              onClick={() => setStampMode('create')}
-                            >
-                              Create
-                            </Button>
-                          </Tooltip>
-                        </div>
-
-                        {/* Create Stamp Section */}
-                        {stampMode === 'create' && (
-                          <div className="border-t pt-2">
-                            <div className="text-xs font-medium mb-1">Create New Stamp</div>
-                            <div className="flex gap-1">
-                              <input
-                                type="text"
-                                placeholder="Stamp name"
-                                value={newStampName}
-                                onChange={(e) => setNewStampName(e.target.value)}
-                                className="flex-1 text-xs px-2 py-1 border rounded"
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') {
-                                    handleCreateStamp();
-                                  }
-                                }}
-                              />
-                              <Button
-                                size="sm"
-                                className="text-xs"
-                                onClick={handleCreateStamp}
-                                disabled={!newStampName.trim()}
-                              >
-                                Create
-                              </Button>
-                            </div>
-                            <div className="text-xs text-gray-500 mt-1">First select tiles, then create stamp</div>
-                          </div>
-                        )}
-
-                        {/* Stamps List */}
-                        {stampMode === 'select' && (
-                          <div className="border-t pt-2 max-h-32 overflow-y-auto">
-                            <div className="text-xs font-medium mb-1">Available Stamps</div>
-                            {stamps.length === 0 ? (
-                              <div className="text-xs text-gray-500">No stamps created yet</div>
-                            ) : (
-                              <div className="flex flex-col gap-1">
-                                {stamps.map((stamp) => (
-                                  <div key={stamp.id} className="flex items-center gap-1">
-                                    <Tooltip content={`${stamp.name} (${stamp.width}x${stamp.height})`}>
-                                      <Button
-                                        variant={selectedStamp === stamp.id ? 'default' : 'ghost'}
-                                        size="sm"
-                                        className="flex-1 text-xs justify-start"
-                                        onClick={() => handleStampSelect(stamp.id)}
-                                      >
-                                        {stamp.name}
-                                      </Button>
-                                    </Tooltip>
-                                    <Tooltip content="Delete stamp">
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        className="w-6 h-6 p-0 text-red-500"
-                                        onClick={() => handleDeleteStamp(stamp.id)}
-                                      >
-                                        <X className="w-3 h-3" />
-                                      </Button>
-                                    </Tooltip>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Eyedropper Tool */}
-                <div
-                  className={`flex-shrink-0 transition-all duration-300 ease-out ${bottomToolbarExpanded || selectedTool === 'eyedropper' ? 'opacity-100 scale-100 max-w-[3rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
-                >
-                  <Button
-                    variant={selectedTool === 'eyedropper' ? 'default' : 'ghost'}
-                    size="sm"
-                    className="w-7 h-7 p-1 rounded-full tool-button"
-                    onClick={() => handleSelectTool('eyedropper')}
-                    onMouseEnter={(e) => showTooltipWithDelay('Eyedropper Tool - Pick a tile from the map to reuse', e.currentTarget)}
-                    onMouseLeave={hideTooltip}
-                  >
-                    <Pipette className="w-3 h-3" />
-                  </Button>
-                </div>
-              </div>
-            </div>
+              selectedTool={selectedTool}
+              handleSelectTool={handleSelectTool}
+              showBrushOptions={showBrushOptions}
+              handleShowBrushOptions={handleShowBrushOptions}
+              handleHideBrushOptions={handleHideBrushOptions}
+              selectedBrushTool={selectedBrushTool}
+              setSelectedBrushTool={setSelectedBrushTool}
+              showTooltipWithDelay={showTooltipWithDelay}
+              hideTooltip={hideTooltip}
+              setShowClearLayerDialog={setShowClearLayerDialog}
+              getBrushIcon={getBrushIcon}
+              showSelectionOptions={showSelectionOptions}
+              handleShowSelectionOptions={handleShowSelectionOptions}
+              handleHideSelectionOptions={handleHideSelectionOptions}
+              selectedSelectionTool={selectedSelectionTool}
+              setSelectedSelectionTool={setSelectedSelectionTool}
+              getSelectionIcon={getSelectionIcon}
+              showShapeOptions={showShapeOptions}
+              handleShowShapeOptions={handleShowShapeOptions}
+              handleHideShapeOptions={handleHideShapeOptions}
+              selectedShapeTool={selectedShapeTool}
+              setSelectedShapeTool={setSelectedShapeTool}
+              getShapeIcon={getShapeIcon}
+              stampMode={stampMode}
+              setStampMode={setStampMode}
+              newStampName={newStampName}
+              setNewStampName={setNewStampName}
+              handleCreateStamp={handleCreateStamp}
+              stamps={stamps}
+              selectedStamp={selectedStamp}
+              handleStampSelect={handleStampSelect}
+              handleDeleteStamp={handleDeleteStamp}
+            />
           </div>
         </section>
         )}
@@ -6503,237 +5793,30 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         </DialogContent>
       </Dialog>
 
-      {/* Rule Creation Dialog */}
-      <Dialog
+      <RuleDialog
         open={showRuleDialog}
-        onOpenChange={(open) => {
-          if (!open) {
-            setShowRuleDialog(false);
-            setRuleDialogError(null);
-            setRuleDialogStep('start');
-            setRuleStartType(null);
-            setRuleTriggerId('');
-            setRuleActionSelection(null);
-          }
+        ruleDialogStep={ruleDialogStep}
+        ruleDialogError={ruleDialogError}
+        ruleNameInput={ruleNameInput}
+        setRuleNameInput={setRuleNameInput}
+        ruleStartType={ruleStartType}
+        setRuleStartType={setRuleStartType}
+        ruleTriggerId={ruleTriggerId}
+        setRuleTriggerId={setRuleTriggerId}
+        ruleActionSelection={ruleActionSelection}
+        setRuleActionSelection={setRuleActionSelection}
+        availableRuleTriggers={availableRuleTriggers}
+        onClose={() => {
+          setShowRuleDialog(false);
+          setRuleDialogError(null);
+          setRuleDialogStep('start');
+          setRuleStartType(null);
+          setRuleTriggerId('');
+          setRuleActionSelection(null);
         }}
-      >
-        <DialogContent className="max-w-xl w-[520px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <GitBranch className="w-5 h-5 text-orange-500" />
-              Add Rule
-            </DialogTitle>
-            <DialogDescription>Give the rule a name and pick how it begins.</DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            {ruleDialogStep === 'start' ? (
-              <>
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Rule Name <span className="text-red-500">*</span>
-                  </label>
-                  <Input
-                    value={ruleNameInput}
-                    onChange={(event) => setRuleNameInput(event.target.value)}
-                    placeholder="Rule name"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">How does this rule start?</label>
-                  <div className="grid sm:grid-cols-2 gap-2">
-                    {[
-                      { id: 'player', label: 'Started by player', hint: 'Triggered by player actions', icon: User },
-                      { id: 'game', label: 'Started by the game', hint: 'Triggered by world or system', icon: Shield }
-                    ].map((option) => {
-                      const IconComp = option.icon;
-                      const isActive = ruleStartType === option.id;
-                      return (
-                        <Tooltip
-                          key={option.id}
-                          content={
-                            <div className="flex flex-col gap-0.5">
-                              <span className="font-medium text-sm">{option.label}</span>
-                              <span className="text-xs text-muted-foreground">{option.hint}</span>
-                            </div>
-                          }
-                        >
-                          <button
-                            type="button"
-                            onClick={() => setRuleStartType(option.id as RuleStartType)}
-                            className={`flex items-center justify-center rounded-md p-1 transition-all border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
-                              isActive
-                                ? 'bg-orange-50 dark:bg-orange-900/20 shadow-md border-orange-500'
-                                : 'hover:bg-muted/60 border-transparent'
-                            }`}
-                            aria-label={option.label}
-                          >
-                            <span className={`w-10 h-10 rounded-md flex items-center justify-center ${isActive ? 'bg-white dark:bg-orange-900/40 text-orange-600 dark:text-orange-200' : 'bg-muted text-foreground/80'}`}>
-                              <IconComp className="w-5 h-5" />
-                            </span>
-                            <span className="sr-only">{option.label}</span>
-                          </button>
-                        </Tooltip>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <label className="text-sm font-medium">Pick a trigger</label>
-                    <span className="text-xs text-muted-foreground">
-                      {ruleStartType === 'player'
-                        ? 'Player driven events'
-                        : ruleStartType === 'game'
-                          ? 'Game driven events'
-                          : 'Select how the rule starts'}
-                    </span>
-                  </div>
-                  <div className="rounded-lg border border-border/60 bg-muted/30 p-3">
-                    {ruleStartType ? (
-                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 min-h-[140px] items-start">
-                        {availableRuleTriggers.map((option) => {
-                          const IconComp = option.icon;
-                          const isActive = ruleTriggerId === option.id;
-                          return (
-                            <Tooltip key={option.id} content={option.tooltip || option.label}>
-                              <button
-                                type="button"
-                                onClick={() => setRuleTriggerId(option.id)}
-                                className={`flex flex-col items-center gap-1 rounded-md p-0 transition-colors border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
-                                  isActive
-                                    ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-200 shadow-md border-orange-500'
-                                    : 'hover:bg-muted/50 border-transparent'
-                                }`}
-                                aria-pressed={isActive}
-                                aria-label={option.label}
-                              >
-                                <span className={`w-9 h-9 rounded-md flex items-center justify-center bg-background ${isActive ? 'text-orange-600 dark:text-orange-200' : 'text-foreground/80'}`}>
-                                  <IconComp className="w-5 h-5" />
-                                </span>
-                                <span className="sr-only">{option.label}</span>
-                              </button>
-                            </Tooltip>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div className="min-h-[140px] flex items-center justify-center text-xs text-muted-foreground text-center">
-                        Choose how this rule starts to see available triggers.
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="space-y-4">
-                <h4 className="text-sm font-semibold">What happens</h4>
-                <div className="grid sm:grid-cols-2 gap-3">
-                  {RULE_ACTION_GROUPS.map((group) => {
-                    const GroupIcon = group.icon;
-                    const isGroupActive = ruleActionSelection?.groupId === group.id;
-                    return (
-                      <div
-                        key={group.id}
-                        className={`rounded-lg border p-3 flex flex-col gap-3 transition-colors ${
-                          isGroupActive ? 'border-orange-500 bg-orange-50/50 dark:bg-orange-900/10' : 'border-border bg-muted/30'
-                        }`}
-                      >
-                        <Tooltip content={group.tooltip || group.title}>
-                          <button
-                            type="button"
-                            className={`w-12 h-12 rounded-lg border bg-background transition-colors flex items-center justify-center ${
-                              isGroupActive ? 'border-orange-500 text-orange-600 dark:text-orange-200 shadow-md' : 'border-border hover:bg-muted/60'
-                            }`}
-                            aria-label={group.title}
-                            onClick={() => {
-                              setRuleActionSelection(prev => {
-                                const currentAction = prev?.groupId === group.id ? prev.actionId : group.actions[0]?.id ?? '';
-                                if (!currentAction) return null;
-                                return { groupId: group.id, actionId: currentAction };
-                              });
-                            }}
-                          >
-                            <GroupIcon className="w-6 h-6" />
-                          </button>
-                        </Tooltip>
-                        <div className="flex flex-wrap gap-2 min-h-[44px]">
-                          {group.actions.map((action) => {
-                            const ActionIcon = action.icon;
-                            const isActionActive = ruleActionSelection?.groupId === group.id && ruleActionSelection?.actionId === action.id;
-                            return (
-                              <Tooltip key={action.id} content={action.label}>
-                                <button
-                                  type="button"
-                                  className={`w-10 h-10 rounded-md border bg-background transition-colors flex items-center justify-center ${
-                                    isActionActive ? 'border-orange-500 text-orange-600 dark:text-orange-200 shadow-md' : 'border-border hover:bg-muted/60'
-                                  }`}
-                                  aria-label={action.label}
-                                  onClick={() => setRuleActionSelection({ groupId: group.id, actionId: action.id })}
-                                >
-                                  <ActionIcon className="w-5 h-5" />
-                                </button>
-                              </Tooltip>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            <div className="rounded-md border border-gray-300 dark:border-neutral-700 bg-neutral-900 px-3 py-3 text-xs flex items-center gap-3 shadow-inner">
-              <span className="font-semibold text-foreground">Preview</span>
-              <div className="flex items-center gap-2 flex-1 min-w-0">
-                <span className="px-3 py-2 rounded-md bg-orange-500 text-white text-xs font-medium truncate">
-                  {ruleStartType ? (ruleStartType === 'player' ? 'Started by player' : 'Started by the game') : 'Pick a start type'}
-                </span>
-                <span className="px-3 py-2 rounded-md bg-orange-500 text-white text-xs font-medium truncate">
-                  {ruleTriggerId ? (RULE_TRIGGER_LOOKUP[ruleTriggerId]?.label || RULE_TRIGGER_LOOKUP[ruleTriggerId]?.tooltip || 'Trigger') : 'Pick a trigger'}
-                </span>
-                <span className="text-white font-extrabold text-lg px-1">→</span>
-                <span className="px-3 py-2 rounded-md bg-orange-500 text-white text-xs font-medium truncate">
-                  {ruleActionSelection
-                    ? RULE_ACTION_GROUPS.find((g) => g.id === ruleActionSelection.groupId)?.actions.find((a) => a.id === ruleActionSelection.actionId)?.label || 'Action'
-                    : 'Pick an action'}
-                </span>
-              </div>
-            </div>
-
-            {ruleDialogError && (
-              <div className="text-sm text-red-500">{ruleDialogError}</div>
-            )}
-          </div>
-
-          <DialogFooter className="justify-between">
-            {ruleDialogStep === 'actions' ? (
-              <>
-                <Button
-                  variant="outline"
-                  onClick={() => setRuleDialogStep('start')}
-                >
-                  Back
-                </Button>
-                <Button onClick={handleSaveRule}>Save Rule</Button>
-              </>
-            ) : (
-              <>
-                <Button onClick={handleSaveRule}>Save Rule</Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setRuleDialogStep('actions')}
-                >
-                  Next &gt;
-                </Button>
-              </>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        onSave={handleSaveRule}
+        onSetStep={setRuleDialogStep}
+      />
 
       {/* Ability Creation Dialog */}
       <Dialog
@@ -6807,313 +5890,28 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         </DialogContent>
       </Dialog>
 
-      {/* NPC / Enemy Creation Dialog */}
-      <Dialog open={actorDialogState !== null} onOpenChange={(open) => (open ? void 0 : handleCloseActorDialog())}>
-        <DialogContent className="max-w-md">
-          <DialogHeader className="relative">
-            <DialogTitle>
-              {actorDialogState?.type === 'npc' ? 'Add NPC' : 'Add Enemy'}
-            </DialogTitle>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="absolute top-0 right-0 w-6 h-6 p-0 hover:bg-transparent"
-              onClick={handleCloseActorDialog}
-            >
-              <X className="w-4 h-4 text-muted-foreground" />
-            </Button>
-            <DialogDescription>
-              Define the details for this {actorDialogState?.type === 'npc' ? 'NPC' : 'enemy'}.
-            </DialogDescription>
-          </DialogHeader>
-          {actorDialogState && (
-            <div className="space-y-4">
-              {/* Name (zorunlu) */}
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  {actorDialogState.type === 'npc' ? 'NPC Name' : 'Enemy Name'} <span className="text-red-500">*</span>
-                </label>
-                <Input
-                  value={actorDialogState.name}
-                  onChange={(event) => handleActorFieldChange('name', event.target.value)}
-                  placeholder={actorDialogState.type === 'npc' ? 'Village Elder' : 'Goblin Scout'}
-                />
-              </div>
+      <ActorDialog
+        actorDialogState={actorDialogState}
+        actorDialogError={actorDialogError}
+        canUseTilesetDialog={canUseTilesetDialog}
+        onClose={handleCloseActorDialog}
+        onFieldChange={handleActorFieldChange}
+        onRoleToggle={handleActorRoleToggle}
+        onTilesetBrowse={() => { void handleActorTilesetBrowse(); }}
+        onPortraitBrowse={() => { void handleActorPortraitBrowse(); }}
+        onSubmit={handleActorSubmit}
+      />
 
-              {/* Role (toggle buttons) */}
-              <div>
-                {(() => {
-                  const roleOptions = actorDialogState.type === 'npc' ? NPC_ROLE_OPTIONS : ENEMY_ROLE_OPTIONS;
-                  const hasRoleSelection = roleOptions.some((option) => actorDialogState[option.key]);
-                  return (
-                    <>
-                      <label className="block text-sm font-medium mb-1">
-                        {actorDialogState.type === 'npc' ? 'Roles' : 'Enemy Types'}
-                      </label>
-                      <div className="flex flex-wrap gap-2">
-                        {roleOptions.map((option) => {
-                          const isActive = actorDialogState[option.key];
-                          return (
-                            <button
-                              key={option.key}
-                              type="button"
-                              onClick={() => handleActorRoleToggle(option.key)}
-                              className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                                isActive
-                                  ? `border ${option.badgeClass} ring-1 ring-border/60`
-                                  : 'border-transparent bg-muted/50 text-muted-foreground hover:bg-muted'
-                              }`}
-                              title={option.description}
-                            >
-                              {option.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {actorDialogState.type === 'npc'
-                          ? hasRoleSelection
-                            ? 'Select one or more roles for this NPC.'
-                            : 'Static NPC with no interaction.'
-                          : hasRoleSelection
-                            ? 'Pick one or more enemy types.'
-                            : 'No behavior selected; enemy is unassigned.'}
-                      </p>
-                    </>
-                  );
-                })()}
-              </div>
-
-              {/* Tileset Location (opsiyonel) */}
-              <div>
-                <label className="block text-sm font-medium mb-1">Tileset Location</label>
-                <div className="flex gap-2">
-                  <Input
-                    className="flex-1"
-                    value={actorDialogState.tilesetPath}
-                    onChange={(event) => handleActorFieldChange('tilesetPath', event.target.value)}
-                    placeholder="npcs/merchant.png (optional)"
-                    readOnly={canUseTilesetDialog}
-                    onClick={canUseTilesetDialog ? () => { void handleActorTilesetBrowse(); } : undefined}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-10 px-3 gap-2"
-                    onClick={() => { void handleActorTilesetBrowse(); }}
-                    disabled={!canUseTilesetDialog}
-                  >
-                    <Image className="w-4 h-4" />
-                    <span>Browse</span>
-                  </Button>
-                </div>
-              </div>
-
-              {/* Portrait Location (opsiyonel) */}
-              <div>
-                <label className="block text-sm font-medium mb-1">Portrait Location</label>
-                <div className="flex gap-2">
-                  <Input
-                    className="flex-1"
-                    value={actorDialogState.portraitPath}
-                    onChange={(event) => handleActorFieldChange('portraitPath', event.target.value)}
-                    placeholder="portraits/merchant.png (optional)"
-                    readOnly={canUseTilesetDialog}
-                    onClick={canUseTilesetDialog ? () => { void handleActorPortraitBrowse(); } : undefined}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-10 px-3 gap-2"
-                    onClick={() => { void handleActorPortraitBrowse(); }}
-                    disabled={!canUseTilesetDialog}
-                  >
-                    <User className="w-4 h-4" />
-                    <span>Browse</span>
-                  </Button>
-                </div>
-              </div>
-
-              {actorDialogError && (
-                <div className="text-sm text-red-500">
-                  {actorDialogError}
-                </div>
-              )}
-            </div>
-          )}
-          <DialogFooter className="mt-4">
-            <div className="flex gap-0 divide-x divide-white/20 rounded-md overflow-hidden shadow-sm">
-              <Tooltip content={actorDialogState?.type === 'npc' ? 'Add NPC' : 'Add Enemy'} side="top">
-                <Button 
-                  onClick={() => handleActorSubmit(false)} 
-                  className="rounded-r-none h-8 px-3 bg-orange-500 hover:bg-orange-600 border-none"
-                >
-                  <Save className="w-4 h-4" />
-                </Button>
-              </Tooltip>
-              <Tooltip content={actorDialogState?.type === 'npc' ? 'Add and Edit NPC' : 'Add and Edit Enemy'} side="top">
-                <Button 
-                  onClick={() => handleActorSubmit(true)} 
-                  className="rounded-l-none h-8 px-3 bg-orange-500 hover:bg-orange-600 border-none"
-                >
-                  <Edit2 className="w-4 h-4" />
-                </Button>
-              </Tooltip>
-            </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Item Creation Dialog */}
-      <Dialog
-        open={!!itemDialogState}
-        onOpenChange={(open) => {
-          if (!open) {
-            handleCloseItemDialog();
-          }
-        }}
-      >
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Sword className="w-5 h-5 text-orange-500" />
-              Add Item
-            </DialogTitle>
-            <DialogDescription>Create a new item definition.</DialogDescription>
-          </DialogHeader>
-          {itemDialogState && (
-            <div className="space-y-4">
-              {/* Item Name (required) */}
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Item Name <span className="text-red-500">*</span>
-                </label>
-                <Input
-                  value={itemDialogState.name}
-                  onChange={(event) => handleItemFieldChange('name', event.target.value)}
-                  placeholder="Health Potion"
-                />
-              </div>
-
-              {/* Item role presets (tagged like NPC roles) */}
-              <div>
-                <label className="block text-sm font-medium mb-1">What is this item for?</label>
-                <div className="grid sm:grid-cols-2 gap-2">
-                  {ITEM_ROLE_SELECTIONS.map((roleOption) => {
-                    const isActive = itemDialogState.role === roleOption.id;
-                    const roleMeta = ITEM_ROLE_META[roleOption.id];
-                    return (
-                      <button
-                        key={roleOption.id}
-                        type="button"
-                        onClick={() => {
-                          handleItemFieldChange('role', roleOption.id);
-                          if (roleOption.id !== 'resource') {
-                            handleItemFieldChange('resourceSubtype', '');
-                          } else if (!itemDialogState.resourceSubtype) {
-                            handleItemFieldChange('resourceSubtype', 'material');
-                          }
-                        }}
-                        className={`text-left border rounded-md px-3 py-2 transition-colors ${isActive ? 'border-orange-500 bg-orange-500/10 ring-1 ring-orange-500/30' : 'border-border hover:bg-muted/60'}`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${roleMeta.badgeClass}`}>
-                            {roleMeta.label}
-                          </span>
-                          <Check className={`w-4 h-4 transition-opacity ${isActive ? 'opacity-100 text-orange-500' : 'opacity-0'}`} />
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1 leading-snug">{roleOption.description}</p>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Resource subtype helper */}
-              {itemDialogState.role === 'resource' && (
-                <div>
-                  <label className="block text-sm font-medium mb-1">Resource subtype</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {(Object.keys(RESOURCE_SUBTYPE_META) as Array<Exclude<ItemResourceSubtype, ''>>).map((key) => {
-                      const meta = RESOURCE_SUBTYPE_META[key];
-                      const isActive = itemDialogState.resourceSubtype === key;
-                      return (
-                        <button
-                          key={key}
-                          type="button"
-                          onClick={() => handleItemFieldChange('resourceSubtype', key)}
-                          className={`text-left border rounded-md px-3 py-2 transition-colors ${isActive ? 'border-purple-500 bg-purple-500/10 ring-1 ring-purple-500/30' : 'border-border hover:bg-muted/60'}`}
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${meta.badgeClass}`}>
-                              {meta.label}
-                            </span>
-                            <Check className={`w-4 h-4 transition-opacity ${isActive ? 'opacity-100 text-purple-500' : 'opacity-0'}`} />
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-1 leading-snug">{meta.hint}</p>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {itemDialogError && (
-                <div className="text-sm text-red-500">
-                  {itemDialogError}
-                </div>
-              )}
-            </div>
-          )}
-          <DialogFooter className="relative">
-            {pendingDuplicateItem && (
-              <div className="absolute -top-24 right-4 w-[280px]">
-                <div className="rounded-md border border-amber-500/50 bg-background shadow-lg text-xs p-2.5 flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5" />
-                  <div className="flex-1">
-                    <div className="text-[13px] font-semibold text-foreground text-left">Heads up</div>
-                    <div className="mt-1 space-y-1 text-left">
-                      {pendingDuplicateItem.kind === 'same-role' ? (
-                        <div className="text-[11px] text-muted-foreground">
-                          An item with this name already exists in this role.
-                        </div>
-                      ) : (
-                        <>
-                          <div className="text-[11px] text-muted-foreground leading-snug">
-                            Same name in another role. Create anyway?
-                          </div>
-                          <div className="text-[11px] text-muted-foreground leading-snug">
-                            Existing: {ITEM_ROLE_META[pendingDuplicateItem.conflictRole]?.label || pendingDuplicateItem.conflictRole}<br />
-                            New: {ITEM_ROLE_META[pendingDuplicateItem.targetRole]?.label || pendingDuplicateItem.targetRole}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-center gap-1">
-                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setPendingDuplicateItem(null)}>
-                      <X className="w-3.5 h-3.5" />
-                    </Button>
-                    {pendingDuplicateItem.kind === 'other-role' && (
-                      <Button size="icon" className="h-7 w-7 bg-amber-500 text-white hover:bg-amber-600" onClick={handleConfirmDuplicateItem}>
-                        <Check className="w-3.5 h-3.5" />
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-            <Button variant="outline" onClick={handleCloseItemDialog}>
-              Cancel
-            </Button>
-            <Button onClick={handleItemSubmit}>
-              Add Item
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <ItemDialog
+        itemDialogState={itemDialogState}
+        itemDialogError={itemDialogError}
+        pendingDuplicateItem={pendingDuplicateItem}
+        onClose={handleCloseItemDialog}
+        onFieldChange={handleItemFieldChange}
+        onSubmit={handleItemSubmit}
+        onConfirmDuplicate={handleConfirmDuplicateItem}
+        onClearDuplicate={() => setPendingDuplicateItem(null)}
+      />
 
       {/* Item Edit Dialog */}
       <Dialog open={showItemEditDialog} onOpenChange={(open) => !open && handleCloseItemEdit()}>

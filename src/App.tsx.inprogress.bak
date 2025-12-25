@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import Tooltip from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Upload, Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Blend, MapPin, Save, Edit2, Scan, Link2, Scissors, Trash2, Check, HelpCircle, Folder, Shield, Plus, Image, Grid, Box, Users, User, Locate, Clock, Menu, ChevronLeft, ChevronRight, GripVertical, MessageSquare, ChevronDown, ChevronUp, ArrowLeft, Gift, Coins, Sparkles, Heart, Zap, ZapOff, Volume2, Tag, Package, AlignLeft, Sword, ChevronsUpDown, AlertTriangle, Book, GitBranch, Apple, Skull, Swords, RefreshCw, Repeat, Dices, Timer, UserPlus, Flag, CheckCircle, ArrowRight, Puzzle } from 'lucide-react';
+import { Upload, Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Blend, MapPin, MapPinOff, Save, Scan, Link2, Scissors, Trash2, Check, HelpCircle, Folder, Shield, Plus, Image, Grid, Box, Users, User, Locate, Clock, Menu, ChevronLeft, ChevronRight, GripVertical, MessageSquare, ChevronDown, ChevronUp, ArrowLeft, Gift, Coins, Sparkles, Heart, Zap, ZapOff, Volume2, Film, Tag, Package, AlignLeft, Sword, ChevronsUpDown, AlertTriangle, Book, GitBranch, Apple, Skull, Swords, RefreshCw, Repeat, Dices, Timer, UserPlus, Flag, CheckCircle, ArrowRight, Puzzle } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { TileMapEditor } from './editor/TileMapEditor';
 import type { EditorProjectData, SavedTilesetEntry } from './editor/TileMapEditor';
@@ -15,7 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/toaster';
 import WelcomeScreen from './components/WelcomeScreen';
 import OverwriteExportDialog from './components/OverwriteExportDialog';
-import EnemyTabPanel from '@/components/EnemyTabPanel';
+import EditEnemyWindow from '@/components/EditEnemyWindow';
 import flareIconUrl from '/flare-ico.png?url';
 
 interface MapConfig {
@@ -31,11 +31,8 @@ interface EditorTab {
   id: string;
   name: string;
   projectPath?: string | null;
-  config?: EditorProjectData | MapConfig | { enemy: MapObject } | null;
-  tabType?: 'map' | 'enemy';
+  config?: EditorProjectData | MapConfig | null;
 }
-
-type EnemyTabConfig = { enemy: MapObject };
 
 type PropertyType =
   | 'int'
@@ -242,6 +239,54 @@ const ENEMY_ROLE_META_LOOKUP: Record<EnemyRoleKey, { label: string; badgeClass: 
     return acc;
   }, {} as Record<EnemyRoleKey, { label: string; badgeClass: string; description: string }>);
 
+const ENEMY_FIELD_WEIGHTS: Record<string, { primary: string[]; secondary: string[]; rare: string[] }> = {
+  melee: {
+    primary: ['hp', 'poise', 'dmg_melee_min', 'dmg_melee_max', 'accuracy', 'speed', 'chance_pursue', 'melee_range'],
+    secondary: ['crit', 'avoidance', 'cooldown'],
+    rare: ['dmg_ranged_min', 'dmg_ranged_max', 'dmg_ment_min', 'dmg_ment_max', 'threat_range'],
+  },
+  ranged: {
+    primary: ['hp', 'dmg_ranged_min', 'dmg_ranged_max', 'accuracy', 'threat_range', 'cooldown', 'speed'],
+    secondary: ['avoidance', 'crit', 'melee_range'],
+    rare: ['poise', 'dmg_melee_min', 'dmg_melee_max'],
+  },
+  caster: {
+    primary: ['hp', 'dmg_ment_min', 'dmg_ment_max', 'cooldown', 'accuracy', 'threat_range'],
+    secondary: ['avoidance', 'speed', 'crit'],
+    rare: ['poise', 'dmg_melee_min', 'dmg_melee_max'],
+  },
+  summoner: {
+    primary: ['hp', 'cooldown', 'threat_range', 'speed'],
+    secondary: ['dmg_ment_min', 'dmg_ment_max', 'avoidance'],
+    rare: ['dmg_melee_min', 'dmg_melee_max', 'crit', 'poise'],
+  },
+  boss: {
+    primary: ['hp', 'poise', 'accuracy', 'cooldown', 'speed'],
+    secondary: [
+      'dmg_melee_min', 'dmg_melee_max',
+      'dmg_ranged_min', 'dmg_ranged_max',
+      'dmg_ment_min', 'dmg_ment_max',
+      'crit', 'avoidance', 'threat_range'
+    ],
+    rare: [],
+  },
+  passive: {
+    primary: ['hp', 'avoidance', 'speed'],
+    secondary: ['threat_range', 'cooldown'],
+    rare: [
+      'dmg_melee_min', 'dmg_melee_max',
+      'dmg_ranged_min', 'dmg_ranged_max',
+      'dmg_ment_min', 'dmg_ment_max',
+      'crit', 'poise'
+    ],
+  },
+  stationary: {
+    primary: ['hp', 'dmg_ranged_min', 'dmg_ranged_max', 'dmg_ment_min', 'dmg_ment_max', 'accuracy', 'threat_range', 'cooldown'],
+    secondary: ['poise'],
+    rare: ['speed', 'dmg_melee_min', 'dmg_melee_max'],
+  },
+};
+
 const EMPTY_ACTOR_ROLES: Record<ActorRoleKey, boolean> = {
   isTalker: false,
   isVendor: false,
@@ -390,18 +435,7 @@ function App() {
   const [newMapStarting, setNewMapStarting] = useState(false);
   // Editor tabs
   const [tabs, setTabs] = useState<EditorTab[]>([]);
-  const [pendingEnemyTabCloseId, setPendingEnemyTabCloseId] = useState<string | null>(null);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
-  const switchToTabHelpersRef = useRef({
-    handleOpenMap: async (_projectDir: string, _createTab?: boolean, _mapName?: string) => {},
-    loadProjectData: async (_editor: TileMapEditor, _mapConfig: EditorProjectData) => false,
-    setupAutoSave: (_editor: TileMapEditor) => {},
-    syncMapObjects: () => {},
-    updateLayersList: () => {},
-  });
-  // Convenience accessors for tab-aware UI (used to hide map controls for enemy editor tabs)
-  const activeTab = tabs.find(t => t.id === activeTabId) || null;
-  const isEnemyTabActive = !!activeTab && activeTab.tabType === 'enemy';
 
   // Session is now stored per-project in .flare-session.json
   // Load session when a project is opened (handled in handleOpenMap)
@@ -427,7 +461,7 @@ function App() {
   const [hoveredLayerId, setHoveredLayerId] = useState<number | null>(null);
   const [showHelp, setShowHelp] = useState(false);
   const [activeHelpTab, setActiveHelpTab] = useState('engine');
-  const [tipsMinimized, setTipsMinimized] = useState(false);
+  const [showTooltip, setShowTooltip] = useState(true);
   // Force refresh counter to trigger re-render when editor-managed tabs change
   const [tabTick, setTabTick] = useState(0);
   const [toolbarExpanded, setToolbarExpanded] = useState(true);
@@ -719,7 +753,7 @@ function App() {
   );
   
   // Tab helpers
-  const createTabFor = useCallback((name: string, projectPath?: string | null, config?: EditorProjectData | MapConfig | { enemy: MapObject } | null) => {
+  const createTabFor = (name: string, projectPath?: string | null, config?: EditorProjectData | MapConfig | null) => {
     const id = Date.now().toString();
     const safeConfig = config ? JSON.parse(JSON.stringify(config)) : null;
     const tab: EditorTab = { id, name, projectPath: projectPath ?? null, config: safeConfig };
@@ -728,24 +762,9 @@ function App() {
     setActiveTabId(id);
     setCurrentProjectPath(projectPath ?? null);
     return tab;
-  }, []);
-
-  const closeEditorTab = useCallback((tabId: string) => {
-    setTabs((prev) => {
-      const index = prev.findIndex((tab) => tab.id === tabId);
-      if (index === -1) return prev;
-      const nextTabs = prev.filter((tab) => tab.id !== tabId);
-      if (activeTabId === tabId) {
-        const fallback = nextTabs[index] ?? nextTabs[index - 1] ?? nextTabs[0] ?? null;
-        const nextActiveId = fallback?.id ?? null;
-        setActiveTabId(nextActiveId);
-        setCurrentProjectPath(fallback?.projectPath ?? null);
-      }
-      return nextTabs;
-    });
-  }, [activeTabId]);
+  };
   
-  const switchToTab = useCallback(async (tabId: string) => {
+  const switchToTab = async (tabId: string) => {
     if (tabId === activeTabId) return;
     const prevTab = tabs.find(t => t.id === activeTabId);
     const nextTab = tabs.find(t => t.id === tabId);
@@ -783,10 +802,6 @@ function App() {
     setActiveTabId(tabId);
     setCurrentProjectPath(nextTab.projectPath ?? null);
 
-    if (nextTab.tabType === 'enemy') {
-      return;
-    }
-
     // If the tab contains a preloaded in-memory config, prefer restoring it
     // (this can include tileset images that haven't been written to disk yet).
     // However, if this tab belongs to a project on disk and the in-memory
@@ -799,11 +814,11 @@ function App() {
         const cfgCheck = nextTab.config as EditorProjectData;
         if (nextTab.projectPath && (!cfgCheck.tilesetImages || Object.keys(cfgCheck.tilesetImages || {}).length === 0) && nextTab.name) {
           console.log('In-memory config missing tileset images and no editor; preferring disk open for tab', tabId, nextTab.name);
-          await switchToTabHelpersRef.current.handleOpenMap(nextTab.projectPath, false, nextTab.name);
-          if (editor) switchToTabHelpersRef.current.setupAutoSave(editor);
+          await handleOpenMap(nextTab.projectPath, false, nextTab.name);
+          if (editor) setupAutoSave(editor);
           return;
         }
-} catch {
+      } catch (e) {
         // ignore and fall back to normal restore
       }
 
@@ -823,19 +838,23 @@ function App() {
               // The editor's loadProjectData will replace layers, tilesets etc.
               // Just clear localStorage backup to prevent old data loading
               editor.clearLocalStorageBackup();
-              const cfg = nextTab.config as EditorProjectData;
-              
-              if (cfg.name) {
-                editor.setMapName(cfg.name);
-                setMapName(cfg.name);
+
+              // Narrow config into a shared union so we can safely access common fields
+              const cfgAny = nextTab.config as EditorProjectData | MapConfig | undefined;
+              if (cfgAny?.name) {
+                editor.setMapName(cfgAny.name);
+                setMapName(cfgAny.name);
               }
-              if (cfg.width && cfg.height) {
-                editor.setMapSize(cfg.width ?? 20, cfg.height ?? 15);
-                setMapWidth(cfg.width ?? 20);
-                setMapHeight(cfg.height ?? 15);
+              if (cfgAny?.width && cfgAny?.height) {
+                editor.setMapSize(cfgAny.width ?? 20, cfgAny.height ?? 15);
+                setMapWidth(cfgAny.width ?? 20);
+                setMapHeight(cfgAny.height ?? 15);
               }
 
-              // Helper type for optional editor runtime extensions used by the UI
+              const cfg = nextTab.config as EditorProjectData;
+
+              // Editor has several optional runtime methods that aren't part of the core
+              // public API; create a narrowed helper type to access them safely.
               type EditorWithExtras = TileMapEditor & Partial<{
                 setTilesetImages: (images: Record<string, string>) => void;
                 tilesetImages: Record<string, string>;
@@ -843,10 +862,10 @@ function App() {
                 getActiveLayerType: () => string | null;
                 updateCurrentTileset: (t: unknown) => void;
                 refreshTilePalette: (force?: boolean) => void;
-                redraw: () => void;
+                draw: () => void;
               }>;
 
-              const ed = editor as EditorWithExtras;
+              const ed = editor as EditorWithExtras; 
 
               // If the in-memory config includes tileset images, apply them into
               // the live editor first so loadProjectData can make use of them.
@@ -856,7 +875,7 @@ function App() {
                     ed.setTilesetImages(cfg.tilesetImages);
                   } else {
                     // best-effort fallback: attach to editor for later use
-                    ed.tilesetImages = { ...(ed.tilesetImages || {}), ...JSON.parse(JSON.stringify(cfg.tilesetImages)) };
+                    (ed as any).tilesetImages = JSON.parse(JSON.stringify(cfg.tilesetImages));
                   }
                   console.log('Applied tilesetImages to editor for tab', tabId, Object.keys(cfg.tilesetImages));
                 } else {
@@ -873,9 +892,10 @@ function App() {
               // snapshot didn't include the image data URL.
               try {
                 await new Promise(r => setTimeout(r, 150));
-                if (currentProjectPath && window.electronAPI?.discoverTilesetImages) {
-                  const discovered = await window.electronAPI.discoverTilesetImages(currentProjectPath);
-                  const discoveredImages = discovered?.tilesetImages || {};
+                const electronAPIForDiscovery = window.electronAPI as unknown as { discoverTilesetImages?: (p: string) => Promise<{ tilesetImages?: Record<string, string> }>; };
+                if (currentProjectPath && electronAPIForDiscovery.discoverTilesetImages) {
+                  const discovered = await electronAPIForDiscovery.discoverTilesetImages(currentProjectPath);
+                  const discoveredImages: Record<string, string> = discovered?.tilesetImages || {};
                   if (Object.keys(discoveredImages).length > 0) {
                     // Determine which filenames we care about from the config
                     const cfgNames = new Set<string>();
@@ -905,17 +925,12 @@ function App() {
                       } else {
                         // attach to editor as fallback
                         ed.tilesetImages = { ...(ed.tilesetImages || {}), ...toApply };
-                        console.log('Attached discovered project tileset images to editor.tilesetImages for tab', tabId, Object.keys(toApply));
                       }
-                    }
-                    
-                    // If some tilesets still missing, attempt to read sourcePath files
-                    // referenced in the config directly from disk (supports absolute
                     // or external paths). This uses the new preload IPC
                     // `readFileAsDataURL` implemented in the main process.
                     const stillMissing = (cfg.tilesets || []).filter((t: SavedTilesetEntry) => {
                       const name = t.fileName || (t.sourcePath ? String(t.sourcePath).split(/[\\/]/).pop() : null);
-                      return name && !Object.prototype.hasOwnProperty.call(ed.tilesetImages || {}, name) && !toApply[name];
+                      return name && !Object.prototype.hasOwnProperty.call((ed as any).tilesetImages || {}, name) && !toApply[name];
                     });
                     const electronAPI = window.electronAPI as unknown as {
                       readFileAsDataURL?: (p: string) => Promise<string | null>;
@@ -972,10 +987,7 @@ function App() {
                 console.warn('ensureTilesetsLoaded failed or timed out:', e);
               }
 
-              const loaded = await switchToTabHelpersRef.current.loadProjectData(
-                editor,
-                nextTab.config as EditorProjectData
-              );
+              const loaded = await loadProjectData(editor, nextTab.config as EditorProjectData);
 
               // Force palette rebuild after images and layers settle
               try {
@@ -994,16 +1006,16 @@ function App() {
               }
 
               console.log('Loaded tab config into editor, result:', loaded);
-              switchToTabHelpersRef.current.setupAutoSave(editor);
-              switchToTabHelpersRef.current.updateLayersList();
-              switchToTabHelpersRef.current.syncMapObjects();
+              setupAutoSave(editor);
+              updateLayersList();
+              syncMapObjects();
               setPendingMapConfig(null);
               setMapInitialized(true);
               
               // Force canvas redraw after loading
               try {
-                if (typeof ed.redraw === 'function') {
-                  ed.redraw();
+                if (typeof ed.draw === 'function') {
+                  ed.draw();
                   console.log('Forced canvas redraw after tab switch');
                 }
               } catch (e) {
@@ -1016,10 +1028,7 @@ function App() {
           }
 
       // Fall back to pendingMapConfig which triggers editor creation/restoration
-      if (nextTab.config && 'enemy' in nextTab.config) {
-        return;
-      }
-      setPendingMapConfig(nextTab.config ?? null);
+      setPendingMapConfig(nextTab.config);
       return;
     }
 
@@ -1076,9 +1085,9 @@ function App() {
           console.error('Error loading map for tab switch:', e);
         }
       }
-      if (editor) switchToTabHelpersRef.current.setupAutoSave(editor);
+      if (editor) setupAutoSave(editor);
     }
-  }, [activeTabId, currentProjectPath, editor, tabs]);
+  };
 
   const [isDarkMode, setIsDarkMode] = useState(() => {
     // Initialize from localStorage or default to false
@@ -1095,13 +1104,13 @@ function App() {
   useEffect(() => {
     try {
       localStorage.setItem('showSidebarToggle', JSON.stringify(showSidebarToggle));
-    } catch {
+    } catch (e) {
       // ignore storage errors
     }
   }, [showSidebarToggle]);
   
   // Auto-save states
-  const [saveStatus, setSaveStatus] = useState<'saving' | 'saved' | 'error' | 'unsaved'>('unsaved');
+  const [saveStatus, setSaveStatus] = useState<'saving' | 'saved' | 'error' | 'unsaved'>('saved');
   const [autoSaveEnabled, setAutoSaveEnabledState] = useState(true);
   const [lastSaveTime, setLastSaveTime] = useState<number>(0);
   const [isManuallySaving, setIsManuallySaving] = useState(false);
@@ -1179,6 +1188,8 @@ function App() {
   // Object management states  
   const [showObjectDialog, setShowObjectDialog] = useState(false);
   const [editingObject, setEditingObject] = useState<MapObject | null>(null);
+  const [showEnemyEditor, setShowEnemyEditor] = useState(false);
+  const [editingEnemy, setEditingEnemy] = useState<MapObject | null>(null);
   const [objectValidationErrors, setObjectValidationErrors] = useState<string[]>([]);
   const [mapObjects, setMapObjects] = useState<MapObject[]>([]);
   const [showDeleteNpcConfirm, setShowDeleteNpcConfirm] = useState(false);
@@ -1206,12 +1217,52 @@ function App() {
     kind: 'same-role' | 'other-role';
   } | null>(null);
 
+  const getEnemyFieldCounts = useCallback((fieldKey: string): { primary: number; secondary: number; rare: number } => {
+    if (!editingObject || editingObject.type !== 'enemy') return { primary: 0, secondary: 0, rare: 0 };
+    const props = editingObject.properties || {};
+    let primary = 0;
+    let secondary = 0;
+    let rare = 0;
+    for (const [roleKey, weights] of Object.entries(ENEMY_FIELD_WEIGHTS)) {
+      if (props[roleKey] === 'true') {
+        if (weights.primary.includes(fieldKey)) primary += 1;
+        if (weights.secondary.includes(fieldKey)) secondary += 1;
+        if (weights.rare.includes(fieldKey)) rare += 1;
+      }
+    }
+    return { primary, secondary, rare };
+  }, [editingObject]);
+
+  const renderEnemyFieldWeight = useCallback((fieldKey: string) => {
+    const { primary, secondary, rare } = getEnemyFieldCounts(fieldKey);
+    if (primary + secondary + rare === 0) return null;
+    return (
+      <span className="flex items-center gap-0.5 text-amber-500 drop-shadow">
+        {Array.from({ length: primary }).map((_, idx) => (
+          <span
+            key={`full-${fieldKey}-${idx}`}
+            className="w-1.5 h-1.5 rounded-full bg-amber-300 border border-amber-500 shadow-[0_0_8px_rgba(251,191,36,0.95)]"
+          />
+        ))}
+        {Array.from({ length: secondary }).map((_, idx) => (
+          <span
+            key={`empty-${fieldKey}-${idx}`}
+            className="w-1.5 h-1.5 rounded-full border border-amber-400 bg-transparent"
+          />
+        ))}
+        {Array.from({ length: rare }).map((_, idx) => (
+          <span
+            key={`half-${fieldKey}-${idx}`}
+            className="w-1.5 h-1.5 rounded-full border border-amber-400 bg-[linear-gradient(90deg,rgba(251,191,36,0.85)_50%,transparent_50%)]"
+          />
+        ))}
+      </span>
+    );
+  }, [getEnemyFieldCounts]);
+
   // Rules list for the Rules layer (UI-only for now; persistence will be added later).
   const [rulesList, setRulesList] = useState<Array<{ id: string; name: string; startType: RuleStartType; triggerId: string }>>([]);
   const [showRuleDialog, setShowRuleDialog] = useState(false);
-  const [showAbilityDialog, setShowAbilityDialog] = useState(false);
-  const [abilityNameInput, setAbilityNameInput] = useState('');
-  const [, setAbilitiesList] = useState<Array<{ id: string; name: string; type: string }>>([]);
   const [ruleNameInput, setRuleNameInput] = useState('');
   const [ruleStartType, setRuleStartType] = useState<RuleStartType | null>(null);
   const [ruleTriggerId, setRuleTriggerId] = useState<string>('');
@@ -2145,25 +2196,14 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     const obj = editor.getMapObjects().find((o: MapObject) => o.id === objectId);
     if (obj) {
       if (obj.type === 'enemy') {
-        const existingTab = tabs.find(
-          (tab) => tab.tabType === 'enemy' && (tab.config as { enemy?: MapObject } | null)?.enemy?.id === obj.id
-        );
-        if (existingTab) {
-          void switchToTab(existingTab.id);
-          return;
-        }
-
-        // Create tab for enemy editing
-        const tabName = obj.name || 'Enemy';
-        const tab = createTabFor(tabName, currentProjectPath, { enemy: obj });
-        setActiveTabId(tab.id);
-        setTabs(prev => prev.map(t => t.id === tab.id ? { ...t, tabType: 'enemy' } : t));
+        setEditingEnemy(obj);
+        setShowEnemyEditor(true);
       } else {
         setEditingObject(obj);
         setShowObjectDialog(true);
       }
     }
-  }, [editor, currentProjectPath, createTabFor, setActiveTabId, tabs, switchToTab]);
+  }, [editor]);
 
   const handleUpdateObject = useCallback((updatedObject: MapObject) => {
     if (!editor) return;
@@ -2385,13 +2425,11 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
 
       // Create item file
       if (window.electronAPI?.createItemFile) {
-        type CreateItemPayload = Parameters<NonNullable<Window['electronAPI']>['createItemFile']>[1];
-        const payload: CreateItemPayload = {
+        const result = await window.electronAPI.createItemFile(currentProjectPath, {
           name: itemDialogState.name.trim(),
           id: itemId,
-          category: selectedCategory,
-        };
-        const result = await window.electronAPI.createItemFile(currentProjectPath, payload);
+          category: selectedCategory
+        });
         
         if (result.success) {
           console.log('Item file created:', result.filePath);
@@ -2576,7 +2614,11 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     setEditingItem(prev => prev ? { ...prev, [key]: value } : null);
   }, []);
 
-
+  const handleRemoveActor = useCallback((objectId: number) => {
+    if (!editor) return;
+    editor.removeMapObject(objectId);
+    syncMapObjects();
+  }, [editor, syncMapObjects]);
 
   // NPC'yi haritaya belirli konuma yerleştir
   const handlePlaceActorOnMap = useCallback((objectId: number, x?: number, y?: number) => {
@@ -2609,7 +2651,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     setDraggingNpcId(null);
   }, [editor]);
 
-  const handleActorSubmit = useCallback(async (editAfter = false) => {
+  const handleActorSubmit = useCallback(async () => {
     if (!editor || !actorDialogState) {
       return;
     }
@@ -2709,7 +2751,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       x: unplacedX,
       y: unplacedY,
       type: actorDialogState.type,
-      category: actorDialogState.type === 'npc' ? 'npc' : '',
+      category: actorDialogState.type === 'npc' ? 'npc' : 'enemy',
       wander_radius: 0,
       properties: {
         ...(newObject.properties || {}),
@@ -2721,16 +2763,11 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     });
 
     syncMapObjects();
-    const newObjectId = newObject.id;
     handleCloseActorDialog();
-    
-    if (editAfter) {
-      handleEditObject(newObjectId);
-    }
     
     // Trigger autosave after NPC is added
     editor.triggerAutoSave(true);
-  }, [actorDialogState, editor, handleCloseActorDialog, syncMapObjects, currentProjectPath, handleEditObject]);
+  }, [actorDialogState, editor, handleCloseActorDialog, syncMapObjects, currentProjectPath]);
 
   const handleObjectDialogClose = useCallback(() => {
     setShowObjectDialog(false);
@@ -2793,7 +2830,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           const { npcFileContent } = serializeNpcToFlare(npc);
           
           // Dosya yolunu belirle (npcs/ prefix'i çıkar)
-          const npcFilenameClean = existingFilename.replace(/^npcs\//, '');
+          const npcFilenameClean = existingFilename.replace(/^npcs[\/\\]/, '');
           
           // Dosyayı yaz (mevcut dosyanın üzerine)
           await window.electronAPI.writeNpcFile(currentProjectPath, npcFilenameClean, npcFileContent);
@@ -3202,7 +3239,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         type: l.type,
         name: l.name,
         dataLength: l.data?.length || 0,
-        hasNonZeroData: l.data?.some((d) => d !== 0) || false
+        hasNonZeroData: l.data?.some((d: number | undefined) => d !== 0) || false
       })));
 
       // Load the complete project data into the editor
@@ -3919,7 +3956,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         }
       }
     },
-  [editor, currentProjectPath, mapName, startingMapIntermap, toast, checkExportFilesExist, buildConstantStockString, mapObjects]
+  [editor, currentProjectPath, mapName, startingMapIntermap, toast, checkExportFilesExist]
   );
 
   const handleExportMap = useCallback(async () => {
@@ -4065,7 +4102,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     // Tabs should only be created when the user creates an actual map inside the project.
   };
 
-  const handleOpenMap = useCallback(async (projectDir: string, _createTab: boolean = false, mapName?: string) => {
+  const handleOpenMap = useCallback(async (projectDir: string, createTab: boolean = false, mapName?: string) => {
     console.log('=== HANDLE OPEN MAP CALLED ===', projectDir);
     console.log('Project path details:', {
       path: projectDir,
@@ -4299,16 +4336,6 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
   // Keep a ref to handleOpenMap so IPC listeners can call the latest implementation
   useEffect(() => { handleOpenMapRef.current = handleOpenMap; }, [handleOpenMap]);
 
-  useEffect(() => {
-    switchToTabHelpersRef.current = {
-      handleOpenMap,
-      loadProjectData,
-      setupAutoSave,
-      syncMapObjects,
-      updateLayersList,
-    };
-  }, [handleOpenMap, loadProjectData, setupAutoSave, syncMapObjects, updateLayersList]);
-
   // Wire Electron menu actions (Save/Open/New)
   useEffect(() => {
     if (!window.electronAPI) return;
@@ -4444,7 +4471,6 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
   const isEnemyLayer = activeLayer?.type === 'enemy';
   const isItemsLayer = activeLayer?.type === 'items';
   const isRulesLayer = activeLayer?.type === 'rules';
-
   const availableRuleTriggers = ruleStartType ? (ruleStartType === 'player' ? PLAYER_TRIGGER_OPTIONS : GAME_TRIGGER_OPTIONS) : [];
 
   const actorEntries = useMemo(() => {
@@ -4456,6 +4482,9 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     }
     return [];
   }, [mapObjects, isNpcLayer, isEnemyLayer]);
+
+  // Settings modal tab state
+  const [settingsTab, setSettingsTab] = useState<'map' | 'other'>('map');
 
   return (
     <>
@@ -4479,8 +4508,46 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             />
             <span className="text-sm font-semibold text-orange-600 dark:text-orange-400">Flare Studio</span>
           </div>
-          {/* Save Status Indicator - moved to be next to logo */}
-          <div className="flex items-center gap-1 text-xs mx-4 min-w-[70px]">
+          {/* Tabs */}
+          <div className="ml-4 flex items-center gap-2 overflow-x-auto max-w-[60vw] no-drag">
+            {tabs.map((tab) => (
+              <div key={tab.id} className="inline-flex items-center">
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => { void switchToTab(tab.id); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); void switchToTab(tab.id); } }}
+                  className={`px-3 py-1 rounded-t-md border border-b-0 text-sm truncate max-w-xs text-left no-drag select-none inline-flex items-center gap-2 cursor-pointer transition-all duration-200 ${tab.id === activeTabId ? 'bg-orange-500 text-white border-orange-500' : 'bg-transparent text-gray-600 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-neutral-700'}`}
+                  title={`Open ${tab.name}`}
+                  aria-label={`Open ${tab.name}`}
+                >
+                  <span className="truncate inline-block max-w-[10rem] align-middle">{tab.name}</span>
+                  <Tooltip content="Map Settings" side="top">
+                    <button
+                      onClick={async (e) => { e.stopPropagation(); e.preventDefault(); try { await switchToTab(tab.id); setSettingsTab('map'); setShowMapSettingsOnly(true); setShowSettings(true); } catch (err) { console.error(err); } }}
+                      className="w-5 h-5 flex items-center justify-center rounded-full bg-transparent hover:bg-gray-500/25 transition-colors no-drag"
+                      aria-label={`Open settings for ${tab.name}`}
+                      title={`Open settings for ${tab.name}`}
+                    >
+                      <Settings className="w-3 h-3 text-white" />
+                    </button>
+                  </Tooltip>
+                </div>
+              </div>
+            ))}
+            <Tooltip content="Create a new map" side="right">
+              <button
+                onClick={() => setShowCreateMapDialog(true)}
+                className="ml-1 p-1 rounded-md hover:bg-slate-100 dark:hover:bg-neutral-800 no-drag"
+                aria-label="Create new map"
+              >
+                <Plus className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+              </button>
+            </Tooltip>
+          </div>
+          <div className="text-sm font-medium"></div>
+          {/* Save Status Indicator */}
+          <div className="flex items-center gap-1 text-xs">
             {saveStatus === 'saving' && (
               <>
                 <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
@@ -4501,68 +4568,11 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             )}
             {saveStatus === 'unsaved' && (
               <>
-                <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
-                <span className="text-gray-500">Unsaved</span>
+                <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                <span className="text-yellow-600">Unsaved</span>
               </>
             )}
           </div>
-          {/* Tabs - come after the save status */}
-          <div className="ml-2 flex items-center gap-2 overflow-x-auto max-w-[60vw] no-drag">
-            {tabs.map((tab) => (
-              <div
-                key={tab.id}
-                className={`flex items-center gap-1 px-3 py-1 rounded-t-md border border-b-0 text-sm truncate max-w-xs no-drag transition-all duration-200 ${tab.id === activeTabId ? 'bg-orange-500 text-white border-orange-500' : 'bg-transparent text-gray-600 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-neutral-700'}`}
-              >
-                <button
-                  onClick={() => { void switchToTab(tab.id); }}
-                  className="truncate"
-                  title={tab.name}
-                >
-                  {tab.name}
-                </button>
-                {tab.id === activeTabId && tab.tabType !== 'enemy' && (
-                  <Tooltip content="Edit Map Settings" side="bottom">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowMapSettingsOnly(true);
-                      }}
-                      className="flex-shrink-0 w-4 h-4 flex items-center justify-center rounded"
-                      aria-label="Edit Map Settings"
-                    >
-                      <Settings className="w-3 h-3" />
-                    </button>
-                  </Tooltip>
-                )}
-                {tab.tabType === 'enemy' && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (tab.id !== activeTabId) {
-                        void switchToTab(tab.id);
-                      }
-                      setPendingEnemyTabCloseId(tab.id);
-                    }}
-                    className="flex-shrink-0 w-4 h-4 flex items-center justify-center rounded hover:bg-black/10 dark:hover:bg-white/10"
-                    aria-label="Close enemy tab"
-                    title="Close"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                )}
-              </div>
-            ))}
-            <Tooltip content="Create a new map" side="right">
-              <button
-                onClick={() => setShowCreateMapDialog(true)}
-                className="ml-1 p-1 rounded-md hover:bg-slate-100 dark:hover:bg-neutral-800 no-drag"
-                aria-label="Create new map"
-              >
-                <Plus className="w-4 h-4 text-orange-600 dark:text-orange-400" />
-              </button>
-            </Tooltip>
-          </div>
-          <div className="text-sm font-medium"></div>
         </div>
         <div className="flex no-drag">
           <button 
@@ -4596,14 +4606,14 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           onClick={() => {
             setLeftTransitioning(true);
             if (editor && typeof editor.setSidebarTransitioning === 'function') {
-              try { editor.setSidebarTransitioning(true); } catch { /* ignore */ }
+              try { editor.setSidebarTransitioning(true); } catch (e) { /* ignore */ }
             }
             setLeftCollapsed((s) => !s);
             // keep the transitioning flag for slightly longer than the CSS transition
             window.setTimeout(() => {
               setLeftTransitioning(false);
               if (editor && typeof editor.setSidebarTransitioning === 'function') {
-                try { editor.setSidebarTransitioning(false); } catch { /* ignore */ }
+                try { editor.setSidebarTransitioning(false); } catch (e) { /* ignore */ }
               }
             }, 380);
           }}
@@ -4845,8 +4855,6 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               return null;
             })()}
 
-
-
             {/* Rules Layer - list and add button (similar UX to NPC layer) */}
             {isRulesLayer && (
               <div className="flex flex-col flex-1">
@@ -4915,7 +4923,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 <div className="flex-1 min-h-0 border border-dashed border-border rounded-md overflow-y-auto">
                   {itemsList.length === 0 ? (
                     <div className="flex items-center justify-center h-full text-sm text-muted-foreground px-4 text-center">
-                      Click &quot;+ Item&quot; to create a new item definition file.
+                      Click "+ Item" to create a new item definition file.
                     </div>
                   ) : (
                     <div className="flex flex-col gap-1 p-2">
@@ -5008,7 +5016,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               </div>
             )}
 
-            {/* Tileset Brushes Window - render for all layers except NPC, Enemy, Items, Rules, and Actions */}
+            {/* Tileset Brushes Window - render for all layers except NPC, Enemy, and Items */}
             {!isNpcLayer && !isEnemyLayer && !isItemsLayer && !isRulesLayer && (
             <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-0 m-0">
               {/* Layer Tabs (background / object only) */}
@@ -5017,11 +5025,11 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 const showTabs = activeLayerType === 'background' || activeLayerType === 'object';
                 console.log('[DEBUG UI] Rendering tabs - activeLayerType:', activeLayerType, 'showTabs:', showTabs);
                 if (editor && activeLayerType) {
-                  const tabs = editor.getLayerTabs ? editor.getLayerTabs(activeLayerType) : [];
+                  const tabs = editor.getLayerTabs ? editor.getLayerTabs(activeLayerType) : [] as Array<{ id: number; name?: string }>;
                   const activeTabId = editor.getActiveLayerTabId ? editor.getActiveLayerTabId(activeLayerType) : null;
-                  console.log('[DEBUG UI] tabs for', activeLayerType, ':', tabs.length, 'tabs', JSON.stringify(tabs.map((t: { id: number; name?: string }) => ({ id: t.id, name: t.name }))));
+                  console.log('[DEBUG UI] tabs for', activeLayerType, ':', tabs.length, 'tabs', JSON.stringify(tabs.map((t) => ({ id: t.id, name: t.name }))));
                   console.log('[DEBUG UI] activeTabId for', activeLayerType, ':', activeTabId);
-                  console.log('[DEBUG UI] Tab ID match check: tab IDs are', tabs.map((t: { id: number; name?: string }) => t.id), 'and looking for active ID', activeTabId);
+                  console.log('[DEBUG UI] Tab ID match check: tab IDs are', tabs.map((t) => t.id), 'and looking for active ID', activeTabId);
                 }
                 if (!showTabs) return null;
         return (
@@ -5031,7 +5039,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             try {
               const tabs = editor && activeLayerType ? (editor.getLayerTabs ? editor.getLayerTabs(activeLayerType) : []) : [];
               return tabs && tabs.length > 7 ? 'tabs-limited' : '';
-            } catch { return ''; }
+            } catch (e) { return ''; }
           })()}`}
           onWheel={(e: React.WheelEvent<HTMLDivElement>) => {
             const el = e.currentTarget as HTMLDivElement;
@@ -5053,7 +5061,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                             onClick={() => {
                               if (!editor) return;
                               editor.setActiveLayerTab(activeLayerType!, tab.id);
-                              try { editor.refreshTilePalette(true); } catch { /* ignore */ }
+                              try { editor.refreshTilePalette(true); } catch (err) { /* ignore */ }
                               setTabTick(t => t + 1);
                             }}
                             style={{
@@ -5131,6 +5139,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                     {/* Existing Import button: now imports into active tab for background/object layers, falls back to existing layer tileset behavior for actor layers */}
                     {(() => {
                       const isNpc = activeLayer?.type === 'npc';
+                      const isEnemy = activeLayer?.type === 'enemy';
                       const isEventLayer = activeLayer?.type === 'event';
                       const isActorLayer = isNpc || isEventLayer; // enemy handled separately below the list
                       const tooltip = isActorLayer ? `Add ${isEventLayer ? 'Event' : 'NPC'}` : 'Import a PNG tileset or brush for the active layer tab';
@@ -5319,7 +5328,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             <div className="mb-2 w-full flex flex-col justify-center h-full">
               <div className="h-auto overflow-hidden flex flex-col justify-center w-full">
                 <div className="space-y-0.5 h-auto overflow-y-visible flex flex-col justify-center w-full">
-                  {layers.filter(layer => layer.type !== 'actions').map((layer) => {
+                  {layers.map((layer) => {
                     const isActive = activeLayerId === layer.id;
                     const isHovered = hoveredLayerId === layer.id;
                     const visible = layersPanelExpanded || isActive;
@@ -5441,6 +5450,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               </div>
             </div>
           </section>
+          </div>
 
           {/* Bottom Action Buttons */}
           <section className="flex-shrink-0 mt-auto mb-2">
@@ -5485,7 +5495,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                         <>
                           <div className="relative">
                             <button
-                              className="w-full text-left p-2 hover:bg-gray-100 dark:hover:bg-neutral-800 text-xs flex items-center gap-2"
+                              className="w-full text-left p-2 hover:bg-gray-100 dark:hover:bg-neutral-800 text-xs flex items-center gap-2 gap-2"
                               onClick={() => setMapsSubOpen((s) => !s)}
                             >
                               <span className="flex items-center gap-2"><Folder className="w-3 h-3" /><span>Open map</span></span>
@@ -5614,168 +5624,17 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
 
               {/* Help button moved into Settings > Other Options */}
 
-              <Tooltip content="Engine Settings">
-                <Button onClick={() => setShowSettings(true)} className="w-7 h-7 p-0 shadow-sm" variant="outline" size="sm">
+              <Tooltip content="Map Settings">
+                <Button onClick={() => { setShowMapSettingsOnly(false); setShowSettings(true); }} className="w-7 h-7 p-0 shadow-sm" variant="outline" size="sm">
                   <Settings className="w-3 h-3" />
                 </Button>
               </Tooltip>
             </div>
           </section>
-          </div>
         </aside>
 
-        {/* Engine Settings Modal */}
-        {showSettings && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-background border border-border rounded-lg p-6 w-96">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold">Engine Settings</h3>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => setShowSettings(false)}
-                  className="w-8 h-8 p-0"
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-2">Theme (Experimental)</label>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm">Light Mode</span>
-                    <button
-                      onClick={() => setIsDarkMode(!isDarkMode)}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        isDarkMode ? 'bg-orange-600' : 'bg-gray-200'
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          isDarkMode ? 'translate-x-6' : 'translate-x-1'
-                        }`}
-                      />
-                      <span className="sr-only">Toggle dark mode</span>
-                    </button>
-                    <span className="text-sm flex items-center gap-1">
-                      {isDarkMode ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
-                      Dark Mode
-                    </span>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Debug Mode</label>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm">Disabled</span>
-                    <button
-                      onClick={() => {
-                        if (editor) {
-                          editor.toggleDebugMode();
-                        }
-                      }}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        editor?.getDebugMode() ? 'bg-orange-600' : 'bg-gray-200'
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          editor?.getDebugMode() ? 'translate-x-6' : 'translate-x-1'
-                        }`}
-                      />
-                      <span className="sr-only">Toggle debug mode</span>
-                    </button>
-                    <span className="text-sm flex items-center gap-1">
-                      <Target className="w-4 h-4" />
-                      Debug Tiles
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Shows tile boundaries and coordinates for debugging
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Auto-Save</label>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm">Disabled</span>
-                    <button
-                      onClick={() => {
-                        const newEnabled = !autoSaveEnabled;
-                        setAutoSaveEnabledState(newEnabled);
-                        if (editor) {
-                          editor.setAutoSaveEnabled(newEnabled);
-                        }
-                      }}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        autoSaveEnabled ? 'bg-orange-600' : 'bg-gray-200'
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          autoSaveEnabled ? 'translate-x-6' : 'translate-x-1'
-                        }`}
-                      />
-                      <span className="sr-only">Toggle auto-save</span>
-                    </button>
-                    <span className="text-sm">
-                      Enabled
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Automatically saves your work every 8 seconds
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Active GID Indicator</label>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm">Show</span>
-                    <button
-                      onClick={() => {
-                        const newVal = !showActiveGid;
-                        setShowActiveGid(newVal);
-                      }}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        showActiveGid ? 'bg-orange-600' : 'bg-gray-200'
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          showActiveGid ? 'translate-x-6' : 'translate-x-1'
-                        }`}
-                      />
-                      <span className="sr-only">Toggle Active GID Indicator</span>
-                    </button>
-                    <span className="text-sm">{showActiveGid ? 'Shown' : 'Hidden'}</span>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">Toggle whether the Active GID badge is visible next to the hover coordinates.</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Sidebar Collapse Button</label>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm">Show toggle</span>
-                    <button
-                      onClick={() => setShowSidebarToggle((s: boolean) => !s)}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                        showSidebarToggle ? 'bg-orange-600' : 'bg-gray-200'
-                      }`}
-                    >
-                      <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          showSidebarToggle ? 'translate-x-6' : 'translate-x-1'
-                        }`}
-                      />
-                      <span className="sr-only">Toggle sidebar collapse button</span>
-                    </button>
-                    <span className="text-sm">{showSidebarToggle ? 'Shown' : 'Hidden'}</span>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">Show or hide the left-edge sidebar collapse/expand toggle.</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Map Settings Only Modal (opens from tab settings button) */}
-        {showMapSettingsOnly && (
+        {/* Map-only Settings Modal */}
+        {showSettings && showMapSettingsOnly && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-background border border-border rounded-lg p-6 w-96">
               <div className="flex justify-between items-center mb-4">
@@ -5783,7 +5642,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 <Button 
                   variant="ghost" 
                   size="sm" 
-                  onClick={() => setShowMapSettingsOnly(false)}
+                  onClick={() => { setShowSettings(false); setShowMapSettingsOnly(false); }}
                   className="w-8 h-8 p-0"
                 >
                   <X className="w-4 h-4" />
@@ -5824,7 +5683,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 </div>
                 <div className="flex items-center gap-2 rounded-md border border-border px-3 py-2">
                   <div className="flex items-center gap-2">
-                    <label htmlFor="starting-map-checkbox-modal" className="text-sm font-medium text-muted-foreground">
+                    <label htmlFor="starting-map-checkbox" className="text-sm font-medium text-muted-foreground">
                       Starting Map
                     </label>
                     <Tooltip content="If this map is the map that players will start the game then mark this option">
@@ -5832,7 +5691,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                     </Tooltip>
                   </div>
                   <input
-                    id="starting-map-checkbox-modal"
+                    id="starting-map-checkbox"
                     type="checkbox"
                     className="h-4 w-4 rounded border border-border accent-orange-500"
                     checked={isStartingMap}
@@ -5844,7 +5703,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 <div className="flex gap-2 mt-6">
                   <Button 
                     variant="outline" 
-                    onClick={() => setShowMapSettingsOnly(false)}
+                    onClick={() => { setShowSettings(false); setShowMapSettingsOnly(false); }}
                     className="flex-1"
                   >
                     Cancel
@@ -5852,6 +5711,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                   <Button 
                     onClick={() => {
                       handleMapResize();
+                      setShowSettings(false);
                       setShowMapSettingsOnly(false);
                     }}
                     className="flex-1"
@@ -5863,6 +5723,264 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             </div>
           </div>
         )}
+
+        {/* Settings Modal */}
+        {showSettings && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-background border border-border rounded-lg p-6 w-96">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold">Settings</h3>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => { setShowSettings(false); setShowMapSettingsOnly(false); }}
+                  className="w-8 h-8 p-0"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+              <div className="flex border-b mb-4">
+                <button
+                  className={`flex-1 py-2 text-sm font-medium border-b-2 transition-colors ${settingsTab === 'map' ? 'border-orange-500 text-orange-600' : 'border-transparent text-gray-500'}`}
+                  onClick={() => setSettingsTab('map')}
+                >
+                  Current Map Settings
+                </button>
+                <button
+                  className={`flex-1 py-2 text-sm font-medium border-b-2 transition-colors ${settingsTab === 'other' ? 'border-orange-500 text-orange-600' : 'border-transparent text-gray-500'}`}
+                  onClick={() => setSettingsTab('other')}
+                >
+                  Other Options
+                </button>
+              </div>
+              {settingsTab === 'map' ? (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Map Name</label>
+                    <Input
+                      type="text"
+                      value={mapName}
+                      onChange={(e) => setMapName(e.target.value)}
+                      placeholder="Enter map name"
+                      className="w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Map Width</label>
+                    <Input
+                      type="number"
+                      value={mapWidth}
+                      onChange={(e) => setMapWidth(Number(e.target.value))}
+                      min="1"
+                      max="100"
+                      className="w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Map Height</label>
+                    <Input
+                      type="number"
+                      value={mapHeight}
+                      onChange={(e) => setMapHeight(Number(e.target.value))}
+                      min="1"
+                      max="100"
+                      className="w-full"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2 rounded-md border border-border px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <label htmlFor="starting-map-checkbox" className="text-sm font-medium text-muted-foreground">
+                        Starting Map
+                      </label>
+                      <Tooltip content="If this map is the map that players will start the game then mark this option">
+                        <HelpCircle className="h-4 w-4 text-muted-foreground" aria-hidden />
+                      </Tooltip>
+                    </div>
+                    <input
+                      id="starting-map-checkbox"
+                      type="checkbox"
+                      className="h-4 w-4 rounded border border-border accent-orange-500"
+                      checked={isStartingMap}
+                      onChange={(e) => updateStartingMap(e.target.checked)}
+                      aria-checked={isStartingMap}
+                      aria-label="Set this map as the starting map"
+                    />
+                  </div>
+                  <div className="flex gap-2 mt-6">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setShowSettings(false)}
+                      className="flex-1"
+                    >
+                      Cancel
+                    </Button>
+                    <Button 
+                      onClick={() => {
+                        handleMapResize();
+                        setShowSettings(false);
+                      }}
+                      className="flex-1"
+                    >
+                      Apply Changes
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Theme (Experimental)</label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm">Light Mode</span>
+                      <button
+                        onClick={() => setIsDarkMode(!isDarkMode)}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          isDarkMode ? 'bg-orange-600' : 'bg-gray-200'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            isDarkMode ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                        <span className="sr-only">Toggle dark mode</span>
+                      </button>
+                      <span className="text-sm flex items-center gap-1">
+                        {isDarkMode ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+                        Dark Mode
+                      </span>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Debug Mode</label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm">Disabled</span>
+                      <button
+                        onClick={() => {
+                          if (editor) {
+                            editor.toggleDebugMode();
+                          }
+                        }}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          editor?.getDebugMode() ? 'bg-orange-600' : 'bg-gray-200'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            editor?.getDebugMode() ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                        <span className="sr-only">Toggle debug mode</span>
+                      </button>
+                      <span className="text-sm flex items-center gap-1">
+                        <Target className="w-4 h-4" />
+                        Debug Tiles
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Shows tile boundaries and coordinates for debugging
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Auto-Save</label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm">Disabled</span>
+                      <button
+                        onClick={() => {
+                          const newEnabled = !autoSaveEnabled;
+                          setAutoSaveEnabledState(newEnabled);
+                          if (editor) {
+                            editor.setAutoSaveEnabled(newEnabled);
+                          }
+                        }}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          autoSaveEnabled ? 'bg-orange-600' : 'bg-gray-200'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            autoSaveEnabled ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                        <span className="sr-only">Toggle auto-save</span>
+                      </button>
+                      <span className="text-sm">
+                        Enabled
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Automatically saves your work every 8 seconds
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Active GID Indicator</label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm">Show</span>
+                      <button
+                        onClick={() => {
+                          const newVal = !showActiveGid;
+                          setShowActiveGid(newVal);
+                        }}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          showActiveGid ? 'bg-orange-600' : 'bg-gray-200'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            showActiveGid ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                        <span className="sr-only">Toggle Active GID Indicator</span>
+                      </button>
+                      <span className="text-sm">{showActiveGid ? 'Shown' : 'Hidden'}</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Toggle whether the Active GID badge is visible next to the hover coordinates.</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Sidebar Collapse Button</label>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm">Show toggle</span>
+                      <button
+                        onClick={() => setShowSidebarToggle((s: boolean) => !s)}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                          showSidebarToggle ? 'bg-orange-600' : 'bg-gray-200'
+                        }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                            showSidebarToggle ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                        <span className="sr-only">Toggle sidebar collapse button</span>
+                      </button>
+                      <span className="text-sm">{showSidebarToggle ? 'Shown' : 'Hidden'}</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Show or hide the left-edge sidebar collapse/expand toggle.</p>
+                  </div>
+                  <div className="flex gap-2 mt-6">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setShowSettings(false)}
+                      className="flex-1"
+                    >
+                      Close
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setShowHelp(true);
+                        setShowSettings(false);
+                      }}
+                      className="flex-1 flex items-center justify-center gap-2"
+                    >
+                      <HelpCircle className="w-4 h-4" />
+                      <span>Help & Docs</span>
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Clear Layer Confirmation Dialog (replaces native confirm) */}
         {showClearLayerDialog && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -6287,32 +6405,8 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         )}
 
         {/* Center Area */}
-        {isEnemyTabActive ? (
-          <section className="flex-1 min-w-0 flex flex-col relative">
-            <div className="p-6 h-full overflow-auto">
-              <EnemyTabPanel
-                enemy={(activeTab?.config as EnemyTabConfig | null)?.enemy}
-                showCloseConfirm={pendingEnemyTabCloseId === activeTabId}
-                onCloseDecision={(decision) => {
-                  if (decision === 'cancel') {
-                    setPendingEnemyTabCloseId(null);
-                    return;
-                  }
-                  setPendingEnemyTabCloseId(null);
-                  closeEditorTab(activeTabId ?? '');
-                }}
-                onSave={(updated: MapObject) => {
-                  // Persist into the map/editor and also update the tab's cached config
-                  handleUpdateObject(updated);
-                  setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, config: { ...t.config, enemy: updated } } : t));
-                }}
-              />
-            </div>
-          </section>
-        ) : (
-          <section className="flex-1 min-w-0 flex flex-col relative">
+        <section className="flex-1 min-w-0 flex flex-col relative">
           {/* Zoom Controls & Undo/Redo */}
-        {!isEnemyTabActive && (
           <div
             ref={toolbarContainerRef}
             className="absolute top-2 right-2 z-10"
@@ -6398,7 +6492,6 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               </div>
             </div>
           </div>
-        )}
           <div 
             className={`bg-gray-100 flex-1 min-h-0 flex items-center justify-center overflow-hidden relative ${draggingNpcId ? 'ring-2 ring-orange-500 ring-inset' : ''}`}
             onDragOver={(e) => {
@@ -6416,7 +6509,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 }
               }
             }}
-            onDragLeave={() => {
+            onDragLeave={(e) => {
               // Clear hover when leaving the canvas area
               if (draggingNpcId && editor) {
                 editor.clearNpcDragHover();
@@ -6449,68 +6542,42 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               setDraggingNpcId(null);
             }}
           >
-            {/* Canvas Tips Panel - minimizes to question mark icon with animation */}
-            {!isEnemyTabActive && (
-            <div className="absolute top-4 left-4 z-20">
-              {/* Minimized state: Question mark icon in a circle */}
-              <div 
-                className={`absolute inset-0 transition-all duration-300 ${tipsMinimized ? 'opacity-100 scale-100 pointer-events-auto' : 'opacity-0 scale-75 pointer-events-none'}`}
+            {/* Canvas Tooltip Panel - always mounted; visibility via classes */}
+            <div
+              className={`absolute top-4 left-4 z-20 p-3 bg-white/90 dark:bg-neutral-900/90 backdrop-blur-sm rounded-lg border border-border shadow-lg transition-opacity duration-300 ${showTooltip ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+              aria-hidden={!showTooltip}
+            >
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute top-1 right-1 w-6 h-6 p-0"
+                onClick={() => setShowTooltip(false)}
               >
-                <Tooltip content="Click to see help" side="right">
-                  <button
-                    className="w-8 h-8 flex items-center justify-center bg-white dark:bg-neutral-900 rounded-full border border-border shadow-lg hover:bg-gray-100 dark:hover:bg-neutral-800 transition-all duration-200 hover:scale-105"
-                    onClick={() => setTipsMinimized(false)}
-                    aria-label="Show help tips"
-                  >
-                    <HelpCircle className="w-4 h-4 text-gray-600 dark:text-gray-300" />
-                  </button>
-                </Tooltip>
-              </div>
+                <X className="w-3 h-3" />
+              </Button>
 
-              {/* Expanded state: Full tips panel */}
-              <div
-                className={`p-3 bg-white/90 dark:bg-neutral-900/90 backdrop-blur-sm rounded-lg border border-border shadow-lg transition-all duration-300 origin-top-left ${tipsMinimized ? 'opacity-0 scale-75 pointer-events-none' : 'opacity-100 scale-100 pointer-events-auto'}`}
-              >
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="absolute top-1 right-1 w-6 h-6 p-0"
-                  onClick={() => setTipsMinimized(true)}
-                >
-                  <X className="w-3 h-3" />
-                </Button>
-
-                <div className="space-y-2 pr-6">
-                  <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
-                    <MousePointer2 className="w-4 h-4" />
-                    <span>Left Click to Paint</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
+              <div className="space-y-2 pr-6">
+                <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
+                  <MousePointer2 className="w-4 h-4" />
+                  <span>Left Click to Paint</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
+                  <Mouse className="w-4 h-4" />
+                  <span>Right Click to Delete</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
+                  <Move className="w-4 h-4" />
+                  <span>Spacebar + Mouse to Pan</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
+                  <div className="relative">
                     <Mouse className="w-4 h-4" />
-                    <span>Right Click to Delete</span>
+                    <Circle className="w-2 h-2 absolute top-1 left-1.5 opacity-60" />
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
-                    <Move className="w-4 h-4" />
-                    <span>Spacebar + Mouse to Pan</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
-                    <div className="relative">
-                      <Mouse className="w-4 h-4" />
-                      <Circle className="w-2 h-2 absolute top-1 left-1.5 opacity-60" />
-                    </div>
-                    <span>Mouse Wheel to Zoom In-Out</span>
-                  </div>
-                  <button
-                    className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300 hover:text-orange-500 transition-colors w-full text-left mt-1 pt-1 border-t border-gray-100 dark:border-neutral-800"
-                    onClick={() => setShowHelp(true)}
-                  >
-                    <HelpCircle className="w-4 h-4 text-orange-400" />
-                    <span className="font-medium">Help and Documentation</span>
-                  </button>
+                  <span>Mouse Wheel to Zoom In-Out</span>
                 </div>
               </div>
             </div>
-            )}
 
             <canvas
               ref={canvasRef}
@@ -6545,7 +6612,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               <MapPin className="w-4 h-4 text-gray-500 dark:text-gray-400" />
               <span>{hoverCoords ? `${hoverCoords.x}, ${hoverCoords.y}` : ''}</span>
               {/* Active GID Indicator - keep mounted but toggle visibility */}
-              <div className={`ml-2 transition-opacity duration-200 ${hoverCoords && showActiveGid && !isEnemyTabActive ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+              <div className={`ml-2 transition-opacity duration-200 ${hoverCoords && showActiveGid ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
                 <Tooltip content="Active GID number of selected tilebrush">
                   <Badge variant="secondary" className="text-xs px-2 py-1 bg-black/80 text-white border-gray-600 hover:bg-black/90">
                     <span id="activeGid">{activeGid}</span>
@@ -6981,10 +7048,16 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             </div>
           </div>
         </section>
-        )}
       </main>
       
       <Toaster />
+
+      <EditEnemyWindow
+        open={showEnemyEditor}
+        onOpenChange={(v) => { setShowEnemyEditor(v); if (!v) setEditingEnemy(null); }}
+        enemy={editingEnemy || undefined}
+        onSave={(updated) => { handleUpdateObject(updated); setShowEnemyEditor(false); }}
+      />
       
       {/* Separate Brush Confirmation Dialog */}
       <Dialog open={showSeparateDialog} onOpenChange={setShowSeparateDialog}>
@@ -7477,93 +7550,13 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         </DialogContent>
       </Dialog>
 
-      {/* Ability Creation Dialog */}
-      <Dialog
-        open={showAbilityDialog}
-        onOpenChange={(open) => {
-          if (!open) {
-            setShowAbilityDialog(false);
-            setAbilityNameInput('');
-          }
-        }}
-      >
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Zap className="w-5 h-5 text-orange-500" />
-              Add Ability
-            </DialogTitle>
-            <DialogDescription>Create a new ability for the Actions layer.</DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Ability Name <span className="text-red-500">*</span>
-              </label>
-              <Input
-                value={abilityNameInput}
-                onChange={(e) => setAbilityNameInput(e.target.value)}
-                placeholder="e.g. Fireball"
-                autoFocus
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && abilityNameInput.trim()) {
-                    setAbilitiesList((prev) => [
-                      ...prev,
-                      {
-                        id: `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
-                        name: abilityNameInput.trim(),
-                        type: 'Standard'
-                      }
-                    ]);
-                    setShowAbilityDialog(false);
-                    setAbilityNameInput('');
-                  }
-                }}
-              />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAbilityDialog(false)}>
-              Cancel
-            </Button>
-            <Button
-              disabled={!abilityNameInput.trim()}
-              onClick={() => {
-                setAbilitiesList((prev) => [
-                  ...prev,
-                  {
-                    id: `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
-                    name: abilityNameInput.trim(),
-                    type: 'Standard'
-                  }
-                ]);
-                setShowAbilityDialog(false);
-                setAbilityNameInput('');
-              }}
-            >
-              Create Ability
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       {/* NPC / Enemy Creation Dialog */}
       <Dialog open={actorDialogState !== null} onOpenChange={(open) => (open ? void 0 : handleCloseActorDialog())}>
         <DialogContent className="max-w-md">
-          <DialogHeader className="relative">
+          <DialogHeader>
             <DialogTitle>
               {actorDialogState?.type === 'npc' ? 'Add NPC' : 'Add Enemy'}
             </DialogTitle>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="absolute top-0 right-0 w-6 h-6 p-0 hover:bg-transparent"
-              onClick={handleCloseActorDialog}
-            >
-              <X className="w-4 h-4 text-muted-foreground" />
-            </Button>
             <DialogDescription>
               Define the details for this {actorDialogState?.type === 'npc' ? 'NPC' : 'enemy'}.
             </DialogDescription>
@@ -7685,25 +7678,13 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               )}
             </div>
           )}
-          <DialogFooter className="mt-4">
-            <div className="flex gap-0 divide-x divide-white/20 rounded-md overflow-hidden shadow-sm">
-              <Tooltip content={actorDialogState?.type === 'npc' ? 'Add NPC' : 'Add Enemy'} side="top">
-                <Button 
-                  onClick={() => handleActorSubmit(false)} 
-                  className="rounded-r-none h-8 px-3 bg-orange-500 hover:bg-orange-600 border-none"
-                >
-                  <Save className="w-4 h-4" />
-                </Button>
-              </Tooltip>
-              <Tooltip content={actorDialogState?.type === 'npc' ? 'Add and Edit NPC' : 'Add and Edit Enemy'} side="top">
-                <Button 
-                  onClick={() => handleActorSubmit(true)} 
-                  className="rounded-l-none h-8 px-3 bg-orange-500 hover:bg-orange-600 border-none"
-                >
-                  <Edit2 className="w-4 h-4" />
-                </Button>
-              </Tooltip>
-            </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={handleCloseActorDialog}>
+              Cancel
+            </Button>
+            <Button onClick={handleActorSubmit}>
+              {actorDialogState?.type === 'npc' ? 'Add NPC' : 'Add Enemy'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -7760,7 +7741,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                         }}
                         className={`text-left border rounded-md px-3 py-2 transition-colors ${isActive ? 'border-orange-500 bg-orange-500/10 ring-1 ring-orange-500/30' : 'border-border hover:bg-muted/60'}`}
                       >
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 gap-2">
                           <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${roleMeta.badgeClass}`}>
                             {roleMeta.label}
                           </span>
@@ -7788,7 +7769,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                           onClick={() => handleItemFieldChange('resourceSubtype', key)}
                           className={`text-left border rounded-md px-3 py-2 transition-colors ${isActive ? 'border-purple-500 bg-purple-500/10 ring-1 ring-purple-500/30' : 'border-border hover:bg-muted/60'}`}
                         >
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 gap-2">
                             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${meta.badgeClass}`}>
                               {meta.label}
                             </span>
@@ -8062,7 +8043,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                               const autoSell = editingItem.price_sell === '0' || editingItem.price_sell === '' || editingItem.price_sell === undefined;
                               return (
                                 <>
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-2 gap-2">
                                     <div className="flex items-center gap-1">
                                       <label className="text-xs text-muted-foreground">Sell Price</label>
                                       <Tooltip content="0 = use automatic sell price (price * vendor_ratio_sell)." side="right">
@@ -8142,7 +8123,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                             onClick={() => updateEditingItemField('resourceSubtype', key)}
                             className={`text-left border rounded-md px-3 py-2 transition-colors ${isActive ? 'border-purple-500 bg-purple-500/10 ring-1 ring-purple-500/30' : 'border-border hover:bg-muted/60'}`}
                           >
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 gap-2">
                               <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${meta.badgeClass}`}>
                                 {meta.label}
                               </span>
@@ -8388,7 +8369,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                           checked={editingItem.book_is_readable}
                           onChange={(e) => updateEditingItemField('book_is_readable', e.target.checked)}
                         />
-                        Show &quot;Read&quot; instead of &quot;Use&quot;
+                        Show "Read" instead of "Use"
                       </label>
                     </div>
                   </div>
@@ -8481,7 +8462,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
 
       {/* Object Management Dialog */}
       <Dialog
-        open={showObjectDialog && editingObject?.type !== 'enemy'}
+        open={showObjectDialog}
         onOpenChange={(open) => {
           if (!open) {
             handleObjectDialogClose();
@@ -8493,52 +8474,47 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         <DialogContent className="max-w-5xl w-full h-[90vh] flex flex-col">
           <DialogHeader className="mb-4">
             <DialogTitle className="flex items-center gap-2">
-              {editingObject?.type === 'enemy' ? (
-                'Edit Enemy'
-              ) : (
-                <>
-                  {editingObject?.type === 'npc' && (
-                    <User className="w-5 h-5 text-orange-500" />
-                  )}
-                  {editingObject?.type === 'enemy' && (
-                    <div className="flex items-center gap-2">
-                      <span>{editingObject ? `Edit ${editingObject.type.toUpperCase()}` : 'Add Object'}</span>
-                      <Tooltip
-                        content={
-                          <div
-                            className="max-w-lg whitespace-normal break-words text-sm text-foreground leading-snug p-2"
-                            style={{ whiteSpace: 'normal', overflow: 'visible', textOverflow: 'clip' }}
-                          >
-                            Enemy stats normally scale with level. Overriding a stat disables scaling for that stat.
-                          </div>
-                        }
-                        side="right"
-                      >
-                        <span className="inline-flex items-center text-orange-500 font-semibold">
-                          <HelpCircle className="w-4 h-4" strokeWidth={2.4} />
-                        </span>
-                      </Tooltip>
-                    </div>
-                  )}
-                  {editingObject?.type !== 'enemy' && (editingObject ? `Edit ${editingObject.type.toUpperCase()}` : 'Add Object')}
-                </>
+              {editingObject?.type === 'npc' && (
+                <User className="w-5 h-5 text-orange-500" />
               )}
-            </DialogTitle>
-          </DialogHeader>
-          {objectValidationErrors.length > 0 && (
-                <div className="mb-3 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-                  <p className="font-semibold mb-1">Please fix the following:</p>
-                  <ul className="ml-4 list-disc space-y-1">
-                    {objectValidationErrors.map((error, index) => (
-                      <li key={`${error}-${index}`}>{error}</li>
-                    ))}
-                  </ul>
+              {editingObject?.type === 'enemy' && (
+                <div className="flex items-center gap-2">
+                  <span>{editingObject ? `Edit ${editingObject.type.toUpperCase()}` : 'Add Object'}</span>
+                  <Tooltip
+                    content={
+                      <div
+                        className="max-w-lg whitespace-normal break-words text-sm text-foreground leading-snug p-2"
+                        style={{ whiteSpace: 'normal', overflow: 'visible', textOverflow: 'clip' }}
+                      >
+                        Enemy stats normally scale with level. Overriding a stat disables scaling for that stat.
+                      </div>
+                    }
+                    side="right"
+                  >
+                    <span className="inline-flex items-center text-orange-500 font-semibold">
+                      <HelpCircle className="w-4 h-4" strokeWidth={2.4} />
+                    </span>
+                  </Tooltip>
                 </div>
               )}
+              {editingObject?.type !== 'enemy' && (editingObject ? `Edit ${editingObject.type.toUpperCase()}` : 'Add Object')}
+            </DialogTitle>
+          </DialogHeader>
+          
+          {objectValidationErrors.length > 0 && (
+            <div className="mb-3 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+              <p className="font-semibold mb-1">Please fix the following:</p>
+              <ul className="ml-4 list-disc space-y-1">
+                {objectValidationErrors.map((error, index) => (
+                  <li key={`${error}-${index}`}>{error}</li>
+                ))}
+              </ul>
+            </div>
+          )}
 
-              <div className="flex-1 overflow-y-auto pr-2 minimal-scroll">
-                {editingObject && (
-                  <div className="space-y-3 pb-4">
+          <div className="flex-1 overflow-y-auto pr-2 minimal-scroll">
+            {editingObject && (
+            <div className="space-y-3 pb-4">
               {/* Basic Info Row */}
               <div className="flex gap-3 items-end">
                 <div className="flex-1">
@@ -8573,8 +8549,30 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               </div>
 
               {editingObject.type === 'enemy' ? (
-                <div className="rounded-md border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
-                  Enemy details are edited in the enemy tab.
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Level</label>
+                      <Input
+                        type="number"
+                        value={editingObject.level || 1}
+                        onChange={(e) => setEditingObject({...editingObject, level: Number(e.target.value)})}
+                        min="1"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-1">Number</label>
+                      <Input
+                        type="number"
+                        value={editingObject.number || 1}
+                        onChange={(e) => setEditingObject({...editingObject, number: Number(e.target.value)})}
+                        min="1"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Button onClick={() => { setEditingEnemy(editingObject); setShowEnemyEditor(true); setShowObjectDialog(false); }} className="bg-orange-500 text-white">Open Enemy Editor</Button>
+                  </div>
                 </div>
               ) : (
                 <>
@@ -9121,8 +9119,8 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               )}
               </>
               )}
-            </div>
-          )}
+              </div>
+            )}
           </div>
 
           <DialogFooter className="mt-4 flex-shrink-0">
@@ -9844,7 +9842,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               Always Available Items
             </DialogTitle>
             <DialogDescription>
-              Select items to keep in this vendor&apos;s shop and set their quantities.
+              Select items to keep in this vendor's shop and set their quantities.
             </DialogDescription>
           </DialogHeader>
 

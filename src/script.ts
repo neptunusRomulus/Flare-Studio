@@ -13,18 +13,14 @@ import {
   TileLayer,
   TilesetInfo,
   MapObject,
-  ExportTMXParams,
-  ExportTSXParams,
-  ExportFlareTXTParams,
-  FlareEvent,
-  FlareNPC,
-  UndoRedoState,
+
   Tool,
   Orientation,
   EditorElements
 } from './types.js';
 // Declarations for functions implemented in main.ts to satisfy type checking
 declare function drawMiniMap(): void;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 declare function updateExportButtonStates(): void;
 
 (function(): void {
@@ -58,50 +54,34 @@ declare function updateExportButtonStates(): void;
   };
 
   const ctx: CanvasRenderingContext2D = elements.mapCanvas.getContext('2d')!;
-  const miniCtx: CanvasRenderingContext2D = elements.miniMapCanvas.getContext('2d')!;
+
 
   // State with proper typing
-  let mapWidth: number = parseInt(elements.mapWidthInput.value, 10);
-  let mapHeight: number = parseInt(elements.mapHeightInput.value, 10);
+  const mapWidth: number = parseInt(elements.mapWidthInput.value, 10);
+  const mapHeight: number = parseInt(elements.mapHeightInput.value, 10);
   const tileSizeX: number = 64; // Fixed tile width for isometric
   const tileSizeY: number = 32; // Fixed tile height for isometric
   const orientation: Orientation = 'isometric'; // Fixed to isometric view
 
   // Tileset management
-  let tilesets: TilesetInfo[] = [];
-  let tilesetImage: HTMLImageElement | null = null;
-  let tilesetFileName: string | null = null;
-  let tilesetColumns: number = 0;
-  let tilesetRows: number = 0;
-  let tileCount: number = 0;
+  const tilesets: TilesetInfo[] = []; 
 
   // Layer management
-  let tileLayers: TileLayer[] = [];
-  let activeLayerId: number | null = null;
-  let nextLayerId: number = 1;
+  const tileLayers: TileLayer[] = []; 
 
   // Collision and object management
-  let collisionData: number[] = new Array(mapWidth * mapHeight).fill(0);
-  let objects: MapObject[] = [];
-  let nextObjectId: number = 1;
-  let selectedObjectId: number | null = null;
-  let draggingObject: MapObject | null = null;
+  const collisionData: number[] = new Array(mapWidth * mapHeight).fill(0);
+  const objects: MapObject[] = []; 
+  const selectedObjectId: number | null = null;
 
   // Tool and interaction state
-  let tool: Tool = 'tiles';
-  let activeGid: number = 0;
-  let isMouseDown: boolean = false;
-  let dragStartX: number = 0;
-  let dragStartY: number = 0;
-  let dragOffsetX: number = 0;
-  let dragOffsetY: number = 0;
+  const tool: Tool = 'tiles';
 
-  // Undo/Redo system
-  let undoStack: UndoRedoState[] = [];
-  let redoStack: UndoRedoState[] = [];
-  const maxUndoStates: number = 50;
+
+
 
   // Canvas utilities
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   function resizeMapCanvas(): void {
     if (orientation === 'isometric') {
       // Isometric canvas sizing
@@ -118,52 +98,6 @@ declare function updateExportButtonStates(): void;
     drawMiniMap();
   }
 
-  function resizeMap(newW: number, newH: number): void {
-    const copyLayer = (oldArr: number[]): number[] => {
-      const arr = new Array(newW * newH).fill(0);
-      for (let y = 0; y < Math.min(mapHeight, newH); y++) {
-        for (let x = 0; x < Math.min(mapWidth, newW); x++) {
-          arr[y * newW + x] = oldArr[y * mapWidth + x];
-        }
-      }
-      return arr;
-    };
-    
-    tileLayers.forEach(l => { l.data = copyLayer(l.data); });
-    collisionData = copyLayer(collisionData);
-    mapWidth = newW;
-    mapHeight = newH;
-    resizeMapCanvas();
-    draw();
-    updateExportButtonStates();
-  }
-
-  // Coordinate conversion for isometric view
-  function screenToMapCoords(screenX: number, screenY: number): { x: number; y: number } {
-    const rect = elements.mapCanvas.getBoundingClientRect();
-    const canvasX = screenX - rect.left;
-    const canvasY = screenY - rect.top;
-    
-    if (orientation === 'isometric') {
-      // Isometric coordinate conversion
-      const centerX = elements.mapCanvas.width / 2;
-      const centerY = tileSizeY * 2;
-      
-      const relX = canvasX - centerX;
-      const relY = canvasY - centerY;
-      
-      const mapX = Math.floor((relX / (tileSizeX / 2) + relY / (tileSizeY / 2)) / 2);
-      const mapY = Math.floor((relY / (tileSizeY / 2) - relX / (tileSizeX / 2)) / 2);
-      
-      return { x: mapX, y: mapY };
-    } else {
-      // Orthogonal fallback
-      return {
-        x: Math.floor(canvasX / tileSizeX),
-        y: Math.floor(canvasY / tileSizeY)
-      };
-    }
-  }
 
   // Drawing functions
   function draw(): void {
@@ -301,8 +235,8 @@ declare function updateExportButtonStates(): void;
     });
   }
 
-  let hoverX: number = -1;
-  let hoverY: number = -1;
+  const hoverX: number = -1;
+  const hoverY: number = -1;
 
   function drawHoverEffect(): void {
     if (hoverX < 0 || hoverX >= mapWidth || hoverY < 0 || hoverY >= mapHeight) return;

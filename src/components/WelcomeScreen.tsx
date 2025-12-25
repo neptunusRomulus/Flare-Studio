@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import Tooltip from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import { Plus, FolderOpen, Grid3X3, Folder, Minus, Square, X } from 'lucide-react';
 import flareIconUrl from '/flare-ico.png?url';
@@ -49,15 +48,14 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
 
       let maps: RecentMap[] = JSON.parse(savedRecentMaps);
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const api: any = (window as any).electronAPI;
+      const api = window.electronAPI;
       if (api && typeof api.checkProjectExists === 'function') {
         try {
           const checks = await Promise.all(maps.map(async (m) => {
             try {
               const exists = await api.checkProjectExists(m.path);
               return exists ? m : null;
-            } catch (e) {
+            } catch {
               // If check fails, keep the entry to avoid accidental deletion
               return m;
             }
@@ -88,18 +86,16 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
     const loadFor = async (map: RecentMap) => {
       // If recentMaps entry already contains a thumbnailDataUrl, use it
       // (Some flows might store it in localStorage)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const anyMap = map as any;
-      if (anyMap.thumbnailDataUrl) {
-        setThumbnails(prev => ({ ...prev, [map.id]: anyMap.thumbnailDataUrl }));
+      const maybeThumbnail = (map as unknown as { thumbnailDataUrl?: string }).thumbnailDataUrl;
+      if (maybeThumbnail) {
+        setThumbnails(prev => ({ ...prev, [map.id]: maybeThumbnail }));
         return;
       }
 
       try {
         // Preferred: ask preload/electron to return a data URL for the project's minimap
         // We check for a permissive API but gracefully continue if it doesn't exist
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const api: any = (window as any).electronAPI;
+          const api = window.electronAPI;
         if (api && typeof api.getProjectThumbnail === 'function') {
           const dataUrl = await api.getProjectThumbnail(map.path);
           if (dataUrl) {
@@ -271,30 +267,27 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
             <span className="text-sm font-semibold">Flare Studio</span>
           </div>
           <div className="flex no-drag">
-            <Tooltip content="Minimize">
-              <button 
-                onClick={handleMinimize}
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
-              >
-                <Minus className="w-4 h-4" />
-              </button>
-            </Tooltip>
-            <Tooltip content="Maximize">
-              <button 
-                onClick={handleMaximize}
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
-              >
-                <Square className="w-4 h-4" />
-              </button>
-            </Tooltip>
-            <Tooltip content="Close">
-              <button 
-                onClick={handleClose}
-                className="text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </Tooltip>
+            <button 
+              onClick={handleMinimize}
+              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
+              aria-label="Minimize"
+            >
+              <Minus className="w-4 h-4" />
+            </button>
+            <button 
+              onClick={handleMaximize}
+              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
+              aria-label="Maximize"
+            >
+              <Square className="w-4 h-4" />
+            </button>
+            <button 
+              onClick={handleClose}
+              className="text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
+              aria-label="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
         </div>
         
@@ -374,32 +367,29 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
           />
           <span className="text-sm font-semibold">Flare Studio</span>
         </div>
-        <div className="flex no-drag">
-          <Tooltip content="Minimize">
+          <div className="flex no-drag">
             <button 
               onClick={handleMinimize}
               className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
+              aria-label="Minimize"
             >
               <Minus className="w-4 h-4" />
             </button>
-          </Tooltip>
-          <Tooltip content="Maximize">
             <button 
               onClick={handleMaximize}
               className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
+              aria-label="Maximize"
             >
               <Square className="w-4 h-4" />
             </button>
-          </Tooltip>
-          <Tooltip content="Close">
             <button 
               onClick={handleClose}
               className="text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
+              aria-label="Close"
             >
               <X className="w-4 h-4" />
             </button>
-          </Tooltip>
-        </div>
+          </div>
       </div>
       
       <div className="flex flex-1 min-h-0 overflow-hidden">

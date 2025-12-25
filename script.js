@@ -9,6 +9,7 @@
 //    Uses CSV encoding for tile layers and properties for objects.
 // Still plain JS, no frameworks.
 
+/* eslint-disable */
 (function() {
   // Remove orientation and tile size selections - fixed to isometric with 64x32 tiles
   const tilesetFileInput = document.getElementById('tilesetFile');

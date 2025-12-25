@@ -9,7 +9,7 @@ export interface TooltipProps {
   offsetY?: number;
   children: React.ReactNode;
 }
-const Tooltip: React.FC<TooltipProps> = ({ content, side = 'top', className = '', children, offsetY = 8 }: TooltipProps) => {
+const Tooltip: React.FC<TooltipProps> = ({ content, side = 'top', className = '', children, offsetY = 14 }: TooltipProps) => {
   // Basic shadcn-like tooltip using Tailwind. Keeps markup simple and local.
   // Note: positioning is handled by the portal-based tooltip rendering below.
 
@@ -35,6 +35,8 @@ const Tooltip: React.FC<TooltipProps> = ({ content, side = 'top', className = ''
   const portalRef = React.useRef<HTMLDivElement | null>(null);
   const [hovered, setHovered] = React.useState(false);
   const [pos, setPos] = React.useState<{ left: number; top: number } | null>(null);
+  const [isExpanded, setIsExpanded] = React.useState(false);
+  const timerRef = React.useRef<number | null>(null);
   // keep the portal mounted briefly to allow CSS fade-out
   const [visiblePortal, setVisiblePortal] = React.useState(false);
 
@@ -48,7 +50,7 @@ const Tooltip: React.FC<TooltipProps> = ({ content, side = 'top', className = ''
           const parsed = parseInt(ds.tooltipOffset, 10);
           if (!Number.isNaN(parsed)) localOffset = parsed;
         }
-      } catch (e) {
+      } catch {
         // ignore dataset parsing errors
       }
     }
@@ -61,18 +63,29 @@ const Tooltip: React.FC<TooltipProps> = ({ content, side = 'top', className = ''
     const localOffset = getLocalOffset();
 
     // initial center x for tooltip
-    const centerX = trig.left + trig.width / 2;
-
-    // For initial positioning, estimate tooltip height (will be refined later)
+    // For initial positioning, estimate tooltip dimensions (will be refined later)
     const estimatedTooltipHeight = 40; // reasonable estimate for single line tooltip
-    
-    // compute default top depending on side
-    let top = trig.top;
-    if (side === 'top') top = trig.top - estimatedTooltipHeight - localOffset; // above
-    else if (side === 'bottom' || side === 'auto') top = trig.bottom + localOffset; // below
-    else top = trig.top + trig.height / 2;
+    const estimatedTooltipWidth = 120;
 
-    setPos({ left: centerX, top });
+    // compute default positions depending on side
+    let left = trig.left + trig.width / 2;
+    let top = trig.top;
+
+    if (side === 'top') {
+      top = trig.top - estimatedTooltipHeight - localOffset; // above
+      left = trig.left + trig.width / 2;
+    } else if (side === 'bottom' || side === 'auto') {
+      top = trig.bottom + localOffset + 6; // below (extra gap so cursor doesn't cover tooltip)
+      left = trig.left + trig.width / 2;
+    } else if (side === 'right') {
+      left = trig.right + localOffset; // to the right of trigger
+      top = trig.top + trig.height / 2;
+    } else if (side === 'left') {
+      left = trig.left - estimatedTooltipWidth - localOffset; // to the left
+      top = trig.top + trig.height / 2;
+    }
+
+    setPos({ left, top });
     // measurement and fine adjustment will run in effect after portal renders
   }, [side, getLocalOffset]);
 
@@ -82,9 +95,26 @@ const Tooltip: React.FC<TooltipProps> = ({ content, side = 'top', className = ''
   return () => window.removeEventListener('resize', computeOffset);
   }, [computeOffset]);
 
+  const clearTimer = React.useCallback(() => {
+    if (timerRef.current) {
+      window.clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+  }, []);
+
+  const startCloseTimer = React.useCallback((delay = 1500) => {
+    clearTimer();
+    timerRef.current = window.setTimeout(() => {
+      setHovered(false);
+      setIsExpanded(false);
+      window.setTimeout(() => setVisiblePortal(false), 220);
+    }, delay);
+  }, [clearTimer]);
+
   // recompute when the tooltip becomes visible via hover/focus. We attach handlers
   // on the wrapper to trigger measurement.
   const onTriggerEnter = () => {
+    clearTimer();
     // measure on next frame so layout is stable
     requestAnimationFrame(() => computeOffset());
     setHovered(true);
@@ -92,9 +122,37 @@ const Tooltip: React.FC<TooltipProps> = ({ content, side = 'top', className = ''
   };
 
   const onTriggerLeave = () => {
-    setHovered(false);
-    // allow fade-out animation before removing portal
-    window.setTimeout(() => setVisiblePortal(false), 220);
+    if (isExpanded) {
+      startCloseTimer(1500);
+    } else {
+      setHovered(false);
+      // allow fade-out animation before removing portal
+      window.setTimeout(() => setVisiblePortal(false), 220);
+    }
+  };
+
+  const onPortalEnter = () => {
+    if (isExpanded) {
+      clearTimer();
+      setHovered(true);
+    }
+  };
+
+  const onPortalLeave = () => {
+    if (isExpanded) {
+      startCloseTimer(1500);
+    }
+  };
+
+  React.useEffect(() => {
+    return () => clearTimer();
+  }, [clearTimer]);
+
+  const handleToggleExpand = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsExpanded(!isExpanded);
+    // re-measure since size changed
+    requestAnimationFrame(() => computeOffset());
   };
 
   // after portal tooltip renders, measure and clamp its position
@@ -104,21 +162,37 @@ const Tooltip: React.FC<TooltipProps> = ({ content, side = 'top', className = ''
     const trig = wrapperRef.current.getBoundingClientRect();
     const localOffset = getLocalOffset();
 
-    const halfWidth = portalRect.width / 2;
-    let left = trig.left + trig.width / 2;
-    const minCenter = 8 + halfWidth;
-    const maxCenter = window.innerWidth - 8 - halfWidth;
-    if (left < minCenter) left = minCenter;
-    if (left > maxCenter) left = maxCenter;
+    let left = 0;
+    let top = 0;
 
-    // For top/bottom we position the portal with transform translateX(-50%) so left is center
-    let top = trig.top - portalRect.height - localOffset;
-    if (side === 'bottom' || side === 'auto') top = trig.bottom + localOffset;
-    // clamp vertical to viewport
-    top = Math.max(8, Math.min(window.innerHeight - portalRect.height - 8, top));
+    if (side === 'right') {
+      left = trig.right + localOffset;
+      // avoid clipping on the right
+      left = Math.min(left, window.innerWidth - portalRect.width - 8);
+      top = trig.top + trig.height / 2 - portalRect.height / 2; // center vertically
+      top = Math.max(8, Math.min(window.innerHeight - portalRect.height - 8, top));
+    } else if (side === 'left') {
+      left = trig.left - portalRect.width - localOffset;
+      left = Math.max(8, left);
+      top = trig.top + trig.height / 2 - portalRect.height / 2;
+      top = Math.max(8, Math.min(window.innerHeight - portalRect.height - 8, top));
+    } else {
+      const halfWidth = portalRect.width / 2;
+      left = trig.left + trig.width / 2;
+      const minCenter = 8 + halfWidth;
+      const maxCenter = window.innerWidth - 8 - halfWidth;
+      if (left < minCenter) left = minCenter;
+      if (left > maxCenter) left = maxCenter;
+
+      // For top/bottom we position the portal with transform translateX(-50%) so left is center
+      top = trig.top - portalRect.height - localOffset;
+      if (side === 'bottom' || side === 'auto') top = trig.bottom + localOffset + 6;
+      // clamp vertical to viewport
+      top = Math.max(8, Math.min(window.innerHeight - portalRect.height - 8, top));
+    }
 
     setPos({ left, top });
-  }, [hovered, side, getLocalOffset]);
+  }, [hovered, side, getLocalOffset, isExpanded]);
 
   // Render wrapper and portal tooltip to avoid clipping by overflow parents
   return (
@@ -129,7 +203,8 @@ const Tooltip: React.FC<TooltipProps> = ({ content, side = 'top', className = ''
         onFocus={onTriggerEnter}
         onMouseLeave={onTriggerLeave}
         onBlur={onTriggerLeave}
-        className={`relative inline-flex ${className}`}
+        onClick={handleToggleExpand}
+        className={`relative inline-flex cursor-help ${className}`}
       >
         {trigger}
       </span>
@@ -138,27 +213,45 @@ const Tooltip: React.FC<TooltipProps> = ({ content, side = 'top', className = ''
           ref={portalRef}
           id={id}
           role="tooltip"
-          className={`custom-tooltip ${hovered ? 'visible' : 'fade-out'}`}
-          style={{
-            left: pos.left,
-            top: pos.top,
-            transform: 'translateX(-50%)'
-          }}
+          onMouseEnter={onPortalEnter}
+          onMouseLeave={onPortalLeave}
+          className={`custom-tooltip transition-all duration-200 ${hovered ? 'visible' : 'fade-out'}`}
+          style={(() => {
+            const base = side === 'right' || side === 'left' 
+              ? { left: pos.left, top: pos.top, transform: 'translateY(-50%)' } 
+              : { left: pos.left, top: pos.top, transform: 'translateX(-50%)' };
+            
+            if (isExpanded) {
+              return { 
+                ...base, 
+                zIndex: 100,
+              } as React.CSSProperties;
+            }
+            return base as React.CSSProperties;
+          })()}
         >
           <span
             ref={tooltipRef}
-            className="inline-block text-xs px-3 py-1.5 rounded-md shadow-md max-w-[18rem] break-words"
+            className={`inline-block text-xs px-3 py-2 rounded-md shadow-xl transition-all duration-200 break-words bg-black text-white border border-white/10 ${isExpanded ? 'max-w-[24rem]' : 'max-w-[18rem]'}`}
             style={{
-              display: '-webkit-box',
-              WebkitLineClamp: 2,
+              display: isExpanded ? 'block' : '-webkit-box',
+              WebkitLineClamp: isExpanded ? 'none' : 2,
               WebkitBoxOrient: 'vertical',
-              overflow: 'hidden'
+              overflow: isExpanded ? 'visible' : 'hidden'
             }}
           >
             {content}
           </span>
-          {/* arrow */}
-          <span className="absolute left-1/2 -translate-x-1/2 mt-[-6px] w-2 h-2 rotate-45 bg-black" aria-hidden />
+          {/* arrow for left/right/top/bottom */}
+          {side === 'right' && (
+            <span className="absolute left-[-6px] top-1/2 -translate-y-1/2 w-2 h-2 rotate-45 bg-black" aria-hidden />
+          )}
+          {side === 'left' && (
+            <span className="absolute right-[-6px] top-1/2 -translate-y-1/2 w-2 h-2 rotate-45 bg-black" aria-hidden />
+          )}
+          {(side === 'top' || side === 'bottom' || side === 'auto') && (
+            <span className="absolute left-1/2 -translate-x-1/2 mt-[-6px] w-2 h-2 rotate-45 bg-black" aria-hidden />
+          )}
         </div>,
         document.body
       )}

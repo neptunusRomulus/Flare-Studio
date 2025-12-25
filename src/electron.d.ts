@@ -1,6 +1,19 @@
 import type { EditorProjectData, SavedTilesetEntry } from './editor/TileMapEditor';
 import type { TileLayer, MapObject } from './types';
 
+// Session data stored per-project in .flare-session.json
+interface SessionTab {
+  id: string;
+  name: string;
+  projectPath?: string;
+}
+
+interface SessionData {
+  tabs: SessionTab[];
+  activeTabId: string | null;
+  lastOpened?: string; // ISO timestamp
+}
+
 interface MapConfig {
   name: string;
   width: number;
@@ -36,7 +49,7 @@ declare global {
       createMapProject: (config: MapConfig) => Promise<boolean>;
       openMapProject: (projectPath: string) => Promise<EditorProjectData | null>;
       saveMapProject: (projectPath: string, mapData: ProjectMapData) => Promise<boolean>;
-      saveExportFiles: (projectPath: string, mapName: string, mapTxt: string, tilesetDef: string, options?: { spawn?: { enabled: boolean; content: string; filename?: string }; tilesetImages?: Record<string, string> }) => Promise<boolean>;
+      saveExportFiles: (projectPath: string, mapName: string, mapTxt: string, tilesetDef: string, options?: { spawn?: { enabled: boolean; content: string; filename?: string }; tilesetImages?: Record<string, string>; npcFiles?: Array<{ filename: string; content: string }> }) => Promise<boolean>;
   discoverTilesetImages: (projectPath: string) => Promise<{ tilesetImages: { [key: string]: string }; tilesets: { name: string; fileName: string }[] }>;
   fileExists: (filePath: string) => Promise<boolean>;
       listMaps: (projectPath: string) => Promise<string[]>;
@@ -46,6 +59,38 @@ declare global {
       resolvePathRelative: (fromPath: string, toPath: string) => Promise<string>;
       getProjectThumbnail: (projectPath: string) => Promise<string | null>;
       checkProjectExists: (projectPath: string) => Promise<boolean>;
+      // Session management (per-project)
+      readSession: (projectPath: string) => Promise<SessionData | null>;
+      writeSession: (projectPath: string, sessionData: SessionData) => Promise<boolean>;
+      readFileAsDataURL: (filePath: string) => Promise<string | null>;
+      // NPC file management
+      createNpcFile: (projectPath: string, npcData: {
+        name: string;
+        role: 'talker' | 'vendor' | 'quest' | 'static';
+        tilesetPath?: string;
+        portraitPath?: string;
+      }) => Promise<{ success: boolean; filePath?: string; filename?: string; error?: string }>;
+      writeNpcFile: (projectPath: string, filename: string, content: string) => Promise<boolean>;
+      // Item file management
+      createItemFile: (projectPath: string, itemData: {
+        name: string;
+        id: number;
+        category?: string;
+      }) => Promise<{ success: boolean; filePath?: string; filename?: string; error?: string }>;
+      getItemCategories: (projectPath: string) => Promise<{ success: boolean; categories: string[]; error?: string }>;
+      createItemCategory: (projectPath: string, categoryName: string) => Promise<{ success: boolean; categoryName?: string; categoryPath?: string; error?: string }>;
+      ensureItemsFolders: (projectPath: string) => Promise<{ success: boolean; error?: string }>;
+      getNextItemId: (projectPath: string) => Promise<{ success: boolean; nextId: number; error?: string }>;
+      listItems: (projectPath: string) => Promise<{ success: boolean; items: Array<{ id: number; name: string; category: string; filePath: string; fileName: string }>; error?: string }>;
+      readItemFile: (filePath: string) => Promise<{ success: boolean; data?: Record<string, unknown>; error?: string }>;
+      writeItemFile: (filePath: string, itemData: Record<string, unknown>) => Promise<{ success: boolean; error?: string }>;
+      listEnemies: (projectPath: string) => Promise<string[]>;
+      saveEnemyPreset: (projectPath: string, filename: string, content: string) => Promise<boolean>;
+      // Generic filesystem helpers for renderer
+      createFolderIfNotExists: (folderPath: string) => Promise<boolean>;
+      writeFile: (filePath: string, content: string) => Promise<boolean>;
+      readDir: (dirPath: string) => Promise<Array<{ name: string; isDirectory: boolean }>>;
+      getProjectFolder: () => Promise<string | null>;
       // Menu event listeners
       onMenuNewMap: (callback: () => void) => void;
       onMenuOpenMap: (callback: () => void) => void;

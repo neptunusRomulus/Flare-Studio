@@ -46,14 +46,14 @@ Coming Soon...
 
 ---
 #### ⚡ **Beta Version** 
-- [ ] 0- Multi-tileset use with "Tabs" (I'm working on it)
+- [x] 0- Multi-tileset use with "Tabs"
 - [ ] 1- Objects (In progress)
-- [ ] 2- Events (In progress) 
+- [ ] 2- Events 
 - [ ] 3- NPCs (In progress)
-- [ ] 4- Enemies (In progress)
-- [ ] 5- Dialogue
+- [ ] 4- Enemies
+- [ ] 5- Dialogue (In progress)
 - [ ] 6- Sounds
-- [ ] 7- Quest  
+- [ ] 7- Quest (In progress)
 - [ ] 8- Cutscenes  
 - [ ] 9- **You name it. I will check on it. Promise.**
 
@@ -64,8 +64,9 @@ Coming Soon...
 - [ ] 10- Skills
 - [ ] 12- Stats
 - [ ] 13- Shaders (with injection method)
-- [ ] 14- Particles
-- [ ] 15- **You name it. I will check on it. Promise.**
+- [ ] 14- Translations/localization editor
+- [ ] 15- Particles
+- [ ] 16- **You name it. I will check on it. Promise.**
   
 
 
@@ -76,13 +77,23 @@ Run this single commands to start development after cloning the repo;
 
 ```bash
 npm install
-npm run go
+npm run dev
 ```
 
 
 This will:
 
 - Install dependencies (if needed)
+- Start Vite dev server
+
+To run Vite + Electron together:
+
+```bash
+npm run electron-dev
+```
+
+This will:
+
 - Start Vite dev server
 - Launch Electron app automatically
 

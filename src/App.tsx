@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import Tooltip from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Upload, Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Blend, MapPin, Save, Edit2, Scan, Link2, Scissors, Trash2, Check, HelpCircle, Folder, Shield, Plus, Image, Grid, Box, Users, User, Locate, Clock, Menu, ChevronLeft, ChevronRight, GripVertical, MessageSquare, ChevronDown, ChevronUp, ArrowLeft, Gift, Coins, Sparkles, Zap, Volume2, Tag, Package, AlignLeft, Sword, ChevronsUpDown, AlertTriangle, Book, GitBranch } from 'lucide-react';
+import { Upload, Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Blend, MapPin, Save, Edit2, Scan, Link2, Scissors, Trash2, Check, HelpCircle, Folder, Shield, Plus, Image, Grid, Box, Users, User, Locate, Clock, Menu, ChevronLeft, ChevronRight, MessageSquare, ChevronDown, ChevronUp, ArrowLeft, Gift, Coins, Sparkles, Zap, Volume2, Tag, Package, AlignLeft, Sword, ChevronsUpDown, AlertTriangle, Book, GitBranch } from 'lucide-react';
 import { TileMapEditor } from './editor/TileMapEditor';
 import type { EditorProjectData, SavedTilesetEntry } from './editor/TileMapEditor';
 import { TileLayer, MapObject, DialogueLine, DialogueRequirement, DialogueReward, DialogueWorldEffect, DialogueTree, FlareNPC } from './types';
@@ -15,11 +15,14 @@ import { Toaster } from '@/components/ui/toaster';
 import WelcomeScreen from './components/WelcomeScreen';
 import OverwriteExportDialog from './components/OverwriteExportDialog';
 import EnemyTabPanel from '@/components/EnemyTabPanel';
+import SidebarActorEntries from '@/components/SidebarActorEntries';
+import SidebarItemsPanel from '@/components/SidebarItemsPanel';
+import SidebarRulesPanel from '@/components/SidebarRulesPanel';
 import { buildSpawnContent, computeIntermapTarget, extractSpawnIntermapValue, STARTING_MAP_INVALID_NAMES } from './editor/mapSpawnUtils';
 import { validateAndSanitizeObject } from './editor/objectValidation';
 import { ITEM_ROLE_META, ITEM_ROLE_SELECTIONS, RESOURCE_SUBTYPE_META } from './editor/itemRoles';
 import type { ItemResourceSubtype, ItemRole } from './editor/itemRoles';
-import { EMPTY_ACTOR_ROLES, ENEMY_ROLE_META_LOOKUP, ENEMY_ROLE_OPTIONS, NPC_ROLE_OPTIONS } from './editor/actorRoles';
+import { EMPTY_ACTOR_ROLES, ENEMY_ROLE_OPTIONS, NPC_ROLE_OPTIONS } from './editor/actorRoles';
 import type { ActorDialogState, ActorRoleKey } from './editor/actorRoles';
 import { GAME_TRIGGER_OPTIONS, PLAYER_TRIGGER_OPTIONS, RULE_ACTION_GROUPS, RULE_TRIGGER_LOOKUP } from './editor/ruleOptions';
 import type { RuleStartType } from './editor/ruleOptions';
@@ -4225,380 +4228,42 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           {/* Tileset Brushes Section */}
           <section className="flex flex-col flex-1">
             {/* If this is an NPC, Enemy, Event, Rules, or Items layer render a header and controls */}
-            {(() => {
-              // Keep actor entries for NPC/Enemy layers but remove the header and its add-button.
-              const isEventLayer = activeLayer?.type === 'event';
-              if (isNpcLayer || isEnemyLayer || isEventLayer) {
-                return (
-                  <>
-                    {/* Actor entries shown only for NPC/Enemy layers (header removed per UX request) */}
-                    {(isNpcLayer || isEnemyLayer) && (
-                      <div className="flex-1 min-h-0 flex flex-col gap-3">
-                        {actorEntries.length === 0 ? (
-                          <div className="h-full border border-dashed border-border rounded-md flex items-center justify-center text-sm text-muted-foreground px-4 text-center">
-                            {isNpcLayer ? 'No NPCs added yet. Use the Add control to create your first NPC.' : 'No enemies added yet. Use the Add control to place an enemy.'}
-                          </div>
-                        ) : (
-                          <div className="space-y-2 overflow-y-auto pr-1">
-                            {actorEntries.map((actor) => {
-                              // NPC role tags
-                              const isTalker = actor.properties?.talker === 'true' || actor.properties?.talker === '1';
-                              const isVendor = actor.properties?.vendor === 'true' || actor.properties?.vendor === '1';
-                              const isQuestGiver = actor.properties?.questGiver === 'true' || actor.properties?.questGiver === '1';
-                              const hasNpcRole = isTalker || isVendor || isQuestGiver;
-                              // Enemy role tags
-                              const enemyRoles = {
-                                melee: actor.properties?.melee === 'true' || actor.properties?.melee === '1',
-                                ranged: actor.properties?.ranged === 'true' || actor.properties?.ranged === '1',
-                                caster: actor.properties?.caster === 'true' || actor.properties?.caster === '1',
-                                summoner: actor.properties?.summoner === 'true' || actor.properties?.summoner === '1',
-                                boss: actor.properties?.boss === 'true' || actor.properties?.boss === '1',
-                                passive: actor.properties?.passive === 'true' || actor.properties?.passive === '1',
-                                stationary: actor.properties?.stationary === 'true' || actor.properties?.stationary === '1',
-                              };
-                              const hasEnemyRole = Object.values(enemyRoles).some(Boolean);
-                              // Portrait path
-                              const portraitPath = actor.properties?.portraitPath;
-                              const isPlacedOnMap = actor.x >= 0 && actor.y >= 0;
-                              
-                              return (
-                              <div
-                                key={actor.id}
-                                className={`rounded-md px-2 py-2 hover:bg-background transition-colors cursor-pointer ${
-                                  isPlacedOnMap 
-                                    ? 'border-2 border-orange-500 bg-background/50' 
-                                    : 'border border-dashed border-gray-400 dark:border-gray-600 bg-muted/20'
-                                } ${draggingNpcId === actor.id ? 'opacity-50' : ''}`}
-                                onClick={() => handleEditObject(actor.id)}
-                                onMouseMove={(e) => setNpcHoverTooltip({ x: e.clientX, y: e.clientY })}
-                                onMouseLeave={() => setNpcHoverTooltip(null)}
-                              >
-                                <div className="flex items-center gap-2">
-                                    {/* Portrait thumbnail */}
-                                    <div className={`flex-shrink-0 w-10 h-10 rounded border bg-muted/50 flex items-center justify-center overflow-hidden ${
-                                      isPlacedOnMap ? 'border-border' : 'border-dashed border-muted-foreground/40'
-                                    }`}>
-                                      {portraitPath ? (
-                                        <img
-                                          src={portraitPath}
-                                          alt={actor.name || 'NPC portrait'}
-                                          className={`w-full h-full object-cover ${!isPlacedOnMap ? 'opacity-50' : ''}`}
-                                          onError={(e) => {
-                                            // If portrait cannot load, show the fallback icon
-                                            e.currentTarget.style.display = 'none';
-                                            e.currentTarget.nextElementSibling?.classList.remove('hidden');
-                                          }}
-                                        />
-                                      ) : null}
-                                      <HelpCircle className={`w-5 h-5 text-muted-foreground ${portraitPath ? 'hidden' : ''} ${!isPlacedOnMap ? 'opacity-50' : ''}`} />
-                                    </div>
-                                    {/* Actor summary */}
-                                    <div className="space-y-1 text-sm flex-1 min-w-0">
-                                    <div className={`font-medium ${isPlacedOnMap ? 'text-foreground' : 'text-muted-foreground'}`} title={actor.name || `${actor.type === 'npc' ? 'NPC' : 'Enemy'} #${actor.id}`}>
-                                      <span className={leftCollapsed ? 'sr-only' : ''}>{actor.name || `${actor.type === 'npc' ? 'NPC' : 'Enemy'} #${actor.id}`}</span>
-                                      {!actor.name && leftCollapsed && <span className="text-xs text-muted-foreground">#{actor.id}</span>}
-                                    </div>
-                                    {/* NPC Role Tags */}
-                                    {isNpcLayer && !leftCollapsed && (
-                                      <div className="flex flex-wrap gap-1 mt-1">
-                                        {isTalker && (
-                                          <span className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/30">
-                                            Talker
-                                          </span>
-                                        )}
-                                        {isVendor && (
-                                          <span className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
-                                            Vendor
-                                          </span>
-                                        )}
-                                        {isQuestGiver && (
-                                          <span className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30">
-                                            Quest
-                                          </span>
-                                        )}
-                                        {!hasNpcRole && (
-                                          <span className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-gray-500/20 text-gray-600 dark:text-gray-400 border border-gray-500/30">
-                                            Static
-                                          </span>
-                                        )}
-                                      </div>
-                                    )}
-                                    {isEnemyLayer && !leftCollapsed && (
-                                      <div className="flex flex-wrap gap-1 mt-1">
-                                        {enemyRoles.melee && (
-                                          <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium border ${ENEMY_ROLE_META_LOOKUP.isMelee.badgeClass}`}>
-                                            {ENEMY_ROLE_META_LOOKUP.isMelee.label}
-                                          </span>
-                                        )}
-                                        {enemyRoles.ranged && (
-                                          <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium border ${ENEMY_ROLE_META_LOOKUP.isRanged.badgeClass}`}>
-                                            {ENEMY_ROLE_META_LOOKUP.isRanged.label}
-                                          </span>
-                                        )}
-                                        {enemyRoles.caster && (
-                                          <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium border ${ENEMY_ROLE_META_LOOKUP.isCaster.badgeClass}`}>
-                                            {ENEMY_ROLE_META_LOOKUP.isCaster.label}
-                                          </span>
-                                        )}
-                                        {enemyRoles.summoner && (
-                                          <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium border ${ENEMY_ROLE_META_LOOKUP.isSummoner.badgeClass}`}>
-                                            {ENEMY_ROLE_META_LOOKUP.isSummoner.label}
-                                          </span>
-                                        )}
-                                        {enemyRoles.boss && (
-                                          <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium border ${ENEMY_ROLE_META_LOOKUP.isBoss.badgeClass}`}>
-                                            {ENEMY_ROLE_META_LOOKUP.isBoss.label}
-                                          </span>
-                                        )}
-                                        {enemyRoles.passive && (
-                                          <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium border ${ENEMY_ROLE_META_LOOKUP.isPassive.badgeClass}`}>
-                                            {ENEMY_ROLE_META_LOOKUP.isPassive.label}
-                                          </span>
-                                        )}
-                                        {enemyRoles.stationary && (
-                                          <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium border ${ENEMY_ROLE_META_LOOKUP.isStationary.badgeClass}`}>
-                                            {ENEMY_ROLE_META_LOOKUP.isStationary.label}
-                                          </span>
-                                        )}
-                                        {!hasEnemyRole && (
-                                          <span className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-gray-500/20 text-gray-600 dark:text-gray-400 border border-gray-500/30">
-                                            Unassigned
-                                          </span>
-                                        )}
-                                      </div>
-                                    )}
-                                  </div>
-                                  {/* Drag handle for NPC/Enemy - centered vertically */}
-                                  {(isNpcLayer || isEnemyLayer) && (
-                                    <Tooltip content={isNpcLayer ? 'Drag and drop to place NPC on map' : 'Drag and drop to place enemy on map'}>
-                                      <div
-                                        draggable
-                                        onDragStart={(e) => handleNpcDragStart(e, actor.id)}
-                                        onDragEnd={handleNpcDragEnd}
-                                        className="w-8 h-8 flex items-center justify-center cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
-                                        onClick={(e) => e.stopPropagation()}
-                                      >
-                                        <GripVertical className="w-5 h-5" />
-                                      </div>
-                                    </Tooltip>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                            })}
-
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    {/* Add actor buttons placed below the list */}
-                    {isNpcLayer && (
-                      <div className="flex justify-center py-2">
-                        <Tooltip content="Add NPC" side="bottom">
-                          <Button
-                            variant="default"
-                            size="sm"
-                            aria-label="Add NPC"
-                            className="text-xs px-3 py-1 h-7 shadow-sm bg-orange-500 hover:bg-orange-600 text-white border-orange-500"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              e.preventDefault();
-                              handleOpenActorDialog('npc');
-                            }}
-                          >
-                            <Plus className="w-3 h-3 mr-1" />
-                            NPC
-                          </Button>
-                        </Tooltip>
-                      </div>
-                    )}
-                    {isEnemyLayer && (
-                      <div className="flex justify-center py-2">
-                        <Tooltip content="Add Enemy" side="bottom">
-                          <Button
-                            variant="default"
-                            size="sm"
-                            aria-label="Add Enemy"
-                            className="text-xs px-3 py-1 h-7 shadow-sm bg-orange-500 hover:bg-orange-600 text-white border-orange-500"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              e.preventDefault();
-                              handleOpenActorDialog('enemy');
-                            }}
-                          >
-                            <Plus className="w-3 h-3 mr-1" />
-                            Enemy
-                          </Button>
-                        </Tooltip>
-                      </div>
-                    )}
-                  </>
-                );
-              }
-              return null;
-            })()}
+            {(isNpcLayer || isEnemyLayer) && (
+              <SidebarActorEntries
+                isNpcLayer={isNpcLayer}
+                isEnemyLayer={isEnemyLayer}
+                actorEntries={actorEntries}
+                leftCollapsed={leftCollapsed}
+                draggingNpcId={draggingNpcId}
+                onEditObject={handleEditObject}
+                onHover={(position) => setNpcHoverTooltip(position)}
+                onHoverEnd={() => setNpcHoverTooltip(null)}
+                onDragStart={handleNpcDragStart}
+                onDragEnd={handleNpcDragEnd}
+                onAddNpc={() => handleOpenActorDialog('npc')}
+                onAddEnemy={() => handleOpenActorDialog('enemy')}
+              />
+            )}
 
 
 
             {/* Rules Layer - list and add button (similar UX to NPC layer) */}
             {isRulesLayer && (
-              <div className="flex flex-col flex-1">
-                <div className="flex-1 min-h-0 border border-dashed border-border rounded-md overflow-y-auto">
-                  {rulesList.length === 0 ? (
-                    <div className="flex items-center justify-center h-full text-sm text-muted-foreground px-4 text-center">
-                      Click &quot;+ Rule&quot; to create your first rule.
-                    </div>
-                  ) : (
-                    <div className="flex flex-col gap-1 p-2">
-                      {rulesList.map((rule) => {
-                        const triggerMeta = RULE_TRIGGER_LOOKUP[rule.triggerId];
-                        const TriggerIcon = triggerMeta?.icon;
-                        return (
-                          <div
-                            key={rule.id}
-                            className="flex items-center gap-3 p-2 bg-muted/50 hover:bg-muted rounded-md border border-border cursor-pointer transition-colors w-full"
-                            title={rule.name}
-                          >
-                            <GitBranch className="w-4 h-4 text-orange-500 flex-shrink-0" />
-                            <div className="flex-1 min-w-0">
-                              <div className="text-sm font-medium truncate">{rule.name}</div>
-                              <div className="flex items-center gap-2 mt-1">
-                                <Badge className="text-[11px] px-2 py-0.5">
-                                  {rule.startType === 'player' ? 'Started by player' : 'Started by the game'}
-                                </Badge>
-                                {TriggerIcon && (
-                                  <Tooltip content={triggerMeta?.tooltip || triggerMeta?.label || 'Trigger'}>
-                                    <div className="w-7 h-7 rounded-md border border-border bg-background flex items-center justify-center text-muted-foreground hover:text-foreground">
-                                      <TriggerIcon className="w-4 h-4" />
-                                    </div>
-                                  </Tooltip>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-                <div className="flex justify-center py-2">
-                  <Tooltip content="Add Rule" side="bottom">
-                    <Button
-                      variant="default"
-                      size="sm"
-                      aria-label="Add Rule"
-                      className="text-xs px-3 py-1 h-7 shadow-sm bg-orange-500 hover:bg-orange-600 text-white border-orange-500"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        handleAddRule();
-                      }}
-                    >
-                      <Plus className="w-3 h-3 mr-1" />
-                      Rule
-                    </Button>
-                  </Tooltip>
-                </div>
-              </div>
+              <SidebarRulesPanel
+                rulesList={rulesList}
+                onAddRule={handleAddRule}
+              />
             )}
 
             {/* Items Layer - Add Item button only */}
             {isItemsLayer && (
-              <div className="flex flex-col flex-1">
-                <div className="flex-1 min-h-0 border border-dashed border-border rounded-md overflow-y-auto">
-                  {itemsList.length === 0 ? (
-                    <div className="flex items-center justify-center h-full text-sm text-muted-foreground px-4 text-center">
-                      Click &quot;+ Item&quot; to create a new item definition file.
-                    </div>
-                  ) : (
-                    <div className="flex flex-col gap-1 p-2">
-                      {/* Group items by role (mirroring Add Item roles) */}
-                      {(() => {
-                        const roleOrder = ITEM_ROLE_SELECTIONS.map(r => r.id).concat('unspecified' as ItemRole);
-                        const roleMetaLookup = ITEM_ROLE_SELECTIONS.reduce((acc, r) => ({ ...acc, [r.id]: ITEM_ROLE_META[r.id] }), {} as Record<ItemRole, { label: string; badgeClass: string }>);
-
-                        return roleOrder.map((roleId) => {
-                          const items = itemsList.filter((item) => item.role === roleId);
-                          if (items.length === 0) return null;
-                          const meta = roleMetaLookup[roleId] || ITEM_ROLE_META.unspecified;
-                          const isExpanded = expandedItemCategories.has(roleId) || (roleId === 'equipment' && expandedItemCategories.size === 0);
-                          return (
-                            <div key={roleId} className="flex flex-col w-full">
-                              <Tooltip content="Click to expand" side="right">
-                                <div
-                                  className="flex items-center gap-2 p-2 bg-muted/30 hover:bg-muted/50 rounded-md border border-border cursor-pointer transition-colors w-full"
-                                  onClick={() => {
-                                    setExpandedItemCategories(prev => {
-                                      const newSet = new Set(prev);
-                                      if (newSet.has(roleId)) {
-                                        newSet.delete(roleId);
-                                      } else {
-                                        newSet.add(roleId);
-                                      }
-                                      return newSet;
-                                    });
-                                  }}
-                                >
-                                  <Folder className="w-4 h-4 text-orange-500 flex-shrink-0" />
-                                  <span className="flex items-center gap-2 flex-1 text-sm font-medium truncate">
-                                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold border ${meta.badgeClass}`}>
-                                      {meta.label}
-                                    </span>
-                                  </span>
-                                  <span className="text-xs text-muted-foreground">({items.length})</span>
-                                  <ChevronsUpDown className={`w-4 h-4 text-muted-foreground flex-shrink-0 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
-                                </div>
-                              </Tooltip>
-                              <div
-                                className={`grid transition-all duration-200 ease-in-out ${isExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}
-                              >
-                                <div className="overflow-hidden">
-                                  <div className="flex flex-col gap-1 mt-1">
-                                    {items.map((item) => (
-                                      <div
-                                        key={item.id}
-                                        className="flex items-center gap-2 p-2 bg-muted/50 hover:bg-muted rounded-md border border-border cursor-pointer transition-colors w-full"
-                                        title={`${item.name} (ID: ${item.id}) - Click to edit`}
-                                        onClick={() => handleOpenItemEdit(item)}
-                                      >
-                                        <Sword className="w-4 h-4 text-orange-500 flex-shrink-0" />
-                                        <div className="flex-1 min-w-0">
-                                          <div className="text-sm font-medium truncate">{item.name}</div>
-                                          <div className="text-xs text-muted-foreground truncate">
-                                            ID: {item.id}
-                                          </div>
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        });
-                      })()}
-                    </div>
-                  )}
-                </div>
-                <div className="flex justify-center py-2">
-                  <Tooltip content="Add Item" side="bottom">
-                    <Button
-                      variant="default"
-                      size="sm"
-                      aria-label="Add Item"
-                      className="text-xs px-3 py-1 h-7 shadow-sm bg-orange-500 hover:bg-orange-600 text-white border-orange-500"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        e.preventDefault();
-                        handleOpenItemDialog();
-                      }}
-                    >
-                      <Plus className="w-3 h-3" />
-                      Item
-                    </Button>
-                  </Tooltip>
-                </div>
-              </div>
+              <SidebarItemsPanel
+                itemsList={itemsList}
+                expandedItemCategories={expandedItemCategories}
+                setExpandedItemCategories={setExpandedItemCategories}
+                onOpenItemEdit={handleOpenItemEdit}
+                onAddItem={handleOpenItemDialog}
+              />
             )}
 
             {/* Tileset Brushes Window - render for all layers except NPC, Enemy, Items, Rules, and Actions */}

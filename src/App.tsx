@@ -6323,7 +6323,6 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             tabIndex={toolbarExpanded ? -1 : 0}
             aria-label="Map controls"
           >
-        )
             <div
               className={`flex items-center bg-white/90 dark:bg-neutral-900/90 border border-border rounded-full shadow-lg transition-all duration-300 ease-in-out ${toolbarExpanded ? 'px-2 py-1' : 'px-1 py-1'}`}
             >

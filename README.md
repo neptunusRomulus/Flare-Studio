@@ -77,13 +77,23 @@ Run this single commands to start development after cloning the repo;
 
 ```bash
 npm install
-npm run go
+npm run dev
 ```
 
 
 This will:
 
 - Install dependencies (if needed)
+- Start Vite dev server
+
+To run Vite + Electron together:
+
+```bash
+npm run electron-dev
+```
+
+This will:
+
 - Start Vite dev server
 - Launch Electron app automatically
 

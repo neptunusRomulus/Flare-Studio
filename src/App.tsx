@@ -3,11 +3,10 @@ import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import Tooltip from '@/components/ui/tooltip';
-import { Input } from '@/components/ui/input';
-import { Upload, Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Pipette, Blend, MapPin, Save, Scan, Check, HelpCircle, Folder, Plus, Image, Grid, Box, Users, Locate, Clock, Menu, Sword, GitBranch } from 'lucide-react';
+import { Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Blend, MapPin, Save, Scan, Check, HelpCircle, Folder, Plus, Image, Grid, Box, Users, Locate, Clock, Menu, Sword, GitBranch } from 'lucide-react';
 import { TileMapEditor } from './editor/TileMapEditor';
 import type { EditorProjectData } from './editor/TileMapEditor';
-import { TileLayer, MapObject, DialogueTree, FlareNPC } from './types';
+import { TileLayer, MapObject, FlareNPC } from './types';
 import { serializeNpcToFlare } from './utils/flareNpcUtils';
 import { useToast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/toaster';
@@ -25,6 +24,7 @@ import ItemDialog from '@/components/ItemDialog';
 import ItemEditDialog from '@/components/ItemEditDialog';
 import MapDialogs from '@/components/MapDialogs';
 import MapSettingsDialog from '@/components/MapSettingsDialog';
+import ObjectManagementDialog from '@/components/ObjectManagementDialog';
 import RuleDialog from '@/components/RuleDialog';
 import DialogueTreeDialog from '@/components/dialogue/DialogueTreeDialog';
 import SeparateBrushDialog from '@/components/SeparateBrushDialog';
@@ -145,7 +145,7 @@ function App() {
 
   const canUseTilesetDialog = useMemo(() => {
     return typeof window !== 'undefined' && !!window.electronAPI?.selectTilesetFile;
-  }, []);
+  }, [setVendorStockSelection]);
   
   const {
     selectedTool,
@@ -182,7 +182,6 @@ function App() {
     setSelectedStamp,
     stampMode,
     setStampMode,
-    showStampDialog,
     setShowStampDialog,
     newStampName,
     setNewStampName
@@ -253,6 +252,68 @@ function App() {
   const syncMapObjectsWrapper = useCallback(() => {
     syncMapObjectsRef.current?.();
   }, []);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    // Initialize from localStorage or default to false
+    const savedTheme = localStorage.getItem('isDarkMode');
+    return savedTheme ? JSON.parse(savedTheme) : false;
+  });
+
+  // Show/hide the left sidebar collapse toggle (user preference)
+  const [showSidebarToggle, setShowSidebarToggle] = useState(() => {
+    const saved = localStorage.getItem('showSidebarToggle');
+    return saved ? JSON.parse(saved) : true;
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('showSidebarToggle', JSON.stringify(showSidebarToggle));
+    } catch {
+      // ignore storage errors
+    }
+  }, [showSidebarToggle]);
+  
+  // Auto-save states
+  const [saveStatus, setSaveStatus] = useState<'saving' | 'saved' | 'error' | 'unsaved'>('unsaved');
+  const [autoSaveEnabled, setAutoSaveEnabledState] = useState(true);
+  const [lastSaveTime, setLastSaveTime] = useState<number>(0);
+  const [isManuallySaving, setIsManuallySaving] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  // When true, we're in the middle of opening an existing project
+  // and should avoid creating a blank editor instance.
+  const [isOpeningProject, setIsOpeningProject] = useState(false);
+  
+  const { tooltip, showTooltipWithDelay, hideTooltip } = useTooltip({ toolbarRef, canvasRef });
+
+  const {
+    showObjectDialog,
+    setShowObjectDialog,
+    editingObject,
+    setEditingObject,
+    objectValidationErrors,
+    setObjectValidationErrors,
+    mapObjects,
+    setMapObjects,
+    showDeleteNpcConfirm,
+    setShowDeleteNpcConfirm,
+    showDeleteEnemyConfirm,
+    setShowDeleteEnemyConfirm,
+    actorDialogState,
+    setActorDialogState,
+    actorDialogError,
+    setActorDialogError,
+    handleOpenActorDialog,
+    handleCloseActorDialog,
+    showDialogueTreeDialog,
+    setShowDialogueTreeDialog,
+    dialogueTrees,
+    setDialogueTrees,
+    activeDialogueTab,
+    setActiveDialogueTab,
+    dialogueTabToDelete,
+    setDialogueTabToDelete
+  } = useObjectEditing();
+
   const createTabForRef = useRef<((name: string, projectPath: string | null, config: EditorProjectData) => void) | null>(null);
   const beforeCreateMapRef = useRef<(() => Promise<void>) | null>(null);
   const getCreateTabFor = useCallback(() => createTabForRef.current, []);
@@ -361,11 +422,8 @@ function App() {
 
   useProjectSession({ tabs, activeTabId, currentProjectPath });
 
-  // Ensure a tab is always selected when tabs exist but activeTabId is null
-  // This handles the case where the UI shows tabs but none appears selected
   useEffect(() => {
     if (tabs.length > 0 && !activeTabId) {
-      // Find tabs for the current project
       if (currentProjectPath) {
         const normalizedProjectPath = currentProjectPath.replace(/\\/g, '/').toLowerCase();
         const projectTabs = tabs.filter(t => {
@@ -377,96 +435,11 @@ function App() {
           setActiveTabId(projectTabs[0].id);
         }
       } else if (tabs.length > 0) {
-        // Fallback: select first available tab
         console.log('Auto-selecting first available tab:', tabs[0].name);
         setActiveTabId(tabs[0].id);
       }
     }
   }, [activeTabId, currentProjectPath, setActiveTabId, tabs]);
-
-
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    // Initialize from localStorage or default to false
-    const savedTheme = localStorage.getItem('isDarkMode');
-    return savedTheme ? JSON.parse(savedTheme) : false;
-  });
-
-  // Show/hide the left sidebar collapse toggle (user preference)
-  const [showSidebarToggle, setShowSidebarToggle] = useState(() => {
-    const saved = localStorage.getItem('showSidebarToggle');
-    return saved ? JSON.parse(saved) : true;
-  });
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('showSidebarToggle', JSON.stringify(showSidebarToggle));
-    } catch {
-      // ignore storage errors
-    }
-  }, [showSidebarToggle]);
-  
-  // Auto-save states
-  const [saveStatus, setSaveStatus] = useState<'saving' | 'saved' | 'error' | 'unsaved'>('unsaved');
-  const [autoSaveEnabled, setAutoSaveEnabledState] = useState(true);
-  const [lastSaveTime, setLastSaveTime] = useState<number>(0);
-  const [isManuallySaving, setIsManuallySaving] = useState(false);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-
-  // When true, we're in the middle of opening an existing project
-  // and should avoid creating a blank editor instance.
-  const [isOpeningProject, setIsOpeningProject] = useState(false);
-  
-  // Export loading state
-  const {
-    isExporting,
-    exportProgress,
-    showExportSuccess,
-    setShowExportSuccess,
-    showOverwriteDialog,
-    handleOverwriteConfirm,
-    handleOverwriteCancel,
-    performExport,
-    handleExportMap
-  } = useProjectIO({
-    editor,
-    currentProjectPath,
-    mapName,
-    startingMapIntermap,
-    mapObjects,
-    buildConstantStockString,
-    toast
-  });
-  
-  const { tooltip, showTooltipWithDelay, hideTooltip } = useTooltip({ toolbarRef, canvasRef });
-
-  const {
-    showObjectDialog,
-    setShowObjectDialog,
-    editingObject,
-    setEditingObject,
-    objectValidationErrors,
-    setObjectValidationErrors,
-    mapObjects,
-    setMapObjects,
-    showDeleteNpcConfirm,
-    setShowDeleteNpcConfirm,
-    showDeleteEnemyConfirm,
-    setShowDeleteEnemyConfirm,
-    actorDialogState,
-    setActorDialogState,
-    actorDialogError,
-    setActorDialogError,
-    handleOpenActorDialog,
-    handleCloseActorDialog,
-    showDialogueTreeDialog,
-    setShowDialogueTreeDialog,
-    dialogueTrees,
-    setDialogueTrees,
-    activeDialogueTab,
-    setActiveDialogueTab,
-    dialogueTabToDelete,
-    setDialogueTabToDelete
-  } = useObjectEditing();
   
   // Item dialog state
   const [itemDialogState, setItemDialogState] = useState<{
@@ -510,7 +483,7 @@ function App() {
       role: (item.role as ItemRole) || 'unspecified',
       resourceSubtype: toResourceSubtype(item.resourceSubtype)
     }));
-  }, [setEditingObject]);
+  }, []);
 
   const refreshItemsList = useCallback(async (projectPath: string | null) => {
     if (!projectPath || !window.electronAPI?.listItems) {
@@ -580,6 +553,26 @@ function App() {
       .map(([id, qty]) => `${id}:${qty}`);
     return entries.join(',');
   }, []);
+
+  const {
+    isExporting,
+    exportProgress,
+    showExportSuccess,
+    setShowExportSuccess,
+    showOverwriteDialog,
+    handleOverwriteConfirm,
+    handleOverwriteCancel,
+    performExport,
+    handleExportMap
+  } = useProjectIO({
+    editor,
+    currentProjectPath,
+    mapName,
+    startingMapIntermap,
+    mapObjects,
+    buildConstantStockString,
+    toast
+  });
 
   const parseStatusStockEntries = useCallback((value?: string): Array<{ id: string; requirement: string; items: Record<number, number> }> => {
     if (!value) return [];
@@ -818,7 +811,7 @@ function App() {
     } else {
       setMapObjects([]);
     }
-  }, [editor]);
+  }, [editor, setMapObjects]);
 
   useEffect(() => {
     syncMapObjectsRef.current = syncMapObjects;
@@ -1203,7 +1196,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         setShowObjectDialog(true);
       }
     }
-  }, [createTabFor, currentProjectPath, editor, setActiveTabId, setTabs, switchToTab, tabs]);
+  }, [createTabFor, currentProjectPath, editor, setActiveTabId, setEditingObject, setObjectValidationErrors, setShowObjectDialog, setTabs, switchToTab, tabs]);
 
   const handleUpdateObject = useCallback((updatedObject: MapObject) => {
     if (!editor) return;
@@ -1216,7 +1209,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     
     // Trigger autosave after NPC attributes are edited
     editor.triggerAutoSave(true);
-  }, [editor, syncMapObjects]);
+  }, [editor, setEditingObject, setObjectValidationErrors, setShowObjectDialog, syncMapObjects]);
 
   const handleActorFieldChange = useCallback((field: 'name' | 'tilesetPath' | 'portraitPath', value: string) => {
     setActorDialogState((prev) => {
@@ -1224,14 +1217,14 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       return { ...prev, [field]: value };
     });
     setActorDialogError(null);
-  }, []);
+  }, [setActorDialogError, setActorDialogState]);
 
   const handleActorRoleToggle = useCallback((role: ActorRoleKey) => {
     setActorDialogState((prev) => {
       if (!prev) return prev;
       return { ...prev, [role]: !prev[role] };
     });
-  }, []);
+  }, [setActorDialogState]);
 
   const handleActorTilesetBrowse = useCallback(async () => {
     if (typeof window === 'undefined' || !window.electronAPI?.selectTilesetFile) {
@@ -1777,7 +1770,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     setObjectValidationErrors([]);
     setShowDeleteNpcConfirm(false);
     setShowDeleteEnemyConfirm(false);
-  }, []);
+  }, [setEditingObject, setObjectValidationErrors, setShowDeleteEnemyConfirm, setShowDeleteNpcConfirm, setShowObjectDialog]);
 
   const handleObjectDialogSave = useCallback(async () => {
     if (!editingObject) return;
@@ -1846,7 +1839,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     }
     
     handleUpdateObject({ ...editingObject, properties: sanitized });
-  }, [editingObject, handleUpdateObject, currentProjectPath]);
+  }, [currentProjectPath, editingObject, handleUpdateObject, setObjectValidationErrors]);
 
   const updateEditingObjectProperty = useCallback((key: string, value: string | null) => {
     setEditingObject((prev) => {
@@ -1859,7 +1852,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       }
       return { ...prev, properties };
     });
-  }, []);
+  }, [setEditingObject]);
 
   const updateEditingObjectBoolean = useCallback((key: string, checked: boolean) => {
     setEditingObject((prev) => {
@@ -1868,7 +1861,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       properties[key] = checked ? 'true' : 'false';
       return { ...prev, properties };
     });
-  }, []);
+  }, [setEditingObject]);
 
   const getEditingObjectProperty = useCallback((key: string, fallback = '') => {
     if (!editingObject || !editingObject.properties) return fallback;
@@ -1880,7 +1873,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     const parsed = parseConstantStock(editingObject.properties?.constant_stock as string | undefined);
     setVendorStockSelection(parsed);
     setShowVendorStockDialog(true);
-  }, [editingObject, parseConstantStock]);
+  }, [editingObject, parseConstantStock, setShowVendorStockDialog, setVendorStockSelection]);
 
   const handleOpenVendorUnlockDialog = useCallback(() => {
     if (!editingObject) return;
@@ -1891,7 +1884,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       setVendorUnlockEntries(parsed);
     }
     setShowVendorUnlockDialog(true);
-  }, [editingObject, parseStatusStockEntries]);
+  }, [editingObject, parseStatusStockEntries, setShowVendorUnlockDialog, setVendorUnlockEntries]);
 
   const handleOpenVendorRandomDialog = useCallback(() => {
     if (!editingObject) return;
@@ -1900,7 +1893,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     const parsedCount = parseRandomStockCount(editingObject.properties?.random_stock_count as string | undefined);
     setVendorRandomCount(parsedCount);
     setShowVendorRandomDialog(true);
-  }, [editingObject, parseRandomStock, parseRandomStockCount]);
+  }, [editingObject, parseRandomStock, parseRandomStockCount, setShowVendorRandomDialog, setVendorRandomCount, setVendorRandomSelection]);
 
   const handleToggleVendorStockItem = useCallback((id: number) => {
     setVendorStockSelection((prev) => {
@@ -1937,15 +1930,15 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       return { ...prev, properties };
     });
     setShowVendorStockDialog(false);
-  }, [editingObject, buildConstantStockString, vendorStockSelection]);
+  }, [editingObject, buildConstantStockString, setEditingObject, setShowVendorStockDialog, vendorStockSelection]);
 
   const handleAddVendorUnlockRequirement = useCallback(() => {
     setVendorUnlockEntries((prev) => [...prev, { id: `req-${Date.now()}-${Math.random()}`, requirement: '', items: {} }]);
-  }, []);
+  }, [setVendorUnlockEntries]);
 
   const handleUpdateVendorUnlockRequirement = useCallback((id: string, requirement: string) => {
     setVendorUnlockEntries((prev) => prev.map((entry) => entry.id === id ? { ...entry, requirement } : entry));
-  }, []);
+  }, [setVendorUnlockEntries]);
 
   const handleToggleVendorUnlockItem = useCallback((reqId: string, itemId: number) => {
     setVendorUnlockEntries((prev) => prev.map((entry) => {
@@ -1958,7 +1951,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       }
       return { ...entry, items };
     }));
-  }, []);
+  }, [setVendorUnlockEntries]);
 
   const handleVendorUnlockQtyChange = useCallback((reqId: string, itemId: number, qty: number) => {
     setVendorUnlockEntries((prev) => prev.map((entry) => {
@@ -1967,11 +1960,11 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       items[itemId] = Math.max(1, qty || 1);
       return { ...entry, items };
     }));
-  }, []);
+  }, [setVendorUnlockEntries]);
 
   const handleRemoveVendorUnlockRequirement = useCallback((id: string) => {
     setVendorUnlockEntries((prev) => prev.filter((entry) => entry.id !== id));
-  }, []);
+  }, [setVendorUnlockEntries]);
 
   const handleSaveVendorUnlock = useCallback(() => {
     if (!editingObject) return;
@@ -1996,7 +1989,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       return { ...prev, properties };
     });
     setShowVendorUnlockDialog(false);
-  }, [editingObject, vendorUnlockEntries]);
+  }, [editingObject, setEditingObject, setShowVendorUnlockDialog, vendorUnlockEntries]);
 
   const handleToggleVendorRandomItem = useCallback((itemId: number) => {
     setVendorRandomSelection((prev) => {
@@ -2008,7 +2001,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       }
       return next;
     });
-  }, []);
+  }, [setVendorRandomSelection]);
 
   const handleVendorRandomFieldChange = useCallback((itemId: number, field: 'chance' | 'min' | 'max', value: number) => {
     setVendorRandomSelection((prev) => {
@@ -2026,7 +2019,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       next[itemId] = current;
       return next;
     });
-  }, []);
+  }, [setVendorRandomSelection]);
 
   const handleRandomCountChange = useCallback((field: 'min' | 'max', value: number) => {
     setVendorRandomCount((prev) => {
@@ -2039,7 +2032,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       }
       return next;
     });
-  }, []);
+  }, [setVendorRandomCount]);
 
   const handleSaveVendorRandom = useCallback(() => {
     if (!editingObject) return;
@@ -2058,7 +2051,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       return { ...prev, properties };
     });
     setShowVendorRandomDialog(false);
-  }, [editingObject, vendorRandomSelection, vendorRandomCount, buildRandomStockString, buildRandomStockCountString]);
+  }, [buildRandomStockCountString, buildRandomStockString, editingObject, setEditingObject, setShowVendorRandomDialog, vendorRandomCount, vendorRandomSelection]);
 
   const handleEditingTilesetBrowse = useCallback(async () => {
     if (typeof window === 'undefined' || !window.electronAPI?.selectTilesetFile) {
@@ -2354,7 +2347,21 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
 
       createEditorWithConfig();
     }
-  }, [pendingMapConfig, showWelcome, currentProjectPath, setupAutoSave, updateLayersList]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [
+    canvasRef,
+    currentProjectPath,
+    isDarkMode,
+    loadProjectData,
+    pendingMapConfig,
+    setEditor,
+    setMapInitialized,
+    setPendingMapConfig,
+    setShowCreateMapDialog,
+    showWelcome,
+    setupAutoSave,
+    toast,
+    updateLayersList
+  ]);
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>, type: 'tileset' | 'layerTileset') => {
     const file = event.target.files?.[0];

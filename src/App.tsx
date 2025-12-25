@@ -5,8 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import Tooltip from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Upload, Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Blend, MapPin, Save, Edit2, Scan, Link2, Scissors, Trash2, Check, HelpCircle, Folder, Shield, Plus, Image, Grid, Box, Users, User, Locate, Clock, Menu, ChevronLeft, ChevronRight, GripVertical, MessageSquare, ChevronDown, ChevronUp, ArrowLeft, Gift, Coins, Sparkles, Heart, Zap, ZapOff, Volume2, Tag, Package, AlignLeft, Sword, ChevronsUpDown, AlertTriangle, Book, GitBranch, Apple, Skull, Swords, RefreshCw, Repeat, Dices, Timer, UserPlus, Flag, CheckCircle, ArrowRight, Puzzle } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
+import { Upload, Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Minus, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Blend, MapPin, Save, Edit2, Scan, Link2, Scissors, Trash2, Check, HelpCircle, Folder, Shield, Plus, Image, Grid, Box, Users, User, Locate, Clock, Menu, ChevronLeft, ChevronRight, GripVertical, MessageSquare, ChevronDown, ChevronUp, ArrowLeft, Gift, Coins, Sparkles, Zap, Volume2, Tag, Package, AlignLeft, Sword, ChevronsUpDown, AlertTriangle, Book, GitBranch } from 'lucide-react';
 import { TileMapEditor } from './editor/TileMapEditor';
 import type { EditorProjectData, SavedTilesetEntry } from './editor/TileMapEditor';
 import { TileLayer, MapObject, DialogueLine, DialogueRequirement, DialogueReward, DialogueWorldEffect, DialogueTree, FlareNPC } from './types';
@@ -16,6 +15,15 @@ import { Toaster } from '@/components/ui/toaster';
 import WelcomeScreen from './components/WelcomeScreen';
 import OverwriteExportDialog from './components/OverwriteExportDialog';
 import EnemyTabPanel from '@/components/EnemyTabPanel';
+import { buildSpawnContent, computeIntermapTarget, extractSpawnIntermapValue, STARTING_MAP_INVALID_NAMES } from './editor/mapSpawnUtils';
+import { validateAndSanitizeObject } from './editor/objectValidation';
+import { ITEM_ROLE_META, ITEM_ROLE_SELECTIONS, RESOURCE_SUBTYPE_META } from './editor/itemRoles';
+import type { ItemResourceSubtype, ItemRole } from './editor/itemRoles';
+import { EMPTY_ACTOR_ROLES, ENEMY_ROLE_META_LOOKUP, ENEMY_ROLE_OPTIONS, NPC_ROLE_OPTIONS } from './editor/actorRoles';
+import type { ActorDialogState, ActorRoleKey } from './editor/actorRoles';
+import { GAME_TRIGGER_OPTIONS, PLAYER_TRIGGER_OPTIONS, RULE_ACTION_GROUPS, RULE_TRIGGER_LOOKUP } from './editor/ruleOptions';
+import type { RuleStartType } from './editor/ruleOptions';
+import useToolbarAutoCollapse from './hooks/useToolbarAutoCollapse';
 import flareIconUrl from '/flare-ico.png?url';
 
 interface MapConfig {
@@ -36,343 +44,6 @@ interface EditorTab {
 }
 
 type EnemyTabConfig = { enemy: MapObject };
-
-type PropertyType =
-  | 'int'
-  | 'float'
-  | 'bool'
-  | 'filename'
-  | 'duration'
-  | 'intPair'
-  | 'floatPair'
-  | 'direction'
-  | 'point'
-  | 'predefined'
-  | 'list'
-  | 'string';
-
-interface PropertySpec {
-  type: PropertyType;
-  min?: number;
-  max?: number;
-  options?: string[];
-}
-
-type ItemRole = 'equipment' | 'consumable' | 'quest' | 'resource' | 'book' | 'unspecified';
-type ItemResourceSubtype = 'currency' | 'material' | '';
-
-const ITEM_ROLE_META: Record<ItemRole, { label: string; badgeClass: string; description?: string }> = {
-  equipment: { label: 'Equipment', badgeClass: 'bg-orange-500/20 text-orange-600 dark:text-orange-400 border-orange-500/30', description: 'Weapons, armor, wearable gear' },
-  consumable: { label: 'Consumable', badgeClass: 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30', description: 'Potions, scrolls, buffs' },
-  quest: { label: 'Quest / Key Item', badgeClass: 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30', description: 'Quest progression items' },
-  resource: { label: 'Resource', badgeClass: 'bg-purple-500/20 text-purple-600 dark:text-purple-400 border-purple-500/30', description: 'Currency or crafting mats' },
-  book: { label: 'Book / Lore', badgeClass: 'bg-blue-500/20 text-blue-600 dark:text-blue-400 border-blue-500/30', description: 'Readable lore items' },
-  unspecified: { label: 'Unspecified', badgeClass: 'bg-gray-500/20 text-gray-600 dark:text-gray-400 border-gray-500/30', description: 'No role set' }
-};
-
-const ITEM_ROLE_SELECTIONS: Array<{ id: ItemRole; label: string; description: string }> = [
-  { id: 'equipment', label: 'Equipment', description: 'Wearable gear with stats, damage/absorb, requirements' },
-  { id: 'consumable', label: 'Consumable', description: 'Usable items that trigger a power; can stack' },
-  { id: 'quest', label: 'Quest / Key Item', description: 'Progression items; usually unsellable and single stack' },
-  { id: 'resource', label: 'Resource (Currency / Material)', description: 'Currencies or crafting materials; stackable loot' },
-  { id: 'book', label: 'Book / Lore', description: 'Readable items that open a book file' }
-];
-
-const RESOURCE_SUBTYPE_META: Record<Exclude<ItemResourceSubtype, ''>, { label: string; hint: string; badgeClass: string }> = {
-  currency: { label: 'Currency', hint: 'Gold, coins; high stack, symmetric price', badgeClass: 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-400 border-yellow-500/30' },
-  material: { label: 'Material', hint: 'Crafting mats or generic loot', badgeClass: 'bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 border-indigo-500/30' }
-};
-
-// Helper sets used by validation
-const CARDINAL_DIRECTIONS = new Set(['N','NE','E','SE','S','SW','W','NW']);
-const BOOLEAN_STRINGS = new Set(['true','false','1','0']);
-
-const STARTING_MAP_INVALID_NAMES = new Set(['', 'untitled map', 'map name', 'untitled_map']);
-
-const sanitizeMapFileBase = (rawName: string): string => {
-  const sanitized = rawName
-    .replace(/[<>:"/|?*]/g, '_')
-    .trim()
-    .replace(/\s+/g, '_')
-    .replace(/_{2,}/g, '_');
-  return sanitized || 'Untitled_Map';
-};
-
-const computeIntermapTarget = (starting: boolean, rawName: string | undefined | null): string | null => {
-  if (!starting) return null;
-  const name = (rawName ?? '').trim();
-  if (!name) return null;
-  if (STARTING_MAP_INVALID_NAMES.has(name.toLowerCase())) return null;
-  const sanitized = sanitizeMapFileBase(name);
-  return `maps/${sanitized}.txt`;
-};
-
-const buildSpawnContent = (intermapTarget: string | null): string => [
-  '# this file is automatically loaded when a New Game starts.',
-  "# it's a dummy map to send the player to the actual starting point.",
-  '',
-  '[header]',
-  'width=1',
-  'height=1',
-  'hero_pos=0,0',
-  '',
-  '[event]',
-  'type=event',
-  'location=0,0,1,1',
-  'activate=on_load',
-  `intermap=${intermapTarget ?? ''}`,
-  ''
-].join('\n');
-
-const extractSpawnIntermapValue = (content: string | null | undefined): string | null => {
-  if (!content) return null;
-  const match = content.match(/^\s*intermap\s*=\s*(.*)$/m);
-  if (!match) return null;
-  const value = match[1].trim();
-  return value ? value : null;
-};
-
-function validateValue(key: string, trimmed: string, spec: PropertySpec): string | null {
-  switch (spec.type) {
-    case 'int': {
-      const parsed = Number.parseInt(trimmed, 10);
-      if (Number.isNaN(parsed)) return `${key} must be an integer.`;
-      if (spec.min !== undefined && parsed < spec.min) return `${key} must be greater than or equal to ${spec.min}.`;
-      if (spec.max !== undefined && parsed > spec.max) return `${key} must be less than or equal to ${spec.max}.`;
-      return null;
-    }
-    case 'float': {
-      const parsed = Number.parseFloat(trimmed);
-      if (Number.isNaN(parsed)) return `${key} must be a number.`;
-      if (spec.min !== undefined && parsed < spec.min) return `${key} must be greater than or equal to ${spec.min}.`;
-      if (spec.max !== undefined && parsed > spec.max) return `${key} must be less than or equal to ${spec.max}.`;
-      return null;
-    }
-    case 'bool': {
-      if (!BOOLEAN_STRINGS.has(trimmed.toLowerCase())) return `${key} must be true or false.`;
-      return null;
-    }
-    case 'filename': {
-      if (!trimmed) return `${key} cannot be empty.`;
-      return null;
-    }
-    case 'duration': {
-      if (!/^\d+(ms|s)?$/i.test(trimmed)) return `${key} must be a duration such as 200ms or 2s.`;
-      return null;
-    }
-    case 'intPair': {
-      const parts = trimmed.split(',').map(p => p.trim()).filter(Boolean);
-      if (parts.length === 0 || parts.length > 2) return `${key} must contain one or two comma-separated integers.`;
-      for (const part of parts) {
-        if (!/^-?\d+$/.test(part)) return `${key} must contain valid integers.`;
-        const parsed = Number.parseInt(part, 10);
-        if (spec.min !== undefined && parsed < spec.min) return `${key} values must be greater than or equal to ${spec.min}.`;
-        if (spec.max !== undefined && parsed > spec.max) return `${key} values must be less than or equal to ${spec.max}.`;
-      }
-      return null;
-    }
-    case 'floatPair': {
-      const parts = trimmed.split(',').map(p => p.trim()).filter(Boolean);
-      if (parts.length === 0 || parts.length > 2) return `${key} must contain one or two comma-separated numbers.`;
-      for (const part of parts) {
-        const parsed = Number.parseFloat(part);
-        if (Number.isNaN(parsed)) return `${key} must contain valid numbers.`;
-        if (spec.min !== undefined && parsed < spec.min) return `${key} values must be greater than or equal to ${spec.min}.`;
-        if (spec.max !== undefined && parsed > spec.max) return `${key} values must be less than or equal to ${spec.max}.`;
-      }
-      return null;
-    }
-    case 'direction': {
-      const upper = trimmed.toUpperCase();
-      if (CARDINAL_DIRECTIONS.has(upper)) return null;
-      const parsed = Number.parseInt(trimmed, 10);
-      if (!Number.isNaN(parsed) && parsed >= 0 && parsed <= 7) return null;
-      return `${key} must be a direction (N, NE, ... , NW) or a number between 0 and 7.`;
-    }
-    case 'point': {
-      const parts = trimmed.split(',').map(p => p.trim());
-      if (parts.length !== 2 || !parts.every(part => /^-?\d+$/.test(part))) return `${key} must be two comma-separated integers.`;
-      return null;
-    }
-    case 'predefined': {
-      if (spec.options && !spec.options.includes(trimmed)) return `${key} must be one of: ${spec.options.join(', ')}.`;
-      return null;
-    }
-    case 'list':
-    case 'string':
-    default:
-      return null;
-  }
-}
-
-// Property specs for NPCs and enemies (left empty for now).
-const ENEMY_PROPERTY_SPECS: Record<string, PropertySpec> = {};
-const NPC_PROPERTY_SPECS: Record<string, PropertySpec> = {};
-
-type NpcRoleKey = 'isTalker' | 'isVendor' | 'isQuestGiver';
-type EnemyRoleKey = 'isMelee' | 'isRanged' | 'isCaster' | 'isSummoner' | 'isBoss' | 'isPassive' | 'isStationary';
-type ActorRoleKey = NpcRoleKey | EnemyRoleKey;
-
-type ActorDialogState = {
-  type: 'npc' | 'enemy';
-  name: string;
-  tilesetPath: string;
-  portraitPath: string;
-} & Record<ActorRoleKey, boolean>;
-
-const NPC_ROLE_OPTIONS: Array<{ key: NpcRoleKey; label: string; badgeClass: string; description: string }> = [
-  { key: 'isTalker', label: 'Talker', badgeClass: 'bg-blue-500/20 text-blue-600 dark:text-blue-400 border-blue-500/30', description: 'Has dialogue interactions' },
-  { key: 'isVendor', label: 'Vendor', badgeClass: 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/30', description: 'Sells items to the player' },
-  { key: 'isQuestGiver', label: 'Quest', badgeClass: 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30', description: 'Provides or tracks quests' }
-];
-
-const ENEMY_ROLE_OPTIONS: Array<{ key: EnemyRoleKey; label: string; badgeClass: string; description: string }> = [
-  { key: 'isMelee', label: 'Melee', badgeClass: 'bg-red-500/20 text-red-600 dark:text-red-400 border-red-500/40', description: 'Closes distance quickly and deals damage in close combat.' },
-  { key: 'isRanged', label: 'Ranged', badgeClass: 'bg-sky-500/20 text-sky-600 dark:text-sky-400 border-sky-500/40', description: 'Attacks from a distance and avoids close combat.' },
-  { key: 'isCaster', label: 'Caster', badgeClass: 'bg-purple-500/20 text-purple-600 dark:text-purple-400 border-purple-500/40', description: 'Uses spells with high impact but low durability.' },
-  { key: 'isSummoner', label: 'Summoner', badgeClass: 'bg-teal-500/20 text-teal-600 dark:text-teal-400 border-teal-500/40', description: 'Relies on summoned allies rather than direct damage.' },
-  { key: 'isBoss', label: 'Boss', badgeClass: 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/40', description: 'Powerful enemy with high durability and multiple attack patterns.' },
-  { key: 'isPassive', label: 'Passive / Neutral', badgeClass: 'bg-lime-500/20 text-lime-600 dark:text-lime-400 border-lime-500/40', description: 'Does not attack unless provoked or triggered.' },
-  { key: 'isStationary', label: 'Stationary', badgeClass: 'bg-slate-500/20 text-slate-600 dark:text-slate-400 border-slate-500/40', description: 'Immobile enemy that controls an area with ranged attacks.' }
-];
-
-const ENEMY_ROLE_META_LOOKUP: Record<EnemyRoleKey, { label: string; badgeClass: string; description: string }> =
-  ENEMY_ROLE_OPTIONS.reduce((acc, option) => {
-    acc[option.key] = option;
-    return acc;
-  }, {} as Record<EnemyRoleKey, { label: string; badgeClass: string; description: string }>);
-
-const EMPTY_ACTOR_ROLES: Record<ActorRoleKey, boolean> = {
-  isTalker: false,
-  isVendor: false,
-  isQuestGiver: false,
-  isMelee: false,
-  isRanged: false,
-  isCaster: false,
-  isSummoner: false,
-  isBoss: false,
-  isPassive: false,
-  isStationary: false
-};
-
-type RuleStartType = 'player' | 'game';
-
-interface RuleTriggerOption {
-  id: string;
-  label: string;
-  tooltip: string;
-  icon: React.ComponentType<{ className?: string }>;
-  startType: RuleStartType;
-}
-
-const PLAYER_TRIGGER_OPTIONS: RuleTriggerOption[] = [
-  { id: 'item-used', label: 'Item Used', tooltip: 'When an item is used', icon: Apple, startType: 'player' },
-  { id: 'skill-used', label: 'Skill Used', tooltip: 'When a skill is used', icon: Zap, startType: 'player' },
-  { id: 'npc-interaction', label: 'NPC Interaction', tooltip: 'When an NPC option is chosen', icon: UserPlus, startType: 'player' }
-];
-
-const GAME_TRIGGER_OPTIONS: RuleTriggerOption[] = [
-  { id: 'enemy-dies', label: 'Enemy dies', tooltip: 'Enemy dies', icon: Skull, startType: 'game' },
-  { id: 'player-enters-area', label: 'Player enters area', tooltip: 'Player enters area', icon: MapPin, startType: 'game' },
-  { id: 'combat-starts', label: 'Combat starts', tooltip: 'Combat starts', icon: Swords, startType: 'game' },
-  { id: 'player-hit', label: 'Player is hit', tooltip: 'Player is hit', icon: Zap, startType: 'game' },
-  { id: 'health-low', label: 'Health very low', tooltip: 'Health very low', icon: Heart, startType: 'game' },
-  { id: 'effect-used', label: 'Another effect is used', tooltip: 'Another effect is used', icon: Repeat, startType: 'game' },
-  { id: 'after-delay', label: 'After a delay', tooltip: 'After a delay', icon: Clock, startType: 'game' },
-  { id: 'repeats-while-active', label: 'Repeats while active', tooltip: 'Repeats while active', icon: RefreshCw, startType: 'game' },
-  { id: 'random-chance', label: 'Random chance', tooltip: 'Random chance', icon: Dices, startType: 'game' },
-  { id: 'every-x-seconds', label: 'Every X seconds', tooltip: 'Every X seconds', icon: Timer, startType: 'game' }
-];
-
-const ALL_RULE_TRIGGER_OPTIONS: RuleTriggerOption[] = [...PLAYER_TRIGGER_OPTIONS, ...GAME_TRIGGER_OPTIONS];
-const RULE_TRIGGER_LOOKUP: Record<string, RuleTriggerOption> = ALL_RULE_TRIGGER_OPTIONS.reduce((acc, option) => {
-  acc[option.id] = option;
-  return acc;
-}, {} as Record<string, RuleTriggerOption>);
-
-type IconComponent = LucideIcon;
-
-interface RuleActionGroup {
-  id: string;
-  title: string;
-  tooltip?: string;
-  icon: IconComponent;
-  actions: Array<{ id: string; label: string; icon: IconComponent }>;
-}
-
-const RULE_ACTION_GROUPS: RuleActionGroup[] = [
-  {
-    id: 'items',
-    title: 'Give or Take Items',
-    tooltip: 'Give or Take Items',
-    icon: Gift,
-    actions: [
-      { id: 'give-item', label: 'Give Item', icon: Gift },
-      { id: 'remove-item', label: 'Remove Item', icon: Trash2 }
-    ]
-  },
-  {
-    id: 'flags',
-    title: 'Change a game flag',
-    tooltip: 'Conditions',
-    icon: Flag,
-    actions: [
-      { id: 'set-flag', label: 'Set Condition', icon: Zap },
-      { id: 'clear-flag', label: 'Unset Condition', icon: ZapOff }
-    ]
-  },
-  {
-    id: 'quests',
-    title: 'Advance a quest',
-    tooltip: 'Quest progression',
-    icon: CheckCircle,
-    actions: [
-      { id: 'complete-quest', label: 'Complete Quest', icon: Check },
-      { id: 'next-step', label: 'Next Step', icon: ArrowRight }
-    ]
-  },
-  {
-    id: 'advanced',
-    title: 'Advanced',
-    tooltip: 'Custom Action',
-    icon: Puzzle,
-    actions: []
-  }
-];
-
-function validateAndSanitizeObject(object: MapObject): { errors: string[]; sanitized: Record<string, string> } {
-  const specs = object.type === 'enemy' ? ENEMY_PROPERTY_SPECS
-    : object.type === 'npc' ? NPC_PROPERTY_SPECS
-    : {};
-
-  const sanitized: Record<string, string> = {};
-  const errors: string[] = [];
-  const properties = object.properties || {};
-
-  for (const [key, rawValue] of Object.entries(properties)) {
-    const value = (rawValue ?? '').toString();
-    const trimmed = value.trim();
-    const spec = specs[key];
-
-    if (spec) {
-      const error = validateValue(key, trimmed, spec);
-      if (error) {
-        errors.push(error);
-      }
-      if (spec.type === 'bool') {
-        sanitized[key] = trimmed.toLowerCase();
-      } else if (spec.type === 'direction' && CARDINAL_DIRECTIONS.has(trimmed.toUpperCase())) {
-        sanitized[key] = trimmed.toUpperCase();
-      } else {
-        sanitized[key] = trimmed;
-      }
-    } else {
-      sanitized[key] = trimmed;
-    }
-  }
-
-  return { errors, sanitized };
-}
 
 function App() {
   const [showWelcome, setShowWelcome] = useState(true);
@@ -430,124 +101,46 @@ function App() {
   const [tipsMinimized, setTipsMinimized] = useState(false);
   // Force refresh counter to trigger re-render when editor-managed tabs change
   const [tabTick, setTabTick] = useState(0);
-  const [toolbarExpanded, setToolbarExpanded] = useState(true);
-  const toolbarCollapseTimer = useRef<number | null>(null);
-  const toolbarContainerRef = useRef<HTMLDivElement | null>(null);
-  const [bottomToolbarExpanded, setBottomToolbarExpanded] = useState(true);
-  const bottomToolbarCollapseTimer = useRef<number | null>(null);
-  const bottomToolbarContainerRef = useRef<HTMLDivElement | null>(null);
-  const [brushToolbarExpanded, setBrushToolbarExpanded] = useState(true);
-  const brushToolbarCollapseTimer = useRef<number | null>(null);
-  const brushToolbarContainerRef = useRef<HTMLDivElement | null>(null);
+  const toolbar = useToolbarAutoCollapse();
+  const bottomToolbar = useToolbarAutoCollapse();
+  const brushToolbar = useToolbarAutoCollapse({ autoCollapse: false });
+  const {
+    expanded: toolbarExpanded,
+    setExpanded: setToolbarExpanded,
+    containerRef: toolbarContainerRef,
+    clearCollapseTimer: clearToolbarCollapseTimer,
+    showTemporarily: showToolbarTemporarily,
+    handleMouseEnter: handleToolbarMouseEnter,
+    handleMouseLeave: handleToolbarMouseLeave,
+    handleFocus: handleToolbarFocus,
+    handleBlur: handleToolbarBlur
+  } = toolbar;
+  const {
+    expanded: bottomToolbarExpanded,
+    setExpanded: setBottomToolbarExpanded,
+    containerRef: bottomToolbarContainerRef,
+    clearCollapseTimer: clearBottomToolbarCollapseTimer,
+    showTemporarily: showBottomToolbarTemporarily,
+    handleMouseEnter: handleBottomToolbarMouseEnter,
+    handleMouseLeave: handleBottomToolbarMouseLeave,
+    handleFocus: handleBottomToolbarFocus,
+    handleBlur: handleBottomToolbarBlur
+  } = bottomToolbar;
+  const {
+    expanded: brushToolbarExpanded,
+    setExpanded: setBrushToolbarExpanded,
+    containerRef: brushToolbarContainerRef,
+    clearCollapseTimer: clearBrushToolbarCollapseTimer,
+    showTemporarily: showBrushToolbarTemporarily,
+    handleMouseEnter: handleBrushToolbarMouseEnter,
+    handleMouseLeave: handleBrushToolbarMouseLeave,
+    handleFocus: handleBrushToolbarFocus,
+    handleBlur: handleBrushToolbarBlur
+  } = brushToolbar;
   // Left sidebar buttons expand/collapse (independent)
   // Left bottom action buttons are always expanded now; no local state required.
   const [pendingMapConfig, setPendingMapConfig] = useState<EditorProjectData | null>(null);
-  const clearToolbarCollapseTimer = useCallback(() => {
-    if (toolbarCollapseTimer.current !== null) {
-      window.clearTimeout(toolbarCollapseTimer.current);
-      toolbarCollapseTimer.current = null;
-    }
-  }, []);
 
-  const scheduleToolbarCollapse = useCallback(() => {
-    clearToolbarCollapseTimer();
-    toolbarCollapseTimer.current = window.setTimeout(() => {
-      setToolbarExpanded(false);
-    }, 500);
-  }, [clearToolbarCollapseTimer]);
-
-  const showToolbarTemporarily = useCallback(() => {
-    setToolbarExpanded(true);
-    scheduleToolbarCollapse();
-  }, [scheduleToolbarCollapse]);
-
-  const handleToolbarMouseEnter = useCallback(() => {
-    clearToolbarCollapseTimer();
-    setToolbarExpanded(true);
-  }, [clearToolbarCollapseTimer]);
-
-  const handleToolbarMouseLeave = useCallback(() => {
-    const activeElement = typeof document !== 'undefined' ? document.activeElement : null;
-    if (activeElement && toolbarContainerRef.current?.contains(activeElement)) {
-      return;
-    }
-    scheduleToolbarCollapse();
-  }, [scheduleToolbarCollapse, toolbarContainerRef]);
-
-  const handleToolbarFocus = useCallback(() => {
-    clearToolbarCollapseTimer();
-    setToolbarExpanded(true);
-  }, [clearToolbarCollapseTimer]);
-
-  const handleToolbarBlur = useCallback((event: React.FocusEvent<HTMLDivElement>) => {
-    const nextTarget = event.relatedTarget as Node | null;
-    if (!event.currentTarget.contains(nextTarget)) {
-      scheduleToolbarCollapse();
-    }
-  }, [scheduleToolbarCollapse]);
-
-  // Left bottom action buttons are always expanded now; collapse behavior removed.
-
-  const clearBottomToolbarCollapseTimer = useCallback(() => {
-    if (bottomToolbarCollapseTimer.current !== null) {
-      window.clearTimeout(bottomToolbarCollapseTimer.current);
-      bottomToolbarCollapseTimer.current = null;
-    }
-  }, []);
-
-  const scheduleBottomToolbarCollapse = useCallback(() => {
-    clearBottomToolbarCollapseTimer();
-    bottomToolbarCollapseTimer.current = window.setTimeout(() => {
-      setBottomToolbarExpanded(false);
-    }, 500);
-  }, [clearBottomToolbarCollapseTimer]);
-
-  const showBottomToolbarTemporarily = useCallback(() => {
-    setBottomToolbarExpanded(true);
-    scheduleBottomToolbarCollapse();
-  }, [scheduleBottomToolbarCollapse]);
-
-  const handleBottomToolbarMouseEnter = useCallback(() => {
-    clearBottomToolbarCollapseTimer();
-    setBottomToolbarExpanded(true);
-  }, [clearBottomToolbarCollapseTimer]);
-
-  const handleBottomToolbarMouseLeave = useCallback(() => {
-    const activeElement = typeof document !== 'undefined' ? document.activeElement : null;
-    if (activeElement && bottomToolbarContainerRef.current?.contains(activeElement)) {
-      return;
-    }
-    scheduleBottomToolbarCollapse();
-  }, [scheduleBottomToolbarCollapse]);
-
-  const handleBottomToolbarFocus = useCallback(() => {
-    clearBottomToolbarCollapseTimer();
-    setBottomToolbarExpanded(true);
-  }, [clearBottomToolbarCollapseTimer]);
-
-  const handleBottomToolbarBlur = useCallback((event: React.FocusEvent<HTMLDivElement>) => {
-    const nextTarget = event.relatedTarget as Node | null;
-    if (!event.currentTarget.contains(nextTarget)) {
-      scheduleBottomToolbarCollapse();
-    }
-  }, [scheduleBottomToolbarCollapse]);
-
-  const clearBrushToolbarCollapseTimer = useCallback(() => {
-    if (brushToolbarCollapseTimer.current !== null) {
-      window.clearTimeout(brushToolbarCollapseTimer.current);
-      brushToolbarCollapseTimer.current = null;
-    }
-  }, []);
-
-  const scheduleBrushToolbarCollapse = useCallback(() => {
-    // Intentionally disabled: keep brush toolbar expanded permanently.
-    clearBrushToolbarCollapseTimer();
-  }, [clearBrushToolbarCollapseTimer]);
-
-  const showBrushToolbarTemporarily = useCallback(() => {
-    setBrushToolbarExpanded(true);
-    scheduleBrushToolbarCollapse();
-  }, [scheduleBrushToolbarCollapse]);
   const setBrushToolbarNode = useCallback((node: HTMLDivElement | null) => {
     brushToolbarContainerRef.current = node;
   }, []);

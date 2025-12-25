@@ -19,7 +19,9 @@ import ActorDialog from '@/components/ActorDialog';
 import BottomToolbar from '@/components/BottomToolbar';
 import BrushToolbar from '@/components/BrushToolbar';
 import ItemDialog from '@/components/ItemDialog';
+import ItemEditDialog from '@/components/ItemEditDialog';
 import RuleDialog from '@/components/RuleDialog';
+import DialogueTreeDialog from '@/components/dialogue/DialogueTreeDialog';
 import SidebarLayout from '@/components/SidebarLayout';
 import SidebarToggle from '@/components/SidebarToggle';
 import TilesetPalette from '@/components/TilesetPalette';
@@ -37,24 +39,12 @@ import { GAME_TRIGGER_OPTIONS, PLAYER_TRIGGER_OPTIONS, RULE_ACTION_GROUPS, RULE_
 import type { RuleStartType } from './editor/ruleOptions';
 import useToolbarAutoCollapse from './hooks/useToolbarAutoCollapse';
 import useToolbarVisibility from './hooks/useToolbarVisibility';
+import useTooltip from './hooks/useTooltip';
+import useToolSelection from './hooks/useToolSelection';
+import useEditorTabs from './hooks/useEditorTabs';
 import flareIconUrl from '/flare-ico.png?url';
-
-interface MapConfig {
-  name: string;
-  width: number;
-  height: number;
-  tileSize: number;
-  location: string;
-  isStartingMap?: boolean;
-}
-
-interface EditorTab {
-  id: string;
-  name: string;
-  projectPath?: string | null;
-  config?: EditorProjectData | MapConfig | { enemy: MapObject } | null;
-  tabType?: 'map' | 'enemy';
-}
+import type { MapConfig } from './editor/mapConfig';
+import type { EditorTab } from './hooks/useEditorTabs';
 
 type EnemyTabConfig = { enemy: MapObject };
 
@@ -73,9 +63,7 @@ function App() {
   const [reservedMapNames, setReservedMapNames] = useState<string[]>([]);
   const [newMapStarting, setNewMapStarting] = useState(false);
   // Editor tabs
-  const [tabs, setTabs] = useState<EditorTab[]>([]);
   const [pendingEnemyTabCloseId, setPendingEnemyTabCloseId] = useState<string | null>(null);
-  const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const switchToTabHelpersRef = useRef({
     handleOpenMap: async (_projectDir: string, _createTab?: boolean, _mapName?: string) => {},
     loadProjectData: async (_editor: TileMapEditor, _mapConfig: EditorProjectData) => false,
@@ -83,9 +71,6 @@ function App() {
     syncMapObjects: () => {},
     updateLayersList: () => {},
   });
-  // Convenience accessors for tab-aware UI (used to hide map controls for enemy editor tabs)
-  const activeTab = tabs.find(t => t.id === activeTabId) || null;
-  const isEnemyTabActive = !!activeTab && activeTab.tabType === 'enemy';
 
   // Session is now stored per-project in .flare-session.json
   // Load session when a project is opened (handled in handleOpenMap)
@@ -177,6 +162,188 @@ function App() {
     return typeof window !== 'undefined' && !!window.electronAPI?.selectTilesetFile;
   }, []);
   
+  const {
+    selectedTool,
+    setSelectedTool,
+    showBrushOptions,
+    showSelectionOptions,
+    showShapeOptions,
+    selectedBrushTool,
+    setSelectedBrushTool,
+    selectedSelectionTool,
+    setSelectedSelectionTool,
+    selectedShapeTool,
+    setSelectedShapeTool,
+    handleShowBrushOptions,
+    handleHideBrushOptions,
+    handleShowSelectionOptions,
+    handleHideSelectionOptions,
+    handleShowShapeOptions,
+    handleHideShapeOptions
+  } = useToolSelection({
+    onCloseStampDialog: () => setShowStampDialog(false)
+  });
+  
+  // Brush management states
+  const [brushTool, setBrushTool] = useState<'none' | 'move' | 'merge' | 'separate' | 'remove'>('none');
+  // Removed unused state: selectedBrushes
+  const [showSeparateDialog, setShowSeparateDialog] = useState(false);
+  const [brushToSeparate, setBrushToSeparate] = useState<number | null>(null);
+  
+  // Stamp states
+  const [stamps, setStamps] = useState<import('./types').Stamp[]>([]);
+  const [selectedStamp, setSelectedStamp] = useState<string | null>(null);
+  const [stampMode, setStampMode] = useState<'select' | 'create' | 'place'>('select');
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [showStampDialog, setShowStampDialog] = useState(false);
+  const [newStampName, setNewStampName] = useState('');
+  // Clear layer confirmation dialog state (replaces window.confirm)
+  const [showClearLayerDialog, setShowClearLayerDialog] = useState(false);
+  // Generic confirmation dialog for other destructive actions
+  const [confirmAction, setConfirmAction] = useState<null | { type: 'removeBrush' | 'removeTileset' | 'removeTab'; payload?: number | { layerType: string; tabId: number } }>(null);
+  // Keep a stable React state for the tab that was requested to be deleted so
+  // the confirmation handler can use the exact intended tab (avoids stale refs).
+  const [tabToDelete, setTabToDelete] = useState<null | { layerType: string; tabId: number }>(null);
+  // Keep an optional ref as a fallback for older flows
+  const confirmPayloadRef = React.useRef<null | { layerType: string; tabId: number }>(null);
+  
+  // Settings states
+  const [mapName, setMapName] = useState('Untitled Map');
+  const [isStartingMap, setIsStartingMap] = useState(false);
+  const [currentProjectPath, setCurrentProjectPath] = useState<string | null>(null);
+  const [startingMapIntermap, setStartingMapIntermap] = useState<string | null>(null);
+  const previousMapNameRef = useRef(mapName);
+  const {
+    tabs,
+    setTabs,
+    activeTabId,
+    setActiveTabId,
+    activeTab,
+    isEnemyTabActive,
+    createTabFor,
+    closeEditorTab,
+    switchToTab
+  } = useEditorTabs({
+    editor,
+    currentProjectPath,
+    setCurrentProjectPath,
+    setMapName,
+    setMapWidth,
+    setMapHeight,
+    switchToTabHelpersRef
+  });
+
+  // Ensure a tab is always selected when tabs exist but activeTabId is null
+  // This handles the case where the UI shows tabs but none appears selected
+  useEffect(() => {
+    if (tabs.length > 0 && !activeTabId) {
+      // Find tabs for the current project
+      if (currentProjectPath) {
+        const normalizedProjectPath = currentProjectPath.replace(/\\/g, '/').toLowerCase();
+        const projectTabs = tabs.filter(t => {
+          const normalizedTabPath = t.projectPath?.replace(/\\/g, '/').toLowerCase() || '';
+          return normalizedTabPath === normalizedProjectPath;
+        });
+        if (projectTabs.length > 0) {
+          console.log('Auto-selecting first project tab:', projectTabs[0].name);
+          setActiveTabId(projectTabs[0].id);
+        }
+      } else if (tabs.length > 0) {
+        // Fallback: select first available tab
+        console.log('Auto-selecting first available tab:', tabs[0].name);
+        setActiveTabId(tabs[0].id);
+      }
+    }
+  }, [tabs, activeTabId, currentProjectPath]);
+
+  // Auto-save session to project folder when tabs or activeTabId changes
+  useEffect(() => {
+    const saveSession = async () => {
+      if (!currentProjectPath || !window.electronAPI?.writeSession) return;
+      if (tabs.length === 0) return;
+      
+      try {
+        // Only save tabs that belong to this project
+        const normalizedProjectPath = currentProjectPath.replace(/\\/g, '/').toLowerCase();
+        const projectTabs = tabs
+          .filter(t => {
+            const normalizedTabPath = t.projectPath?.replace(/\\/g, '/').toLowerCase() || '';
+            return normalizedTabPath === normalizedProjectPath;
+          })
+          .map(t => ({
+            id: t.id,
+            name: t.name,
+            projectPath: t.projectPath ?? undefined // Convert null to undefined for type compatibility
+          }));
+        
+        if (projectTabs.length === 0) return;
+        
+        // Deduplicate tabs by name (keep only the first occurrence of each map name)
+        const seenNames = new Set<string>();
+        const uniqueTabs = projectTabs.filter(t => {
+          const lowerName = t.name.toLowerCase();
+          if (seenNames.has(lowerName)) {
+            console.log('Session save: removing duplicate tab:', t.name);
+            return false;
+          }
+          seenNames.add(lowerName);
+          return true;
+        });
+        
+        // Only save activeTabId if it's a valid tab in this project
+        // This prevents saving null during the brief moment between setTabs and setActiveTabId
+        const validActiveTabId = activeTabId && uniqueTabs.some(t => t.id === activeTabId) 
+          ? activeTabId 
+          : (uniqueTabs.length > 0 ? uniqueTabs[0].id : null);
+        
+        const sessionData = {
+          tabs: uniqueTabs,
+          activeTabId: validActiveTabId,
+          lastOpened: new Date().toISOString()
+        };
+        
+        await window.electronAPI.writeSession(currentProjectPath, sessionData);
+        console.log('Session saved to project:', currentProjectPath, uniqueTabs.length, 'tabs');
+      } catch (e) {
+        console.warn('Failed to save session to project:', e);
+      }
+    };
+    
+    saveSession();
+  }, [tabs, activeTabId, currentProjectPath]);
+
+  const writeSpawnFile = useCallback(async (starting: boolean, mapNameOverride?: string) => {
+    const effectiveName = mapNameOverride ?? mapName;
+    const intermapTarget = computeIntermapTarget(starting, effectiveName);
+    if (!currentProjectPath || !window.electronAPI?.updateSpawnFile) {
+      setStartingMapIntermap(intermapTarget);
+      return;
+    }
+    const spawnContent = buildSpawnContent(intermapTarget);
+    try {
+      const success = await window.electronAPI.updateSpawnFile(currentProjectPath, spawnContent);
+      if (success) {
+        setStartingMapIntermap(intermapTarget);
+      }
+    } catch (error) {
+      console.error('Failed to update spawn file:', error);
+    }
+  }, [mapName, currentProjectPath]);
+
+  const updateStartingMap = useCallback(
+    (nextValue: boolean, options?: { propagate?: boolean; mapNameOverride?: string }) => {
+      setIsStartingMap(nextValue);
+      if (options?.propagate === false) return;
+      void writeSpawnFile(nextValue, options?.mapNameOverride);
+    },
+    [writeSpawnFile]
+  );
+  
+  // Tab helpers
+  const canUseTilesetDialog = useMemo(() => {
+    return typeof window !== 'undefined' && !!window.electronAPI?.selectTilesetFile;
+  }, []);
+  
   // Toolbar states
   const [selectedTool, setSelectedTool] = useState('brush');
   const [showBrushOptions, setShowBrushOptions] = useState(false);
@@ -217,6 +384,25 @@ function App() {
   const [currentProjectPath, setCurrentProjectPath] = useState<string | null>(null);
   const [startingMapIntermap, setStartingMapIntermap] = useState<string | null>(null);
   const previousMapNameRef = useRef(mapName);
+  const {
+    tabs,
+    setTabs,
+    activeTabId,
+    setActiveTabId,
+    activeTab,
+    isEnemyTabActive,
+    createTabFor,
+    closeEditorTab,
+    switchToTab
+  } = useEditorTabs({
+    editor,
+    currentProjectPath,
+    setCurrentProjectPath,
+    setMapName,
+    setMapWidth,
+    setMapHeight,
+    switchToTabHelpersRef
+  });
 
   // Ensure a tab is always selected when tabs exist but activeTabId is null
   // This handles the case where the UI shows tabs but none appears selected
@@ -772,15 +958,7 @@ function App() {
   const [showExportSuccess, setShowExportSuccess] = useState(false);
   const [isPreparingNewMap, setIsPreparingNewMap] = useState(false);
   
-  // Custom tooltip states
-  const [tooltip, setTooltip] = useState<{
-    content: React.ReactNode;
-    x: number;
-    y: number;
-    visible: boolean;
-    fadeOut: boolean;
-  } | null>(null);
-  const tooltipTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const { tooltip, showTooltipWithDelay, hideTooltip } = useTooltip({ toolbarRef, canvasRef });
 
   // Object management states  
   const [showObjectDialog, setShowObjectDialog] = useState(false);
@@ -1062,10 +1240,6 @@ function App() {
     onConfirm: (x: number, y: number) => void;
   } | null>(null);
   
-  // Tool dropdown timeout refs
-  const brushOptionsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const selectionOptionsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const shapeOptionsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   // Floating toolbar ref for anchored tooltip
   const toolbarRef = useRef<HTMLDivElement | null>(null);
 
@@ -1429,159 +1603,6 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       document.removeEventListener('click', handleClickOutside);
     };
   }, [showAddLayerDropdown]);
-
-  // Custom tooltip handlers
-  const showTooltipWithDelay = useCallback((content: React.ReactNode, element: HTMLElement) => {
-    // If a toolbarRef exists, anchor the tooltip to the left of the floating toolbar
-    if (toolbarRef.current) {
-      const tb = toolbarRef.current.getBoundingClientRect();
-      // Place tooltip centered on screen and above the floating toolbar
-  // Center horizontally then nudge a bit to the right and higher above the toolbar
-      // Center horizontally to the canvas grid area if available, otherwise fall back to window center.
-      let x = window.innerWidth / 2;
-      if (canvasRef && canvasRef.current) {
-        const cr = canvasRef.current.getBoundingClientRect();
-        x = cr.left + cr.width / 2;
-      }
-  const y = Math.max(8, tb.top - 60); // 60px above the toolbar top (a little higher)
-
-      setTooltip({
-        content,
-        x,
-        y,
-        visible: true,
-        fadeOut: false
-      });
-    } else {
-      const rect = element.getBoundingClientRect();
-      const x = rect.left + rect.width / 2;
-      const y = rect.top - 10;
-
-      setTooltip({
-        content,
-        x,
-        y,
-        visible: true,
-        fadeOut: false
-      });
-    }
-
-    // Clear any existing timeout
-    if (tooltipTimeoutRef.current) {
-      clearTimeout(tooltipTimeoutRef.current);
-    }
-
-    // Set timeout to start fade out after 1 second
-    tooltipTimeoutRef.current = setTimeout(() => {
-      setTooltip(prev => prev ? { ...prev, fadeOut: true } : null);
-      
-      // Remove tooltip completely after fade animation
-      setTimeout(() => {
-        setTooltip(null);
-      }, 300); // Match CSS transition duration
-    }, 1000);
-  }, []);
-
-  const hideTooltip = useCallback(() => {
-    if (tooltipTimeoutRef.current) {
-      clearTimeout(tooltipTimeoutRef.current);
-    }
-    setTooltip(null);
-  }, []);
-
-  // Cleanup tooltip timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (tooltipTimeoutRef.current) {
-        clearTimeout(tooltipTimeoutRef.current);
-      }
-      // Cleanup dropdown timeouts
-      if (brushOptionsTimeoutRef.current) {
-        clearTimeout(brushOptionsTimeoutRef.current);
-      }
-      if (selectionOptionsTimeoutRef.current) {
-        clearTimeout(selectionOptionsTimeoutRef.current);
-      }
-      if (shapeOptionsTimeoutRef.current) {
-        clearTimeout(shapeOptionsTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  // Tool dropdown handlers
-  const handleShowBrushOptions = useCallback(() => {
-    // Clear all dropdown timeouts
-    if (brushOptionsTimeoutRef.current) {
-      clearTimeout(brushOptionsTimeoutRef.current);
-    }
-    if (selectionOptionsTimeoutRef.current) {
-      clearTimeout(selectionOptionsTimeoutRef.current);
-    }
-    if (shapeOptionsTimeoutRef.current) {
-      clearTimeout(shapeOptionsTimeoutRef.current);
-    }
-    
-    // Close other dropdowns and show brush options
-    setShowSelectionOptions(false);
-    setShowShapeOptions(false);
-    setShowStampDialog(false);
-    setShowBrushOptions(true);
-  }, []);
-
-  const handleHideBrushOptions = useCallback(() => {
-    brushOptionsTimeoutRef.current = setTimeout(() => {
-      setShowBrushOptions(false);
-    }, 1000);
-  }, []);
-
-  const handleShowSelectionOptions = useCallback(() => {
-    // Clear all dropdown timeouts
-    if (brushOptionsTimeoutRef.current) {
-      clearTimeout(brushOptionsTimeoutRef.current);
-    }
-    if (selectionOptionsTimeoutRef.current) {
-      clearTimeout(selectionOptionsTimeoutRef.current);
-    }
-    if (shapeOptionsTimeoutRef.current) {
-      clearTimeout(shapeOptionsTimeoutRef.current);
-    }
-    
-    // Close other dropdowns and show selection options
-    setShowBrushOptions(false);
-    setShowShapeOptions(false);
-    setShowStampDialog(false);
-    setShowSelectionOptions(true);
-  }, []);
-
-  const handleHideSelectionOptions = useCallback(() => {
-    selectionOptionsTimeoutRef.current = setTimeout(() => {
-      setShowSelectionOptions(false);
-    }, 1000);
-  }, []);
-
-  const handleShowShapeOptions = useCallback(() => {
-    // Clear all dropdown timeouts
-    if (brushOptionsTimeoutRef.current) {
-      clearTimeout(brushOptionsTimeoutRef.current);
-    }
-    if (selectionOptionsTimeoutRef.current) {
-      clearTimeout(selectionOptionsTimeoutRef.current);
-    }
-    if (shapeOptionsTimeoutRef.current) {
-      clearTimeout(shapeOptionsTimeoutRef.current);
-    }
-    
-    // Close other dropdowns and show shape options
-    setShowBrushOptions(false);
-    setShowSelectionOptions(false);
-    setShowShapeOptions(true);
-  }, []);
-
-  const handleHideShapeOptions = useCallback(() => {
-    shapeOptionsTimeoutRef.current = setTimeout(() => {
-      setShowShapeOptions(false);
-    }, 1000);
-  }, []);
 
   // Stamp handlers
   const handleCreateStamp = useCallback(() => {
@@ -5913,1983 +5934,144 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         onClearDuplicate={() => setPendingDuplicateItem(null)}
       />
 
-      {/* Item Edit Dialog */}
-      <Dialog open={showItemEditDialog} onOpenChange={(open) => !open && handleCloseItemEdit()}>
-        <DialogContent className="max-w-4xl w-full h-[90vh] flex flex-col">
-          <DialogHeader className="mb-2">
-            <DialogTitle className="flex items-center gap-2">
-              <Sword className="w-5 h-5 text-orange-500" />
-              Edit Item: {editingItem?.name || 'Unknown'}
-            </DialogTitle>
-          </DialogHeader>
-          
-          {editingItem && (
-            <div className="flex-1 overflow-y-auto pr-2 minimal-scroll">
-              {(() => {
-                const role = editingItem.role || 'unspecified';
-                const isUnspecified = role === 'unspecified';
-                const isEquipment = role === 'equipment' || isUnspecified;
-                const isConsumable = role === 'consumable';
-                const isQuest = role === 'quest';
-                const isResource = role === 'resource';
-                const isBook = role === 'book';
-                return (
-              <div className="space-y-4 pb-4">
-                {/* Basic Identifier Properties */}
-                <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
-                  <h4 className="text-sm font-semibold flex items-center gap-2">
-                    <Tag className="w-4 h-4 text-orange-500" />
-                    Basic Identifier Properties
-                  </h4>
-                      <div className="grid grid-cols-2 gap-3 items-start">
-                        <div className="space-y-2">
-                          <div className="flex flex-col gap-1">
-                            <label className="text-xs text-muted-foreground">ID</label>
-                            <Badge variant="secondary" className="w-fit text-xs px-2 py-1 border border-border bg-muted/60">
-                              {editingItem.id}
-                            </Badge>
-                          </div>
-                          <div className="flex flex-col gap-1">
-                            <label className="text-xs text-muted-foreground">Name</label>
-                            <Input
-                              value={editingItem.name}
-                              onChange={(e) => updateEditingItemField('name', e.target.value)}
-                              placeholder="Item name"
-                              className="h-8"
-                            />
-                          </div>
-                          <div className="flex flex-col gap-1">
-                            <label className="text-xs text-muted-foreground">Description</label>
-                            <Input
-                              value={editingItem.flavor}
-                              onChange={(e) => updateEditingItemField('flavor', e.target.value)}
-                              placeholder="Item description shown in tooltips"
-                              className="h-16"
-                            />
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <div>
-                            <label className="text-xs text-muted-foreground">Level</label>
-                            <Input
-                              type="text"
-                              value={editingItem.level}
-                              onChange={(e) => updateEditingItemField('level', parseInt(e.target.value, 10) || 1)}
-                              className="h-8 w-24"
-                            />
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-1">
-                              <label className="text-xs text-muted-foreground">Quality (Rarity)</label>
-                              <Tooltip content="Controls rarity color & overlay; does not affect stats." side="right">
-                                <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
-                              </Tooltip>
-                            </div>
-                            {(() => {
-                              const qualityOptions = [
-                                { value: '', label: 'None', swatch: '#d4d4d8' },
-                                { value: 'low', label: 'Low', swatch: 'rgb(127,127,127)' },
-                                { value: 'normal', label: 'Normal', swatch: 'rgb(255,255,255)' },
-                                { value: 'high', label: 'High', swatch: 'rgb(64,255,64)' },
-                                { value: 'epic', label: 'Epic', swatch: 'rgb(64,128,255)' },
-                                { value: 'rare', label: 'Rare', swatch: 'rgb(160,64,255)' },
-                                { value: 'unique', label: 'Unique', swatch: 'rgb(255,192,64)' },
-                                { value: 'one_time_use', label: 'One-time Use', swatch: 'rgb(64,255,255)' },
-                                { value: 'currency', label: 'Currency', swatch: 'rgb(255,232,156)' }
-                              ];
-                              const currentValue = editingItem.quality || '';
-                              return (
-                                <div className="space-y-2">
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {qualityOptions.map((opt) => {
-                                      const isActive = currentValue === opt.value;
-                                      return (
-                                        <Button
-                                          key={opt.value ?? 'none'}
-                                          type="button"
-                                          variant="outline"
-                                          size="sm"
-                                          className="h-8 px-2 text-xs flex items-center gap-2 border-border bg-card text-foreground hover:border-muted-foreground/60"
-                                          onClick={() => updateEditingItemField('quality', opt.value)}
-                                          style={isActive ? { borderColor: opt.swatch } : undefined}
-                                        >
-                                          <span
-                                            className="h-3 w-3 rounded-full border border-border"
-                                            style={{ backgroundColor: opt.swatch }}
-                                          ></span>
-                                          <span className="truncate">{opt.label}</span>
-                                        </Button>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              );
-                            })()}
-                          </div>
-                        </div>
-                      </div>
-                </div>
+      <ItemEditDialog
+        showItemEditDialog={showItemEditDialog}
+        editingItem={editingItem}
+        updateEditingItemField={updateEditingItemField}
+        handleCloseItemEdit={handleCloseItemEdit}
+        handleSaveItemEdit={handleSaveItemEdit}
+      />
 
-                {/* Trade and Inventory Properties */}
-                <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
-              <h4 className="text-sm font-semibold flex items-center gap-2">
-                <Coins className="w-4 h-4 text-orange-500" />
-                Trade and Inventory Properties
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-start">
-                <div className="md:col-span-1">
-                  {(() => {
-                    const noStash = editingItem.no_stash || 'ignore';
-                    const allowPrivate = !(noStash === 'private' || noStash === 'all');
-                    const allowShared = !(noStash === 'shared' || noStash === 'all');
-                    const updateStash = (nextAllowPrivate: boolean, nextAllowShared: boolean) => {
-                      let next: 'ignore' | 'private' | 'shared' | 'all';
-                      if (nextAllowPrivate && nextAllowShared) next = 'ignore';
-                      else if (!nextAllowPrivate && nextAllowShared) next = 'private';
-                      else if (nextAllowPrivate && !nextAllowShared) next = 'shared';
-                      else next = 'all';
-                      updateEditingItemField('no_stash', next);
-                    };
-                    return (
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-medium">Stash</span>
-                          <Tooltip content="Where this can be stored?" side="right">
-                            <HelpCircle className="w-4 h-4 text-muted-foreground" />
-                          </Tooltip>
-                        </div>
-                        <div className="flex flex-col gap-1">
-                          <label className="flex items-center gap-2 text-xs text-foreground">
-                            <input
-                              type="checkbox"
-                              className="h-4 w-4"
-                              checked={allowPrivate}
-                              onChange={(e) => updateStash(e.target.checked, allowShared)}
-                            />
-                            <span className="leading-tight">
-                              Private stash
-                              <span className="block text-muted-foreground text-[11px]">Character-only storage</span>
-                            </span>
-                          </label>
-                          <label className="flex items-center gap-2 text-xs text-foreground">
-                            <input
-                              type="checkbox"
-                              className="h-4 w-4"
-                              checked={allowShared}
-                              onChange={(e) => updateStash(allowPrivate, e.target.checked)}
-                            />
-                            <span className="leading-tight">
-                              Shared stash
-                              <span className="block text-muted-foreground text-[11px]">Account-wide storage</span>
-                            </span>
-                          </label>
-                        </div>
-                        {editingItem.quest_item && (
-                          <div className="text-[11px] text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700 rounded px-2 py-1">
-                            Quest items are not stashable by default. Adjust the checkboxes above if you want to allow stashing this quest item.
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })()}
-                </div>
-                    <div className="md:col-span-2">
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-2">
-                          <div>
-                            <div className="flex items-center gap-1">
-                              <label className="text-xs text-muted-foreground">Buy Price</label>
-                              <Tooltip content="0 = vendors won’t buy this item (unsellable)." side="right">
-                                <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
-                              </Tooltip>
-                            </div>
-                            <input
-                              type="text"
-                              value={editingItem.price ?? ''}
-                              onChange={(e) => updateEditingItemField('price', e.target.value)}
-                              placeholder="10"
-                              className="h-8 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                              inputMode="numeric"
-                              pattern="[0-9]*"
-                            />
-                          </div>
-                          <div>
-                            {(() => {
-                              const autoSell = editingItem.price_sell === '0' || editingItem.price_sell === '' || editingItem.price_sell === undefined;
-                              return (
-                                <>
-                                  <div className="flex items-center gap-2">
-                                    <div className="flex items-center gap-1">
-                                      <label className="text-xs text-muted-foreground">Sell Price</label>
-                                      <Tooltip content="0 = use automatic sell price (price * vendor_ratio_sell)." side="right">
-                                        <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
-                                      </Tooltip>
-                                    </div>
-                                    <label className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                                      <input
-                                        type="checkbox"
-                                        className="h-3.5 w-3.5"
-                                        checked={autoSell}
-                                        onChange={(e) => {
-                                          if (e.target.checked) {
-                                            updateEditingItemField('price_sell', '0');
-                                          } else {
-                                            const fallbackValue = editingItem.price_sell && editingItem.price_sell !== '0'
-                                              ? editingItem.price_sell
-                                              : (editingItem.price && Number(editingItem.price) > 0 ? Math.max(1, Number(editingItem.price) / 2) : 1);
-                                            updateEditingItemField('price_sell', fallbackValue.toString());
-                                          }
-                                        }}
-                                      />
-                                      Use automatic sell price
-                                    </label>
-                                  </div>
-                                  <input
-                                    type="text"
-                                    value={editingItem.price_sell ?? ''}
-                                    onChange={(e) => updateEditingItemField('price_sell', e.target.value)}
-                                    placeholder="5"
-                                    className="h-8 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                                    inputMode="numeric"
-                                    pattern="[0-9]*"
-                                    disabled={autoSell}
-                                  />
-                                </>
-                              );
-                            })()}
-                          </div>
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-1">
-                            <label className="text-xs text-muted-foreground">Max stack size</label>
-                            <Tooltip content="Maximum items per stack. 1 = no stacking." side="right">
-                              <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
-                            </Tooltip>
-                          </div>
-                          <input
-                            type="text"
-                            value={editingItem.max_quantity}
-                            onChange={(e) => updateEditingItemField('max_quantity', parseInt(e.target.value, 10) || 1)}
-                            className="h-8 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                            inputMode="numeric"
-                            pattern="[0-9]*"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+      <ObjectManagementDialog
+        showObjectDialog={showObjectDialog}
+        editingObject={editingObject}
+        objectValidationErrors={objectValidationErrors}
+        setEditingObject={setEditingObject}
+        handleObjectDialogClose={handleObjectDialogClose}
+        handleObjectDialogSave={handleObjectDialogSave}
+        updateEditingObjectProperty={updateEditingObjectProperty}
+        editor={editor}
+        syncMapObjects={syncMapObjects}
+        canUseTilesetDialog={canUseTilesetDialog}
+        handleEditingTilesetBrowse={handleEditingTilesetBrowse}
+        handleEditingPortraitBrowse={handleEditingPortraitBrowse}
+        handleEditingPreviewBrowse={handleEditingPreviewBrowse}
+        handleOpenVendorStockDialog={handleOpenVendorStockDialog}
+        handleOpenVendorUnlockDialog={handleOpenVendorUnlockDialog}
+        handleOpenVendorRandomDialog={handleOpenVendorRandomDialog}
+        handleOpenVendorStockAdd={handleOpenVendorStockAdd}
+        handleOpenVendorUnlockAdd={handleOpenVendorUnlockAdd}
+        handleOpenVendorRandomAdd={handleOpenVendorRandomAdd}
+        handleToggleActorRole={handleToggleActorRole}
+        editingNpcDialogues={editingNpcDialogues}
+        setEditingNpcDialogues={setEditingNpcDialogues}
+        dialogueTrees={dialogueTrees}
+        setDialogueTrees={setDialogueTrees}
+        setActiveDialogueTab={setActiveDialogueTab}
+        setShowDialogueTreeDialog={setShowDialogueTreeDialog}
+        editingItem={editingItem}
+        setEditingItem={setEditingItem}
+        updateEditingItemField={updateEditingItemField}
+        editingNpcVendorStock={editingNpcVendorStock}
+        setEditingNpcVendorStock={setEditingNpcVendorStock}
+        editingNpcVendorUnlocks={editingNpcVendorUnlocks}
+        setEditingNpcVendorUnlocks={setEditingNpcVendorUnlocks}
+        editingNpcVendorRandom={editingNpcVendorRandom}
+        setEditingNpcVendorRandom={setEditingNpcVendorRandom}
+        editingNpcDisplayName={editingNpcDisplayName}
+        setEditingNpcDisplayName={setEditingNpcDisplayName}
+        editingNpcTitle={editingNpcTitle}
+        setEditingNpcTitle={setEditingNpcTitle}
+        editingNpcDialogue={editingNpcDialogue}
+        setEditingNpcDialogue={setEditingNpcDialogue}
+        editingNpcCanTalk={editingNpcCanTalk}
+        setEditingNpcCanTalk={setEditingNpcCanTalk}
+        editingNpcCanTrade={editingNpcCanTrade}
+        setEditingNpcCanTrade={setEditingNpcCanTrade}
+        editingNpcCanQuest={editingNpcCanQuest}
+        setEditingNpcCanQuest={setEditingNpcCanQuest}
+        editingNpcHeroStartX={editingNpcHeroStartX}
+        setEditingNpcHeroStartX={setEditingNpcHeroStartX}
+        editingNpcHeroStartY={editingNpcHeroStartY}
+        setEditingNpcHeroStartY={setEditingNpcHeroStartY}
+        editingNpcLevelOverride={editingNpcLevelOverride}
+        setEditingNpcLevelOverride={setEditingNpcLevelOverride}
+        editingNpcNoStatScaling={editingNpcNoStatScaling}
+        setEditingNpcNoStatScaling={setEditingNpcNoStatScaling}
+        editingNpcAbilityIds={editingNpcAbilityIds}
+        setEditingNpcAbilityIds={setEditingNpcAbilityIds}
+        editingNpcPowerLevel={editingNpcPowerLevel}
+        setEditingNpcPowerLevel={setEditingNpcPowerLevel}
+        editingNpcPowerMods={editingNpcPowerMods}
+        setEditingNpcPowerMods={setEditingNpcPowerMods}
+        editingNpcPowerModsDesc={editingNpcPowerModsDesc}
+        setEditingNpcPowerModsDesc={setEditingNpcPowerModsDesc}
+        editingNpcDialogueNpc={editingNpcDialogueNpc}
+        setEditingNpcDialogueNpc={setEditingNpcDialogueNpc}
+        editingNpcDialoguePlayer={editingNpcDialoguePlayer}
+        setEditingNpcDialoguePlayer={setEditingNpcDialoguePlayer}
+        editingNpcDialogueTrigger={editingNpcDialogueTrigger}
+        setEditingNpcDialogueTrigger={setEditingNpcDialogueTrigger}
+        editingNpcDialogueQuest={editingNpcDialogueQuest}
+        setEditingNpcDialogueQuest={setEditingNpcDialogueQuest}
+        editingNpcDialogueReward={editingNpcDialogueReward}
+        setEditingNpcDialogueReward={setEditingNpcDialogueReward}
+        editingNpcDialogueStatus={editingNpcDialogueStatus}
+        setEditingNpcDialogueStatus={setEditingNpcDialogueStatus}
+        editingNpcDialogueType={editingNpcDialogueType}
+        setEditingNpcDialogueType={setEditingNpcDialogueType}
+        editingNpcDialogueName={editingNpcDialogueName}
+        setEditingNpcDialogueName={setEditingNpcDialogueName}
+        editingNpcDialogueText={editingNpcDialogueText}
+        setEditingNpcDialogueText={setEditingNpcDialogueText}
+        editingNpcDialogueEvents={editingNpcDialogueEvents}
+        setEditingNpcDialogueEvents={setEditingNpcDialogueEvents}
+        editingNpcDialogueLineIndex={editingNpcDialogueLineIndex}
+        setEditingNpcDialogueLineIndex={setEditingNpcDialogueLineIndex}
+        editingNpcDialogueTopic={editingNpcDialogueTopic}
+        setEditingNpcDialogueTopic={setEditingNpcDialogueTopic}
+        editingNpcDialogueRequirements={editingNpcDialogueRequirements}
+        setEditingNpcDialogueRequirements={setEditingNpcDialogueRequirements}
+        editingNpcDialogueRewards={editingNpcDialogueRewards}
+        setEditingNpcDialogueRewards={setEditingNpcDialogueRewards}
+        editingNpcDialogueWorldEffects={editingNpcDialogueWorldEffects}
+        setEditingNpcDialogueWorldEffects={setEditingNpcDialogueWorldEffects}
+        editingNpcDialoguePreview={editingNpcDialoguePreview}
+        setEditingNpcDialoguePreview={setEditingNpcDialoguePreview}
+        editingNpcDialogueEditor={editingNpcDialogueEditor}
+        setEditingNpcDialogueEditor={setEditingNpcDialogueEditor}
+        setEditingNpcDialogue={setEditingNpcDialogue}
+        setEditingNpcDialogueEvent={setEditingNpcDialogueEvent}
+        setEditingNpcDialogueNode={setEditingNpcDialogueNode}
+        setEditingNpcDialogueTextNode={setEditingNpcDialogueTextNode}
+        setEditingNpcDialogueTopicNode={setEditingNpcDialogueTopicNode}
+        setEditingNpcDialogueChoice={setEditingNpcDialogueChoice}
+        setEditingNpcDialogueChoiceNode={setEditingNpcDialogueChoiceNode}
+        setEditingNpcDialogueRewardNode={setEditingNpcDialogueRewardNode}
+        setEditingNpcDialogueRequirementNode={setEditingNpcDialogueRequirementNode}
+        setEditingNpcDialogueWorldEffectNode={setEditingNpcDialogueWorldEffectNode}
+        setEditingNpcDialogueTriggerNode={setEditingNpcDialogueTriggerNode}
+        showDeleteNpcConfirm={showDeleteNpcConfirm}
+        setShowDeleteNpcConfirm={setShowDeleteNpcConfirm}
+        showDeleteEnemyConfirm={showDeleteEnemyConfirm}
+        setShowDeleteEnemyConfirm={setShowDeleteEnemyConfirm}
+      />
 
-                {/* Resource-specific */}
-                {isResource && (
-                  <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
-                    <h4 className="text-sm font-semibold flex items-center gap-2">
-                      <Box className="w-4 h-4 text-orange-500" />
-                      Resource
-                    </h4>
-                    <div className="grid sm:grid-cols-2 gap-2">
-                      {(Object.keys(RESOURCE_SUBTYPE_META) as Array<Exclude<ItemResourceSubtype, ''>>).map((key) => {
-                        const meta = RESOURCE_SUBTYPE_META[key];
-                        const isActive = editingItem.resourceSubtype === key;
-                        return (
-                          <button
-                            key={key}
-                            type="button"
-                            onClick={() => updateEditingItemField('resourceSubtype', key)}
-                            className={`text-left border rounded-md px-3 py-2 transition-colors ${isActive ? 'border-purple-500 bg-purple-500/10 ring-1 ring-purple-500/30' : 'border-border hover:bg-muted/60'}`}
-                          >
-                            <div className="flex items-center gap-2">
-                              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${meta.badgeClass}`}>
-                                {meta.label}
-                              </span>
-                              <Check className={`w-4 h-4 transition-opacity ${isActive ? 'opacity-100 text-purple-500' : 'opacity-0'}`} />
-                            </div>
-                            <p className="text-xs text-muted-foreground mt-1 leading-snug">{meta.hint}</p>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* Equipment and Requirement Properties */}
-                {isEquipment && (
-                <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
-                  <h4 className="text-sm font-semibold flex items-center gap-2">
-                    <Shield className="w-4 h-4 text-orange-500" />
-                    Equipment and Requirements
-                  </h4>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs text-muted-foreground">Item Type (equipment slot)</label>
-                      <Input
-                        value={editingItem.item_type}
-                        onChange={(e) => updateEditingItemField('item_type', e.target.value)}
-                        placeholder="items/types.txt ID"
-                        className="h-8"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground">Equip Flags</label>
-                      <Input
-                        value={editingItem.equip_flags}
-                        onChange={(e) => updateEditingItemField('equip_flags', e.target.value)}
-                        placeholder="flag1,flag2"
-                        className="h-8"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-3 gap-3">
-                    <div>
-                      <label className="text-xs text-muted-foreground">Requires Level</label>
-                      <Input
-                        type="number"
-                        value={editingItem.requires_level}
-                        onChange={(e) => updateEditingItemField('requires_level', parseInt(e.target.value) || 0)}
-                        min={0}
-                        className="h-8"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground">Requires Stat</label>
-                      <Input
-                        value={editingItem.requires_stat}
-                        onChange={(e) => updateEditingItemField('requires_stat', e.target.value)}
-                        placeholder="physical,6"
-                        className="h-8"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground">Requires Class</label>
-                      <Input
-                        value={editingItem.requires_class}
-                        onChange={(e) => updateEditingItemField('requires_class', e.target.value)}
-                        placeholder="warrior"
-                        className="h-8"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs text-muted-foreground">Disable Slots</label>
-                      <Input
-                        value={editingItem.disable_slots}
-                        onChange={(e) => updateEditingItemField('disable_slots', e.target.value)}
-                        placeholder="slot1,slot2"
-                        className="h-8"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground">GFX (Animation)</label>
-                      <Input
-                        value={editingItem.gfx}
-                        onChange={(e) => updateEditingItemField('gfx', e.target.value)}
-                        placeholder="animations/item.txt"
-                        className="h-8"
-                      />
-                    </div>
-                  </div>
-                </div>
-                )}
-
-                {/* Status and Effect Properties (Bonuses) */}
-                {isEquipment && (
-                <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
-                  <h4 className="text-sm font-semibold flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-orange-500" />
-                    Bonuses and Effects
-                  </h4>
-                  <div>
-                    <label className="text-xs text-muted-foreground">Bonus (stat bonuses)</label>
-                    <Input
-                      value={editingItem.bonus}
-                      onChange={(e) => updateEditingItemField('bonus', e.target.value)}
-                      placeholder="hp,50 or speed,10"
-                      className="h-8"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground">Bonus Power Level</label>
-                    <Input
-                      value={editingItem.bonus_power_level}
-                      onChange={(e) => updateEditingItemField('bonus_power_level', e.target.value)}
-                      placeholder="power_id,level"
-                      className="h-8"
-                    />
-                  </div>
-                </div>
-                )}
-
-                    {/* Usage and Power Properties */}
-                    {(isEquipment || isConsumable) && (
-                    <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
-                  <h4 className="text-sm font-semibold flex items-center gap-2">
-                    <Zap className="w-4 h-4 text-orange-500" />
-                    Usage and Power (TODO IN FUTURE)
-                  </h4>
-                  {isEquipment && (
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs text-muted-foreground">Damage (dmg)</label>
-                      <Input
-                        value={editingItem.dmg}
-                        onChange={(e) => updateEditingItemField('dmg', e.target.value)}
-                        placeholder="melee,1,10"
-                        className="h-8"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground">Absorb (abs)</label>
-                      <Input
-                        value={editingItem.abs}
-                        onChange={(e) => updateEditingItemField('abs', e.target.value)}
-                        placeholder="1,5"
-                        className="h-8"
-                      />
-                    </div>
-                  </div>
-                  )}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs text-muted-foreground">Power ID</label>
-                      <Input
-                            value={editingItem.power}
-                            onChange={(e) => updateEditingItemField('power', e.target.value)}
-                            placeholder="power_id"
-                            className="h-8"
-                          />
-                    </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground">Power Description</label>
-                      <Input
-                        value={editingItem.power_desc}
-                        onChange={(e) => updateEditingItemField('power_desc', e.target.value)}
-                            placeholder="Description text"
-                            className="h-8"
-                          />
-                        </div>
-                      </div>
-                      {/* TODO: When equipment power presets are finalized, add configuration controls here. */}
-                      <div>
-                        <label className="text-xs text-muted-foreground">Replace Power</label>
-                        <Input
-                      value={editingItem.replace_power}
-                      onChange={(e) => updateEditingItemField('replace_power', e.target.value)}
-                      placeholder="old_power_id,new_power_id"
-                      className="h-8"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground">Script</label>
-                    <Input
-                      value={editingItem.script}
-                      onChange={(e) => updateEditingItemField('script', e.target.value)}
-                      placeholder="scripts/item_script.txt"
-                      className="h-8"
-                    />
-                  </div>
-                </div>
-                )}
-
-                {/* Quest-only */}
-                {isQuest && (
-                  <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
-                    <h4 className="text-sm font-semibold flex items-center gap-2">
-                      <AlertTriangle className="w-4 h-4 text-orange-500" />
-                      Quest Item Settings
-                    </h4>
-                    <div className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        id="quest_item_lock"
-                        checked={!!editingItem.quest_item}
-                        disabled
-                        className="h-4 w-4"
-                      />
-                      <label htmlFor="quest_item_lock" className="text-xs text-muted-foreground">Quest item (always on for this role)</label>
-                    </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground">Pickup Status</label>
-                      <Input
-                        value={editingItem.pickup_status}
-                        onChange={(e) => updateEditingItemField('pickup_status', e.target.value)}
-                        placeholder="campaign_status_id"
-                        className="h-8"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* Book / Lore */}
-                {isBook && (
-                  <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
-                    <h4 className="text-sm font-semibold flex items-center gap-2">
-                      <Book className="w-4 h-4 text-orange-500" />
-                      Book / Lore
-                    </h4>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="text-xs text-muted-foreground">Book File</label>
-                        <Input
-                          value={editingItem.book}
-                          onChange={(e) => updateEditingItemField('book', e.target.value)}
-                          placeholder="books/lore.txt"
-                          className="h-8"
-                        />
-                      </div>
-                      <label className="flex items-center gap-2 text-xs text-foreground mt-6">
-                        <input
-                          type="checkbox"
-                          className="h-4 w-4"
-                          checked={editingItem.book_is_readable}
-                          onChange={(e) => updateEditingItemField('book_is_readable', e.target.checked)}
-                        />
-                        Show &quot;Read&quot; instead of &quot;Use&quot;
-                      </label>
-                    </div>
-                  </div>
-                )}
-
-                {/* Visual and Audio Properties */}
-                <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
-                  <h4 className="text-sm font-semibold flex items-center gap-2">
-                    <Volume2 className="w-4 h-4 text-orange-500" />
-                    Visual and Audio
-                  </h4>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs text-muted-foreground">Sound FX</label>
-                      <Input
-                        value={editingItem.soundfx}
-                        onChange={(e) => updateEditingItemField('soundfx', e.target.value)}
-                        placeholder="sounds/item.ogg"
-                        className="h-8"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground">Step FX (for armor)</label>
-                      <Input
-                        value={editingItem.stepfx}
-                        onChange={(e) => updateEditingItemField('stepfx', e.target.value)}
-                        placeholder="step_fx_id"
-                        className="h-8"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground">Loot Animation</label>
-                    <Input
-                      value={editingItem.loot_animation}
-                      onChange={(e) => updateEditingItemField('loot_animation', e.target.value)}
-                      placeholder="loot/animation.txt,min,max"
-                      className="h-8"
-                    />
-                  </div>
-                </div>
-
-                {/* Randomization and Loot Properties */}
-                {!isQuest && (
-                <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
-                  <h4 className="text-sm font-semibold flex items-center gap-2">
-                    <Gift className="w-4 h-4 text-orange-500" />
-                    Randomization and Loot
-                  </h4>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs text-muted-foreground">Randomizer Definition</label>
-                      <Input
-                        value={editingItem.randomizer_def}
-                        onChange={(e) => updateEditingItemField('randomizer_def', e.target.value)}
-                        placeholder="randomizer/def.txt"
-                        className="h-8"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground">Loot Drops Max</label>
-                      <Input
-                        type="number"
-                        value={editingItem.loot_drops_max}
-                        onChange={(e) => updateEditingItemField('loot_drops_max', parseInt(e.target.value) || 1)}
-                        min={1}
-                        className="h-8"
-                      />
-                    </div>
-                  </div>
-                </div>
-                )}
-
-              </div>
-                );
-              })()}
-            </div>
-          )}
-          
-          <DialogFooter className="pt-2 border-t">
-            <Button variant="outline" onClick={handleCloseItemEdit}>
-              Cancel
-            </Button>
-            <Button onClick={handleSaveItemEdit} className="bg-orange-500 hover:bg-orange-600 text-white">
-              Save Item
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Object Management Dialog */}
-      <Dialog
-        open={showObjectDialog && editingObject?.type !== 'enemy'}
-        onOpenChange={(open) => {
-          if (!open) {
-            handleObjectDialogClose();
-          } else {
-            setShowObjectDialog(true);
-          }
+      <DialogueTreeDialog
+        showDialogueTreeDialog={showDialogueTreeDialog}
+        dialogueTrees={dialogueTrees}
+        setDialogueTrees={setDialogueTrees}
+        activeDialogueTab={activeDialogueTab}
+        setActiveDialogueTab={setActiveDialogueTab}
+        dialogueTabToDelete={dialogueTabToDelete}
+        setDialogueTabToDelete={setDialogueTabToDelete}
+        editingObject={editingObject}
+        updateEditingObjectProperty={updateEditingObjectProperty}
+        onClose={() => {
+          setShowDialogueTreeDialog(false);
+          setDialogueTabToDelete(null);
         }}
-      >
-        <DialogContent className="max-w-5xl w-full h-[90vh] flex flex-col">
-          <DialogHeader className="mb-4">
-            <DialogTitle className="flex items-center gap-2">
-              {editingObject?.type === 'enemy' ? (
-                'Edit Enemy'
-              ) : (
-                <>
-                  {editingObject?.type === 'npc' && (
-                    <User className="w-5 h-5 text-orange-500" />
-                  )}
-                  {editingObject?.type === 'enemy' && (
-                    <div className="flex items-center gap-2">
-                      <span>{editingObject ? `Edit ${editingObject.type.toUpperCase()}` : 'Add Object'}</span>
-                      <Tooltip
-                        content={
-                          <div
-                            className="max-w-lg whitespace-normal break-words text-sm text-foreground leading-snug p-2"
-                            style={{ whiteSpace: 'normal', overflow: 'visible', textOverflow: 'clip' }}
-                          >
-                            Enemy stats normally scale with level. Overriding a stat disables scaling for that stat.
-                          </div>
-                        }
-                        side="right"
-                      >
-                        <span className="inline-flex items-center text-orange-500 font-semibold">
-                          <HelpCircle className="w-4 h-4" strokeWidth={2.4} />
-                        </span>
-                      </Tooltip>
-                    </div>
-                  )}
-                  {editingObject?.type !== 'enemy' && (editingObject ? `Edit ${editingObject.type.toUpperCase()}` : 'Add Object')}
-                </>
-              )}
-            </DialogTitle>
-          </DialogHeader>
-          {objectValidationErrors.length > 0 && (
-                <div className="mb-3 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
-                  <p className="font-semibold mb-1">Please fix the following:</p>
-                  <ul className="ml-4 list-disc space-y-1">
-                    {objectValidationErrors.map((error, index) => (
-                      <li key={`${error}-${index}`}>{error}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              <div className="flex-1 overflow-y-auto pr-2 minimal-scroll">
-                {editingObject && (
-                  <div className="space-y-3 pb-4">
-              {/* Basic Info Row */}
-              <div className="flex gap-3 items-end">
-                <div className="flex-1">
-                  <label className="text-xs text-muted-foreground">Name</label>
-                  <Input
-                    value={editingObject.name || ''}
-                    onChange={(e) => setEditingObject({...editingObject, name: e.target.value})}
-                    placeholder="Object name"
-                    className="h-8"
-                  />
-                </div>
-                <div className="w-24">
-                  <label className="text-xs text-muted-foreground">Position</label>
-                  <div className="flex items-center gap-1">
-                    <Input
-                      type="number"
-                      value={editingObject.x}
-                      onChange={(e) => setEditingObject({...editingObject, x: Number(e.target.value)})}
-                      disabled={editingObject.type === 'npc' || editingObject.type === 'enemy'}
-                      className={`h-8 w-11 px-1 text-center ${(editingObject.type === 'npc' || editingObject.type === 'enemy') ? 'opacity-50' : ''}`}
-                    />
-                    <span className="text-muted-foreground text-xs">,</span>
-                    <Input
-                      type="number"
-                      value={editingObject.y}
-                      onChange={(e) => setEditingObject({...editingObject, y: Number(e.target.value)})}
-                      disabled={editingObject.type === 'npc' || editingObject.type === 'enemy'}
-                      className={`h-8 w-11 px-1 text-center ${(editingObject.type === 'npc' || editingObject.type === 'enemy') ? 'opacity-50' : ''}`}
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {editingObject.type === 'enemy' ? (
-                <div className="rounded-md border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
-                  Enemy details are edited in the enemy tab.
-                </div>
-              ) : (
-                <>
-
-              {/* NPC Roles */}
-              {editingObject.type === 'npc' && (
-                <div className="flex gap-1.5">
-                  {[
-                    { key: 'talker', label: 'Talker', color: 'blue' },
-                    { key: 'vendor', label: 'Vendor', color: 'emerald' },
-                    { key: 'questGiver', label: 'Quest', color: 'amber' }
-                  ].map(role => (
-                    <button
-                      key={role.key}
-                      type="button"
-                      onClick={() => {
-                        const newProps = { ...editingObject.properties };
-                        if (newProps[role.key] === 'true') {
-                          delete newProps[role.key];
-                        } else {
-                          newProps[role.key] = 'true';
-                        }
-                        setEditingObject({ ...editingObject, properties: newProps });
-                      }}
-                      className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
-                        editingObject.properties?.[role.key] === 'true'
-                          ? role.color === 'blue' ? 'bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/50'
-                          : role.color === 'emerald' ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/50'
-                          : 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/50'
-                          : 'bg-muted/50 text-muted-foreground border border-transparent hover:bg-muted'
-                      }`}
-                    >
-                      {role.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {/* Tileset & Portrait for NPC/Enemy */}
-              {(editingObject.type === 'npc' || editingObject.type === 'enemy') && (
-                <div className="space-y-2">
-                  <div className="flex gap-2">
-                  <Input
-                    className="h-8 flex-1 text-xs"
-                    value={getEditingObjectProperty('tilesetPath', '')}
-                    onChange={(e) => updateEditingObjectProperty('tilesetPath', e.target.value)}
-                    placeholder="Tileset path..."
-                      readOnly={canUseTilesetDialog}
-                      onClick={canUseTilesetDialog ? () => { void handleEditingTilesetBrowse(); } : undefined}
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-8 px-2 gap-2"
-                      onClick={() => { void handleEditingTilesetBrowse(); }}
-                      disabled={!canUseTilesetDialog}
-                    >
-                      <Image className="w-4 h-4" />
-                      <span className="text-xs">Tileset</span>
-                    </Button>
-                  </div>
-                  {editingObject.type === 'npc' && (
-                    <div className="flex gap-2">
-                      <Input
-                        className="h-8 flex-1 text-xs"
-                        value={getEditingObjectProperty('portraitPath', '')}
-                        onChange={(e) => updateEditingObjectProperty('portraitPath', e.target.value)}
-                        placeholder="Portrait path..."
-                        readOnly={canUseTilesetDialog}
-                        onClick={canUseTilesetDialog ? () => { void handleEditingPortraitBrowse(); } : undefined}
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        className="h-8 px-2 gap-2"
-                        onClick={() => { void handleEditingPortraitBrowse(); }}
-                        disabled={!canUseTilesetDialog}
-                      >
-                        <User className="w-4 h-4" />
-                        <span className="text-xs">Portrait</span>
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Role-specific compact options */}
-              {editingObject.type === 'npc' && editingObject.properties?.talker === 'true' && (
-                <div className="pl-2 border-l-2 border-blue-500/50">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-8 w-full text-xs gap-2"
-                    onClick={() => {
-                      // Load existing dialogue trees from properties if any
-                      const existingTrees = editingObject.properties?.dialogueTrees;
-                      if (existingTrees) {
-                        try {
-                          const parsed = JSON.parse(existingTrees as string);
-                          // Ensure rewards and worldEffects exist for backward compatibility
-                          const normalized = parsed.map((t: DialogueTree) => ({
-                            ...t,
-                            rewards: t.rewards || [],
-                            worldEffects: t.worldEffects || []
-                          }));
-                          setDialogueTrees(normalized);
-                        } catch {
-                          setDialogueTrees([{ id: '1', topic: '', requirements: [], dialogues: [], rewards: [], worldEffects: [] }]);
-                        }
-                      } else {
-                        setDialogueTrees([{ id: '1', topic: '', requirements: [], dialogues: [], rewards: [], worldEffects: [] }]);
-                      }
-                      setActiveDialogueTab(0);
-                      setShowDialogueTreeDialog(true);
-                    }}
-                  >
-                    <MessageSquare className="w-3.5 h-3.5" />
-                    Edit Dialogue Trees
-                  </Button>
-                </div>
-              )}
-
-              {editingObject.type === 'npc' && editingObject.properties?.vendor === 'true' && (
-                <div className="pl-2 border-l-2 border-emerald-500/50">
-                  <div className="space-y-1.5 flex flex-col">
-                    <div className="w-full">
-                      <Tooltip content="Items that are always in this vendor's shop.">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-8 w-full text-xs gap-2 justify-start"
-                          onClick={handleOpenVendorStockDialog}
-                        >
-                          <Package className="w-3.5 h-3.5" />
-                          Edit Always Available Items
-                        </Button>
-                      </Tooltip>
-                    </div>
-                    <div className="w-full">
-                      <Tooltip content="Extra items that appear after certain quests or story steps.">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-8 w-full text-xs gap-2 justify-start"
-                          onClick={handleOpenVendorUnlockDialog}
-                        >
-                          <Gift className="w-3.5 h-3.5" />
-                          Edit Unlockable Items
-                        </Button>
-                      </Tooltip>
-                    </div>
-                    <div className="w-full">
-                      <Tooltip content="Extra items randomly picked from a loot table each time.">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="h-8 w-full text-xs gap-2 justify-start"
-                          onClick={handleOpenVendorRandomDialog}
-                        >
-                          <Sparkles className="w-3.5 h-3.5" />
-                          Edit Random Offers
-                        </Button>
-                      </Tooltip>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {editingObject.type === 'npc' && editingObject.properties?.questGiver === 'true' && (
-                <div className="pl-2 border-l-2 border-amber-500/50 space-y-1.5">
-                  <Input
-                    className="h-7 text-xs"
-                    value={getEditingObjectProperty('questRequiresStatus', '')}
-                    onChange={(e) => updateEditingObjectProperty('questRequiresStatus', e.target.value)}
-                    placeholder="Requires status..."
-                  />
-                  <Input
-                    className="h-7 text-xs"
-                    value={getEditingObjectProperty('questSetStatus', '')}
-                    onChange={(e) => updateEditingObjectProperty('questSetStatus', e.target.value)}
-                    placeholder="Set status on accept..."
-                  />
-                </div>
-              )}
-
-              {editingObject.type === 'enemy' && (
-                <>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Level</label>
-                      <Input
-                        type="number"
-                        value={editingObject.level || 1}
-                        onChange={(e) => setEditingObject({...editingObject, level: Number(e.target.value)})}
-                        min="1"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Number</label>
-                      <Input
-                        type="number"
-                        value={editingObject.number || 1}
-                        onChange={(e) => setEditingObject({...editingObject, number: Number(e.target.value)})}
-                        min="1"
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Wander Radius</label>
-                    <Input
-                      type="number"
-                      value={editingObject.wander_radius || 4}
-                      onChange={(e) => setEditingObject({...editingObject, wander_radius: Number(e.target.value)})}
-                      min="0"
-                    />
-                  </div>
-
-                  <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
-                    <div>
-                      <h4 className="text-sm font-semibold">Enemy Specifications</h4>
-                      <p className="text-xs text-muted-foreground">Configure Flare StatBlock-compatible values.</p>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium mb-1">XP</label>
-                        <Input
-                          type="number"
-                          value={getEditingObjectProperty('xp', '')}
-                          onChange={(e) => updateEditingObjectProperty('xp', e.target.value)}
-                          min="0"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">XP Scaling Table</label>
-                        <Input
-                          value={getEditingObjectProperty('xp_scaling', '')}
-                          onChange={(e) => updateEditingObjectProperty('xp_scaling', e.target.value)}
-                          placeholder="tables/xp_scaling.txt"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Defeat Status</label>
-                        <Input
-                          value={getEditingObjectProperty('defeat_status', '')}
-                          onChange={(e) => updateEditingObjectProperty('defeat_status', e.target.value)}
-                          placeholder="campaign_status_id"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Convert Status</label>
-                        <Input
-                          value={getEditingObjectProperty('convert_status', '')}
-                          onChange={(e) => updateEditingObjectProperty('convert_status', e.target.value)}
-                          placeholder="campaign_status_id"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium mb-1">First Defeat Loot</label>
-                        <Input
-                          value={getEditingObjectProperty('first_defeat_loot', '')}
-                          onChange={(e) => updateEditingObjectProperty('first_defeat_loot', e.target.value)}
-                          placeholder="items/id.txt"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Animations Definition</label>
-                        <Input
-                          value={getEditingObjectProperty('animations', '')}
-                          onChange={(e) => updateEditingObjectProperty('animations', e.target.value)}
-                          placeholder="animations/enemies/foo.txt"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Loot Entries (one per line)</label>
-                      <textarea
-                        className="w-full min-h-[80px] text-sm rounded-md border border-border bg-background px-2 py-1"
-                        value={getEditingObjectProperty('loot', '')}
-                        onChange={(e) => updateEditingObjectProperty('loot', e.target.value)}
-                        placeholder="item_id, chance"
-                      />
-                    </div>
-
-                    {(() => {
-                      const lootCountRaw = getEditingObjectProperty('loot_count', '');
-                      const [lootCountMin = '', lootCountMax = ''] = lootCountRaw.split(',').map((part) => part.trim());
-                      return (
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-sm font-medium mb-1">Loot Count Min</label>
-                            <Input
-                              type="number"
-                              value={lootCountMin}
-                              min="0"
-                              onChange={(e) => {
-                                const newMin = e.target.value;
-                                if (!newMin) {
-                                  updateEditingObjectProperty('loot_count', '');
-                                } else {
-                                  updateEditingObjectProperty('loot_count', lootCountMax ? `${newMin},${lootCountMax}` : newMin);
-                                }
-                              }}
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium mb-1">Loot Count Max</label>
-                            <Input
-                              type="number"
-                              value={lootCountMax}
-                              min="0"
-                              onChange={(e) => {
-                                const newMax = e.target.value;
-                                if (!lootCountMin) {
-                                  updateEditingObjectProperty('loot_count', '');
-                                } else {
-                                  updateEditingObjectProperty('loot_count', newMax ? `${lootCountMin},${newMax}` : lootCountMin);
-                                }
-                              }}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })()}
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Threat Range (engage, stop)</label>
-                        {(() => {
-                          const raw = getEditingObjectProperty('threat_range', '');
-                          const [engage = '', stop = ''] = raw.split(',').map((part) => part.trim());
-                          return (
-                            <div className="grid grid-cols-2 gap-2">
-                              <Input
-                                type="number"
-                                value={engage}
-                                onChange={(e) => {
-                                  const newEngage = e.target.value;
-                                  if (!newEngage) {
-                                    updateEditingObjectProperty('threat_range', stop ? `0,${stop}` : '');
-                                  } else {
-                                    updateEditingObjectProperty('threat_range', stop ? `${newEngage},${stop}` : newEngage);
-                                  }
-                                }}
-                              />
-                              <Input
-                                type="number"
-                                value={stop}
-                                onChange={(e) => {
-                                  const newStop = e.target.value;
-                                  if (!engage) {
-                                    updateEditingObjectProperty('threat_range', '');
-                                  } else {
-                                    updateEditingObjectProperty('threat_range', newStop ? `${engage},${newStop}` : engage);
-                                  }
-                                }}
-                              />
-                            </div>
-                          );
-                        })()}
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Flee Range</label>
-                        <Input
-                          type="number"
-                          value={getEditingObjectProperty('flee_range', '')}
-                          onChange={(e) => updateEditingObjectProperty('flee_range', e.target.value)}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Chance Pursue (%)</label>
-                        <Input
-                          type="number"
-                          value={getEditingObjectProperty('chance_pursue', '')}
-                          onChange={(e) => updateEditingObjectProperty('chance_pursue', e.target.value)}
-                          min="0"
-                          max="100"
-                          step="0.1"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Chance Flee (%)</label>
-                        <Input
-                          type="number"
-                          value={getEditingObjectProperty('chance_flee', '')}
-                          onChange={(e) => updateEditingObjectProperty('chance_flee', e.target.value)}
-                          min="0"
-                          max="100"
-                          step="0.1"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Waypoint Pause</label>
-                        <Input
-                          value={getEditingObjectProperty('waypoint_pause', '')}
-                          onChange={(e) => updateEditingObjectProperty('waypoint_pause', e.target.value)}
-                          placeholder="250ms"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Turn Delay</label>
-                        <Input
-                          value={getEditingObjectProperty('turn_delay', '')}
-                          onChange={(e) => updateEditingObjectProperty('turn_delay', e.target.value)}
-                          placeholder="100ms"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Combat Style</label>
-                      <select
-                        className="w-full rounded-md border border-border bg-background px-2 py-1 text-sm"
-                        value={getEditingObjectProperty('combat_style', '')}
-                        onChange={(e) => updateEditingObjectProperty('combat_style', e.target.value)}
-                      >
-                        <option value="">Default</option>
-                        <option value="default">default</option>
-                        <option value="aggressive">aggressive</option>
-                        <option value="passive">passive</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Triggered Powers (state,power,chance per line)</label>
-                      <textarea
-                        className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
-                        value={getEditingObjectProperty('power', '')}
-                        onChange={(e) => updateEditingObjectProperty('power', e.target.value)}
-                        placeholder="melee,power/melee_slash,25"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Passive Powers (one power id per line)</label>
-                      <textarea
-                        className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
-                        value={getEditingObjectProperty('passive_powers', '')}
-                        onChange={(e) => updateEditingObjectProperty('passive_powers', e.target.value)}
-                        placeholder="power_id"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Quest Loot (one per line: status,not_status,item_id)</label>
-                      <textarea
-                        className="w-full min-h-[60px] text-sm rounded-md border border-border bg-background px-2 py-1"
-                        value={getEditingObjectProperty('quest_loot', '')}
-                        onChange={(e) => updateEditingObjectProperty('quest_loot', e.target.value)}
-                        placeholder="status_required,status_block,item_id"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Flee Duration</label>
-                        <Input
-                          value={getEditingObjectProperty('flee_duration', '')}
-                          onChange={(e) => updateEditingObjectProperty('flee_duration', e.target.value)}
-                          placeholder="1.5s"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Flee Cooldown</label>
-                        <Input
-                          value={getEditingObjectProperty('flee_cooldown', '')}
-                          onChange={(e) => updateEditingObjectProperty('flee_cooldown', e.target.value)}
-                          placeholder="5s"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-3">
-                      {[
-                        { key: 'humanoid', label: 'Humanoid' },
-                        { key: 'lifeform', label: 'Lifeform' },
-                        { key: 'flying', label: 'Flying' },
-                        { key: 'intangible', label: 'Intangible' },
-                        { key: 'facing', label: 'Facing' },
-                        { key: 'suppress_hp', label: 'Hide HP Bar' }
-                      ].map((field) => (
-                        <label key={field.key} className="flex items-center gap-2 text-sm">
-                          <input
-                            type="checkbox"
-                            className="w-4 h-4"
-                            checked={getEditingObjectProperty(field.key, 'false') === 'true'}
-                            onChange={(e) => updateEditingObjectBoolean(field.key, e.target.checked)}
-                          />
-                          {field.label}
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {editingObject.type === 'event' && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Activate</label>
-                    <Input
-                      value={editingObject.activate || 'on_trigger'}
-                      onChange={(e) => setEditingObject({...editingObject, activate: e.target.value})}
-                      placeholder="on_trigger, on_load, etc."
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Hotspot</label>
-                    <Input
-                      value={editingObject.hotspot || '0,0,1,1'}
-                      onChange={(e) => setEditingObject({...editingObject, hotspot: e.target.value})}
-                      placeholder="x,y,width,height"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium mb-1">Tooltip</label>
-                    <Input
-                      value={editingObject.tooltip || ''}
-                      onChange={(e) => setEditingObject({...editingObject, tooltip: e.target.value})}
-                      placeholder="Hover text"
-                    />
-                  </div>
-                </>
-              )}
-              </>
-              )}
-            </div>
-          )}
-          </div>
-
-          <DialogFooter className="mt-4 flex-shrink-0">
-            <div className="flex w-full justify-between items-center">
-              {/* Delete buttons */}
-              <div className="flex items-center gap-2">
-                {editingObject?.type === 'npc' && (
-                  <>
-                    {showDeleteNpcConfirm ? (
-                      <>
-                        <span className="text-xs text-muted-foreground">Delete?</span>
-                        <Button
-                          variant="destructive"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => {
-                            if (editingObject) {
-                              editor?.removeMapObject(editingObject.id);
-                              syncMapObjects();
-                              setShowObjectDialog(false);
-                              setEditingObject(null);
-                              setShowDeleteNpcConfirm(false);
-                            }
-                          }}
-                        >
-                          <Check className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => setShowDeleteNpcConfirm(false)}
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </>
-                    ) : (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                        onClick={() => setShowDeleteNpcConfirm(true)}
-                        aria-label="Delete NPC"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    )}
-                  </>
-                )}
-                {editingObject?.type === 'enemy' && (
-                  <>
-                    {showDeleteEnemyConfirm ? (
-                      <>
-                        <span className="text-xs text-muted-foreground">Delete?</span>
-                        <Button
-                          variant="destructive"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => {
-                            if (editingObject) {
-                              editor?.removeMapObject(editingObject.id);
-                              syncMapObjects();
-                              setShowObjectDialog(false);
-                              setEditingObject(null);
-                              setShowDeleteEnemyConfirm(false);
-                            }
-                          }}
-                        >
-                          <Check className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => setShowDeleteEnemyConfirm(false)}
-                        >
-                          <X className="w-4 h-4" />
-                        </Button>
-                      </>
-                    ) : (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                        onClick={() => setShowDeleteEnemyConfirm(true)}
-                        aria-label="Delete Enemy"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    )}
-                  </>
-                )}
-              </div>
-              
-              <div className="flex gap-2">
-                <Button variant="outline" size="icon" onClick={handleObjectDialogClose} aria-label="Cancel edit">
-                  <X className="w-4 h-4" />
-                </Button>
-                <Button size="icon" onClick={handleObjectDialogSave} aria-label="Save">
-                  <Save className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Dialogue Tree Dialog */}
-      <Dialog
-        open={showDialogueTreeDialog}
-        onOpenChange={(open) => {
-          if (!open) {
-            setShowDialogueTreeDialog(false);
-            setDialogueTabToDelete(null);
-          }
-        }}
-      >
-        <DialogContent className="max-w-4xl w-full h-[80vh] flex flex-col">
-          <DialogHeader className="mb-4">
-            <DialogTitle className="flex items-center gap-2">
-              <MessageSquare className="w-5 h-5 text-blue-500" />
-              Dialogue Trees
-            </DialogTitle>
-          </DialogHeader>
-          
-          <div className="flex-1 flex gap-4 overflow-hidden">
-            {/* Tab sidebar */}
-            <div className="w-48 flex flex-col border-r pr-4">
-              <div className="flex-1 space-y-1 overflow-y-auto minimal-scroll">
-                {dialogueTrees.map((tree, index) => (
-                  <button
-                    key={tree.id}
-                    type="button"
-                    onContextMenu={(e) => {
-                      e.preventDefault();
-                      if (dialogueTrees.length > 1) {
-                        setDialogueTabToDelete(index);
-                      }
-                    }}
-                    onClick={() => {
-                      if (dialogueTabToDelete === index) {
-                        setDialogueTabToDelete(null);
-                      } else {
-                        setActiveDialogueTab(index);
-                      }
-                    }}
-                    className={`w-full px-3 py-2 text-left text-sm rounded-md transition-colors ${
-                      dialogueTabToDelete === index
-                        ? 'bg-red-500/20 border border-red-500/50 text-red-600 dark:text-red-400'
-                        : activeDialogueTab === index
-                        ? 'bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/50'
-                        : 'hover:bg-muted border border-transparent'
-                    }`}
-                  >
-                    {dialogueTabToDelete === index ? (
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs">Delete?</span>
-                        <div className="flex gap-1">
-                          <button
-                            type="button"
-                            className="p-0.5 rounded hover:bg-red-500/30"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              const newTrees = dialogueTrees.filter((_, i) => i !== index);
-                              setDialogueTrees(newTrees);
-                              setDialogueTabToDelete(null);
-                              if (activeDialogueTab >= newTrees.length) {
-                                setActiveDialogueTab(Math.max(0, newTrees.length - 1));
-                              }
-                            }}
-                          >
-                            <Check className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            className="p-0.5 rounded hover:bg-muted"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setDialogueTabToDelete(null);
-                            }}
-                          >
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <span>Dialogue {index + 1}</span>
-                    )}
-                  </button>
-                ))}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="mt-1 w-full gap-1"
-                  onClick={() => {
-                    const newTree: DialogueTree = {
-                      id: String(Date.now()),
-                      topic: '',
-                      requirements: [],
-                      dialogues: [],
-                      rewards: [],
-                      worldEffects: []
-                    };
-                    setDialogueTrees([...dialogueTrees, newTree]);
-                    setActiveDialogueTab(dialogueTrees.length);
-                  }}
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  Add
-                </Button>
-              </div>
-            </div>
-            
-            {/* Tab content */}
-            <div className="flex-1 overflow-y-auto minimal-scroll pr-2">
-              {dialogueTrees[activeDialogueTab] && (
-                <div className="space-y-4">
-                  {/* Topic */}
-                  <div>
-                    <label className="text-xs text-muted-foreground font-medium">Topic</label>
-                    <Input
-                      value={dialogueTrees[activeDialogueTab].topic}
-                      onChange={(e) => {
-                        const newTrees = [...dialogueTrees];
-                        newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], topic: e.target.value };
-                        setDialogueTrees(newTrees);
-                      }}
-                      placeholder="Enter dialogue topic..."
-                      className="h-8"
-                    />
-                  </div>
-                  
-                  {/* Requirements - Expandable */}
-                  <div className="border rounded-md">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const tree = dialogueTrees[activeDialogueTab];
-                        const newTrees = [...dialogueTrees];
-                        newTrees[activeDialogueTab] = {
-                          ...tree,
-                          _reqExpanded: !tree._reqExpanded
-                        };
-                        setDialogueTrees(newTrees);
-                      }}
-                      className="w-full px-3 py-2 flex items-center gap-2 text-sm font-medium hover:bg-muted/50 rounded-t-md"
-                    >
-                      <div className="flex items-center gap-2">
-                        <Eye className="w-4 h-4 text-blue-400" />
-                        <span>Dialogue is visible when player has ({dialogueTrees[activeDialogueTab].requirements.length})</span>
-                      </div>
-                      {dialogueTrees[activeDialogueTab]._reqExpanded 
-                        ? <ChevronUp className="w-4 h-4" /> 
-                        : <ChevronDown className="w-4 h-4" />}
-                    </button>
-                    {dialogueTrees[activeDialogueTab]._reqExpanded && (
-                      <div className="px-3 pb-3 space-y-2">
-                        {dialogueTrees[activeDialogueTab].requirements.length === 0 && (
-                          <p className="text-xs text-muted-foreground py-1">Everyone can see this dialogue. Add conditions to restrict it.</p>
-                        )}
-                        {dialogueTrees[activeDialogueTab].requirements.map((req, reqIndex) => {
-                          const reqConfig: Record<DialogueRequirement['type'], { icon: React.ReactNode; label: string; placeholder: string; color: string }> = {
-                            status: { icon: <Tag className="w-3.5 h-3.5" />, label: 'Status', placeholder: 'e.g. quest_started', color: 'text-green-400' },
-                            not_status: { icon: <Tag className="w-3.5 h-3.5" />, label: 'Missing Status', placeholder: 'e.g. quest_completed', color: 'text-red-400' },
-                            item: { icon: <Package className="w-3.5 h-3.5" />, label: 'Item', placeholder: 'Item ID (e.g. 1)', color: 'text-yellow-400' },
-                            level: { icon: <Zap className="w-3.5 h-3.5" />, label: 'Min Level', placeholder: 'e.g. 5', color: 'text-cyan-400' },
-                            class: { icon: <User className="w-3.5 h-3.5" />, label: 'Class', placeholder: 'e.g. warrior', color: 'text-purple-400' }
-                          };
-                          const config = reqConfig[req.type];
-                          return (
-                            <div key={req.id} className="flex gap-2 items-center bg-muted/30 rounded-md p-2">
-                              <select
-                                value={req.type}
-                                onChange={(e) => {
-                                  const newTrees = [...dialogueTrees];
-                                  const newReqs = [...newTrees[activeDialogueTab].requirements];
-                                  newReqs[reqIndex] = { ...newReqs[reqIndex], type: e.target.value as DialogueRequirement['type'], value: '' };
-                                  newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], requirements: newReqs };
-                                  setDialogueTrees(newTrees);
-                                }}
-                                className="h-8 px-2 py-1 rounded border text-[11px] bg-background cursor-pointer hover:border-primary/50 transition-colors min-w-[130px]"
-                              >
-                                <option value="status">Status</option>
-                                <option value="not_status">Missing Status</option>
-                                <option value="item">Item</option>
-                                <option value="level">Min Level</option>
-                                <option value="class">Class</option>
-                              </select>
-                              <Input
-                                value={req.value}
-                                onChange={(e) => {
-                                  const newTrees = [...dialogueTrees];
-                                  const newReqs = [...newTrees[activeDialogueTab].requirements];
-                                  newReqs[reqIndex] = { ...newReqs[reqIndex], value: e.target.value };
-                                  newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], requirements: newReqs };
-                                  setDialogueTrees(newTrees);
-                                }}
-                                placeholder={config.placeholder}
-                                className="h-8 text-xs flex-1"
-                              />
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 w-7 p-0 hover:bg-destructive/20 hover:text-destructive"
-                                onClick={() => {
-                                  const newTrees = [...dialogueTrees];
-                                  const newReqs = dialogueTrees[activeDialogueTab].requirements.filter((_, i) => i !== reqIndex);
-                                  newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], requirements: newReqs };
-                                  setDialogueTrees(newTrees);
-                                }}
-                              >
-                                <X className="w-3.5 h-3.5" />
-                              </Button>
-                            </div>
-                          );
-                        })}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-7 text-xs gap-1"
-                          onClick={() => {
-                            const newTrees = [...dialogueTrees];
-                            const newReq: DialogueRequirement = { id: String(Date.now()), type: 'status', value: '' };
-                            newTrees[activeDialogueTab] = {
-                              ...newTrees[activeDialogueTab],
-                              requirements: [...newTrees[activeDialogueTab].requirements, newReq]
-                            };
-                            setDialogueTrees(newTrees);
-                          }}
-                        >
-                          <Plus className="w-3 h-3" />
-                          Add Condition
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                  
-                  {/* Dialogues - Expandable */}
-                  <div className="border rounded-md">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const tree = dialogueTrees[activeDialogueTab];
-                        const newTrees = [...dialogueTrees];
-                        newTrees[activeDialogueTab] = {
-                          ...tree,
-                          _dlgExpanded: !tree._dlgExpanded
-                        };
-                        setDialogueTrees(newTrees);
-                      }}
-                      className="w-full px-3 py-2 flex items-center gap-2 text-sm font-medium hover:bg-muted/50 rounded-t-md"
-                    >
-                      <div className="flex items-center gap-2">
-                        <AlignLeft className="w-4 h-4 text-blue-400" />
-                        <span>Dialogues ({dialogueTrees[activeDialogueTab].dialogues.length})</span>
-                      </div>
-                      {dialogueTrees[activeDialogueTab]._dlgExpanded 
-                        ? <ChevronUp className="w-4 h-4" /> 
-                        : <ChevronDown className="w-4 h-4" />}
-                    </button>
-                    {dialogueTrees[activeDialogueTab]._dlgExpanded && (
-                      <div className="px-3 pb-3 space-y-2">
-                        {dialogueTrees[activeDialogueTab].dialogues.map((dlg, dlgIndex) => (
-                          <div key={dlg.id} className="flex gap-2 items-start">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const newTrees = [...dialogueTrees];
-                                const newDlgs = [...newTrees[activeDialogueTab].dialogues];
-                                newDlgs[dlgIndex] = { ...newDlgs[dlgIndex], speaker: dlg.speaker === 'npc' ? 'player' : 'npc' };
-                                newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], dialogues: newDlgs };
-                                setDialogueTrees(newTrees);
-                              }}
-                              className={`px-2 py-1 rounded text-xs font-medium shrink-0 ${
-                                dlg.speaker === 'npc'
-                                  ? 'bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/50'
-                                  : 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/50'
-                              }`}
-                            >
-                              {dlg.speaker === 'npc' ? 'NPC' : 'Player'}
-                            </button>
-                            <Input
-                              value={dlg.text}
-                              onChange={(e) => {
-                                const newTrees = [...dialogueTrees];
-                                const newDlgs = [...newTrees[activeDialogueTab].dialogues];
-                                newDlgs[dlgIndex] = { ...newDlgs[dlgIndex], text: e.target.value };
-                                newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], dialogues: newDlgs };
-                                setDialogueTrees(newTrees);
-                              }}
-                              placeholder={dlg.speaker === 'npc' ? 'NPC says...' : 'Player says...'}
-                              className="h-7 text-xs flex-1"
-                            />
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 w-7 p-0 shrink-0"
-                              onClick={() => {
-                                const newTrees = [...dialogueTrees];
-                                const newDlgs = dialogueTrees[activeDialogueTab].dialogues.filter((_, i) => i !== dlgIndex);
-                                newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], dialogues: newDlgs };
-                                setDialogueTrees(newTrees);
-                              }}
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </Button>
-                          </div>
-                        ))}
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-7 text-xs gap-1 flex-1"
-                            onClick={() => {
-                              const newTrees = [...dialogueTrees];
-                              const newDlg: DialogueLine = { id: String(Date.now()), speaker: 'npc', text: '' };
-                              newTrees[activeDialogueTab] = {
-                                ...newTrees[activeDialogueTab],
-                                dialogues: [...newTrees[activeDialogueTab].dialogues, newDlg]
-                              };
-                              setDialogueTrees(newTrees);
-                            }}
-                          >
-                            <Plus className="w-3 h-3" />
-                            NPC Line
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-7 text-xs gap-1 flex-1"
-                            onClick={() => {
-                              const newTrees = [...dialogueTrees];
-                              const newDlg: DialogueLine = { id: String(Date.now()) + 1, speaker: 'player', text: '' };
-                              newTrees[activeDialogueTab] = {
-                                ...newTrees[activeDialogueTab],
-                                dialogues: [...newTrees[activeDialogueTab].dialogues, newDlg]
-                              };
-                              setDialogueTrees(newTrees);
-                            }}
-                          >
-                            <Plus className="w-3 h-3" />
-                            Player Line
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Rewards - Expandable */}
-                  <div className="border rounded-md">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const tree = dialogueTrees[activeDialogueTab];
-                        const newTrees = [...dialogueTrees];
-                        newTrees[activeDialogueTab] = {
-                          ...tree,
-                          _rewExpanded: !tree._rewExpanded
-                        };
-                        setDialogueTrees(newTrees);
-                      }}
-                      className="w-full px-3 py-2 flex items-center gap-2 text-sm font-medium hover:bg-muted/50 rounded-t-md"
-                    >
-                      <div className="flex items-center gap-2">
-                        <Gift className="w-4 h-4 text-emerald-500" />
-                        <span>Rewards ({dialogueTrees[activeDialogueTab].rewards?.length || 0})</span>
-                      </div>
-                      {dialogueTrees[activeDialogueTab]._rewExpanded 
-                        ? <ChevronUp className="w-4 h-4" /> 
-                        : <ChevronDown className="w-4 h-4" />}
-                    </button>
-                    {dialogueTrees[activeDialogueTab]._rewExpanded && (
-                      <div className="px-3 pb-3 space-y-2">
-                        <p className="text-xs text-muted-foreground">What does the player gain or lose?</p>
-                        {(dialogueTrees[activeDialogueTab].rewards || []).map((rew, rewIndex) => (
-                          <div key={rew.id} className={`flex gap-2 items-center p-2 rounded-md ${
-                            rew.type.includes('remove') ? 'bg-red-500/10 border-l-2 border-l-red-500/50' : 'bg-emerald-500/10 border-l-2 border-l-emerald-500/50'
-                          }`}>
-                            <select
-                              value={rew.type}
-                              onChange={(e) => {
-                                const newTrees = [...dialogueTrees];
-                                const newRews = [...(newTrees[activeDialogueTab].rewards || [])];
-                                newRews[rewIndex] = { ...newRews[rewIndex], type: e.target.value as DialogueReward['type'] };
-                                newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], rewards: newRews };
-                                setDialogueTrees(newTrees);
-                              }}
-                              className="h-8 px-2 py-1 rounded-md border text-[11px] bg-background min-w-[110px] cursor-pointer"
-                            >
-                              <option value="xp">Give XP</option>
-                              <option value="gold">Give Gold</option>
-                              <option value="item">Give Item</option>
-                              <option value="remove_gold">Take Gold</option>
-                              <option value="remove_item">Take Item</option>
-                              <option value="restore">Restore HP/MP</option>
-                            </select>
-                            <Input
-                              value={rew.value}
-                              onChange={(e) => {
-                                const newTrees = [...dialogueTrees];
-                                const newRews = [...(newTrees[activeDialogueTab].rewards || [])];
-                                newRews[rewIndex] = { ...newRews[rewIndex], value: e.target.value };
-                                newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], rewards: newRews };
-                                setDialogueTrees(newTrees);
-                              }}
-                              placeholder={rew.type === 'item' || rew.type === 'remove_item' ? 'Item ID...' : rew.type === 'restore' ? 'hp/mp/all' : 'Amount...'}
-                              className="h-7 text-xs flex-1"
-                            />
-                            {(rew.type === 'item' || rew.type === 'remove_item') && (
-                              <>
-                                <span className="text-xs text-muted-foreground">×</span>
-                                <Input
-                                  type="number"
-                                  min={1}
-                                  value={rew.quantity || 1}
-                                  onChange={(e) => {
-                                const newTrees = [...dialogueTrees];
-                                const newRews = [...(newTrees[activeDialogueTab].rewards || [])];
-                                newRews[rewIndex] = { ...newRews[rewIndex], quantity: parseInt(e.target.value, 10) || 1 };
-                                newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], rewards: newRews };
-                                setDialogueTrees(newTrees);
-                              }}
-                                  className="h-7 w-14 text-xs"
-                                />
-                              </>
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 w-7 p-0"
-                              onClick={() => {
-                                const newTrees = [...dialogueTrees];
-                                const newRews = (dialogueTrees[activeDialogueTab].rewards || []).filter((_, i) => i !== rewIndex);
-                                newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], rewards: newRews };
-                                setDialogueTrees(newTrees);
-                              }}
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </Button>
-                          </div>
-                        ))}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-7 text-xs gap-1"
-                          onClick={() => {
-                            const newTrees = [...dialogueTrees];
-                            const newRew: DialogueReward = { id: String(Date.now()), type: 'xp', value: '' };
-                            newTrees[activeDialogueTab] = {
-                              ...newTrees[activeDialogueTab],
-                              rewards: [...(newTrees[activeDialogueTab].rewards || []), newRew]
-                            };
-                            setDialogueTrees(newTrees);
-                          }}
-                        >
-                          <Plus className="w-3 h-3" />
-                          Add Reward
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* World Effects - Expandable (Advanced) */}
-                  <div className="border rounded-md">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const tree = dialogueTrees[activeDialogueTab];
-                        const newTrees = [...dialogueTrees];
-                        newTrees[activeDialogueTab] = {
-                          ...tree,
-                          _wfExpanded: !tree._wfExpanded
-                        };
-                        setDialogueTrees(newTrees);
-                      }}
-                      className="w-full px-3 py-2 flex items-center gap-2 text-sm font-medium hover:bg-muted/50 rounded-t-md"
-                    >
-                      <div className="flex items-center gap-2">
-                        <Zap className="w-4 h-4 text-purple-500" />
-                        <span>World Effects ({dialogueTrees[activeDialogueTab].worldEffects?.length || 0})</span>
-                        <span className="text-xs text-muted-foreground">(Advanced)</span>
-                      </div>
-                      {dialogueTrees[activeDialogueTab]._wfExpanded 
-                        ? <ChevronUp className="w-4 h-4" /> 
-                        : <ChevronDown className="w-4 h-4" />}
-                    </button>
-                    {dialogueTrees[activeDialogueTab]._wfExpanded && (
-                      <div className="px-3 pb-3 space-y-2">
-                        <p className="text-xs text-muted-foreground">What happens in the world after this?</p>
-                        {(dialogueTrees[activeDialogueTab].worldEffects || []).map((wf, wfIndex) => (
-                          <div key={wf.id} className="flex gap-2 items-center p-2 rounded-md bg-purple-500/10 border-l-2 border-l-purple-500/50">
-                            <select
-                              value={wf.type}
-                              onChange={(e) => {
-                                const newTrees = [...dialogueTrees];
-                                const newWfs = [...(newTrees[activeDialogueTab].worldEffects || [])];
-                                newWfs[wfIndex] = { ...newWfs[wfIndex], type: e.target.value as DialogueWorldEffect['type'] };
-                                newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], worldEffects: newWfs };
-                                setDialogueTrees(newTrees);
-                              }}
-                              className="h-8 px-2 py-1 rounded-md border text-[11px] bg-background min-w-[110px] cursor-pointer"
-                            >
-                              <option value="set_status">Set Status</option>
-                              <option value="unset_status">Clear Status</option>
-                              <option value="teleport">Teleport</option>
-                              <option value="spawn">Spawn Enemy</option>
-                              <option value="cutscene">Cutscene</option>
-                              <option value="sound">Play Sound</option>
-                              <option value="npc">NPC Dialog</option>
-                            </select>
-                            <Input
-                              value={wf.value}
-                              onChange={(e) => {
-                                const newTrees = [...dialogueTrees];
-                                const newWfs = [...(newTrees[activeDialogueTab].worldEffects || [])];
-                                newWfs[wfIndex] = { ...newWfs[wfIndex], value: e.target.value };
-                                newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], worldEffects: newWfs };
-                                setDialogueTrees(newTrees);
-                              }}
-                              placeholder={
-                                wf.type === 'set_status' || wf.type === 'unset_status' ? 'Status tag...' :
-                                wf.type === 'teleport' ? 'map.txt,x,y' :
-                                wf.type === 'spawn' ? 'Enemy category' :
-                                wf.type === 'cutscene' ? 'Cutscene file...' :
-                                wf.type === 'sound' ? 'Sound file...' :
-                                wf.type === 'npc' ? 'NPC file...' : 'Value...'
-                              }
-                              className="h-7 text-xs flex-1"
-                            />
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-7 w-7 p-0"
-                              onClick={() => {
-                                const newTrees = [...dialogueTrees];
-                                const newWfs = (dialogueTrees[activeDialogueTab].worldEffects || []).filter((_, i) => i !== wfIndex);
-                                newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], worldEffects: newWfs };
-                                setDialogueTrees(newTrees);
-                              }}
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </Button>
-                          </div>
-                        ))}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-7 text-xs gap-1"
-                          onClick={() => {
-                            const newTrees = [...dialogueTrees];
-                            const newWf: DialogueWorldEffect = { id: String(Date.now()), type: 'set_status', value: '' };
-                            newTrees[activeDialogueTab] = {
-                              ...newTrees[activeDialogueTab],
-                              worldEffects: [...(newTrees[activeDialogueTab].worldEffects || []), newWf]
-                            };
-                            setDialogueTrees(newTrees);
-                          }}
-                        >
-                          <Plus className="w-3 h-3" />
-                          Add Effect
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-          
-          <DialogFooter className="mt-4">
-            <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => setShowDialogueTreeDialog(false)}>
-              <ArrowLeft className="w-4 h-4" />
-            </Button>
-            <Button 
-              size="icon" 
-              className="h-9 w-9" 
-              disabled={!dialogueTrees.some(tree => tree.topic.trim() && tree.dialogues.some(d => d.text.trim()))}
-              title={!dialogueTrees.some(tree => tree.topic.trim() && tree.dialogues.some(d => d.text.trim())) 
-                ? "Each dialogue needs a topic and at least one dialogue line" 
-                : "Save dialogues"}
-              onClick={() => {
-                // Validate: at least one tree must have topic and at least one dialogue
-                const validTrees = dialogueTrees.filter(tree => 
-                  tree.topic.trim() && tree.dialogues.some(d => d.text.trim())
-                );
-                
-                if (validTrees.length === 0) {
-                  return; // Button should be disabled anyway
-                }
-                
-                // Save dialogue trees to editing object properties
-                if (editingObject) {
-                  // Clean up expanded state before saving, only save valid trees
-                  const cleanTrees = validTrees.map(tree => ({
-                    id: tree.id,
-                    topic: tree.topic,
-                    requirements: tree.requirements.filter(r => r.value.trim()), // Only save requirements with values
-                    dialogues: tree.dialogues.filter(d => d.text.trim()), // Only save dialogues with text
-                    rewards: (tree.rewards || []).filter(r => r.value.trim()), // Only save rewards with values
-                    worldEffects: (tree.worldEffects || []).filter(w => w.value.trim()) // Only save effects with values
-                  }));
-                  updateEditingObjectProperty('dialogueTrees', JSON.stringify(cleanTrees));
-                }
-                setShowDialogueTreeDialog(false);
-              }}
-            >
-              <Save className="w-4 h-4" />
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      />
 
       {/* Vendor Always-Available Items Dialog */}
       <Dialog open={showVendorStockDialog} onOpenChange={(open) => setShowVendorStockDialog(open)} zIndex={80}>

@@ -4,8 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import Tooltip from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Upload, Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Pipette, Sun, Moon, Blend, MapPin, Save, Scan, Link2, Check, HelpCircle, Folder, Shield, Plus, Image, Grid, Box, Users, Locate, Clock, Menu, Gift, Sparkles, Zap, Package, Sword, GitBranch } from 'lucide-react';
+import { Upload, Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Pipette, Sun, Moon, Blend, MapPin, Save, Scan, Link2, Check, HelpCircle, Folder, Shield, Plus, Image, Grid, Box, Users, Locate, Clock, Menu, Sword, GitBranch } from 'lucide-react';
 import { TileMapEditor } from './editor/TileMapEditor';
 import type { EditorProjectData } from './editor/TileMapEditor';
 import { TileLayer, MapObject, DialogueTree, FlareNPC } from './types';
@@ -15,17 +14,22 @@ import { Toaster } from '@/components/ui/toaster';
 import WelcomeScreen from './components/WelcomeScreen';
 import OverwriteExportDialog from './components/OverwriteExportDialog';
 import EnemyTabPanel from '@/components/EnemyTabPanel';
+import AbilityDialog from '@/components/AbilityDialog';
 import ActorDialog from '@/components/ActorDialog';
 import BottomToolbar from '@/components/BottomToolbar';
 import BrushToolbar from '@/components/BrushToolbar';
+import ClearLayerDialog from '@/components/ClearLayerDialog';
 import ItemDialog from '@/components/ItemDialog';
 import ItemEditDialog from '@/components/ItemEditDialog';
+import MapDialogs from '@/components/MapDialogs';
 import RuleDialog from '@/components/RuleDialog';
 import DialogueTreeDialog from '@/components/dialogue/DialogueTreeDialog';
+import SeparateBrushDialog from '@/components/SeparateBrushDialog';
 import SidebarLayout from '@/components/SidebarLayout';
 import SidebarToggle from '@/components/SidebarToggle';
 import TilesetPalette from '@/components/TilesetPalette';
 import TitleBar from '@/components/TitleBar';
+import VendorDialogs from '@/components/VendorDialogs';
 import SidebarActorEntries from '@/components/SidebarActorEntries';
 import SidebarItemsPanel from '@/components/SidebarItemsPanel';
 import SidebarRulesPanel from '@/components/SidebarRulesPanel';
@@ -1358,6 +1362,24 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     setRuleTriggerId('');
     setRuleActionSelection(null);
   }, [ruleNameInput, ruleStartType, ruleTriggerId]);
+
+  const handleCloseAbilityDialog = useCallback(() => {
+    setShowAbilityDialog(false);
+    setAbilityNameInput('');
+  }, []);
+
+  const handleCreateAbility = useCallback((name: string) => {
+    setAbilitiesList((prev) => [
+      ...prev,
+      {
+        id: `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
+        name,
+        type: 'Standard'
+      }
+    ]);
+    setShowAbilityDialog(false);
+    setAbilityNameInput('');
+  }, []);
 
   const handleItemFieldChange = useCallback((field: 'name' | 'role' | 'resourceSubtype', value: string) => {
     setItemDialogState((prev) => {
@@ -4238,41 +4260,17 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             </div>
           </div>
         )}
-        {/* Clear Layer Confirmation Dialog (replaces native confirm) */}
-        {showClearLayerDialog && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-background border border-border rounded-lg p-6 w-80">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold">Clear Layer</h3>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => setShowClearLayerDialog(false)}
-                  className="w-8 h-8 p-0"
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
-              <div className="text-sm text-foreground mb-4">Are you sure you want to clear all tiles from the current layer? This action cannot be undone.</div>
-              <div className="flex gap-2 justify-end">
-                <Button variant="outline" onClick={() => setShowClearLayerDialog(false)}>
-                  Cancel
-                </Button>
-                <Button
-                  onClick={() => {
-                    if (editor) {
-                      editor.clearLayer();
-                    }
-                    setSelectedBrushTool('brush'); // Reset to brush tool after clearing
-                    setShowClearLayerDialog(false);
-                  }}
-                >
-                  Clear
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
+        <ClearLayerDialog
+          open={showClearLayerDialog}
+          onClose={() => setShowClearLayerDialog(false)}
+          onConfirm={() => {
+            if (editor) {
+              editor.clearLayer();
+            }
+            setSelectedBrushTool('brush');
+            setShowClearLayerDialog(false);
+          }}
+        />
 
         {/* Generic Confirmation Dialog for destructive actions */}
         {confirmAction && (
@@ -5061,264 +5059,38 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       
       <Toaster />
       
-      {/* Separate Brush Confirmation Dialog */}
-      <Dialog open={showSeparateDialog} onOpenChange={setShowSeparateDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Separate Brush</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to separate this brush?
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowSeparateDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={confirmSeparateBrush}>
-              Separate
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <SeparateBrushDialog
+        open={showSeparateDialog}
+        onOpenChange={setShowSeparateDialog}
+        onConfirm={confirmSeparateBrush}
+      />
 
-      {/* Vendor Unlockable Items Dialog */}
-      <Dialog open={showVendorUnlockDialog} onOpenChange={(open) => setShowVendorUnlockDialog(open)} zIndex={80}>
-        <DialogContent className="max-w-4xl w-full z-[9999]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Gift className="w-5 h-5 text-amber-500" />
-              Unlockable Items
-            </DialogTitle>
-            <DialogDescription>
-              Add status-based stock. Each requirement creates its own stock list.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-1">
-            {vendorUnlockEntries.length === 0 && (
-              <div className="text-sm text-muted-foreground">
-                No requirements yet. Use &quot;Add Requirement&quot; to start.
-              </div>
-            )}
-
-            {vendorUnlockEntries.map((entry) => (
-              <div key={entry.id} className="space-y-2 rounded-md border border-border p-3 bg-muted/20">
-                <div className="flex items-center gap-2">
-                  <Input
-                    className="flex-1 h-9 text-sm"
-                    placeholder="Requirement status (e.g., emp_perdition_trader1)"
-                    value={entry.requirement}
-                    onChange={(e) => handleUpdateVendorUnlockRequirement(entry.id, e.target.value)}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => handleRemoveVendorUnlockRequirement(entry.id)}
-                    aria-label="Remove requirement"
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
-                </div>
-
-                <div className="space-y-2">
-                  {itemsList.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">
-                      No items found. Create items in the Items layer to add them here.
-                    </p>
-                  ) : (
-                    itemsList.map((item) => {
-                      const selected = entry.items[item.id] !== undefined;
-                      const qty = entry.items[item.id] ?? 1;
-                      return (
-                        <div
-                          key={item.id}
-                          className={`flex items-center gap-3 p-2 rounded-md border transition-all ${
-                            selected
-                              ? 'border-amber-500 ring-2 ring-amber-200 dark:ring-amber-900/60 bg-amber-50/40 dark:bg-amber-900/10'
-                              : 'border-border bg-muted/30 hover:bg-muted/50'
-                          }`}
-                        >
-                          <button
-                            type="button"
-                            onClick={() => handleToggleVendorUnlockItem(entry.id, item.id)}
-                            className="flex-1 text-left"
-                          >
-                            <div className="flex items-center gap-2">
-                              <Badge className="text-[10px] font-semibold px-2 py-0.5">
-                                ID {item.id}
-                              </Badge>
-                              <span className="font-medium text-sm">{item.name || `Item ${item.id}`}</span>
-                              <span className="text-xs text-muted-foreground">({item.role})</span>
-                            </div>
-                            <div className="text-xs text-muted-foreground mt-0.5">
-                              {item.category || 'Default'} • {item.fileName}
-                            </div>
-                          </button>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-muted-foreground">Qty</span>
-                            <Input
-                              type="number"
-                              className="h-8 w-20 text-xs"
-                              min={1}
-                              disabled={!selected}
-                              value={qty}
-                              onChange={(e) => handleVendorUnlockQtyChange(entry.id, item.id, Number.parseInt(e.target.value, 10) || 1)}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Button type="button" variant="secondary" size="sm" onClick={handleAddVendorUnlockRequirement}>
-              Add Requirement
-            </Button>
-          <DialogFooter className="justify-between w-auto gap-2">
-            <Button variant="outline" size="icon" onClick={() => setShowVendorUnlockDialog(false)} aria-label="Cancel unlockable items">
-              <X className="w-4 h-4" />
-            </Button>
-            <Button size="icon" onClick={handleSaveVendorUnlock} aria-label="Save unlockable items">
-              <Save className="w-4 h-4" />
-            </Button>
-          </DialogFooter>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Vendor Random Offers Dialog */}
-      <Dialog open={showVendorRandomDialog} onOpenChange={(open) => setShowVendorRandomDialog(open)} zIndex={80}>
-        <DialogContent className="max-w-4xl w-full z-[9999]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-purple-500" />
-              Random Offers
-            </DialogTitle>
-            <DialogDescription>
-              Pick random offer candidates with chance and quantity ranges.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-1">
-            {itemsList.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No items found. Create items in the Items layer to add them here.
-              </p>
-            ) : (
-              itemsList.map((item) => {
-                const selected = vendorRandomSelection[item.id] !== undefined;
-                const entry = vendorRandomSelection[item.id] || { chance: 100, min: 1, max: 1 };
-                return (
-                  <div
-                    key={item.id}
-                    className={`flex items-center gap-3 p-2 rounded-md border transition-all ${
-                      selected
-                        ? 'border-purple-500 ring-2 ring-purple-200 dark:ring-purple-900/60 bg-purple-50/40 dark:bg-purple-900/10'
-                        : 'border-border bg-muted/30 hover:bg-muted/50'
-                    }`}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => handleToggleVendorRandomItem(item.id)}
-                      className="flex-1 text-left"
-                    >
-                      <div className="flex items-center gap-2">
-                        <Badge className="text-[10px] font-semibold px-2 py-0.5">
-                          ID {item.id}
-                        </Badge>
-                        <span className="font-medium text-sm">{item.name || `Item ${item.id}`}</span>
-                        <span className="text-xs text-muted-foreground">({item.role})</span>
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-0.5">
-                        {item.category || 'Default'} · {item.fileName}
-                      </div>
-                    </button>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">Chance</span>
-                      <select
-                        className="h-8 text-xs border rounded px-2 bg-background"
-                        disabled={!selected}
-                        value={entry.chance.toString()}
-                        onChange={(e) => handleVendorRandomFieldChange(item.id, 'chance', parseInt(e.target.value, 10) || 1)}
-                      >
-                        {[100, 50, 25, 10, 5].map((c) => (
-                          <option key={c} value={c}>{c}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">Min</span>
-                      <Input
-                        type="number"
-                        className="h-8 w-16 text-xs"
-                        min={1}
-                        disabled={!selected}
-                        value={entry.min}
-                        onChange={(e) => handleVendorRandomFieldChange(item.id, 'min', parseInt(e.target.value, 10) || 1)}
-                      />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">Max</span>
-                      <Input
-                        type="number"
-                        className="h-8 w-16 text-xs"
-                        min={1}
-                        disabled={!selected}
-                        value={entry.max}
-                        onChange={(e) => handleVendorRandomFieldChange(item.id, 'max', parseInt(e.target.value, 10) || 1)}
-                      />
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">Min item number</span>
-                <Tooltip content="How many of these items can appear in total?">
-                  <HelpCircle className="w-4 h-4 text-muted-foreground" />
-                </Tooltip>
-                <Input
-                  type="number"
-                  className="h-8 w-20 text-xs"
-                  min={1}
-                  value={vendorRandomCount.min}
-                  onChange={(e) => handleRandomCountChange('min', parseInt(e.target.value, 10) || 1)}
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">Max item number</span>
-                <Tooltip content="How many of these items can appear in total?">
-                  <HelpCircle className="w-4 h-4 text-muted-foreground" />
-                </Tooltip>
-                <Input
-                  type="number"
-                  className="h-8 w-20 text-xs"
-                  min={1}
-                  value={vendorRandomCount.max}
-                  onChange={(e) => handleRandomCountChange('max', parseInt(e.target.value, 10) || 1)}
-                />
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="icon" onClick={() => setShowVendorRandomDialog(false)} aria-label="Cancel random offers">
-                <X className="w-4 h-4" />
-              </Button>
-              <Button size="icon" onClick={handleSaveVendorRandom} aria-label="Save random offers">
-                <Save className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <VendorDialogs
+        itemsList={itemsList}
+        showVendorUnlockDialog={showVendorUnlockDialog}
+        setShowVendorUnlockDialog={setShowVendorUnlockDialog}
+        vendorUnlockEntries={vendorUnlockEntries}
+        handleUpdateVendorUnlockRequirement={handleUpdateVendorUnlockRequirement}
+        handleRemoveVendorUnlockRequirement={handleRemoveVendorUnlockRequirement}
+        handleToggleVendorUnlockItem={handleToggleVendorUnlockItem}
+        handleVendorUnlockQtyChange={handleVendorUnlockQtyChange}
+        handleAddVendorUnlockRequirement={handleAddVendorUnlockRequirement}
+        handleSaveVendorUnlock={handleSaveVendorUnlock}
+        showVendorRandomDialog={showVendorRandomDialog}
+        setShowVendorRandomDialog={setShowVendorRandomDialog}
+        vendorRandomSelection={vendorRandomSelection}
+        handleToggleVendorRandomItem={handleToggleVendorRandomItem}
+        handleVendorRandomFieldChange={handleVendorRandomFieldChange}
+        vendorRandomCount={vendorRandomCount}
+        handleRandomCountChange={handleRandomCountChange}
+        handleSaveVendorRandom={handleSaveVendorRandom}
+        showVendorStockDialog={showVendorStockDialog}
+        setShowVendorStockDialog={setShowVendorStockDialog}
+        vendorStockSelection={vendorStockSelection}
+        handleToggleVendorStockItem={handleToggleVendorStockItem}
+        handleVendorStockQtyChange={handleVendorStockQtyChange}
+        handleSaveVendorStock={handleSaveVendorStock}
+      />
 
       <RuleDialog
         open={showRuleDialog}
@@ -5345,77 +5117,13 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         onSetStep={setRuleDialogStep}
       />
 
-      {/* Ability Creation Dialog */}
-      <Dialog
+      <AbilityDialog
         open={showAbilityDialog}
-        onOpenChange={(open) => {
-          if (!open) {
-            setShowAbilityDialog(false);
-            setAbilityNameInput('');
-          }
-        }}
-      >
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Zap className="w-5 h-5 text-orange-500" />
-              Add Ability
-            </DialogTitle>
-            <DialogDescription>Create a new ability for the Actions layer.</DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Ability Name <span className="text-red-500">*</span>
-              </label>
-              <Input
-                value={abilityNameInput}
-                onChange={(e) => setAbilityNameInput(e.target.value)}
-                placeholder="e.g. Fireball"
-                autoFocus
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && abilityNameInput.trim()) {
-                    setAbilitiesList((prev) => [
-                      ...prev,
-                      {
-                        id: `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
-                        name: abilityNameInput.trim(),
-                        type: 'Standard'
-                      }
-                    ]);
-                    setShowAbilityDialog(false);
-                    setAbilityNameInput('');
-                  }
-                }}
-              />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAbilityDialog(false)}>
-              Cancel
-            </Button>
-            <Button
-              disabled={!abilityNameInput.trim()}
-              onClick={() => {
-                setAbilitiesList((prev) => [
-                  ...prev,
-                  {
-                    id: `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
-                    name: abilityNameInput.trim(),
-                    type: 'Standard'
-                  }
-                ]);
-                setShowAbilityDialog(false);
-                setAbilityNameInput('');
-              }}
-            >
-              Create Ability
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        abilityNameInput={abilityNameInput}
+        onNameChange={setAbilityNameInput}
+        onClose={handleCloseAbilityDialog}
+        onCreate={handleCreateAbility}
+      />
 
       <ActorDialog
         actorDialogState={actorDialogState}
@@ -5492,265 +5200,28 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         }}
       />
 
-      {/* Vendor Always-Available Items Dialog */}
-      <Dialog open={showVendorStockDialog} onOpenChange={(open) => setShowVendorStockDialog(open)} zIndex={80}>
-        <DialogContent className="max-w-3xl w-full z-[9999]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Package className="w-5 h-5 text-emerald-500" />
-              Always Available Items
-            </DialogTitle>
-            <DialogDescription>
-              Select items to keep in this vendor&apos;s shop and set their quantities.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
-            {itemsList.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No items found. Create items in the Items layer to add them here.
-              </p>
-            ) : (
-              itemsList.map((item) => {
-                const selected = vendorStockSelection[item.id] !== undefined;
-                const qty = vendorStockSelection[item.id] ?? 1;
-                return (
-                  <div
-                    key={item.id}
-                    className={`flex items-center gap-3 p-2 rounded-md border transition-all ${selected
-                      ? 'border-emerald-500 ring-2 ring-emerald-200 dark:ring-emerald-900/60 bg-emerald-50/40 dark:bg-emerald-900/10'
-                      : 'border-border bg-muted/30 hover:bg-muted/50'
-                    }`}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => handleToggleVendorStockItem(item.id)}
-                      className="flex-1 text-left"
-                    >
-                      <div className="flex items-center gap-2">
-                        <Badge className="text-[10px] font-semibold px-2 py-0.5">
-                          ID {item.id}
-                        </Badge>
-                        <span className="font-medium text-sm">{item.name || `Item ${item.id}`}</span>
-                        <span className="text-xs text-muted-foreground">({item.role})</span>
-                      </div>
-                      <div className="text-xs text-muted-foreground mt-0.5">
-                        {item.category || 'Default'} • {item.fileName}
-                      </div>
-                    </button>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">Qty</span>
-                      <Input
-                        type="number"
-                        className="h-8 w-20 text-xs"
-                        min={1}
-                        disabled={!selected}
-                        value={qty}
-                        onChange={(e) => handleVendorStockQtyChange(item.id, Number.parseInt(e.target.value, 10) || 1)}
-                      />
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-
-          <DialogFooter className="justify-between">
-            <Button variant="outline" size="icon" onClick={() => setShowVendorStockDialog(false)} aria-label="Cancel vendor items">
-              <X className="w-4 h-4" />
-            </Button>
-            <Button size="icon" onClick={handleSaveVendorStock} aria-label="Save vendor items">
-              <Save className="w-4 h-4" />
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={showCreateMapDialog}
-        onOpenChange={(open) => {
-          setShowCreateMapDialog(open);
-          if (!open) {
-            setCreateMapError(null);
-          }
-        }}
-      >
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Create Map</DialogTitle>
-            <DialogDescription>
-              Set the name, dimensions, and starting status for your new map.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div>
-              <label className="block text-sm font-medium text-muted-foreground mb-1">
-                Map Name
-              </label>
-              <Input
-                value={newMapName}
-                onChange={(e) => {
-                  setNewMapName(e.target.value);
-                  if (createMapError) {
-                    setCreateMapError(null);
-                  }
-                }}
-                onKeyDown={(e) => {
-                  // Allow editing keys to work even if parent handlers exist
-                  e.stopPropagation();
-                }}
-                placeholder="Enter map name"
-                autoFocus
-              />
-              {createMapError && (
-                <p className="mt-1 text-xs text-red-500">{createMapError}</p>
-              )}
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-muted-foreground mb-1">
-                  Width (tiles)
-                </label>
-                <Input
-                  type="number"
-                  min={1}
-                  max={100}
-                  value={newMapWidth}
-                  onChange={(e) => setNewMapWidth(Math.max(1, Number.parseInt(e.target.value, 10) || 0))}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-muted-foreground mb-1">
-                  Height (tiles)
-                </label>
-                <Input
-                  type="number"
-                  min={1}
-                  max={100}
-                  value={newMapHeight}
-                  onChange={(e) => setNewMapHeight(Math.max(1, Number.parseInt(e.target.value, 10) || 0))}
-                />
-              </div>
-            </div>
-            <div className="flex items-center gap-2 rounded-md border border-border px-3 py-2">
-              <div className="flex items-center gap-2">
-                <label htmlFor="starting-map-checkbox" className="text-sm font-medium text-muted-foreground">
-                  Starting Map
-                </label>
-                <Tooltip content="If this map is the map that players will start the game then mark this option">
-                  <HelpCircle className="h-4 w-4 text-muted-foreground" aria-hidden />
-                </Tooltip>
-              </div>
-              <input
-                id="starting-map-checkbox"
-                type="checkbox"
-                className="h-4 w-4 rounded border border-border accent-orange-500"
-                checked={newMapStarting}
-                onChange={(e) => setNewMapStarting(e.target.checked)}
-                aria-checked={newMapStarting}
-                aria-label="Set this map as the starting map"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowCreateMapDialog(false);
-                setCreateMapError(null);
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleConfirmCreateMap}
-              disabled={isPreparingNewMap}
-              className="flex items-center gap-2"
-            >
-              {isPreparingNewMap ? (
-                <>
-                  <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                  <span>Creating...</span>
-                </>
-              ) : (
-                <span>Create</span>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      {/* Hero Position Edit Dialog */}
-      <Dialog open={showHeroEditDialog} onOpenChange={setShowHeroEditDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Edit Hero Position</DialogTitle>
-            <DialogDescription>
-              Set the hero spawn position on the map.
-            </DialogDescription>
-          </DialogHeader>
-          
-          {heroEditData && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">X Position</label>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={heroEditData.mapWidth - 1}
-                    defaultValue={heroEditData.currentX}
-                    onChange={(e) => {
-                      const newX = parseInt(e.target.value);
-                      if (!isNaN(newX)) {
-                        setHeroEditData({
-                          ...heroEditData,
-                          currentX: newX
-                        });
-                      }
-                    }}
-                  />
-                  <span className="text-xs text-gray-500">
-                    (0 - {heroEditData.mapWidth - 1})
-                  </span>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Y Position</label>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={heroEditData.mapHeight - 1}
-                    defaultValue={heroEditData.currentY}
-                    onChange={(e) => {
-                      const newY = parseInt(e.target.value);
-                      if (!isNaN(newY)) {
-                        setHeroEditData({
-                          ...heroEditData,
-                          currentY: newY
-                        });
-                      }
-                    }}
-                  />
-                  <span className="text-xs text-gray-500">
-                    (0 - {heroEditData.mapHeight - 1})
-                  </span>
-                </div>
-              </div>
-              <div className="text-sm text-gray-600">
-                Current position: ({heroEditData.currentX}, {heroEditData.currentY})
-              </div>
-            </div>
-          )}
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={handleHeroEditCancel}>
-              Cancel
-            </Button>
-            <Button onClick={() => heroEditData && handleHeroEditConfirm(heroEditData.currentX, heroEditData.currentY)}>
-              Confirm
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <MapDialogs
+        showCreateMapDialog={showCreateMapDialog}
+        setShowCreateMapDialog={setShowCreateMapDialog}
+        newMapName={newMapName}
+        setNewMapName={setNewMapName}
+        newMapWidth={newMapWidth}
+        setNewMapWidth={setNewMapWidth}
+        newMapHeight={newMapHeight}
+        setNewMapHeight={setNewMapHeight}
+        newMapStarting={newMapStarting}
+        setNewMapStarting={setNewMapStarting}
+        createMapError={createMapError}
+        setCreateMapError={setCreateMapError}
+        isPreparingNewMap={isPreparingNewMap}
+        handleConfirmCreateMap={handleConfirmCreateMap}
+        showHeroEditDialog={showHeroEditDialog}
+        setShowHeroEditDialog={setShowHeroEditDialog}
+        heroEditData={heroEditData}
+        setHeroEditData={setHeroEditData}
+        handleHeroEditCancel={handleHeroEditCancel}
+        handleHeroEditConfirm={handleHeroEditConfirm}
+      />
       
       {/* Overwrite Export Confirmation Dialog */}
       <OverwriteExportDialog

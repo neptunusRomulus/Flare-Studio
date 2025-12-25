@@ -29,12 +29,12 @@ const useObjectEditing = () => {
         : { isMelee: true })
     });
     setActorDialogError(null);
-  }, []);
+  }, [setActorDialogError, setActorDialogState]);
 
   const handleCloseActorDialog = useCallback(() => {
     setActorDialogState(null);
     setActorDialogError(null);
-  }, []);
+  }, [setActorDialogError, setActorDialogState]);
 
   return {
     showObjectDialog,

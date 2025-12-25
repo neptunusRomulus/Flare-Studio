@@ -51,6 +51,7 @@ function App() {
   const [showWelcome, setShowWelcome] = useState(true);
   const [editor, setEditor] = useState<TileMapEditor | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const toolbarRef = useRef<HTMLDivElement | null>(null);
   const [mapWidth, setMapWidth] = useState(0);
   const [mapHeight, setMapHeight] = useState(0);
   const [mapInitialized, setMapInitialized] = useState(false);
@@ -149,7 +150,7 @@ function App() {
 
   const canUseTilesetDialog = useMemo(() => {
     return typeof window !== 'undefined' && !!window.electronAPI?.selectTilesetFile;
-  }, [setEditingObject]);
+  }, []);
   
   const {
     selectedTool,
@@ -697,7 +698,6 @@ function App() {
   } | null>(null);
   
   // Floating toolbar ref for anchored tooltip
-  const toolbarRef = useRef<HTMLDivElement | null>(null);
 
   // Hover coordinates state
   const [hoverCoords, setHoverCoords] = useState<{ x: number; y: number } | null>(null);

@@ -173,27 +173,6 @@ function App() {
     showBrushToolbarTemporarily();
   }, [showBrushToolbarTemporarily]);
 
-  const handleDeleteActiveTab = useCallback(() => {
-    if (!editor) {
-      toast({ title: 'No editor', description: 'Editor is not initialized yet.', variant: 'destructive' });
-      return;
-    }
-    const layerType = activeLayer?.type;
-    if (!layerType) {
-      toast({ title: 'No active layer', description: 'Please select a layer first.', variant: 'destructive' });
-      return;
-    }
-    const activeTabId = editor.getActiveLayerTabId ? editor.getActiveLayerTabId(layerType) : null;
-    if (typeof activeTabId !== 'number' || activeTabId === null) {
-      toast({ title: 'No tab selected', description: 'There is no active tileset tab to delete for this layer.', variant: 'destructive' });
-      return;
-    }
-    const payload = { layerType, tabId: activeTabId };
-    confirmPayloadRef.current = payload;
-    setTabToDelete(payload);
-    setConfirmAction({ type: 'removeTab', payload });
-  }, [activeLayer?.type, editor, toast]);
-
   const canUseTilesetDialog = useMemo(() => {
     return typeof window !== 'undefined' && !!window.electronAPI?.selectTilesetFile;
   }, []);
@@ -4017,6 +3996,27 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
   const activeLayer = useMemo(() => {
     return layers.find((layer) => layer.id === activeLayerId) ?? null;
   }, [layers, activeLayerId]);
+
+  const handleDeleteActiveTab = useCallback(() => {
+    if (!editor) {
+      toast({ title: 'No editor', description: 'Editor is not initialized yet.', variant: 'destructive' });
+      return;
+    }
+    const layerType = activeLayer?.type;
+    if (!layerType) {
+      toast({ title: 'No active layer', description: 'Please select a layer first.', variant: 'destructive' });
+      return;
+    }
+    const activeTabId = editor.getActiveLayerTabId ? editor.getActiveLayerTabId(layerType) : null;
+    if (typeof activeTabId !== 'number' || activeTabId === null) {
+      toast({ title: 'No tab selected', description: 'There is no active tileset tab to delete for this layer.', variant: 'destructive' });
+      return;
+    }
+    const payload = { layerType, tabId: activeTabId };
+    confirmPayloadRef.current = payload;
+    setTabToDelete(payload);
+    setConfirmAction({ type: 'removeTab', payload });
+  }, [activeLayer?.type, editor, toast]);
 
   const isCollisionLayer = activeLayer?.type === 'collision';
   const isNpcLayer = activeLayer?.type === 'npc';

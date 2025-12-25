@@ -52,8 +52,8 @@ type BottomToolbarProps = {
   selectedShapeTool: 'rectangle' | 'circle' | 'line';
   setSelectedShapeTool: React.Dispatch<React.SetStateAction<'rectangle' | 'circle' | 'line'>>;
   getShapeIcon: () => React.ReactNode;
-  stampMode: 'select' | 'create';
-  setStampMode: React.Dispatch<React.SetStateAction<'select' | 'create'>>;
+  stampMode: 'select' | 'create' | 'place';
+  setStampMode: React.Dispatch<React.SetStateAction<'select' | 'create' | 'place'>>;
   newStampName: string;
   setNewStampName: React.Dispatch<React.SetStateAction<string>>;
   handleCreateStamp: () => void;

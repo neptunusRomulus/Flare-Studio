@@ -5,10 +5,10 @@ import { Badge } from '@/components/ui/badge';
 import Tooltip from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { Upload, Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Stamp, Pipette, Sun, Moon, Blend, MapPin, Save, Edit2, Scan, Link2, Scissors, Trash2, Check, HelpCircle, Folder, Shield, Plus, Image, Grid, Box, Users, User, Locate, Clock, Menu, MessageSquare, ChevronDown, ChevronUp, ArrowLeft, Gift, Coins, Sparkles, Zap, Volume2, Tag, Package, AlignLeft, Sword, ChevronsUpDown, AlertTriangle, Book, GitBranch } from 'lucide-react';
+import { Upload, Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Pipette, Sun, Moon, Blend, MapPin, Save, Scan, Link2, Check, HelpCircle, Folder, Shield, Plus, Image, Grid, Box, Users, Locate, Clock, Menu, Gift, Sparkles, Zap, Package, Sword, GitBranch } from 'lucide-react';
 import { TileMapEditor } from './editor/TileMapEditor';
-import type { EditorProjectData, SavedTilesetEntry } from './editor/TileMapEditor';
-import { TileLayer, MapObject, DialogueLine, DialogueRequirement, DialogueReward, DialogueWorldEffect, DialogueTree, FlareNPC } from './types';
+import type { EditorProjectData } from './editor/TileMapEditor';
+import { TileLayer, MapObject, DialogueTree, FlareNPC } from './types';
 import { serializeNpcToFlare } from './utils/flareNpcUtils';
 import { useToast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/toaster';
@@ -31,11 +31,10 @@ import SidebarItemsPanel from '@/components/SidebarItemsPanel';
 import SidebarRulesPanel from '@/components/SidebarRulesPanel';
 import { buildSpawnContent, computeIntermapTarget, extractSpawnIntermapValue, STARTING_MAP_INVALID_NAMES } from './editor/mapSpawnUtils';
 import { validateAndSanitizeObject } from './editor/objectValidation';
-import { ITEM_ROLE_META, ITEM_ROLE_SELECTIONS, RESOURCE_SUBTYPE_META } from './editor/itemRoles';
 import type { ItemResourceSubtype, ItemRole } from './editor/itemRoles';
 import { EMPTY_ACTOR_ROLES } from './editor/actorRoles';
 import type { ActorDialogState, ActorRoleKey } from './editor/actorRoles';
-import { GAME_TRIGGER_OPTIONS, PLAYER_TRIGGER_OPTIONS, RULE_ACTION_GROUPS, RULE_TRIGGER_LOOKUP } from './editor/ruleOptions';
+import { GAME_TRIGGER_OPTIONS, PLAYER_TRIGGER_OPTIONS } from './editor/ruleOptions';
 import type { RuleStartType } from './editor/ruleOptions';
 import useToolbarAutoCollapse from './hooks/useToolbarAutoCollapse';
 import useToolbarVisibility from './hooks/useToolbarVisibility';
@@ -104,9 +103,7 @@ function App() {
   const brushToolbar = useToolbarAutoCollapse({ autoCollapse: false });
   const {
     expanded: toolbarExpanded,
-    setExpanded: setToolbarExpanded,
     containerRef: toolbarContainerRef,
-    clearCollapseTimer: clearToolbarCollapseTimer,
     showTemporarily: showToolbarTemporarily,
     handleMouseEnter: handleToolbarMouseEnter,
     handleMouseLeave: handleToolbarMouseLeave,
@@ -115,9 +112,7 @@ function App() {
   } = toolbar;
   const {
     expanded: bottomToolbarExpanded,
-    setExpanded: setBottomToolbarExpanded,
     containerRef: bottomToolbarContainerRef,
-    clearCollapseTimer: clearBottomToolbarCollapseTimer,
     showTemporarily: showBottomToolbarTemporarily,
     handleMouseEnter: handleBottomToolbarMouseEnter,
     handleMouseLeave: handleBottomToolbarMouseLeave,
@@ -126,14 +121,8 @@ function App() {
   } = bottomToolbar;
   const {
     expanded: brushToolbarExpanded,
-    setExpanded: setBrushToolbarExpanded,
     containerRef: brushToolbarContainerRef,
-    clearCollapseTimer: clearBrushToolbarCollapseTimer,
-    showTemporarily: showBrushToolbarTemporarily,
-    handleMouseEnter: handleBrushToolbarMouseEnter,
-    handleMouseLeave: handleBrushToolbarMouseLeave,
-    handleFocus: handleBrushToolbarFocus,
-    handleBlur: handleBrushToolbarBlur
+    showTemporarily: showBrushToolbarTemporarily
   } = brushToolbar;
   // Left sidebar buttons expand/collapse (independent)
   // Left bottom action buttons are always expanded now; no local state required.
@@ -141,26 +130,26 @@ function App() {
 
   const setBrushToolbarNode = useCallback((node: HTMLDivElement | null) => {
     brushToolbarContainerRef.current = node;
-  }, []);
+  }, [brushToolbarContainerRef]);
 
   const setBottomToolbarNode = useCallback((node: HTMLDivElement | null) => {
     toolbarRef.current = node;
     bottomToolbarContainerRef.current = node;
-  }, []);
+  }, [bottomToolbarContainerRef, toolbarRef]);
 
   const handleSelectTool = useCallback((tool: 'brush' | 'selection' | 'shape' | 'stamp' | 'eyedropper') => {
     setSelectedTool(tool);
     showBottomToolbarTemporarily();
-  }, [showBottomToolbarTemporarily]);
+  }, [setSelectedTool, showBottomToolbarTemporarily]);
 
   const handleToggleBrushTool = useCallback((tool: 'move' | 'merge' | 'separate' | 'remove') => {
     setBrushTool((current) => (current === tool ? 'none' : tool));
     showBrushToolbarTemporarily();
-  }, [showBrushToolbarTemporarily]);
+  }, [setBrushTool, showBrushToolbarTemporarily]);
 
   const canUseTilesetDialog = useMemo(() => {
     return typeof window !== 'undefined' && !!window.electronAPI?.selectTilesetFile;
-  }, []);
+  }, [setEditingObject]);
   
   const {
     selectedTool,
@@ -254,7 +243,7 @@ function App() {
         setActiveTabId(tabs[0].id);
       }
     }
-  }, [tabs, activeTabId, currentProjectPath]);
+  }, [activeTabId, currentProjectPath, setActiveTabId, tabs]);
 
   // Auto-save session to project folder when tabs or activeTabId changes
   useEffect(() => {
@@ -328,7 +317,7 @@ function App() {
     } catch (error) {
       console.error('Failed to update spawn file:', error);
     }
-  }, [mapName, currentProjectPath]);
+  }, [currentProjectPath, mapName, setStartingMapIntermap]);
 
   const updateStartingMap = useCallback(
     (nextValue: boolean, options?: { propagate?: boolean; mapNameOverride?: string }) => {
@@ -336,542 +325,9 @@ function App() {
       if (options?.propagate === false) return;
       void writeSpawnFile(nextValue, options?.mapNameOverride);
     },
-    [writeSpawnFile]
+    [setIsStartingMap, writeSpawnFile]
   );
   
-  // Tab helpers
-  const canUseTilesetDialog = useMemo(() => {
-    return typeof window !== 'undefined' && !!window.electronAPI?.selectTilesetFile;
-  }, []);
-  
-  // Toolbar states
-  const [selectedTool, setSelectedTool] = useState('brush');
-  const [showBrushOptions, setShowBrushOptions] = useState(false);
-  const [showSelectionOptions, setShowSelectionOptions] = useState(false);
-  const [showShapeOptions, setShowShapeOptions] = useState(false);
-  
-  // Sub-tool states
-  const [selectedBrushTool, setSelectedBrushTool] = useState('brush');
-  const [selectedSelectionTool, setSelectedSelectionTool] = useState('rectangular');
-  const [selectedShapeTool, setSelectedShapeTool] = useState('rectangle');
-  
-  // Brush management states
-  const [brushTool, setBrushTool] = useState<'none' | 'move' | 'merge' | 'separate' | 'remove'>('none');
-  // Removed unused state: selectedBrushes
-  const [showSeparateDialog, setShowSeparateDialog] = useState(false);
-  const [brushToSeparate, setBrushToSeparate] = useState<number | null>(null);
-  
-  // Stamp states
-  const [stamps, setStamps] = useState<import('./types').Stamp[]>([]);
-  const [selectedStamp, setSelectedStamp] = useState<string | null>(null);
-  const [stampMode, setStampMode] = useState<'select' | 'create' | 'place'>('select');
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [showStampDialog, setShowStampDialog] = useState(false);
-  const [newStampName, setNewStampName] = useState('');
-  // Clear layer confirmation dialog state (replaces window.confirm)
-  const [showClearLayerDialog, setShowClearLayerDialog] = useState(false);
-  // Generic confirmation dialog for other destructive actions
-  const [confirmAction, setConfirmAction] = useState<null | { type: 'removeBrush' | 'removeTileset' | 'removeTab'; payload?: number | { layerType: string; tabId: number } }>(null);
-  // Keep a stable React state for the tab that was requested to be deleted so
-  // the confirmation handler can use the exact intended tab (avoids stale refs).
-  const [tabToDelete, setTabToDelete] = useState<null | { layerType: string; tabId: number }>(null);
-  // Keep an optional ref as a fallback for older flows
-  const confirmPayloadRef = React.useRef<null | { layerType: string; tabId: number }>(null);
-  
-  // Settings states
-  const [mapName, setMapName] = useState('Untitled Map');
-  const [isStartingMap, setIsStartingMap] = useState(false);
-  const [currentProjectPath, setCurrentProjectPath] = useState<string | null>(null);
-  const [startingMapIntermap, setStartingMapIntermap] = useState<string | null>(null);
-  const previousMapNameRef = useRef(mapName);
-  const {
-    tabs,
-    setTabs,
-    activeTabId,
-    setActiveTabId,
-    activeTab,
-    isEnemyTabActive,
-    createTabFor,
-    closeEditorTab,
-    switchToTab
-  } = useEditorTabs({
-    editor,
-    currentProjectPath,
-    setCurrentProjectPath,
-    setMapName,
-    setMapWidth,
-    setMapHeight,
-    switchToTabHelpersRef
-  });
-
-  // Ensure a tab is always selected when tabs exist but activeTabId is null
-  // This handles the case where the UI shows tabs but none appears selected
-  useEffect(() => {
-    if (tabs.length > 0 && !activeTabId) {
-      // Find tabs for the current project
-      if (currentProjectPath) {
-        const normalizedProjectPath = currentProjectPath.replace(/\\/g, '/').toLowerCase();
-        const projectTabs = tabs.filter(t => {
-          const normalizedTabPath = t.projectPath?.replace(/\\/g, '/').toLowerCase() || '';
-          return normalizedTabPath === normalizedProjectPath;
-        });
-        if (projectTabs.length > 0) {
-          console.log('Auto-selecting first project tab:', projectTabs[0].name);
-          setActiveTabId(projectTabs[0].id);
-        }
-      } else if (tabs.length > 0) {
-        // Fallback: select first available tab
-        console.log('Auto-selecting first available tab:', tabs[0].name);
-        setActiveTabId(tabs[0].id);
-      }
-    }
-  }, [tabs, activeTabId, currentProjectPath]);
-
-  // Auto-save session to project folder when tabs or activeTabId changes
-  useEffect(() => {
-    const saveSession = async () => {
-      if (!currentProjectPath || !window.electronAPI?.writeSession) return;
-      if (tabs.length === 0) return;
-      
-      try {
-        // Only save tabs that belong to this project
-        const normalizedProjectPath = currentProjectPath.replace(/\\/g, '/').toLowerCase();
-        const projectTabs = tabs
-          .filter(t => {
-            const normalizedTabPath = t.projectPath?.replace(/\\/g, '/').toLowerCase() || '';
-            return normalizedTabPath === normalizedProjectPath;
-          })
-          .map(t => ({
-            id: t.id,
-            name: t.name,
-            projectPath: t.projectPath ?? undefined // Convert null to undefined for type compatibility
-          }));
-        
-        if (projectTabs.length === 0) return;
-        
-        // Deduplicate tabs by name (keep only the first occurrence of each map name)
-        const seenNames = new Set<string>();
-        const uniqueTabs = projectTabs.filter(t => {
-          const lowerName = t.name.toLowerCase();
-          if (seenNames.has(lowerName)) {
-            console.log('Session save: removing duplicate tab:', t.name);
-            return false;
-          }
-          seenNames.add(lowerName);
-          return true;
-        });
-        
-        // Only save activeTabId if it's a valid tab in this project
-        // This prevents saving null during the brief moment between setTabs and setActiveTabId
-        const validActiveTabId = activeTabId && uniqueTabs.some(t => t.id === activeTabId) 
-          ? activeTabId 
-          : (uniqueTabs.length > 0 ? uniqueTabs[0].id : null);
-        
-        const sessionData = {
-          tabs: uniqueTabs,
-          activeTabId: validActiveTabId,
-          lastOpened: new Date().toISOString()
-        };
-        
-        await window.electronAPI.writeSession(currentProjectPath, sessionData);
-        console.log('Session saved to project:', currentProjectPath, uniqueTabs.length, 'tabs');
-      } catch (e) {
-        console.warn('Failed to save session to project:', e);
-      }
-    };
-    
-    saveSession();
-  }, [tabs, activeTabId, currentProjectPath]);
-
-  const writeSpawnFile = useCallback(async (starting: boolean, mapNameOverride?: string) => {
-    const effectiveName = mapNameOverride ?? mapName;
-    const intermapTarget = computeIntermapTarget(starting, effectiveName);
-    if (!currentProjectPath || !window.electronAPI?.updateSpawnFile) {
-      setStartingMapIntermap(intermapTarget);
-      return;
-    }
-    const spawnContent = buildSpawnContent(intermapTarget);
-    try {
-      const success = await window.electronAPI.updateSpawnFile(currentProjectPath, spawnContent);
-      if (success) {
-        setStartingMapIntermap(intermapTarget);
-      }
-    } catch (error) {
-      console.error('Failed to update spawn file:', error);
-    }
-  }, [mapName, currentProjectPath]);
-
-  const updateStartingMap = useCallback(
-    (nextValue: boolean, options?: { propagate?: boolean; mapNameOverride?: string }) => {
-      setIsStartingMap(nextValue);
-      if (options?.propagate === false) return;
-      void writeSpawnFile(nextValue, options?.mapNameOverride);
-    },
-    [writeSpawnFile]
-  );
-  
-  // Tab helpers
-  const createTabFor = useCallback((name: string, projectPath?: string | null, config?: EditorProjectData | MapConfig | { enemy: MapObject } | null) => {
-    const id = Date.now().toString();
-    const safeConfig = config ? JSON.parse(JSON.stringify(config)) : null;
-    const tab: EditorTab = { id, name, projectPath: projectPath ?? null, config: safeConfig };
-    console.log('Creating tab:', { id, name, projectPath, hasConfig: !!safeConfig });
-    setTabs((prev) => [...prev, tab]);
-    setActiveTabId(id);
-    setCurrentProjectPath(projectPath ?? null);
-    return tab;
-  }, []);
-
-  const closeEditorTab = useCallback((tabId: string) => {
-    setTabs((prev) => {
-      const index = prev.findIndex((tab) => tab.id === tabId);
-      if (index === -1) return prev;
-      const nextTabs = prev.filter((tab) => tab.id !== tabId);
-      if (activeTabId === tabId) {
-        const fallback = nextTabs[index] ?? nextTabs[index - 1] ?? nextTabs[0] ?? null;
-        const nextActiveId = fallback?.id ?? null;
-        setActiveTabId(nextActiveId);
-        setCurrentProjectPath(fallback?.projectPath ?? null);
-      }
-      return nextTabs;
-    });
-  }, [activeTabId]);
-  
-  const switchToTab = useCallback(async (tabId: string) => {
-    if (tabId === activeTabId) return;
-    const prevTab = tabs.find(t => t.id === activeTabId);
-    const nextTab = tabs.find(t => t.id === tabId);
-    try {
-      if (editor && prevTab) {
-        // Always save a snapshot to the tab's config for quick restoration
-        try {
-          await editor.ensureTilesetsLoaded();
-          const snapshot = await editor.getProjectData();
-          const safeSnapshot = JSON.parse(JSON.stringify(snapshot));
-          setTabs((prev) => prev.map(t => t.id === prevTab.id ? { ...t, config: safeSnapshot } : t));
-          console.log('Snapshot saved into prevTab.config during tab switch:', { tabId: prevTab.id, snapshotKeys: Object.keys(safeSnapshot || {}) });
-        } catch (err) {
-          console.warn('Failed to snapshot tab before switching:', err);
-        }
-        
-        // Also save to disk if it's a disk-based project
-        if (prevTab.projectPath) {
-          try {
-            await editor.saveProjectData(prevTab.projectPath);
-          } catch (e) {
-            console.warn('Failed to save to disk before switching tabs:', e);
-          }
-        }
-      }
-    } catch (e) {
-      console.warn('Error during tab switch save:', e);
-    }
-
-    if (!nextTab) {
-      setActiveTabId(null);
-      return;
-    }
-
-    setActiveTabId(tabId);
-    setCurrentProjectPath(nextTab.projectPath ?? null);
-
-    if (nextTab.tabType === 'enemy') {
-      return;
-    }
-
-    // If the tab contains a preloaded in-memory config, prefer restoring it
-    // (this can include tileset images that haven't been written to disk yet).
-    // However, if this tab belongs to a project on disk and the in-memory
-    // config does not include any tileset images, and we DON'T have an editor
-    // instance yet, prefer opening the map file from disk (pass the map name)
-    // so embedded project map files that have tileset images are used instead.
-    // NOTE: If editor already exists, skip this and use the in-memory restore path below.
-    if (nextTab.config && !editor) {
-      try {
-        const cfgCheck = nextTab.config as EditorProjectData;
-        if (nextTab.projectPath && (!cfgCheck.tilesetImages || Object.keys(cfgCheck.tilesetImages || {}).length === 0) && nextTab.name) {
-          console.log('In-memory config missing tileset images and no editor; preferring disk open for tab', tabId, nextTab.name);
-          await switchToTabHelpersRef.current.handleOpenMap(nextTab.projectPath, false, nextTab.name);
-          if (editor) switchToTabHelpersRef.current.setupAutoSave(editor);
-          return;
-        }
-} catch {
-        // ignore and fall back to normal restore
-      }
-
-    }
-
-    
-    // If the tab contains a preloaded in-memory config, prefer restoring it
-    // (this can include tileset images that haven't been written to disk yet).
-    if (nextTab.config) {
-      console.log('Switching to tab with in-memory config, attempting to restore for tab:', tabId, { hasProjectPath: !!nextTab.projectPath, configKeys: Object.keys(nextTab.config || {}) });
-      // If an editor instance exists, restore directly into it for a more
-      // immediate and reliable update (avoids race conditions creating a new editor).
-          try {
-            if (editor) {
-              console.log('Restoring config into existing editor for tab:', tabId);
-              // DON'T call resetForNewProject - just load the new project data directly
-              // The editor's loadProjectData will replace layers, tilesets etc.
-              // Just clear localStorage backup to prevent old data loading
-              editor.clearLocalStorageBackup();
-              const cfg = nextTab.config as EditorProjectData;
-              
-              if (cfg.name) {
-                editor.setMapName(cfg.name);
-                setMapName(cfg.name);
-              }
-              if (cfg.width && cfg.height) {
-                editor.setMapSize(cfg.width ?? 20, cfg.height ?? 15);
-                setMapWidth(cfg.width ?? 20);
-                setMapHeight(cfg.height ?? 15);
-              }
-
-              // Helper type for optional editor runtime extensions used by the UI
-              type EditorWithExtras = TileMapEditor & Partial<{
-                setTilesetImages: (images: Record<string, string>) => void;
-                tilesetImages: Record<string, string>;
-                ensureTilesetsLoaded: (timeout?: number) => Promise<void>;
-                getActiveLayerType: () => string | null;
-                updateCurrentTileset: (t: unknown) => void;
-                refreshTilePalette: (force?: boolean) => void;
-                redraw: () => void;
-              }>;
-
-              const ed = editor as EditorWithExtras;
-
-              // If the in-memory config includes tileset images, apply them into
-              // the live editor first so loadProjectData can make use of them.
-              try {
-                if (cfg.tilesetImages && Object.keys(cfg.tilesetImages).length > 0) {
-                  if (typeof ed.setTilesetImages === 'function') {
-                    ed.setTilesetImages(cfg.tilesetImages);
-                  } else {
-                    // best-effort fallback: attach to editor for later use
-                    ed.tilesetImages = { ...(ed.tilesetImages || {}), ...JSON.parse(JSON.stringify(cfg.tilesetImages)) };
-                  }
-                  console.log('Applied tilesetImages to editor for tab', tabId, Object.keys(cfg.tilesetImages));
-                } else {
-                  console.log('No tilesetImages present in config for tab', tabId);
-                }
-              } catch (e) {
-                console.warn('Failed to apply tilesetImages into editor:', e);
-              }
-
-              // After a short delay, attempt to discover tileset images from the
-              // project folder and apply any matching images. This handles the
-              // case where the original import referenced a file saved inside
-              // the project (images/tilesets or assets) and the in-memory
-              // snapshot didn't include the image data URL.
-              try {
-                await new Promise(r => setTimeout(r, 150));
-                if (currentProjectPath && window.electronAPI?.discoverTilesetImages) {
-                  const discovered = await window.electronAPI.discoverTilesetImages(currentProjectPath);
-                  const discoveredImages = discovered?.tilesetImages || {};
-                  if (Object.keys(discoveredImages).length > 0) {
-                    // Determine which filenames we care about from the config
-                    const cfgNames = new Set<string>();
-                    if (cfg.tilesets && Array.isArray(cfg.tilesets)) {
-                      for (const t of cfg.tilesets) {
-                        if (t.fileName) cfgNames.add(t.fileName);
-                        if (t.sourcePath) {
-                          const s = String(t.sourcePath);
-                          const parts = s.split(/[\\/]/);
-                          const maybe = parts[parts.length - 1];
-                          if (maybe) cfgNames.add(maybe);
-                        }
-                      }
-                    }
-
-                    // Merge discovered images for matching names
-                    const toApply: Record<string, string> = {};
-                    for (const name of Object.keys(discoveredImages)) {
-                      if (cfgNames.has(name)) {
-                        toApply[name] = discoveredImages[name];
-                      }
-                    }
-                    if (Object.keys(toApply).length > 0) {
-                      if (typeof ed.setTilesetImages === 'function') {
-                        ed.setTilesetImages(toApply);
-                        console.log('Applied discovered project tileset images for tab', tabId, Object.keys(toApply));
-                      } else {
-                        // attach to editor as fallback
-                        ed.tilesetImages = { ...(ed.tilesetImages || {}), ...toApply };
-                        console.log('Attached discovered project tileset images to editor.tilesetImages for tab', tabId, Object.keys(toApply));
-                      }
-                    }
-                    
-                    // If some tilesets still missing, attempt to read sourcePath files
-                    // referenced in the config directly from disk (supports absolute
-                    // or external paths). This uses the new preload IPC
-                    // `readFileAsDataURL` implemented in the main process.
-                    const stillMissing = (cfg.tilesets || []).filter((t: SavedTilesetEntry) => {
-                      const name = t.fileName || (t.sourcePath ? String(t.sourcePath).split(/[\\/]/).pop() : null);
-                      return name && !Object.prototype.hasOwnProperty.call(ed.tilesetImages || {}, name) && !toApply[name];
-                    });
-                    const electronAPI = window.electronAPI as unknown as {
-                      readFileAsDataURL?: (p: string) => Promise<string | null>;
-                      resolvePathRelative?: (a: string, b: string) => Promise<string | null>;
-                      fileExists?: (p: string) => Promise<boolean>;
-                    };
-                    if (stillMissing.length > 0 && electronAPI?.readFileAsDataURL) {
-                      for (const t of stillMissing) {
-                        try {
-                          let candidatePath: string | null = t.sourcePath ?? null;
-                          if (candidatePath && currentProjectPath && electronAPI.resolvePathRelative) {
-                            try {
-                              const rel = await electronAPI.resolvePathRelative(currentProjectPath, candidatePath);
-                              if (rel && rel.trim()) candidatePath = rel;
-                            } catch {
-                              // ignore resolution errors
-                            }
-                          }
-                          if (!candidatePath) continue;
-                          const exists = await electronAPI.fileExists?.(candidatePath);
-                          if (!exists) continue;
-                          const dataUrl = await electronAPI.readFileAsDataURL(candidatePath);
-                          if (!dataUrl) continue;
-                          const key = t.fileName || candidatePath.split(/[\\/]/).pop();
-                          if (key) toApply[key] = dataUrl;
-                          console.log('Loaded tileset from sourcePath for tab', tabId, key);
-                        } catch (e) {
-                          console.warn('Failed to load tileset from sourcePath for', t, e);
-                        }
-                      }
-                      if (Object.keys(toApply).length > 0) {
-                        if (typeof ed.setTilesetImages === 'function') {
-                          ed.setTilesetImages(toApply);
-                          console.log('Applied discovered/project-source tileset images for tab', tabId, Object.keys(toApply));
-                        } else {
-                          ed.tilesetImages = { ...(ed.tilesetImages || {}), ...toApply };
-                        }
-                      }
-                    }
-                  }
-                }
-              } catch (e) {
-                console.warn('Failed to discover/apply project tileset images:', e);
-              }
-
-              // Wait for any in-flight image loads then load the rest of the project data
-              try {
-                if (typeof ed.ensureTilesetsLoaded === 'function') {
-                  await ed.ensureTilesetsLoaded(2000);
-                } else {
-                  await new Promise((r) => setTimeout(r, 50));
-                }
-              } catch (e) {
-                console.warn('ensureTilesetsLoaded failed or timed out:', e);
-              }
-
-              const loaded = await switchToTabHelpersRef.current.loadProjectData(
-                editor,
-                nextTab.config as EditorProjectData
-              );
-
-              // Force palette rebuild after images and layers settle
-              try {
-                const activeLayerType = typeof ed.getActiveLayerType === 'function'
-                  ? ed.getActiveLayerType()
-                  : null;
-                if (activeLayerType && typeof ed.updateCurrentTileset === 'function') {
-                  ed.updateCurrentTileset(activeLayerType);
-                }
-                if (typeof ed.refreshTilePalette === 'function') {
-                  ed.refreshTilePalette(true);
-                }
-                console.log('Forced palette rebuild after restoring tab', tabId);
-              } catch (e) {
-                console.warn('Palette rebuild after restore failed', e);
-              }
-
-              console.log('Loaded tab config into editor, result:', loaded);
-              switchToTabHelpersRef.current.setupAutoSave(editor);
-              switchToTabHelpersRef.current.updateLayersList();
-              switchToTabHelpersRef.current.syncMapObjects();
-              setPendingMapConfig(null);
-              setMapInitialized(true);
-              
-              // Force canvas redraw after loading
-              try {
-                if (typeof ed.redraw === 'function') {
-                  ed.redraw();
-                  console.log('Forced canvas redraw after tab switch');
-                }
-              } catch (e) {
-                console.warn('Failed to force redraw:', e);
-              }
-              return;
-            }
-          } catch (err) {
-            console.warn('Failed to restore tab.config into existing editor, falling back to pendingMapConfig:', err);
-          }
-
-      // Fall back to pendingMapConfig which triggers editor creation/restoration
-      if (nextTab.config && 'enemy' in nextTab.config) {
-        return;
-      }
-      setPendingMapConfig(nextTab.config ?? null);
-      return;
-    }
-
-    // If the tab references a project path, open it from disk. Pass the
-    // tab's map name when available so the main process can open the
-    // specific map file (e.g. `MyMap.json`) instead of the project's
-    // default/first JSON file.
-    if (nextTab.projectPath) {
-      // If the tab has a cached config (from previous switch), prefer using that
-      // This is handled above in the nextTab.config block, so we only reach here
-      // if there's no cached config (first time opening this tab in this session)
-      
-      console.log('=== TAB SWITCH: Loading from disk ===');
-      console.log('Tab:', nextTab.name, 'Project:', nextTab.projectPath);
-      console.log('Current tabs before handleOpenMap:', tabs.map(t => t.name));
-      
-      // DON'T call handleOpenMap - it rebuilds tabs from scratch!
-      // Instead, just load the map config directly
-      if (window.electronAPI?.openMapProject) {
-        try {
-          const mapConfig = await (window.electronAPI.openMapProject as (path: string, mapName?: string) => Promise<EditorProjectData | null>)(nextTab.projectPath, nextTab.name);
-          if (mapConfig) {
-            console.log('Loaded map config for tab:', nextTab.name, Object.keys(mapConfig));
-            setPendingMapConfig(mapConfig);
-            setMapName(mapConfig.name || nextTab.name);
-            setMapWidth(mapConfig.width ?? 20);
-            setMapHeight(mapConfig.height ?? 15);
-            setMapInitialized(true);
-            setShowWelcome(false);
-            setShowCreateMapDialog(false);
-          } else {
-            // Map file doesn't exist on disk - create a fresh empty map
-            console.warn('Map file not found for tab:', nextTab.name, '- creating fresh map');
-            const freshConfig: EditorProjectData = {
-              name: nextTab.name,
-              width: 20,
-              height: 15,
-              tileSize: 64,
-              layers: [],
-              version: '1.0'
-            };
-            setPendingMapConfig(freshConfig);
-            setMapName(nextTab.name);
-            setMapWidth(20);
-            setMapHeight(15);
-            setMapInitialized(true);
-            setShowWelcome(false);
-            setShowCreateMapDialog(false);
-            
-            // Also update the tab's config so it has something to work with
-            setTabs(prev => prev.map(t => t.id === nextTab.id ? { ...t, config: freshConfig } : t));
-          }
-        } catch (e) {
-          console.error('Error loading map for tab switch:', e);
-        }
-      }
-      if (editor) switchToTabHelpersRef.current.setupAutoSave(editor);
-    }
-  }, [activeTabId, currentProjectPath, editor, tabs]);
-
   const [isDarkMode, setIsDarkMode] = useState(() => {
     // Initialize from localStorage or default to false
     const savedTheme = localStorage.getItem('isDarkMode');
@@ -924,7 +380,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [currentProjectPath]);
+  }, [currentProjectPath, setStartingMapIntermap]);
 
   useEffect(() => {
     const previous = previousMapNameRef.current;
@@ -1005,7 +461,7 @@ function App() {
   // Items list for display
   const [itemsList, setItemsList] = useState<Array<{ id: number; name: string; category: string; filePath: string; fileName: string; role: ItemRole; resourceSubtype?: ItemResourceSubtype }>>([]);
   // Expanded item categories for accordion
-  const [expandedItemCategories, setExpandedItemCategories] = useState<Set<string>>(new Set());
+  const [expandedItemCategories, setExpandedItemCategories] = useState<Set<ItemRole>>(new Set());
   // Vendor stock dialog
   const [showVendorStockDialog, setShowVendorStockDialog] = useState(false);
   const [vendorStockSelection, setVendorStockSelection] = useState<Record<number, number>>({});
@@ -1028,7 +484,7 @@ function App() {
       role: (item.role as ItemRole) || 'unspecified',
       resourceSubtype: toResourceSubtype(item.resourceSubtype)
     }));
-  }, []);
+  }, [setEditingObject]);
 
   const refreshItemsList = useCallback(async (projectPath: string | null) => {
     if (!projectPath || !window.electronAPI?.listItems) {
@@ -1426,7 +882,20 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       setHeroEditData({ currentX, currentY, mapWidth, mapHeight, onConfirm });
       setShowHeroEditDialog(true);
     });
-  }, [autoSaveEnabled, currentProjectPath, handleSelectTool]);
+  }, [
+    autoSaveEnabled,
+    currentProjectPath,
+    handleSelectTool,
+    setHasUnsavedChanges,
+    setHeroEditData,
+    setLastSaveTime,
+    setMapObjects,
+    setNpcDeletePopup,
+    setSaveStatus,
+    setSelectedBrushTool,
+    setShowHeroEditDialog,
+    setStamps
+  ]);
 
   useToolbarVisibility({
     showWelcome,
@@ -1614,12 +1083,12 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       setShowStampDialog(false);
       setStampMode('select');
     }
-  }, [editor, newStampName]);
+  }, [editor, newStampName, setNewStampName, setShowStampDialog, setStampMode]);
 
   const handleStampSelect = useCallback((stampId: string) => {
     setSelectedStamp(stampId);
     setStampMode('place');
-  }, []);
+  }, [setSelectedStamp, setStampMode]);
 
   const handleDeleteStamp = useCallback((stampId: string) => {
     if (!editor) return;
@@ -1628,7 +1097,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       setSelectedStamp(null);
       setStampMode('select');
     }
-  }, [editor, selectedStamp]);
+  }, [editor, selectedStamp, setSelectedStamp, setStampMode]);
 
   // Icon helper functions
   const getBrushIcon = () => {
@@ -1672,7 +1141,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
   const handleSeparateBrush = useCallback((brushId: number) => {
     setBrushToSeparate(brushId);
     setShowSeparateDialog(true);
-  }, []);
+  }, [setBrushToSeparate, setShowSeparateDialog]);
 
   const confirmSeparateBrush = useCallback(() => {
     if (!editor || brushToSeparate === null) return;
@@ -1688,7 +1157,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     setShowSeparateDialog(false);
     setBrushToSeparate(null);
     setBrushTool('none'); // Exit separate mode after action
-  }, [editor, brushToSeparate]);
+  }, [brushToSeparate, editor, setBrushTool, setBrushToSeparate, setShowSeparateDialog]);
 
   const handleRemoveBrush = useCallback((brushId: number) => {
     if (!editor) return;
@@ -1696,7 +1165,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     console.log(`handleRemoveBrush called with brushId: ${brushId}`);
   // Open generic confirm dialog
   setConfirmAction({ type: 'removeBrush', payload: brushId });
-  }, [editor]);
+  }, [editor, setConfirmAction]);
 
   const handleBrushReorder = useCallback((fromTileIndex: number, toTileIndex: number) => {
     if (!editor) return;
@@ -1742,7 +1211,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         setShowObjectDialog(true);
       }
     }
-  }, [editor, currentProjectPath, createTabFor, setActiveTabId, tabs, switchToTab]);
+  }, [createTabFor, currentProjectPath, editor, setActiveTabId, setTabs, switchToTab, tabs]);
 
   const handleUpdateObject = useCallback((updatedObject: MapObject) => {
     if (!editor) return;
@@ -2151,9 +1620,9 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     }
   }, [editingItem, currentProjectPath, toast, handleCloseItemEdit, normalizeItemsForState]);
 
-  const updateEditingItemField = useCallback(<K extends keyof NonNullable<typeof editingItem>>(key: K, value: NonNullable<typeof editingItem>[K]) => {
-    setEditingItem(prev => prev ? { ...prev, [key]: value } : null);
-  }, []);
+  const updateEditingItemField = useCallback((key: string, value: unknown) => {
+    setEditingItem((prev) => (prev ? { ...prev, [key]: value } : null));
+  }, [setEditingItem]);
 
 
 
@@ -3606,7 +3075,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       console.error('Open map error:', e);
       toast({ title: 'Open failed', description: 'An unexpected error occurred while opening the map.', variant: 'destructive' });
     }
-  }, [currentProjectPath, performExport, handleManualSave, editor, updateLayersList, syncMapObjects, toast]);
+  }, [currentProjectPath, editor, handleManualSave, performExport, setMapInitialized, setMapName, syncMapObjects, toast, updateLayersList]);
 
   const handleToggleMinimap = () => {
     if (editor?.toggleMinimap) {
@@ -3873,7 +3342,44 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       // Re-enable default editor creation for other flows
       setIsOpeningProject(false);
     }
-  }, [editor, setupAutoSave, updateLayersList, startingMapIntermap, updateStartingMap]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [
+    activeTabId,
+    editor,
+    setActiveLayerId,
+    setActiveTabId,
+    setCreateMapError,
+    setCurrentProjectPath,
+    setEditor,
+    setHasSelection,
+    setHasUnsavedChanges,
+    setHoverCoords,
+    setIsOpeningProject,
+    setLayers,
+    setMapHeight,
+    setMapInitialized,
+    setMapName,
+    setMapObjects,
+    setMapWidth,
+    setNewMapHeight,
+    setNewMapName,
+    setNewMapStarting,
+    setNewMapWidth,
+    setPendingMapConfig,
+    setProjectMaps,
+    setReservedMapNames,
+    setSaveStatus,
+    setSelectionCount,
+    setShowCreateMapDialog,
+    setShowWelcome,
+    setStartingMapIntermap,
+    setStamps,
+    setTabs,
+    showBottomToolbarTemporarily,
+    showToolbarTemporarily,
+    startingMapIntermap,
+    tabs,
+    updateStartingMap
+  ]);
 
   // Keep a ref to handleOpenMap so IPC listeners can call the latest implementation
   useEffect(() => { handleOpenMapRef.current = handleOpenMap; }, [handleOpenMap]);
@@ -4037,7 +3543,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     confirmPayloadRef.current = payload;
     setTabToDelete(payload);
     setConfirmAction({ type: 'removeTab', payload });
-  }, [activeLayer?.type, editor, toast]);
+  }, [activeLayer?.type, editor, setConfirmAction, setTabToDelete, toast]);
 
   const isCollisionLayer = activeLayer?.type === 'collision';
   const isNpcLayer = activeLayer?.type === 'npc';
@@ -5950,107 +5456,20 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         handleObjectDialogClose={handleObjectDialogClose}
         handleObjectDialogSave={handleObjectDialogSave}
         updateEditingObjectProperty={updateEditingObjectProperty}
+        updateEditingObjectBoolean={updateEditingObjectBoolean}
+        getEditingObjectProperty={getEditingObjectProperty}
         editor={editor}
         syncMapObjects={syncMapObjects}
         canUseTilesetDialog={canUseTilesetDialog}
         handleEditingTilesetBrowse={handleEditingTilesetBrowse}
         handleEditingPortraitBrowse={handleEditingPortraitBrowse}
-        handleEditingPreviewBrowse={handleEditingPreviewBrowse}
         handleOpenVendorStockDialog={handleOpenVendorStockDialog}
         handleOpenVendorUnlockDialog={handleOpenVendorUnlockDialog}
         handleOpenVendorRandomDialog={handleOpenVendorRandomDialog}
-        handleOpenVendorStockAdd={handleOpenVendorStockAdd}
-        handleOpenVendorUnlockAdd={handleOpenVendorUnlockAdd}
-        handleOpenVendorRandomAdd={handleOpenVendorRandomAdd}
-        handleToggleActorRole={handleToggleActorRole}
-        editingNpcDialogues={editingNpcDialogues}
-        setEditingNpcDialogues={setEditingNpcDialogues}
         dialogueTrees={dialogueTrees}
         setDialogueTrees={setDialogueTrees}
         setActiveDialogueTab={setActiveDialogueTab}
         setShowDialogueTreeDialog={setShowDialogueTreeDialog}
-        editingItem={editingItem}
-        setEditingItem={setEditingItem}
-        updateEditingItemField={updateEditingItemField}
-        editingNpcVendorStock={editingNpcVendorStock}
-        setEditingNpcVendorStock={setEditingNpcVendorStock}
-        editingNpcVendorUnlocks={editingNpcVendorUnlocks}
-        setEditingNpcVendorUnlocks={setEditingNpcVendorUnlocks}
-        editingNpcVendorRandom={editingNpcVendorRandom}
-        setEditingNpcVendorRandom={setEditingNpcVendorRandom}
-        editingNpcDisplayName={editingNpcDisplayName}
-        setEditingNpcDisplayName={setEditingNpcDisplayName}
-        editingNpcTitle={editingNpcTitle}
-        setEditingNpcTitle={setEditingNpcTitle}
-        editingNpcDialogue={editingNpcDialogue}
-        setEditingNpcDialogue={setEditingNpcDialogue}
-        editingNpcCanTalk={editingNpcCanTalk}
-        setEditingNpcCanTalk={setEditingNpcCanTalk}
-        editingNpcCanTrade={editingNpcCanTrade}
-        setEditingNpcCanTrade={setEditingNpcCanTrade}
-        editingNpcCanQuest={editingNpcCanQuest}
-        setEditingNpcCanQuest={setEditingNpcCanQuest}
-        editingNpcHeroStartX={editingNpcHeroStartX}
-        setEditingNpcHeroStartX={setEditingNpcHeroStartX}
-        editingNpcHeroStartY={editingNpcHeroStartY}
-        setEditingNpcHeroStartY={setEditingNpcHeroStartY}
-        editingNpcLevelOverride={editingNpcLevelOverride}
-        setEditingNpcLevelOverride={setEditingNpcLevelOverride}
-        editingNpcNoStatScaling={editingNpcNoStatScaling}
-        setEditingNpcNoStatScaling={setEditingNpcNoStatScaling}
-        editingNpcAbilityIds={editingNpcAbilityIds}
-        setEditingNpcAbilityIds={setEditingNpcAbilityIds}
-        editingNpcPowerLevel={editingNpcPowerLevel}
-        setEditingNpcPowerLevel={setEditingNpcPowerLevel}
-        editingNpcPowerMods={editingNpcPowerMods}
-        setEditingNpcPowerMods={setEditingNpcPowerMods}
-        editingNpcPowerModsDesc={editingNpcPowerModsDesc}
-        setEditingNpcPowerModsDesc={setEditingNpcPowerModsDesc}
-        editingNpcDialogueNpc={editingNpcDialogueNpc}
-        setEditingNpcDialogueNpc={setEditingNpcDialogueNpc}
-        editingNpcDialoguePlayer={editingNpcDialoguePlayer}
-        setEditingNpcDialoguePlayer={setEditingNpcDialoguePlayer}
-        editingNpcDialogueTrigger={editingNpcDialogueTrigger}
-        setEditingNpcDialogueTrigger={setEditingNpcDialogueTrigger}
-        editingNpcDialogueQuest={editingNpcDialogueQuest}
-        setEditingNpcDialogueQuest={setEditingNpcDialogueQuest}
-        editingNpcDialogueReward={editingNpcDialogueReward}
-        setEditingNpcDialogueReward={setEditingNpcDialogueReward}
-        editingNpcDialogueStatus={editingNpcDialogueStatus}
-        setEditingNpcDialogueStatus={setEditingNpcDialogueStatus}
-        editingNpcDialogueType={editingNpcDialogueType}
-        setEditingNpcDialogueType={setEditingNpcDialogueType}
-        editingNpcDialogueName={editingNpcDialogueName}
-        setEditingNpcDialogueName={setEditingNpcDialogueName}
-        editingNpcDialogueText={editingNpcDialogueText}
-        setEditingNpcDialogueText={setEditingNpcDialogueText}
-        editingNpcDialogueEvents={editingNpcDialogueEvents}
-        setEditingNpcDialogueEvents={setEditingNpcDialogueEvents}
-        editingNpcDialogueLineIndex={editingNpcDialogueLineIndex}
-        setEditingNpcDialogueLineIndex={setEditingNpcDialogueLineIndex}
-        editingNpcDialogueTopic={editingNpcDialogueTopic}
-        setEditingNpcDialogueTopic={setEditingNpcDialogueTopic}
-        editingNpcDialogueRequirements={editingNpcDialogueRequirements}
-        setEditingNpcDialogueRequirements={setEditingNpcDialogueRequirements}
-        editingNpcDialogueRewards={editingNpcDialogueRewards}
-        setEditingNpcDialogueRewards={setEditingNpcDialogueRewards}
-        editingNpcDialogueWorldEffects={editingNpcDialogueWorldEffects}
-        setEditingNpcDialogueWorldEffects={setEditingNpcDialogueWorldEffects}
-        editingNpcDialoguePreview={editingNpcDialoguePreview}
-        setEditingNpcDialoguePreview={setEditingNpcDialoguePreview}
-        editingNpcDialogueEditor={editingNpcDialogueEditor}
-        setEditingNpcDialogueEditor={setEditingNpcDialogueEditor}
-        setEditingNpcDialogue={setEditingNpcDialogue}
-        setEditingNpcDialogueEvent={setEditingNpcDialogueEvent}
-        setEditingNpcDialogueNode={setEditingNpcDialogueNode}
-        setEditingNpcDialogueTextNode={setEditingNpcDialogueTextNode}
-        setEditingNpcDialogueTopicNode={setEditingNpcDialogueTopicNode}
-        setEditingNpcDialogueChoice={setEditingNpcDialogueChoice}
-        setEditingNpcDialogueChoiceNode={setEditingNpcDialogueChoiceNode}
-        setEditingNpcDialogueRewardNode={setEditingNpcDialogueRewardNode}
-        setEditingNpcDialogueRequirementNode={setEditingNpcDialogueRequirementNode}
-        setEditingNpcDialogueWorldEffectNode={setEditingNpcDialogueWorldEffectNode}
-        setEditingNpcDialogueTriggerNode={setEditingNpcDialogueTriggerNode}
         showDeleteNpcConfirm={showDeleteNpcConfirm}
         setShowDeleteNpcConfirm={setShowDeleteNpcConfirm}
         showDeleteEnemyConfirm={showDeleteEnemyConfirm}

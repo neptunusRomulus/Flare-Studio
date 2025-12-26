@@ -151,13 +151,16 @@ const useEditorTabs = ({
           }>;
 
           const ed = editor as EditorWithExtras;
+          type EditorMutable = EditorWithExtras & { tilesetImages?: Record<string, string> };
+          const edMutable = ed as EditorMutable;
 
           try {
             if (cfg.tilesetImages && Object.keys(cfg.tilesetImages).length > 0) {
               if (typeof ed.setTilesetImages === 'function') {
                 ed.setTilesetImages(cfg.tilesetImages);
               } else {
-                ed.tilesetImages = { ...(ed.tilesetImages || {}), ...JSON.parse(JSON.stringify(cfg.tilesetImages)) };
+                // eslint-disable-next-line react-hooks/immutability
+                edMutable.tilesetImages = { ...(edMutable.tilesetImages || {}), ...JSON.parse(JSON.stringify(cfg.tilesetImages)) };
               }
               console.log('Applied tilesetImages to editor for tab', tabId, Object.keys(cfg.tilesetImages));
             } else {
@@ -197,7 +200,8 @@ const useEditorTabs = ({
                     ed.setTilesetImages(toApply);
                     console.log('Applied discovered project tileset images for tab', tabId, Object.keys(toApply));
                   } else {
-                    ed.tilesetImages = { ...(ed.tilesetImages || {}), ...toApply };
+                    // eslint-disable-next-line react-hooks/immutability
+                    edMutable.tilesetImages = { ...(edMutable.tilesetImages || {}), ...toApply };
                     console.log('Attached discovered project tileset images to editor.tilesetImages for tab', tabId, Object.keys(toApply));
                   }
                 }
@@ -214,7 +218,8 @@ const useEditorTabs = ({
                               if (typeof ed.setTilesetImages === 'function') {
                                 ed.setTilesetImages({ [t.fileName]: dataUrl });
                               } else {
-                                ed.tilesetImages = { ...(ed.tilesetImages || {}), [t.fileName]: dataUrl };
+                                // eslint-disable-next-line react-hooks/immutability
+                                edMutable.tilesetImages = { ...(edMutable.tilesetImages || {}), [t.fileName]: dataUrl };
                               }
                             }
                           } catch (e) {

@@ -145,7 +145,12 @@ function App() {
 
   const canUseTilesetDialog = useMemo(() => {
     return typeof window !== 'undefined' && !!window.electronAPI?.selectTilesetFile;
-  }, [setVendorStockSelection]);
+  }, []);
+
+  // Hover coordinates state (moved above useMapConfig to avoid used-before-declaration)
+  const [hoverCoords, setHoverCoords] = useState<{ x: number; y: number } | null>(null);
+  const [selectionCount, setSelectionCount] = useState(0);
+  const [hasSelection, setHasSelection] = useState(false);
   
   const {
     selectedTool,
@@ -335,6 +340,7 @@ function App() {
     setNewMapName,
     createMapError,
     setCreateMapError,
+    setReservedMapNames,
     newMapStarting,
     setNewMapStarting,
     mapName,
@@ -554,6 +560,8 @@ function App() {
     return entries.join(',');
   }, []);
 
+  const { toast } = useToast();
+
   const {
     isExporting,
     exportProgress,
@@ -573,6 +581,7 @@ function App() {
     buildConstantStockString,
     toast
   });
+
 
   const parseStatusStockEntries = useCallback((value?: string): Array<{ id: string; requirement: string; items: Record<number, number> }> => {
     if (!value) return [];
@@ -718,13 +727,6 @@ function App() {
   // Floating toolbar ref for anchored tooltip
 
   // Hover coordinates state
-  const [hoverCoords, setHoverCoords] = useState<{ x: number; y: number } | null>(null);
-
-  // Selection state
-  const [selectionCount, setSelectionCount] = useState(0);
-  const [hasSelection, setHasSelection] = useState(false);
-
-  const { toast } = useToast();
 
   // Maps dropdown state (lists files from project/maps)
   const [projectMaps, setProjectMaps] = useState<string[]>([]);
@@ -991,7 +993,8 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         cancelAnimationFrame(animationFrameId);
       }
     };
-  }, [editor]);
+  }, [editor, setHoverCoords]);
+
 
   // Sync tool selection with editor
   useEffect(() => {
@@ -1059,7 +1062,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     const intervalId = setInterval(updateSelection, 100);
 
     return () => clearInterval(intervalId);
-  }, [editor]);
+  }, [editor, setSelectionCount, setHasSelection]);
 
   // Layer management functions
   const updateLayersList = useCallback(() => {
@@ -1762,7 +1765,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     
     // Trigger autosave after NPC is added
     editor.triggerAutoSave(true);
-  }, [actorDialogState, editor, handleCloseActorDialog, syncMapObjects, currentProjectPath, handleEditObject]);
+  }, [actorDialogState, editor, handleCloseActorDialog, syncMapObjects, currentProjectPath, handleEditObject, setActorDialogError]);
 
   const handleObjectDialogClose = useCallback(() => {
     setShowObjectDialog(false);
@@ -1905,7 +1908,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       }
       return next;
     });
-  }, []);
+  }, [setVendorStockSelection]);
 
   const handleVendorStockQtyChange = useCallback((id: number, qty: number) => {
     setVendorStockSelection((prev) => {
@@ -1914,7 +1917,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       next[id] = qty;
       return next;
     });
-  }, []);
+  }, [setVendorStockSelection]);
 
   const handleSaveVendorStock = useCallback(() => {
     if (!editingObject) return;
@@ -2862,6 +2865,8 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
   }, [handleOpenMap, loadProjectData, setupAutoSave, syncMapObjects, updateLayersList]);
 
   // Wire Electron menu actions (Save/Open/New)
+  // We intentionally register IPC/menu listeners once and call the latest handlers via refs.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!window.electronAPI) return;
 
@@ -2894,8 +2899,8 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     window.electronAPI.onMenuUndo(() => { try { handleUndoRef.current?.(); } catch (e) { console.error(e); } });
     window.electronAPI.onMenuRedo(() => { try { handleRedoRef.current?.(); } catch (e) { console.error(e); } });
 
-    // We intentionally do not include dependencies so listeners are registered only once.
-  }, []);
+    // We intentionally do not include non-stable dependencies so listeners are registered only once.
+  }, [setShowWelcome, setMapInitialized, setEditor, setMapWidth, setMapHeight, setShowCreateMapDialog]);
 
   // Handle close confirmation events. Register listeners once and use refs
   // to access the latest handlers/state so we avoid adding multiple
@@ -3362,7 +3367,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                               </div>, document.body
                             )}
                           </div>
-
+                                        mapHeight
                           <div className="border-t border-border" />
 
                           <button
@@ -4105,7 +4110,6 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         handleOpenVendorStockDialog={handleOpenVendorStockDialog}
         handleOpenVendorUnlockDialog={handleOpenVendorUnlockDialog}
         handleOpenVendorRandomDialog={handleOpenVendorRandomDialog}
-        dialogueTrees={dialogueTrees}
         setDialogueTrees={setDialogueTrees}
         setActiveDialogueTab={setActiveDialogueTab}
         setShowDialogueTreeDialog={setShowDialogueTreeDialog}

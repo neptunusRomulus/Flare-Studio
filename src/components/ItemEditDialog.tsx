@@ -8,7 +8,7 @@ import { AlertTriangle, Book, Box, Check, Coins, Gift, HelpCircle, Shield, Spark
 import { RESOURCE_SUBTYPE_META } from '@/editor/itemRoles';
 import type { ItemResourceSubtype } from '@/editor/itemRoles';
 
-type EditingItem = any;
+type EditingItem = Record<string, any>;
 
 type ItemEditDialogProps = {
   showItemEditDialog: boolean;

@@ -157,6 +157,7 @@ const useEditorTabs = ({
               if (typeof ed.setTilesetImages === 'function') {
                 ed.setTilesetImages(cfg.tilesetImages);
               } else {
+                // eslint-disable-next-line react-hooks/immutability
                 ed.tilesetImages = { ...(ed.tilesetImages || {}), ...JSON.parse(JSON.stringify(cfg.tilesetImages)) };
               }
               console.log('Applied tilesetImages to editor for tab', tabId, Object.keys(cfg.tilesetImages));

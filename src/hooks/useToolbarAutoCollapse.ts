@@ -10,10 +10,12 @@ type UseToolbarAutoCollapseOptions = {
 const useToolbarAutoCollapse = ({
   delayMs = 500,
   defaultExpanded = true,
-  autoCollapse = true
-}: UseToolbarAutoCollapseOptions = {}) => {
+  autoCollapse = true,
+  containerRef: externalContainerRef
+}: UseToolbarAutoCollapseOptions & { containerRef?: React.RefObject<HTMLDivElement | null> } = {}) => {
   const [expanded, setExpanded] = useState(defaultExpanded);
-  const containerRef = useRef<HTMLDivElement | null>(null);
+  const internalRef = useRef<HTMLDivElement | null>(null);
+  const containerRef = externalContainerRef ?? internalRef;
   const collapseTimerRef = useRef<number | null>(null);
 
   const clearCollapseTimer = useCallback(() => {
@@ -49,7 +51,7 @@ const useToolbarAutoCollapse = ({
       return;
     }
     scheduleCollapse();
-  }, [scheduleCollapse]);
+  }, [scheduleCollapse, containerRef]);
 
   const handleFocus = useCallback(() => {
     clearCollapseTimer();

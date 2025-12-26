@@ -4,8 +4,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Input } from '@/components/ui/input';
 import Tooltip from '@/components/ui/tooltip';
 import { Check, Gift, HelpCircle, Image, MessageSquare, Package, Save, Sparkles, Trash2, User, X } from 'lucide-react';
-import type { DialogueTree, MapObject } from '@/types';
-import { NPC_ROLE_OPTIONS, ENEMY_ROLE_OPTIONS } from '@/editor/actorRoles';
+import type { DialogueTree } from '@/types';
 
 const ObjectManagementDialog = ({
   showObjectDialog,
@@ -25,7 +24,6 @@ const ObjectManagementDialog = ({
   handleOpenVendorStockDialog,
   handleOpenVendorUnlockDialog,
   handleOpenVendorRandomDialog,
-  dialogueTrees,
   setDialogueTrees,
   setActiveDialogueTab,
   setShowDialogueTreeDialog,

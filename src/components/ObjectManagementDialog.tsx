@@ -5,7 +5,34 @@ import { Input } from '@/components/ui/input';
 import Tooltip from '@/components/ui/tooltip';
 import { Check, Gift, HelpCircle, Image, MessageSquare, Package, Save, Sparkles, Trash2, User, X } from 'lucide-react';
 import type { DialogueTree, MapObject } from '@/types';
-import { NPC_ROLE_OPTIONS, ENEMY_ROLE_OPTIONS } from '@/editor/actorRoles';
+import type { TileMapEditor } from '@/editor/TileMapEditor';
+
+type ObjectManagementDialogProps = {
+  showObjectDialog: boolean;
+  editingObject: MapObject | null;
+  objectValidationErrors: string[];
+  setEditingObject: (obj: MapObject | null) => void;
+  handleObjectDialogClose: () => void;
+  handleObjectDialogSave: () => void;
+  updateEditingObjectProperty: (key: string, value: string | null) => void;
+  updateEditingObjectBoolean: (key: string, checked: boolean) => void;
+  getEditingObjectProperty: (key: string, fallback?: string) => string;
+  editor?: TileMapEditor | null;
+  syncMapObjects: () => void;
+  canUseTilesetDialog: boolean;
+  handleEditingTilesetBrowse: () => Promise<void> | void;
+  handleEditingPortraitBrowse: () => Promise<void> | void;
+  handleOpenVendorStockDialog: () => void;
+  handleOpenVendorUnlockDialog: () => void;
+  handleOpenVendorRandomDialog: () => void;
+  setDialogueTrees: (trees: DialogueTree[]) => void;
+  setActiveDialogueTab: (idx: number) => void;
+  setShowDialogueTreeDialog: (v: boolean) => void;
+  showDeleteNpcConfirm: boolean;
+  setShowDeleteNpcConfirm: (v: boolean) => void;
+  showDeleteEnemyConfirm: boolean;
+  setShowDeleteEnemyConfirm: (v: boolean) => void;
+};
 
 const ObjectManagementDialog = ({
   showObjectDialog,
@@ -25,7 +52,6 @@ const ObjectManagementDialog = ({
   handleOpenVendorStockDialog,
   handleOpenVendorUnlockDialog,
   handleOpenVendorRandomDialog,
-  dialogueTrees,
   setDialogueTrees,
   setActiveDialogueTab,
   setShowDialogueTreeDialog,
@@ -33,7 +59,7 @@ const ObjectManagementDialog = ({
   setShowDeleteNpcConfirm,
   showDeleteEnemyConfirm,
   setShowDeleteEnemyConfirm
-}: any) => (
+}: ObjectManagementDialogProps) => (
 <Dialog
   open={showObjectDialog && editingObject?.type !== 'enemy'}
   onOpenChange={(open) => {

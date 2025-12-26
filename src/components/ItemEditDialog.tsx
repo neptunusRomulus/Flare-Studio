@@ -8,12 +8,49 @@ import { AlertTriangle, Book, Box, Check, Coins, Gift, HelpCircle, Shield, Spark
 import { RESOURCE_SUBTYPE_META } from '@/editor/itemRoles';
 import type { ItemResourceSubtype } from '@/editor/itemRoles';
 
-type EditingItem = any;
+type EditingItem = {
+  id?: number;
+  name?: string;
+  flavor?: string;
+  level?: number;
+  quality?: string;
+  no_stash?: string;
+  quest_item?: boolean;
+  price?: string | number;
+  price_sell?: string | number;
+  max_quantity?: number;
+  resourceSubtype?: string;
+  item_type?: string;
+  equip_flags?: string;
+  requires_level?: number;
+  requires_stat?: string;
+  requires_class?: string;
+  disable_slots?: string;
+  gfx?: string;
+  bonus?: string;
+  bonus_power_level?: string;
+  dmg?: string;
+  abs?: string;
+  power?: string;
+  power_desc?: string;
+  replace_power?: string;
+  script?: string;
+  book?: string;
+  book_is_readable?: boolean;
+  soundfx?: string;
+  stepfx?: string;
+  loot_animation?: string;
+  randomizer_def?: string;
+  loot_drops_max?: number;
+  [key: string]: unknown;
+};
+
+type FieldValue = string | number | boolean | Record<string, unknown> | null | undefined;
 
 type ItemEditDialogProps = {
   showItemEditDialog: boolean;
   editingItem: EditingItem | null;
-  updateEditingItemField: (key: string, value: any) => void;
+  updateEditingItemField: (key: string, value: FieldValue) => void;
   handleCloseItemEdit: () => void;
   handleSaveItemEdit: () => void;
 };

@@ -211,9 +211,9 @@ const useEditorTabs = ({
                     const missing = cfg.tilesets.filter((t) => t.fileName && !toApply[t.fileName]);
                     if (missing.length > 0) {
                       for (const t of missing) {
-                        if (t.sourcePath && window.electronAPI?.readFileAsDataUrl) {
+                        if (t.sourcePath && window.electronAPI?.readFileAsDataURL) {
                           try {
-                            const dataUrl = await window.electronAPI.readFileAsDataUrl(t.sourcePath);
+                            const dataUrl = await window.electronAPI.readFileAsDataURL(t.sourcePath);
                             if (dataUrl) {
                               if (typeof ed.setTilesetImages === 'function') {
                                 ed.setTilesetImages({ [t.fileName]: dataUrl });
@@ -288,6 +288,4 @@ const useEditorTabs = ({
     switchToTab
   };
 };
-
-export type { EditorTab };
 export default useEditorTabs;

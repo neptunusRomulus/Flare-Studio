@@ -9,6 +9,8 @@ import {
   Pen,
   Pipette,
   Square,
+  Shapes,
+  Mouse,
   Stamp,
   Target,
   Wand2,
@@ -39,19 +41,19 @@ type BottomToolbarProps = {
   showTooltipWithDelay: (text: React.ReactNode, target: HTMLElement) => void;
   hideTooltip: () => void;
   setShowClearLayerDialog: React.Dispatch<React.SetStateAction<boolean>>;
-  getBrushIcon: () => React.ReactNode;
+  
   showSelectionOptions: boolean;
   handleShowSelectionOptions: () => void;
   handleHideSelectionOptions: () => void;
   selectedSelectionTool: 'rectangular' | 'magic-wand' | 'same-tile' | 'circular';
   setSelectedSelectionTool: React.Dispatch<React.SetStateAction<'rectangular' | 'magic-wand' | 'same-tile' | 'circular'>>;
-  getSelectionIcon: () => React.ReactNode;
+  
   showShapeOptions: boolean;
   handleShowShapeOptions: () => void;
   handleHideShapeOptions: () => void;
   selectedShapeTool: 'rectangle' | 'circle' | 'line';
   setSelectedShapeTool: React.Dispatch<React.SetStateAction<'rectangle' | 'circle' | 'line'>>;
-  getShapeIcon: () => React.ReactNode;
+  
   stampMode: 'select' | 'create' | 'place';
   setStampMode: React.Dispatch<React.SetStateAction<'select' | 'create' | 'place'>>;
   newStampName: string;
@@ -80,19 +82,16 @@ const BottomToolbar = ({
   showTooltipWithDelay,
   hideTooltip,
   setShowClearLayerDialog,
-  getBrushIcon,
   showSelectionOptions,
   handleShowSelectionOptions,
   handleHideSelectionOptions,
   selectedSelectionTool,
   setSelectedSelectionTool,
-  getSelectionIcon,
   showShapeOptions,
   handleShowShapeOptions,
   handleHideShapeOptions,
   selectedShapeTool,
   setSelectedShapeTool,
-  getShapeIcon,
   stampMode,
   setStampMode,
   newStampName,
@@ -102,7 +101,43 @@ const BottomToolbar = ({
   selectedStamp,
   handleStampSelect,
   handleDeleteStamp
-}: BottomToolbarProps) => (
+}: BottomToolbarProps) => {
+  const renderBrushIcon = () => {
+    switch (selectedBrushTool) {
+      case 'bucket':
+        return <PaintBucket className="w-4 h-4" />;
+      case 'eraser':
+        return <Eraser className="w-4 h-4" />;
+      default:
+        return <Paintbrush2 className="w-4 h-4" />;
+    }
+  };
+
+  const renderSelectionIcon = () => {
+    switch (selectedSelectionTool) {
+      case 'magic-wand':
+        return <Wand2 className="w-4 h-4" />;
+      case 'same-tile':
+        return <Target className="w-4 h-4" />;
+      case 'circular':
+        return <Circle className="w-4 h-4" />;
+      default:
+        return <Mouse className="w-4 h-4" />;
+    }
+  };
+
+  const renderShapeIcon = () => {
+    switch (selectedShapeTool) {
+      case 'circle':
+        return <Circle className="w-4 h-4" />;
+      case 'line':
+        return <Pen className="w-4 h-4" />;
+      default:
+        return <Shapes className="w-4 h-4" />;
+    }
+  };
+
+  return (
   <div
     ref={setBottomToolbarNode}
     className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-30"
@@ -133,7 +168,7 @@ const BottomToolbar = ({
             hideTooltip();
           }}
         >
-          {getBrushIcon()}
+          {renderBrushIcon()}
         </Button>
 
         {showBrushOptions && (
@@ -203,7 +238,7 @@ const BottomToolbar = ({
             hideTooltip();
           }}
         >
-          {getSelectionIcon()}
+          {renderSelectionIcon()}
         </Button>
 
         {showSelectionOptions && (
@@ -267,7 +302,7 @@ const BottomToolbar = ({
           onMouseEnter={(event) => { handleShowShapeOptions(); showTooltipWithDelay('Shape Tool', event.currentTarget); }}
           onMouseLeave={() => { handleHideShapeOptions(); hideTooltip(); }}
         >
-          {getShapeIcon()}
+          {renderShapeIcon()}
         </Button>
 
         {showShapeOptions && (
@@ -434,7 +469,8 @@ const BottomToolbar = ({
         </Button>
       </div>
     </div>
-  </div>
-);
+    </div>
+    );
+  };
 
-export default BottomToolbar;
+  export default BottomToolbar;

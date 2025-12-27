@@ -1,9 +1,4 @@
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
-import { createPortal } from 'react-dom';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import Tooltip from '@/components/ui/tooltip';
-import { Download, Undo2, Redo2, X, ZoomIn, ZoomOut, RotateCcw, Map, Square, Settings, Mouse, MousePointer2, Eye, EyeOff, Move, Circle, Paintbrush2, PaintBucket, Eraser, MousePointer, Wand2, Target, Shapes, Pen, Blend, MapPin, Save, Scan, Check, HelpCircle, Folder, Plus, Image, Grid, Box, Users, Locate, Clock, Menu, Sword, GitBranch } from 'lucide-react';
 import { TileMapEditor } from './editor/TileMapEditor';
 import type { EditorProjectData } from './editor/TileMapEditor';
 import { TileLayer, MapObject, FlareNPC } from './types';
@@ -11,6 +6,7 @@ import { serializeNpcToFlare } from './utils/flareNpcUtils';
 import { useToast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/toaster';
 import WelcomeScreen from './components/WelcomeScreen';
+// UI helpers like Button/Badge/Tooltip are imported in the components that use them.
 import OverwriteExportDialog from './components/OverwriteExportDialog';
 import EnemyTabPanel from '@/components/EnemyTabPanel';
 import AbilityDialog from '@/components/AbilityDialog';
@@ -32,6 +28,17 @@ import SidebarLayout from '@/components/SidebarLayout';
 import SidebarToggle from '@/components/SidebarToggle';
 import TilesetPalette from '@/components/TilesetPalette';
 import TitleBar from '@/components/TitleBar';
+import LayersPanel from '@/components/LayersPanel';
+import TopBar from '@/components/TopBar';
+import AppControls from '@/components/AppControls';
+import CanvasTips from '@/components/CanvasTips';
+import ConfirmActionDialog from '@/components/ConfirmActionDialog';
+import MapInitOverlay from '@/components/MapInitOverlay';
+import MapHoverDisplay from '@/components/MapHoverDisplay';
+import NpcDeletePopup from '@/components/NpcDeletePopup';
+import NpcHoverTooltip from '@/components/NpcHoverTooltip';
+import SelectionInfo from '@/components/SelectionInfo';
+import ExportSuccessModal from '@/components/ExportSuccessModal';
 import VendorDialogs from '@/components/VendorDialogs';
 import SidebarActorEntries from '@/components/SidebarActorEntries';
 import SidebarItemsPanel from '@/components/SidebarItemsPanel';
@@ -47,28 +54,38 @@ import useMapConfig from './hooks/useMapConfig';
 import useObjectEditing from './hooks/useObjectEditing';
 import useProjectSession from './hooks/useProjectSession';
 import useProjectIO from './hooks/useProjectIO';
+import { buildConstantStockString } from './utils/parsers';
 import useStampState from './hooks/useStampState';
 import useToolbarAutoCollapse from './hooks/useToolbarAutoCollapse';
 import useToolbarHandlers from './hooks/useToolbarHandlers';
 import useToolbarVisibility from './hooks/useToolbarVisibility';
 import useTooltip from './hooks/useTooltip';
-import useToolSelection from './hooks/useToolSelection';
 import useVendorState from './hooks/useVendorState';
 import useEditorTabs from './hooks/useEditorTabs';
+import useEditorState from './hooks/useEditorState';
 import flareIconUrl from '/flare-ico.png?url';
 import type { MapConfig } from './editor/mapConfig';
 import type { EditorTab } from './hooks/useEditorTabs';
 
 type EnemyTabConfig = { enemy: MapObject };
 
+import useItems from './hooks/useItems';
+import useVendorDialogs from './hooks/useVendorDialogs';
+
 function App() {
   const [showWelcome, setShowWelcome] = useState(true);
-  const [editor, setEditor] = useState<TileMapEditor | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const editorOptsRef = useRef<Record<string, unknown> | null>(null);
+  const {
+    editor,
+    setEditor,
+    canvasRef,
+    updateLayersListRef,
+    syncMapObjectsRef,
+    setupAutoSaveWrapper,
+    updateLayersListWrapper,
+    syncMapObjectsWrapper
+  } = useEditorState(editorOptsRef);
   const toolbarRef = useRef<HTMLDivElement | null>(null);
-  const setupAutoSaveRef = useRef<null | ((editor: TileMapEditor) => void)>(null);
-  const updateLayersListRef = useRef<null | (() => void)>(null);
-  const syncMapObjectsRef = useRef<null | (() => void)>(null);
   // Editor tabs
   const [pendingEnemyTabCloseId, setPendingEnemyTabCloseId] = useState<string | null>(null);
   const switchToTabHelpersRef = useRef({
@@ -83,8 +100,10 @@ function App() {
   // Load session when a project is opened (handled in handleOpenMap)
   // Save session effect is defined after currentProjectPath state (see below)
 
+  // Keep a stable reference to editor active GID even if the value isn't rendered
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [activeGid, setActiveGid] = useState<string>('(none)');
-  const [showMinimap, setShowMinimap] = useState(true);
+  
   // Show/hide Active GID indicator (user preference)
   const [showActiveGid, setShowActiveGid] = useState<boolean>(true);
   // Left sidebar collapsed (icon-strip) state
@@ -107,73 +126,53 @@ function App() {
   const toolbar = useToolbarAutoCollapse();
   const bottomToolbar = useToolbarAutoCollapse();
   const brushToolbar = useToolbarAutoCollapse({ autoCollapse: false });
-  const {
-    expanded: toolbarExpanded,
-    containerRef: toolbarContainerRef,
-    showTemporarily: showToolbarTemporarily,
-    handleMouseEnter: handleToolbarMouseEnter,
-    handleMouseLeave: handleToolbarMouseLeave,
-    handleFocus: handleToolbarFocus,
-    handleBlur: handleToolbarBlur
-  } = toolbar;
-  const {
-    expanded: bottomToolbarExpanded,
-    containerRef: bottomToolbarContainerRef,
-    showTemporarily: showBottomToolbarTemporarily,
-    handleMouseEnter: handleBottomToolbarMouseEnter,
-    handleMouseLeave: handleBottomToolbarMouseLeave,
-    handleFocus: handleBottomToolbarFocus,
-    handleBlur: handleBottomToolbarBlur
-  } = bottomToolbar;
-  const {
-    expanded: brushToolbarExpanded,
-    containerRef: brushToolbarContainerRef,
-    showTemporarily: showBrushToolbarTemporarily
-  } = brushToolbar;
-  // Left sidebar buttons expand/collapse (independent)
-  // Left bottom action buttons are always expanded now; no local state required.
+  // Selection / tool state moved here to ensure availability for handlers
+  const [selectedTool, setSelectedTool] = useState<'brush' | 'selection' | 'shape' | 'eyedropper' | 'stamp'>('brush');
+  const [selectedBrushTool, setSelectedBrushTool] = useState<'brush' | 'bucket' | 'eraser' | 'clear'>('brush');
+  const [selectedSelectionTool, setSelectedSelectionTool] = useState<'rectangular' | 'magic-wand' | 'same-tile' | 'circular'>('rectangular');
+  const [selectedShapeTool, setSelectedShapeTool] = useState<'rectangle' | 'circle' | 'line'>('rectangle');
+  const [hoverCoords, setHoverCoords] = useState<{ x: number; y: number } | null>(null);
+  const [selectionCount, setSelectionCount] = useState<number>(0);
+  const [hasSelection, setHasSelection] = useState<boolean>(false);
   const [pendingMapConfig, setPendingMapConfig] = useState<EditorProjectData | null>(null);
 
-  const setBrushToolbarNode = useCallback((node: HTMLDivElement | null) => {
-    brushToolbarContainerRef.current = node;
-  }, [brushToolbarContainerRef]);
+  const showToolbarTemporarily = useCallback(() => toolbar.showTemporarily(), [toolbar]);
+  const showBottomToolbarTemporarily = useCallback(() => bottomToolbar.showTemporarily(), [bottomToolbar]);
+  const showBrushToolbarTemporarily = useCallback(() => brushToolbar.showTemporarily(), [brushToolbar]);
 
-  const setBottomToolbarNode = useCallback((node: HTMLDivElement | null) => {
-    toolbarRef.current = node;
-    bottomToolbarContainerRef.current = node;
-  }, [bottomToolbarContainerRef, toolbarRef]);
+  // Expose toolbar state/handlers under the names expected by extracted components
+  const toolbarExpanded = toolbar.expanded;
+  const toolbarContainerRef = toolbar.containerRef;
+  const handleToolbarMouseEnter = toolbar.handleMouseEnter;
+  const handleToolbarMouseLeave = toolbar.handleMouseLeave;
+  const handleToolbarFocus = toolbar.handleFocus;
+  const handleToolbarBlur = (event?: React.FocusEvent<HTMLDivElement>) => toolbar.handleBlur(event as React.FocusEvent<HTMLDivElement>);
 
-  const canUseTilesetDialog = useMemo(() => {
-    return typeof window !== 'undefined' && !!window.electronAPI?.selectTilesetFile;
-  }, []);
+  const bottomToolbarExpanded = bottomToolbar.expanded;
+  const setBottomToolbarNode = (node: HTMLDivElement | null) => { bottomToolbar.containerRef.current = node; };
+  const handleBottomToolbarMouseEnter = bottomToolbar.handleMouseEnter;
+  const handleBottomToolbarMouseLeave = bottomToolbar.handleMouseLeave;
+  const handleBottomToolbarFocus = bottomToolbar.handleFocus;
+  const handleBottomToolbarBlur = bottomToolbar.handleBlur;
 
-  // Hover coordinates state (moved above useMapConfig to avoid used-before-declaration)
-  const [hoverCoords, setHoverCoords] = useState<{ x: number; y: number } | null>(null);
-  const [selectionCount, setSelectionCount] = useState(0);
-  const [hasSelection, setHasSelection] = useState(false);
+  const brushToolbarExpanded = brushToolbar.expanded;
+  const setBrushToolbarNode = (node: HTMLDivElement | null) => { brushToolbar.containerRef.current = node; };
   
-  const {
-    selectedTool,
-    setSelectedTool,
-    showBrushOptions,
-    showSelectionOptions,
-    showShapeOptions,
-    selectedBrushTool,
-    setSelectedBrushTool,
-    selectedSelectionTool,
-    setSelectedSelectionTool,
-    selectedShapeTool,
-    setSelectedShapeTool,
-    handleShowBrushOptions,
-    handleHideBrushOptions,
-    handleShowSelectionOptions,
-    handleHideSelectionOptions,
-    handleShowShapeOptions,
-    handleHideShapeOptions
-  } = useToolSelection({
-    onCloseStampDialog: () => setShowStampDialog(false)
-  });
-  
+
+  // Option popovers for toolbar buttons
+  const [showBrushOptions, setShowBrushOptions] = useState(false);
+  const handleShowBrushOptions = useCallback(() => setShowBrushOptions(true), []);
+  const handleHideBrushOptions = useCallback(() => setShowBrushOptions(false), []);
+
+  const [showSelectionOptions, setShowSelectionOptions] = useState(false);
+  const handleShowSelectionOptions = useCallback(() => setShowSelectionOptions(true), []);
+  const handleHideSelectionOptions = useCallback(() => setShowSelectionOptions(false), []);
+
+  const [showShapeOptions, setShowShapeOptions] = useState(false);
+  const handleShowShapeOptions = useCallback(() => setShowShapeOptions(true), []);
+  const handleHideShapeOptions = useCallback(() => setShowShapeOptions(false), []);
+
+  const canUseTilesetDialog = !!editor;
   const {
     brushTool,
     setBrushTool,
@@ -248,15 +247,7 @@ function App() {
     vendorRandomCount,
     setVendorRandomCount
   } = useVendorState();
-  const setupAutoSaveWrapper = useCallback((target: TileMapEditor) => {
-    setupAutoSaveRef.current?.(target);
-  }, []);
-  const updateLayersListWrapper = useCallback(() => {
-    updateLayersListRef.current?.();
-  }, []);
-  const syncMapObjectsWrapper = useCallback(() => {
-    syncMapObjectsRef.current?.();
-  }, []);
+  
   const [isDarkMode, setIsDarkMode] = useState(() => {
     // Initialize from localStorage or default to false
     const savedTheme = localStorage.getItem('isDarkMode');
@@ -289,6 +280,29 @@ function App() {
   const [isOpeningProject, setIsOpeningProject] = useState(false);
   
   const { tooltip, showTooltipWithDelay, hideTooltip } = useTooltip({ toolbarRef, canvasRef });
+
+  // NPC drag-drop state
+  const [draggingNpcId, setDraggingNpcId] = useState<number | null>(null);
+
+  // NPC hover tooltip state (follows cursor)
+  const [npcHoverTooltip, setNpcHoverTooltip] = useState<{ x: number; y: number } | null>(null);
+
+  // NPC delete confirmation popup state
+  const [npcDeletePopup, setNpcDeletePopup] = useState<{
+    npcId: number;
+    screenX: number;
+    screenY: number;
+  } | null>(null);
+
+  // Hero position edit dialog state
+  const [showHeroEditDialog, setShowHeroEditDialog] = useState(false);
+  const [heroEditData, setHeroEditData] = useState<{
+    currentX: number;
+    currentY: number;
+    mapWidth: number;
+    mapHeight: number;
+    onConfirm: (x: number, y: number) => void;
+  } | null>(null);
 
   const {
     showObjectDialog,
@@ -447,20 +461,6 @@ function App() {
     }
   }, [activeTabId, currentProjectPath, setActiveTabId, tabs]);
   
-  // Item dialog state
-  const [itemDialogState, setItemDialogState] = useState<{
-    name: string;
-    role: ItemRole;
-    resourceSubtype: ItemResourceSubtype;
-  } | null>(null);
-  const [itemDialogError, setItemDialogError] = useState<string | null>(null);
-  const [pendingDuplicateItem, setPendingDuplicateItem] = useState<{
-    name: string;
-    targetRole: ItemRole;
-    conflictRole: ItemRole;
-    kind: 'same-role' | 'other-role';
-  } | null>(null);
-
   // Rules list for the Rules layer (UI-only for now; persistence will be added later).
   const [rulesList, setRulesList] = useState<Array<{ id: string; name: string; startType: RuleStartType; triggerId: string }>>([]);
   const [showRuleDialog, setShowRuleDialog] = useState(false);
@@ -474,7 +474,7 @@ function App() {
   const [ruleDialogError, setRuleDialogError] = useState<string | null>(null);
   const [ruleDialogStep, setRuleDialogStep] = useState<'start' | 'actions'>('start');
   // Items list for display
-  const [itemsList, setItemsList] = useState<Array<{ id: number; name: string; category: string; filePath: string; fileName: string; role: ItemRole; resourceSubtype?: ItemResourceSubtype }>>([]);
+  
   // Expanded item categories for accordion
   const [expandedItemCategories, setExpandedItemCategories] = useState<Set<ItemRole>>(new Set());
 
@@ -491,75 +491,6 @@ function App() {
     }));
   }, []);
 
-  const refreshItemsList = useCallback(async (projectPath: string | null) => {
-    if (!projectPath || !window.electronAPI?.listItems) {
-      setItemsList([]);
-      return;
-    }
-
-    try {
-      // Preload at project start so other UIs (dialogue/vendor/etc.) don't depend on selecting the Items layer first.
-      if (window.electronAPI.ensureItemsFolders) {
-        await window.electronAPI.ensureItemsFolders(projectPath);
-      }
-
-      const itemsResult = await window.electronAPI.listItems(projectPath);
-      if (itemsResult.success && itemsResult.items) {
-        setItemsList(normalizeItemsForState(itemsResult.items));
-      } else {
-        setItemsList([]);
-      }
-    } catch (error) {
-      console.error('Failed to load items list:', error);
-    }
-  }, [normalizeItemsForState]);
-
-  useEffect(() => {
-    void refreshItemsList(currentProjectPath);
-  }, [currentProjectPath, refreshItemsList]);
-
-  useEffect(() => {
-    setRulesList([]);
-  }, [currentProjectPath]);
-
-  useEffect(() => {
-    if (!ruleStartType) {
-      if (ruleTriggerId) {
-        setRuleTriggerId('');
-      }
-      return;
-    }
-
-    const availableOptions = ruleStartType === 'player' ? PLAYER_TRIGGER_OPTIONS : GAME_TRIGGER_OPTIONS;
-    if (!availableOptions.some(option => option.id === ruleTriggerId)) {
-      setRuleTriggerId(availableOptions[0]?.id ?? '');
-    }
-  }, [ruleStartType, ruleTriggerId]);
-
-  const parseConstantStock = useCallback((value?: string): Record<number, number> => {
-    if (!value) return {};
-    return value
-      .split(',')
-      .map((part) => part.trim())
-      .filter(Boolean)
-      .reduce<Record<number, number>>((acc, token) => {
-        const [idPart, qtyPart] = token.split(':').map((p) => p.trim());
-        const id = Number.parseInt(idPart, 10);
-        if (Number.isNaN(id)) return acc;
-        const qty = Math.max(1, Number.parseInt(qtyPart || '1', 10) || 1);
-        acc[id] = qty;
-        return acc;
-      }, {});
-  }, []);
-
-  const buildConstantStockString = useCallback((selection: Record<number, number>): string => {
-    const entries = Object.entries(selection)
-      .filter(([, qty]) => qty > 0)
-      .sort((a, b) => Number(a[0]) - Number(b[0]))
-      .map(([id, qty]) => `${id}:${qty}`);
-    return entries.join(',');
-  }, []);
-
   const { toast } = useToast();
 
   const {
@@ -570,8 +501,7 @@ function App() {
     showOverwriteDialog,
     handleOverwriteConfirm,
     handleOverwriteCancel,
-    performExport,
-    handleExportMap
+    performExport
   } = useProjectIO({
     editor,
     currentProjectPath,
@@ -582,160 +512,32 @@ function App() {
     toast
   });
 
-
-  const parseStatusStockEntries = useCallback((value?: string): Array<{ id: string; requirement: string; items: Record<number, number> }> => {
-    if (!value) return [];
-    try {
-      const parsed = JSON.parse(value);
-      if (!Array.isArray(parsed)) return [];
-      return parsed
-        .map((entry, idx) => {
-          if (!entry) return null;
-          const requirement = typeof entry.requirement === 'string' ? entry.requirement.trim() : '';
-          const itemsObj = typeof entry.items === 'object' && entry.items !== null ? entry.items : {};
-          return {
-            id: entry.id || `req-${idx}`,
-            requirement,
-            items: Object.entries(itemsObj).reduce<Record<number, number>>((acc, [k, v]) => {
-              const idNum = Number.parseInt(k, 10);
-              const qtyNum = Math.max(1, Number.parseInt(String(v), 10) || 1);
-              if (!Number.isNaN(idNum)) acc[idNum] = qtyNum;
-              return acc;
-            }, {})
-          };
-        })
-        .filter(Boolean) as Array<{ id: string; requirement: string; items: Record<number, number> }>;
-    } catch {
-      return [];
-    }
-  }, []);
-
-  const parseRandomStock = useCallback((value?: string): Record<number, { chance: number; min: number; max: number }> => {
-    if (!value) return {};
-    const tokens = value.split(',').map(t => t.trim()).filter(Boolean);
-    const result: Record<number, { chance: number; min: number; max: number }> = {};
-    for (let i = 0; i + 3 < tokens.length; i += 4) {
-      const id = parseInt(tokens[i], 10);
-      const chance = parseInt(tokens[i + 1], 10);
-      const min = parseInt(tokens[i + 2], 10);
-      const max = parseInt(tokens[i + 3], 10);
-      if (Number.isNaN(id)) continue;
-      result[id] = {
-        chance: Number.isNaN(chance) ? 100 : chance,
-        min: Number.isNaN(min) ? 1 : Math.max(1, min),
-        max: Number.isNaN(max) ? Math.max(1, Number.isNaN(min) ? 1 : min) : Math.max(1, max)
-      };
-    }
-    return result;
-  }, []);
-
-  const parseRandomStockCount = useCallback((value?: string): { min: number; max: number } => {
-    if (!value) return { min: 1, max: 1 };
-    const parts = value.split(',').map(p => p.trim()).filter(Boolean);
-    const min = parts[0] ? Math.max(1, parseInt(parts[0], 10) || 1) : 1;
-    const max = parts[1] ? Math.max(min, parseInt(parts[1], 10) || min) : min;
-    return { min, max };
-  }, []);
-
-  const buildRandomStockString = useCallback((selection: Record<number, { chance: number; min: number; max: number }>): string => {
-    const entries = Object.entries(selection)
-      .filter(([, val]) => val.min > 0 && val.max > 0 && val.chance > 0)
-      .sort((a, b) => Number(a[0]) - Number(b[0]))
-      .flatMap(([id, val]) => [id, val.chance.toString(), val.min.toString(), val.max.toString()]);
-    return entries.join(', ');
-  }, []);
-
-  const buildRandomStockCountString = useCallback((count: { min: number; max: number }) => {
-    return `${Math.max(1, count.min)},${Math.max(Math.max(1, count.min), count.max)}`;
-  }, []);
-  
-  // Item Edit Dialog state
-  const [showItemEditDialog, setShowItemEditDialog] = useState(false);
-  const [editingItem, setEditingItem] = useState<{
-    // Basic Identifier Properties
-    id: number;
-    name: string;
-    role: ItemRole;
-    resourceSubtype: ItemResourceSubtype;
-    flavor: string;
-    level: number;
-    icon: string;
-    quality: string;
-    // Trade and Inventory Properties
-    price: string;
-    price_sell: string;
-    max_quantity: number;
-    quest_item: boolean;
-    no_stash: string;
-    // Equipment and Requirement Properties
-    item_type: string;
-    equip_flags: string;
-    requires_level: number;
-    requires_stat: string;
-    requires_class: string;
-    disable_slots: string;
-    gfx: string;
-    // Status and Effect Properties (Bonuses)
-    bonus: string;
-    bonus_power_level: string;
-    // Usage and Power Properties
-    dmg: string;
-    abs: string;
-    power: string;
-    power_desc: string;
-    replace_power: string;
-    book: string;
-    book_is_readable: boolean;
-    script: string;
-    // Visual and Audio Properties
-    soundfx: string;
-    stepfx: string;
-    loot_animation: string;
-    // Randomization and Loot Properties
-    randomizer_def: string;
-    loot_drops_max: number;
-    pickup_status: string;
-    // Metadata
-    category: string;
-    filePath: string;
-    fileName: string;
-  } | null>(null);
-  
-  // NPC drag-drop state
-  const [draggingNpcId, setDraggingNpcId] = useState<number | null>(null);
-  
-  // NPC hover tooltip state (follows cursor)
-  const [npcHoverTooltip, setNpcHoverTooltip] = useState<{ x: number; y: number } | null>(null);
-  
-  // NPC delete confirmation popup state
-  const [npcDeletePopup, setNpcDeletePopup] = useState<{
-    npcId: number;
-    screenX: number;
-    screenY: number;
-  } | null>(null);
-  
-  // Hero position edit dialog state
-  const [showHeroEditDialog, setShowHeroEditDialog] = useState(false);
-  const [heroEditData, setHeroEditData] = useState<{
-    currentX: number;
-    currentY: number;
-    mapWidth: number;
-    mapHeight: number;
-    onConfirm: (x: number, y: number) => void;
-  } | null>(null);
-  
-  // Floating toolbar ref for anchored tooltip
-
-  // Hover coordinates state
-
-  // Maps dropdown state (lists files from project/maps)
+  // Items state & handlers moved to hook
+  const {
+    itemsList,
+    setItemsList,
+    itemDialogState,
+    itemDialogError,
+    pendingDuplicateItem,
+    setPendingDuplicateItem,
+    handleOpenItemDialog,
+    handleCloseItemDialog,
+    handleItemFieldChange,
+    handleItemSubmit,
+    handleConfirmDuplicateItem,
+    showItemEditDialog,
+    editingItem,
+    handleOpenItemEdit,
+    handleCloseItemEdit,
+    handleSaveItemEdit,
+    updateEditingItemField
+  } = useItems({ currentProjectPath, toast, normalizeItemsForState });
   const [projectMaps, setProjectMaps] = useState<string[]>([]);
   const [mapsDropdownOpen, setMapsDropdownOpen] = useState<boolean>(false);
   const mapsButtonRef = useRef<HTMLButtonElement | null>(null);
   const [mapsDropdownPos, setMapsDropdownPos] = useState<{ left: number; top: number } | null>(null);
   const mapsPortalRef = useRef<HTMLDivElement | null>(null);
   const mapsSubPortalRef = useRef<HTMLDivElement | null>(null);
-  const [mapsSubPos, setMapsSubPos] = useState<{ left: number; top: number } | null>(null);
   const [mapsSubOpen, setMapsSubOpen] = useState<boolean>(false);
 
   useEffect(() => {
@@ -756,24 +558,7 @@ function App() {
     };
   }, [mapsDropdownOpen]);
 
-  // Compute position for the nested maps submenu so it appears to the right of the main dropdown
-  useEffect(() => {
-    if (!mapsSubOpen) return;
-    const computeSubPos = () => {
-      const portal = mapsPortalRef.current;
-      if (!portal) return setMapsSubPos(null);
-      const rect = portal.getBoundingClientRect();
-      // place submenu to the right of the main portal with a small gap
-      setMapsSubPos({ left: rect.right + 8, top: rect.top });
-    };
-    computeSubPos();
-    window.addEventListener('resize', computeSubPos);
-    window.addEventListener('scroll', computeSubPos, true);
-    return () => {
-      window.removeEventListener('resize', computeSubPos);
-      window.removeEventListener('scroll', computeSubPos, true);
-    };
-  }, [mapsSubOpen]);
+  
 
   // Close maps dropdown on Escape or clicking outside
   useEffect(() => {
@@ -817,7 +602,7 @@ function App() {
 
   useEffect(() => {
     syncMapObjectsRef.current = syncMapObjects;
-  }, [syncMapObjects]);
+  }, [syncMapObjects, syncMapObjectsRef]);
 
   // Keep 'toast' referenced to avoid unused variable errors while toasts are suppressed.
   // This creates a stable noop reference that will never show UI.
@@ -859,71 +644,7 @@ function App() {
     };
   }, [editor]);
 
-  // Helper function to set up auto-save for an editor instance
-const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
-    // Set up optional callback for additional auto-save actions
-    editorInstance.setAutoSaveCallback(async () => {
-      // Persist to disk automatically when running in Electron with a project path
-      try {
-        if (window.electronAPI && currentProjectPath) {
-          await editorInstance.saveProjectData(currentProjectPath);
-        }
-      } catch (e) {
-        console.warn('Auto-save to disk failed:', e);
-      }
-      setLastSaveTime(Date.now());
-    });
-
-    editorInstance.setSaveStatusCallback((status) => {
-      setSaveStatus(status);
-      setHasUnsavedChanges(status === 'unsaved' || status === 'error');
-    });
-
-    editorInstance.setAutoSaveEnabled(autoSaveEnabled);
-    
-    // Set up eyedropper callback to switch back to brush tool
-    editorInstance.setEyedropperCallback(() => {
-      handleSelectTool('brush');
-      setSelectedBrushTool('brush');
-    });
-
-    // Set up stamp callback to update stamps list
-    editorInstance.setStampCallback((stampsList) => {
-      setStamps(stampsList);
-    });
-
-    editorInstance.setObjectsChangedCallback((objects) => {
-      setMapObjects(objects);
-    });
-
-    // Set up NPC right-click callback to show delete confirmation
-    editorInstance.setNpcRightClickCallback((npcId, screenX, screenY) => {
-      setNpcDeletePopup({ npcId, screenX, screenY });
-    });
-
-    // Set up hero edit callback to show dialog
-    editorInstance.setHeroEditCallback((currentX, currentY, mapWidth, mapHeight, onConfirm) => {
-      setHeroEditData({ currentX, currentY, mapWidth, mapHeight, onConfirm });
-      setShowHeroEditDialog(true);
-    });
-}, [
-    autoSaveEnabled,
-    currentProjectPath,
-    handleSelectTool,
-    setHasUnsavedChanges,
-    setHeroEditData,
-    setLastSaveTime,
-    setMapObjects,
-    setNpcDeletePopup,
-    setSaveStatus,
-    setSelectedBrushTool,
-    setShowHeroEditDialog,
-    setStamps
-  ]);
-
-  useEffect(() => {
-    setupAutoSaveRef.current = setupAutoSave;
-  }, [setupAutoSave]);
+  
 
   useToolbarVisibility({
     showWelcome,
@@ -932,43 +653,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     brushToolbar,
     bottomToolbar
   });
-
-  // Wire Electron menu actions (Save/Open/New)
-  // Moved after function definitions
-
-  useEffect(() => {
-    // Prepare an editor instance when entering the workspace, unless a project load is in progress
-    if (
-      canvasRef.current &&
-      !showWelcome &&
-      !editor &&
-      !isOpeningProject &&
-      !pendingMapConfig
-    ) {
-      const tileEditor = new TileMapEditor(canvasRef.current);
-      tileEditor.setDarkMode(isDarkMode);
-      setupAutoSave(tileEditor);
-
-      tileEditor.resetForNewProject();
-      if (mapInitialized && mapWidth > 0 && mapHeight > 0) {
-        tileEditor.setMapSize(mapWidth, mapHeight);
-      } else {
-        tileEditor.setMapSize(0, 0);
-      }
-
-      setEditor(tileEditor);
-    }
-  }, [
-    showWelcome,
-    editor,
-    setupAutoSave,
-    isOpeningProject,
-    isDarkMode,
-    pendingMapConfig,
-    mapInitialized,
-    mapWidth,
-    mapHeight
-  ]);
+  // Editor-instantiation is now handled by `useEditorState` hook.
 
   // Track hover coordinates
   useEffect(() => {
@@ -1077,7 +762,59 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
 
   useEffect(() => {
     updateLayersListRef.current = updateLayersList;
-  }, [updateLayersList]);
+  }, [updateLayersList, updateLayersListRef]);
+
+  // Populate `editorOptsRef.current` with callbacks/state the hook needs.
+  useEffect(() => {
+    editorOptsRef.current = {
+      autoSaveEnabled,
+      setAutoSaveEnabled: setAutoSaveEnabledState,
+      currentProjectPath,
+      isDarkMode,
+      showWelcome,
+      isOpeningProject,
+      pendingMapConfig,
+      mapInitialized,
+      mapWidth,
+      mapHeight,
+      handleSelectTool,
+      setSelectedBrushTool,
+      setStamps,
+      setMapObjects,
+      setNpcDeletePopup,
+      setHeroEditData,
+      setShowHeroEditDialog,
+      setSaveStatus,
+      setHasUnsavedChanges,
+      setLastSaveTime,
+      // helper refs
+      updateLayersListRef,
+      syncMapObjectsRef
+    };
+  }, [
+    autoSaveEnabled,
+    setAutoSaveEnabledState,
+    currentProjectPath,
+    isDarkMode,
+    showWelcome,
+    isOpeningProject,
+    pendingMapConfig,
+    mapInitialized,
+    mapWidth,
+    mapHeight,
+    handleSelectTool,
+    setSelectedBrushTool,
+    setStamps,
+    setMapObjects,
+    setNpcDeletePopup,
+    setHeroEditData,
+    setShowHeroEditDialog,
+    setSaveStatus,
+    setHasUnsavedChanges,
+    setLastSaveTime,
+    updateLayersListRef,
+    syncMapObjectsRef
+  ]);
 
   useEffect(() => {
     if (editor) {
@@ -1106,41 +843,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     };
   }, [showAddLayerDropdown]);
 
-  // Icon helper functions
-  const getBrushIcon = () => {
-    switch (selectedBrushTool) {
-      case 'bucket':
-        return <PaintBucket className="w-4 h-4" />;
-      case 'eraser':
-        return <Eraser className="w-4 h-4" />;
-      default:
-        return <Paintbrush2 className="w-4 h-4" />;
-    }
-  };
-
-  const getSelectionIcon = () => {
-    switch (selectedSelectionTool) {
-      case 'magic-wand':
-        return <Wand2 className="w-4 h-4" />;
-      case 'same-tile':
-        return <Target className="w-4 h-4" />;
-      case 'circular':
-        return <Circle className="w-4 h-4" />;
-      default:
-        return <MousePointer className="w-4 h-4" />;
-    }
-  };
-
-  const getShapeIcon = () => {
-    switch (selectedShapeTool) {
-      case 'circle':
-        return <Circle className="w-4 h-4" />;
-      case 'line':
-        return <Pen className="w-4 h-4" />;
-      default:
-        return <Shapes className="w-4 h-4" />;
-    }
-  };
+  // Icon helper functions were moved into toolbar components.
 
   // Brush management handlers
   // Removed unused handlers: handleMergeBrushes, handleCancelMerge
@@ -1269,20 +972,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     }
   }, [handleActorFieldChange]);
 
-  // Item dialog handlers
-  const handleOpenItemDialog = useCallback(async () => {
-    setItemDialogState({
-      name: '',
-      role: 'equipment',
-      resourceSubtype: 'material'
-    });
-    setItemDialogError(null);
-  }, []);
-
-  const handleCloseItemDialog = useCallback(() => {
-    setItemDialogState(null);
-    setItemDialogError(null);
-  }, []);
+  // Item handlers moved to `useItems` hook (see src/hooks/useItems.ts)
 
   const handleAddRule = useCallback(() => {
     setRuleDialogError(null);
@@ -1346,270 +1036,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     setAbilityNameInput('');
   }, []);
 
-  const handleItemFieldChange = useCallback((field: 'name' | 'role' | 'resourceSubtype', value: string) => {
-    setItemDialogState((prev) => {
-      if (!prev) return prev;
-      return { ...prev, [field]: value };
-    });
-    setItemDialogError(null);
-  }, []);
-
-  const performCreateItem = useCallback(async (skipDuplicateCheck = false) => {
-    if (!itemDialogState) return;
-    
-    if (!itemDialogState.name.trim()) {
-      setItemDialogError('Item name is required.');
-      return;
-    }
-
-    if (!currentProjectPath) {
-      setItemDialogError('No project path available.');
-      return;
-    }
-
-    try {
-      // Pull latest items for duplicate checks
-      let latestItems = itemsList;
-      if (window.electronAPI?.listItems) {
-        const itemsResult = await window.electronAPI.listItems(currentProjectPath);
-        if (itemsResult.success && itemsResult.items) {
-          latestItems = normalizeItemsForState(itemsResult.items);
-          setItemsList(latestItems);
-        }
-      }
-
-      const selectedCategory = 'Default';
-      const selectedRole = itemDialogState.role || 'unspecified';
-      const normalizedName = itemDialogState.name.trim().toLowerCase();
-      if (!skipDuplicateCheck) {
-        const sameCategory = latestItems.find(
-          (it) => (it.category || 'Default') === selectedCategory && (it.name || '').trim().toLowerCase() === normalizedName && (it.role || 'unspecified') === selectedRole
-        );
-        if (sameCategory) {
-          setItemDialogError(null);
-          setPendingDuplicateItem({
-            name: itemDialogState.name.trim(),
-            targetRole: selectedRole,
-            conflictRole: selectedRole,
-            kind: 'same-role'
-          });
-          return;
-        }
-        const otherRole = latestItems.find(
-          (it) => (it.category || 'Default') === selectedCategory && (it.name || '').trim().toLowerCase() === normalizedName && (it.role || 'unspecified') !== selectedRole
-        );
-        if (otherRole) {
-          setPendingDuplicateItem({
-            name: itemDialogState.name.trim(),
-            targetRole: selectedRole,
-            conflictRole: (otherRole.role as ItemRole) || 'unspecified',
-            kind: 'other-role'
-          });
-          return;
-        }
-      }
-
-      // Get next item ID
-      let itemId = 1;
-      if (window.electronAPI?.getNextItemId) {
-        const idResult = await window.electronAPI.getNextItemId(currentProjectPath);
-        if (idResult.success) {
-          itemId = idResult.nextId;
-        }
-      }
-
-      // Create item file
-      if (window.electronAPI?.createItemFile) {
-        type CreateItemPayload = Parameters<NonNullable<Window['electronAPI']>['createItemFile']>[1];
-        const payload: CreateItemPayload = {
-          name: itemDialogState.name.trim(),
-          id: itemId,
-          category: selectedCategory,
-        };
-        const result = await window.electronAPI.createItemFile(currentProjectPath, payload);
-        
-        if (result.success) {
-          console.log('Item file created:', result.filePath);
-          toast({ title: 'Item Created', description: `${itemDialogState.name} (ID: ${itemId}) has been created.` });
-          
-          // Refresh items list
-          if (window.electronAPI?.listItems) {
-            const itemsResult = await window.electronAPI.listItems(currentProjectPath);
-            if (itemsResult.success && itemsResult.items) {
-              setItemsList(normalizeItemsForState(itemsResult.items));
-            }
-          }
-          
-          handleCloseItemDialog();
-        } else if (result.error) {
-          setItemDialogError(result.error);
-        }
-      }
-    } catch (err) {
-      console.error('Error creating item:', err);
-      setItemDialogError('Failed to create item file.');
-    }
-  }, [itemDialogState, currentProjectPath, handleCloseItemDialog, toast, normalizeItemsForState, itemsList]);
-
-  const handleItemSubmit = useCallback(async () => {
-    await performCreateItem(false);
-  }, [performCreateItem]);
-
-  const handleConfirmDuplicateItem = useCallback(async () => {
-    setPendingDuplicateItem(null);
-    await performCreateItem(true);
-  }, [performCreateItem]);
-
-  // Item Edit Dialog handlers
-  const handleOpenItemEdit = useCallback(async (item: { id: number; name: string; category: string; filePath: string; fileName: string; role?: ItemRole; resourceSubtype?: ItemResourceSubtype }) => {
-    // Read item file and parse all properties
-    if (window.electronAPI?.readItemFile) {
-      try {
-        const result = await window.electronAPI.readItemFile(item.filePath);
-        if (result.success && result.data) {
-          const d = result.data as Record<string, unknown>;
-          const itemRole = (typeof item.role === 'string' ? item.role : 'unspecified') as ItemRole;
-          const isQuestRole = itemRole === 'quest';
-          const roleDefaultMaxQuantity = (() => {
-            if (itemRole === 'consumable') return 10;
-            if (itemRole === 'resource') return 99;
-            return 1;
-          })();
-          setEditingItem({
-            id: (typeof d.id === 'number' ? d.id : item.id),
-            name: (typeof d.name === 'string' ? d.name : item.name),
-            role: itemRole,
-            resourceSubtype: (typeof item.resourceSubtype === 'string' ? item.resourceSubtype : '') as ItemResourceSubtype,
-            flavor: (typeof d.flavor === 'string' ? d.flavor : ''),
-            level: (typeof d.level === 'number' ? d.level : 1),
-            icon: (typeof d.icon === 'string' ? d.icon : ''),
-            quality: (typeof d.quality === 'string' ? d.quality : ''),
-            price: (typeof d.price === 'string' ? d.price : (typeof d.price === 'number' ? String(d.price) : '0')),
-            price_sell: (typeof d.price_sell === 'string' ? d.price_sell : (typeof d.price_sell === 'number' ? String(d.price_sell) : '0')),
-            max_quantity: (typeof d.max_quantity === 'number' ? d.max_quantity : roleDefaultMaxQuantity),
-            quest_item: isQuestRole ? true : (d.quest_item === 'true' || d.quest_item === true),
-            no_stash: (typeof d.no_stash === 'string' ? d.no_stash : 'ignore'),
-            item_type: (typeof d.item_type === 'string' ? d.item_type : ''),
-            equip_flags: (typeof d.equip_flags === 'string' ? d.equip_flags : ''),
-            requires_level: (typeof d.requires_level === 'number' ? d.requires_level : 0),
-            requires_stat: (typeof d.requires_stat === 'string' ? d.requires_stat : ''),
-            requires_class: (typeof d.requires_class === 'string' ? d.requires_class : ''),
-            disable_slots: (typeof d.disable_slots === 'string' ? d.disable_slots : ''),
-            gfx: (typeof d.gfx === 'string' ? d.gfx : ''),
-            bonus: (typeof d.bonus === 'string' ? d.bonus : ''),
-            bonus_power_level: (typeof d.bonus_power_level === 'string' ? d.bonus_power_level : ''),
-            dmg: (typeof d.dmg === 'string' ? d.dmg : ''),
-            abs: (typeof d.abs === 'string' ? d.abs : ''),
-            power: (typeof d.power === 'string' ? d.power : ''),
-            power_desc: (typeof d.power_desc === 'string' ? d.power_desc : ''),
-            replace_power: (typeof d.replace_power === 'string' ? d.replace_power : ''),
-            book: (typeof d.book === 'string' ? d.book : ''),
-            book_is_readable: d.book_is_readable === 'true' || d.book_is_readable === true,
-            script: (typeof d.script === 'string' ? d.script : ''),
-            soundfx: (typeof d.soundfx === 'string' ? d.soundfx : ''),
-            stepfx: (typeof d.stepfx === 'string' ? d.stepfx : ''),
-            loot_animation: (typeof d.loot_animation === 'string' ? d.loot_animation : ''),
-            randomizer_def: (typeof d.randomizer_def === 'string' ? d.randomizer_def : ''),
-            loot_drops_max: (typeof d.loot_drops_max === 'number' ? d.loot_drops_max : 1),
-            pickup_status: (typeof d.pickup_status === 'string' ? d.pickup_status : ''),
-            category: item.category,
-            filePath: item.filePath,
-            fileName: item.fileName,
-          });
-          setShowItemEditDialog(true);
-        } else {
-          // Fallback if file can't be read
-          const fallbackRole = (typeof item.role === 'string' ? item.role : 'unspecified') as ItemRole;
-          const fallbackMaxQuantity = (() => {
-            if (fallbackRole === 'consumable') return 10;
-            if (fallbackRole === 'resource') return 99;
-            return 1;
-          })();
-          setEditingItem({
-            id: item.id,
-            name: item.name,
-            role: fallbackRole,
-            resourceSubtype: (typeof item.resourceSubtype === 'string' ? item.resourceSubtype : '') as ItemResourceSubtype,
-            flavor: '',
-            level: 1,
-            icon: '',
-            quality: '',
-            price: '0',
-            price_sell: '0',
-            max_quantity: fallbackMaxQuantity,
-            quest_item: item.role === 'quest',
-            no_stash: 'ignore',
-            item_type: '',
-            equip_flags: '',
-            requires_level: 0,
-            requires_stat: '',
-            requires_class: '',
-            disable_slots: '',
-            gfx: '',
-            bonus: '',
-            bonus_power_level: '',
-            dmg: '',
-            abs: '',
-            power: '',
-            power_desc: '',
-            replace_power: '',
-            book: '',
-            book_is_readable: false,
-            script: '',
-            soundfx: '',
-            stepfx: '',
-            loot_animation: '',
-            randomizer_def: '',
-            loot_drops_max: 1,
-            pickup_status: '',
-            category: item.category,
-            filePath: item.filePath,
-            fileName: item.fileName,
-          });
-          setShowItemEditDialog(true);
-        }
-      } catch (err) {
-        console.error('Error reading item file:', err);
-        toast({ title: 'Error', description: 'Failed to read item file.', variant: 'destructive' });
-      }
-    }
-  }, [toast]);
-
-  const handleCloseItemEdit = useCallback(() => {
-    setShowItemEditDialog(false);
-    setEditingItem(null);
-  }, []);
-
-  const handleSaveItemEdit = useCallback(async () => {
-    if (!editingItem || !window.electronAPI?.writeItemFile) return;
-    
-    // Ensure role is persisted as item_type in the saved file
-    const payload = { ...editingItem, item_type: editingItem.role || editingItem.item_type };
-
-    try {
-      const result = await window.electronAPI.writeItemFile(editingItem.filePath, payload);
-      if (result.success) {
-        toast({ title: 'Item Saved', description: `${editingItem.name} has been updated.` });
-        // Refresh items list
-        if (window.electronAPI?.listItems && currentProjectPath) {
-          const itemsResult = await window.electronAPI.listItems(currentProjectPath);
-          if (itemsResult.success && itemsResult.items) {
-            setItemsList(normalizeItemsForState(itemsResult.items));
-          }
-        }
-        handleCloseItemEdit();
-      } else {
-        toast({ title: 'Error', description: result.error || 'Failed to save item.', variant: 'destructive' });
-      }
-    } catch (err) {
-      console.error('Error saving item:', err);
-      toast({ title: 'Error', description: 'Failed to save item file.', variant: 'destructive' });
-    }
-  }, [editingItem, currentProjectPath, toast, handleCloseItemEdit, normalizeItemsForState]);
-
-  const updateEditingItemField = useCallback((key: string, value: unknown) => {
-    setEditingItem((prev) => (prev ? { ...prev, [key]: value } : null));
-  }, [setEditingItem]);
+  // Item edit/create handlers moved to `useItems` hook (see src/hooks/useItems.ts)
 
 
 
@@ -1871,190 +1298,39 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     return editingObject.properties[key] ?? fallback;
   }, [editingObject]);
 
-  const handleOpenVendorStockDialog = useCallback(() => {
-    if (!editingObject) return;
-    const parsed = parseConstantStock(editingObject.properties?.constant_stock as string | undefined);
-    setVendorStockSelection(parsed);
-    setShowVendorStockDialog(true);
-  }, [editingObject, parseConstantStock, setShowVendorStockDialog, setVendorStockSelection]);
-
-  const handleOpenVendorUnlockDialog = useCallback(() => {
-    if (!editingObject) return;
-    const parsed = parseStatusStockEntries(editingObject.properties?.status_stock_entries as string | undefined);
-    if (parsed.length === 0) {
-      setVendorUnlockEntries([{ id: `req-${Date.now()}`, requirement: '', items: {} }]);
-    } else {
-      setVendorUnlockEntries(parsed);
-    }
-    setShowVendorUnlockDialog(true);
-  }, [editingObject, parseStatusStockEntries, setShowVendorUnlockDialog, setVendorUnlockEntries]);
-
-  const handleOpenVendorRandomDialog = useCallback(() => {
-    if (!editingObject) return;
-    const parsed = parseRandomStock(editingObject.properties?.random_stock as string | undefined);
-    setVendorRandomSelection(parsed);
-    const parsedCount = parseRandomStockCount(editingObject.properties?.random_stock_count as string | undefined);
-    setVendorRandomCount(parsedCount);
-    setShowVendorRandomDialog(true);
-  }, [editingObject, parseRandomStock, parseRandomStockCount, setShowVendorRandomDialog, setVendorRandomCount, setVendorRandomSelection]);
-
-  const handleToggleVendorStockItem = useCallback((id: number) => {
-    setVendorStockSelection((prev) => {
-      const next = { ...prev };
-      if (next[id] !== undefined) {
-        delete next[id];
-      } else {
-        next[id] = 1;
-      }
-      return next;
-    });
-  }, [setVendorStockSelection]);
-
-  const handleVendorStockQtyChange = useCallback((id: number, qty: number) => {
-    setVendorStockSelection((prev) => {
-      const next = { ...prev };
-      if (qty <= 0) qty = 1;
-      next[id] = qty;
-      return next;
-    });
-  }, [setVendorStockSelection]);
-
-  const handleSaveVendorStock = useCallback(() => {
-    if (!editingObject) return;
-    const constantStock = buildConstantStockString(vendorStockSelection);
-    setEditingObject((prev) => {
-      if (!prev) return prev;
-      const properties = { ...(prev.properties || {}) };
-      if (constantStock) {
-        properties.constant_stock = constantStock;
-      } else {
-        delete properties.constant_stock;
-      }
-      return { ...prev, properties };
-    });
-    setShowVendorStockDialog(false);
-  }, [editingObject, buildConstantStockString, setEditingObject, setShowVendorStockDialog, vendorStockSelection]);
-
-  const handleAddVendorUnlockRequirement = useCallback(() => {
-    setVendorUnlockEntries((prev) => [...prev, { id: `req-${Date.now()}-${Math.random()}`, requirement: '', items: {} }]);
-  }, [setVendorUnlockEntries]);
-
-  const handleUpdateVendorUnlockRequirement = useCallback((id: string, requirement: string) => {
-    setVendorUnlockEntries((prev) => prev.map((entry) => entry.id === id ? { ...entry, requirement } : entry));
-  }, [setVendorUnlockEntries]);
-
-  const handleToggleVendorUnlockItem = useCallback((reqId: string, itemId: number) => {
-    setVendorUnlockEntries((prev) => prev.map((entry) => {
-      if (entry.id !== reqId) return entry;
-      const items = { ...entry.items };
-      if (items[itemId] !== undefined) {
-        delete items[itemId];
-      } else {
-        items[itemId] = 1;
-      }
-      return { ...entry, items };
-    }));
-  }, [setVendorUnlockEntries]);
-
-  const handleVendorUnlockQtyChange = useCallback((reqId: string, itemId: number, qty: number) => {
-    setVendorUnlockEntries((prev) => prev.map((entry) => {
-      if (entry.id !== reqId) return entry;
-      const items = { ...entry.items };
-      items[itemId] = Math.max(1, qty || 1);
-      return { ...entry, items };
-    }));
-  }, [setVendorUnlockEntries]);
-
-  const handleRemoveVendorUnlockRequirement = useCallback((id: string) => {
-    setVendorUnlockEntries((prev) => prev.filter((entry) => entry.id !== id));
-  }, [setVendorUnlockEntries]);
-
-  const handleSaveVendorUnlock = useCallback(() => {
-    if (!editingObject) return;
-    const cleaned = vendorUnlockEntries
-      .map((entry, idx) => ({
-        id: entry.id || `req-${idx}`,
-        requirement: entry.requirement.trim(),
-        items: Object.fromEntries(
-          Object.entries(entry.items || {}).filter(([, qty]) => qty > 0)
-        )
-      }))
-      .filter((entry) => entry.requirement && Object.keys(entry.items).length > 0);
-
-    setEditingObject((prev) => {
-      if (!prev) return prev;
-      const properties = { ...(prev.properties || {}) };
-      if (cleaned.length > 0) {
-        properties.status_stock_entries = JSON.stringify(cleaned);
-      } else {
-        delete properties.status_stock_entries;
-      }
-      return { ...prev, properties };
-    });
-    setShowVendorUnlockDialog(false);
-  }, [editingObject, setEditingObject, setShowVendorUnlockDialog, vendorUnlockEntries]);
-
-  const handleToggleVendorRandomItem = useCallback((itemId: number) => {
-    setVendorRandomSelection((prev) => {
-      const next = { ...prev };
-      if (next[itemId]) {
-        delete next[itemId];
-      } else {
-        next[itemId] = { chance: 100, min: 1, max: 1 };
-      }
-      return next;
-    });
-  }, [setVendorRandomSelection]);
-
-  const handleVendorRandomFieldChange = useCallback((itemId: number, field: 'chance' | 'min' | 'max', value: number) => {
-    setVendorRandomSelection((prev) => {
-      const next = { ...prev };
-      const current = next[itemId] || { chance: 100, min: 1, max: 1 };
-      const val = Math.max(1, value || 1);
-      if (field === 'chance') {
-        current.chance = val;
-      } else if (field === 'min') {
-        current.min = val;
-        if (current.max < val) current.max = val;
-      } else {
-        current.max = val < current.min ? current.min : val;
-      }
-      next[itemId] = current;
-      return next;
-    });
-  }, [setVendorRandomSelection]);
-
-  const handleRandomCountChange = useCallback((field: 'min' | 'max', value: number) => {
-    setVendorRandomCount((prev) => {
-      const next = { ...prev };
-      if (field === 'min') {
-        next.min = Math.max(1, value || 1);
-        if (next.max < next.min) next.max = next.min;
-      } else {
-        next.max = Math.max(prev.min, value || prev.min);
-      }
-      return next;
-    });
-  }, [setVendorRandomCount]);
-
-  const handleSaveVendorRandom = useCallback(() => {
-    if (!editingObject) return;
-    const randomStock = buildRandomStockString(vendorRandomSelection);
-    const randomStockCount = buildRandomStockCountString(vendorRandomCount);
-    setEditingObject((prev) => {
-      if (!prev) return prev;
-      const properties = { ...(prev.properties || {}) };
-      if (randomStock) {
-        properties.random_stock = randomStock;
-        properties.random_stock_count = randomStockCount;
-      } else {
-        delete properties.random_stock;
-        delete properties.random_stock_count;
-      }
-      return { ...prev, properties };
-    });
-    setShowVendorRandomDialog(false);
-  }, [buildRandomStockCountString, buildRandomStockString, editingObject, setEditingObject, setShowVendorRandomDialog, vendorRandomCount, vendorRandomSelection]);
+  // Vendor dialog handlers moved to hook
+  const {
+    handleOpenVendorStockDialog,
+    handleOpenVendorUnlockDialog,
+    handleOpenVendorRandomDialog,
+    handleToggleVendorStockItem,
+    handleVendorStockQtyChange,
+    handleSaveVendorStock,
+    handleAddVendorUnlockRequirement,
+    handleUpdateVendorUnlockRequirement,
+    handleToggleVendorUnlockItem,
+    handleVendorUnlockQtyChange,
+    handleRemoveVendorUnlockRequirement,
+    handleSaveVendorUnlock,
+    handleToggleVendorRandomItem,
+    handleVendorRandomFieldChange,
+    handleRandomCountChange,
+    handleSaveVendorRandom
+  } = useVendorDialogs({
+    editingObject,
+    setEditingObject,
+    vendorStockSelection,
+    setVendorStockSelection,
+    vendorUnlockEntries,
+    setVendorUnlockEntries,
+    vendorRandomSelection,
+    setVendorRandomSelection,
+    vendorRandomCount,
+    setVendorRandomCount,
+    setShowVendorStockDialog,
+    setShowVendorUnlockDialog,
+    setShowVendorRandomDialog
+  });
 
   const handleEditingTilesetBrowse = useCallback(async () => {
     if (typeof window === 'undefined' || !window.electronAPI?.selectTilesetFile) {
@@ -2165,7 +1441,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     return () => {
       canvas.removeEventListener('dblclick', handleCanvasDoubleClick);
     };
-  }, [editor, handleEditObject]);
+  }, [editor, handleEditObject, canvasRef]);
 
   // Effect to handle brush tool state changes
   useEffect(() => {
@@ -2254,117 +1530,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     }
   }, []);
 
-  // Effect to handle pending map config when canvas becomes available
-  useEffect(() => {
-    if (pendingMapConfig && canvasRef.current && !showWelcome) {
-      console.log('Canvas available and map config pending, creating editor...');
-
-      const createEditorWithConfig = async () => {
-        try {
-          console.log('Creating new editor with pending config...');
-          const newEditor = new TileMapEditor(canvasRef.current!);
-          if (pendingMapConfig.name) {
-            newEditor.setMapName(pendingMapConfig.name);
-          } else {
-            newEditor.setMapName('Untitled Map');
-          }
-
-          // Clear auto-save backup to prevent old data from loading
-          console.log('Clearing local storage backup...');
-          newEditor.clearLocalStorageBackup();
-
-          console.log('Setting map size...');
-          newEditor.setMapSize(pendingMapConfig.width ?? 20, pendingMapConfig.height ?? 15);
-
-          // Load project data
-          console.log('Loading project data...');
-          const projectDataLoaded = await loadProjectData(newEditor, pendingMapConfig);
-          console.log('Project data loading result:', projectDataLoaded);
-
-          // Check editor state after loadProjectData
-          console.log('=== EDITOR STATE AFTER loadProjectData ===');
-          console.log('Tile count after loadProjectData:', newEditor.getTileCount());
-          console.log('Active layer after loadProjectData:', newEditor.getActiveLayerId());
-          console.log('Layers after loadProjectData:', newEditor.getLayers().map(l => ({ id: l.id, name: l.name, type: l.type })));
-
-          // Discover and assign tilesets - only for projects without per-layer tileset data
-          if (window.electronAPI?.discoverTilesetImages && currentProjectPath) {
-            console.log('Calling discoverTilesetImages for path:', currentProjectPath);
-            const found = await window.electronAPI.discoverTilesetImages(currentProjectPath);
-
-            const images = found?.tilesetImages || {};
-            const imageKeys = Object.keys(images);
-
-            // Check if the project already has per-layer tilesets loaded
-            const hasPerLayerTilesets = Array.isArray(pendingMapConfig.tilesets) &&
-              pendingMapConfig.tilesets.some((ts) => Boolean(ts?.layerType));
-
-            console.log('Has per-layer tilesets in project:', hasPerLayerTilesets);
-            console.log('Available discovered images:', imageKeys);
-
-            // Do NOT auto-assign discovered project tileset images when loading a map.
-            // Auto-assigning can cause tilesets imported in one map to appear in other maps
-            // unexpectedly. Tilesets should be per-map and restored only from saved
-            // project/map data. If you want automatic assignment in the future we can
-            // add an explicit opt-in setting.
-            if (!hasPerLayerTilesets && imageKeys.length > 0) {
-              console.log('Discovered project tileset images are available but auto-assignment is disabled to preserve per-map tileset isolation.');
-            }
-          }
-
-          console.log('Setting up autosave and updating UI...');
-          // Set dark mode state
-          newEditor.setDarkMode(isDarkMode);
-          setupAutoSave(newEditor);
-          setEditor(newEditor);
-          setMapInitialized(true);
-          setShowCreateMapDialog(false);
-
-          // Update layers list and UI state after everything is loaded
-          setTimeout(() => {
-            updateLayersList();
-            // Force UI state update after loading - check current active layer
-            const activeLayerId = newEditor.getActiveLayerId();
-            const activeLayer = newEditor.getLayers().find(l => l.id === activeLayerId);
-            console.log('Final UI update - checking active layer:', activeLayerId, activeLayer?.type);
-
-            // Force a final redraw to ensure everything is visible
-            newEditor.redraw();
-          }, 150);
-
-          // Clear pending config
-          setPendingMapConfig(null);
-
-          // toast suppressed: Project loaded
-
-        } catch (error) {
-          console.error('Failed to create editor with pending config:', error);
-          setPendingMapConfig(null);
-          setMapInitialized(false);
-          if (typeof toast === 'function') {
-            const description = error instanceof Error ? error.message : 'An error occurred while loading the project.';
-            toast({ title: 'Failed to open project', description, variant: 'destructive' });
-          }
-        }
-      };
-
-      createEditorWithConfig();
-    }
-  }, [
-    canvasRef,
-    currentProjectPath,
-    isDarkMode,
-    loadProjectData,
-    pendingMapConfig,
-    setEditor,
-    setMapInitialized,
-    setPendingMapConfig,
-    setShowCreateMapDialog,
-    showWelcome,
-    setupAutoSave,
-    toast,
-    updateLayersList
-  ]);
+  // Project-load editor creation is now managed inside `useEditorState`.
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>, type: 'tileset' | 'layerTileset') => {
     const file = event.target.files?.[0];
@@ -2547,12 +1713,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     }
   }, [currentProjectPath, editor, handleManualSave, performExport, setMapInitialized, setMapName, syncMapObjects, toast, updateLayersList]);
 
-  const handleToggleMinimap = () => {
-    if (editor?.toggleMinimap) {
-      editor.toggleMinimap();
-    }
-    setShowMinimap(!showMinimap);
-  };
+  // minimap toggle handed inline where needed; removed unused handler
 
   const handleCreateNewMap = (config: MapConfig, newProjectPath?: string) => {
     localStorage.removeItem('tilemap_autosave_backup');
@@ -2858,11 +2019,11 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
     switchToTabHelpersRef.current = {
       handleOpenMap,
       loadProjectData,
-      setupAutoSave,
+      setupAutoSave: setupAutoSaveWrapper,
       syncMapObjects,
       updateLayersList,
     };
-  }, [handleOpenMap, loadProjectData, setupAutoSave, syncMapObjects, updateLayersList]);
+  }, [handleOpenMap, loadProjectData, setupAutoSaveWrapper, syncMapObjects, updateLayersList]);
 
   // Wire Electron menu actions (Save/Open/New)
   // We intentionally register IPC/menu listeners once and call the latest handlers via refs.
@@ -3103,7 +2264,8 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
                 onAddNpc={() => handleOpenActorDialog('npc')}
                 onAddEnemy={() => handleOpenActorDialog('enemy')}
               />
-            )}
+              )}
+            
 
 
 
@@ -3156,139 +2318,20 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             )}
           </section>
 
-          {/* Layers Section */}
-          <section
-            className="mb-0 flex-shrink-0 flex flex-col justify-center h-auto" // auto height to fit all layers
-            onMouseEnter={() => setLayersPanelExpanded(true)}
-            onMouseLeave={() => setLayersPanelExpanded(false)}
-            tabIndex={0}
-          >
-            {/* Layers List - reserve height to avoid layout shifts */}
-            <div className="mb-2 w-full flex flex-col justify-center h-full">
-              <div className="h-auto overflow-hidden flex flex-col justify-center w-full">
-                <div className="space-y-0.5 h-auto overflow-y-visible flex flex-col justify-center w-full">
-                  {layers.filter(layer => layer.type !== 'actions').map((layer) => {
-                    const isActive = activeLayerId === layer.id;
-                    const isHovered = hoveredLayerId === layer.id;
-                    const visible = layersPanelExpanded || isActive;
-                    return (
-                      <div
-                        key={layer.id}
-                        className={`block w-full max-w-xs px-2 py-1 rounded transition-all text-xs transform-gpu ${
-                          isActive
-                            ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-400'
-                            : isHovered
-                            ? 'bg-orange-100/50 dark:bg-orange-800/15 border-orange-300/50'
-                            : 'bg-transparent border-transparent'
-                        }`}
-                        style={{
-                          opacity: visible ? 1 : 0.65,
-                          transform: visible ? 'scaleY(1) translateY(0)' : 'scaleY(0.98) translateY(0)',
-                          transformOrigin: 'top',
-                          pointerEvents: visible ? 'auto' : 'none',
-                          transition: 'transform 400ms cubic-bezier(.2,.9,.2,1), opacity 400ms ease, box-shadow 300ms ease, background-color 150ms ease',
-                          boxShadow: isActive ? '0 6px 12px rgba(15,23,42,0.06)' : isHovered ? '0 2px 6px rgba(251,146,60,0.15)' : 'none',
-                          zIndex: isActive ? 30 : isHovered ? 20 : 10,
-                        }}
-                        onMouseEnter={() => setHoveredLayerId(layer.id)}
-                        onMouseLeave={() => setHoveredLayerId(null)}
-                      >
-                        <div
-                          className="cursor-pointer w-full flex items-center"
-                          onClick={() => handleSetActiveLayer(layer.id)}
-                        >
-                          <div className={`flex items-center gap-2 w-full ${isActive ? 'opacity-100' : isHovered ? 'opacity-95' : 'opacity-80'}`}> 
-                            <Tooltip content={layer.visible ? 'Hide layer' : 'Show layer'}>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleToggleLayerVisibility(layer.id);
-                                }}
-                                className="w-4 h-4 p-0 hover:bg-gray-200 dark:hover:bg-gray-700"
-                              >
-                                {layer.visible ? <Eye className="w-2.5 h-2.5" /> : <EyeOff className="w-2.5 h-2.5 text-gray-400 dark:text-gray-500" />}
-                              </Button>
-                            </Tooltip>
-
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="w-4 h-4 p-0 hover:bg-gray-200 dark:hover:bg-gray-700"
-                              onMouseEnter={(e) => {
-                                const transparencyPercent = Math.round((layer.transparency || 0) * 100);
-                                showTooltipWithDelay(
-                                  <div className="flex items-center gap-1">
-                                    <Mouse className="w-3 h-3" />
-                                    Transparency ({transparencyPercent}%)
-                                  </div>,
-                                  e.currentTarget
-                                );
-                              }}
-                              onMouseLeave={hideTooltip}
-                              onWheel={(e) => {
-                                e.preventDefault();
-                                const delta = e.deltaY > 0 ? 0.1 : -0.1;
-                                handleLayerTransparencyChange(layer.id, delta);
-                                const currentTransparency = layer.transparency || 0;
-                                const newTransparency = Math.max(0, Math.min(1, currentTransparency + delta));
-                                const newPercent = Math.round(newTransparency * 100);
-                                showTooltipWithDelay(
-                                  <div className="flex items-center gap-1">
-                                    <Mouse className="w-3 h-3" />
-                                    Transparency ({newPercent}%)
-                                  </div>,
-                                  e.currentTarget
-                                );
-                              }}
-                            >
-                              <Blend className="w-2.5 h-2.5" />
-                            </Button>
-
-                            <div className="flex items-center gap-2">
-                              <Tooltip content={layer.type === 'rules' ? 'When this happens → do this' : layer.name}>
-                                <span className="text-xs font-medium truncate flex items-center gap-2">
-                                  {(() => {
-                                    switch ((layer.type || '').toLowerCase()) {
-                                      case 'background':
-                                      case 'bg':
-                                        return <Image className="w-4 h-4" />;
-                                      case 'collision':
-                                      case 'collision layer':
-                                        return <Grid className="w-4 h-4" />;
-                                      case 'objects':
-                                      case 'object':
-                                        return <Box className="w-4 h-4" />;
-                                      case 'items':
-                                        return <Sword className="w-4 h-4" />;
-                                      case 'rules':
-                                        return <GitBranch className="w-4 h-4" />;
-                                      case 'npc':
-                                        return <Users className="w-4 h-4" />;
-                                      case 'enemy':
-                                        return <Locate className="w-4 h-4" />;
-                                      case 'event':
-                                        return <Clock className="w-4 h-4" />;
-                                      default:
-                                        return <Map className="w-4 h-4" />;
-                                    }
-                                  })()}
-                                </span>
-                              </Tooltip>
-                              <span className={leftCollapsed ? 'sr-only text-xs font-medium' : 'text-xs font-medium truncate'} title={layer.name}>
-                                {layer.name.replace(/ Layer$/i, '')}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </section>
+          <LayersPanel
+            layers={layers}
+            activeLayerId={activeLayerId}
+            hoveredLayerId={hoveredLayerId}
+            layersPanelExpanded={layersPanelExpanded}
+            setLayersPanelExpanded={setLayersPanelExpanded}
+            setHoveredLayerId={setHoveredLayerId}
+            handleSetActiveLayer={handleSetActiveLayer}
+            handleToggleLayerVisibility={handleToggleLayerVisibility}
+            showTooltipWithDelay={showTooltipWithDelay}
+            hideTooltip={hideTooltip}
+            handleLayerTransparencyChange={handleLayerTransparencyChange}
+            leftCollapsed={leftCollapsed}
+          />
 
           {/* Bottom Action Buttons */}
           <section className="flex-shrink-0 mt-auto mb-2">
@@ -3307,166 +2350,26 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
             </div>
 
             <div className={`flex gap-2 justify-center`}>
-              <div>
-                <Button
-                  ref={mapsButtonRef}
-                  size="sm"
-                  className="w-7 h-7 p-0 shadow-sm"
-                  onClick={async () => {
-                    if (!mapsDropdownOpen) await refreshProjectMaps();
-                    setMapsDropdownOpen((s) => !s);
-                  }}
-                  disabled={isExporting || isPreparingNewMap}
-                >
-                  <Menu className="w-3 h-3" />
-                </Button>
-
-                {mapsDropdownOpen && mapsDropdownPos && createPortal(
-                  <div
-                    ref={mapsPortalRef}
-                    style={{ left: mapsDropdownPos.left, top: mapsDropdownPos.top, position: 'absolute', transform: 'translateY(-100%)' }}
-                    className="w-56 bg-background border border-border rounded shadow-lg z-[9999]"
-                  >
-                    {/* Actions header removed per UX request */}
-                    <div className="max-h-60 overflow-y-auto minimal-scroll">
-                      {currentProjectPath ? (
-                        <>
-                          <div className="relative">
-                            <button
-                              className="w-full text-left p-2 hover:bg-gray-100 dark:hover:bg-neutral-800 text-xs flex items-center gap-2"
-                              onClick={() => setMapsSubOpen((s) => !s)}
-                            >
-                              <span className="flex items-center gap-2"><Folder className="w-3 h-3" /><span>Open map</span></span>
-                              <svg className={`w-3 h-3 transition-transform ${mapsSubOpen ? 'transform rotate-90' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-                            </button>
-
-                            {/* nested maps list: render into a separate portal to appear to the right */}
-                            {mapsSubOpen && mapsSubPos && createPortal(
-                              <div
-                                ref={mapsSubPortalRef}
-                                style={{ left: mapsSubPos.left, top: mapsSubPos.top, position: 'absolute' }}
-                                className="w-48 bg-background border border-border rounded shadow-md z-[10000] max-h-60 overflow-y-auto minimal-scroll"
-                              >
-                                {projectMaps.length === 0 ? (
-                                  <div className="p-2 text-xs text-muted-foreground">No maps found</div>
-                                ) : (
-                                  projectMaps.map((f) => (
-                                    <button
-                                      key={f}
-                                      className="w-full text-left p-2 hover:bg-gray-100 dark:hover:bg-neutral-800 text-xs"
-                                      onClick={() => {
-                                        setMapsDropdownOpen(false);
-                                        setMapsSubOpen(false);
-                                        handleOpenMapFromMapsFolder(f);
-                                      }}
-                                    >
-                                      {f}
-                                    </button>
-                                  ))
-                                )}
-                              </div>, document.body
-                            )}
-                          </div>
-                                        mapHeight
-                          <div className="border-t border-border" />
-
-                          <button
-                            className="w-full text-left p-2 hover:bg-gray-100 dark:hover:bg-neutral-800 text-xs flex items-center gap-2"
-                            onClick={async () => {
-                              setMapsDropdownOpen(false);
-                              await handleExportMap();
-                            }}
-                          >
-                            <Download className="w-3 h-3" />
-                            <span>Export map</span>
-                          </button>
-
-                          <div className="border-t border-border" />
-
-                          <button
-                            className="w-full text-left p-2 hover:bg-gray-100 dark:hover:bg-neutral-800 text-xs flex items-center gap-2"
-                            onClick={() => {
-                              setMapsDropdownOpen(false);
-                              handleOpenCreateMapDialog();
-                            }}
-                          >
-                            <Plus className="w-3 h-3" />
-                            <span>Create new map</span>
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            className="w-full text-left p-2 hover:bg-gray-100 dark:hover:bg-neutral-800 text-xs flex items-center gap-2"
-                            onClick={async () => {
-                              setMapsDropdownOpen(false);
-                              if (window.electronAPI?.selectDirectory) {
-                                try {
-                                  const selected = await window.electronAPI.selectDirectory();
-                                  if (selected) {
-                                    await handleOpenMap(selected);
-                                  }
-                                } catch (err) {
-                                  console.error('Failed to select directory:', err);
-                                  toast({ title: 'Open failed', description: 'Unable to open project directory.', variant: 'destructive' });
-                                }
-                              } else {
-                                toast({ title: 'Open unavailable', description: 'Open project requires the desktop app.', variant: 'destructive' });
-                              }
-                            }}
-                          >
-                            <Folder className="w-3 h-3" />
-                            <span>Open project...</span>
-                          </button>
-
-                          <div className="border-t border-border" />
-
-                          <div className="p-2 text-xs">No project is currently open. Open a project to list maps and enable Export.</div>
-
-                          <div className="border-t border-border" />
-
-                          <button
-                            className="w-full text-left p-2 hover:bg-gray-100 dark:hover:bg-neutral-800 text-xs flex items-center gap-2"
-                            onClick={() => {
-                              setMapsDropdownOpen(false);
-                              // Open the create map dialog in-app as fallback for creating a new map without an existing project
-                              handleOpenCreateMapDialog();
-                            }}
-                          >
-                            <Plus className="w-3 h-3" />
-                            <span>Create new map</span>
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>, document.body
-                )}
-              </div>
-
-              <Tooltip content={hasUnsavedChanges ? 'Save changes' : 'All changes saved'}>
-                <Button
-                  onClick={handleManualSave}
-                  className={`w-7 h-7 p-0 shadow-sm transition-colors ${
-                    isManuallySaving ? 'bg-blue-500 hover:bg-blue-600' : hasUnsavedChanges ? 'bg-orange-500 hover:bg-orange-600 text-white' : 'bg-green-500 hover:bg-green-600 text-white'
-                  }`}
-                  disabled={isManuallySaving || isPreparingNewMap}
-                  size="sm"
-                >
-                  {isManuallySaving ? (
-                    <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <Save className="w-3 h-3" />
-                  )}
-                </Button>
-              </Tooltip>
-
-              {/* Help button moved into Settings > Other Options */}
-
-              <Tooltip content="Engine Settings">
-                <Button onClick={() => setShowSettings(true)} className="w-7 h-7 p-0 shadow-sm" variant="outline" size="sm">
-                  <Settings className="w-3 h-3" />
-                </Button>
-              </Tooltip>
+              <AppControls
+                mapsButtonRef={mapsButtonRef}
+                mapsDropdownOpen={mapsDropdownOpen}
+                mapsDropdownPos={mapsDropdownPos}
+                mapsPortalRef={mapsPortalRef}
+                mapsSubOpen={mapsSubOpen}
+                currentProjectPath={currentProjectPath}
+                projectMaps={projectMaps}
+                setMapsSubOpen={setMapsSubOpen}
+                setMapsDropdownOpen={setMapsDropdownOpen}
+                handleOpenCreateMapDialog={handleOpenCreateMapDialog}
+                handleOpenMap={handleOpenMapFromMapsFolder}
+                toast={toast}
+                handleManualSave={handleManualSave}
+                isManuallySaving={isManuallySaving}
+                isPreparingNewMap={isPreparingNewMap}
+                hasUnsavedChanges={hasUnsavedChanges}
+                setShowSettings={setShowSettings}
+                refreshProjectMaps={refreshProjectMaps}
+              />
             </div>
           </section>
         </SidebarLayout>
@@ -3510,83 +2413,50 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           }}
         />
 
-        {/* Generic Confirmation Dialog for destructive actions */}
-        {confirmAction && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-background border border-border rounded-lg p-6 w-80">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold">Confirm</h3>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={() => setConfirmAction(null)}
-                  className="w-8 h-8 p-0"
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
-              <div className="text-sm text-foreground mb-4">
-                {confirmAction.type === 'removeBrush' && 'Are you sure you want to remove this brush?'}
-                {confirmAction.type === 'removeTileset' && 'Are you sure you want to remove the tileset for this layer? This will clear the tileset but keep any placed tiles.'}
-                {confirmAction.type === 'removeTab' && 'Are you sure you want to remove this tileset tab?'}
-              </div>
-              <div className="flex gap-2 justify-end">
-                <Button variant="outline" onClick={() => setConfirmAction(null)}>Cancel</Button>
-                <Button
-                  onClick={() => {
+        <ConfirmActionDialog
+          action={confirmAction}
+          onCancel={() => setConfirmAction(null)}
+          onConfirm={() => {
+            try {
+              if (!confirmAction) return;
+              if (confirmAction.type === 'removeBrush') {
+                const brushId = confirmAction.payload as number;
+                if (editor) editor.removeBrush(brushId);
+              } else if (confirmAction.type === 'removeTileset') {
+                if (editor) editor.removeLayerTileset();
+              } else if (confirmAction.type === 'removeTab') {
+                const payload = tabToDelete ?? confirmPayloadRef.current ?? (confirmAction.payload as { layerType: string; tabId: number } | undefined);
+                if (editor && payload && payload.layerType) {
+                  const liveActive = editor.getActiveLayerTabId ? editor.getActiveLayerTabId(payload.layerType) : null;
+                  const finalTabId = (typeof liveActive === 'number' && liveActive !== null) ? liveActive : payload.tabId;
+                  if (typeof finalTabId === 'number') {
+                    editor.removeLayerTab(payload.layerType, finalTabId);
+                    setTabTick(t => t + 1);
+                    try { editor.refreshTilePalette(true); } catch (err) { console.warn('refreshTilePalette failed', err); }
                     try {
-                      if (confirmAction.type === 'removeBrush') {
-                        const brushId = confirmAction.payload as number;
-                        if (editor) editor.removeBrush(brushId);
-                      } else if (confirmAction.type === 'removeTileset') {
-                        if (editor) editor.removeLayerTileset();
-                      } else if (confirmAction.type === 'removeTab') {
-                        // Prefer the stable React state if present
-                        const payload = tabToDelete ?? confirmPayloadRef.current ?? (confirmAction.payload as { layerType: string; tabId: number } | undefined);
-                        if (editor && payload && payload.layerType) {
-                          // At confirmation time prefer the editor's current active tab for that layer
-                          const liveActive = editor.getActiveLayerTabId ? editor.getActiveLayerTabId(payload.layerType) : null;
-                          const finalTabId = (typeof liveActive === 'number' && liveActive !== null) ? liveActive : payload.tabId;
-                          console.info('Confirm removeTab: requested=', payload, 'liveActive=', liveActive, 'using=', finalTabId);
-                          if (typeof finalTabId === 'number') {
-                            editor.removeLayerTab(payload.layerType, finalTabId);
-                            // Force UI update and refresh palette
-                            setTabTick(t => t + 1);
-                            try { editor.refreshTilePalette(true); } catch (err) { console.warn('refreshTilePalette failed', err); }
-
-                            // Extra safeguard: explicitly set the editor's active tab to the new live active
-                            try {
-                              const newActive = editor.getActiveLayerTabId ? editor.getActiveLayerTabId(payload.layerType) : null;
-                              if (typeof newActive === 'number') {
-                                editor.setActiveLayerTab(payload.layerType, newActive);
-                                // one more refresh to ensure palette content is synced
-                                setTabTick(t => t + 1);
-                                try { editor.refreshTilePalette(true); } catch (err) { console.warn('refreshTilePalette failed', err); }
-                              }
-                            } catch (e) {
-                              console.warn('Post-remove setActiveLayerTab safeguard failed', e);
-                            }
-                          } else {
-                            console.warn('Confirm removeTab: no finalTabId available, aborting', payload);
-                          }
-                        }
-                        // Clear the state/ref after handling
-                        setTabToDelete(null);
-                        confirmPayloadRef.current = null;
+                      const newActive = editor.getActiveLayerTabId ? editor.getActiveLayerTabId(payload.layerType) : null;
+                      if (typeof newActive === 'number') {
+                        editor.setActiveLayerTab(payload.layerType, newActive);
+                        setTabTick(t => t + 1);
+                        try { editor.refreshTilePalette(true); } catch (err) { console.warn('refreshTilePalette failed', err); }
                       }
-                    } catch (error) {
-                      console.error('Confirm action failed:', error);
-                    } finally {
-                      setConfirmAction(null);
+                    } catch (e) {
+                      console.warn('Post-remove setActiveLayerTab safeguard failed', e);
                     }
-                  }}
-                >
-                  Confirm
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
+                  } else {
+                    console.warn('Confirm removeTab: no finalTabId available, aborting', payload);
+                  }
+                }
+                setTabToDelete(null);
+                confirmPayloadRef.current = null;
+              }
+            } catch (error) {
+              console.error('Confirm action failed:', error);
+            } finally {
+              setConfirmAction(null);
+            }
+          }}
+        />
 
         <HelpDialog
           open={showHelp}
@@ -3622,91 +2492,19 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
           <section className="flex-1 min-w-0 flex flex-col relative">
           {/* Zoom Controls & Undo/Redo */}
         {!isEnemyTabActive && (
-          <div
-            ref={toolbarContainerRef}
-            className="absolute top-2 right-2 z-10"
+          <TopBar
+            toolbarExpanded={toolbarExpanded}
+            containerRef={toolbarContainerRef}
             onMouseEnter={handleToolbarMouseEnter}
             onMouseLeave={handleToolbarMouseLeave}
             onFocus={handleToolbarFocus}
             onBlur={handleToolbarBlur}
-            tabIndex={toolbarExpanded ? -1 : 0}
-            aria-label="Map controls"
-          >
-            <div
-              className={`flex items-center bg-white/90 dark:bg-neutral-900/90 border border-border rounded-full shadow-lg transition-all duration-300 ease-in-out ${toolbarExpanded ? 'px-2 py-1' : 'px-1 py-1'}`}
-            >
-              <div
-                className={`flex items-center gap-1 overflow-hidden transition-all duration-300 ease-out ${toolbarExpanded ? 'opacity-100 scale-100 max-w-[420px]' : 'opacity-0 scale-95 max-w-0 pointer-events-none'}`}
-              >
-                <Tooltip content="Undo (Ctrl+Z)" side="bottom">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="w-8 h-8 p-0 rounded-full"
-                    onClick={handleUndo}
-                  >
-                    <Undo2 className="w-4 h-4" />
-                  </Button>
-                </Tooltip>
-                <Tooltip content="Redo (Ctrl+Y)" side="bottom">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="w-8 h-8 p-0 rounded-full"
-                    onClick={handleRedo}
-                  >
-                    <Redo2 className="w-4 h-4" />
-                  </Button>
-                </Tooltip>
-                <Tooltip content="Zoom In" side="bottom">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="w-8 h-8 p-0 rounded-full"
-                    onClick={handleZoomIn}
-                  >
-                    <ZoomIn className="w-4 h-4" />
-                  </Button>
-                </Tooltip>
-                <Tooltip content="Zoom Out" side="bottom">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="w-8 h-8 p-0 rounded-full"
-                    onClick={handleZoomOut}
-                  >
-                    <ZoomOut className="w-4 h-4" />
-                  </Button>
-                </Tooltip>
-                <Tooltip content="Reset View" side="bottom">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="w-8 h-8 p-0 rounded-full"
-                    onClick={handleResetZoom}
-                  >
-                    <RotateCcw className="w-4 h-4" />
-                  </Button>
-                </Tooltip>
-                <Tooltip content="Toggle Minimap" side="bottom">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="w-8 h-8 p-0 rounded-full"
-                    onClick={handleToggleMinimap}
-                  >
-                    <Map className="w-4 h-4" />
-                  </Button>
-                </Tooltip>
-              </div>
-              <div
-                className={`flex items-center justify-center w-8 h-8 transition-all duration-300 ease-out ${toolbarExpanded ? 'opacity-50 scale-90' : 'opacity-100 scale-100'}`}
-                aria-hidden
-              >
-                <Scan className="w-4 h-4 text-muted-foreground" />
-              </div>
-            </div>
-          </div>
+            handleUndo={handleUndo}
+            handleRedo={handleRedo}
+            handleZoomIn={handleZoomIn}
+            handleZoomOut={handleZoomOut}
+            handleResetZoom={handleResetZoom}
+          />
         )}
           <div 
             className={`bg-gray-100 flex-1 min-h-0 flex items-center justify-center overflow-hidden relative ${draggingNpcId ? 'ring-2 ring-orange-500 ring-inset' : ''}`}
@@ -3758,68 +2556,12 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               setDraggingNpcId(null);
             }}
           >
-            {/* Canvas Tips Panel - minimizes to question mark icon with animation */}
-            {!isEnemyTabActive && (
-            <div className="absolute top-4 left-4 z-20">
-              {/* Minimized state: Question mark icon in a circle */}
-              <div 
-                className={`absolute inset-0 transition-all duration-300 ${tipsMinimized ? 'opacity-100 scale-100 pointer-events-auto' : 'opacity-0 scale-75 pointer-events-none'}`}
-              >
-                <Tooltip content="Click to see help" side="right">
-                  <button
-                    className="w-8 h-8 flex items-center justify-center bg-white dark:bg-neutral-900 rounded-full border border-border shadow-lg hover:bg-gray-100 dark:hover:bg-neutral-800 transition-all duration-200 hover:scale-105"
-                    onClick={() => setTipsMinimized(false)}
-                    aria-label="Show help tips"
-                  >
-                    <HelpCircle className="w-4 h-4 text-gray-600 dark:text-gray-300" />
-                  </button>
-                </Tooltip>
-              </div>
-
-              {/* Expanded state: Full tips panel */}
-              <div
-                className={`p-3 bg-white/90 dark:bg-neutral-900/90 backdrop-blur-sm rounded-lg border border-border shadow-lg transition-all duration-300 origin-top-left ${tipsMinimized ? 'opacity-0 scale-75 pointer-events-none' : 'opacity-100 scale-100 pointer-events-auto'}`}
-              >
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="absolute top-1 right-1 w-6 h-6 p-0"
-                  onClick={() => setTipsMinimized(true)}
-                >
-                  <X className="w-3 h-3" />
-                </Button>
-
-                <div className="space-y-2 pr-6">
-                  <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
-                    <MousePointer2 className="w-4 h-4" />
-                    <span>Left Click to Paint</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
-                    <Mouse className="w-4 h-4" />
-                    <span>Right Click to Delete</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
-                    <Move className="w-4 h-4" />
-                    <span>Spacebar + Mouse to Pan</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
-                    <div className="relative">
-                      <Mouse className="w-4 h-4" />
-                      <Circle className="w-2 h-2 absolute top-1 left-1.5 opacity-60" />
-                    </div>
-                    <span>Mouse Wheel to Zoom In-Out</span>
-                  </div>
-                  <button
-                    className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300 hover:text-orange-500 transition-colors w-full text-left mt-1 pt-1 border-t border-gray-100 dark:border-neutral-800"
-                    onClick={() => setShowHelp(true)}
-                  >
-                    <HelpCircle className="w-4 h-4 text-orange-400" />
-                    <span className="font-medium">Help and Documentation</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-            )}
+            <CanvasTips
+              tipsMinimized={tipsMinimized}
+              setTipsMinimized={setTipsMinimized}
+              setShowHelp={setShowHelp}
+              isEnemyTabActive={isEnemyTabActive}
+            />
 
             <canvas
               ref={canvasRef}
@@ -3827,126 +2569,15 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               className={`tile-canvas w-full h-full max-w-full max-h-full canvas-fade ${leftTransitioning ? 'during-sidebar-transition' : ''}`}
             />
 
-            {/* Map initialization overlay - always mounted for smooth transitions */}
-            <div
-              className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${!mapInitialized ? 'opacity-100 pointer-events-auto bg-background/80 backdrop-blur-sm' : 'opacity-0 pointer-events-none'}`}
-              aria-hidden={mapInitialized}
-            >
-              <div className={`flex items-center gap-3 px-4 py-2 rounded-full border-2 border-orange-500/80 bg-background/95 shadow-lg backdrop-blur-sm transition-opacity duration-200 ${!mapInitialized ? 'opacity-100' : 'opacity-0'}`}>
-                <span className="text-sm font-medium text-muted-foreground">Create a map</span>
-                <Button
-                  size="sm"
-                  variant="default"
-                  className="w-9 h-9 p-0 rounded-full bg-orange-500 text-white shadow-sm transition-all duration-150 hover:bg-orange-600 hover:shadow-md hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
-                  onClick={handleOpenCreateMapDialog}
-                  disabled={isPreparingNewMap}
-                >
-                  <Plus className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
+            <MapInitOverlay mapInitialized={mapInitialized} handleOpenCreateMapDialog={handleOpenCreateMapDialog} isPreparingNewMap={isPreparingNewMap} />
 
-            {/* Hover Coordinates Display - always mounted to allow transitions */}
-            <div
-              className={`absolute bottom-4 left-4 z-10 p-2 rounded-md text-xs font-mono flex items-center gap-2 transition-opacity duration-200 ${hoverCoords ? 'opacity-100 pointer-events-auto bg-white/90 dark:bg-neutral-900/90 border border-gray-200 dark:border-neutral-600 text-gray-800 dark:text-white shadow-sm' : 'opacity-0 pointer-events-none'}`}
-              aria-hidden={!hoverCoords}
-            >
-              <MapPin className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-              <span>{hoverCoords ? `${hoverCoords.x}, ${hoverCoords.y}` : ''}</span>
-              {/* Active GID Indicator - keep mounted but toggle visibility */}
-              <div className={`ml-2 transition-opacity duration-200 ${hoverCoords && showActiveGid && !isEnemyTabActive ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-                <Tooltip content="Active GID number of selected tilebrush">
-                  <Badge variant="secondary" className="text-xs px-2 py-1 bg-black/80 text-white border-gray-600 hover:bg-black/90">
-                    <span id="activeGid">{activeGid}</span>
-                  </Badge>
-                </Tooltip>
-              </div>
-            </div>
+            <MapHoverDisplay hoverCoords={hoverCoords} showActiveGid={showActiveGid} isEnemyTabActive={isEnemyTabActive} />
 
-            {/* NPC Delete Confirmation Popup */}
-            {npcDeletePopup && (
-              <div
-                className="fixed z-50 flex items-center gap-1 px-2 py-1.5 bg-black rounded-lg shadow-xl border border-neutral-700"
-                style={{
-                  left: npcDeletePopup.screenX,
-                  top: npcDeletePopup.screenY,
-                  transform: 'translate(-50%, -120%)'
-                }}
-              >
-                <span className="text-white text-xs font-medium mr-1">Remove NPC?</span>
-                <button
-                  className="w-6 h-6 flex items-center justify-center rounded hover:bg-neutral-700 transition-colors"
-                  onClick={() => {
-                    handleUnplaceActorFromMap(npcDeletePopup.npcId);
-                    setNpcDeletePopup(null);
-                  }}
-                  title="Confirm"
-                >
-                  <Check className="w-4 h-4 text-emerald-500" />
-                </button>
-                <button
-                  className="w-6 h-6 flex items-center justify-center rounded hover:bg-neutral-700 transition-colors"
-                  onClick={() => setNpcDeletePopup(null)}
-                  title="Cancel"
-                >
-                  <X className="w-4 h-4 text-red-500" />
-                </button>
-              </div>
-            )}
+            <NpcDeletePopup npcDeletePopup={npcDeletePopup} onConfirm={handleUnplaceActorFromMap} onCancel={() => setNpcDeletePopup(null)} />
 
-            {/* NPC Hover Tooltip - follows cursor */}
-            {npcHoverTooltip && (
-              <div
-                className="fixed z-50 px-2 py-1 bg-black/90 text-white text-xs rounded shadow-lg pointer-events-none flex items-center gap-1.5"
-                style={{
-                  left: npcHoverTooltip.x + 12,
-                  top: npcHoverTooltip.y + 12
-                }}
-              >
-                <MousePointer className="w-3 h-3" />
-                <span>Click to Edit</span>
-              </div>
-            )}
+            <NpcHoverTooltip npcHoverTooltip={npcHoverTooltip} />
 
-            {/* Selection Info Display - keep mounted to avoid reflows */}
-            <div className={`absolute bottom-4 left-32 z-10 p-2 rounded-md text-xs flex items-center gap-3 transition-opacity duration-200 ${hasSelection ? 'opacity-100 pointer-events-auto bg-orange-600/90 border border-orange-500 text-white' : 'opacity-0 pointer-events-none'}`}>
-              <div className="flex items-center gap-2 font-mono">
-                <Square className="w-4 h-4 text-orange-200" />
-                <span>{hasSelection ? `${selectionCount} tiles selected` : ''}</span>
-              </div>
-              <div className={`flex items-center gap-1 ${hasSelection ? '' : 'pointer-events-none'}`}>
-                <Tooltip content="Fill selection with active tile">
-                  <Button 
-                    size="sm" 
-                    variant="ghost" 
-                    className="h-6 px-2 text-xs text-white hover:bg-orange-500/50"
-                    onClick={handleFillSelection}
-                  >
-                    Fill
-                  </Button>
-                </Tooltip>
-                <Tooltip content="Delete selected tiles (DEL)">
-                  <Button 
-                    size="sm" 
-                    variant="ghost" 
-                    className="h-6 px-2 text-xs text-white hover:bg-orange-500/50"
-                    onClick={handleDeleteSelection}
-                  >
-                    Delete
-                  </Button>
-                </Tooltip>
-                <Tooltip content="Clear selection (ESC)">
-                  <Button 
-                    size="sm" 
-                    variant="ghost" 
-                    className="h-6 px-2 text-xs text-white hover:bg-orange-500/50"
-                    onClick={handleClearSelection}
-                  >
-                    Clear
-                  </Button>
-                </Tooltip>
-              </div>
-            </div>
+            <SelectionInfo hasSelection={hasSelection} selectionCount={selectionCount} handleFillSelection={handleFillSelection} handleDeleteSelection={handleDeleteSelection} handleClearSelection={handleClearSelection} />
             {/* Floating Toolbar (inside canvas, centered, pill-sized) */}
             <BottomToolbar
               bottomToolbarExpanded={bottomToolbarExpanded}
@@ -3965,19 +2596,16 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               showTooltipWithDelay={showTooltipWithDelay}
               hideTooltip={hideTooltip}
               setShowClearLayerDialog={setShowClearLayerDialog}
-              getBrushIcon={getBrushIcon}
               showSelectionOptions={showSelectionOptions}
               handleShowSelectionOptions={handleShowSelectionOptions}
               handleHideSelectionOptions={handleHideSelectionOptions}
               selectedSelectionTool={selectedSelectionTool}
               setSelectedSelectionTool={setSelectedSelectionTool}
-              getSelectionIcon={getSelectionIcon}
               showShapeOptions={showShapeOptions}
               handleShowShapeOptions={handleShowShapeOptions}
               handleHideShapeOptions={handleHideShapeOptions}
               selectedShapeTool={selectedShapeTool}
               setSelectedShapeTool={setSelectedShapeTool}
-              getShapeIcon={getShapeIcon}
               stampMode={stampMode}
               setStampMode={setStampMode}
               newStampName={newStampName}
@@ -4165,37 +2793,7 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
         onCancel={handleOverwriteCancel}
       />
 
-      {/* Export Success Modal */}
-      {showExportSuccess && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-black rounded-lg shadow-xl p-6 max-w-md mx-4 relative">
-            {/* Close button */}
-            <button
-              onClick={() => setShowExportSuccess(false)}
-              className="absolute top-3 right-3 text-gray-400 hover:text-gray-200 transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            
-            {/* Content */}
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">
-                <Check className="w-5 h-5 text-green-600 dark:text-green-400" />
-              </div>
-              <h3 className="text-lg font-semibold text-white">
-                Export Successful
-              </h3>
-            </div>
-            
-            <p className="text-gray-300 flex items-center gap-2">
-              <span className="inline-flex items-center gap-1 font-medium text-white">
-                <Folder className="w-4 h-4" />
-              </span>
-              Project exported to project folder.
-            </p>
-          </div>
-        </div>
-      )}
+      <ExportSuccessModal open={showExportSuccess} onClose={() => setShowExportSuccess(false)} />
 
       {/* Custom Tooltip */}
       {tooltip && (

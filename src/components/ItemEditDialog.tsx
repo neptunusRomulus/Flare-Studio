@@ -16,6 +16,7 @@ type EditingItem = {
   quality?: string;
   no_stash?: string;
   quest_item?: boolean;
+  pickup_status?: string;
   price?: string | number;
   price_sell?: string | number;
   max_quantity?: number;

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
-import type { EditorProjectData, TileMapEditor } from '@/editor/TileMapEditor';
+import type { EditorProjectData } from '@/editor/TileMapEditor';
+import { TileMapEditor } from '@/editor/TileMapEditor';
+import type { TileLayer } from '@/types';
 import { buildSpawnContent, computeIntermapTarget, extractSpawnIntermapValue, STARTING_MAP_INVALID_NAMES } from '@/editor/mapSpawnUtils';
 
 type MapConfigOptions = {
@@ -16,7 +18,7 @@ type MapConfigOptions = {
   getCreateTabFor: () => ((name: string, projectPath: string | null, config: EditorProjectData) => void) | null;
   getBeforeCreateMap: () => (() => Promise<void>) | null;
   currentProjectPath: string | null;
-  setLayers: React.Dispatch<React.SetStateAction<import('@/editor/TileMapEditor').TileLayer[]>>;
+  setLayers: React.Dispatch<React.SetStateAction<TileLayer[]>>;
   setActiveLayerId: React.Dispatch<React.SetStateAction<number | null>>;
   setStamps: React.Dispatch<React.SetStateAction<import('@/types').Stamp[]>>;
   setSelectedStamp: React.Dispatch<React.SetStateAction<string | null>>;
@@ -293,7 +295,7 @@ const useMapConfig = ({
       const createTabFor = getCreateTabFor();
       if (createTabFor) {
         try {
-          createTabFor(resolvedName, currentProjectPath ?? null, { name: resolvedName, width, height, tileSize: 64, location: currentProjectPath ?? '' });
+          createTabFor(resolvedName, currentProjectPath ?? null, { name: resolvedName, width, height, tileSize: 64 });
         } catch (e) {
           console.warn('Failed to create tab for new in-project map:', e);
         }

@@ -23,58 +23,95 @@ type VendorUnlockEntry = {
 };
 
 type VendorDialogsProps = {
-  itemsList: ItemSummary[];
-  showVendorUnlockDialog: boolean;
-  setShowVendorUnlockDialog: (open: boolean) => void;
-  vendorUnlockEntries: VendorUnlockEntry[];
-  handleUpdateVendorUnlockRequirement: (entryId: string, value: string) => void;
-  handleRemoveVendorUnlockRequirement: (entryId: string) => void;
-  handleToggleVendorUnlockItem: (entryId: string, itemId: number) => void;
-  handleVendorUnlockQtyChange: (entryId: string, itemId: number, value: number) => void;
-  handleAddVendorUnlockRequirement: () => void;
-  handleSaveVendorUnlock: () => void;
-  showVendorRandomDialog: boolean;
-  setShowVendorRandomDialog: (open: boolean) => void;
-  vendorRandomSelection: Record<number, { chance: number; min: number; max: number }>;
-  handleToggleVendorRandomItem: (itemId: number) => void;
-  handleVendorRandomFieldChange: (itemId: number, field: 'chance' | 'min' | 'max', value: number) => void;
-  vendorRandomCount: { min: number; max: number };
-  handleRandomCountChange: (field: 'min' | 'max', value: number) => void;
-  handleSaveVendorRandom: () => void;
-  showVendorStockDialog: boolean;
-  setShowVendorStockDialog: (open: boolean) => void;
-  vendorStockSelection: Record<number, number>;
-  handleToggleVendorStockItem: (itemId: number) => void;
-  handleVendorStockQtyChange: (itemId: number, value: number) => void;
-  handleSaveVendorStock: () => void;
+  // Backwards-compatible individual props (optional)
+  itemsList?: ItemSummary[];
+  showVendorUnlockDialog?: boolean;
+  setShowVendorUnlockDialog?: (open: boolean) => void;
+  vendorUnlockEntries?: VendorUnlockEntry[];
+  handleUpdateVendorUnlockRequirement?: (entryId: string, value: string) => void;
+  handleRemoveVendorUnlockRequirement?: (entryId: string) => void;
+  handleToggleVendorUnlockItem?: (entryId: string, itemId: number) => void;
+  handleVendorUnlockQtyChange?: (entryId: string, itemId: number, value: number) => void;
+  handleAddVendorUnlockRequirement?: () => void;
+  handleSaveVendorUnlock?: () => void;
+  showVendorRandomDialog?: boolean;
+  setShowVendorRandomDialog?: (open: boolean) => void;
+  vendorRandomSelection?: Record<number, { chance: number; min: number; max: number }>;
+  handleToggleVendorRandomItem?: (itemId: number) => void;
+  handleVendorRandomFieldChange?: (itemId: number, field: 'chance' | 'min' | 'max', value: number) => void;
+  vendorRandomCount?: { min: number; max: number };
+  handleRandomCountChange?: (field: 'min' | 'max', value: number) => void;
+  handleSaveVendorRandom?: () => void;
+  showVendorStockDialog?: boolean;
+  setShowVendorStockDialog?: (open: boolean) => void;
+  vendorStockSelection?: Record<number, number>;
+  handleToggleVendorStockItem?: (itemId: number) => void;
+  handleVendorStockQtyChange?: (itemId: number, value: number) => void;
+  handleSaveVendorStock?: () => void;
+
+  // Grouped props (preferred)
+  vendorState?: {
+    itemsList: ItemSummary[];
+    showVendorUnlockDialog: boolean;
+    setShowVendorUnlockDialog: (open: boolean) => void;
+    vendorUnlockEntries: VendorUnlockEntry[];
+    showVendorRandomDialog: boolean;
+    setShowVendorRandomDialog: (open: boolean) => void;
+    vendorRandomSelection: Record<number, { chance: number; min: number; max: number }>;
+    vendorRandomCount: { min: number; max: number };
+    showVendorStockDialog: boolean;
+    setShowVendorStockDialog: (open: boolean) => void;
+    vendorStockSelection: Record<number, number>;
+  };
+
+  vendorHandlers?: {
+    handleUpdateVendorUnlockRequirement: (entryId: string, value: string) => void;
+    handleRemoveVendorUnlockRequirement: (entryId: string) => void;
+    handleToggleVendorUnlockItem: (entryId: string, itemId: number) => void;
+    handleVendorUnlockQtyChange: (entryId: string, itemId: number, value: number) => void;
+    handleAddVendorUnlockRequirement: () => void;
+    handleSaveVendorUnlock: () => void;
+    handleToggleVendorRandomItem: (itemId: number) => void;
+    handleVendorRandomFieldChange: (itemId: number, field: 'chance' | 'min' | 'max', value: number) => void;
+    handleRandomCountChange: (field: 'min' | 'max', value: number) => void;
+    handleSaveVendorRandom: () => void;
+    handleToggleVendorStockItem: (itemId: number) => void;
+    handleVendorStockQtyChange: (itemId: number, value: number) => void;
+    handleSaveVendorStock: () => void;
+  };
 };
 
-const VendorDialogs = ({
-  itemsList,
-  showVendorUnlockDialog,
-  setShowVendorUnlockDialog,
-  vendorUnlockEntries,
-  handleUpdateVendorUnlockRequirement,
-  handleRemoveVendorUnlockRequirement,
-  handleToggleVendorUnlockItem,
-  handleVendorUnlockQtyChange,
-  handleAddVendorUnlockRequirement,
-  handleSaveVendorUnlock,
-  showVendorRandomDialog,
-  setShowVendorRandomDialog,
-  vendorRandomSelection,
-  handleToggleVendorRandomItem,
-  handleVendorRandomFieldChange,
-  vendorRandomCount,
-  handleRandomCountChange,
-  handleSaveVendorRandom,
-  showVendorStockDialog,
-  setShowVendorStockDialog,
-  vendorStockSelection,
-  handleToggleVendorStockItem,
-  handleVendorStockQtyChange,
-  handleSaveVendorStock
-}: VendorDialogsProps) => {
+const VendorDialogs = (props: VendorDialogsProps) => {
+  // Prefer grouped props when provided
+  const vs = props.vendorState;
+  const vh = props.vendorHandlers;
+
+  const itemsList = vs?.itemsList ?? props.itemsList ?? [];
+  const showVendorUnlockDialog = vs?.showVendorUnlockDialog ?? props.showVendorUnlockDialog ?? false;
+  const setShowVendorUnlockDialog = vs?.setShowVendorUnlockDialog ?? props.setShowVendorUnlockDialog ?? (() => {});
+  const vendorUnlockEntries = vs?.vendorUnlockEntries ?? props.vendorUnlockEntries ?? [];
+  const showVendorRandomDialog = vs?.showVendorRandomDialog ?? props.showVendorRandomDialog ?? false;
+  const setShowVendorRandomDialog = vs?.setShowVendorRandomDialog ?? props.setShowVendorRandomDialog ?? (() => {});
+  const vendorRandomSelection = vs?.vendorRandomSelection ?? props.vendorRandomSelection ?? {};
+  const vendorRandomCount = vs?.vendorRandomCount ?? props.vendorRandomCount ?? { min: 1, max: 1 };
+  const showVendorStockDialog = vs?.showVendorStockDialog ?? props.showVendorStockDialog ?? false;
+  const setShowVendorStockDialog = vs?.setShowVendorStockDialog ?? props.setShowVendorStockDialog ?? (() => {});
+  const vendorStockSelection = vs?.vendorStockSelection ?? props.vendorStockSelection ?? {};
+
+  const handleUpdateVendorUnlockRequirement = vh?.handleUpdateVendorUnlockRequirement ?? props.handleUpdateVendorUnlockRequirement ?? (() => {});
+  const handleRemoveVendorUnlockRequirement = vh?.handleRemoveVendorUnlockRequirement ?? props.handleRemoveVendorUnlockRequirement ?? (() => {});
+  const handleToggleVendorUnlockItem = vh?.handleToggleVendorUnlockItem ?? props.handleToggleVendorUnlockItem ?? (() => {});
+  const handleVendorUnlockQtyChange = vh?.handleVendorUnlockQtyChange ?? props.handleVendorUnlockQtyChange ?? (() => {});
+  const handleAddVendorUnlockRequirement = vh?.handleAddVendorUnlockRequirement ?? props.handleAddVendorUnlockRequirement ?? (() => {});
+  const handleSaveVendorUnlock = vh?.handleSaveVendorUnlock ?? props.handleSaveVendorUnlock ?? (() => {});
+  const handleToggleVendorRandomItem = vh?.handleToggleVendorRandomItem ?? props.handleToggleVendorRandomItem ?? (() => {});
+  const handleVendorRandomFieldChange = vh?.handleVendorRandomFieldChange ?? props.handleVendorRandomFieldChange ?? (() => {});
+  const handleRandomCountChange = vh?.handleRandomCountChange ?? props.handleRandomCountChange ?? (() => {});
+  const handleSaveVendorRandom = vh?.handleSaveVendorRandom ?? props.handleSaveVendorRandom ?? (() => {});
+  const handleToggleVendorStockItem = vh?.handleToggleVendorStockItem ?? props.handleToggleVendorStockItem ?? (() => {});
+  const handleVendorStockQtyChange = vh?.handleVendorStockQtyChange ?? props.handleVendorStockQtyChange ?? (() => {});
+  const handleSaveVendorStock = vh?.handleSaveVendorStock ?? props.handleSaveVendorStock ?? (() => {});
+
   return (
     <>
       <Dialog open={showVendorUnlockDialog} onOpenChange={setShowVendorUnlockDialog} zIndex={80}>

@@ -23,6 +23,10 @@ type Props = {
   hasUnsavedChanges: boolean;
   setShowSettings: (v: boolean) => void;
   refreshProjectMaps: () => Promise<void>;
+  uiHelpers?: {
+    showTooltipWithDelay: (text: React.ReactNode, target: HTMLElement) => void;
+    hideTooltip: () => void;
+  };
 };
 
 const AppControls: React.FC<Props> = ({
@@ -44,7 +48,10 @@ const AppControls: React.FC<Props> = ({
   hasUnsavedChanges,
   setShowSettings,
   refreshProjectMaps
+  ,
+  uiHelpers: _uiHelpers
 }) => {
+  void _uiHelpers;
   return (
     <div className="flex items-center gap-2">
       <div>

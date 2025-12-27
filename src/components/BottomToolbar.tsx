@@ -63,6 +63,7 @@ type BottomToolbarProps = {
   selectedStamp: string | null;
   handleStampSelect: (id: string) => void;
   handleDeleteStamp: (id: string) => void;
+  stampsState?: unknown;
 };
 
 const BottomToolbar = ({

@@ -11,8 +11,6 @@ import OverwriteExportDialog from './components/OverwriteExportDialog';
 import EnemyTabPanel from '@/components/EnemyTabPanel';
 import AbilityDialog from '@/components/AbilityDialog';
 import ActorDialog from '@/components/ActorDialog';
-import BottomToolbar from '@/components/BottomToolbar';
-import BrushToolbar from '@/components/BrushToolbar';
 import ClearLayerDialog from '@/components/ClearLayerDialog';
 import EngineSettingsDialog from '@/components/EngineSettingsDialog';
 import HelpDialog from '@/components/HelpDialog';
@@ -24,25 +22,17 @@ import ObjectManagementDialog from '@/components/ObjectManagementDialog';
 import RuleDialog from '@/components/RuleDialog';
 import DialogueTreeDialog from '@/components/dialogue/DialogueTreeDialog';
 import SeparateBrushDialog from '@/components/SeparateBrushDialog';
-import SidebarLayout from '@/components/SidebarLayout';
-import SidebarToggle from '@/components/SidebarToggle';
-import TilesetPalette from '@/components/TilesetPalette';
 import TitleBar from '@/components/TitleBar';
-import LayersPanel from '@/components/LayersPanel';
 import TopBar from '@/components/TopBar';
-import AppControls from '@/components/AppControls';
-import CanvasTips from '@/components/CanvasTips';
 import ConfirmActionDialog from '@/components/ConfirmActionDialog';
-import MapInitOverlay from '@/components/MapInitOverlay';
-import MapHoverDisplay from '@/components/MapHoverDisplay';
-import NpcDeletePopup from '@/components/NpcDeletePopup';
-import NpcHoverTooltip from '@/components/NpcHoverTooltip';
-import SelectionInfo from '@/components/SelectionInfo';
+import SidebarToggle from '@/components/SidebarToggle';
+import AppSidebar from '@/components/AppSidebar';
+import EditorCanvas from '@/components/EditorCanvas';
+import useMapsDropdown from './hooks/useMapsDropdown';
+import type { ControlsProps } from '@/components/SidebarControlsArea';
 import ExportSuccessModal from '@/components/ExportSuccessModal';
 import VendorDialogs from '@/components/VendorDialogs';
-import SidebarActorEntries from '@/components/SidebarActorEntries';
-import SidebarItemsPanel from '@/components/SidebarItemsPanel';
-import SidebarRulesPanel from '@/components/SidebarRulesPanel';
+// Sidebar child components are now rendered inside AppSidebar
 import { computeIntermapTarget, extractSpawnIntermapValue } from './editor/mapSpawnUtils';
 import { validateAndSanitizeObject } from './editor/objectValidation';
 import type { ItemResourceSubtype, ItemRole } from './editor/itemRoles';
@@ -54,15 +44,18 @@ import useMapConfig from './hooks/useMapConfig';
 import useObjectEditing from './hooks/useObjectEditing';
 import useProjectSession from './hooks/useProjectSession';
 import useProjectIO from './hooks/useProjectIO';
+import useDialogs from './hooks/useDialogs';
 import { buildConstantStockString } from './utils/parsers';
 import useStampState from './hooks/useStampState';
 import useToolbarAutoCollapse from './hooks/useToolbarAutoCollapse';
+import useAutosave from './hooks/useAutosave';
 import useToolbarHandlers from './hooks/useToolbarHandlers';
 import useToolbarVisibility from './hooks/useToolbarVisibility';
 import useTooltip from './hooks/useTooltip';
 import useVendorState from './hooks/useVendorState';
 import useEditorTabs from './hooks/useEditorTabs';
 import useEditorState from './hooks/useEditorState';
+import usePreferences from './hooks/usePreferences';
 import flareIconUrl from '/flare-ico.png?url';
 import type { MapConfig } from './editor/mapConfig';
 import type { EditorTab } from './hooks/useEditorTabs';
@@ -83,9 +76,15 @@ function App() {
     syncMapObjectsRef,
     setupAutoSaveWrapper,
     updateLayersListWrapper,
-    syncMapObjectsWrapper
+    syncMapObjectsWrapper,
+    handlePlaceActorOnMap,
+    handleUnplaceActorFromMap,
+    handleFillSelection,
+    handleClearSelection,
+    handleDeleteSelection
   } = useEditorState(editorOptsRef);
   const toolbarRef = useRef<HTMLDivElement | null>(null);
+  const handleManualSaveRef = useRef<(() => Promise<void>) | undefined>(undefined);
   // Editor tabs
   const [pendingEnemyTabCloseId, setPendingEnemyTabCloseId] = useState<string | null>(null);
   const switchToTabHelpersRef = useRef({
@@ -114,8 +113,6 @@ function App() {
   const [layers, setLayers] = useState<TileLayer[]>([]);
   const [activeLayerId, setActiveLayerId] = useState<number | null>(null);
   const [showAddLayerDropdown, setShowAddLayerDropdown] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [showMapSettingsOnly, setShowMapSettingsOnly] = useState(false);
   // Layers panel expand/collapse state
   const [layersPanelExpanded, setLayersPanelExpanded] = useState(false);
   // Individual layer hover state
@@ -214,6 +211,23 @@ function App() {
     setShowSeparateDialog,
     brushToSeparate
   });
+
+  const stampsState = {
+    stamps,
+    setStamps,
+    selectedStamp,
+    setSelectedStamp,
+    stampMode,
+    setStampMode,
+    setShowStampDialog,
+    newStampName,
+    setNewStampName,
+    handleCreateStamp,
+    handleStampSelect,
+    handleDeleteStamp,
+    handleSeparateBrush,
+    confirmSeparateBrush
+  };
   // Clear layer confirmation dialog state (replaces window.confirm)
   const [showClearLayerDialog, setShowClearLayerDialog] = useState(false);
   // Generic confirmation dialog for other destructive actions
@@ -248,38 +262,36 @@ function App() {
     setVendorRandomCount
   } = useVendorState();
   
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    // Initialize from localStorage or default to false
-    const savedTheme = localStorage.getItem('isDarkMode');
-    return savedTheme ? JSON.parse(savedTheme) : false;
-  });
-
-  // Show/hide the left sidebar collapse toggle (user preference)
-  const [showSidebarToggle, setShowSidebarToggle] = useState(() => {
-    const saved = localStorage.getItem('showSidebarToggle');
-    return saved ? JSON.parse(saved) : true;
-  });
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('showSidebarToggle', JSON.stringify(showSidebarToggle));
-    } catch {
-      // ignore storage errors
-    }
-  }, [showSidebarToggle]);
+  const { isDarkMode, setIsDarkMode, showSidebarToggle, setShowSidebarToggle } = usePreferences();
   
-  // Auto-save states
-  const [saveStatus, setSaveStatus] = useState<'saving' | 'saved' | 'error' | 'unsaved'>('unsaved');
-  const [autoSaveEnabled, setAutoSaveEnabledState] = useState(true);
-  const [lastSaveTime, setLastSaveTime] = useState<number>(0);
-  const [isManuallySaving, setIsManuallySaving] = useState(false);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  // Autosave state moved to hook
+  const {
+    autoSaveEnabled,
+    setAutoSaveEnabled: setAutoSaveEnabledState,
+    isManuallySaving,
+    setIsManuallySaving,
+    saveStatus,
+    setSaveStatus,
+    lastSaveTime,
+    setLastSaveTime,
+    hasUnsavedChanges,
+    setHasUnsavedChanges,
+    
+  } = useAutosave({ manualSaveRef: handleManualSaveRef });
 
   // When true, we're in the middle of opening an existing project
   // and should avoid creating a blank editor instance.
   const [isOpeningProject, setIsOpeningProject] = useState(false);
   
-  const { tooltip, showTooltipWithDelay, hideTooltip } = useTooltip({ toolbarRef, canvasRef });
+  const { tooltip, showTooltipWithDelay: showTooltipWithDelayFn, hideTooltip: hideTooltipFn } = useTooltip({ toolbarRef, canvasRef });
+
+  const uiHelpers = {
+    tooltip,
+    showTooltipWithDelay: showTooltipWithDelayFn,
+    hideTooltip: hideTooltipFn,
+    toolbarRef,
+    canvasRef
+  };
 
   // NPC drag-drop state
   const [draggingNpcId, setDraggingNpcId] = useState<number | null>(null);
@@ -294,15 +306,7 @@ function App() {
     screenY: number;
   } | null>(null);
 
-  // Hero position edit dialog state
-  const [showHeroEditDialog, setShowHeroEditDialog] = useState(false);
-  const [heroEditData, setHeroEditData] = useState<{
-    currentX: number;
-    currentY: number;
-    mapWidth: number;
-    mapHeight: number;
-    onConfirm: (x: number, y: number) => void;
-  } | null>(null);
+  // Hero position edit dialog state moved to useDialogs
 
   const {
     showObjectDialog,
@@ -463,7 +467,25 @@ function App() {
   
   // Rules list for the Rules layer (UI-only for now; persistence will be added later).
   const [rulesList, setRulesList] = useState<Array<{ id: string; name: string; startType: RuleStartType; triggerId: string }>>([]);
-  const [showRuleDialog, setShowRuleDialog] = useState(false);
+  const {
+    showRuleDialog,
+    openRuleDialog,
+    closeRuleDialog,
+    ruleDialogStep,
+    setRuleDialogStep,
+    ruleDialogError,
+    setRuleDialogError,
+    showSettings,
+    setShowSettings,
+    showMapSettingsOnly,
+    setShowMapSettingsOnly,
+    showHeroEditDialog,
+    setShowHeroEditDialog,
+    heroEditData,
+    setHeroEditData,
+    handleHeroEditConfirm,
+    handleHeroEditCancel
+  } = useDialogs();
   const [showAbilityDialog, setShowAbilityDialog] = useState(false);
   const [abilityNameInput, setAbilityNameInput] = useState('');
   const [, setAbilitiesList] = useState<Array<{ id: string; name: string; type: string }>>([]);
@@ -471,8 +493,6 @@ function App() {
   const [ruleStartType, setRuleStartType] = useState<RuleStartType | null>(null);
   const [ruleTriggerId, setRuleTriggerId] = useState<string>('');
   const [ruleActionSelection, setRuleActionSelection] = useState<{ groupId: string; actionId: string } | null>(null);
-  const [ruleDialogError, setRuleDialogError] = useState<string | null>(null);
-  const [ruleDialogStep, setRuleDialogStep] = useState<'start' | 'actions'>('start');
   // Items list for display
   
   // Expanded item categories for accordion
@@ -501,7 +521,9 @@ function App() {
     showOverwriteDialog,
     handleOverwriteConfirm,
     handleOverwriteCancel,
-    performExport
+    projectMaps,
+    refreshProjectMaps,
+    handleOpenMapFromMapsFolder
   } = useProjectIO({
     editor,
     currentProjectPath,
@@ -510,7 +532,15 @@ function App() {
     mapObjects,
     buildConstantStockString,
     toast
+    ,
+    handleManualSave: async () => { if (handleManualSaveRef.current) await handleManualSaveRef.current(); },
+    updateLayersList: updateLayersListWrapper,
+    syncMapObjects: syncMapObjectsWrapper,
+    setMapInitialized,
+    setMapName
   });
+
+  // Stable ref for manual save handler: referenced by project IO and autosave hooks.
 
   // Items state & handlers moved to hook
   const {
@@ -532,62 +562,16 @@ function App() {
     handleSaveItemEdit,
     updateEditingItemField
   } = useItems({ currentProjectPath, toast, normalizeItemsForState });
-  const [projectMaps, setProjectMaps] = useState<string[]>([]);
-  const [mapsDropdownOpen, setMapsDropdownOpen] = useState<boolean>(false);
-  const mapsButtonRef = useRef<HTMLButtonElement | null>(null);
-  const [mapsDropdownPos, setMapsDropdownPos] = useState<{ left: number; top: number } | null>(null);
-  const mapsPortalRef = useRef<HTMLDivElement | null>(null);
-  const mapsSubPortalRef = useRef<HTMLDivElement | null>(null);
-  const [mapsSubOpen, setMapsSubOpen] = useState<boolean>(false);
-
-  useEffect(() => {
-    if (!mapsDropdownOpen) return;
-    const computePos = () => {
-      const btn = mapsButtonRef.current as HTMLButtonElement | null;
-      if (!btn) return setMapsDropdownPos(null);
-      const rect = btn.getBoundingClientRect();
-      // position the menu to open upwards: set top to the button's top and use translateY(-100%) in CSS
-      setMapsDropdownPos({ left: rect.left, top: rect.top - 8 });
-    };
-    computePos();
-    window.addEventListener('resize', computePos);
-    window.addEventListener('scroll', computePos, true);
-    return () => {
-      window.removeEventListener('resize', computePos);
-      window.removeEventListener('scroll', computePos, true);
-    };
-  }, [mapsDropdownOpen]);
-
-  
-
-  // Close maps dropdown on Escape or clicking outside
-  useEffect(() => {
-    if (!mapsDropdownOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setMapsDropdownOpen(false);
-        setMapsSubOpen(false);
-      }
-    };
-    const onMouse = (e: MouseEvent) => {
-      const portal = mapsPortalRef.current;
-      const subportal = mapsSubPortalRef.current;
-      const btn = mapsButtonRef.current;
-      const target = e.target as Node | null;
-      if (!portal) return;
-      if (portal.contains(target)) return;
-      if (subportal && subportal.contains(target)) return;
-      if (btn && btn.contains(target)) return; // clicking the button toggles; allow it
-      setMapsDropdownOpen(false);
-      setMapsSubOpen(false);
-    };
-    window.addEventListener('keydown', onKey);
-    window.addEventListener('mousedown', onMouse);
-    return () => {
-      window.removeEventListener('keydown', onKey);
-      window.removeEventListener('mousedown', onMouse);
-    };
-  }, [mapsDropdownOpen]);
+  // projectMaps now provided by useProjectIO
+  const {
+    mapsDropdownOpen,
+    setMapsDropdownOpen,
+    mapsButtonRef,
+    mapsDropdownPos,
+    mapsPortalRef,
+    mapsSubOpen,
+    setMapsSubOpen
+  } = useMapsDropdown();
   // (selectedMapTxt removed — we call editor.loadFlareMapTxt when available)
 
   // refreshProjectMaps and handleOpenMapFromMapsFolder are declared later (after helpers they depend on)
@@ -981,8 +965,8 @@ function App() {
     setRuleActionSelection(null);
     setRuleNameInput(`Rule ${rulesList.length + 1}`);
     setRuleDialogStep('start');
-    setShowRuleDialog(true);
-  }, [rulesList.length]);
+    openRuleDialog();
+  }, [rulesList.length, openRuleDialog, setRuleDialogStep, setRuleDialogError, setRuleStartType, setRuleTriggerId, setRuleActionSelection, setRuleNameInput]);
 
   const handleSaveRule = useCallback(() => {
     const trimmedName = ruleNameInput.trim();
@@ -1010,13 +994,13 @@ function App() {
         triggerId: ruleTriggerId
       }
     ]);
-    setShowRuleDialog(false);
+    closeRuleDialog();
     setRuleDialogError(null);
     setRuleNameInput('');
     setRuleStartType(null);
     setRuleTriggerId('');
     setRuleActionSelection(null);
-  }, [ruleNameInput, ruleStartType, ruleTriggerId]);
+  }, [ruleNameInput, ruleStartType, ruleTriggerId, closeRuleDialog, setRuleDialogError, setRulesList, setRuleNameInput, setRuleStartType, setRuleTriggerId, setRuleActionSelection]);
 
   const handleCloseAbilityDialog = useCallback(() => {
     setShowAbilityDialog(false);
@@ -1040,21 +1024,7 @@ function App() {
 
 
 
-  // NPC'yi haritaya belirli konuma yerleştir
-  const handlePlaceActorOnMap = useCallback((objectId: number, x?: number, y?: number) => {
-    if (!editor) return;
-    const spawnX = x !== undefined ? x : Math.floor(mapWidth / 2);
-    const spawnY = y !== undefined ? y : Math.floor(mapHeight / 2);
-    editor.updateMapObject(objectId, { x: spawnX, y: spawnY });
-    syncMapObjects();
-  }, [editor, mapWidth, mapHeight, syncMapObjects]);
-
-  // NPC'yi haritadan kaldır (database olarak tut)
-  const handleUnplaceActorFromMap = useCallback((objectId: number) => {
-    if (!editor) return;
-    editor.updateMapObject(objectId, { x: -1, y: -1 });
-    syncMapObjects();
-  }, [editor, syncMapObjects]);
+  
 
   // NPC drag start
   const handleNpcDragStart = useCallback((e: React.DragEvent, npcId: number) => {
@@ -1372,19 +1342,7 @@ function App() {
     }
   }, [updateEditingObjectProperty]);
 
-  // Hero position edit handlers
-  const handleHeroEditConfirm = useCallback((x: number, y: number) => {
-    if (heroEditData?.onConfirm) {
-      heroEditData.onConfirm(x, y);
-    }
-    setShowHeroEditDialog(false);
-    setHeroEditData(null);
-  }, [heroEditData]);
-
-  const handleHeroEditCancel = useCallback(() => {
-    setShowHeroEditDialog(false);
-    setHeroEditData(null);
-  }, []);
+  // Hero edit handlers moved to useDialogs
 
   // Canvas double-click handler for editing objects
   useEffect(() => {
@@ -1648,11 +1606,10 @@ function App() {
     } finally {
       setIsManuallySaving(false);
     }
-  }, [editor, currentProjectPath]);
+  }, [editor, currentProjectPath, setIsManuallySaving, setLastSaveTime]);
 
   // Keep stable refs to the handlers so we can register IPC listeners once
   // and still call the latest handler implementations without re-registering.
-  const handleManualSaveRef = useRef(handleManualSave);
   const handleOpenMapRef = useRef<typeof handleOpenMap | null>(null);
   const handleUndoRef = useRef(handleUndo);
   const handleRedoRef = useRef(handleRedo);
@@ -1661,57 +1618,7 @@ function App() {
   useEffect(() => { handleUndoRef.current = handleUndo; }, [handleUndo]);
   useEffect(() => { handleRedoRef.current = handleRedo; }, [handleRedo]);
 
-  // Maps helpers (moved after performExport/handleManualSave to avoid forward ref issues)
-  const refreshProjectMaps = useCallback(async () => {
-    if (!currentProjectPath || !window.electronAPI?.listMaps) {
-      setProjectMaps([]);
-      return;
-    }
-    try {
-      const maps: string[] = await window.electronAPI.listMaps(currentProjectPath);
-      setProjectMaps([...maps]);
-    } catch (e) {
-      console.warn('Failed to list maps:', e);
-      setProjectMaps([]);
-    }
-  }, [currentProjectPath]);
-
-  const handleOpenMapFromMapsFolder = useCallback(async (filename: string) => {
-    if (!currentProjectPath) return;
-
-    try {
-      const exported = await performExport({ silent: true });
-      if (!exported) {
-        toast({ title: 'Export failed', description: 'Failed to export current map before opening a new one.', variant: 'destructive' });
-        return;
-      }
-
-      await handleManualSave();
-
-      const content = await window.electronAPI.readMapFile(currentProjectPath, filename);
-      if (!content) {
-        toast({ title: 'Open failed', description: `Failed to read map file ${filename}`, variant: 'destructive' });
-        return;
-      }
-
-      // If editor has a loader for Flare TXT, use it. Otherwise notify user.
-      if (editor && typeof editor.loadFlareMapTxt === 'function') {
-        editor.loadFlareMapTxt!(content);
-        editor.setMapName(filename.replace(/\.txt$/i, ''));
-        updateLayersList();
-        syncMapObjects();
-        setMapInitialized(true);
-        setMapName(filename.replace(/\.txt$/i, ''));
-        toast({ title: 'Map opened', description: `Opened ${filename}` });
-      } else {
-        // Editor does not implement a loader yet — notify user
-        toast({ title: 'Map loaded (raw)', description: 'Map content loaded but no parser available in the editor. Implement loadFlareMapTxt to parse it.' });
-      }
-    } catch (e) {
-      console.error('Open map error:', e);
-      toast({ title: 'Open failed', description: 'An unexpected error occurred while opening the map.', variant: 'destructive' });
-    }
-  }, [currentProjectPath, editor, handleManualSave, performExport, setMapInitialized, setMapName, syncMapObjects, toast, updateLayersList]);
+  // Maps management moved into useProjectIO hook
 
   // minimap toggle handed inline where needed; removed unused handler
 
@@ -1786,7 +1693,7 @@ function App() {
       }
       if (maps.length === 0) {
         // No maps yet: switch to the editor shell and prompt for map creation
-        setProjectMaps([]);
+        if (typeof refreshProjectMaps === 'function') refreshProjectMaps();
         setMapInitialized(false);
         setEditor(null);
         setPendingMapConfig(null);
@@ -1813,7 +1720,7 @@ function App() {
         setShowCreateMapDialog(true);
         return;
       }
-      setProjectMaps([...maps]);
+      await (typeof refreshProjectMaps === 'function' ? refreshProjectMaps() : Promise.resolve());
       
       // Load session from project folder (.flare-session.json)
       // This restores tabs that were open when the project was last used
@@ -1996,7 +1903,7 @@ function App() {
     setNewMapStarting,
     setNewMapWidth,
     setPendingMapConfig,
-    setProjectMaps,
+    refreshProjectMaps,
     setReservedMapNames,
     setSaveStatus,
     setSelectionCount,
@@ -2135,23 +2042,7 @@ function App() {
     }
   };
 
-  const handleFillSelection = () => {
-    if (editor) {
-      editor.fillSelection();
-    }
-  };
-
-  const handleClearSelection = () => {
-    if (editor) {
-      editor.clearSelection();
-    }
-  };
-
-  const handleDeleteSelection = () => {
-    if (editor) {
-      editor.deleteSelection();
-    }
-  };
+  
 
   const activeLayer = useMemo(() => {
     return layers.find((layer) => layer.id === activeLayerId) ?? null;
@@ -2242,137 +2133,107 @@ function App() {
       />
 
       <main className="flex flex-1 min-h-0">
-        {/* Left Sidebar */}
-        <SidebarLayout leftCollapsed={leftCollapsed}>
-          {/* Hover handle / visual affordance when collapsed (removed) */}
-          {/* collapse toggle is provided on the outer edge (see edge button) */}
-          {/* Tileset Brushes Section */}
-          <section className="flex flex-col flex-1">
-            {/* If this is an NPC, Enemy, Event, Rules, or Items layer render a header and controls */}
-            {(isNpcLayer || isEnemyLayer) && (
-              <SidebarActorEntries
-                isNpcLayer={isNpcLayer}
-                isEnemyLayer={isEnemyLayer}
-                actorEntries={actorEntries}
+        {
+          (() => {
+            const actors = {
+              isNpcLayer,
+              isEnemyLayer,
+              actorEntries,
+              draggingNpcId,
+              handleEditObject,
+              setNpcHoverTooltip,
+              handleNpcDragStart,
+              handleNpcDragEnd,
+              handleOpenActorDialog
+            };
+
+            const rules = {
+              isRulesLayer,
+              rulesList,
+              handleAddRule
+            };
+
+            const items = {
+              isItemsLayer,
+              itemsList,
+              expandedItemCategories,
+              setExpandedItemCategories,
+              handleOpenItemEdit,
+              handleOpenItemDialog
+            };
+
+            const tileset = {
+              editor,
+              activeLayer,
+              tabTick,
+              setTabTick,
+              brushTool,
+              isCollisionLayer,
+              brushToolbarExpanded,
+              showBrushToolbarTemporarily,
+              setBrushToolbarNode,
+              handleFileUpload,
+              handleToggleBrushTool,
+              handleDeleteActiveTab,
+              toast,
+              handleOpenActorDialog,
+              stampsState
+            };
+
+            const layersObj = {
+              layers,
+              activeLayerId,
+              hoveredLayerId,
+              layersPanelExpanded,
+              setLayersPanelExpanded,
+              setHoveredLayerId,
+              handleSetActiveLayer,
+              handleToggleLayerVisibility,
+              handleLayerTransparencyChange,
+              showTooltipWithDelay: showTooltipWithDelayFn,
+              hideTooltip: hideTooltipFn,
+              uiHelpers,
+              leftCollapsed
+            };
+
+            const exportStatus = { isExporting, exportProgress };
+
+            const controlsObj: ControlsProps = {
+              mapsButtonRef,
+              mapsDropdownOpen,
+              mapsDropdownPos,
+              mapsPortalRef,
+              mapsSubOpen,
+              currentProjectPath,
+              projectMaps,
+              setMapsSubOpen,
+              setMapsDropdownOpen,
+              handleOpenCreateMapDialog,
+              handleOpenMapFromMapsFolder,
+              handleManualSave,
+              isManuallySaving,
+              isPreparingNewMap,
+              hasUnsavedChanges,
+              setShowSettings,
+              refreshProjectMaps,
+              uiHelpers,
+              toast
+            };
+
+            return (
+              <AppSidebar
                 leftCollapsed={leftCollapsed}
-                draggingNpcId={draggingNpcId}
-                onEditObject={handleEditObject}
-                onHover={(position) => setNpcHoverTooltip(position)}
-                onHoverEnd={() => setNpcHoverTooltip(null)}
-                onDragStart={handleNpcDragStart}
-                onDragEnd={handleNpcDragEnd}
-                onAddNpc={() => handleOpenActorDialog('npc')}
-                onAddEnemy={() => handleOpenActorDialog('enemy')}
+                actors={actors}
+                rules={rules}
+                items={items}
+                tileset={tileset}
+                layers={layersObj}
+                exportStatus={exportStatus}
+                controls={controlsObj}
               />
-              )}
-            
-
-
-
-            {/* Rules Layer - list and add button (similar UX to NPC layer) */}
-            {isRulesLayer && (
-              <SidebarRulesPanel
-                rulesList={rulesList}
-                onAddRule={handleAddRule}
-              />
-            )}
-
-            {/* Items Layer - Add Item button only */}
-            {isItemsLayer && (
-              <SidebarItemsPanel
-                itemsList={itemsList}
-                expandedItemCategories={expandedItemCategories}
-                setExpandedItemCategories={setExpandedItemCategories}
-                onOpenItemEdit={handleOpenItemEdit}
-                onAddItem={handleOpenItemDialog}
-              />
-            )}
-
-            {/* Tileset Brushes Window - render for all layers except NPC, Enemy, Items, Rules, and Actions */}
-            {!isNpcLayer && !isEnemyLayer && !isItemsLayer && !isRulesLayer && (
-              <TilesetPalette
-                editor={editor}
-                activeLayer={activeLayer}
-                tabTick={tabTick}
-                setTabTick={setTabTick}
-                brushTool={brushTool}
-              />
-            )}
-            {/* Brush Tools - stick to bottom so palette can fill remaining space */}
-            {!isNpcLayer && !isEnemyLayer && !isItemsLayer && !isRulesLayer && (
-              <BrushToolbar
-                editor={editor}
-                activeLayer={activeLayer}
-                isCollisionLayer={isCollisionLayer}
-                brushTool={brushTool}
-                brushToolbarExpanded={brushToolbarExpanded}
-                showBrushToolbarTemporarily={showBrushToolbarTemporarily}
-                setTabTick={setTabTick}
-                setBrushToolbarNode={setBrushToolbarNode}
-                onOpenActorDialog={handleOpenActorDialog}
-                onFileUpload={handleFileUpload}
-                onToggleBrushTool={handleToggleBrushTool}
-                onDeleteActiveTab={handleDeleteActiveTab}
-                toast={toast}
-              />
-            )}
-          </section>
-
-          <LayersPanel
-            layers={layers}
-            activeLayerId={activeLayerId}
-            hoveredLayerId={hoveredLayerId}
-            layersPanelExpanded={layersPanelExpanded}
-            setLayersPanelExpanded={setLayersPanelExpanded}
-            setHoveredLayerId={setHoveredLayerId}
-            handleSetActiveLayer={handleSetActiveLayer}
-            handleToggleLayerVisibility={handleToggleLayerVisibility}
-            showTooltipWithDelay={showTooltipWithDelay}
-            hideTooltip={hideTooltip}
-            handleLayerTransparencyChange={handleLayerTransparencyChange}
-            leftCollapsed={leftCollapsed}
-          />
-
-          {/* Bottom Action Buttons */}
-          <section className="flex-shrink-0 mt-auto mb-2">
-            {/* Export Loading Bar - reserve space */}
-            <div className="w-full h-1.5 mb-2">
-              {isExporting ? (
-                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-full overflow-hidden">
-                  <div
-                    className="bg-gradient-to-r from-orange-500 to-orange-600 h-full transition-all duration-1000 ease-out rounded-full"
-                    style={{ width: `${exportProgress}%` }}
-                  />
-                </div>
-              ) : (
-                <div className="w-full h-full" />
-              )}
-            </div>
-
-            <div className={`flex gap-2 justify-center`}>
-              <AppControls
-                mapsButtonRef={mapsButtonRef}
-                mapsDropdownOpen={mapsDropdownOpen}
-                mapsDropdownPos={mapsDropdownPos}
-                mapsPortalRef={mapsPortalRef}
-                mapsSubOpen={mapsSubOpen}
-                currentProjectPath={currentProjectPath}
-                projectMaps={projectMaps}
-                setMapsSubOpen={setMapsSubOpen}
-                setMapsDropdownOpen={setMapsDropdownOpen}
-                handleOpenCreateMapDialog={handleOpenCreateMapDialog}
-                handleOpenMap={handleOpenMapFromMapsFolder}
-                toast={toast}
-                handleManualSave={handleManualSave}
-                isManuallySaving={isManuallySaving}
-                isPreparingNewMap={isPreparingNewMap}
-                hasUnsavedChanges={hasUnsavedChanges}
-                setShowSettings={setShowSettings}
-                refreshProjectMaps={refreshProjectMaps}
-              />
-            </div>
-          </section>
-        </SidebarLayout>
+            );
+          })()
+        }
 
         <EngineSettingsDialog
           open={showSettings}
@@ -2506,117 +2367,76 @@ function App() {
             handleResetZoom={handleResetZoom}
           />
         )}
-          <div 
-            className={`bg-gray-100 flex-1 min-h-0 flex items-center justify-center overflow-hidden relative ${draggingNpcId ? 'ring-2 ring-orange-500 ring-inset' : ''}`}
-            onDragOver={(e) => {
-              if (draggingNpcId && editor) {
-                e.preventDefault();
-                e.dataTransfer.dropEffect = 'move';
-                
-                // Update NPC drag hover highlight on map
-                const canvas = canvasRef.current;
-                if (canvas) {
-                  const rect = canvas.getBoundingClientRect();
-                  const canvasX = e.clientX - rect.left;
-                  const canvasY = e.clientY - rect.top;
-                  editor.setNpcDragHover(canvasX, canvasY);
-                }
-              }
+          <EditorCanvas
+            ctx={{
+              editor,
+              canvasRef,
+              draggingNpcId,
+              setDraggingNpcId,
+              tipsMinimized,
+              setTipsMinimized,
+              setShowHelp,
+              isEnemyTabActive,
+              mapWidth,
+              mapHeight,
+              handlePlaceActorOnMap,
+              mapInitialized,
+              handleOpenCreateMapDialog,
+              isPreparingNewMap,
+              hoverCoords,
+              showActiveGid,
+              npcDeletePopup,
+              setNpcDeletePopup,
+              handleUnplaceActorFromMap,
+              npcHoverTooltip,
+              uiHelpers,
+              stampsState,
+              hasSelection,
+              selectionCount,
+              handleFillSelection,
+              handleDeleteSelection,
+              handleClearSelection,
+              leftTransitioning
             }}
-            onDragLeave={() => {
-              // Clear hover when leaving the canvas area
-              if (draggingNpcId && editor) {
-                editor.clearNpcDragHover();
-              }
+            bottomToolbarProps={{
+              bottomToolbarExpanded,
+              setBottomToolbarNode,
+              onMouseEnter: handleBottomToolbarMouseEnter,
+              onMouseLeave: handleBottomToolbarMouseLeave,
+              onFocus: handleBottomToolbarFocus,
+              onBlur: handleBottomToolbarBlur,
+              selectedTool,
+              handleSelectTool,
+              showBrushOptions,
+              handleShowBrushOptions,
+              handleHideBrushOptions,
+              selectedBrushTool,
+              setSelectedBrushTool,
+              showTooltipWithDelay: showTooltipWithDelayFn,
+              hideTooltip: hideTooltipFn,
+              setShowClearLayerDialog,
+              showSelectionOptions,
+              handleShowSelectionOptions,
+              handleHideSelectionOptions,
+              selectedSelectionTool,
+              setSelectedSelectionTool,
+              showShapeOptions,
+              handleShowShapeOptions,
+              handleHideShapeOptions,
+              selectedShapeTool,
+              setSelectedShapeTool,
+              stampMode,
+              setStampMode,
+              newStampName,
+              setNewStampName,
+              handleCreateStamp,
+              stamps,
+              selectedStamp,
+              handleStampSelect,
+              handleDeleteStamp,
+              stampsState
             }}
-            onDrop={(e) => {
-              e.preventDefault();
-              const npcIdStr = e.dataTransfer.getData('npc-id');
-              if (!npcIdStr || !editor) return;
-              
-              const npcId = parseInt(npcIdStr, 10);
-              if (isNaN(npcId)) return;
-              
-              // Canvas üzerindeki koordinatları hesapla
-              const canvas = canvasRef.current;
-              if (!canvas) return;
-              
-              const rect = canvas.getBoundingClientRect();
-              const canvasX = e.clientX - rect.left;
-              const canvasY = e.clientY - rect.top;
-              
-              // Screen koordinatlarını map koordinatlarına çevir (aynı fonksiyon hover'da kullanılan)
-              const mapCoords = editor.screenToTile(canvasX, canvasY);
-              if (mapCoords && mapCoords.x >= 0 && mapCoords.x < mapWidth && mapCoords.y >= 0 && mapCoords.y < mapHeight) {
-                handlePlaceActorOnMap(npcId, mapCoords.x, mapCoords.y);
-              }
-              
-              // Clear the hover highlight
-              editor.clearNpcDragHover();
-              setDraggingNpcId(null);
-            }}
-          >
-            <CanvasTips
-              tipsMinimized={tipsMinimized}
-              setTipsMinimized={setTipsMinimized}
-              setShowHelp={setShowHelp}
-              isEnemyTabActive={isEnemyTabActive}
-            />
-
-            <canvas
-              ref={canvasRef}
-              id="mapCanvas"
-              className={`tile-canvas w-full h-full max-w-full max-h-full canvas-fade ${leftTransitioning ? 'during-sidebar-transition' : ''}`}
-            />
-
-            <MapInitOverlay mapInitialized={mapInitialized} handleOpenCreateMapDialog={handleOpenCreateMapDialog} isPreparingNewMap={isPreparingNewMap} />
-
-            <MapHoverDisplay hoverCoords={hoverCoords} showActiveGid={showActiveGid} isEnemyTabActive={isEnemyTabActive} />
-
-            <NpcDeletePopup npcDeletePopup={npcDeletePopup} onConfirm={handleUnplaceActorFromMap} onCancel={() => setNpcDeletePopup(null)} />
-
-            <NpcHoverTooltip npcHoverTooltip={npcHoverTooltip} />
-
-            <SelectionInfo hasSelection={hasSelection} selectionCount={selectionCount} handleFillSelection={handleFillSelection} handleDeleteSelection={handleDeleteSelection} handleClearSelection={handleClearSelection} />
-            {/* Floating Toolbar (inside canvas, centered, pill-sized) */}
-            <BottomToolbar
-              bottomToolbarExpanded={bottomToolbarExpanded}
-              setBottomToolbarNode={setBottomToolbarNode}
-              onMouseEnter={handleBottomToolbarMouseEnter}
-              onMouseLeave={handleBottomToolbarMouseLeave}
-              onFocus={handleBottomToolbarFocus}
-              onBlur={handleBottomToolbarBlur}
-              selectedTool={selectedTool}
-              handleSelectTool={handleSelectTool}
-              showBrushOptions={showBrushOptions}
-              handleShowBrushOptions={handleShowBrushOptions}
-              handleHideBrushOptions={handleHideBrushOptions}
-              selectedBrushTool={selectedBrushTool}
-              setSelectedBrushTool={setSelectedBrushTool}
-              showTooltipWithDelay={showTooltipWithDelay}
-              hideTooltip={hideTooltip}
-              setShowClearLayerDialog={setShowClearLayerDialog}
-              showSelectionOptions={showSelectionOptions}
-              handleShowSelectionOptions={handleShowSelectionOptions}
-              handleHideSelectionOptions={handleHideSelectionOptions}
-              selectedSelectionTool={selectedSelectionTool}
-              setSelectedSelectionTool={setSelectedSelectionTool}
-              showShapeOptions={showShapeOptions}
-              handleShowShapeOptions={handleShowShapeOptions}
-              handleHideShapeOptions={handleHideShapeOptions}
-              selectedShapeTool={selectedShapeTool}
-              setSelectedShapeTool={setSelectedShapeTool}
-              stampMode={stampMode}
-              setStampMode={setStampMode}
-              newStampName={newStampName}
-              setNewStampName={setNewStampName}
-              handleCreateStamp={handleCreateStamp}
-              stamps={stamps}
-              selectedStamp={selectedStamp}
-              handleStampSelect={handleStampSelect}
-              handleDeleteStamp={handleDeleteStamp}
-            />
-          </div>
+          />
         </section>
         )}
       </main>
@@ -2629,32 +2449,39 @@ function App() {
         onConfirm={confirmSeparateBrush}
       />
 
-      <VendorDialogs
-        itemsList={itemsList}
-        showVendorUnlockDialog={showVendorUnlockDialog}
-        setShowVendorUnlockDialog={setShowVendorUnlockDialog}
-        vendorUnlockEntries={vendorUnlockEntries}
-        handleUpdateVendorUnlockRequirement={handleUpdateVendorUnlockRequirement}
-        handleRemoveVendorUnlockRequirement={handleRemoveVendorUnlockRequirement}
-        handleToggleVendorUnlockItem={handleToggleVendorUnlockItem}
-        handleVendorUnlockQtyChange={handleVendorUnlockQtyChange}
-        handleAddVendorUnlockRequirement={handleAddVendorUnlockRequirement}
-        handleSaveVendorUnlock={handleSaveVendorUnlock}
-        showVendorRandomDialog={showVendorRandomDialog}
-        setShowVendorRandomDialog={setShowVendorRandomDialog}
-        vendorRandomSelection={vendorRandomSelection}
-        handleToggleVendorRandomItem={handleToggleVendorRandomItem}
-        handleVendorRandomFieldChange={handleVendorRandomFieldChange}
-        vendorRandomCount={vendorRandomCount}
-        handleRandomCountChange={handleRandomCountChange}
-        handleSaveVendorRandom={handleSaveVendorRandom}
-        showVendorStockDialog={showVendorStockDialog}
-        setShowVendorStockDialog={setShowVendorStockDialog}
-        vendorStockSelection={vendorStockSelection}
-        handleToggleVendorStockItem={handleToggleVendorStockItem}
-        handleVendorStockQtyChange={handleVendorStockQtyChange}
-        handleSaveVendorStock={handleSaveVendorStock}
-      />
+      {(() => {
+        const vendorState = {
+          itemsList,
+          showVendorUnlockDialog,
+          setShowVendorUnlockDialog,
+          vendorUnlockEntries,
+          showVendorRandomDialog,
+          setShowVendorRandomDialog,
+          vendorRandomSelection,
+          vendorRandomCount,
+          showVendorStockDialog,
+          setShowVendorStockDialog,
+          vendorStockSelection
+        };
+
+        const vendorHandlers = {
+          handleUpdateVendorUnlockRequirement,
+          handleRemoveVendorUnlockRequirement,
+          handleToggleVendorUnlockItem,
+          handleVendorUnlockQtyChange,
+          handleAddVendorUnlockRequirement,
+          handleSaveVendorUnlock,
+          handleToggleVendorRandomItem,
+          handleVendorRandomFieldChange,
+          handleRandomCountChange,
+          handleSaveVendorRandom,
+          handleToggleVendorStockItem,
+          handleVendorStockQtyChange,
+          handleSaveVendorStock
+        };
+
+        return <VendorDialogs vendorState={vendorState} vendorHandlers={vendorHandlers} />;
+      })()}
 
       <RuleDialog
         open={showRuleDialog}
@@ -2670,7 +2497,7 @@ function App() {
         setRuleActionSelection={setRuleActionSelection}
         availableRuleTriggers={availableRuleTriggers}
         onClose={() => {
-          setShowRuleDialog(false);
+          closeRuleDialog();
           setRuleDialogError(null);
           setRuleDialogStep('start');
           setRuleStartType(null);

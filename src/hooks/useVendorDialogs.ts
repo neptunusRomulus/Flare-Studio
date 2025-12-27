@@ -9,7 +9,7 @@ import {
   buildRandomStockCountString,
   RandomStockEntry
 } from '../utils/parsers';
-import type { MapObject } from '../types';
+import type { MapObject } from '@/types';
 
 type VendorUnlockEntry = { id: string; requirement: string; items: Record<number, number> };
 

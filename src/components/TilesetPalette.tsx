@@ -8,6 +8,7 @@ type TilesetPaletteProps = {
   tabTick: number;
   setTabTick: React.Dispatch<React.SetStateAction<number>>;
   brushTool: string;
+  stampsState?: unknown;
 };
 
 const TilesetPalette = ({
@@ -15,8 +16,11 @@ const TilesetPalette = ({
   activeLayer,
   tabTick,
   setTabTick,
-  brushTool
-}: TilesetPaletteProps) => (
+  brushTool,
+  stampsState: _stampsState
+}: TilesetPaletteProps) => {
+  void _stampsState;
+  return (
   <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-0 m-0">
     {(() => {
       const activeLayerType = activeLayer?.type;
@@ -91,5 +95,7 @@ const TilesetPalette = ({
     </div>
   </div>
 );
+
+};
 
 export default TilesetPalette;

@@ -54,6 +54,37 @@ export function useEditorState(optsRef: React.RefObject<Partial<UseEditorStateOp
     syncMapObjectsRef.current?.();
   }, []);
 
+  // Editor command helpers — keep lifecycle and commands inside the hook
+  const handlePlaceActorOnMap = useCallback((objectId: number, x?: number, y?: number) => {
+    if (!editor) return;
+    const opts = optsRef.current ?? {};
+    const spawnX = x !== undefined ? x : Math.floor((opts.mapWidth ?? 0) / 2);
+    const spawnY = y !== undefined ? y : Math.floor((opts.mapHeight ?? 0) / 2);
+    editor.updateMapObject(objectId, { x: spawnX, y: spawnY });
+    syncMapObjectsWrapper();
+  }, [editor, syncMapObjectsWrapper, optsRef]);
+
+  const handleUnplaceActorFromMap = useCallback((objectId: number) => {
+    if (!editor) return;
+    editor.updateMapObject(objectId, { x: -1, y: -1 });
+    syncMapObjectsWrapper();
+  }, [editor, syncMapObjectsWrapper]);
+
+  const handleFillSelection = useCallback(() => {
+    if (!editor) return;
+    editor.fillSelection();
+  }, [editor]);
+
+  const handleClearSelection = useCallback(() => {
+    if (!editor) return;
+    editor.clearSelection();
+  }, [editor]);
+
+  const handleDeleteSelection = useCallback(() => {
+    if (!editor) return;
+    editor.deleteSelection();
+  }, [editor]);
+
   // Implement setupAutoSave here using passed callbacks stored in optsRef
   const setupAutoSave = useCallback((editorInstance: TileMapEditorType) => {
     const opts = optsRef.current ?? {};
@@ -153,6 +184,12 @@ export function useEditorState(optsRef: React.RefObject<Partial<UseEditorStateOp
     setupAutoSaveWrapper,
     updateLayersListWrapper,
     syncMapObjectsWrapper
+    ,
+    handlePlaceActorOnMap,
+    handleUnplaceActorFromMap,
+    handleFillSelection,
+    handleClearSelection,
+    handleDeleteSelection
   } as const;
 }
 

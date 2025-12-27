@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useRef, useEffect } from 'react';
 import type { MapObject } from '@/types';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 import { buildSpawnContent, STARTING_MAP_INVALID_NAMES } from '@/editor/mapSpawnUtils';
@@ -11,6 +11,12 @@ type ProjectIOOptions = {
   mapObjects: MapObject[];
   buildConstantStockString: (items: Record<number, number>) => string;
   toast: (opts: { title: string; description: string; variant?: 'destructive' }) => void;
+  // Callbacks from App for map handling
+  handleManualSave?: () => Promise<void>;
+  updateLayersList?: () => void;
+  syncMapObjects?: () => void;
+  setMapInitialized?: (v: boolean) => void;
+  setMapName?: (n: string) => void;
 };
 
 const useProjectIO = ({
@@ -20,7 +26,12 @@ const useProjectIO = ({
   startingMapIntermap,
   mapObjects,
   buildConstantStockString,
-  toast
+  toast,
+  handleManualSave,
+  updateLayersList,
+  syncMapObjects,
+  setMapInitialized,
+  setMapName
 }: ProjectIOOptions) => {
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
@@ -337,6 +348,74 @@ const useProjectIO = ({
     await performExport();
   }, [performExport]);
 
+  // Project maps state and helpers
+  const [projectMaps, setProjectMaps] = useState<string[]>([]);
+
+  const refreshProjectMaps = useCallback(async () => {
+    if (!currentProjectPath || !window.electronAPI?.listMaps) {
+      setProjectMaps([]);
+      return;
+    }
+    try {
+      const maps: string[] = await window.electronAPI.listMaps(currentProjectPath);
+      setProjectMaps([...maps]);
+    } catch (e) {
+      console.warn('Failed to list maps:', e);
+      setProjectMaps([]);
+    }
+  }, [currentProjectPath]);
+
+  // Keep refs to external callbacks so we don't force consumers to create
+  // new functions and cause unnecessary callback re-creations.
+  const handleManualSaveRef = useRef<typeof handleManualSave | undefined>(undefined);
+  const updateLayersListRef = useRef<typeof updateLayersList | undefined>(undefined);
+  const syncMapObjectsRef = useRef<typeof syncMapObjects | undefined>(undefined);
+  const setMapInitializedRef = useRef<typeof setMapInitialized | undefined>(undefined);
+  const setMapNameRef = useRef<typeof setMapName | undefined>(undefined);
+
+  // update refs when inputs change
+  useEffect(() => { handleManualSaveRef.current = handleManualSave; }, [handleManualSave]);
+  useEffect(() => { updateLayersListRef.current = updateLayersList; }, [updateLayersList]);
+  useEffect(() => { syncMapObjectsRef.current = syncMapObjects; }, [syncMapObjects]);
+  useEffect(() => { setMapInitializedRef.current = setMapInitialized; }, [setMapInitialized]);
+  useEffect(() => { setMapNameRef.current = setMapName; }, [setMapName]);
+
+  const handleOpenMapFromMapsFolder = useCallback(async (filename: string) => {
+    if (!currentProjectPath) return;
+    try {
+      const exported = await performExport({ silent: true });
+      if (!exported) {
+        toast({ title: 'Export failed', description: 'Failed to export current map before opening a new one.', variant: 'destructive' });
+        return;
+      }
+
+      if (typeof handleManualSaveRef.current === 'function') await handleManualSaveRef.current();
+
+      const content = await window.electronAPI.readMapFile(currentProjectPath, filename);
+      if (!content) {
+        toast({ title: 'Open failed', description: `Failed to read map file ${filename}`, variant: 'destructive' });
+        return;
+      }
+
+      if (editor && typeof editor.loadFlareMapTxt === 'function') {
+        editor.loadFlareMapTxt!(content);
+        if (typeof editor.setMapName === 'function') editor.setMapName(filename.replace(/\.txt$/i, ''));
+        updateLayersListRef.current?.();
+        syncMapObjectsRef.current?.();
+        setMapInitializedRef.current?.(true);
+        setMapNameRef.current?.(filename.replace(/\.txt$/i, ''));
+        toast({ title: 'Map opened', description: `Opened ${filename}` });
+      } else {
+        toast({ title: 'Map loaded (raw)', description: 'Map content loaded but no parser available in the editor. Implement loadFlareMapTxt to parse it.' });
+      }
+    } catch (e) {
+      console.error('Open map error:', e);
+      toast({ title: 'Open failed', description: 'An unexpected error occurred while opening the map.', variant: 'destructive' });
+    }
+  }, [currentProjectPath, editor, performExport, toast]);
+
+  
+
   const handleOverwriteConfirm = useCallback(() => {
     setShowOverwriteDialog(false);
     if (pendingExport) {
@@ -360,6 +439,10 @@ const useProjectIO = ({
     handleOverwriteCancel,
     performExport,
     handleExportMap
+    ,
+    projectMaps,
+    refreshProjectMaps,
+    handleOpenMapFromMapsFolder
   };
 };
 

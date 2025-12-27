@@ -4020,12 +4020,12 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       setProjectMaps([]);
       return;
     }
-    try {
+      try {
       const maps: string[] = await window.electronAPI.listMaps(currentProjectPath);
-      setProjectMaps([...maps]);
+      // migrated: project maps are now managed by useProjectIO
+      void maps;
     } catch (e) {
       console.warn('Failed to list maps:', e);
-      setProjectMaps([]);
     }
   }, [currentProjectPath]);
 
@@ -4144,7 +4144,8 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
       }
       if (maps.length === 0) {
         // No maps yet: switch to the editor shell and prompt for map creation
-        setProjectMaps([]);
+        // migrated: project maps are now managed by useProjectIO
+        void 0;
         setMapInitialized(false);
         setEditor(null);
         setPendingMapConfig(null);

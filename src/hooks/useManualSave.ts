@@ -6,7 +6,7 @@ export default function useManualSave(args: {
   currentProjectPath?: string | null;
   setIsManuallySaving: (v: boolean) => void;
   setLastSaveTime: (t: number) => void;
-  manualSaveRef?: React.RefObject<(() => Promise<void>) | undefined>;
+  manualSaveRef?: React.MutableRefObject<(() => Promise<void>) | undefined>;
 }) {
   const { editor, currentProjectPath, setIsManuallySaving, setLastSaveTime } = args;
 

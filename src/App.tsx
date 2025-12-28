@@ -68,7 +68,6 @@ import useEditorOptionsRef from './hooks/useEditorOptionsRef';
 import useActiveGidCallback from './hooks/useActiveGidCallback';
 import useBeforeUnload from './hooks/useBeforeUnload';
 import flareIconUrl from '/flare-ico.png?url';
-// removed unused imports moved into hooks
 
 type EnemyTabConfig = { enemy: MapObject };
 

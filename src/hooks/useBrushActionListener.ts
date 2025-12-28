@@ -1,5 +1,4 @@
 import { useEffect } from 'react';
-import { useEffect } from 'react';
 
 export default function useBrushActionListener(args: {
   onSeparate: (tileIndex: number) => void;

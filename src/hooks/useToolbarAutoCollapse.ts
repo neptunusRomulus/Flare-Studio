@@ -67,6 +67,8 @@ const useToolbarAutoCollapse = ({
     expanded,
     setExpanded,
     containerRef,
+    // Provide a setter to assign the DOM node without mutating hook return values externally
+    setContainerRef: (node: HTMLDivElement | null) => { containerRef.current = node; },
     clearCollapseTimer,
     scheduleCollapse,
     showTemporarily,

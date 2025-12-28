@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ItemRole, ItemResourceSubtype } from '../editor/itemRoles';
+import type { RawItem, ItemSummary } from '@/utils/items';
 
 type PendingDuplicate = {
   name: string;
@@ -8,21 +9,11 @@ type PendingDuplicate = {
   kind: 'same-role' | 'other-role';
 } | null;
 
-type ItemSummary = {
-  id: number;
-  name: string;
-  category: string;
-  filePath: string;
-  fileName: string;
-  role: ItemRole;
-  resourceSubtype?: ItemResourceSubtype;
-};
-
 type ItemEdit = {
   id: number;
   name: string;
   role: ItemRole;
-  resourceSubtype: ItemResourceSubtype | '';
+  resourceSubtype: string | '';
   category: string;
   filePath: string;
   fileName: string;
@@ -30,8 +21,6 @@ type ItemEdit = {
 } | null;
 
 type ToastFn = typeof import('@/hooks/use-toast').toast;
-
-type RawItem = { id: number; name: string; category: string; filePath: string; fileName: string; role?: string; resourceSubtype?: string };
 
 export default function useItems({ currentProjectPath, toast, normalizeItemsForState }:
   { currentProjectPath: string | null; toast: ToastFn; normalizeItemsForState: (items: RawItem[]) => ItemSummary[] }) {

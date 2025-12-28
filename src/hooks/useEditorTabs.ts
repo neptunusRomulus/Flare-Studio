@@ -46,7 +46,7 @@ const useEditorTabs = ({
     const id = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
     const safeConfig = config ? JSON.parse(JSON.stringify(config)) : null;
     const tab: EditorTab = { id, name, projectPath: projectPath ?? null, config: safeConfig };
-    console.log('Creating tab:', { id, name, projectPath, hasConfig: !!safeConfig });
+    // created tab
     setTabs((prev) => [...prev, tab]);
     setActiveTabId(id);
     setCurrentProjectPath(projectPath ?? null);
@@ -79,7 +79,6 @@ const useEditorTabs = ({
           const snapshot = await editor.getProjectData();
           const safeSnapshot = JSON.parse(JSON.stringify(snapshot));
           setTabs((prev) => prev.map(t => t.id === prevTab.id ? { ...t, config: safeSnapshot } : t));
-          console.log('Snapshot saved into prevTab.config during tab switch:', { tabId: prevTab.id, snapshotKeys: Object.keys(safeSnapshot || {}) });
         } catch (err) {
           console.warn('Failed to snapshot tab before switching:', err);
         }
@@ -111,8 +110,7 @@ const useEditorTabs = ({
     if (nextTab.config && !editor) {
       try {
         const cfgCheck = nextTab.config as EditorProjectData;
-        if (nextTab.projectPath && (!cfgCheck.tilesetImages || Object.keys(cfgCheck.tilesetImages || {}).length === 0) && nextTab.name) {
-          console.log('In-memory config missing tileset images and no editor; preferring disk open for tab', tabId, nextTab.name);
+          if (nextTab.projectPath && (!cfgCheck.tilesetImages || Object.keys(cfgCheck.tilesetImages || {}).length === 0) && nextTab.name) {
           await switchToTabHelpersRef.current.handleOpenMap(nextTab.projectPath, false, nextTab.name);
           if (editor) switchToTabHelpersRef.current.setupAutoSave(editor);
           return;
@@ -126,7 +124,6 @@ const useEditorTabs = ({
       console.log('Switching to tab with in-memory config, attempting to restore for tab:', tabId, { hasProjectPath: !!nextTab.projectPath, configKeys: Object.keys(nextTab.config || {}) });
       try {
         if (editor) {
-          console.log('Restoring config into existing editor for tab:', tabId);
           editor.clearLocalStorageBackup();
           const cfg = nextTab.config as EditorProjectData;
 
@@ -162,9 +159,6 @@ const useEditorTabs = ({
                 // eslint-disable-next-line react-hooks/immutability
                 edMutable.tilesetImages = { ...(edMutable.tilesetImages || {}), ...JSON.parse(JSON.stringify(cfg.tilesetImages)) };
               }
-              console.log('Applied tilesetImages to editor for tab', tabId, Object.keys(cfg.tilesetImages));
-            } else {
-              console.log('No tilesetImages present in config for tab', tabId);
             }
           } catch (e) {
             console.warn('Failed to apply tilesetImages into editor:', e);
@@ -198,11 +192,9 @@ const useEditorTabs = ({
                 if (Object.keys(toApply).length > 0) {
                   if (typeof ed.setTilesetImages === 'function') {
                     ed.setTilesetImages(toApply);
-                    console.log('Applied discovered project tileset images for tab', tabId, Object.keys(toApply));
                   } else {
                     // eslint-disable-next-line react-hooks/immutability
                     edMutable.tilesetImages = { ...(edMutable.tilesetImages || {}), ...toApply };
-                    console.log('Attached discovered project tileset images to editor.tilesetImages for tab', tabId, Object.keys(toApply));
                   }
                 }
 

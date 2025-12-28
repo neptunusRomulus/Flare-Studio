@@ -61,7 +61,7 @@ import useWindowControls from './hooks/useWindowControls';
 import useSidebarToggle from './hooks/useSidebarToggle';
 import useClearLayerHandler from './hooks/useClearLayerHandler';
 import useDialogCloseHandlers from './hooks/useDialogCloseHandlers';
-import useEnemyTabHandlers from './hooks/useEnemyTabHandlers';
+import useEnemyEditing from './hooks/useEnemyEditing';
 import useDarkModeSync from './hooks/useDarkModeSync';
 import useBrushToolDomSync from './hooks/useBrushToolDomSync';
 import useEditorOptionsRef from './hooks/useEditorOptionsRef';
@@ -107,7 +107,6 @@ function App() {
   const toolbarRef = useRef<HTMLDivElement | null>(null);
   const handleManualSaveRef = useRef<(() => Promise<void>) | undefined>(undefined);
   // Editor tabs
-  const [pendingEnemyTabCloseId, setPendingEnemyTabCloseId] = useState<string | null>(null);
   const switchToTabHelpersRef = useRef({
     handleOpenMap: async (_projectDir: string, _createTab?: boolean, _mapName?: string) => {},
     loadProjectData: async (_editor: TileMapEditor, _mapConfig: EditorProjectData) => false,
@@ -1045,9 +1044,13 @@ function App() {
     return [];
   }, [mapObjects, isNpcLayer, isEnemyLayer]);
 
-  const { handleEnemyTabCloseDecision, handleEnemyTabSave } = useEnemyTabHandlers({
-    closeEditorTab,
+  const {
+    pendingEnemyTabCloseId,
     setPendingEnemyTabCloseId,
+    handleEnemyTabCloseDecision,
+    handleEnemyTabSave
+  } = useEnemyEditing({
+    closeEditorTab,
     handleUpdateObject,
     setTabs,
     activeTabId

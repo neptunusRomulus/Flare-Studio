@@ -9,10 +9,7 @@ export default function useLoadProjectData() {
         newEditor.projectName = mapConfig.name;
       }
 
-      // Preserve existing debug logs
-      // eslint-disable-next-line no-console
       console.log('=== LOAD PROJECT DATA DEBUG ===');
-      // eslint-disable-next-line no-console
       console.log('Map config received:', {
         name: mapConfig.name,
         tilesets: mapConfig.tilesets ? mapConfig.tilesets.length : 0,
@@ -20,17 +17,12 @@ export default function useLoadProjectData() {
         layers: mapConfig.layers ? mapConfig.layers.length : 0
       });
 
-      // Load the project data into the editor
-      // editor.loadProjectData handles mapping layers
-      // eslint-disable-next-line no-console
       console.log('=== CALLING EDITOR loadProjectData ===');
       newEditor.loadProjectData(mapConfig);
 
-      // eslint-disable-next-line no-console
       console.log('Project data loading completed');
       return true;
     } catch (error) {
-      // eslint-disable-next-line no-console
       console.error('Error loading project data:', error);
       return false;
     }

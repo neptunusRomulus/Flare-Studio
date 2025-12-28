@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 
 export default function useManualSave(args: {
@@ -6,6 +6,7 @@ export default function useManualSave(args: {
   currentProjectPath?: string | null;
   setIsManuallySaving: (v: boolean) => void;
   setLastSaveTime: (t: number) => void;
+  manualSaveRef?: React.RefObject<(() => Promise<void>) | undefined>;
 }) {
   const { editor, currentProjectPath, setIsManuallySaving, setLastSaveTime } = args;
 
@@ -31,6 +32,15 @@ export default function useManualSave(args: {
       setIsManuallySaving(false);
     }
   }, [editor, currentProjectPath, setIsManuallySaving, setLastSaveTime]);
+
+  // Optionally populate a stable ref so callers (IPC) can call the latest implementation
+  useEffect(() => {
+    if (args.manualSaveRef) {
+      args.manualSaveRef.current = handleManualSave;
+      return () => { if (args.manualSaveRef) args.manualSaveRef.current = undefined; };
+    }
+    return undefined;
+  }, [handleManualSave, args.manualSaveRef]);
 
   return { handleManualSave };
 }

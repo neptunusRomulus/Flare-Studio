@@ -57,9 +57,7 @@ type SidebarProps = {
     setTabTick: React.Dispatch<React.SetStateAction<number>>;
     brushTool: 'none' | 'move' | 'merge' | 'separate' | 'remove';
     isCollisionLayer: boolean;
-    brushToolbarExpanded: boolean;
-    showBrushToolbarTemporarily: () => void;
-    setBrushToolbarNode: (n: HTMLDivElement | null) => void;
+    // Brush toolbar visibility/node are handled internally by the BrushToolbar hook
     handleFileUpload: (event: React.ChangeEvent<HTMLInputElement>, type: 'tileset' | 'layerTileset') => void;
     handleToggleBrushTool: (tool: 'move' | 'merge' | 'separate' | 'remove') => void;
     handleDeleteActiveTab: () => void;
@@ -137,9 +135,7 @@ export default function AppSidebar(p: SidebarProps) {
             setTabTick={p.tileset.setTabTick}
             brushTool={p.tileset.brushTool}
             isCollisionLayer={p.tileset.isCollisionLayer}
-            brushToolbarExpanded={p.tileset.brushToolbarExpanded}
-            showBrushToolbarTemporarily={p.tileset.showBrushToolbarTemporarily}
-            setBrushToolbarNode={p.tileset.setBrushToolbarNode}
+            
             handleFileUpload={p.tileset.handleFileUpload}
             handleToggleBrushTool={p.tileset.handleToggleBrushTool}
             handleDeleteActiveTab={p.tileset.handleDeleteActiveTab}

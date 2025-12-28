@@ -9,9 +9,7 @@ export default function buildConfirmActionHandlers(params: Record<string, any>) 
     setConfirmAction
   } = params;
 
-  const onCancel = () => {
-    setConfirmAction(null);
-  };
+  const onCancel = () => { setConfirmAction(null); };
 
   const onConfirm = () => {
     try {

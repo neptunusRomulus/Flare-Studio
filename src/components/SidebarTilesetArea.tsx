@@ -13,9 +13,9 @@ type Props = {
   setTabTick: React.Dispatch<React.SetStateAction<number>>;
   brushTool: 'none' | 'move' | 'merge' | 'separate' | 'remove';
   isCollisionLayer: boolean;
-  brushToolbarExpanded: boolean;
-  showBrushToolbarTemporarily: () => void;
-  setBrushToolbarNode: (n: HTMLDivElement | null) => void;
+  brushToolbarExpanded?: boolean;
+  showBrushToolbarTemporarily?: () => void;
+  setBrushToolbarNode?: (n: HTMLDivElement | null) => void;
   handleFileUpload?: (event: React.ChangeEvent<HTMLInputElement>, type: 'tileset' | 'layerTileset') => void;
   handleToggleBrushTool: (tool: 'move' | 'merge' | 'separate' | 'remove') => void;
   handleDeleteActiveTab?: () => void;
@@ -55,10 +55,7 @@ const SidebarTilesetArea: React.FC<Props> = ({
         activeLayer={activeLayer}
         isCollisionLayer={isCollisionLayer}
         brushTool={brushTool}
-        brushToolbarExpanded={brushToolbarExpanded}
-        showBrushToolbarTemporarily={showBrushToolbarTemporarily}
         setTabTick={setTabTick}
-        setBrushToolbarNode={setBrushToolbarNode}
         onOpenActorDialog={handleOpenActorDialog}
         onFileUpload={handleFileUpload}
         onToggleBrushTool={handleToggleBrushTool}

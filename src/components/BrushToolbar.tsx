@@ -4,16 +4,17 @@ import Tooltip from '@/components/ui/tooltip';
 import { Link2, Scan, Scissors, Trash2, Upload, X } from 'lucide-react';
 import type { TileLayer } from '@/types';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
+import useBrushToolbar from '@/hooks/useBrushToolbar';
 
 type BrushToolbarProps = {
   editor: TileMapEditor | null;
   activeLayer: TileLayer | null;
   isCollisionLayer: boolean;
   brushTool: 'none' | 'move' | 'merge' | 'separate' | 'remove';
-  brushToolbarExpanded: boolean;
-  showBrushToolbarTemporarily: () => void;
+  brushToolbarExpanded?: boolean;
+  showBrushToolbarTemporarily?: () => void;
   setTabTick: React.Dispatch<React.SetStateAction<number>>;
-  setBrushToolbarNode: (node: HTMLDivElement | null) => void;
+  setBrushToolbarNode?: (node: HTMLDivElement | null) => void;
   onOpenActorDialog: (type: 'npc' | 'enemy') => void;
   onFileUpload: (event: React.ChangeEvent<HTMLInputElement>, type: 'tileset' | 'layerTileset') => void;
   onToggleBrushTool: (tool: 'move' | 'merge' | 'separate' | 'remove') => void;
@@ -35,12 +36,18 @@ const BrushToolbar = ({
   onToggleBrushTool,
   onDeleteActiveTab,
   toast
-}: BrushToolbarProps) => (
+}: BrushToolbarProps) => {
+  const fallback = useBrushToolbar();
+  const expanded = typeof brushToolbarExpanded === 'boolean' ? brushToolbarExpanded : fallback.brushToolbarExpanded;
+  const setNode = setBrushToolbarNode ?? fallback.setBrushToolbarNode;
+  const showTemporarily = showBrushToolbarTemporarily ?? fallback.showBrushToolbarTemporarily;
+
+  return (
   <div className="sticky bottom-0 z-10 bg-transparent py-2">
     <div className="text-xs text-muted-foreground"></div>
     <div className="w-full flex justify-center">
       <div
-        ref={setBrushToolbarNode}
+        ref={setNode}
         className="flex items-center transition-all duration-300 ease-in-out gap-1 transform -translate-x-1 mt-2 mb-2"
       >
         {!isCollisionLayer && (
@@ -154,7 +161,7 @@ const BrushToolbar = ({
               </Tooltip>
             </div>
             <div
-              className={`flex-shrink-0 overflow-hidden transition-all duration-300 ease-out ${brushToolbarExpanded || brushTool === 'merge' ? 'opacity-100 scale-100 max-w-[2.5rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
+              className={`flex-shrink-0 overflow-hidden transition-all duration-300 ease-out ${expanded || brushTool === 'merge' ? 'opacity-100 scale-100 max-w-[2.5rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
             >
               <Tooltip content="Merge brushes">
                 <Button
@@ -168,7 +175,7 @@ const BrushToolbar = ({
               </Tooltip>
             </div>
             <div
-              className={`flex-shrink-0 overflow-hidden transition-all duration-300 ease-out ${brushToolbarExpanded || brushTool === 'separate' ? 'opacity-100 scale-100 max-w-[2.5rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
+              className={`flex-shrink-0 overflow-hidden transition-all duration-300 ease-out ${expanded || brushTool === 'separate' ? 'opacity-100 scale-100 max-w-[2.5rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
             >
               <Tooltip content="Separate brushes">
                 <Button
@@ -182,7 +189,7 @@ const BrushToolbar = ({
               </Tooltip>
             </div>
             <div
-              className={`flex-shrink-0 overflow-hidden transition-all duration-300 ease-out ${brushToolbarExpanded || brushTool === 'remove' ? 'opacity-100 scale-100 max-w-[2.5rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
+              className={`flex-shrink-0 overflow-hidden transition-all duration-300 ease-out ${expanded || brushTool === 'remove' ? 'opacity-100 scale-100 max-w-[2.5rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
             >
               <Tooltip content="Remove brushes">
                 <Button
@@ -196,7 +203,7 @@ const BrushToolbar = ({
               </Tooltip>
             </div>
             <div
-              className={`flex-shrink-0 overflow-hidden transition-all duration-300 ease-out ${brushToolbarExpanded ? 'opacity-100 scale-100 max-w-[2.5rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
+              className={`flex-shrink-0 overflow-hidden transition-all duration-300 ease-out ${expanded ? 'opacity-100 scale-100 max-w-[2.5rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
             >
               <Tooltip content="Delete tileset tab">
                 <Button
@@ -204,7 +211,7 @@ const BrushToolbar = ({
                   size="sm"
                   className="text-xs px-1 py-1 h-6 border-red-500 hover:border-red-600 hover:bg-red-50 shadow-sm"
                   onClick={() => {
-                    showBrushToolbarTemporarily();
+                    showTemporarily();
                     onDeleteActiveTab();
                   }}
                 >
@@ -217,6 +224,7 @@ const BrushToolbar = ({
       </div>
     </div>
   </div>
-);
+  );
+}
 
 export default BrushToolbar;

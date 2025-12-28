@@ -33,9 +33,7 @@ export default function useSidebarProps(params: any) {
     setTabTick: p.setTabTick,
     brushTool: p.brushTool,
     isCollisionLayer: p.isCollisionLayer,
-    brushToolbarExpanded: p.brushToolbarExpanded,
-    showBrushToolbarTemporarily: p.showBrushToolbarTemporarily,
-    setBrushToolbarNode: p.setBrushToolbarNode,
+    // brush toolbar visibility and node are handled by the BrushToolbar/useBrushToolbar hook
     handleFileUpload: p.handleFileUpload,
     handleToggleBrushTool: p.handleToggleBrushTool,
     handleDeleteActiveTab: p.handleDeleteActiveTab,

@@ -1,21 +1,19 @@
-import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { TileMapEditor } from './editor/TileMapEditor';
 import type { EditorProjectData } from './editor/TileMapEditor';
 import { useToast } from '@/hooks/use-toast';
 import { Toaster } from '@/components/ui/toaster';
 import WelcomeScreen from './components/WelcomeScreen';
 // UI helpers like Button/Badge/Tooltip are imported in the components that use them.
-import EnemyTabPanel from '@/components/EnemyTabPanel';
 import ClearLayerDialog from '@/components/ClearLayerDialog';
 import EngineSettingsDialog from '@/components/EngineSettingsDialog';
 import HelpDialog from '@/components/HelpDialog';
 import MapSettingsDialog from '@/components/MapSettingsDialog';
-import TopBar from '@/components/TopBar';
+import EditorArea from '@/components/EditorArea';
 import AppShell from '@/components/AppShell';
 import useTitleBarProps from './hooks/useTitleBarProps';
 import ConfirmActionDialog from '@/components/ConfirmActionDialog';
 import AppSidebar from '@/components/AppSidebar';
-import EditorCanvas from '@/components/EditorCanvas';
 import DialogsContainer from '@/components/DialogsContainer';
 import buildConfirmDialogProps from './hooks/buildConfirmDialogProps';
 import buildDialogsCtx from './hooks/useDialogsCtx';
@@ -45,6 +43,8 @@ import useEditorIpc from './hooks/useEditorIpc';
 import useHoverAndSelection from './hooks/useHoverAndSelection';
 import useUndoRedoZoom from './hooks/useUndoRedoZoom';
 import useCreateMap from './hooks/useCreateMap';
+import useBeforeCreateMap from './hooks/useBeforeCreateMap';
+import useGetters from './hooks/useGetters';
 import useProjectLoader from './hooks/useProjectLoader';
 import useActorManagement from './hooks/useActorManagement';
 import useNpcDrag from './hooks/useNpcDrag';
@@ -62,6 +62,11 @@ import useSidebarToggle from './hooks/useSidebarToggle';
 import useClearLayerHandler from './hooks/useClearLayerHandler';
 import useDialogCloseHandlers from './hooks/useDialogCloseHandlers';
 import useEnemyTabHandlers from './hooks/useEnemyTabHandlers';
+import useDarkModeSync from './hooks/useDarkModeSync';
+import useBrushToolDomSync from './hooks/useBrushToolDomSync';
+import useEditorOptionsRef from './hooks/useEditorOptionsRef';
+import useActiveGidCallback from './hooks/useActiveGidCallback';
+import useBeforeUnload from './hooks/useBeforeUnload';
 import flareIconUrl from '/flare-ico.png?url';
 // removed unused imports moved into hooks
 
@@ -78,6 +83,9 @@ import useManualSave from './hooks/useManualSave';
 import useDeleteActiveTab from './hooks/useDeleteActiveTab';
 import useSettingsHandlers from './hooks/useSettingsHandlers';
 import useMapHandlers from './hooks/useMapHandlers';
+import useBrushActionListener from './hooks/useBrushActionListener';
+import buildConfirmActionHandlers from './hooks/useConfirmActionHandlers';
+import useBrushToolbar from './hooks/useBrushToolbar';
 
 function App() {
   const [showWelcome, setShowWelcome] = useState(true);
@@ -151,11 +159,10 @@ function App() {
     handleBottomToolbarMouseLeave,
     handleBottomToolbarFocus,
     handleBottomToolbarBlur,
-    brushToolbarExpanded,
-    setBrushToolbarNode,
+    
     showToolbarTemporarily,
     showBottomToolbarTemporarily,
-    showBrushToolbarTemporarily,
+    
     selectedTool,
     setSelectedTool,
     selectedBrushTool,
@@ -196,6 +203,9 @@ function App() {
     setBrushToSeparate
   } = toolbarState;
 
+  // local brush toolbar helpers (fallback hook) used by handlers and other hooks
+  const { showBrushToolbarTemporarily: showBrushToolbarTemporarilyFallback } = useBrushToolbar();
+
   const [pendingMapConfig, setPendingMapConfig] = useState<EditorProjectData | null>(null);
   const canUseTilesetDialog = !!editor;
   const {
@@ -211,7 +221,7 @@ function App() {
     setSelectedTool,
     showBottomToolbarTemporarily,
     setBrushTool,
-    showBrushToolbarTemporarily,
+    showBrushToolbarTemporarily: showBrushToolbarTemporarilyFallback,
     newStampName,
     setNewStampName,
     setShowStampDialog,
@@ -360,8 +370,7 @@ function App() {
 
   const createTabForRef = useRef<((name: string, projectPath: string | null, config: EditorProjectData) => void) | null>(null);
   const beforeCreateMapRef = useRef<(() => Promise<void>) | null>(null);
-  const getCreateTabFor = useCallback(() => createTabForRef.current, []);
-  const getBeforeCreateMap = useCallback(() => beforeCreateMapRef.current, []);
+  const { getCreateTabFor, getBeforeCreateMap } = useGetters({ createTabForRef, beforeCreateMapRef });
   const {
     mapWidth,
     setMapWidth,
@@ -442,26 +451,8 @@ function App() {
   useEffect(() => {
     createTabForRef.current = createTabFor;
   }, [createTabFor]);
-
-  // loadProjectData hook used below where needed
-
-  const handleBeforeCreateMap = useCallback(async () => {
-    if (!editor || !activeTabId) {
-      return;
-    }
-
-    try {
-      await editor.ensureTilesetsLoaded();
-      const snapshot = await editor.getProjectData();
-      const safeSnapshot = JSON.parse(JSON.stringify(snapshot));
-      setTabs((prev) => prev.map(t => t.id === activeTabId ? { ...t, config: safeSnapshot } : t));
-      if (currentProjectPath) {
-        await editor.saveProjectData(currentProjectPath);
-      }
-    } catch (err) {
-      console.warn('Failed to snapshot current tab before creating a new map:', err);
-    }
-  }, [editor, activeTabId, setTabs, currentProjectPath]);
+  // before-create-map behavior extracted to a hook
+  const { handleBeforeCreateMap } = useBeforeCreateMap({ editor, activeTabId, setTabs, currentProjectPath });
 
   useEffect(() => {
     beforeCreateMapRef.current = handleBeforeCreateMap;
@@ -619,35 +610,8 @@ function App() {
     };
   }, [toast]);
 
-  // Handle dark mode toggle
-  useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-    
-    // Update editor dark mode if it exists
-    if (editor) {
-      editor.setDarkMode(isDarkMode);
-    }
-    
-    // Save to localStorage
-    localStorage.setItem('isDarkMode', JSON.stringify(isDarkMode));
-  }, [isDarkMode, editor]);
-
-  // Wire editor activeGid updates into React state
-  useEffect(() => {
-    if (!editor) return;
-    const cb = (gid: number) => {
-      setActiveGid(gid > 0 ? gid.toString() : '(none)');
-    };
-    editor.setActiveGidCallback(cb);
-    return () => {
-      // remove callback when editor changes/unmounts
-      editor.setActiveGidCallback(null);
-    };
-  }, [editor]);
+  useDarkModeSync(isDarkMode, editor);
+  useActiveGidCallback(editor, setActiveGid);
 
   
 
@@ -737,33 +701,29 @@ function App() {
     updateLayersListRef.current = updateLayersList;
   }, [updateLayersList, updateLayersListRef]);
 
-  // Populate `editorOptsRef.current` with callbacks/state the hook needs.
-  useEffect(() => {
-    editorOptsRef.current = {
-      autoSaveEnabled,
-      setAutoSaveEnabled: setAutoSaveEnabledState,
-      currentProjectPath,
-      isDarkMode,
-      showWelcome,
-      isOpeningProject,
-      pendingMapConfig,
-      mapInitialized,
-      mapWidth,
-      mapHeight,
-      handleSelectTool,
-      setSelectedBrushTool,
-      setStamps,
-      setMapObjects,
-      setNpcDeletePopup,
-      setHeroEditData,
-      setShowHeroEditDialog,
-      setSaveStatus,
-      setHasUnsavedChanges,
-      setLastSaveTime,
-      // helper refs
-      updateLayersListRef,
-      syncMapObjectsRef
-    };
+  useEditorOptionsRef(editorOptsRef, {
+    autoSaveEnabled,
+    setAutoSaveEnabled: setAutoSaveEnabledState,
+    currentProjectPath,
+    isDarkMode,
+    showWelcome,
+    isOpeningProject,
+    pendingMapConfig,
+    mapInitialized,
+    mapWidth,
+    mapHeight,
+    handleSelectTool,
+    setSelectedBrushTool,
+    setStamps,
+    setMapObjects,
+    setNpcDeletePopup,
+    setHeroEditData,
+    setShowHeroEditDialog,
+    setSaveStatus,
+    setHasUnsavedChanges,
+    setLastSaveTime,
+    updateLayersListRef,
+    syncMapObjectsRef
   }, [
     autoSaveEnabled,
     setAutoSaveEnabledState,
@@ -926,51 +886,10 @@ function App() {
   // Hero edit handlers moved to useDialogs
   useCanvasDoubleClick({ editor, canvasRef, handleEditObject });
 
-  // Effect to handle brush tool state changes
-  useEffect(() => {
-    console.log(`Brush tool changed to: ${brushTool}`);
-    const brushToolElement = document.querySelector('[data-brush-tool]');
-    if (brushToolElement) {
-      brushToolElement.setAttribute('data-brush-tool', brushTool);
-      console.log(`Updated existing data-brush-tool attribute to: ${brushTool}`);
-    } else {
-      // Create the brush tool state element if it doesn't exist
-      const stateElement = document.createElement('div');
-      stateElement.setAttribute('data-brush-tool', brushTool);
-      stateElement.style.display = 'none';
-      document.body.appendChild(stateElement);
-      console.log(`Created new data-brush-tool element with value: ${brushTool}`);
-    }
-  }, [brushTool]);
+  useBrushToolDomSync(brushTool);
 
-  // Effect to listen for brush events from the editor
-  useEffect(() => {
-    const handleBrushAction = (event: CustomEvent) => {
-      const { action, tileIndex } = event.detail;
-      switch (action) {
-        // Removed select/deselect cases as selectedBrushes state is gone
-        case 'separate':
-          handleSeparateBrush(tileIndex);
-          break;
-        case 'remove':
-          handleRemoveBrush(tileIndex);
-          break;
-        case 'drop':
-          if (event.detail.from && event.detail.to) {
-            handleBrushReorder(event.detail.from, event.detail.to);
-          }
-          break;
-        default:
-          break;
-      }
-    };
-
-    document.addEventListener('brushAction', handleBrushAction as EventListener);
-    
-    return () => {
-      document.removeEventListener('brushAction', handleBrushAction as EventListener);
-    };
-  }, [handleSeparateBrush, handleRemoveBrush, handleBrushReorder]);
+  // Listen for brush actions emitted from editor via custom events
+  useBrushActionListener({ onSeparate: handleSeparateBrush, onRemove: handleRemoveBrush, onReorder: handleBrushReorder });
 
   // Helper function to load project data into editor
   const { loadProjectData } = useLoadProjectData();
@@ -992,7 +911,7 @@ function App() {
 
   
 
-  const { handleManualSave } = useManualSave({ editor, currentProjectPath, setIsManuallySaving, setLastSaveTime });
+  const { handleManualSave } = useManualSave({ editor, currentProjectPath, setIsManuallySaving, setLastSaveTime, manualSaveRef: handleManualSaveRef });
 
   // Keep stable refs to the handlers so we can register IPC listeners once
   // and still call the latest handler implementations without re-registering.
@@ -1000,7 +919,7 @@ function App() {
   const handleUndoRef = useRef<(() => void) | undefined>(undefined);
   const handleRedoRef = useRef<(() => void) | undefined>(undefined);
 
-  useEffect(() => { handleManualSaveRef.current = handleManualSave; }, [handleManualSave]);
+  
   useEffect(() => { handleUndoRef.current = handleUndo; }, [handleUndo]);
   useEffect(() => { handleRedoRef.current = handleRedo; }, [handleRedo]);
 
@@ -1098,23 +1017,7 @@ function App() {
     hasUnsavedChanges
   });
 
-  // Handle browser beforeunload event (for web version)
-  useEffect(() => {
-    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
-      if (hasUnsavedChanges) {
-        event.preventDefault();
-        event.returnValue = ''; // Required for Chrome
-        return ''; // Required for some browsers
-      }
-      return undefined;
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, [hasUnsavedChanges]);
+  useBeforeUnload(hasUnsavedChanges);
 
   
 
@@ -1286,9 +1189,6 @@ function App() {
     setTabTick,
     brushTool,
     isCollisionLayer,
-    brushToolbarExpanded,
-    showBrushToolbarTemporarily,
-    setBrushToolbarNode,
     handleFileUpload,
     handleToggleBrushTool,
     handleDeleteActiveTab,
@@ -1342,6 +1242,147 @@ function App() {
     handleMaximize,
     handleClose,
     flareIconUrl
+  });
+
+  const { onCancel: confirmOnCancel, onConfirm: confirmOnConfirm } = buildConfirmActionHandlers({
+    confirmAction,
+    tabToDelete: undefined,
+    confirmPayloadRef,
+    editor,
+    setTabTick,
+    setTabToDelete,
+    setConfirmAction
+  });
+
+  const confirmDialogProps = buildConfirmDialogProps({ confirmAction, setConfirmAction, onCancel: confirmOnCancel, onConfirm: confirmOnConfirm });
+
+  const dialogsCtx = buildDialogsCtx({
+    showSeparateDialog,
+    setShowSeparateDialog,
+    confirmSeparateBrush,
+    vendorState: {
+      itemsList,
+      showVendorUnlockDialog,
+      setShowVendorUnlockDialog,
+      vendorUnlockEntries,
+      showVendorRandomDialog,
+      setShowVendorRandomDialog,
+      vendorRandomSelection,
+      vendorRandomCount,
+      showVendorStockDialog,
+      setShowVendorStockDialog,
+      vendorStockSelection
+    },
+    vendorHandlers: {
+      handleUpdateVendorUnlockRequirement,
+      handleRemoveVendorUnlockRequirement,
+      handleToggleVendorUnlockItem,
+      handleVendorUnlockQtyChange,
+      handleAddVendorUnlockRequirement,
+      handleSaveVendorUnlock,
+      handleToggleVendorRandomItem,
+      handleVendorRandomFieldChange,
+      handleRandomCountChange,
+      handleSaveVendorRandom,
+      handleToggleVendorStockItem,
+      handleVendorStockQtyChange,
+      handleSaveVendorStock
+    },
+    showRuleDialog,
+    ruleDialogStep,
+    ruleDialogError,
+    ruleNameInput,
+    setRuleNameInput,
+    ruleStartType,
+    setRuleStartType,
+    ruleTriggerId,
+    setRuleTriggerId,
+    ruleActionSelection,
+    setRuleActionSelection,
+    availableRuleTriggers,
+    onRuleClose: handleRuleClose,
+    handleSaveRule,
+    showAbilityDialog,
+    abilityNameInput,
+    setAbilityNameInput,
+    handleCloseAbilityDialog,
+    handleCreateAbility,
+    actorDialogState,
+    actorDialogError,
+    canUseTilesetDialog,
+    handleCloseActorDialog,
+    handleActorFieldChange,
+    handleActorRoleToggle,
+    handleActorTilesetBrowse,
+    handleActorPortraitBrowse,
+    handleActorSubmit,
+    itemDialogState,
+    itemDialogError,
+    pendingDuplicateItem,
+    handleCloseItemDialog,
+    handleItemFieldChange,
+    handleItemSubmit,
+    handleConfirmDuplicateItem,
+    clearPendingDuplicate: () => setPendingDuplicateItem(null),
+    showItemEditDialog,
+    editingItem,
+    updateEditingItemField,
+    handleCloseItemEdit,
+    handleSaveItemEdit,
+    showObjectDialog,
+    editingObject,
+    objectValidationErrors,
+    setEditingObject,
+    handleObjectDialogClose,
+    handleObjectDialogSave,
+    updateEditingObjectProperty,
+    updateEditingObjectBoolean,
+    getEditingObjectProperty,
+    editor,
+    syncMapObjects,
+    handleEditingTilesetBrowse,
+    handleEditingPortraitBrowse,
+    handleOpenVendorStockDialog,
+    handleOpenVendorUnlockDialog,
+    handleOpenVendorRandomDialog,
+    setShowDialogueTreeDialog,
+    showDeleteNpcConfirm,
+    setShowDeleteNpcConfirm,
+    showDeleteEnemyConfirm,
+    setShowDeleteEnemyConfirm,
+    showDialogueTreeDialog,
+    dialogueTrees,
+    setDialogueTrees,
+    activeDialogueTab,
+    setActiveDialogueTab,
+    dialogueTabToDelete,
+    setDialogueTabToDelete,
+    onDialogueClose: handleDialogueClose,
+    showCreateMapDialog,
+    setShowCreateMapDialog,
+    newMapName,
+    setNewMapName,
+    newMapWidth,
+    setNewMapWidth,
+    newMapHeight,
+    setNewMapHeight,
+    newMapStarting,
+    setNewMapStarting,
+    createMapError,
+    setCreateMapError,
+    isPreparingNewMap,
+    handleConfirmCreateMap,
+    showHeroEditDialog,
+    setShowHeroEditDialog,
+    heroEditData,
+    setHeroEditData,
+    handleHeroEditCancel,
+    handleHeroEditConfirm,
+    showOverwriteDialog,
+    handleOverwriteConfirm,
+    handleOverwriteCancel,
+    showExportSuccess,
+    closeExportSuccess: () => setShowExportSuccess(false)
   });
 
   return (
@@ -1408,15 +1449,7 @@ function App() {
           onConfirm={handleClearLayerConfirm}
         />
 
-        {(() => {
-          const props = buildConfirmDialogProps({
-            confirmAction,
-            setConfirmAction,
-            onCancel: undefined,
-            onConfirm: undefined
-          });
-          return <ConfirmActionDialog {...props} />;
-        })()}
+        <ConfirmActionDialog {...confirmDialogProps} />
 
         <HelpDialog
           open={showHelp}
@@ -1426,176 +1459,36 @@ function App() {
         />
 
         {/* Center Area */}
-        {isEnemyTabActive ? (
-          <section className="flex-1 min-w-0 flex flex-col relative">
-            <div className="p-6 h-full overflow-auto">
-              <EnemyTabPanel
-                enemy={(activeTab?.config as EnemyTabConfig | null)?.enemy}
-                showCloseConfirm={pendingEnemyTabCloseId === activeTabId}
-                onCloseDecision={handleEnemyTabCloseDecision}
-                onSave={handleEnemyTabSave}
-              />
-            </div>
-          </section>
-        ) : (
-          <section className="flex-1 min-w-0 flex flex-col relative">
-          {/* Zoom Controls & Undo/Redo */}
-        {!isEnemyTabActive && (
-          <TopBar
-            toolbarExpanded={toolbarExpanded}
-            containerRef={toolbarContainerRef}
-            onMouseEnter={handleToolbarMouseEnter}
-            onMouseLeave={handleToolbarMouseLeave}
-            onFocus={handleToolbarFocus}
-            onBlur={handleToolbarBlur}
-            handleUndo={handleUndo}
-            handleRedo={handleRedo}
-            handleZoomIn={handleZoomIn}
-            handleZoomOut={handleZoomOut}
-            handleResetZoom={handleResetZoom}
-          />
-        )}
-          {/* EditorCanvas assembled via `useEditorCanvasCtx` above */}
-          <EditorCanvas ctx={editorCanvasCtx} bottomToolbarProps={bottomToolbarProps} />
-        </section>
-        )}
+        <EditorArea
+          topBarProps={{
+            toolbarExpanded,
+            containerRef: toolbarContainerRef,
+            onMouseEnter: handleToolbarMouseEnter,
+            onMouseLeave: handleToolbarMouseLeave,
+            onFocus: handleToolbarFocus,
+            onBlur: handleToolbarBlur,
+            handleUndo,
+            handleRedo,
+            handleZoomIn,
+            handleZoomOut,
+            handleResetZoom
+          }}
+          canvasCtx={editorCanvasCtx}
+          bottomToolbarProps={bottomToolbarProps}
+          enemyPanelProps={{
+            isEnemyActive: isEnemyTabActive,
+            enemy: (activeTab?.config as EnemyTabConfig | null)?.enemy,
+            showCloseConfirm: pendingEnemyTabCloseId === activeTabId,
+            onCloseDecision: handleEnemyTabCloseDecision,
+            onSave: handleEnemyTabSave
+          }}
+        />
       </main>
       
       <Toaster />
 
       {/* Centralized dialogs container */}
-      {(() => {
-        const dialogsCtx = buildDialogsCtx({
-          showSeparateDialog,
-          setShowSeparateDialog,
-          confirmSeparateBrush,
-          vendorState: {
-            itemsList,
-            showVendorUnlockDialog,
-            setShowVendorUnlockDialog,
-            vendorUnlockEntries,
-            showVendorRandomDialog,
-            setShowVendorRandomDialog,
-            vendorRandomSelection,
-            vendorRandomCount,
-            showVendorStockDialog,
-            setShowVendorStockDialog,
-            vendorStockSelection
-          },
-          vendorHandlers: {
-            handleUpdateVendorUnlockRequirement,
-            handleRemoveVendorUnlockRequirement,
-            handleToggleVendorUnlockItem,
-            handleVendorUnlockQtyChange,
-            handleAddVendorUnlockRequirement,
-            handleSaveVendorUnlock,
-            handleToggleVendorRandomItem,
-            handleVendorRandomFieldChange,
-            handleRandomCountChange,
-            handleSaveVendorRandom,
-            handleToggleVendorStockItem,
-            handleVendorStockQtyChange,
-            handleSaveVendorStock
-          },
-          showRuleDialog,
-          ruleDialogStep,
-          ruleDialogError,
-          ruleNameInput,
-          setRuleNameInput,
-          ruleStartType,
-          setRuleStartType,
-          ruleTriggerId,
-          setRuleTriggerId,
-          ruleActionSelection,
-          setRuleActionSelection,
-          availableRuleTriggers,
-          onRuleClose: handleRuleClose,
-          handleSaveRule,
-          showAbilityDialog,
-          abilityNameInput,
-          setAbilityNameInput,
-          handleCloseAbilityDialog,
-          handleCreateAbility,
-          actorDialogState,
-          actorDialogError,
-          canUseTilesetDialog,
-          handleCloseActorDialog,
-          handleActorFieldChange,
-          handleActorRoleToggle,
-          handleActorTilesetBrowse,
-          handleActorPortraitBrowse,
-          handleActorSubmit,
-          itemDialogState,
-          itemDialogError,
-          pendingDuplicateItem,
-          handleCloseItemDialog,
-          handleItemFieldChange,
-          handleItemSubmit,
-          handleConfirmDuplicateItem,
-          clearPendingDuplicate: () => setPendingDuplicateItem(null),
-          showItemEditDialog,
-          editingItem,
-          updateEditingItemField,
-          handleCloseItemEdit,
-          handleSaveItemEdit,
-          showObjectDialog,
-          editingObject,
-          objectValidationErrors,
-          setEditingObject,
-          handleObjectDialogClose,
-          handleObjectDialogSave,
-          updateEditingObjectProperty,
-          updateEditingObjectBoolean,
-          getEditingObjectProperty,
-          editor,
-          syncMapObjects,
-          handleEditingTilesetBrowse,
-          handleEditingPortraitBrowse,
-          handleOpenVendorStockDialog,
-          handleOpenVendorUnlockDialog,
-          handleOpenVendorRandomDialog,
-          setShowDialogueTreeDialog,
-          showDeleteNpcConfirm,
-          setShowDeleteNpcConfirm,
-          showDeleteEnemyConfirm,
-          setShowDeleteEnemyConfirm,
-          showDialogueTreeDialog,
-          dialogueTrees,
-          setDialogueTrees,
-          activeDialogueTab,
-          setActiveDialogueTab,
-          dialogueTabToDelete,
-          setDialogueTabToDelete,
-          onDialogueClose: handleDialogueClose,
-          showCreateMapDialog,
-          setShowCreateMapDialog,
-          newMapName,
-          setNewMapName,
-          newMapWidth,
-          setNewMapWidth,
-          newMapHeight,
-          setNewMapHeight,
-          newMapStarting,
-          setNewMapStarting,
-          createMapError,
-          setCreateMapError,
-          isPreparingNewMap,
-          handleConfirmCreateMap,
-          showHeroEditDialog,
-          setShowHeroEditDialog,
-          heroEditData,
-          setHeroEditData,
-          handleHeroEditCancel,
-          handleHeroEditConfirm,
-          showOverwriteDialog,
-          handleOverwriteConfirm,
-          handleOverwriteCancel,
-          showExportSuccess,
-          closeExportSuccess: () => setShowExportSuccess(false)
-        });
-
-        return <DialogsContainer ctx={dialogsCtx} />;
-      })()}
+      <DialogsContainer ctx={dialogsCtx} />
 
       {/* Custom Tooltip */}
       {tooltip && (

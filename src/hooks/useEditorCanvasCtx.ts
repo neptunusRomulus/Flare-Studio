@@ -3,14 +3,14 @@
 import type React from 'react';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 import type { NpcDeletePopup } from '@/hooks/useEditorState';
-import type { StampMode } from '@/types';
+import type { StampMode, Stamp } from '@/types';
 
 type UiHelpers = {
   tooltip?: unknown;
-  showTooltipWithDelay?: (content: React.ReactNode, el: HTMLElement) => void;
-  hideTooltip?: () => void;
-  toolbarRef?: React.RefObject<HTMLDivElement> | null;
-  canvasRef?: React.RefObject<HTMLCanvasElement> | null;
+  showTooltipWithDelay: (content: React.ReactNode, el: HTMLElement) => void;
+  hideTooltip: () => void;
+  toolbarRef: React.RefObject<HTMLDivElement>;
+  canvasRef: React.RefObject<HTMLCanvasElement>;
 };
 
 type StampsState = unknown;
@@ -36,7 +36,7 @@ type UseEditorCanvasDeps = {
   setNpcDeletePopup: (p: NpcDeletePopup) => void;
   handleUnplaceActorFromMap: (objectId: number) => void;
   npcHoverTooltip: { x: number; y: number } | null;
-  uiHelpers: UiHelpers | null;
+  uiHelpers: UiHelpers;
   stampsState: StampsState;
   hasSelection: boolean;
   selectionCount: number;
@@ -77,7 +77,7 @@ type UseEditorCanvasDeps = {
   newStampName: string;
   setNewStampName: React.Dispatch<React.SetStateAction<string>>;
   handleCreateStamp: () => void;
-  stamps: unknown[];
+  stamps: Stamp[];
   selectedStamp: string | null;
   handleStampSelect: (stampId: string) => void;
   handleDeleteStamp: (stampId: string) => void;
@@ -115,44 +115,5 @@ export default function useEditorCanvasCtx(deps: UseEditorCanvasDeps) {
     leftTransitioning: deps.leftTransitioning
   };
 
-  const bottomToolbarProps = {
-    bottomToolbarExpanded: deps.bottomToolbarExpanded,
-    setBottomToolbarNode: deps.setBottomToolbarNode,
-    onMouseEnter: deps.handleBottomToolbarMouseEnter,
-    onMouseLeave: deps.handleBottomToolbarMouseLeave,
-    onFocus: deps.handleBottomToolbarFocus,
-    onBlur: deps.handleBottomToolbarBlur,
-    selectedTool: deps.selectedTool,
-    handleSelectTool: deps.handleSelectTool,
-    showBrushOptions: deps.showBrushOptions,
-    handleShowBrushOptions: deps.handleShowBrushOptions,
-    handleHideBrushOptions: deps.handleHideBrushOptions,
-    selectedBrushTool: deps.selectedBrushTool,
-    setSelectedBrushTool: deps.setSelectedBrushTool,
-    showTooltipWithDelay: deps.showTooltipWithDelayFn,
-    hideTooltip: deps.hideTooltipFn,
-    setShowClearLayerDialog: deps.setShowClearLayerDialog,
-    showSelectionOptions: deps.showSelectionOptions,
-    handleShowSelectionOptions: deps.handleShowSelectionOptions,
-    handleHideSelectionOptions: deps.handleHideSelectionOptions,
-    selectedSelectionTool: deps.selectedSelectionTool,
-    setSelectedSelectionTool: deps.setSelectedSelectionTool,
-    showShapeOptions: deps.showShapeOptions,
-    handleShowShapeOptions: deps.handleShowShapeOptions,
-    handleHideShapeOptions: deps.handleHideShapeOptions,
-    selectedShapeTool: deps.selectedShapeTool,
-    setSelectedShapeTool: deps.setSelectedShapeTool,
-    stampMode: deps.stampMode,
-    setStampMode: deps.setStampMode,
-    newStampName: deps.newStampName,
-    setNewStampName: deps.setNewStampName,
-    handleCreateStamp: deps.handleCreateStamp,
-    stamps: deps.stamps,
-    selectedStamp: deps.selectedStamp,
-    handleStampSelect: deps.handleStampSelect,
-    handleDeleteStamp: deps.handleDeleteStamp,
-    stampsState: deps.stampsState
-  };
-
-  return { ctx, bottomToolbarProps };
+  return { ctx };
 }

@@ -12,10 +12,13 @@ import HelpDialog from '@/components/HelpDialog';
 import MapSettingsDialog from '@/components/MapSettingsDialog';
 import TopBar from '@/components/TopBar';
 import AppShell from '@/components/AppShell';
+import useTitleBarProps from './hooks/useTitleBarProps';
 import ConfirmActionDialog from '@/components/ConfirmActionDialog';
 import AppSidebar from '@/components/AppSidebar';
 import EditorCanvas from '@/components/EditorCanvas';
 import DialogsContainer from '@/components/DialogsContainer';
+import buildConfirmDialogProps from './hooks/buildConfirmDialogProps';
+import buildDialogsCtx from './hooks/useDialogsCtx';
 import useMapsDropdown from './hooks/useMapsDropdown';
 // Sidebar child components are now rendered inside AppSidebar
 import { TileLayer, MapObject } from './types';
@@ -49,9 +52,16 @@ import useLayerHandlers from './hooks/useLayerHandlers';
 import useConfirmations from './hooks/useConfirmations';
 import useObjectDialogHandlers from './hooks/useObjectDialogHandlers';
 import useAbilityDialog from './hooks/useAbilityDialog';
+import useCanvasDoubleClick from './hooks/useCanvasDoubleClick';
+import useBottomToolbarProps from './hooks/useBottomToolbarProps';
 import useBrushActions from './hooks/useBrushActions';
 import useEditorCanvasCtx from './hooks/useEditorCanvasCtx';
 import useSidebarProps from './hooks/useSidebarProps';
+import useWindowControls from './hooks/useWindowControls';
+import useSidebarToggle from './hooks/useSidebarToggle';
+import useClearLayerHandler from './hooks/useClearLayerHandler';
+import useDialogCloseHandlers from './hooks/useDialogCloseHandlers';
+import useEnemyTabHandlers from './hooks/useEnemyTabHandlers';
 import flareIconUrl from '/flare-ico.png?url';
 // removed unused imports moved into hooks
 
@@ -60,6 +70,14 @@ type EnemyTabConfig = { enemy: MapObject };
 import useItems from './hooks/useItems';
 import { normalizeItemsForState as normalizeItemsHelper } from './utils/items';
 import useVendorDialogs from './hooks/useVendorDialogs';
+import useRuleHandlers from './hooks/useRuleHandlers';
+import useObjectDialogClose from './hooks/useObjectDialogClose';
+import useEditingBrowseHandlers from './hooks/useEditingBrowseHandlers';
+import useLoadProjectData from './hooks/useLoadProjectData';
+import useManualSave from './hooks/useManualSave';
+import useDeleteActiveTab from './hooks/useDeleteActiveTab';
+import useSettingsHandlers from './hooks/useSettingsHandlers';
+import useMapHandlers from './hooks/useMapHandlers';
 
 function App() {
   const [showWelcome, setShowWelcome] = useState(true);
@@ -226,7 +244,6 @@ function App() {
     setShowClearLayerDialog,
     confirmAction,
     setConfirmAction,
-    tabToDelete,
     setTabToDelete,
     confirmPayloadRef
   } = useConfirmations();
@@ -238,6 +255,7 @@ function App() {
     activeHelpTab,
     setActiveHelpTab
   } = useHelpState();
+
   const {
     showVendorStockDialog,
     setShowVendorStockDialog,
@@ -425,6 +443,8 @@ function App() {
     createTabForRef.current = createTabFor;
   }, [createTabFor]);
 
+  // loadProjectData hook used below where needed
+
   const handleBeforeCreateMap = useCallback(async () => {
     if (!editor || !activeTabId) {
       return;
@@ -489,11 +509,28 @@ function App() {
     handleHeroEditConfirm,
     handleHeroEditCancel
   } = useDialogs();
+  // Extracted handlers (moved out of JSX)
+  const { handleCloseSettings, handleCloseMapSettings, handleHelpClose } = useSettingsHandlers({ setShowSettings, setShowMapSettingsOnly, setShowHelp });
+
+  const { handleSidebarToggle } = useSidebarToggle({ editor, setLeftTransitioning, setLeftCollapsed });
+  const { handleClearLayerClose, handleClearLayerConfirm } = useClearLayerHandler({ editor, setSelectedBrushTool, setShowClearLayerDialog });
+  const { handleMinimize, handleMaximize, handleClose } = useWindowControls();
+  
   // ability dialog state moved to useAbilityDialog
   const [ruleNameInput, setRuleNameInput] = useState('');
   const [ruleStartType, setRuleStartType] = useState<RuleStartType | null>(null);
   const [ruleTriggerId, setRuleTriggerId] = useState<string>('');
   const [ruleActionSelection, setRuleActionSelection] = useState<{ groupId: string; actionId: string } | null>(null);
+  const { handleRuleClose, handleDialogueClose } = useDialogCloseHandlers({
+    closeRuleDialog,
+    setRuleDialogError,
+    setRuleDialogStep,
+    setRuleStartType,
+    setRuleTriggerId,
+    setRuleActionSelection,
+    setShowDialogueTreeDialog,
+    setDialogueTabToDelete
+  });
   // Items list for display
   
   // Expanded item categories for accordion
@@ -566,13 +603,7 @@ function App() {
 
   // refreshProjectMaps and handleOpenMapFromMapsFolder are declared later (after helpers they depend on)
 
-  const syncMapObjects = useCallback(() => {
-    if (editor) {
-      setMapObjects(editor.getMapObjects());
-    } else {
-      setMapObjects([]);
-    }
-  }, [editor, setMapObjects]);
+  const { syncMapObjects, updateLayersList: updateLayersListFromHook } = useMapHandlers({ editor, setMapObjects, setLayers, setActiveLayerId });
 
   useEffect(() => {
     syncMapObjectsRef.current = syncMapObjects;
@@ -700,15 +731,7 @@ function App() {
   }, [editor, setSelectionCount, setHasSelection]);
 
   // Layer management functions
-  const updateLayersList = useCallback(() => {
-    if (editor) {
-      const currentLayers = editor.getLayers();
-      setLayers([...currentLayers]); // Create a new array to ensure React detects changes
-      const activeId = editor.getActiveLayerId();
-      setActiveLayerId(activeId);
-      syncMapObjects();
-    }
-  }, [editor, syncMapObjects]);
+  const updateLayersList = updateLayersListFromHook;
 
   useEffect(() => {
     updateLayersListRef.current = updateLayersList;
@@ -825,49 +848,20 @@ function App() {
 
   // Item handlers moved to `useItems` hook (see src/hooks/useItems.ts)
 
-  const handleAddRule = useCallback(() => {
-    setRuleDialogError(null);
-    setRuleStartType(null);
-    setRuleTriggerId('');
-    setRuleActionSelection(null);
-    setRuleNameInput(`Rule ${rulesList.length + 1}`);
-    setRuleDialogStep('start');
-    openRuleDialog();
-  }, [rulesList.length, openRuleDialog, setRuleDialogStep, setRuleDialogError, setRuleStartType, setRuleTriggerId, setRuleActionSelection, setRuleNameInput]);
-
-  const handleSaveRule = useCallback(() => {
-    const trimmedName = ruleNameInput.trim();
-    if (!ruleStartType) {
-      setRuleDialogError('Select how this rule starts.');
-      return;
-    }
-
-    const availableOptions = ruleStartType === 'player' ? PLAYER_TRIGGER_OPTIONS : GAME_TRIGGER_OPTIONS;
-    if (!trimmedName) {
-      setRuleDialogError('Rule name is required.');
-      return;
-    }
-    if (!ruleTriggerId || !availableOptions.some(option => option.id === ruleTriggerId)) {
-      setRuleDialogError('Select a start trigger.');
-      return;
-    }
-
-    setRulesList((prev) => [
-      ...prev,
-      {
-        id: `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
-        name: trimmedName,
-        startType: ruleStartType,
-        triggerId: ruleTriggerId
-      }
-    ]);
-    closeRuleDialog();
-    setRuleDialogError(null);
-    setRuleNameInput('');
-    setRuleStartType(null);
-    setRuleTriggerId('');
-    setRuleActionSelection(null);
-  }, [ruleNameInput, ruleStartType, ruleTriggerId, closeRuleDialog, setRuleDialogError, setRulesList, setRuleNameInput, setRuleStartType, setRuleTriggerId, setRuleActionSelection]);
+  const { handleAddRule, handleSaveRule } = useRuleHandlers({
+    openRuleDialog,
+    closeRuleDialog,
+    rulesListLength: rulesList.length,
+    ruleNameInput,
+    setRuleNameInput,
+    ruleStartType,
+    setRuleDialogError,
+    setRuleStartType,
+    setRuleTriggerId,
+    setRuleActionSelection,
+    setRuleDialogStep,
+    setRulesList
+  });
 
   
 
@@ -879,13 +873,7 @@ function App() {
 
   const { handleNpcDragStart, handleNpcDragEnd } = useNpcDrag({ editor, setDraggingNpcId });
 
-  const handleObjectDialogClose = useCallback(() => {
-    setShowObjectDialog(false);
-    setEditingObject(null);
-    setObjectValidationErrors([]);
-    setShowDeleteNpcConfirm(false);
-    setShowDeleteEnemyConfirm(false);
-  }, [setEditingObject, setObjectValidationErrors, setShowDeleteEnemyConfirm, setShowDeleteNpcConfirm, setShowObjectDialog]);
+  const { handleObjectDialogClose } = useObjectDialogClose({ setShowObjectDialog, setEditingObject, setObjectValidationErrors, setShowDeleteNpcConfirm, setShowDeleteEnemyConfirm });
 
 
 
@@ -896,6 +884,8 @@ function App() {
     currentProjectPath,
     handleUpdateObject
   });
+
+  const { handleEditingTilesetBrowse, handleEditingPortraitBrowse } = useEditingBrowseHandlers({ updateEditingObjectProperty });
 
   // Vendor dialog handlers moved to hook
   const {
@@ -931,104 +921,10 @@ function App() {
     setShowVendorRandomDialog
   });
 
-  const handleEditingTilesetBrowse = useCallback(async () => {
-    if (typeof window === 'undefined' || !window.electronAPI?.selectTilesetFile) {
-      return;
-    }
-
-    try {
-      const selected = await window.electronAPI.selectTilesetFile();
-      if (selected) {
-        updateEditingObjectProperty('tilesetPath', selected);
-      }
-    } catch (error) {
-      console.error('Failed to select tileset for editing object:', error);
-    }
-  }, [updateEditingObjectProperty]);
-
-  const handleEditingPortraitBrowse = useCallback(async () => {
-    if (typeof window === 'undefined' || !window.electronAPI?.selectTilesetFile) {
-      return;
-    }
-
-    try {
-      const selected = await window.electronAPI.selectTilesetFile();
-      if (selected) {
-        // Convert to data URL to avoid file:// protocol security restrictions
-        if (window.electronAPI.readFileAsDataURL) {
-          const dataUrl = await window.electronAPI.readFileAsDataURL(selected);
-          if (dataUrl) {
-            updateEditingObjectProperty('portraitPath', dataUrl);
-          } else {
-            updateEditingObjectProperty('portraitPath', selected);
-          }
-        } else {
-          updateEditingObjectProperty('portraitPath', selected);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to select portrait for editing object:', error);
-    }
-  }, [updateEditingObjectProperty]);
+  
 
   // Hero edit handlers moved to useDialogs
-
-  // Canvas double-click handler for editing objects
-  useEffect(() => {
-    if (!editor || !canvasRef.current) return;
-
-    const handleCanvasDoubleClick = (_event: MouseEvent) => {
-      console.log('Double-click detected on canvas');
-      
-      // Get current active layer to check if it's an interactive layer
-      const activeLayer = editor.getActiveLayer();
-      console.log('Active layer:', activeLayer);
-      
-      if (!activeLayer) {
-        console.log('No active layer found');
-        return;
-      }
-      
-      // Only allow double-click editing on interactive layers
-      const interactiveLayers = ['enemy', 'npc', 'object', 'event', 'background'];
-      if (!interactiveLayers.includes(activeLayer.type)) {
-        console.log(`Layer type '${activeLayer.type}' is not interactive, skipping double-click`);
-        return;
-      }
-      
-      // Get hover coordinates from editor
-      const hoverCoords = editor.getHoverCoordinates();
-      console.log('Hover coordinates:', hoverCoords);
-      
-      if (hoverCoords) {
-        // Check if there's an object at this position
-        const objects = editor.getMapObjects();
-        const objectsAtPosition = editor.getObjectsAtPosition(hoverCoords.x, hoverCoords.y);
-        console.log('All objects:', objects.length);
-        console.log('Objects at hover position:', objectsAtPosition);
-        
-        const objectAtPosition = objects.find(obj => 
-          obj.x === hoverCoords.x && obj.y === hoverCoords.y
-        );
-        
-        console.log('Object at position (find method):', objectAtPosition);
-        
-        if (objectAtPosition) {
-          console.log(`Opening edit dialog for object ID: ${objectAtPosition.id}`);
-          handleEditObject(objectAtPosition.id);
-        } else {
-          console.log('No object found at hover position');
-        }
-      }
-    };
-
-    const canvas = canvasRef.current;
-    canvas.addEventListener('dblclick', handleCanvasDoubleClick);
-
-    return () => {
-      canvas.removeEventListener('dblclick', handleCanvasDoubleClick);
-    };
-  }, [editor, handleEditObject, canvasRef]);
+  useCanvasDoubleClick({ editor, canvasRef, handleEditObject });
 
   // Effect to handle brush tool state changes
   useEffect(() => {
@@ -1077,45 +973,7 @@ function App() {
   }, [handleSeparateBrush, handleRemoveBrush, handleBrushReorder]);
 
   // Helper function to load project data into editor
-  const loadProjectData = useCallback(async (newEditor: TileMapEditor, mapConfig: EditorProjectData) => {
-    try {
-      // Set projectName from loaded project data if available
-      if (mapConfig.name) {
-        newEditor.projectName = mapConfig.name;
-      }
-      console.log('=== LOAD PROJECT DATA DEBUG ===');
-      console.log('Map config received:', {
-        name: mapConfig.name,
-        tilesets: mapConfig.tilesets ? mapConfig.tilesets.length : 0,
-        tilesetImages: mapConfig.tilesetImages ? Object.keys(mapConfig.tilesetImages).length : 0,
-        layers: mapConfig.layers ? mapConfig.layers.length : 0
-      });
-
-      // Debug the map config structure in detail
-      console.log('Map config full structure:', mapConfig);
-      
-      // Debug layer data
-      const layers = mapConfig.layers || [];
-      console.log('Layers from config:', layers.map(l => ({
-        type: l.type,
-        name: l.name,
-        dataLength: l.data?.length || 0,
-        hasNonZeroData: l.data?.some((d) => d !== 0) || false
-      })));
-
-      // Load the complete project data into the editor
-      // The editor's loadProjectData handles everything: it sets this.tileLayers directly
-      // from projectData.layers, so we don't need to manually create layers with addLayer()
-      console.log('=== CALLING EDITOR loadProjectData ===');
-      newEditor.loadProjectData(mapConfig);
-      
-      console.log('Project data loading completed');
-      return true;
-    } catch (error) {
-      console.error('Error loading project data:', error);
-      return false;
-    }
-  }, []);
+  const { loadProjectData } = useLoadProjectData();
 
   // Project-load editor creation is now managed inside `useEditorState`.
 
@@ -1134,31 +992,7 @@ function App() {
 
   
 
-  const handleManualSave = useCallback(async () => {
-    if (!editor) return;
-    setIsManuallySaving(true);
-    try {
-      if (window.electronAPI && currentProjectPath) {
-        const success = await editor.saveProjectData(currentProjectPath);
-        await new Promise(resolve => setTimeout(resolve, 300));
-        if (success) {
-          setLastSaveTime(Date.now());
-          // toast suppressed: Project saved to disk
-        } else {
-          // toast suppressed: Failed to save the project to disk
-        }
-      } else {
-  editor.forceSave();
-  await new Promise(resolve => setTimeout(resolve, 500));
-  // toast suppressed: Saved to local backup
-      }
-    } catch (error) {
-      console.error('Save error:', error);
-      // toast suppressed: Failed to save your map
-    } finally {
-      setIsManuallySaving(false);
-    }
-  }, [editor, currentProjectPath, setIsManuallySaving, setLastSaveTime]);
+  const { handleManualSave } = useManualSave({ editor, currentProjectPath, setIsManuallySaving, setLastSaveTime });
 
   // Keep stable refs to the handlers so we can register IPC listeners once
   // and still call the latest handler implementations without re-registering.
@@ -1282,56 +1116,14 @@ function App() {
     };
   }, [hasUnsavedChanges]);
 
-  const handleMinimize = () => {
-    if (window.electronAPI?.minimize) {
-      window.electronAPI.minimize();
-    } else {
-      console.log('Minimize clicked - Electron API not available');
-    }
-  };
-
-  const handleMaximize = () => {
-    if (window.electronAPI?.maximize) {
-      window.electronAPI.maximize();
-    } else {
-      console.log('Maximize clicked - Electron API not available');
-    }
-  };
-
-  const handleClose = () => {
-    if (window.electronAPI?.close) {
-      window.electronAPI.close();
-    } else {
-      console.log('Close clicked - Electron API not available');
-    }
-  };
+  
 
   
 
   const activeLayer = useMemo(() => {
     return layers.find((layer) => layer.id === activeLayerId) ?? null;
   }, [layers, activeLayerId]);
-
-  const handleDeleteActiveTab = useCallback(() => {
-    if (!editor) {
-      toast({ title: 'No editor', description: 'Editor is not initialized yet.', variant: 'destructive' });
-      return;
-    }
-    const layerType = activeLayer?.type;
-    if (!layerType) {
-      toast({ title: 'No active layer', description: 'Please select a layer first.', variant: 'destructive' });
-      return;
-    }
-    const activeTabId = editor.getActiveLayerTabId ? editor.getActiveLayerTabId(layerType) : null;
-    if (typeof activeTabId !== 'number' || activeTabId === null) {
-      toast({ title: 'No tab selected', description: 'There is no active tileset tab to delete for this layer.', variant: 'destructive' });
-      return;
-    }
-    const payload = { layerType, tabId: activeTabId };
-    confirmPayloadRef.current = payload;
-    setTabToDelete(payload);
-    setConfirmAction({ type: 'removeTab', payload });
-  }, [activeLayer?.type, editor, setConfirmAction, setTabToDelete, toast, confirmPayloadRef]);
+  const { handleDeleteActiveTab } = useDeleteActiveTab({ editor, activeLayer, toast, confirmPayloadRef, setTabToDelete, setConfirmAction });
 
   const isCollisionLayer = activeLayer?.type === 'collision';
   const isNpcLayer = activeLayer?.type === 'npc';
@@ -1351,8 +1143,20 @@ function App() {
     return [];
   }, [mapObjects, isNpcLayer, isEnemyLayer]);
 
+  const { handleEnemyTabCloseDecision, handleEnemyTabSave } = useEnemyTabHandlers({
+    closeEditorTab,
+    setPendingEnemyTabCloseId,
+    handleUpdateObject,
+    setTabs,
+    activeTabId
+  });
+
+  
+
+  
+
   // Assemble EditorCanvas props via a hook to keep the JSX area concise.
-  const { ctx: editorCanvasCtx, bottomToolbarProps } = useEditorCanvasCtx({
+  const { ctx: editorCanvasCtx } = useEditorCanvasCtx({
     editor,
     canvasRef,
     draggingNpcId,
@@ -1416,6 +1220,45 @@ function App() {
     selectedStamp,
     handleStampSelect,
     handleDeleteStamp
+  });
+
+  const bottomToolbarProps = useBottomToolbarProps({
+    bottomToolbarExpanded,
+    setBottomToolbarNode,
+    handleBottomToolbarMouseEnter,
+    handleBottomToolbarMouseLeave,
+    handleBottomToolbarFocus,
+    handleBottomToolbarBlur,
+    selectedTool,
+    handleSelectTool,
+    showBrushOptions,
+    handleShowBrushOptions,
+    handleHideBrushOptions,
+    selectedBrushTool,
+    setSelectedBrushTool,
+    showTooltipWithDelay: showTooltipWithDelayFn,
+    hideTooltip: hideTooltipFn,
+    setShowClearLayerDialog,
+    showSelectionOptions,
+    handleShowSelectionOptions,
+    handleHideSelectionOptions,
+    selectedSelectionTool,
+    setSelectedSelectionTool,
+    showShapeOptions,
+    handleShowShapeOptions,
+    handleHideShapeOptions,
+    selectedShapeTool,
+    setSelectedShapeTool,
+    stampMode,
+    setStampMode,
+    newStampName,
+    setNewStampName,
+    handleCreateStamp,
+    stamps,
+    selectedStamp,
+    handleStampSelect,
+    handleDeleteStamp,
+    stampsState
   });
 
   const { actors, rules, items, tileset, layersObj, exportStatus, controls } = useSidebarProps({
@@ -1486,6 +1329,21 @@ function App() {
     refreshProjectMaps
   });
 
+  const titleBarProps = useTitleBarProps({
+    tabs,
+    activeTabId,
+    switchToTab,
+    setShowMapSettingsOnly,
+    setPendingEnemyTabCloseId,
+    setShowCreateMapDialog,
+    saveStatus: (saveStatus ?? 'unsaved') as 'saving' | 'saved' | 'error' | 'unsaved',
+    lastSaveTime: lastSaveTime ?? 0,
+    handleMinimize,
+    handleMaximize,
+    handleClose,
+    flareIconUrl
+  });
+
   return (
     <>
       {showWelcome ? (
@@ -1497,36 +1355,11 @@ function App() {
       ) : (
         <div className="h-screen bg-background text-foreground flex flex-col overflow-hidden">
       <AppShell
-        titleBarProps={{
-          tabs,
-          activeTabId,
-          onSwitchTab: (tabId: string) => { void switchToTab(tabId); },
-          onOpenMapSettings: () => setShowMapSettingsOnly(true),
-          onCloseEnemyTab: (tabId: string) => setPendingEnemyTabCloseId(tabId),
-          onCreateNewMap: () => setShowCreateMapDialog(true),
-          saveStatus,
-          lastSaveTime,
-          onMinimize: handleMinimize,
-          onMaximize: handleMaximize,
-          onClose: handleClose,
-          flareIconUrl
-        }}
+        titleBarProps={titleBarProps}
         sidebarToggleProps={{
           show: showSidebarToggle,
           leftCollapsed,
-          onToggle: () => {
-            setLeftTransitioning(true);
-            if (editor && typeof editor.setSidebarTransitioning === 'function') {
-              try { editor.setSidebarTransitioning(true); } catch { /* ignore */ }
-            }
-            setLeftCollapsed((s) => !s);
-            window.setTimeout(() => {
-              setLeftTransitioning(false);
-              if (editor && typeof editor.setSidebarTransitioning === 'function') {
-                try { editor.setSidebarTransitioning(false); } catch { /* ignore */ }
-              }
-            }, 380);
-          }
+          onToggle: handleSidebarToggle
         }}
       />
 
@@ -1544,7 +1377,7 @@ function App() {
 
         <EngineSettingsDialog
           open={showSettings}
-          onClose={() => setShowSettings(false)}
+          onClose={handleCloseSettings}
           isDarkMode={isDarkMode}
           setIsDarkMode={setIsDarkMode}
           editor={editor}
@@ -1558,7 +1391,7 @@ function App() {
 
         <MapSettingsDialog
           open={showMapSettingsOnly}
-          onClose={() => setShowMapSettingsOnly(false)}
+          onClose={handleCloseMapSettings}
           mapName={mapName}
           setMapName={setMapName}
           mapWidth={mapWidth}
@@ -1571,66 +1404,25 @@ function App() {
         />
         <ClearLayerDialog
           open={showClearLayerDialog}
-          onClose={() => setShowClearLayerDialog(false)}
-          onConfirm={() => {
-            if (editor) {
-              editor.clearLayer();
-            }
-            setSelectedBrushTool('brush');
-            setShowClearLayerDialog(false);
-          }}
+          onClose={handleClearLayerClose}
+          onConfirm={handleClearLayerConfirm}
         />
 
-        <ConfirmActionDialog
-          action={confirmAction}
-          onCancel={() => setConfirmAction(null)}
-          onConfirm={() => {
-            try {
-              if (!confirmAction) return;
-              if (confirmAction.type === 'removeBrush') {
-                const brushId = confirmAction.payload as number;
-                if (editor) editor.removeBrush(brushId);
-              } else if (confirmAction.type === 'removeTileset') {
-                if (editor) editor.removeLayerTileset();
-              } else if (confirmAction.type === 'removeTab') {
-                const payload = tabToDelete ?? confirmPayloadRef.current ?? (confirmAction.payload as { layerType: string; tabId: number } | undefined);
-                if (editor && payload && payload.layerType) {
-                  const liveActive = editor.getActiveLayerTabId ? editor.getActiveLayerTabId(payload.layerType) : null;
-                  const finalTabId = (typeof liveActive === 'number' && liveActive !== null) ? liveActive : payload.tabId;
-                  if (typeof finalTabId === 'number') {
-                    editor.removeLayerTab(payload.layerType, finalTabId);
-                    setTabTick(t => t + 1);
-                    try { editor.refreshTilePalette(true); } catch (err) { console.warn('refreshTilePalette failed', err); }
-                    try {
-                      const newActive = editor.getActiveLayerTabId ? editor.getActiveLayerTabId(payload.layerType) : null;
-                      if (typeof newActive === 'number') {
-                        editor.setActiveLayerTab(payload.layerType, newActive);
-                        setTabTick(t => t + 1);
-                        try { editor.refreshTilePalette(true); } catch (err) { console.warn('refreshTilePalette failed', err); }
-                      }
-                    } catch (e) {
-                      console.warn('Post-remove setActiveLayerTab safeguard failed', e);
-                    }
-                  } else {
-                    console.warn('Confirm removeTab: no finalTabId available, aborting', payload);
-                  }
-                }
-                setTabToDelete(null);
-                confirmPayloadRef.current = null;
-              }
-            } catch (error) {
-              console.error('Confirm action failed:', error);
-            } finally {
-              setConfirmAction(null);
-            }
-          }}
-        />
+        {(() => {
+          const props = buildConfirmDialogProps({
+            confirmAction,
+            setConfirmAction,
+            onCancel: undefined,
+            onConfirm: undefined
+          });
+          return <ConfirmActionDialog {...props} />;
+        })()}
 
         <HelpDialog
           open={showHelp}
           activeTab={activeHelpTab}
           setActiveTab={setActiveHelpTab}
-          onClose={() => setShowHelp(false)}
+          onClose={handleHelpClose}
         />
 
         {/* Center Area */}
@@ -1640,19 +1432,8 @@ function App() {
               <EnemyTabPanel
                 enemy={(activeTab?.config as EnemyTabConfig | null)?.enemy}
                 showCloseConfirm={pendingEnemyTabCloseId === activeTabId}
-                onCloseDecision={(decision) => {
-                  if (decision === 'cancel') {
-                    setPendingEnemyTabCloseId(null);
-                    return;
-                  }
-                  setPendingEnemyTabCloseId(null);
-                  closeEditorTab(activeTabId ?? '');
-                }}
-                onSave={(updated: MapObject) => {
-                  // Persist into the map/editor and also update the tab's cached config
-                  handleUpdateObject(updated);
-                  setTabs(prev => prev.map(t => t.id === activeTabId ? { ...t, config: { ...t.config, enemy: updated } } : t));
-                }}
+                onCloseDecision={handleEnemyTabCloseDecision}
+                onSave={handleEnemyTabSave}
               />
             </div>
           </section>
@@ -1683,8 +1464,8 @@ function App() {
       <Toaster />
 
       {/* Centralized dialogs container */}
-      <DialogsContainer
-        ctx={{
+      {(() => {
+        const dialogsCtx = buildDialogsCtx({
           showSeparateDialog,
           setShowSeparateDialog,
           confirmSeparateBrush,
@@ -1728,14 +1509,7 @@ function App() {
           ruleActionSelection,
           setRuleActionSelection,
           availableRuleTriggers,
-          onRuleClose: () => {
-            closeRuleDialog();
-            setRuleDialogError(null);
-            setRuleDialogStep('start');
-            setRuleStartType(null);
-            setRuleTriggerId('');
-            setRuleActionSelection(null);
-          },
+          onRuleClose: handleRuleClose,
           handleSaveRule,
           showAbilityDialog,
           abilityNameInput,
@@ -1792,7 +1566,7 @@ function App() {
           setActiveDialogueTab,
           dialogueTabToDelete,
           setDialogueTabToDelete,
-          onDialogueClose: () => { setShowDialogueTreeDialog(false); setDialogueTabToDelete(null); },
+          onDialogueClose: handleDialogueClose,
           showCreateMapDialog,
           setShowCreateMapDialog,
           newMapName,
@@ -1818,8 +1592,10 @@ function App() {
           handleOverwriteCancel,
           showExportSuccess,
           closeExportSuccess: () => setShowExportSuccess(false)
-        }}
-      />
+        });
+
+        return <DialogsContainer ctx={dialogsCtx} />;
+      })()}
 
       {/* Custom Tooltip */}
       {tooltip && (

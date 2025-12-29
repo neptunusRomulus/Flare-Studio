@@ -2,14 +2,22 @@ import React from 'react';
 import VendorDialogs from '@/components/VendorDialogs';
 import RuleDialog from '@/components/RuleDialog';
 import AbilityDialog from '@/components/AbilityDialog';
+import RuleDialogContainer from '@/components/RuleDialogContainer';
+import AbilityDialogContainer from '@/components/AbilityDialogContainer';
 import ActorDialog from '@/components/ActorDialog';
-import ItemDialog from '@/components/ItemDialog';
-import ItemEditDialog from '@/components/ItemEditDialog';
-import ObjectManagementDialog from '@/components/ObjectManagementDialog';
+import ActorDialogContainer from '@/components/ActorDialogContainer';
+import ItemDialogContainer from '@/components/ItemDialogContainer';
+import ItemEditDialogContainer from '@/components/ItemEditDialogContainer';
+import VendorDialogsContainer from '@/components/VendorDialogsContainer';
+import ObjectManagementDialogContainer from '@/components/ObjectManagementDialogContainer';
 import DialogueTreeDialog from '@/components/dialogue/DialogueTreeDialog';
 import MapDialogs from '@/components/MapDialogs';
 import OverwriteExportDialog from '@/components/OverwriteExportDialog';
 import ExportSuccessModal from '@/components/ExportSuccessModal';
+import DialogueTreeDialogContainer from '@/components/DialogueTreeDialogContainer';
+import MapDialogsContainer from '@/components/MapDialogsContainer';
+import OverwriteExportDialogContainer from '@/components/OverwriteExportDialogContainer';
+import ExportSuccessModalContainer from '@/components/ExportSuccessModalContainer';
 import SeparateBrushDialog from '@/components/SeparateBrushDialog';
 
 // The dialog context is a large, aggregated object assembled in App.tsx.
@@ -27,135 +35,25 @@ export default function DialogsContainer({ ctx }: { ctx: unknown }) {
         onConfirm={c.confirmSeparateBrush}
       />
 
-      <VendorDialogs vendorState={c.vendorState} vendorHandlers={c.vendorHandlers} />
+      <VendorDialogsContainer ctx={c} />
 
-      <RuleDialog
-        open={c.showRuleDialog}
-        ruleDialogStep={c.ruleDialogStep}
-        ruleDialogError={c.ruleDialogError}
-        ruleNameInput={c.ruleNameInput}
-        setRuleNameInput={c.setRuleNameInput}
-        ruleStartType={c.ruleStartType}
-        setRuleStartType={c.setRuleStartType}
-        ruleTriggerId={c.ruleTriggerId}
-        setRuleTriggerId={c.setRuleTriggerId}
-        ruleActionSelection={c.ruleActionSelection}
-        setRuleActionSelection={c.setRuleActionSelection}
-        availableRuleTriggers={c.availableRuleTriggers}
-        onClose={c.onRuleClose}
-        onSave={c.handleSaveRule}
-        onSetStep={c.setRuleDialogStep}
-      />
+      <RuleDialogContainer ctx={c} />
 
-      <AbilityDialog
-        open={c.showAbilityDialog}
-        abilityNameInput={c.abilityNameInput}
-        onNameChange={c.setAbilityNameInput}
-        onClose={c.handleCloseAbilityDialog}
-        onCreate={c.handleCreateAbility}
-      />
+      <AbilityDialogContainer ctx={c} />
 
-      <ActorDialog
-        actorDialogState={c.actorDialogState}
-        actorDialogError={c.actorDialogError}
-        canUseTilesetDialog={c.canUseTilesetDialog}
-        onClose={c.handleCloseActorDialog}
-        onFieldChange={c.handleActorFieldChange}
-        onRoleToggle={c.handleActorRoleToggle}
-        onTilesetBrowse={c.handleActorTilesetBrowse}
-        onPortraitBrowse={c.handleActorPortraitBrowse}
-        onSubmit={c.handleActorSubmit}
-      />
+      <ActorDialogContainer ctx={c} />
 
-      <ItemDialog
-        itemDialogState={c.itemDialogState}
-        itemDialogError={c.itemDialogError}
-        pendingDuplicateItem={c.pendingDuplicateItem}
-        onClose={c.handleCloseItemDialog}
-        onFieldChange={c.handleItemFieldChange}
-        onSubmit={c.handleItemSubmit}
-        onConfirmDuplicate={c.handleConfirmDuplicateItem}
-        onClearDuplicate={c.clearPendingDuplicate}
-      />
+      <ItemDialogContainer ctx={c} />
+      <ItemEditDialogContainer ctx={c} />
 
-      <ItemEditDialog
-        showItemEditDialog={c.showItemEditDialog}
-        editingItem={c.editingItem}
-        updateEditingItemField={c.updateEditingItemField}
-        handleCloseItemEdit={c.handleCloseItemEdit}
-        handleSaveItemEdit={c.handleSaveItemEdit}
-      />
+      <ObjectManagementDialogContainer ctx={c} />
 
-      <ObjectManagementDialog
-        showObjectDialog={c.showObjectDialog}
-        editingObject={c.editingObject}
-        objectValidationErrors={c.objectValidationErrors}
-        setEditingObject={c.setEditingObject}
-        handleObjectDialogClose={c.handleObjectDialogClose}
-        handleObjectDialogSave={c.handleObjectDialogSave}
-        updateEditingObjectProperty={c.updateEditingObjectProperty}
-        updateEditingObjectBoolean={c.updateEditingObjectBoolean}
-        getEditingObjectProperty={c.getEditingObjectProperty}
-        editor={c.editor}
-        syncMapObjects={c.syncMapObjects}
-        canUseTilesetDialog={c.canUseTilesetDialog}
-        handleEditingTilesetBrowse={c.handleEditingTilesetBrowse}
-        handleEditingPortraitBrowse={c.handleEditingPortraitBrowse}
-        handleOpenVendorStockDialog={c.handleOpenVendorStockDialog}
-        handleOpenVendorUnlockDialog={c.handleOpenVendorUnlockDialog}
-        handleOpenVendorRandomDialog={c.handleOpenVendorRandomDialog}
-        setDialogueTrees={c.setDialogueTrees}
-        setActiveDialogueTab={c.setActiveDialogueTab}
-        setShowDialogueTreeDialog={c.setShowDialogueTreeDialog}
-        showDeleteNpcConfirm={c.showDeleteNpcConfirm}
-        setShowDeleteNpcConfirm={c.setShowDeleteNpcConfirm}
-        showDeleteEnemyConfirm={c.showDeleteEnemyConfirm}
-        setShowDeleteEnemyConfirm={c.setShowDeleteEnemyConfirm}
-      />
+      <DialogueTreeDialogContainer ctx={c} />
 
-      <DialogueTreeDialog
-        showDialogueTreeDialog={c.showDialogueTreeDialog}
-        dialogueTrees={c.dialogueTrees}
-        setDialogueTrees={c.setDialogueTrees}
-        activeDialogueTab={c.activeDialogueTab}
-        setActiveDialogueTab={c.setActiveDialogueTab}
-        dialogueTabToDelete={c.dialogueTabToDelete}
-        setDialogueTabToDelete={c.setDialogueTabToDelete}
-        editingObject={c.editingObject}
-        updateEditingObjectProperty={c.updateEditingObjectProperty}
-        onClose={c.onDialogueClose}
-      />
+      <MapDialogsContainer ctx={c} />
 
-      <MapDialogs
-        showCreateMapDialog={c.showCreateMapDialog}
-        setShowCreateMapDialog={c.setShowCreateMapDialog}
-        newMapName={c.newMapName}
-        setNewMapName={c.setNewMapName}
-        newMapWidth={c.newMapWidth}
-        setNewMapWidth={c.setNewMapWidth}
-        newMapHeight={c.newMapHeight}
-        setNewMapHeight={c.setNewMapHeight}
-        newMapStarting={c.newMapStarting}
-        setNewMapStarting={c.setNewMapStarting}
-        createMapError={c.createMapError}
-        setCreateMapError={c.setCreateMapError}
-        isPreparingNewMap={c.isPreparingNewMap}
-        handleConfirmCreateMap={c.handleConfirmCreateMap}
-        showHeroEditDialog={c.showHeroEditDialog}
-        setShowHeroEditDialog={c.setShowHeroEditDialog}
-        heroEditData={c.heroEditData}
-        setHeroEditData={c.setHeroEditData}
-        handleHeroEditCancel={c.handleHeroEditCancel}
-        handleHeroEditConfirm={c.handleHeroEditConfirm}
-      />
-
-      <OverwriteExportDialog
-        open={c.showOverwriteDialog}
-        onConfirm={c.handleOverwriteConfirm}
-        onCancel={c.handleOverwriteCancel}
-      />
-
-      <ExportSuccessModal open={c.showExportSuccess} onClose={c.closeExportSuccess} />
+      <OverwriteExportDialogContainer ctx={c} />
+      <ExportSuccessModalContainer ctx={c} />
     </>
   );
 }

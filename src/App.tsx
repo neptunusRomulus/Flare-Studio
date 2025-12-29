@@ -17,6 +17,11 @@ import AppSidebar from '@/components/AppSidebar';
 import DialogsContainer from '@/components/DialogsContainer';
 import buildConfirmDialogProps from './hooks/buildConfirmDialogProps';
 import buildDialogsCtx from './hooks/useDialogsCtx';
+import useActorDialogCtx from './hooks/useActorDialogCtx';
+import useItemDialogCtx from './hooks/useItemDialogCtx';
+import useObjectDialogCtx from './hooks/useObjectDialogCtx';
+import useVendorDialogCtx from './hooks/useVendorDialogCtx';
+import useAssembledDialogs from './hooks/useAssembledDialogs';
 import useMapsDropdown from './hooks/useMapsDropdown';
 // Sidebar child components are now rendered inside AppSidebar
 import { TileLayer, MapObject } from './types';
@@ -56,7 +61,7 @@ import useCanvasDoubleClick from './hooks/useCanvasDoubleClick';
 import useBottomToolbarProps from './hooks/useBottomToolbarProps';
 import useBrushActions from './hooks/useBrushActions';
 import useEditorCanvasCtx from './hooks/useEditorCanvasCtx';
-import useSidebarProps from './hooks/useSidebarProps';
+import useAssembledSidebar from './hooks/useAssembledSidebar';
 import useWindowControls from './hooks/useWindowControls';
 import useSidebarToggle from './hooks/useSidebarToggle';
 import useClearLayerHandler from './hooks/useClearLayerHandler';
@@ -157,10 +162,8 @@ function App() {
     handleBottomToolbarMouseLeave,
     handleBottomToolbarFocus,
     handleBottomToolbarBlur,
-    
     showToolbarTemporarily,
     showBottomToolbarTemporarily,
-    
     selectedTool,
     setSelectedTool,
     selectedBrushTool,
@@ -1166,7 +1169,7 @@ function App() {
     stampsState
   });
 
-  const { actors, rules, items, tileset, layersObj, exportStatus, controls } = useSidebarProps({
+  const assembledSidebar = useAssembledSidebar({
     isNpcLayer,
     isEnemyLayer,
     actorEntries,
@@ -1228,8 +1231,13 @@ function App() {
     isPreparingNewMap,
     hasUnsavedChanges,
     setShowSettings,
-    refreshProjectMaps
+    refreshProjectMaps,
+    
   });
+
+  const { actors, rules, items, layersObj } = assembledSidebar.actors;
+  const { tileset } = assembledSidebar.tileset;
+  const { exportStatus, controls } = assembledSidebar.maps;
 
   const titleBarProps = useTitleBarProps({
     tabs,
@@ -1258,57 +1266,7 @@ function App() {
 
   const confirmDialogProps = buildConfirmDialogProps({ confirmAction, setConfirmAction, onCancel: confirmOnCancel, onConfirm: confirmOnConfirm });
 
-  const dialogsCtx = buildDialogsCtx({
-    showSeparateDialog,
-    setShowSeparateDialog,
-    confirmSeparateBrush,
-    vendorState: {
-      itemsList,
-      showVendorUnlockDialog,
-      setShowVendorUnlockDialog,
-      vendorUnlockEntries,
-      showVendorRandomDialog,
-      setShowVendorRandomDialog,
-      vendorRandomSelection,
-      vendorRandomCount,
-      showVendorStockDialog,
-      setShowVendorStockDialog,
-      vendorStockSelection
-    },
-    vendorHandlers: {
-      handleUpdateVendorUnlockRequirement,
-      handleRemoveVendorUnlockRequirement,
-      handleToggleVendorUnlockItem,
-      handleVendorUnlockQtyChange,
-      handleAddVendorUnlockRequirement,
-      handleSaveVendorUnlock,
-      handleToggleVendorRandomItem,
-      handleVendorRandomFieldChange,
-      handleRandomCountChange,
-      handleSaveVendorRandom,
-      handleToggleVendorStockItem,
-      handleVendorStockQtyChange,
-      handleSaveVendorStock
-    },
-    showRuleDialog,
-    ruleDialogStep,
-    ruleDialogError,
-    ruleNameInput,
-    setRuleNameInput,
-    ruleStartType,
-    setRuleStartType,
-    ruleTriggerId,
-    setRuleTriggerId,
-    ruleActionSelection,
-    setRuleActionSelection,
-    availableRuleTriggers,
-    onRuleClose: handleRuleClose,
-    handleSaveRule,
-    showAbilityDialog,
-    abilityNameInput,
-    setAbilityNameInput,
-    handleCloseAbilityDialog,
-    handleCreateAbility,
+  const actorDialogCtx = useActorDialogCtx({
     actorDialogState,
     actorDialogError,
     canUseTilesetDialog,
@@ -1317,7 +1275,10 @@ function App() {
     handleActorRoleToggle,
     handleActorTilesetBrowse,
     handleActorPortraitBrowse,
-    handleActorSubmit,
+    handleActorSubmit
+  });
+
+  const itemDialogCtx = useItemDialogCtx({
     itemDialogState,
     itemDialogError,
     pendingDuplicateItem,
@@ -1330,7 +1291,10 @@ function App() {
     editingItem,
     updateEditingItemField,
     handleCloseItemEdit,
-    handleSaveItemEdit,
+    handleSaveItemEdit
+  });
+
+  const objectDialogCtx = useObjectDialogCtx({
     showObjectDialog,
     editingObject,
     objectValidationErrors,
@@ -1347,7 +1311,56 @@ function App() {
     handleOpenVendorStockDialog,
     handleOpenVendorUnlockDialog,
     handleOpenVendorRandomDialog,
+    setDialogueTrees,
+    setActiveDialogueTab,
     setShowDialogueTreeDialog,
+    showDeleteNpcConfirm,
+    setShowDeleteNpcConfirm,
+    showDeleteEnemyConfirm,
+    setShowDeleteEnemyConfirm
+  });
+
+  const vendorDialogCtx = useVendorDialogCtx({
+    itemsList,
+    showVendorUnlockDialog,
+    setShowVendorUnlockDialog,
+    vendorUnlockEntries,
+    showVendorRandomDialog,
+    setShowVendorRandomDialog,
+    vendorRandomSelection,
+    vendorRandomCount,
+    showVendorStockDialog,
+    setShowVendorStockDialog,
+    vendorStockSelection,
+    handleUpdateVendorUnlockRequirement,
+    handleRemoveVendorUnlockRequirement,
+    handleToggleVendorUnlockItem,
+    handleVendorUnlockQtyChange,
+    handleAddVendorUnlockRequirement,
+    handleSaveVendorUnlock,
+    handleToggleVendorRandomItem,
+    handleVendorRandomFieldChange,
+    handleRandomCountChange,
+    handleSaveVendorRandom,
+    handleToggleVendorStockItem,
+    handleVendorStockQtyChange,
+    handleSaveVendorStock
+  });
+
+  const dialogsCtx = useAssembledDialogs({
+    showSeparateDialog,
+    setShowSeparateDialog,
+    confirmSeparateBrush,
+    ...vendorDialogCtx,
+    handleSaveRule,
+    showAbilityDialog,
+    abilityNameInput,
+    setAbilityNameInput,
+    handleCloseAbilityDialog,
+    handleCreateAbility,
+    ...actorDialogCtx,
+    ...itemDialogCtx,
+    ...objectDialogCtx,
     showDeleteNpcConfirm,
     setShowDeleteNpcConfirm,
     showDeleteEnemyConfirm,

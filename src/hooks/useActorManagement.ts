@@ -82,8 +82,8 @@ export default function useActorManagement({
     }
   }, [handleActorFieldChange]);
 
-  const handleActorSubmit = useCallback(async (editorly = editor, editAfter = false) => {
-    if (!editorly || !actorDialogState) {
+  const handleActorSubmit = useCallback(async (editAfter = false) => {
+    if (!editor || !actorDialogState) {
       return;
     }
 
@@ -147,8 +147,8 @@ export default function useActorManagement({
     const unplacedX = -1;
     const unplacedY = -1;
 
-    const newObject: MapObject = editorly.addMapObject('enemy', unplacedX, unplacedY, 1, 1);
-    editorly.updateMapObject(newObject.id, {
+    const newObject: MapObject = editor.addMapObject('enemy', unplacedX, unplacedY, 1, 1);
+    editor.updateMapObject(newObject.id, {
       name,
       x: unplacedX,
       y: unplacedY,
@@ -171,7 +171,7 @@ export default function useActorManagement({
     if (editAfter) handleEditObject(newObjectId);
 
     try {
-      editorly.triggerAutoSave(true);
+      editor.triggerAutoSave(true);
     } catch (e) {
       console.warn('Auto-save failed after actor creation:', e);
     }

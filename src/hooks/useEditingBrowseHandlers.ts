@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 
-export default function useEditingBrowseHandlers(args: { updateEditingObjectProperty: (k: string, v: any) => void; }) {
+export default function useEditingBrowseHandlers(args: { updateEditingObjectProperty: (k: string, v: string | null) => void; }) {
   const { updateEditingObjectProperty } = args;
 
   const handleEditingTilesetBrowse = useCallback(async () => {

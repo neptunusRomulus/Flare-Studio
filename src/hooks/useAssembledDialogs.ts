@@ -5,6 +5,6 @@ import buildDialogsCtx from './useDialogsCtx';
   to keep App.tsx slimmer. Accepts a big params object and delegates
   to existing `buildDialogsCtx` which merges/validates the shape.
 */
-export default function useAssembledDialogs(params: any) {
-  return buildDialogsCtx(params);
+export default function useAssembledDialogs(params: unknown) {
+  return buildDialogsCtx(params as Record<string, unknown>);
 }

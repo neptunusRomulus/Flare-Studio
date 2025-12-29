@@ -17,7 +17,7 @@ export default function useSelectionPoll(args: {
         const hasActiveSelection = editor.hasActiveSelection ? editor.hasActiveSelection() : false;
         setSelectionCount(selection.length);
         setHasSelection(hasActiveSelection);
-      } catch (err) {
+      } catch {
         // ignore
       }
     };

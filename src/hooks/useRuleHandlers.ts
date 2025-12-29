@@ -1,6 +1,8 @@
 import React, { useCallback } from 'react';
 import type { RuleStartType } from '@/editor/ruleOptions';
 
+type RuleEntry = { id: string; name: string; startType: RuleStartType; triggerId: string };
+
 export default function useRuleHandlers(args: {
   openRuleDialog: () => void;
   closeRuleDialog: () => void;
@@ -10,10 +12,10 @@ export default function useRuleHandlers(args: {
   ruleStartType: RuleStartType | null;
   setRuleDialogError: React.Dispatch<React.SetStateAction<string | null>>;
   setRuleStartType: React.Dispatch<React.SetStateAction<any>>;
-  setRuleTriggerId: React.Dispatch<React.SetStateAction<any>>;
-  setRuleActionSelection: React.Dispatch<React.SetStateAction<any>>;
+  setRuleTriggerId: React.Dispatch<React.SetStateAction<string>>;
+  setRuleActionSelection: React.Dispatch<React.SetStateAction<{ groupId: string; actionId: string } | null>>;
   setRuleDialogStep: React.Dispatch<React.SetStateAction<any>>;
-  setRulesList: (updater: (prev: any[]) => any[]) => void;
+  setRulesList: React.Dispatch<React.SetStateAction<RuleEntry[]>>;
 }) {
   const { openRuleDialog, closeRuleDialog, rulesListLength, ruleNameInput, setRuleNameInput, ruleStartType, setRuleDialogError, setRuleStartType, setRuleTriggerId, setRuleActionSelection, setRuleDialogStep, setRulesList } = args;
 

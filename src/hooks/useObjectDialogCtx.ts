@@ -1,29 +1,33 @@
+import type { Dispatch, SetStateAction } from 'react';
+import type { MapObject, DialogueTree } from '@/types';
+import type { TileMapEditor } from '@/editor/TileMapEditor';
+
 type Params = {
   showObjectDialog: boolean;
-  editingObject: unknown;
-  objectValidationErrors: string[];
-  setEditingObject: (...args: any[]) => any;
-  handleObjectDialogClose: (...args: any[]) => any;
-  handleObjectDialogSave: (...args: any[]) => any;
-  updateEditingObjectProperty: (...args: any[]) => any;
-  updateEditingObjectBoolean: (...args: any[]) => any;
-  getEditingObjectProperty: (...args: any[]) => any;
-  editor: unknown;
-  syncMapObjects: (...args: any[]) => any;
-  handleEditingTilesetBrowse: (...args: any[]) => any;
-  handleEditingPortraitBrowse: (...args: any[]) => any;
-  handleOpenVendorStockDialog: (...args: any[]) => any;
-  handleOpenVendorUnlockDialog: (...args: any[]) => any;
-  handleOpenVendorRandomDialog: (...args: any[]) => any;
-  setDialogueTrees: (...args: any[]) => any;
-  setActiveDialogueTab: (...args: any[]) => any;
-  setShowDialogueTreeDialog: (...args: any[]) => any;
+  editingObject: MapObject | null | undefined;
+  objectValidationErrors: string[] | null | undefined;
+  setEditingObject: Dispatch<SetStateAction<MapObject | null>>;
+  handleObjectDialogClose: () => void;
+  handleObjectDialogSave: () => void;
+  updateEditingObjectProperty: (key: string, value: string | null) => void;
+  updateEditingObjectBoolean: (key: string, checked: boolean) => void;
+  getEditingObjectProperty: (key: string, fallback?: string) => string;
+  editor?: TileMapEditor | null;
+  syncMapObjects?: () => void;
+  handleEditingTilesetBrowse?: () => Promise<void> | void;
+  handleEditingPortraitBrowse?: () => Promise<void> | void;
+  handleOpenVendorStockDialog?: () => void;
+  handleOpenVendorUnlockDialog?: () => void;
+  handleOpenVendorRandomDialog?: () => void;
+  setDialogueTrees?: Dispatch<SetStateAction<DialogueTree[]>>;
+  setActiveDialogueTab?: Dispatch<SetStateAction<number>>;
+  setShowDialogueTreeDialog?: Dispatch<SetStateAction<boolean>>;
   showDeleteNpcConfirm: boolean;
-  setShowDeleteNpcConfirm: (...args: any[]) => any;
+  setShowDeleteNpcConfirm: Dispatch<SetStateAction<boolean>>;
   showDeleteEnemyConfirm: boolean;
-  setShowDeleteEnemyConfirm: (...args: any[]) => any;
+  setShowDeleteEnemyConfirm: Dispatch<SetStateAction<boolean>>;
 };
 
 export default function useObjectDialogCtx(params: Params) {
-  return params as any;
+  return params as Params;
 }

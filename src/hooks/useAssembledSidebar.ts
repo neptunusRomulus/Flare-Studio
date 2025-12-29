@@ -1,15 +1,19 @@
-import useActorsSidebar from './useActorsSidebar';
+import useActorsSidebar, { ActorsSidebarParams } from './useActorsSidebar';
 import useMapsSidebar from './useMapsSidebar';
-import useTilesetSidebar from './useTilesetSidebar';
+import useTilesetSidebar, { TilesetSidebarParams } from './useTilesetSidebar';
 
-export default function useAssembledSidebar(params: any) {
-  const actors = useActorsSidebar(params);
-  const maps = useMapsSidebar(params);
-  const tileset = useTilesetSidebar(params);
+export default function useAssembledSidebar(params: unknown) {
+  const actors = useActorsSidebar(params as ActorsSidebarParams);
+  const maps = useMapsSidebar(params as Record<string, unknown>);
+  const tileset = useTilesetSidebar(params as TilesetSidebarParams);
 
   return {
     actors,
     maps,
     tileset
-  } as any;
+  } as {
+    actors: ReturnType<typeof useActorsSidebar>;
+    maps: ReturnType<typeof useMapsSidebar>;
+    tileset: ReturnType<typeof useTilesetSidebar>;
+  };
 }

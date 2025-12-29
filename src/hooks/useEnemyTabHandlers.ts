@@ -1,11 +1,13 @@
 import { useCallback } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
 import type { MapObject } from '@/types';
+import type { EditorTab } from './useEditorTabs';
 
 export default function useEnemyTabHandlers(args: {
   closeEditorTab: (id: string) => void;
   setPendingEnemyTabCloseId: (id: string | null) => void;
   handleUpdateObject: (obj: MapObject) => void;
-  setTabs: (updater: (prev: any[]) => any[]) => void;
+  setTabs: Dispatch<SetStateAction<EditorTab[]>>;
   activeTabId?: string | null;
 }) {
   const { closeEditorTab, setPendingEnemyTabCloseId, handleUpdateObject, setTabs, activeTabId } = args;

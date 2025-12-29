@@ -1,8 +1,16 @@
 import React from 'react';
 import ItemEditDialog from '@/components/ItemEditDialog';
 
-export default function ItemEditDialogContainer({ ctx }: { ctx: any }) {
-  const c = ctx as any;
+type ItemEditDialogCtx = {
+  showItemEditDialog: boolean;
+  editingItem?: unknown;
+  updateEditingItemField: (key: string, value: unknown) => void;
+  handleCloseItemEdit: () => void;
+  handleSaveItemEdit: () => void;
+};
+
+export default function ItemEditDialogContainer({ ctx }: { ctx: unknown }) {
+  const c = ctx as ItemEditDialogCtx;
   return (
     <ItemEditDialog
       showItemEditDialog={c.showItemEditDialog}

@@ -1,4 +1,20 @@
-export default function buildConfirmActionHandlers(params: Record<string, any>) {
+import type { TileMapEditor } from '@/editor/TileMapEditor';
+import type { MutableRefObject } from 'react';
+
+type ConfirmPayload = { layerType: string; tabId: number };
+type ConfirmAction = { type: 'removeBrush' | 'removeTileset' | 'removeTab'; payload?: number | ConfirmPayload } | null;
+
+type ConfirmParams = {
+  confirmAction: ConfirmAction;
+  tabToDelete?: ConfirmPayload | null;
+  confirmPayloadRef: MutableRefObject<ConfirmPayload | null>;
+  editor?: TileMapEditor | null;
+  setTabTick: (updater: (n: number) => number) => void;
+  setTabToDelete: React.Dispatch<React.SetStateAction<ConfirmPayload | null>>;
+  setConfirmAction: React.Dispatch<React.SetStateAction<ConfirmAction>>;
+};
+
+export default function buildConfirmActionHandlers(params: ConfirmParams) {
   const {
     confirmAction,
     tabToDelete,
@@ -20,7 +36,8 @@ export default function buildConfirmActionHandlers(params: Record<string, any>) 
       } else if (confirmAction.type === 'removeTileset') {
         if (editor) editor.removeLayerTileset?.();
       } else if (confirmAction.type === 'removeTab') {
-        const payload = tabToDelete ?? confirmPayloadRef.current ?? (confirmAction.payload as any);
+        const payloadRaw = tabToDelete ?? confirmPayloadRef.current ?? (confirmAction.payload as unknown);
+        const payload = (payloadRaw as { layerType?: string; tabId?: number } | null) ?? null;
         if (editor && payload && payload.layerType) {
           const liveActive = editor.getActiveLayerTabId ? editor.getActiveLayerTabId(payload.layerType) : null;
           const finalTabId = (typeof liveActive === 'number' && liveActive !== null) ? liveActive : payload.tabId;

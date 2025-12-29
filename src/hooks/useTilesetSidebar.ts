@@ -2,8 +2,6 @@ import type React from 'react';
 import type { TileMapEditor } from '../editor/TileMapEditor';
 import type { TileLayer, Stamp } from '../types';
 
-import type { toast as ToastFn } from '../hooks/use-toast';
-
 type BrushTool = 'none' | 'move' | 'merge' | 'separate' | 'remove';
 
 export type TilesetSidebarParams = {

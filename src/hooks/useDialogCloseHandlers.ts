@@ -8,7 +8,7 @@ export default function useDialogCloseHandlers(args: {
   setRuleStartType: React.Dispatch<React.SetStateAction<any>>;
   setRuleTriggerId: React.Dispatch<React.SetStateAction<any>>;
   setRuleActionSelection: React.Dispatch<React.SetStateAction<any>>;
-  setShowDialogueTreeDialog: React.Dispatch<React.SetStateAction<boolean>>;
+  setShowDialogueTreeDialog: React.Dispatch<React.SetStateAction<any>>;
   setDialogueTabToDelete: React.Dispatch<React.SetStateAction<any>>;
 }) {
   const { closeRuleDialog, setRuleDialogError, setRuleDialogStep, setRuleStartType, setRuleTriggerId, setRuleActionSelection, setShowDialogueTreeDialog, setDialogueTabToDelete } = args;

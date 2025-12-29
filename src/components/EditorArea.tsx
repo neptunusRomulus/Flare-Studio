@@ -2,6 +2,7 @@ import React from 'react';
 import TopBar from '@/components/TopBar';
 import EnemyTabPanel from '@/components/EnemyTabPanel';
 import EditorCanvas from '@/components/EditorCanvas';
+import type { MapObject } from '@/types';
 
 type TopBarProps = {
   toolbarExpanded: boolean;
@@ -19,16 +20,16 @@ type TopBarProps = {
 
 type EnemyPanelProps = {
   isEnemyActive: boolean;
-  enemy: any;
+  enemy?: MapObject | null;
   showCloseConfirm: boolean;
   onCloseDecision: (decision: string) => void;
-  onSave: (data: any) => void;
+  onSave: (data: MapObject) => void;
 };
 
 type Props = {
   topBarProps: TopBarProps;
-  canvasCtx: any;
-  bottomToolbarProps: any;
+  canvasCtx: React.ComponentProps<typeof EditorCanvas>['ctx'];
+  bottomToolbarProps: React.ComponentProps<typeof EditorCanvas>['bottomToolbarProps'];
   enemyPanelProps: EnemyPanelProps;
 };
 

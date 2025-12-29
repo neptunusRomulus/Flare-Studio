@@ -1,8 +1,22 @@
 import React from 'react';
 import DialogueTreeDialog from '@/components/dialogue/DialogueTreeDialog';
+import type { DialogueTree } from '@/types';
 
-export default function DialogueTreeDialogContainer({ ctx }: { ctx: any }) {
-  const c = ctx as any;
+type DialogueTreeDialogCtx = {
+  showDialogueTreeDialog: boolean;
+  dialogueTrees: DialogueTree[];
+  setDialogueTrees: (t: DialogueTree[]) => void;
+  activeDialogueTab?: string | null;
+  setActiveDialogueTab: (id: string | null) => void;
+  dialogueTabToDelete?: string | null;
+  setDialogueTabToDelete: (id: string | null) => void;
+  editingObject?: unknown;
+  updateEditingObjectProperty: (key: string, value: unknown) => void;
+  onDialogueClose: () => void;
+};
+
+export default function DialogueTreeDialogContainer({ ctx }: { ctx: unknown }) {
+  const c = ctx as DialogueTreeDialogCtx;
   return (
     <DialogueTreeDialog
       showDialogueTreeDialog={c.showDialogueTreeDialog}

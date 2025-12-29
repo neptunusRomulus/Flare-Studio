@@ -10,22 +10,28 @@ export default function useBrushActionListener(args: {
   useEffect(() => {
     const handler = (event: Event) => {
       try {
-        const custom = event as CustomEvent;
-        const { action } = (custom.detail || {}) as any;
-        switch (action) {
+        const custom = event as CustomEvent<Record<string, unknown>>;
+        const detail = (custom.detail ?? {}) as {
+          action?: string;
+          tileIndex?: number;
+          from?: number;
+          to?: number;
+        };
+
+        switch (detail.action) {
           case 'separate':
-            onSeparate(custom.detail.tileIndex);
+            if (typeof detail.tileIndex === 'number') onSeparate(detail.tileIndex);
             break;
           case 'remove':
-            onRemove(custom.detail.tileIndex);
+            if (typeof detail.tileIndex === 'number') onRemove(detail.tileIndex);
             break;
           case 'drop':
-            if (custom.detail.from != null && custom.detail.to != null) onReorder(custom.detail.from, custom.detail.to);
+            if (typeof detail.from === 'number' && typeof detail.to === 'number') onReorder(detail.from, detail.to);
             break;
           default:
             break;
         }
-      } catch (err) {
+      } catch {
         // ignore
       }
     };

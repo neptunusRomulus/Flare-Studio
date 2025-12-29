@@ -20,10 +20,10 @@ export type ActorsSidebarParams = {
   handleAddRule: () => void;
 
   isItemsLayer: boolean;
-  itemsList: Array<any>;
+  itemsList: unknown[];
   expandedItemCategories: Set<ItemRole>;
   setExpandedItemCategories: React.Dispatch<React.SetStateAction<Set<ItemRole>>>;
-  handleOpenItemEdit: (item: any) => void;
+  handleOpenItemEdit: (item: unknown) => void;
   handleOpenItemDialog: () => void;
 
   layers: TileLayer[];
@@ -37,7 +37,13 @@ export type ActorsSidebarParams = {
   handleLayerTransparencyChange: (id: number, delta: number) => void;
   showTooltipWithDelay: (text: React.ReactNode, target: HTMLElement) => void;
   hideTooltip: () => void;
-  uiHelpers?: any;
+  uiHelpers?: {
+    showTooltipWithDelay: (text: React.ReactNode, target: HTMLElement) => void;
+    hideTooltip: () => void;
+    toolbarRef?: React.RefObject<HTMLDivElement>;
+    canvasRef?: React.RefObject<HTMLCanvasElement>;
+    tooltip?: unknown;
+  };
   leftCollapsed: boolean;
 };
 

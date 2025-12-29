@@ -1,6 +1,8 @@
+type ConfirmAction = unknown | null;
+
 type Params = {
-  confirmAction: any;
-  setConfirmAction: (v: any) => void;
+  confirmAction: ConfirmAction;
+  setConfirmAction: React.Dispatch<React.SetStateAction<ConfirmAction>>;
   onCancel?: () => void;
   onConfirm?: () => void;
 };

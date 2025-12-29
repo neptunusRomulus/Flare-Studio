@@ -7,9 +7,9 @@ export default function useDarkModeSync(isDarkMode: boolean, editor?: TileMapEdi
     else document.documentElement.classList.remove('dark');
 
     if (editor && typeof editor.setDarkMode === 'function') {
-      try { editor.setDarkMode(isDarkMode); } catch (e) { /* ignore */ }
+      try { editor.setDarkMode(isDarkMode); } catch { /* ignore */ }
     }
 
-    try { localStorage.setItem('isDarkMode', JSON.stringify(isDarkMode)); } catch (e) { /* ignore */ }
+    try { localStorage.setItem('isDarkMode', JSON.stringify(isDarkMode)); } catch { /* ignore */ }
   }, [isDarkMode, editor]);
 }

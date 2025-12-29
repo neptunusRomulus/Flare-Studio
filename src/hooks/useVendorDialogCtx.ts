@@ -1,28 +1,34 @@
+import type { Dispatch, SetStateAction } from 'react';
+
+type RandomCount = { min: number; max: number };
+
+type VendorUnlockEntry = { id: string; requirement: string; items: Record<number, number> };
+
 type Params = {
-  itemsList: unknown;
+  itemsList: unknown[] | null;
   showVendorUnlockDialog: boolean;
-  setShowVendorUnlockDialog: (...args: any[]) => any;
-  vendorUnlockEntries: unknown;
+  setShowVendorUnlockDialog: Dispatch<SetStateAction<boolean>>;
+  vendorUnlockEntries: VendorUnlockEntry[];
   showVendorRandomDialog: boolean;
-  setShowVendorRandomDialog: (...args: any[]) => any;
-  vendorRandomSelection: unknown;
-  vendorRandomCount: any;
+  setShowVendorRandomDialog: Dispatch<SetStateAction<boolean>>;
+  vendorRandomSelection: Record<string, number> | null;
+  vendorRandomCount: RandomCount | null;
   showVendorStockDialog: boolean;
-  setShowVendorStockDialog: (...args: any[]) => any;
-  vendorStockSelection: unknown;
-  handleUpdateVendorUnlockRequirement: (...args: any[]) => any;
-  handleRemoveVendorUnlockRequirement: (...args: any[]) => any;
-  handleToggleVendorUnlockItem: (...args: any[]) => any;
-  handleVendorUnlockQtyChange: (...args: any[]) => any;
-  handleAddVendorUnlockRequirement: (...args: any[]) => any;
-  handleSaveVendorUnlock: (...args: any[]) => any;
-  handleToggleVendorRandomItem: (...args: any[]) => any;
-  handleVendorRandomFieldChange: (...args: any[]) => any;
-  handleRandomCountChange: (...args: any[]) => any;
-  handleSaveVendorRandom: (...args: any[]) => any;
-  handleToggleVendorStockItem: (...args: any[]) => any;
-  handleVendorStockQtyChange: (...args: any[]) => any;
-  handleSaveVendorStock: (...args: any[]) => any;
+  setShowVendorStockDialog: Dispatch<SetStateAction<boolean>>;
+  vendorStockSelection: Record<number, number> | null;
+  handleUpdateVendorUnlockRequirement: (entryId: string, value: string) => void;
+  handleRemoveVendorUnlockRequirement: (entryId: string) => void;
+  handleToggleVendorUnlockItem: (entryId: string, itemId: number) => void;
+  handleVendorUnlockQtyChange: (entryId: string, itemId: number, qty: number) => void;
+  handleAddVendorUnlockRequirement: () => void;
+  handleSaveVendorUnlock: () => void;
+  handleToggleVendorRandomItem: (itemId: number) => void;
+  handleVendorRandomFieldChange: (itemId: number, field: 'chance' | 'min' | 'max', value: number) => void;
+  handleRandomCountChange: (field: 'min' | 'max', value: number) => void;
+  handleSaveVendorRandom: () => void;
+  handleToggleVendorStockItem: (id: number) => void;
+  handleVendorStockQtyChange: (id: number, qty: number) => void;
+  handleSaveVendorStock: () => void;
 };
 
 export default function useVendorDialogCtx(params: Params) {

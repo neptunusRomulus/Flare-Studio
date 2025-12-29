@@ -1,10 +1,11 @@
 import { useCallback } from 'react';
 import type { MapObject } from '@/types';
+import type { Dispatch, SetStateAction } from 'react';
 
 export default function useObjectDialogClose(args: {
   setShowObjectDialog: (v: boolean) => void;
   setEditingObject: (o: MapObject | null) => void;
-  setObjectValidationErrors: (e: any[]) => void;
+  setObjectValidationErrors: Dispatch<SetStateAction<string[]>>;
   setShowDeleteNpcConfirm: (v: boolean) => void;
   setShowDeleteEnemyConfirm: (v: boolean) => void;
 }) {

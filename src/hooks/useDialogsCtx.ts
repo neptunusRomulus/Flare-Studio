@@ -1,5 +1,6 @@
 export default function buildDialogsCtx(params: Record<string, unknown>) {
   // Thin wrapper to move the large dialogs ctx object out of App.tsx
-  // Keep typing permissive for now to avoid wide ripple changes.
-  return params as any;
+  // Return as unknown to avoid spreading `any` widely; callers should
+  // cast to the concrete dialog ctx type they expect.
+  return params as unknown;
 }

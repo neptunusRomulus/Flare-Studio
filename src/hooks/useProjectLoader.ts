@@ -35,7 +35,7 @@ type Params = {
   setHasSelection: Dispatch<SetStateAction<boolean>>;
   setSelectionCount: Dispatch<SetStateAction<number>>;
   setHasUnsavedChanges: Dispatch<SetStateAction<boolean>>;
-  setSaveStatus: Dispatch<SetStateAction<any>>;
+  setSaveStatus: Dispatch<SetStateAction<'saving' | 'saved' | 'unsaved' | 'error'>>;
   setCreateMapError: Dispatch<SetStateAction<string | null>>;
   setShowCreateMapDialog: Dispatch<SetStateAction<boolean>>;
   setShowWelcome: Dispatch<SetStateAction<boolean>>;

@@ -1,8 +1,19 @@
 import React from 'react';
 import ItemDialog from '@/components/ItemDialog';
 
-export default function ItemDialogContainer({ ctx }: { ctx: any }) {
-  const c = ctx as any;
+type ItemDialogCtx = {
+  itemDialogState: unknown;
+  itemDialogError?: string | null;
+  pendingDuplicateItem?: unknown;
+  handleCloseItemDialog: () => void;
+  handleItemFieldChange: (field: string, value: unknown) => void;
+  handleItemSubmit: (data: unknown) => void;
+  handleConfirmDuplicateItem: () => void;
+  clearPendingDuplicate: () => void;
+};
+
+export default function ItemDialogContainer({ ctx }: { ctx: unknown }) {
+  const c = ctx as ItemDialogCtx;
   return (
     <ItemDialog
       itemDialogState={c.itemDialogState}

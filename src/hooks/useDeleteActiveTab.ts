@@ -1,13 +1,18 @@
 import { useCallback } from 'react';
 import type { TileLayer } from '@/types';
+import type { TileMapEditor } from '@/editor/TileMapEditor';
+import type { MutableRefObject } from 'react';
+
+type ConfirmPayload = { layerType: string; tabId: number };
+type ConfirmAction = { type: 'removeBrush' | 'removeTileset' | 'removeTab'; payload?: number | ConfirmPayload } | null;
 
 export default function useDeleteActiveTab(args: {
-  editor?: any;
+  editor?: TileMapEditor | null;
   activeLayer?: TileLayer | null;
-  toast: (...args: any[]) => any;
-  confirmPayloadRef: { current: any };
-  setTabToDelete: (p: any) => void;
-  setConfirmAction: (a: any) => void;
+  toast: typeof import('@/hooks/use-toast').toast;
+  confirmPayloadRef: MutableRefObject<ConfirmPayload | null>;
+  setTabToDelete: React.Dispatch<React.SetStateAction<ConfirmPayload | null>>;
+  setConfirmAction: React.Dispatch<React.SetStateAction<ConfirmAction>>;
 }) {
   const { editor, activeLayer, toast, confirmPayloadRef, setTabToDelete, setConfirmAction } = args;
 

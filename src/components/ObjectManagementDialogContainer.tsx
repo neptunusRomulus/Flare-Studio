@@ -1,8 +1,36 @@
 import React from 'react';
 import ObjectManagementDialog from '@/components/ObjectManagementDialog';
+import type { MapObject } from '@/types';
 
-export default function ObjectManagementDialogContainer({ ctx }: { ctx: any }) {
-  const c = ctx as any;
+type ObjMgmtCtx = {
+  showObjectDialog: boolean;
+  editingObject?: MapObject | null;
+  objectValidationErrors?: Record<string, string> | null;
+  setEditingObject: (obj: MapObject | null) => void;
+  handleObjectDialogClose: () => void;
+  handleObjectDialogSave: () => void;
+  updateEditingObjectProperty: (key: string, value: unknown) => void;
+  updateEditingObjectBoolean: (key: string, value: boolean) => void;
+  getEditingObjectProperty: (key: string) => unknown;
+  editor?: unknown;
+  syncMapObjects?: () => void;
+  canUseTilesetDialog?: boolean;
+  handleEditingTilesetBrowse?: () => void;
+  handleEditingPortraitBrowse?: () => void;
+  handleOpenVendorStockDialog?: () => void;
+  handleOpenVendorUnlockDialog?: () => void;
+  handleOpenVendorRandomDialog?: () => void;
+  setDialogueTrees?: (t: unknown) => void;
+  setActiveDialogueTab?: (id: string | null) => void;
+  setShowDialogueTreeDialog?: (v: boolean) => void;
+  showDeleteNpcConfirm?: boolean;
+  setShowDeleteNpcConfirm?: (v: boolean) => void;
+  showDeleteEnemyConfirm?: boolean;
+  setShowDeleteEnemyConfirm?: (v: boolean) => void;
+};
+
+export default function ObjectManagementDialogContainer({ ctx }: { ctx: unknown }) {
+  const c = ctx as ObjMgmtCtx;
   return (
     <ObjectManagementDialog
       showObjectDialog={c.showObjectDialog}

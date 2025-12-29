@@ -1,10 +1,10 @@
 import React, { useCallback } from 'react';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
-import type { TileLayer } from '@/types';
+import type { TileLayer, MapObject } from '@/types';
 
 export default function useMapHandlers(args: {
   editor?: TileMapEditor | null;
-  setMapObjects: React.Dispatch<React.SetStateAction<any[]>>;
+  setMapObjects: React.Dispatch<React.SetStateAction<MapObject[]>>;
   setLayers: React.Dispatch<React.SetStateAction<TileLayer[]>>;
   setActiveLayerId: React.Dispatch<React.SetStateAction<number | null>>;
 }) {

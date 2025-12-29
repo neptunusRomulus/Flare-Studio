@@ -35,17 +35,31 @@ export default function useEditorIpc(opts: UseEditorIpcOptions) {
   useEffect(() => { hasUnsavedRef.current = hasUnsavedChanges; }, [hasUnsavedChanges]);
 
   useEffect(() => {
-    if (typeof window === 'undefined' || !(window as any).electronAPI) return;
+    if (typeof window === 'undefined') return;
 
     try {
-      const api = (window as any).electronAPI;
+      type EditorAPI = {
+        onMenuSaveMap?: (cb: () => void) => void;
+        onMenuOpenMap?: (cb: () => void) => void;
+        selectDirectory?: () => Promise<string | null>;
+        onMenuNewMap?: (cb: () => void) => void;
+        onMenuUndo?: (cb: () => void) => void;
+        onMenuRedo?: (cb: () => void) => void;
+        onBeforeClose?: (cb: () => void) => void;
+        confirmClose?: (hasUnsaved: boolean) => Promise<void>;
+        onSaveAndClose?: (cb: () => void) => void;
+        closeAfterSave?: () => void;
+      };
 
-      api.onMenuSaveMap(async () => {
+      const api = (window as unknown as { electronAPI?: EditorAPI }).electronAPI;
+      if (!api) return;
+
+      api.onMenuSaveMap?.(async () => {
         try { await handleManualSaveRef.current?.(); } catch (e) { console.error(e); }
       });
 
-      api.onMenuOpenMap(async () => {
-        const selected = await api.selectDirectory();
+      api.onMenuOpenMap?.(async () => {
+        const selected = await api.selectDirectory?.();
         if (selected) {
           try {
             const fn = handleOpenMapRef.current;
@@ -56,7 +70,7 @@ export default function useEditorIpc(opts: UseEditorIpcOptions) {
         }
       });
 
-      api.onMenuNewMap(() => {
+      api.onMenuNewMap?.(() => {
         setShowWelcome(true);
         setMapInitialized(false);
         setEditor(null);
@@ -65,31 +79,31 @@ export default function useEditorIpc(opts: UseEditorIpcOptions) {
         setShowCreateMapDialog(false);
       });
 
-      api.onMenuUndo(() => { try { handleUndoRef.current?.(); } catch (e) { console.error(e); } });
-      api.onMenuRedo(() => { try { handleRedoRef.current?.(); } catch (e) { console.error(e); } });
+      api.onMenuUndo?.(() => { try { handleUndoRef.current?.(); } catch (e) { console.error(e); } });
+      api.onMenuRedo?.(() => { try { handleRedoRef.current?.(); } catch (e) { console.error(e); } });
 
-      api.onBeforeClose(async () => {
+      api.onBeforeClose?.(async () => {
         try {
-          await api.confirmClose(hasUnsavedRef.current);
+          await api.confirmClose?.(hasUnsavedRef.current);
         } catch (err) {
           console.error('onBeforeClose handler failed:', err);
         }
       });
 
-      api.onSaveAndClose(async () => {
+      api.onSaveAndClose?.(async () => {
         try {
           await handleManualSaveRef.current?.();
-          api.closeAfterSave();
+          api.closeAfterSave?.();
         } catch (error) {
           console.error('Failed to save before close:', error);
-          api.closeAfterSave();
+          api.closeAfterSave?.();
         }
       });
     } catch (err) {
       console.warn('useEditorIpc: failed to register some listeners', err);
     }
 
-  // Intentionally no dependencies so listeners register once.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Intentionally no dependencies so listeners register once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 }

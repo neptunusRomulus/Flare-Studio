@@ -1,8 +1,31 @@
 import React from 'react';
 import MapDialogs from '@/components/MapDialogs';
 
-export default function MapDialogsContainer({ ctx }: { ctx: any }) {
-  const c = ctx as any;
+type MapDialogsCtx = {
+  showCreateMapDialog: boolean;
+  setShowCreateMapDialog: (v: boolean) => void;
+  newMapName: string;
+  setNewMapName: (v: string) => void;
+  newMapWidth: number;
+  setNewMapWidth: (n: number) => void;
+  newMapHeight: number;
+  setNewMapHeight: (n: number) => void;
+  newMapStarting: string;
+  setNewMapStarting: (s: string) => void;
+  createMapError?: string | null;
+  setCreateMapError: (s: string | null) => void;
+  isPreparingNewMap: boolean;
+  handleConfirmCreateMap: () => void;
+  showHeroEditDialog: boolean;
+  setShowHeroEditDialog: (v: boolean) => void;
+  heroEditData?: unknown;
+  setHeroEditData: (d: unknown) => void;
+  handleHeroEditCancel: () => void;
+  handleHeroEditConfirm: () => void;
+};
+
+export default function MapDialogsContainer({ ctx }: { ctx: unknown }) {
+  const c = ctx as MapDialogsCtx;
   return (
     <MapDialogs
       showCreateMapDialog={c.showCreateMapDialog}

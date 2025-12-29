@@ -1,7 +1,7 @@
 import useStampState from './useStampState';
 
 export default function useStamps() {
-  const stampState = useStampState() as any;
+  const stampState = useStampState() as ReturnType<typeof useStampState>;
 
   return {
     stamps: stampState.stamps,

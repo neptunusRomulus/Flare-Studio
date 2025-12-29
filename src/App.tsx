@@ -2,21 +2,9 @@ import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { TileMapEditor } from './editor/TileMapEditor';
 import type { EditorProjectData } from './editor/TileMapEditor';
 import { useToast } from '@/hooks/use-toast';
-import { Toaster } from '@/components/ui/toaster';
-import WelcomeScreen from './components/WelcomeScreen';
 // UI helpers like Button/Badge/Tooltip are imported in the components that use them.
-import ClearLayerDialog from '@/components/ClearLayerDialog';
-import EngineSettingsDialog from '@/components/EngineSettingsDialog';
-import HelpDialog from '@/components/HelpDialog';
-import MapSettingsDialog from '@/components/MapSettingsDialog';
-import EditorArea from '@/components/EditorArea';
-import AppShell from '@/components/AppShell';
 import useTitleBarProps from './hooks/useTitleBarProps';
-import ConfirmActionDialog from '@/components/ConfirmActionDialog';
-import AppSidebar from '@/components/AppSidebar';
-import DialogsContainer from '@/components/DialogsContainer';
 import buildConfirmDialogProps from './hooks/buildConfirmDialogProps';
-import buildDialogsCtx from './hooks/useDialogsCtx';
 import useActorDialogCtx from './hooks/useActorDialogCtx';
 import useItemDialogCtx from './hooks/useItemDialogCtx';
 import useObjectDialogCtx from './hooks/useObjectDialogCtx';
@@ -24,7 +12,7 @@ import useVendorDialogCtx from './hooks/useVendorDialogCtx';
 import useAssembledDialogs from './hooks/useAssembledDialogs';
 import useMapsDropdown from './hooks/useMapsDropdown';
 // Sidebar child components are now rendered inside AppSidebar
-import { TileLayer, MapObject } from './types';
+import { MapObject } from './types';
 import type { ItemRole } from './editor/itemRoles';
 import { GAME_TRIGGER_OPTIONS, PLAYER_TRIGGER_OPTIONS } from './editor/ruleOptions';
 import type { RuleStartType } from './editor/ruleOptions';
@@ -58,9 +46,8 @@ import useConfirmations from './hooks/useConfirmations';
 import useObjectDialogHandlers from './hooks/useObjectDialogHandlers';
 import useAbilityDialog from './hooks/useAbilityDialog';
 import useCanvasDoubleClick from './hooks/useCanvasDoubleClick';
-import useBottomToolbarProps from './hooks/useBottomToolbarProps';
 import useBrushActions from './hooks/useBrushActions';
-import useEditorCanvasCtx from './hooks/useEditorCanvasCtx';
+import useEditorAreaProps from './hooks/useEditorAreaProps';
 import useAssembledSidebar from './hooks/useAssembledSidebar';
 import useWindowControls from './hooks/useWindowControls';
 import useSidebarToggle from './hooks/useSidebarToggle';
@@ -90,9 +77,49 @@ import useMapHandlers from './hooks/useMapHandlers';
 import useBrushActionListener from './hooks/useBrushActionListener';
 import buildConfirmActionHandlers from './hooks/useConfirmActionHandlers';
 import useBrushToolbar from './hooks/useBrushToolbar';
+import useAppEffects from './hooks/useAppEffects';
+import AppMain from './components/AppMain';
+import useAppState from './hooks/useAppState';
 
 function App() {
-  const [showWelcome, setShowWelcome] = useState(true);
+  const {
+    showWelcome,
+    setShowWelcome,
+    activeGid,
+    setActiveGid,
+    showActiveGid,
+    setShowActiveGid,
+    leftCollapsed,
+    setLeftCollapsed,
+    leftTransitioning,
+    setLeftTransitioning,
+    layers,
+    setLayers,
+    activeLayerId,
+    setActiveLayerId,
+    showAddLayerDropdown,
+    setShowAddLayerDropdown,
+    layersPanelExpanded,
+    setLayersPanelExpanded,
+    hoveredLayerId,
+    setHoveredLayerId,
+    tipsMinimized,
+    setTipsMinimized,
+    tabTick,
+    setTabTick,
+    pendingMapConfig,
+    setPendingMapConfig,
+    isOpeningProject,
+    setIsOpeningProject,
+    draggingNpcId,
+    setDraggingNpcId,
+    npcHoverTooltip,
+    setNpcHoverTooltip,
+    npcDeletePopup,
+    setNpcDeletePopup,
+    createTabForRef,
+    beforeCreateMapRef
+  } = useAppState();
   const editorOptsRef = useRef<Record<string, unknown> | null>(null);
   const {
     editor,
@@ -124,27 +151,7 @@ function App() {
   // Load session when a project is opened (handled in handleOpenMap)
   // Save session effect is defined after currentProjectPath state (see below)
 
-  // Keep a stable reference to editor active GID even if the value isn't rendered
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [activeGid, setActiveGid] = useState<string>('(none)');
-  
-  // Show/hide Active GID indicator (user preference)
-  const [showActiveGid, setShowActiveGid] = useState<boolean>(true);
-  // Left sidebar collapsed (icon-strip) state
-  // Start expanded by default; users can toggle during the session
-  const [leftCollapsed, setLeftCollapsed] = useState<boolean>(false);
-  // transient flag during sidebar open/close animation to reduce canvas flicker
-  const [leftTransitioning, setLeftTransitioning] = useState<boolean>(false);
-  const [layers, setLayers] = useState<TileLayer[]>([]);
-  const [activeLayerId, setActiveLayerId] = useState<number | null>(null);
-  const [showAddLayerDropdown, setShowAddLayerDropdown] = useState(false);
-  // Layers panel expand/collapse state
-  const [layersPanelExpanded, setLayersPanelExpanded] = useState(false);
-  // Individual layer hover state
-  const [hoveredLayerId, setHoveredLayerId] = useState<number | null>(null);
-  const [tipsMinimized, setTipsMinimized] = useState(false);
-  // Force refresh counter to trigger re-render when editor-managed tabs change
-  const [tabTick, setTabTick] = useState(0);
+  // App UI state consolidated into `useAppState` (keeps App.tsx thin)
   const toolbarState = useToolbarState();
   const {
     toolbarControls,
@@ -207,7 +214,7 @@ function App() {
   // local brush toolbar helpers (fallback hook) used by handlers and other hooks
   const { showBrushToolbarTemporarily: showBrushToolbarTemporarilyFallback } = useBrushToolbar();
 
-  const [pendingMapConfig, setPendingMapConfig] = useState<EditorProjectData | null>(null);
+  
   const canUseTilesetDialog = !!editor;
   const {
     handleSelectTool,
@@ -301,9 +308,7 @@ function App() {
     
   } = useAutosave({ manualSaveRef: handleManualSaveRef });
 
-  // When true, we're in the middle of opening an existing project
-  // and should avoid creating a blank editor instance.
-  const [isOpeningProject, setIsOpeningProject] = useState(false);
+  
   
   const { tooltip, showTooltipWithDelay: showTooltipWithDelayFn, hideTooltip: hideTooltipFn } = useTooltip({ toolbarRef, canvasRef });
 
@@ -315,18 +320,10 @@ function App() {
     canvasRef
   };
 
-  // NPC drag-drop state
-  const [draggingNpcId, setDraggingNpcId] = useState<number | null>(null);
+  // Reference `activeGid` so linters don't mark it as unused (value consumed elsewhere)
+  useEffect(() => { void activeGid; }, [activeGid]);
 
-  // NPC hover tooltip state (follows cursor)
-  const [npcHoverTooltip, setNpcHoverTooltip] = useState<{ x: number; y: number } | null>(null);
-
-  // NPC delete confirmation popup state
-  const [npcDeletePopup, setNpcDeletePopup] = useState<{
-    npcId: number;
-    screenX: number;
-    screenY: number;
-  } | null>(null);
+  
 
   // Hero position edit dialog state moved to useDialogs
 
@@ -369,8 +366,7 @@ function App() {
     handleCreateAbility
   } = useAbilityDialog();
 
-  const createTabForRef = useRef<((name: string, projectPath: string | null, config: EditorProjectData) => void) | null>(null);
-  const beforeCreateMapRef = useRef<(() => Promise<void>) | null>(null);
+  
   const { getCreateTabFor, getBeforeCreateMap } = useGetters({ createTabForRef, beforeCreateMapRef });
   const {
     mapWidth,
@@ -448,37 +444,10 @@ function App() {
     setMapHeight,
     switchToTabHelpersRef
   });
-
-  useEffect(() => {
-    createTabForRef.current = createTabFor;
-  }, [createTabFor]);
   // before-create-map behavior extracted to a hook
   const { handleBeforeCreateMap } = useBeforeCreateMap({ editor, activeTabId, setTabs, currentProjectPath });
 
-  useEffect(() => {
-    beforeCreateMapRef.current = handleBeforeCreateMap;
-  }, [handleBeforeCreateMap]);
-
   useProjectSession({ tabs, activeTabId, currentProjectPath });
-
-  useEffect(() => {
-    if (tabs.length > 0 && !activeTabId) {
-      if (currentProjectPath) {
-        const normalizedProjectPath = currentProjectPath.replace(/\\/g, '/').toLowerCase();
-        const projectTabs = tabs.filter(t => {
-          const normalizedTabPath = t.projectPath?.replace(/\\/g, '/').toLowerCase() || '';
-          return normalizedTabPath === normalizedProjectPath;
-        });
-        if (projectTabs.length > 0) {
-          console.log('Auto-selecting first project tab:', projectTabs[0].name);
-          setActiveTabId(projectTabs[0].id);
-        }
-      } else if (tabs.length > 0) {
-        console.log('Auto-selecting first available tab:', tabs[0].name);
-        setActiveTabId(tabs[0].id);
-      }
-    }
-  }, [activeTabId, currentProjectPath, setActiveTabId, tabs]);
   
   // Rules list for the Rules layer (UI-only for now; persistence will be added later).
   const [rulesList, setRulesList] = useState<Array<{ id: string; name: string; startType: RuleStartType; triggerId: string }>>([]);
@@ -775,7 +744,7 @@ function App() {
     return () => {
       document.removeEventListener('click', handleClickOutside);
     };
-  }, [showAddLayerDropdown]);
+  }, [showAddLayerDropdown, setShowAddLayerDropdown]);
 
   // Icon helper functions were moved into toolbar components.
 
@@ -1020,6 +989,42 @@ function App() {
 
   useBeforeUnload(hasUnsavedChanges);
 
+  useAppEffects({
+    createTabForRef,
+    createTabFor,
+    beforeCreateMapRef,
+    handleBeforeCreateMap,
+    tabs,
+    activeTabId,
+    currentProjectPath,
+    setActiveTabId,
+    toast,
+    editor,
+    selectedTool,
+    selectedBrushTool,
+    selectedSelectionTool,
+    selectedShapeTool,
+    stampMode,
+    selectedStamp,
+    setSelectionCount,
+    setHasSelection,
+    updateLayersList,
+    updateLayersListRef,
+    syncMapObjects,
+    syncMapObjectsRef,
+    showAddLayerDropdown,
+    setShowAddLayerDropdown,
+    loadProjectData,
+    setupAutoSaveWrapper,
+    handleOpenMap,
+    handleUndo,
+    handleRedo,
+    handleOpenMapRef,
+    handleUndoRef,
+    handleRedoRef,
+    switchToTabHelpersRef
+  });
+
   
 
   
@@ -1063,8 +1068,8 @@ function App() {
 
   
 
-  // Assemble EditorCanvas props via a hook to keep the JSX area concise.
-  const { ctx: editorCanvasCtx } = useEditorCanvasCtx({
+  // Assemble Editor-area props via a focused hook to keep App.tsx small
+  const { topBarProps, canvasCtx, bottomToolbarProps, enemyPanelProps } = useEditorAreaProps({
     editor,
     canvasRef,
     draggingNpcId,
@@ -1127,46 +1132,23 @@ function App() {
     stamps,
     selectedStamp,
     handleStampSelect,
-    handleDeleteStamp
-  });
-
-  const bottomToolbarProps = useBottomToolbarProps({
-    bottomToolbarExpanded,
-    setBottomToolbarNode,
-    handleBottomToolbarMouseEnter,
-    handleBottomToolbarMouseLeave,
-    handleBottomToolbarFocus,
-    handleBottomToolbarBlur,
-    selectedTool,
-    handleSelectTool,
-    showBrushOptions,
-    handleShowBrushOptions,
-    handleHideBrushOptions,
-    selectedBrushTool,
-    setSelectedBrushTool,
-    showTooltipWithDelay: showTooltipWithDelayFn,
-    hideTooltip: hideTooltipFn,
-    setShowClearLayerDialog,
-    showSelectionOptions,
-    handleShowSelectionOptions,
-    handleHideSelectionOptions,
-    selectedSelectionTool,
-    setSelectedSelectionTool,
-    showShapeOptions,
-    handleShowShapeOptions,
-    handleHideShapeOptions,
-    selectedShapeTool,
-    setSelectedShapeTool,
-    stampMode,
-    setStampMode,
-    newStampName,
-    setNewStampName,
-    handleCreateStamp,
-    stamps,
-    selectedStamp,
-    handleStampSelect,
     handleDeleteStamp,
-    stampsState
+    toolbarExpanded,
+    toolbarContainerRef,
+    handleToolbarMouseEnter,
+    handleToolbarMouseLeave,
+    handleToolbarFocus,
+    handleToolbarBlur,
+    handleUndo,
+    handleRedo,
+    handleZoomIn,
+    handleZoomOut,
+    handleResetZoom,
+    enemy: (activeTab?.config as EnemyTabConfig | null)?.enemy,
+    pendingEnemyTabCloseId,
+    activeTabId,
+    handleEnemyTabCloseDecision,
+    handleEnemyTabSave
   });
 
   const assembledSidebar = useAssembledSidebar({
@@ -1352,6 +1334,18 @@ function App() {
     setShowSeparateDialog,
     confirmSeparateBrush,
     ...vendorDialogCtx,
+    showRuleDialog,
+    openRuleDialog,
+    closeRuleDialog,
+    ruleDialogStep,
+    setRuleDialogStep,
+    ruleDialogError,
+    setRuleDialogError,
+    ruleTriggerId,
+    setRuleTriggerId,
+    ruleActionSelection,
+    setRuleActionSelection,
+    handleRuleClose,
     handleSaveRule,
     showAbilityDialog,
     abilityNameInput,
@@ -1397,128 +1391,63 @@ function App() {
     handleOverwriteConfirm,
     handleOverwriteCancel,
     showExportSuccess,
-    closeExportSuccess: () => setShowExportSuccess(false)
+    closeExportSuccess: () => setShowExportSuccess(false),
+    availableRuleTriggers
   });
 
   return (
     <>
-      {showWelcome ? (
-        <WelcomeScreen 
-          onCreateNewMap={handleCreateNewMap}
-          onOpenMap={handleOpenMap}
-          isDarkMode={isDarkMode}
-        />
-      ) : (
-        <div className="h-screen bg-background text-foreground flex flex-col overflow-hidden">
-      <AppShell
-        titleBarProps={titleBarProps}
-        sidebarToggleProps={{
-          show: showSidebarToggle,
-          leftCollapsed,
-          onToggle: handleSidebarToggle
-        }}
-      />
-
-      <main className="flex flex-1 min-h-0">
-        <AppSidebar
-          leftCollapsed={leftCollapsed}
-          actors={actors}
-          rules={rules}
-          items={items}
-          tileset={tileset}
-          layers={layersObj}
-          exportStatus={exportStatus}
-          controls={controls}
-        />
-
-        <EngineSettingsDialog
-          open={showSettings}
-          onClose={handleCloseSettings}
-          isDarkMode={isDarkMode}
-          setIsDarkMode={setIsDarkMode}
-          editor={editor}
-          autoSaveEnabled={autoSaveEnabled}
-          setAutoSaveEnabledState={setAutoSaveEnabledState}
-          showActiveGid={showActiveGid}
-          setShowActiveGid={setShowActiveGid}
-          showSidebarToggle={showSidebarToggle}
-          setShowSidebarToggle={setShowSidebarToggle}
-        />
-
-        <MapSettingsDialog
-          open={showMapSettingsOnly}
-          onClose={handleCloseMapSettings}
-          mapName={mapName}
-          setMapName={setMapName}
-          mapWidth={mapWidth}
-          setMapWidth={setMapWidth}
-          mapHeight={mapHeight}
-          setMapHeight={setMapHeight}
-          isStartingMap={isStartingMap}
-          updateStartingMap={updateStartingMap}
-          handleMapResize={handleMapResize}
-        />
-        <ClearLayerDialog
-          open={showClearLayerDialog}
-          onClose={handleClearLayerClose}
-          onConfirm={handleClearLayerConfirm}
-        />
-
-        <ConfirmActionDialog {...confirmDialogProps} />
-
-        <HelpDialog
-          open={showHelp}
-          activeTab={activeHelpTab}
-          setActiveTab={setActiveHelpTab}
-          onClose={handleHelpClose}
-        />
-
-        {/* Center Area */}
-        <EditorArea
-          topBarProps={{
-            toolbarExpanded,
-            containerRef: toolbarContainerRef,
-            onMouseEnter: handleToolbarMouseEnter,
-            onMouseLeave: handleToolbarMouseLeave,
-            onFocus: handleToolbarFocus,
-            onBlur: handleToolbarBlur,
-            handleUndo,
-            handleRedo,
-            handleZoomIn,
-            handleZoomOut,
-            handleResetZoom
-          }}
-          canvasCtx={editorCanvasCtx}
-          bottomToolbarProps={bottomToolbarProps}
-          enemyPanelProps={{
-            isEnemyActive: isEnemyTabActive,
-            enemy: (activeTab?.config as EnemyTabConfig | null)?.enemy,
-            showCloseConfirm: pendingEnemyTabCloseId === activeTabId,
-            onCloseDecision: handleEnemyTabCloseDecision,
-            onSave: handleEnemyTabSave
-          }}
-        />
-      </main>
-      
-      <Toaster />
-
-      {/* Centralized dialogs container */}
-      <DialogsContainer ctx={dialogsCtx} />
-
-      {/* Custom Tooltip */}
-      {tooltip && (
-        <div
-          className={`custom-tooltip ${tooltip.visible ? 'visible' : ''} ${tooltip.fadeOut ? 'fade-out' : ''}`}
-          style={{
-            left: tooltip.x,
-            top: tooltip.y,
-          }}
-        >
-          {tooltip.content}
-        </div>
-      )}
-        </div>
-      )}
+      <AppMain ctx={{
+        showWelcome,
+        handleCreateNewMap,
+        handleOpenMap,
+        isDarkMode,
+        titleBarProps,
+        showSidebarToggle,
+        leftCollapsed,
+        handleSidebarToggle,
+        actors,
+        rules,
+        items,
+        tileset,
+        layersObj,
+        exportStatus,
+        controls,
+        showSettings,
+        handleCloseSettings,
+        setIsDarkMode,
+        editor,
+        autoSaveEnabled,
+        setAutoSaveEnabledState,
+        showActiveGid,
+        setShowActiveGid,
+        setShowSidebarToggle,
+        showMapSettingsOnly,
+        handleCloseMapSettings,
+        mapName,
+        setMapName,
+        mapWidth,
+        setMapWidth,
+        mapHeight,
+        setMapHeight,
+        isStartingMap,
+        updateStartingMap,
+        handleMapResize,
+        showClearLayerDialog,
+        handleClearLayerClose,
+        handleClearLayerConfirm,
+        confirmDialogProps,
+        showHelp,
+        activeHelpTab,
+        setActiveHelpTab,
+        handleHelpClose,
+        topBarProps,
+        canvasCtx,
+        bottomToolbarProps,
+        enemyPanelProps,
+        dialogsCtx,
+        tooltip
+      }} />
     </>
   );
 }

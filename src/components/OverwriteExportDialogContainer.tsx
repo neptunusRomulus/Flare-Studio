@@ -1,8 +1,14 @@
 import React from 'react';
 import OverwriteExportDialog from '@/components/OverwriteExportDialog';
 
-export default function OverwriteExportDialogContainer({ ctx }: { ctx: any }) {
-  const c = ctx as any;
+type OverwriteExportCtx = {
+  showOverwriteDialog: boolean;
+  handleOverwriteConfirm: () => void;
+  handleOverwriteCancel: () => void;
+};
+
+export default function OverwriteExportDialogContainer({ ctx }: { ctx: unknown }) {
+  const c = ctx as OverwriteExportCtx;
   return (
     <OverwriteExportDialog
       open={c.showOverwriteDialog}

@@ -1,5 +1,5 @@
 import React from 'react';
-import TitleBar from '@/components/TitleBar';
+import TitleBar from '@/components/top/TitleBar';
 import SidebarToggle from '@/components/SidebarToggle';
 
 type Props = {

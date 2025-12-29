@@ -1,8 +1,13 @@
 import React from 'react';
 import VendorDialogs from '@/components/VendorDialogs';
 
-export default function VendorDialogsContainer({ ctx }: { ctx: any }) {
-  const c = ctx as any;
+type VendorDialogsCtx = {
+  vendorState: unknown;
+  vendorHandlers: unknown;
+};
+
+export default function VendorDialogsContainer({ ctx }: { ctx: unknown }) {
+  const c = ctx as VendorDialogsCtx;
   return (
     <VendorDialogs vendorState={c.vendorState} vendorHandlers={c.vendorHandlers} />
   );

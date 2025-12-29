@@ -1,8 +1,16 @@
 import React from 'react';
 import AbilityDialog from '@/components/AbilityDialog';
 
-export default function AbilityDialogContainer({ ctx }: { ctx: any }) {
-  const c = ctx as any;
+type AbilityDialogCtx = {
+  showAbilityDialog: boolean;
+  abilityNameInput: string;
+  setAbilityNameInput: (v: string) => void;
+  handleCloseAbilityDialog: () => void;
+  handleCreateAbility: (name: string) => void;
+};
+
+export default function AbilityDialogContainer({ ctx }: { ctx: unknown }) {
+  const c = ctx as AbilityDialogCtx;
   return (
     <AbilityDialog
       open={c.showAbilityDialog}

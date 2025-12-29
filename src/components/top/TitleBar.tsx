@@ -1,7 +1,7 @@
 import React from 'react';
-// removed unused Button and lucide-react imports
-import EditorTabs from './EditorTabs';
-import WindowControls from './WindowControls';
+// removed unused Button import
+import EditorTabs from '@/components/EditorTabs';
+import WindowControls from '@/components/WindowControls';
 
 type TabEntry = {
   id: string;

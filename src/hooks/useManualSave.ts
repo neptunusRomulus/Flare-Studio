@@ -1,4 +1,5 @@
 import { useCallback, useEffect } from 'react';
+import type React from 'react';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 
 export default function useManualSave(args: {
@@ -14,7 +15,8 @@ export default function useManualSave(args: {
     if (!editor) return;
     setIsManuallySaving(true);
     try {
-      if (typeof window !== 'undefined' && (window as any).electronAPI && currentProjectPath) {
+      const api = (typeof window !== 'undefined') ? (window as unknown as { electronAPI?: { save?: () => void } }).electronAPI : undefined;
+      if (api && currentProjectPath) {
         const success = await editor.saveProjectData(currentProjectPath);
         await new Promise(resolve => setTimeout(resolve, 300));
         if (success) {
@@ -22,7 +24,12 @@ export default function useManualSave(args: {
         }
       } else {
         // web/local fallback
-        if (typeof editor.forceSave === 'function') editor.forceSave();
+        try {
+          const maybe = editor as unknown as { forceSave?: () => void };
+          if (typeof maybe.forceSave === 'function') maybe.forceSave();
+        } catch {
+          // ignore
+        }
         await new Promise(resolve => setTimeout(resolve, 500));
       }
     } catch (error) {

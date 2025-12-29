@@ -1,10 +1,12 @@
 import { useCallback } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
+import type { EditorTab } from './useEditorTabs';
 
 export default function useBeforeCreateMap(args: {
   editor?: TileMapEditor | null;
   activeTabId?: string | null;
-  setTabs: (updater: (prev: any[]) => any[]) => void;
+  setTabs: Dispatch<SetStateAction<EditorTab[]>>;
   currentProjectPath?: string | null;
 }) {
   const { editor, activeTabId, setTabs, currentProjectPath } = args;

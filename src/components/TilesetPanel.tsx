@@ -24,7 +24,7 @@ type Props = {
   stampsState?: unknown;
 };
 
-const SidebarTilesetArea: React.FC<Props> = ({
+const TilesetPanel: React.FC<Props> = ({
   editor,
   activeLayer,
   tabTick,
@@ -66,4 +66,4 @@ const SidebarTilesetArea: React.FC<Props> = ({
   );
 };
 
-export default SidebarTilesetArea;
+export default TilesetPanel;

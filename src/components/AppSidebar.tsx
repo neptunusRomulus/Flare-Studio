@@ -3,7 +3,7 @@ import SidebarLayout from '@/components/SidebarLayout';
 import SidebarActorArea from '@/components/SidebarActorArea';
 import SidebarRulesArea from '@/components/SidebarRulesArea';
 import SidebarItemsArea from '@/components/SidebarItemsArea';
-import SidebarTilesetArea from '@/components/SidebarTilesetArea';
+import TilesetPanel from '@/components/sidebar/TilesetPanel';
 import SidebarLayersArea from '@/components/SidebarLayersArea';
 import SidebarControlsArea, { ControlsProps } from '@/components/SidebarControlsArea';
 import type { MapObject, TileLayer } from '@/types';
@@ -128,7 +128,7 @@ export default function AppSidebar(p: SidebarProps) {
         )}
 
         {!p.actors.isNpcLayer && !p.actors.isEnemyLayer && !p.items.isItemsLayer && !p.rules.isRulesLayer && (
-          <SidebarTilesetArea
+          <TilesetPanel
             editor={p.tileset.editor}
             activeLayer={p.tileset.activeLayer}
             tabTick={p.tileset.tabTick}

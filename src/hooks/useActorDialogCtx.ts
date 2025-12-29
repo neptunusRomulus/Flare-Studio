@@ -1,13 +1,15 @@
+import type { ActorDialogState } from '@/editor/actorRoles';
+
 type Params = {
-  actorDialogState: unknown;
+  actorDialogState: ActorDialogState | null | undefined;
   actorDialogError: string | null;
   canUseTilesetDialog: boolean;
   handleCloseActorDialog: () => void;
-  handleActorFieldChange: (...args: any[]) => any;
-  handleActorRoleToggle: (...args: any[]) => any;
-  handleActorTilesetBrowse: (...args: any[]) => any;
-  handleActorPortraitBrowse: (...args: any[]) => any;
-  handleActorSubmit: (...args: any[]) => any;
+  handleActorFieldChange: (field: 'name' | 'tilesetPath' | 'portraitPath', value: string) => void;
+  handleActorRoleToggle: (role: keyof ActorDialogState) => void;
+  handleActorTilesetBrowse: () => Promise<void> | void;
+  handleActorPortraitBrowse: () => Promise<void> | void;
+  handleActorSubmit: (editAfter?: boolean) => Promise<void> | void;
 };
 
 export default function useActorDialogCtx(params: Params) {

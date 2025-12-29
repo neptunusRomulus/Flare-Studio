@@ -1,5 +1,7 @@
+import type { EditorTab } from './useEditorTabs';
+
 type Params = {
-  tabs: any[];
+  tabs: EditorTab[];
   activeTabId: string | null;
   switchToTab: (tabId: string) => void | Promise<void>;
   setShowMapSettingsOnly: (b: boolean) => void;

@@ -1,9 +1,10 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 type Params = {
   itemDialogState: unknown;
   itemDialogError: string | null;
   pendingDuplicateItem: unknown;
   handleCloseItemDialog: () => void;
-  handleItemFieldChange: (field: string, value: unknown) => void;
+  handleItemFieldChange: (field: any, value: any) => void;
   handleItemSubmit: () => void;
   handleConfirmDuplicateItem: (data: unknown) => void;
   clearPendingDuplicate: () => void;

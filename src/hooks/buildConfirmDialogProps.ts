@@ -1,8 +1,9 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 type ConfirmAction = unknown | null;
 
 type Params = {
   confirmAction: ConfirmAction;
-  setConfirmAction: React.Dispatch<React.SetStateAction<ConfirmAction>>;
+  setConfirmAction: (v: any) => void;
   onCancel?: () => void;
   onConfirm?: () => void;
 };

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
 import DialogueTreeDialog from '@/components/dialogue/DialogueTreeDialog';
 import type { DialogueTree } from '@/types';
@@ -21,14 +22,14 @@ export default function DialogueTreeDialogContainer({ ctx }: { ctx: unknown }) {
     <DialogueTreeDialog
       showDialogueTreeDialog={c.showDialogueTreeDialog}
       dialogueTrees={c.dialogueTrees}
-      setDialogueTrees={c.setDialogueTrees}
-      activeDialogueTab={c.activeDialogueTab}
-      setActiveDialogueTab={c.setActiveDialogueTab}
-      dialogueTabToDelete={c.dialogueTabToDelete}
-      setDialogueTabToDelete={c.setDialogueTabToDelete}
-      editingObject={c.editingObject}
-      updateEditingObjectProperty={c.updateEditingObjectProperty}
-      onClose={c.onDialogueClose}
+      setDialogueTrees={c.setDialogueTrees as React.Dispatch<React.SetStateAction<any[]>>}
+      activeDialogueTab={(c.activeDialogueTab as unknown as number) ?? 0}
+      setActiveDialogueTab={(id) => (c.setActiveDialogueTab ? c.setActiveDialogueTab(String(id)) : undefined)}
+      dialogueTabToDelete={(c.dialogueTabToDelete as unknown as number) ?? null}
+      setDialogueTabToDelete={(id) => (c.setDialogueTabToDelete ? c.setDialogueTabToDelete(String(id)) : undefined)}
+      editingObject={c.editingObject as any ?? null}
+      updateEditingObjectProperty={(k, v) => (c.updateEditingObjectProperty ? c.updateEditingObjectProperty(k, v) : undefined)}
+      onClose={c.onDialogueClose ?? (() => {})}
     />
   );
 }

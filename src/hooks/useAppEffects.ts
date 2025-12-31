@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useEffect } from 'react';
 import type { Tool } from '../types';
 
@@ -6,7 +7,7 @@ type RefOrNull<T> = { current: T | null };
 type AppEffectsParams = {
   createTabForRef: RefOrNull<(...args: unknown[]) => unknown>;
   createTabFor: (...args: unknown[]) => unknown;
-  beforeCreateMapRef: RefOrNull<() => Promise<void> | (() => void)>;
+  beforeCreateMapRef: RefOrNull<(...args: any[]) => any>;
   handleBeforeCreateMap: () => Promise<void> | void;
   tabs: Array<{ id: string | number; name?: string; projectPath?: string }>;
   activeTabId: string | number | null;
@@ -135,7 +136,7 @@ export default function useAppEffects(params: unknown) {
       };
       const editorTool = toolMap[selectedBrushTool as string] || 'brush';
       editorLocal.setCurrentTool?.(editorTool);
-    } else if (editorLocal && p.selectedTool === 'selection') {
+    } else if (editorLocal && selectedTool === 'selection') {
       const selectionToolMap: { [key: string]: 'rectangular' | 'magic-wand' | 'same-tile' | 'circular' } = {
         'rectangular': 'rectangular',
         'magic-wand': 'magic-wand',

@@ -1,17 +1,12 @@
 import React, { useRef, useEffect, useState, useMemo } from 'react';
-import { TileMapEditor } from './editor/TileMapEditor';
-import type { EditorProjectData } from './editor/TileMapEditor';
 import { useToast } from '@/hooks/use-toast';
-// UI helpers like Button/Badge/Tooltip are imported in the components that use them.
 import useTitleBarProps from './hooks/useTitleBarProps';
 import buildConfirmDialogProps from './hooks/buildConfirmDialogProps';
 import useActorDialogCtx from './hooks/useActorDialogCtx';
 import useItemDialogCtx from './hooks/useItemDialogCtx';
 import useObjectDialogCtx from './hooks/useObjectDialogCtx';
 import useVendorDialogCtx from './hooks/useVendorDialogCtx';
-import useAssembledDialogs from './hooks/useAssembledDialogs';
 import useMapsDropdown from './hooks/useMapsDropdown';
-// Sidebar child components are now rendered inside AppSidebar
 import { MapObject } from './types';
 import type { ItemRole } from './editor/itemRoles';
 import { GAME_TRIGGER_OPTIONS, PLAYER_TRIGGER_OPTIONS } from './editor/ruleOptions';
@@ -21,16 +16,18 @@ import useMapConfig from './hooks/useMapConfig';
 import useObjectEditing from './hooks/useObjectEditing';
 import useProjectSession from './hooks/useProjectSession';
 import useProjectIO from './hooks/useProjectIO';
+import useProjectLoader from './hooks/useProjectLoader';
 import useDialogs from './hooks/useDialogs';
+import useDialogsCtx from './hooks/useDialogsCtx';
 import { buildConstantStockString } from './utils/parsers';
-import useToolbarState from './hooks/useToolbarState';
+import useToolbarSetup from './hooks/useToolbarSetup';
 import useAutosave from './hooks/useAutosave';
-import useToolbarHandlers from './hooks/useToolbarHandlers';
 import useToolbarVisibility from './hooks/useToolbarVisibility';
 import useTooltip from './hooks/useTooltip';
 import useVendorState from './hooks/useVendorState';
 import useEditorTabs from './hooks/useEditorTabs';
-import useEditorState from './hooks/useEditorState';
+import useEditorSetup from './hooks/useEditorSetup';
+import useSwitchToTabHelpers from './hooks/useSwitchToTabHelpers';
 import usePreferences from './hooks/usePreferences';
 import useEditorIpc from './hooks/useEditorIpc';
 import useHoverAndSelection from './hooks/useHoverAndSelection';
@@ -38,7 +35,6 @@ import useUndoRedoZoom from './hooks/useUndoRedoZoom';
 import useCreateMap from './hooks/useCreateMap';
 import useBeforeCreateMap from './hooks/useBeforeCreateMap';
 import useGetters from './hooks/useGetters';
-import useProjectLoader from './hooks/useProjectLoader';
 import useActorManagement from './hooks/useActorManagement';
 import useNpcDrag from './hooks/useNpcDrag';
 import useLayerHandlers from './hooks/useLayerHandlers';
@@ -48,7 +44,6 @@ import useAbilityDialog from './hooks/useAbilityDialog';
 import useCanvasDoubleClick from './hooks/useCanvasDoubleClick';
 import useBrushActions from './hooks/useBrushActions';
 import useEditorAreaProps from './hooks/useEditorAreaProps';
-import useAssembledSidebar from './hooks/useAssembledSidebar';
 import useWindowControls from './hooks/useWindowControls';
 import useSidebarToggle from './hooks/useSidebarToggle';
 import useClearLayerHandler from './hooks/useClearLayerHandler';
@@ -76,10 +71,16 @@ import useSettingsHandlers from './hooks/useSettingsHandlers';
 import useMapHandlers from './hooks/useMapHandlers';
 import useBrushActionListener from './hooks/useBrushActionListener';
 import buildConfirmActionHandlers from './hooks/useConfirmActionHandlers';
-import useBrushToolbar from './hooks/useBrushToolbar';
 import useAppEffects from './hooks/useAppEffects';
 import AppMain from './components/AppMain';
+// useAppMainCtx was used earlier; appCtx is now built inline in the provider
+import { ToolbarProvider } from './context/ToolbarContext';
+import { SidebarProvider } from './context/SidebarContext';
+import { AppProvider } from './context/AppContext';
 import useAppState from './hooks/useAppState';
+import buildAppMainCtx from './hooks/useAppMainCtx';
+import useEditorToolSync from './hooks/useEditorToolSync';
+import useEditorRefs from './hooks/useEditorRefs';
 
 function App() {
   const {
@@ -120,7 +121,7 @@ function App() {
     createTabForRef,
     beforeCreateMapRef
   } = useAppState();
-  const editorOptsRef = useRef<Record<string, unknown> | null>(null);
+  const { editorOptsRef, handleManualSaveRef, switchToTabHelpersRef } = useEditorRefs();
   const {
     editor,
     setEditor,
@@ -135,24 +136,18 @@ function App() {
     handleFillSelection,
     handleClearSelection,
     handleDeleteSelection
-  } = useEditorState(editorOptsRef);
+  } = useEditorSetup(editorOptsRef);
   const toolbarRef = useRef<HTMLDivElement | null>(null);
-  const handleManualSaveRef = useRef<(() => Promise<void>) | undefined>(undefined);
   // Editor tabs
-  const switchToTabHelpersRef = useRef({
-    handleOpenMap: async (_projectDir: string, _createTab?: boolean, _mapName?: string) => {},
-    loadProjectData: async (_editor: TileMapEditor, _mapConfig: EditorProjectData) => false,
-    setupAutoSave: (_editor: TileMapEditor) => {},
-    syncMapObjects: () => {},
-    updateLayersList: () => {},
-  });
+  
 
   // Session is now stored per-project in .flare-session.json
   // Load session when a project is opened (handled in handleOpenMap)
   // Save session effect is defined after currentProjectPath state (see below)
 
-  // App UI state consolidated into `useAppState` (keeps App.tsx thin)
-  const toolbarState = useToolbarState();
+  // App UI toolbar state moved to a reusable hook
+  const { toolbarState, stampsState, handleSelectTool, handleToggleBrushTool, handleCreateStamp, handleStampSelect, handleDeleteStamp, handleSeparateBrush, confirmSeparateBrush } = useToolbarSetup({ editor });
+
   const {
     toolbarControls,
     brushToolbarControls,
@@ -172,7 +167,6 @@ function App() {
     showToolbarTemporarily,
     showBottomToolbarTemporarily,
     selectedTool,
-    setSelectedTool,
     selectedBrushTool,
     setSelectedBrushTool,
     selectedSelectionTool,
@@ -200,63 +194,16 @@ function App() {
     setSelectedStamp,
     stampMode,
     setStampMode,
-    setShowStampDialog,
     newStampName,
     setNewStampName,
     brushTool,
     setBrushTool,
     showSeparateDialog,
     setShowSeparateDialog,
-    brushToSeparate,
     setBrushToSeparate
   } = toolbarState;
 
-  // local brush toolbar helpers (fallback hook) used by handlers and other hooks
-  const { showBrushToolbarTemporarily: showBrushToolbarTemporarilyFallback } = useBrushToolbar();
-
-  
   const canUseTilesetDialog = !!editor;
-  const {
-    handleSelectTool,
-    handleToggleBrushTool,
-    handleCreateStamp,
-    handleStampSelect,
-    handleDeleteStamp,
-    handleSeparateBrush,
-    confirmSeparateBrush
-  } = useToolbarHandlers({
-    editor,
-    setSelectedTool,
-    showBottomToolbarTemporarily,
-    setBrushTool,
-    showBrushToolbarTemporarily: showBrushToolbarTemporarilyFallback,
-    newStampName,
-    setNewStampName,
-    setShowStampDialog,
-    setStampMode,
-    selectedStamp,
-    setSelectedStamp,
-    setBrushToSeparate,
-    setShowSeparateDialog,
-    brushToSeparate
-  });
-
-  const stampsState = {
-    stamps,
-    setStamps,
-    selectedStamp,
-    setSelectedStamp,
-    stampMode,
-    setStampMode,
-    setShowStampDialog,
-    newStampName,
-    setNewStampName,
-    handleCreateStamp,
-    handleStampSelect,
-    handleDeleteStamp,
-    handleSeparateBrush,
-    confirmSeparateBrush
-  };
   const {
     showClearLayerDialog,
     setShowClearLayerDialog,
@@ -519,13 +466,51 @@ function App() {
     startingMapIntermap,
     mapObjects,
     buildConstantStockString,
-    toast
-    ,
+    toast,
     handleManualSave: async () => { if (handleManualSaveRef.current) await handleManualSaveRef.current(); },
     updateLayersList: updateLayersListWrapper,
     syncMapObjects: syncMapObjectsWrapper,
     setMapInitialized,
     setMapName
+  });
+
+  const { handleOpenMap } = useProjectLoader({
+    editor,
+    tabs,
+    activeTabId,
+    refreshProjectMaps,
+    setIsOpeningProject,
+    setCurrentProjectPath,
+    startingMapIntermap,
+    setStartingMapIntermap,
+    setTabs,
+    setActiveTabId,
+    setEditor,
+    setPendingMapConfig,
+    setMapName,
+    setNewMapName,
+    setMapWidth,
+    setMapHeight,
+    setMapInitialized,
+    setNewMapStarting,
+    updateStartingMap,
+    setLayers,
+    setActiveLayerId,
+    setStamps,
+    setMapObjects,
+    setHoverCoords,
+    setNewMapWidth,
+    setNewMapHeight,
+    setReservedMapNames,
+    setHasSelection,
+    setSelectionCount,
+    setHasUnsavedChanges,
+    setSaveStatus,
+    setCreateMapError,
+    setShowCreateMapDialog,
+    setShowWelcome,
+    showToolbarTemporarily,
+    showBottomToolbarTemporarily
   });
 
   // Stable ref for manual save handler: referenced by project IO and autosave hooks.
@@ -596,73 +581,17 @@ function App() {
 
   useHoverAndSelection({ editor, setHoverCoords, setSelectionCount, setHasSelection });
 
-  // Sync tool selection with editor
-  useEffect(() => {
-    if (editor && selectedTool === 'brush') {
-      // Map selectedBrushTool to editor tool types
-      const toolMap: {[key: string]: 'brush' | 'eraser' | 'bucket'} = {
-        'brush': 'brush',
-        'bucket': 'bucket',
-        'eraser': 'eraser'
-      };
-      const editorTool = toolMap[selectedBrushTool] || 'brush';
-      editor.setCurrentTool(editorTool);
-    } else if (editor && selectedTool === 'selection') {
-      // Set the editor to selection mode and update selection tool
-      const selectionToolMap: {[key: string]: 'rectangular' | 'magic-wand' | 'same-tile' | 'circular'} = {
-        'rectangular': 'rectangular',
-        'magic-wand': 'magic-wand',
-        'same-tile': 'same-tile',
-        'circular': 'circular'
-      };
-      const editorSelectionTool = selectionToolMap[selectedSelectionTool] || 'rectangular';
-      editor.setCurrentSelectionTool(editorSelectionTool);
-    } else if (editor && selectedTool === 'shape') {
-      // Set the editor to shape mode and update shape tool
-      const shapeToolMap: {[key: string]: 'rectangle' | 'circle' | 'line'} = {
-        'rectangle': 'rectangle',
-        'circle': 'circle',
-        'line': 'line'
-      };
-      const editorShapeTool = shapeToolMap[selectedShapeTool] || 'rectangle';
-      editor.setCurrentShapeTool(editorShapeTool);
-    } else if (editor && selectedTool === 'eyedropper') {
-      // Set the editor to eyedropper mode
-      editor.setEyedropperTool();
-    } else if (editor && selectedTool === 'stamp') {
-      // Set the editor to stamp mode
-      editor.setStampTool();
-    }
-  }, [editor, selectedTool, selectedBrushTool, selectedSelectionTool, selectedShapeTool]);
-
-  // Stamp mode synchronization
-  useEffect(() => {
-    if (!editor || selectedTool !== 'stamp') return;
-    editor.setCurrentStampMode(stampMode);
-  }, [editor, selectedTool, stampMode]);
-
-  // Stamp selection synchronization
-  useEffect(() => {
-    if (!editor || selectedTool !== 'stamp') return;
-    editor.setActiveStamp(selectedStamp);
-  }, [editor, selectedTool, selectedStamp]);
-
-  // Track selection state
-  useEffect(() => {
-    if (!editor) return;
-
-    const updateSelection = () => {
-      const selection = editor.getSelection();
-      const hasActiveSelection = editor.hasActiveSelection();
-      setSelectionCount(selection.length);
-      setHasSelection(hasActiveSelection);
-    };
-
-    // Poll selection state (could be optimized with callbacks)
-    const intervalId = setInterval(updateSelection, 100);
-
-    return () => clearInterval(intervalId);
-  }, [editor, setSelectionCount, setHasSelection]);
+  useEditorToolSync({
+    editor,
+    selectedTool,
+    selectedBrushTool,
+    selectedSelectionTool,
+    selectedShapeTool,
+    stampMode,
+    selectedStamp,
+    setSelectionCount,
+    setHasSelection
+  });
 
   // Layer management functions
   const updateLayersList = updateLayersListFromHook;
@@ -921,57 +850,18 @@ function App() {
     setCurrentProjectPath
   });
 
-  const { handleOpenMap } = useProjectLoader({
-    editor,
-    tabs,
-    activeTabId,
-    refreshProjectMaps,
-    setIsOpeningProject,
-    setCurrentProjectPath,
-    startingMapIntermap,
-    setStartingMapIntermap,
-    setTabs,
-    setActiveTabId,
-    setEditor,
-    setPendingMapConfig,
-    setMapName,
-    setNewMapName,
-    setMapWidth,
-    setMapHeight,
-    setMapInitialized,
-    setNewMapStarting,
-    updateStartingMap,
-    setLayers,
-    setActiveLayerId,
-    setStamps,
-    setMapObjects,
-    setHoverCoords,
-    setNewMapWidth,
-    setNewMapHeight,
-    setReservedMapNames,
-    setHasSelection,
-    setSelectionCount,
-    setHasUnsavedChanges,
-    setSaveStatus,
-    setCreateMapError,
-    setShowCreateMapDialog,
-    setShowWelcome,
-    showToolbarTemporarily,
-    showBottomToolbarTemporarily
-  });
+  
 
   // Keep a ref to handleOpenMap so IPC listeners can call the latest implementation
   useEffect(() => { handleOpenMapRef.current = handleOpenMap; }, [handleOpenMap]);
 
-  useEffect(() => {
-    switchToTabHelpersRef.current = {
-      handleOpenMap,
-      loadProjectData,
-      setupAutoSave: setupAutoSaveWrapper,
-      syncMapObjects,
-      updateLayersList,
-    };
-  }, [handleOpenMap, loadProjectData, setupAutoSaveWrapper, syncMapObjects, updateLayersList]);
+  useSwitchToTabHelpers(switchToTabHelpersRef, {
+    handleOpenMap,
+    loadProjectData,
+    setupAutoSave: setupAutoSaveWrapper,
+    syncMapObjects,
+    updateLayersList,
+  });
   // Register Electron IPC/menu & close-confirm listeners via hook
   useEditorIpc({
     handleManualSaveRef,
@@ -1024,6 +914,8 @@ function App() {
     handleRedoRef,
     switchToTabHelpersRef
   });
+
+
 
   
 
@@ -1151,75 +1043,7 @@ function App() {
     handleEnemyTabSave
   });
 
-  const assembledSidebar = useAssembledSidebar({
-    isNpcLayer,
-    isEnemyLayer,
-    actorEntries,
-    draggingNpcId,
-    handleEditObject,
-    setNpcHoverTooltip,
-    handleNpcDragStart,
-    handleNpcDragEnd,
-    handleOpenActorDialog,
-    isRulesLayer,
-    rulesList,
-    handleAddRule,
-    isItemsLayer,
-    itemsList,
-    expandedItemCategories,
-    setExpandedItemCategories,
-    handleOpenItemEdit,
-    handleOpenItemDialog,
-    editor,
-    activeLayer,
-    tabTick,
-    setTabTick,
-    brushTool,
-    isCollisionLayer,
-    handleFileUpload,
-    handleToggleBrushTool,
-    handleDeleteActiveTab,
-    toast,
-    handleOpenActorDialogForTileset: handleOpenActorDialog,
-    stampsState,
-    layers,
-    activeLayerId,
-    hoveredLayerId,
-    layersPanelExpanded,
-    setLayersPanelExpanded,
-    setHoveredLayerId,
-    handleSetActiveLayer,
-    handleToggleLayerVisibility,
-    handleLayerTransparencyChange,
-    showTooltipWithDelay: showTooltipWithDelayFn,
-    hideTooltip: hideTooltipFn,
-    uiHelpers,
-    leftCollapsed,
-    isExporting,
-    exportProgress,
-    mapsButtonRef,
-    mapsDropdownOpen,
-    mapsDropdownPos,
-    mapsPortalRef,
-    mapsSubOpen,
-    currentProjectPath,
-    projectMaps,
-    setMapsSubOpen,
-    setMapsDropdownOpen,
-    handleOpenCreateMapDialog,
-    handleOpenMapFromMapsFolder,
-    handleManualSave,
-    isManuallySaving,
-    isPreparingNewMap,
-    hasUnsavedChanges,
-    setShowSettings,
-    refreshProjectMaps,
-    
-  });
-
-  const { actors, rules, items, layersObj } = assembledSidebar.actors;
-  const { tileset } = assembledSidebar.tileset;
-  const { exportStatus, controls } = assembledSidebar.maps;
+  // assembledSidebar will be provided by SidebarProvider below
 
   const titleBarProps = useTitleBarProps({
     tabs,
@@ -1329,7 +1153,7 @@ function App() {
     handleSaveVendorStock
   });
 
-  const dialogsCtx = useAssembledDialogs({
+  const dialogsCtx = useDialogsCtx({
     showSeparateDialog,
     setShowSeparateDialog,
     confirmSeparateBrush,
@@ -1395,60 +1219,141 @@ function App() {
     availableRuleTriggers
   });
 
+  // appCtx will be built inside SidebarProvider's render function so it can use assembledSidebar
+
+  
+
   return (
-    <>
-      <AppMain ctx={{
-        showWelcome,
-        handleCreateNewMap,
-        handleOpenMap,
-        isDarkMode,
-        titleBarProps,
-        showSidebarToggle,
-        leftCollapsed,
-        handleSidebarToggle,
-        actors,
-        rules,
-        items,
-        tileset,
-        layersObj,
-        exportStatus,
-        controls,
-        showSettings,
-        handleCloseSettings,
-        setIsDarkMode,
+    <ToolbarProvider value={{ ...toolbarState, stampsState }}>
+      <SidebarProvider deps={{
+        isNpcLayer,
+        isEnemyLayer,
+        actorEntries,
+        draggingNpcId,
+        handleEditObject,
+        setNpcHoverTooltip,
+        handleNpcDragStart,
+        handleNpcDragEnd,
+        handleOpenActorDialog,
+        isRulesLayer,
+        rulesList,
+        handleAddRule,
+        isItemsLayer,
+        itemsList,
+        expandedItemCategories,
+        setExpandedItemCategories,
+        handleOpenItemEdit,
+        handleOpenItemDialog,
         editor,
-        autoSaveEnabled,
-        setAutoSaveEnabledState,
-        showActiveGid,
-        setShowActiveGid,
-        setShowSidebarToggle,
-        showMapSettingsOnly,
-        handleCloseMapSettings,
-        mapName,
-        setMapName,
-        mapWidth,
-        setMapWidth,
-        mapHeight,
-        setMapHeight,
-        isStartingMap,
-        updateStartingMap,
-        handleMapResize,
-        showClearLayerDialog,
-        handleClearLayerClose,
-        handleClearLayerConfirm,
-        confirmDialogProps,
-        showHelp,
-        activeHelpTab,
-        setActiveHelpTab,
-        handleHelpClose,
-        topBarProps,
-        canvasCtx,
-        bottomToolbarProps,
-        enemyPanelProps,
-        dialogsCtx,
-        tooltip
-      }} />
-    </>
+        activeLayer,
+        tabTick,
+        setTabTick,
+        brushTool,
+        isCollisionLayer,
+        handleFileUpload,
+        handleToggleBrushTool,
+        handleDeleteActiveTab,
+        toast,
+        handleOpenActorDialogForTileset: handleOpenActorDialog,
+        stampsState,
+        layers,
+        activeLayerId,
+        hoveredLayerId,
+        layersPanelExpanded,
+        setLayersPanelExpanded,
+        setHoveredLayerId,
+        handleSetActiveLayer,
+        handleToggleLayerVisibility,
+        handleLayerTransparencyChange,
+        showTooltipWithDelay: showTooltipWithDelayFn,
+        hideTooltip: hideTooltipFn,
+        uiHelpers,
+        leftCollapsed,
+        isExporting,
+        exportProgress,
+        mapsButtonRef,
+        mapsDropdownOpen,
+        mapsDropdownPos,
+        mapsPortalRef,
+        mapsSubOpen,
+        currentProjectPath,
+        projectMaps,
+        setMapsSubOpen,
+        setMapsDropdownOpen,
+        handleOpenCreateMapDialog,
+        handleOpenMapFromMapsFolder,
+        handleManualSave,
+        isManuallySaving,
+        isPreparingNewMap,
+        hasUnsavedChanges,
+        setShowSettings,
+        refreshProjectMaps,
+      }}>
+        {(assembledSidebar) => {
+          const { actors, rules, items, layersObj } = assembledSidebar.actors;
+          const { tileset } = assembledSidebar.tileset;
+          const { exportStatus, controls } = assembledSidebar.maps;
+
+          const appCtxBuilt = buildAppMainCtx({
+            showWelcome,
+            handleCreateNewMap,
+            handleOpenMap,
+            isDarkMode,
+            titleBarProps,
+            showSidebarToggle,
+            leftCollapsed,
+            handleSidebarToggle,
+            actors,
+            rules,
+            items,
+            tileset,
+            layersObj,
+            exportStatus,
+            controls,
+            showSettings,
+            handleCloseSettings,
+            setIsDarkMode,
+            editor,
+            autoSaveEnabled,
+            setAutoSaveEnabledState,
+            showActiveGid,
+            setShowActiveGid,
+            setShowSidebarToggle,
+            showMapSettingsOnly,
+            handleCloseMapSettings,
+            mapName,
+            setMapName,
+            mapWidth,
+            setMapWidth,
+            mapHeight,
+            setMapHeight,
+            isStartingMap,
+            updateStartingMap,
+            handleMapResize,
+            showClearLayerDialog,
+            handleClearLayerClose,
+            handleClearLayerConfirm,
+            confirmDialogProps,
+            showHelp,
+            activeHelpTab,
+            setActiveHelpTab,
+            handleHelpClose,
+            topBarProps,
+            canvasCtx,
+            bottomToolbarProps,
+            enemyPanelProps,
+            dialogsCtx,
+            tooltip
+          });
+
+          return (
+            <AppProvider value={appCtxBuilt}>
+              <AppMain />
+            </AppProvider>
+          );
+        }}
+      </SidebarProvider>
+    </ToolbarProvider>
   );
 }
 

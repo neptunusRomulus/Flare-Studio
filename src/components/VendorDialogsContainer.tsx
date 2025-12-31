@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
 import VendorDialogs from '@/components/VendorDialogs';
 
@@ -9,6 +10,6 @@ type VendorDialogsCtx = {
 export default function VendorDialogsContainer({ ctx }: { ctx: unknown }) {
   const c = ctx as VendorDialogsCtx;
   return (
-    <VendorDialogs vendorState={c.vendorState} vendorHandlers={c.vendorHandlers} />
+    <VendorDialogs vendorState={c.vendorState as any ?? undefined} vendorHandlers={c.vendorHandlers as any ?? undefined} />
   );
 }

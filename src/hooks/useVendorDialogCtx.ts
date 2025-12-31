@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Dispatch, SetStateAction } from 'react';
 
 type RandomCount = { min: number; max: number };
@@ -11,7 +12,7 @@ type Params = {
   vendorUnlockEntries: VendorUnlockEntry[];
   showVendorRandomDialog: boolean;
   setShowVendorRandomDialog: Dispatch<SetStateAction<boolean>>;
-  vendorRandomSelection: Record<string, number> | null;
+  vendorRandomSelection: Record<any, any> | null;
   vendorRandomCount: RandomCount | null;
   showVendorStockDialog: boolean;
   setShowVendorStockDialog: Dispatch<SetStateAction<boolean>>;

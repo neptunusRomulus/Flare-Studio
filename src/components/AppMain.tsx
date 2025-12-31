@@ -1,4 +1,5 @@
 import React from 'react';
+import { useAppContext } from '../context/AppContext';
 import WelcomeScreen from '../components/WelcomeScreen';
 import AppShell from '@/components/AppShell';
 import AppSidebar from '@/components/AppSidebar';
@@ -11,11 +12,9 @@ import EditorArea from '@/components/EditorArea';
 import { Toaster } from '@/components/ui/toaster';
 import DialogsContainer from '@/components/DialogsContainer';
 
-type Props = { ctx: unknown };
-
-export default function AppMain({ ctx }: Props) {
+export default function AppMain() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const c = ctx as any;
+  const c = useAppContext() as any;
   const {
     showWelcome,
     handleCreateNewMap,

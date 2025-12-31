@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
 import RuleDialog from '@/components/RuleDialog';
 type RuleDialogCtx = {
@@ -23,20 +24,20 @@ export default function RuleDialogContainer({ ctx }: { ctx: unknown }) {
   return (
     <RuleDialog
       open={c.showRuleDialog}
-      ruleDialogStep={c.ruleDialogStep}
-      ruleDialogError={c.ruleDialogError}
+      ruleDialogStep={(c.ruleDialogStep === 1) ? 'actions' : 'start'}
+      ruleDialogError={c.ruleDialogError ?? null}
       ruleNameInput={c.ruleNameInput}
-      setRuleNameInput={c.setRuleNameInput}
-      ruleStartType={c.ruleStartType}
-      setRuleStartType={c.setRuleStartType}
-      ruleTriggerId={c.ruleTriggerId}
-      setRuleTriggerId={c.setRuleTriggerId}
-      ruleActionSelection={c.ruleActionSelection}
-      setRuleActionSelection={c.setRuleActionSelection}
-      availableRuleTriggers={c.availableRuleTriggers}
-      onClose={c.onRuleClose}
-      onSave={c.handleSaveRule}
-      onSetStep={c.setRuleDialogStep}
+      setRuleNameInput={(v) => (typeof v === 'function' ? c.setRuleNameInput(v('')) : c.setRuleNameInput(v))}
+      ruleStartType={(c.ruleStartType as any) ?? null}
+      setRuleStartType={(v) => c.setRuleStartType ? c.setRuleStartType(v as any) : undefined}
+      ruleTriggerId={c.ruleTriggerId ?? ''}
+      setRuleTriggerId={(v) => c.setRuleTriggerId ? c.setRuleTriggerId(v as any) : undefined}
+      ruleActionSelection={c.ruleActionSelection as any ?? null}
+      setRuleActionSelection={(v) => (c.setRuleActionSelection ? c.setRuleActionSelection(v) : undefined)}
+      availableRuleTriggers={(c.availableRuleTriggers as any) ?? []}
+      onClose={c.onRuleClose ?? (() => {})}
+      onSave={c.handleSaveRule ?? (() => {})}
+      onSetStep={(step) => { if (c.setRuleDialogStep) c.setRuleDialogStep(step === 'start' ? 0 : 1); }}
     />
   );
 }

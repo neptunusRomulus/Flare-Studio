@@ -1,4 +1,4 @@
-import type { ActorDialogState } from '@/editor/actorRoles';
+import type { ActorDialogState, ActorRoleKey } from '@/editor/actorRoles';
 
 type Params = {
   actorDialogState: ActorDialogState | null | undefined;
@@ -6,7 +6,7 @@ type Params = {
   canUseTilesetDialog: boolean;
   handleCloseActorDialog: () => void;
   handleActorFieldChange: (field: 'name' | 'tilesetPath' | 'portraitPath', value: string) => void;
-  handleActorRoleToggle: (role: keyof ActorDialogState) => void;
+  handleActorRoleToggle: (role: ActorRoleKey) => void;
   handleActorTilesetBrowse: () => Promise<void> | void;
   handleActorPortraitBrowse: () => Promise<void> | void;
   handleActorSubmit: (editAfter?: boolean) => Promise<void> | void;

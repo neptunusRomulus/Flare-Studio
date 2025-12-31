@@ -1,3 +1,8 @@
+import useAssembledDialogs from './useAssembledDialogs';
+
+export default function useDialogsCtx(params: any) {
+  return useAssembledDialogs(params);
+}
 export default function buildDialogsCtx(params: Record<string, unknown>) {
   // Thin wrapper to move the large dialogs ctx object out of App.tsx
   // Return as unknown to avoid spreading `any` widely; callers should

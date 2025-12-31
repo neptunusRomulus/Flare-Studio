@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
 import MapDialogs from '@/components/MapDialogs';
 
@@ -21,7 +22,7 @@ type MapDialogsCtx = {
   heroEditData?: unknown;
   setHeroEditData: (d: unknown) => void;
   handleHeroEditCancel: () => void;
-  handleHeroEditConfirm: () => void;
+  handleHeroEditConfirm: (x: number, y: number) => void;
 };
 
 export default function MapDialogsContainer({ ctx }: { ctx: unknown }) {
@@ -36,18 +37,18 @@ export default function MapDialogsContainer({ ctx }: { ctx: unknown }) {
       setNewMapWidth={c.setNewMapWidth}
       newMapHeight={c.newMapHeight}
       setNewMapHeight={c.setNewMapHeight}
-      newMapStarting={c.newMapStarting}
-      setNewMapStarting={c.setNewMapStarting}
-      createMapError={c.createMapError}
-      setCreateMapError={c.setCreateMapError}
+      newMapStarting={!!c.newMapStarting}
+      setNewMapStarting={(v) => (c.setNewMapStarting ? c.setNewMapStarting(String(v)) : undefined)}
+      createMapError={c.createMapError ?? null}
+      setCreateMapError={(s) => (c.setCreateMapError ? c.setCreateMapError(s) : undefined)}
       isPreparingNewMap={c.isPreparingNewMap}
       handleConfirmCreateMap={c.handleConfirmCreateMap}
       showHeroEditDialog={c.showHeroEditDialog}
       setShowHeroEditDialog={c.setShowHeroEditDialog}
-      heroEditData={c.heroEditData}
-      setHeroEditData={c.setHeroEditData}
+      heroEditData={c.heroEditData as any ?? null}
+      setHeroEditData={(d) => (c.setHeroEditData ? c.setHeroEditData(d) : undefined)}
       handleHeroEditCancel={c.handleHeroEditCancel}
-      handleHeroEditConfirm={c.handleHeroEditConfirm}
+      handleHeroEditConfirm={(x, y) => (c.handleHeroEditConfirm ? c.handleHeroEditConfirm(x, y) : undefined)}
     />
   );
 }

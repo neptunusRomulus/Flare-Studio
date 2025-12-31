@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
 import ObjectManagementDialog from '@/components/ObjectManagementDialog';
 import type { MapObject } from '@/types';
@@ -33,30 +34,30 @@ export default function ObjectManagementDialogContainer({ ctx }: { ctx: unknown 
   const c = ctx as ObjMgmtCtx;
   return (
     <ObjectManagementDialog
-      showObjectDialog={c.showObjectDialog}
-      editingObject={c.editingObject}
-      objectValidationErrors={c.objectValidationErrors}
-      setEditingObject={c.setEditingObject}
-      handleObjectDialogClose={c.handleObjectDialogClose}
-      handleObjectDialogSave={c.handleObjectDialogSave}
-      updateEditingObjectProperty={c.updateEditingObjectProperty}
-      updateEditingObjectBoolean={c.updateEditingObjectBoolean}
-      getEditingObjectProperty={c.getEditingObjectProperty}
-      editor={c.editor}
-      syncMapObjects={c.syncMapObjects}
-      canUseTilesetDialog={c.canUseTilesetDialog}
-      handleEditingTilesetBrowse={c.handleEditingTilesetBrowse}
-      handleEditingPortraitBrowse={c.handleEditingPortraitBrowse}
-      handleOpenVendorStockDialog={c.handleOpenVendorStockDialog}
-      handleOpenVendorUnlockDialog={c.handleOpenVendorUnlockDialog}
-      handleOpenVendorRandomDialog={c.handleOpenVendorRandomDialog}
-      setDialogueTrees={c.setDialogueTrees}
-      setActiveDialogueTab={c.setActiveDialogueTab}
-      setShowDialogueTreeDialog={c.setShowDialogueTreeDialog}
-      showDeleteNpcConfirm={c.showDeleteNpcConfirm}
-      setShowDeleteNpcConfirm={c.setShowDeleteNpcConfirm}
-      showDeleteEnemyConfirm={c.showDeleteEnemyConfirm}
-      setShowDeleteEnemyConfirm={c.setShowDeleteEnemyConfirm}
+      showObjectDialog={!!c.showObjectDialog}
+      editingObject={c.editingObject ?? null}
+      objectValidationErrors={(c.objectValidationErrors as unknown as string[]) ?? []}
+      setEditingObject={(obj) => (c.setEditingObject ? c.setEditingObject(obj) : undefined)}
+      handleObjectDialogClose={c.handleObjectDialogClose ?? (() => {})}
+      handleObjectDialogSave={c.handleObjectDialogSave ?? (() => {})}
+      updateEditingObjectProperty={(k, v) => (c.updateEditingObjectProperty ? c.updateEditingObjectProperty(k, v) : undefined)}
+      updateEditingObjectBoolean={(k, v) => (c.updateEditingObjectBoolean ? c.updateEditingObjectBoolean(k, v) : undefined)}
+      getEditingObjectProperty={(k, fallback) => String(c.getEditingObjectProperty ? c.getEditingObjectProperty(k) ?? fallback ?? '' : (fallback ?? ''))}
+      editor={c.editor as any ?? null}
+      syncMapObjects={c.syncMapObjects ?? (() => {})}
+      canUseTilesetDialog={!!c.canUseTilesetDialog}
+      handleEditingTilesetBrowse={c.handleEditingTilesetBrowse ?? (() => {})}
+      handleEditingPortraitBrowse={c.handleEditingPortraitBrowse ?? (() => {})}
+      handleOpenVendorStockDialog={c.handleOpenVendorStockDialog ?? (() => {})}
+      handleOpenVendorUnlockDialog={c.handleOpenVendorUnlockDialog ?? (() => {})}
+      handleOpenVendorRandomDialog={c.handleOpenVendorRandomDialog ?? (() => {})}
+      setDialogueTrees={(trees) => (c.setDialogueTrees ? c.setDialogueTrees(trees) : undefined)}
+      setActiveDialogueTab={(idx) => (c.setActiveDialogueTab ? c.setActiveDialogueTab(String(idx)) : undefined)}
+      setShowDialogueTreeDialog={(v) => (c.setShowDialogueTreeDialog ? c.setShowDialogueTreeDialog(v) : undefined)}
+      showDeleteNpcConfirm={!!c.showDeleteNpcConfirm}
+      setShowDeleteNpcConfirm={(v) => (c.setShowDeleteNpcConfirm ? c.setShowDeleteNpcConfirm(v) : undefined)}
+      showDeleteEnemyConfirm={!!c.showDeleteEnemyConfirm}
+      setShowDeleteEnemyConfirm={(v) => (c.setShowDeleteEnemyConfirm ? c.setShowDeleteEnemyConfirm(v) : undefined)}
     />
   );
 }

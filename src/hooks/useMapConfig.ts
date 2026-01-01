@@ -159,6 +159,8 @@ const useMapConfig = ({
   }, [editor, mapWidth, mapHeight]);
 
   const isDuplicateMapName = useCallback((candidate: string) => {
+    // If there's no current project path, skip project-scoped duplicate checks
+    if (!currentProjectPath) return false;
     const normalized = candidate.trim().toLowerCase();
     if (!normalized) {
       return false;
@@ -277,6 +279,21 @@ const useMapConfig = ({
         if (!editor) {
           setEditor(targetEditor);
         }
+        // Ensure layers state reflects the newly created map immediately
+        try {
+          if (typeof targetEditor.getLayers === 'function') {
+            const currentLayers = targetEditor.getLayers();
+            setLayers([...currentLayers]);
+          }
+          if (typeof targetEditor.getActiveLayerId === 'function') {
+            const activeId = targetEditor.getActiveLayerId();
+            setActiveLayerId(activeId);
+          }
+        } catch (err) {
+          console.warn('Failed to populate layers from editor:', err);
+        }
+
+        // keep existing update/sync calls for consumers using wrappers
         updateLayersList();
         syncMapObjects();
       }

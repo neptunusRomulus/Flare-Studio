@@ -38,6 +38,29 @@ export function useEditorState(optsRef: React.RefObject<Partial<UseEditorStateOp
   const [editor, setEditor] = useState<TileMapEditorType | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
+  // read ref.current without invoking accessor getters (protect against malformed refs)
+  const _safeReadSeen = new WeakSet<object>();
+  const safeReadRefCurrent = (r: React.RefObject<unknown> | null | undefined) => {
+    try {
+      if (!r || typeof r !== 'object') return undefined;
+      // avoid re-entering for the same object
+      if (_safeReadSeen.has(r as object)) return undefined;
+      _safeReadSeen.add(r as object);
+      // If the ref is not a plain object (likely a Proxy or exotic object), bail out.
+      const proto = Object.getPrototypeOf(r as object);
+      if (proto !== Object.prototype && proto !== null) {
+        _safeReadSeen.delete(r as object);
+        return undefined;
+      }
+      // Accessing .current directly; if this throws or re-enters it'll be caught.
+      const val = (r as any).current;
+      _safeReadSeen.delete(r as object);
+      return val;
+    } catch (e) {
+      return undefined;
+    }
+  };
+
   const setupAutoSaveRef = useRef<null | ((editor: TileMapEditorType) => void)>(null);
   const updateLayersListRef = useRef<null | (() => void)>(null);
   const syncMapObjectsRef = useRef<null | (() => void)>(null);
@@ -57,7 +80,18 @@ export function useEditorState(optsRef: React.RefObject<Partial<UseEditorStateOp
   // Editor command helpers — keep lifecycle and commands inside the hook
   const handlePlaceActorOnMap = useCallback((objectId: number, x?: number, y?: number) => {
     if (!editor) return;
-    const opts = optsRef.current ?? {};
+    // safe read of optsRef.current to avoid recursive ref structures
+    let opts: Partial<UseEditorStateOptions> = {};
+    try {
+      const cand = safeReadRefCurrent(optsRef) as Partial<UseEditorStateOptions> | undefined;
+      if (cand === optsRef || (cand && (cand as any).current === optsRef)) {
+        opts = {};
+      } else {
+        opts = cand ?? {};
+      }
+    } catch (e) {
+      opts = {};
+    }
     const spawnX = x !== undefined ? x : Math.floor((opts.mapWidth ?? 0) / 2);
     const spawnY = y !== undefined ? y : Math.floor((opts.mapHeight ?? 0) / 2);
     editor.updateMapObject(objectId, { x: spawnX, y: spawnY });
@@ -87,7 +121,18 @@ export function useEditorState(optsRef: React.RefObject<Partial<UseEditorStateOp
 
   // Implement setupAutoSave here using passed callbacks stored in optsRef
   const setupAutoSave = useCallback((editorInstance: TileMapEditorType) => {
-    const opts = optsRef.current ?? {};
+    // safe read to avoid recursing into malformed refs
+    let opts: Partial<UseEditorStateOptions> = {};
+    try {
+      const cand = safeReadRefCurrent(optsRef) as Partial<UseEditorStateOptions> | undefined;
+      if (cand === optsRef || (cand && (cand as any).current === optsRef)) {
+        opts = {};
+      } else {
+        opts = cand ?? {};
+      }
+    } catch (e) {
+      opts = {};
+    }
     editorInstance.setAutoSaveCallback(async () => {
       try {
         if (window.electronAPI && opts.currentProjectPath) {
@@ -137,7 +182,19 @@ export function useEditorState(optsRef: React.RefObject<Partial<UseEditorStateOp
 
   // Editor instantiation effect reads options from optsRef
   useEffect(() => {
-    const opts = optsRef.current ?? {};
+    // guard against malformed refs that recursively reference themselves
+    let opts: Partial<UseEditorStateOptions> = {};
+    try {
+      const candidate = safeReadRefCurrent(optsRef) as Partial<UseEditorStateOptions> | undefined;
+      if (candidate === optsRef) {
+        console.warn('Detected recursive optsRef; ignoring to avoid stack overflow.');
+        opts = {};
+      } else {
+        opts = candidate ?? {};
+      }
+    } catch (e) {
+      opts = {};
+    }
     if (
       canvasRef.current &&
       !opts.showWelcome &&

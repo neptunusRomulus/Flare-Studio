@@ -3,6 +3,8 @@ import useDialogsCtx from './useDialogsCtx';
 import buildConfirmDialogProps from './buildConfirmDialogProps';
 import useEditorRefs from './useEditorRefs';
 import useEditorSetup from './useEditorSetup';
+import useUndoRedoZoom from './useUndoRedoZoom';
+import useTooltip from './useTooltip';
 import usePreferences from './usePreferences';
 import useDarkModeSync from './useDarkModeSync';
 import useAppState from './useAppState';
@@ -36,7 +38,12 @@ export default function useAppMainBuilder() {
     canvasRef,
     setupAutoSaveWrapper: setupAutoSave,
     updateLayersListWrapper: updateLayersList,
-    syncMapObjectsWrapper: syncMapObjects
+    syncMapObjectsWrapper: syncMapObjects,
+    handlePlaceActorOnMap,
+    handleUnplaceActorFromMap,
+    handleFillSelection,
+    handleDeleteSelection,
+    handleClearSelection
   } = editorSetup as unknown as Record<string, any>;
 
   const mapConfig = useMapConfig({
@@ -78,6 +85,12 @@ export default function useAppMainBuilder() {
   });
 
   const { tabs, activeTabId, setTabs, setActiveTabId } = editorTabs as unknown as Record<string, any>;
+  
+  const { handleUndo, handleRedo, handleZoomIn, handleZoomOut, handleResetZoom } = useUndoRedoZoom({ editor, updateLayersList, syncMapObjects });
+
+  const { tooltip, showTooltipWithDelay, hideTooltip } = useTooltip({ toolbarRef: (editorRefs as any).toolbarRef, canvasRef });
+
+  const [showClearLayerDialog, setShowClearLayerDialog] = useState(false);
 
   const projectManager = useProjectManager({
     editor,
@@ -228,12 +241,12 @@ export default function useAppMainBuilder() {
       handleOpenMap: (projectPath?: string) => { try { if ((projectManager as any)?.handleOpenMap) void (projectManager as any).handleOpenMap(projectPath); } catch (e) { console.warn(e); } },
       isDarkMode,
       titleBarProps: {
-        tabs: [],
-        activeTabId: null,
-        onSwitchTab: () => {},
+        tabs: tabs ?? [],
+        activeTabId: activeTabId ?? null,
+        onSwitchTab: (id: string | number) => { try { if (typeof setActiveTabId === 'function') setActiveTabId(id); } catch (e) {} },
         onOpenMapSettings: () => {},
         onCloseEnemyTab: () => {},
-        onCreateNewMap: () => mapConfig.setShowCreateMapDialog(true),
+        onCreateNewMap: () => { if (typeof mapConfig.setShowCreateMapDialog === 'function') mapConfig.setShowCreateMapDialog(true); },
         saveStatus: 'saved',
         lastSaveTime: 0,
         onMinimize: () => {
@@ -322,21 +335,124 @@ export default function useAppMainBuilder() {
       activeHelpTab: 0,
       setActiveHelpTab: () => {},
       handleHelpClose: () => {},
-      topBarProps: {},
+      topBarProps: {
+        toolbarExpanded: toolbarState.toolbarExpanded,
+        containerRef: toolbarState.toolbarContainerRef,
+        onMouseEnter: toolbarState.handleToolbarMouseEnter,
+        onMouseLeave: toolbarState.handleToolbarMouseLeave,
+        onFocus: toolbarState.handleToolbarFocus,
+        onBlur: toolbarState.handleToolbarBlur,
+        handleUndo,
+        handleRedo,
+        handleZoomIn,
+        handleZoomOut,
+        handleResetZoom
+      },
       canvasCtx: {
-        // expose minimal map-related handlers/state so components like EditorCanvas
-        // and MapInitOverlay receive the real create-map handler instead of an empty object
-        handleOpenCreateMapDialog: mapConfig.handleOpenCreateMapDialog,
-        mapInitialized: mapConfig.mapInitialized,
-        isPreparingNewMap: mapConfig.isPreparingNewMap,
-        mapWidth: mapConfig.mapWidth,
-        mapHeight: mapConfig.mapHeight
-      ,
+        editor: editor,
+        canvasRef,
+        draggingNpcId: appState.draggingNpcId,
+        setDraggingNpcId: appState.setDraggingNpcId,
         tipsMinimized: appState.tipsMinimized,
         setTipsMinimized: appState.setTipsMinimized,
-        setShowHelp: helpState.setShowHelp
+        setShowHelp: helpState.setShowHelp,
+        isEnemyTabActive: false,
+        mapWidth: mapConfig.mapWidth,
+        mapHeight: mapConfig.mapHeight,
+        handlePlaceActorOnMap: handlePlaceActorOnMap ?? (() => {}),
+        mapInitialized: mapConfig.mapInitialized,
+        handleOpenCreateMapDialog: mapConfig.handleOpenCreateMapDialog,
+        isPreparingNewMap: mapConfig.isPreparingNewMap,
+        hoverCoords: toolbarState.hoverCoords,
+        showActiveGid: showActiveGid,
+        npcDeletePopup: appState.npcDeletePopup,
+        setNpcDeletePopup: appState.setNpcDeletePopup,
+        handleUnplaceActorFromMap: handleUnplaceActorFromMap ?? (() => {}),
+        npcHoverTooltip: appState.npcHoverTooltip,
+        uiHelpers: { tooltip, toolbarRef: (editorRefs as any).toolbarRef, canvasRef },
+        stampsState: toolbarState.stampsState,
+        hasSelection: toolbarState.hasSelection,
+        selectionCount: toolbarState.selectionCount,
+        handleFillSelection: handleFillSelection ?? (() => {}),
+        handleDeleteSelection: handleDeleteSelection ?? (() => {}),
+        handleClearSelection: handleClearSelection ?? (() => {}),
+        leftTransitioning: appState.leftTransitioning,
+
+        // bottom toolbar wiring
+        bottomToolbarExpanded: toolbarState.bottomToolbarExpanded,
+        setBottomToolbarNode: toolbarState.setBottomToolbarNode,
+        handleBottomToolbarMouseEnter: toolbarState.handleBottomToolbarMouseEnter,
+        handleBottomToolbarMouseLeave: toolbarState.handleBottomToolbarMouseLeave,
+        handleBottomToolbarFocus: toolbarState.handleBottomToolbarFocus,
+        handleBottomToolbarBlur: toolbarState.handleBottomToolbarBlur,
+        selectedTool: toolbarState.selectedTool,
+        handleSelectTool: toolbarState.setSelectedTool,
+        showBrushOptions: toolbarState.showBrushOptions,
+        handleShowBrushOptions: toolbarState.handleShowBrushOptions,
+        handleHideBrushOptions: toolbarState.handleHideBrushOptions,
+        selectedBrushTool: toolbarState.selectedBrushTool,
+        setSelectedBrushTool: toolbarState.setSelectedBrushTool,
+        showTooltipWithDelayFn: showTooltipWithDelay,
+        hideTooltipFn: hideTooltip,
+        setShowClearLayerDialog: setShowClearLayerDialog,
+        showSelectionOptions: toolbarState.showSelectionOptions,
+        handleShowSelectionOptions: toolbarState.handleShowSelectionOptions,
+        handleHideSelectionOptions: toolbarState.handleHideSelectionOptions,
+        selectedSelectionTool: toolbarState.selectedSelectionTool,
+        setSelectedSelectionTool: toolbarState.setSelectedSelectionTool,
+        showShapeOptions: toolbarState.showShapeOptions,
+        handleShowShapeOptions: toolbarState.handleShowShapeOptions,
+        handleHideShapeOptions: toolbarState.handleHideShapeOptions,
+        selectedShapeTool: toolbarState.selectedShapeTool,
+        setSelectedShapeTool: toolbarState.setSelectedShapeTool,
+        stampMode: toolbarState.stampMode,
+        setStampMode: toolbarState.setStampMode,
+        newStampName: toolbarState.newStampName,
+        setNewStampName: toolbarState.setNewStampName,
+        handleCreateStamp: toolbarState.handleCreateStamp ?? (() => {}),
+        stamps: toolbarState.stamps ?? [],
+        selectedStamp: toolbarState.selectedStamp,
+        handleStampSelect: toolbarState.handleStampSelect ?? (() => {}),
+        handleDeleteStamp: toolbarState.handleDeleteStamp ?? (() => {})
       },
-      bottomToolbarProps: {},
+      bottomToolbarProps: {
+        bottomToolbarExpanded: toolbarState.bottomToolbarExpanded,
+        setBottomToolbarNode: toolbarState.setBottomToolbarNode,
+        handleBottomToolbarMouseEnter: toolbarState.handleBottomToolbarMouseEnter,
+        handleBottomToolbarMouseLeave: toolbarState.handleBottomToolbarMouseLeave,
+        handleBottomToolbarFocus: toolbarState.handleBottomToolbarFocus,
+        handleBottomToolbarBlur: toolbarState.handleBottomToolbarBlur,
+        selectedTool: toolbarState.selectedTool,
+        handleSelectTool: toolbarState.setSelectedTool,
+        showBrushOptions: toolbarState.showBrushOptions,
+        handleShowBrushOptions: toolbarState.handleShowBrushOptions,
+        handleHideBrushOptions: toolbarState.handleHideBrushOptions,
+        selectedBrushTool: toolbarState.selectedBrushTool,
+        setSelectedBrushTool: toolbarState.setSelectedBrushTool,
+        showTooltipWithDelay: showTooltipWithDelay,
+        hideTooltip: hideTooltip,
+        setShowClearLayerDialog: setShowClearLayerDialog,
+        showSelectionOptions: toolbarState.showSelectionOptions,
+        handleShowSelectionOptions: toolbarState.handleShowSelectionOptions,
+        handleHideSelectionOptions: toolbarState.handleHideSelectionOptions,
+        selectedSelectionTool: toolbarState.selectedSelectionTool,
+        setSelectedSelectionTool: toolbarState.setSelectedSelectionTool,
+        showShapeOptions: toolbarState.showShapeOptions,
+        handleShowShapeOptions: toolbarState.handleShowShapeOptions,
+        handleHideShapeOptions: toolbarState.handleHideShapeOptions,
+        selectedShapeTool: toolbarState.selectedShapeTool,
+        setSelectedShapeTool: toolbarState.setSelectedShapeTool,
+        stampMode: toolbarState.stampMode,
+        setStampMode: toolbarState.setStampMode,
+        newStampName: toolbarState.newStampName,
+        setNewStampName: toolbarState.setNewStampName,
+        handleCreateStamp: toolbarState.handleCreateStamp ?? (() => {}),
+        stamps: toolbarState.stamps ?? [],
+        selectedStamp: toolbarState.selectedStamp,
+        handleStampSelect: toolbarState.handleStampSelect ?? (() => {}),
+        handleDeleteStamp: toolbarState.handleDeleteStamp ?? (() => {}),
+        stampsState: toolbarState.stampsState
+      },
       enemyPanelProps: {},
       dialogsCtx,
       tooltip: null

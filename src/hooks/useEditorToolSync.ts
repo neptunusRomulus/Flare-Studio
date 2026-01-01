@@ -8,7 +8,7 @@ type Props = {
   selectedSelectionTool: string;
   selectedShapeTool: string;
   stampMode: string | null;
-  selectedStamp: any;
+  selectedStamp: unknown;
   setSelectionCount: (n: number) => void;
   setHasSelection: (v: boolean) => void;
 };
@@ -74,12 +74,14 @@ export default function useEditorToolSync({
 
   useEffect(() => {
     if (!editor || selectedTool !== 'stamp') return;
-    editor.setCurrentStampMode(stampMode);
+    if (stampMode == null) return;
+    editor.setCurrentStampMode(stampMode as 'select' | 'create' | 'place');
   }, [editor, selectedTool, stampMode]);
 
   useEffect(() => {
     if (!editor || selectedTool !== 'stamp') return;
-    editor.setActiveStamp(selectedStamp);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    editor.setActiveStamp(selectedStamp as any);
   }, [editor, selectedTool, selectedStamp]);
 
   useEffect(() => {

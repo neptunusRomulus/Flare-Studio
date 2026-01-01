@@ -41,8 +41,9 @@ const AbilityDialog = ({ open, abilityNameInput, onNameChange, onClose, onCreate
               placeholder="e.g. Fireball"
               autoFocus
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && abilityNameInput.trim()) {
-                  onCreate(abilityNameInput.trim());
+                const name = abilityNameInput ? String(abilityNameInput) : '';
+                if (e.key === 'Enter' && name.trim()) {
+                  onCreate(name.trim());
                 }
               }}
             />
@@ -54,8 +55,8 @@ const AbilityDialog = ({ open, abilityNameInput, onNameChange, onClose, onCreate
             Cancel
           </Button>
           <Button
-            disabled={!abilityNameInput.trim()}
-            onClick={() => onCreate(abilityNameInput.trim())}
+            disabled={!((abilityNameInput ? String(abilityNameInput) : '').trim())}
+            onClick={() => onCreate((abilityNameInput ? String(abilityNameInput) : '').trim())}
           >
             Create Ability
           </Button>

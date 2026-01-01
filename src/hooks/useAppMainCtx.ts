@@ -1,4 +1,4 @@
-export default function buildAppMainCtx(params: any) {
+export default function buildAppMainCtx(params: Record<string, unknown>) {
   const {
     showWelcome,
     handleCreateNewMap,
@@ -49,7 +49,7 @@ export default function buildAppMainCtx(params: any) {
     enemyPanelProps,
     dialogsCtx,
     tooltip
-  } = params;
+  } = params as Record<string, unknown>;
 
   return {
     showWelcome,

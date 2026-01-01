@@ -1,4 +1,4 @@
-export default function buildSidebarDeps(params: any) {
+export default function buildSidebarDeps(params: Record<string, unknown>) {
   const {
     isNpcLayer,
     isEnemyLayer,
@@ -60,7 +60,7 @@ export default function buildSidebarDeps(params: any) {
     hasUnsavedChanges,
     setShowSettings,
     refreshProjectMaps
-  } = params;
+  } = params as Record<string, unknown>;
 
   return {
     isNpcLayer,

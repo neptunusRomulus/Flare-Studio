@@ -1,16 +1,16 @@
 import React, { createContext, useContext } from 'react';
 import useToolbarSetup from '../hooks/useToolbarSetup';
 
-const ToolbarContext = createContext<any | null>(null);
+const ToolbarContext = createContext<Record<string, unknown> | null>(null);
 
 type ToolbarProviderProps = {
-  value?: any;
-  editor?: any;
+  value?: Record<string, unknown>;
+  editor?: unknown;
   children: React.ReactNode;
 };
 
 export const ToolbarProvider = ({ value, editor, children }: ToolbarProviderProps) => {
-  const computed = useToolbarSetup({ editor });
+  const computed = useToolbarSetup({ editor: editor as unknown });
   const provided = value ?? computed;
   return <ToolbarContext.Provider value={provided}>{children}</ToolbarContext.Provider>;
 };

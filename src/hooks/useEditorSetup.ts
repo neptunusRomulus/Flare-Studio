@@ -5,7 +5,9 @@ import type { MutableRefObject } from 'react';
 export default function useEditorSetup(editorOptsRef: MutableRefObject<Record<string, unknown> | null>) {
   const editorState = useEditorState(editorOptsRef);
 
-  const { syncMapObjectsRef, updateLayersListRef, syncMapObjects, updateLayersList } = editorState;
+  const { syncMapObjectsRef, updateLayersListRef, syncMapObjectsWrapper, updateLayersListWrapper } = editorState;
+  const syncMapObjects = syncMapObjectsWrapper;
+  const updateLayersList = updateLayersListWrapper;
 
   useEffect(() => {
     syncMapObjectsRef.current = syncMapObjects;

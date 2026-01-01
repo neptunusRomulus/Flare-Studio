@@ -2,65 +2,22 @@ import useToolbarState from './useToolbarState';
 import useBrushToolbar from './useBrushToolbar';
 import useToolbarHandlers from './useToolbarHandlers';
 
-export default function useToolbarSetup({ editor }: { editor: any }) {
+export default function useToolbarSetup({ editor }: { editor: unknown }) {
   const toolbarState = useToolbarState();
 
   const {
-    toolbarControls,
-    brushToolbarControls,
-    bottomToolbarControls,
-    toolbarExpanded,
-    toolbarContainerRef,
-    handleToolbarMouseEnter,
-    handleToolbarMouseLeave,
-    handleToolbarFocus,
-    handleToolbarBlur,
-    bottomToolbarExpanded,
-    setBottomToolbarNode,
-    handleBottomToolbarMouseEnter,
-    handleBottomToolbarMouseLeave,
-    handleBottomToolbarFocus,
-    handleBottomToolbarBlur,
-    showToolbarTemporarily,
-    showBottomToolbarTemporarily,
-    selectedTool,
     setSelectedTool,
-    selectedBrushTool,
-    setSelectedBrushTool,
-    selectedSelectionTool,
-    setSelectedSelectionTool,
-    selectedShapeTool,
-    setSelectedShapeTool,
-    hoverCoords,
-    setHoverCoords,
-    selectionCount,
-    setSelectionCount,
-    hasSelection,
-    setHasSelection,
-    showBrushOptions,
-    handleShowBrushOptions,
-    handleHideBrushOptions,
-    showSelectionOptions,
-    handleShowSelectionOptions,
-    handleHideSelectionOptions,
-    showShapeOptions,
-    handleShowShapeOptions,
-    handleHideShapeOptions,
-    stamps,
-    setStamps,
-    selectedStamp,
-    setSelectedStamp,
-    stampMode,
-    setStampMode,
-    setShowStampDialog,
+    showBottomToolbarTemporarily,
+    setBrushTool,
     newStampName,
     setNewStampName,
-    brushTool,
-    setBrushTool,
-    showSeparateDialog,
+    setShowStampDialog,
+    setStampMode,
+    selectedStamp,
+    setSelectedStamp,
+    setBrushToSeparate,
     setShowSeparateDialog,
-    brushToSeparate,
-    setBrushToSeparate
+    brushToSeparate
   } = toolbarState;
 
   const { showBrushToolbarTemporarily: showBrushToolbarTemporarilyFallback } = useBrushToolbar();
@@ -74,7 +31,8 @@ export default function useToolbarSetup({ editor }: { editor: any }) {
     handleSeparateBrush,
     confirmSeparateBrush
   } = useToolbarHandlers({
-    editor,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    editor: editor as any,
     setSelectedTool,
     showBottomToolbarTemporarily,
     setBrushTool,
@@ -91,11 +49,11 @@ export default function useToolbarSetup({ editor }: { editor: any }) {
   });
 
   const stampsState = {
-    stamps,
-    setStamps,
+    stamps: toolbarState.stamps,
+    setStamps: toolbarState.setStamps,
     selectedStamp,
     setSelectedStamp,
-    stampMode,
+    stampMode: toolbarState.stampMode,
     setStampMode,
     setShowStampDialog,
     newStampName,

@@ -13,7 +13,7 @@ export default function App() {
     <ToolbarProvider value={toolbarValue}>
       <SidebarProvider deps={useSidebarDeps(sidebarDeps)}>
         {(assembledSidebar: unknown) => {
-          const appCtxBuilt = buildAppMainCtxFromSidebar(assembledSidebar as Record<string, unknown> | null);
+          const appCtxBuilt = buildAppMainCtxFromSidebar(assembledSidebar);
           return (
             <AppProvider value={appCtxBuilt}>
               <AppMain />

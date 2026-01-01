@@ -19,7 +19,7 @@ type Props = {
 };
 
 export default function EditorTabs({
-  tabs,
+  tabs = [],
   activeTabId,
   onSwitchTab,
   onOpenMapSettings,

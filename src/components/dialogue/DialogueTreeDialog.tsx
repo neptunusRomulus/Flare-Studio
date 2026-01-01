@@ -7,7 +7,7 @@ import type { DialogueLine, DialogueRequirement, DialogueReward, DialogueWorldEf
 
 const DialogueTreeDialog = ({
   showDialogueTreeDialog,
-  dialogueTrees,
+  dialogueTrees = [],
   setDialogueTrees,
   activeDialogueTab,
   setActiveDialogueTab,
@@ -18,7 +18,7 @@ const DialogueTreeDialog = ({
   updateEditingObjectProperty
 }: {
   showDialogueTreeDialog: boolean;
-  dialogueTrees: DialogueTree[];
+  dialogueTrees?: DialogueTree[];
   setDialogueTrees: React.Dispatch<React.SetStateAction<DialogueTree[]>>;
   activeDialogueTab: number;
   setActiveDialogueTab: React.Dispatch<React.SetStateAction<number>>;

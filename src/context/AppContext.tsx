@@ -1,8 +1,8 @@
 import React, { createContext, useContext } from 'react';
 
-const AppContext = createContext<any | null>(null);
+const AppContext = createContext<Record<string, unknown> | null>(null);
 
-export const AppProvider = ({ value, children }: { value: any; children: React.ReactNode }) => (
+export const AppProvider = ({ value, children }: { value: Record<string, unknown>; children: React.ReactNode }) => (
   <AppContext.Provider value={value}>{children}</AppContext.Provider>
 );
 

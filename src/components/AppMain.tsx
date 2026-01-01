@@ -135,7 +135,7 @@ export default function AppMain() {
 
       <Toaster />
 
-      <DialogsContainer ctx={dialogsCtx} />
+      <DialogsContainer ctx={c} />
 
       {tooltip && (
         <div

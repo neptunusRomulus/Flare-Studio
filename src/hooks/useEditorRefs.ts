@@ -5,8 +5,8 @@ export default function useEditorRefs() {
   const editorOptsRef = useRef<Record<string, unknown> | null>(null);
   const handleManualSaveRef = useRef<(() => Promise<void>) | undefined>(undefined);
   const switchToTabHelpersRef = useRef<{
-    handleOpenMap: (...args: any[]) => Promise<void>;
-    loadProjectData: (...args: any[]) => Promise<boolean>;
+    handleOpenMap: (...args: unknown[]) => Promise<void>;
+    loadProjectData: (...args: unknown[]) => Promise<boolean>;
     setupAutoSave: (editor: TileMapEditor) => void;
     syncMapObjects: () => void;
     updateLayersList: () => void;

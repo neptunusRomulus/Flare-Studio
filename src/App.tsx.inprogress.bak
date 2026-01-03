@@ -5024,7 +5024,6 @@ const setupAutoSave = useCallback((editorInstance: TileMapEditor) => {
               {(() => {
                 const activeLayerType = activeLayer?.type;
                 const showTabs = activeLayerType === 'background' || activeLayerType === 'object';
-                console.log('[DEBUG UI] Rendering tabs - activeLayerType:', activeLayerType, 'showTabs:', showTabs);
                 if (editor && activeLayerType) {
                   const tabs = editor.getLayerTabs ? editor.getLayerTabs(activeLayerType) : [] as Array<{ id: number; name?: string }>;
                   const activeTabId = editor.getActiveLayerTabId ? editor.getActiveLayerTabId(activeLayerType) : null;

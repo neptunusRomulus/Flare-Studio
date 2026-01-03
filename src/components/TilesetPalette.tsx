@@ -25,7 +25,6 @@ const TilesetPalette = ({
     {(() => {
       const activeLayerType = activeLayer?.type;
       const showTabs = activeLayerType === 'background' || activeLayerType === 'object';
-      console.log('[DEBUG UI] Rendering tabs - activeLayerType:', activeLayerType, 'showTabs:', showTabs);
       if (editor && activeLayerType) {
         const tabs = editor.getLayerTabs ? editor.getLayerTabs(activeLayerType) : [];
         const activeTabId = editor.getActiveLayerTabId ? editor.getActiveLayerTabId(activeLayerType) : null;

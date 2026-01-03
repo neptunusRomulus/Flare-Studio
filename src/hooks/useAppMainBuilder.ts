@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import useDialogsCtx from './useDialogsCtx';
 import buildConfirmDialogProps from './buildConfirmDialogProps';
 import useEditorRefs from './useEditorRefs';
@@ -10,7 +10,7 @@ import useDarkModeSync from './useDarkModeSync';
 import useAppState from './useAppState';
 import useToolbarState from './useToolbarState';
 import useMapConfig from './useMapConfig';
-import useEditorTabs from './useEditorTabs';
+import useEditorTabs, { type EditorTab } from './useEditorTabs';
 import useProjectManager from './useProjectManager';
 import useHelpState from './useHelpState';
 
@@ -84,7 +84,38 @@ export default function useAppMainBuilder() {
     switchToTabHelpersRef: (editorRefs as any).switchToTabHelpersRef
   });
 
-  const { tabs, activeTabId, setTabs, setActiveTabId } = editorTabs as unknown as Record<string, any>;
+  const { tabs, activeTabId, setTabs, setActiveTabId, switchToTab } = editorTabs as unknown as Record<string, any>;
+  
+  useEffect(() => {
+    if (!mapConfig.mapInitialized) {
+      return;
+    }
+    const name = (mapConfig.mapName ?? '').trim();
+    if (!name) return;
+
+    const projectPath = currentProjectPath ?? null;
+    const existing = tabs.find(
+      (tab) => tab.name === name && (tab.projectPath ?? null) === projectPath
+    );
+    if (existing) {
+      if (activeTabId !== existing.id) {
+        setActiveTabId(existing.id);
+      }
+      return;
+    }
+
+    const tabId = `map-${name}-${projectPath ?? 'project'}-${Date.now().toString(36)}`;
+    setTabs((prevTabs: EditorTab[]) => [...prevTabs, { id: tabId, name, projectPath }]);
+    setActiveTabId(tabId);
+  }, [
+    mapConfig.mapInitialized,
+    mapConfig.mapName,
+    currentProjectPath,
+    tabs,
+    activeTabId,
+    setTabs,
+    setActiveTabId
+  ]);
   
   const { handleUndo, handleRedo, handleZoomIn, handleZoomOut, handleResetZoom } = useUndoRedoZoom({ editor, updateLayersList, syncMapObjects });
 
@@ -130,6 +161,30 @@ export default function useAppMainBuilder() {
     showToolbarTemporarily: toolbarState.showToolbarTemporarily,
     showBottomToolbarTemporarily: toolbarState.showBottomToolbarTemporarily
   } as unknown as Record<string, unknown>);
+
+  useEffect(() => {
+    const switchToTabHelpersRef = (editorRefs as any).switchToTabHelpersRef;
+    if (!switchToTabHelpersRef) return;
+
+    switchToTabHelpersRef.current = {
+      handleOpenMap: async (projectDir: string, createTab?: boolean, mapName?: string) => {
+        const manager = projectManager as Record<string, any>;
+        if (manager && typeof manager.handleOpenMap === 'function') {
+          await manager.handleOpenMap(projectDir, createTab, mapName);
+        }
+      },
+      loadProjectData: async () => false,
+      setupAutoSave: (editorInstance: unknown) => {
+        try {
+          setupAutoSave(editorInstance as any);
+        } catch (e) {
+          console.warn('setupAutoSave helper error:', e);
+        }
+      },
+      syncMapObjects: () => void syncMapObjects(),
+      updateLayersList: () => void updateLayersList()
+    };
+  }, [editorRefs, projectManager, setupAutoSave, syncMapObjects, updateLayersList]);
 
   const handleCreateNewMap = (config: { name?: string; width?: number; height?: number; isStartingMap?: boolean } , projectPath?: string | null) => {
     try {
@@ -243,7 +298,7 @@ export default function useAppMainBuilder() {
       titleBarProps: {
         tabs: tabs ?? [],
         activeTabId: activeTabId ?? null,
-        onSwitchTab: (id: string | number) => { try { if (typeof setActiveTabId === 'function') setActiveTabId(id); } catch (e) {} },
+        onSwitchTab: (id: string) => { void switchToTab(id); },
         onOpenMapSettings: () => {},
         onCloseEnemyTab: () => {},
         onCreateNewMap: () => { if (typeof mapConfig.setShowCreateMapDialog === 'function') mapConfig.setShowCreateMapDialog(true); },

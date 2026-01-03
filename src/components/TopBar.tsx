@@ -44,7 +44,7 @@ const TopBar: React.FC<Props> = ({
       className={`flex items-center bg-white/90 dark:bg-neutral-900/90 border border-border rounded-full shadow-lg transition-all duration-300 ease-in-out ${toolbarExpanded ? 'px-2 py-1' : 'px-1 py-1'}`}
     >
       <div
-        className={`flex items-center gap-1 overflow-hidden transition-all duration-300 ease-out ${toolbarExpanded ? 'opacity-100 scale-100 max-w-[420px]' : 'opacity-0 scale-95 max-w-0 pointer-events-none'}`}
+        className={`flex items-center gap-1 overflow-hidden transition-all duration-300 ease-out ${toolbarExpanded ? 'opacity-100 max-w-[420px]' : 'opacity-90 max-w-[420px]'}`}
       >
         <Tooltip content="Undo (Ctrl+Z)" side="bottom">
           <Button size="sm" variant="outline" className="w-8 h-8 p-0 rounded-full" onClick={handleUndo}>

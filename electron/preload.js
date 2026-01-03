@@ -22,6 +22,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("open-map-project", projectPath, mapName),
   saveMapProject: (projectPath, mapData) =>
     ipcRenderer.invoke("save-map-project", projectPath, mapData),
+  deleteMap: (projectPath, mapName) =>
+    ipcRenderer.invoke("delete-map", projectPath, mapName),
   saveExportFiles: (projectPath, projectName, mapTxt, tilesetDef, options) =>
     ipcRenderer.invoke(
       "save-export-files",

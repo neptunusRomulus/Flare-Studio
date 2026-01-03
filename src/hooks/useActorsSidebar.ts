@@ -47,8 +47,52 @@ export type ActorsSidebarParams = {
   leftCollapsed: boolean;
 };
 
-export default function useActorsSidebar(params: ActorsSidebarParams) {
-  const p = params;
+export default function useActorsSidebar(params?: Partial<ActorsSidebarParams>) {
+  const noopBooleanDispatch: React.Dispatch<React.SetStateAction<boolean>> = () => {};
+  const noopNullableNumberDispatch: React.Dispatch<React.SetStateAction<number | null>> = () => {};
+  const noopItemCategoriesDispatch: React.Dispatch<React.SetStateAction<Set<ItemRole>>> = () => {};
+  const noopHandleNumber = (_id: number) => {};
+  const noopTwoArgs = (_id: number, _delta: number) => {};
+  const noopDrag = (_e: React.DragEvent, _actorId: number) => {};
+  const noopNode = () => {};
+  const noopTooltipWithDelay = (_text: React.ReactNode, _target: HTMLElement) => {};
+  const noopHoverTooltip = (_p: { x: number; y: number } | null) => {};
+  const noopActorDialog = (_type: 'npc' | 'enemy') => {};
+  const noopItemEdit = (_item: unknown) => {};
+  const defaultParams: ActorsSidebarParams = {
+    isNpcLayer: false,
+    isEnemyLayer: false,
+    actorEntries: [],
+    draggingNpcId: null,
+    handleEditObject: noopHandleNumber,
+    setNpcHoverTooltip: noopHoverTooltip,
+    handleNpcDragStart: noopDrag,
+    handleNpcDragEnd: noopNode,
+    handleOpenActorDialog: noopActorDialog,
+    isRulesLayer: false,
+    rulesList: [],
+    handleAddRule: noopNode,
+    isItemsLayer: false,
+    itemsList: [],
+    expandedItemCategories: new Set<ItemRole>(),
+    setExpandedItemCategories: noopItemCategoriesDispatch,
+    handleOpenItemEdit: noopItemEdit,
+    handleOpenItemDialog: noopNode,
+    layers: [],
+    activeLayerId: null,
+    hoveredLayerId: null,
+    layersPanelExpanded: false,
+    setLayersPanelExpanded: noopBooleanDispatch,
+    setHoveredLayerId: noopNullableNumberDispatch,
+    handleSetActiveLayer: noopHandleNumber,
+    handleToggleLayerVisibility: noopHandleNumber,
+    handleLayerTransparencyChange: noopTwoArgs,
+    showTooltipWithDelay: noopTooltipWithDelay,
+    hideTooltip: noopNode,
+    uiHelpers: undefined,
+    leftCollapsed: false
+  };
+  const p: ActorsSidebarParams = { ...defaultParams, ...(params ?? {}) };
 
   const actors = {
     isNpcLayer: p.isNpcLayer,

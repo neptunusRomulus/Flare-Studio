@@ -42,6 +42,7 @@ export default function AppMain() {
     setShowSidebarToggle,
     showMapSettingsOnly,
     handleCloseMapSettings,
+    handleDeleteMap,
     mapName,
     setMapName,
     mapWidth,
@@ -67,6 +68,8 @@ export default function AppMain() {
     tooltip
   } = c;
 
+  const hasMap = canvasCtx.mapInitialized;
+
   if (showWelcome) {
     return (
       <WelcomeScreen
@@ -81,20 +84,24 @@ export default function AppMain() {
     <div className="h-screen bg-background text-foreground flex flex-col overflow-hidden">
       <AppShell
         titleBarProps={titleBarProps}
-        sidebarToggleProps={{ show: showSidebarToggle, leftCollapsed, onToggle: handleSidebarToggle }}
+        sidebarToggleProps={{ show: showSidebarToggle && hasMap, leftCollapsed, onToggle: handleSidebarToggle }}
       />
 
       <main className="flex flex-1 min-h-0">
-        <AppSidebar
-          leftCollapsed={leftCollapsed}
-          actors={actors}
-          rules={rules}
-          items={items}
-          tileset={tileset}
-          layers={layersObj}
-          exportStatus={exportStatus}
-          controls={controls}
-        />
+        {hasMap && (
+          <AppSidebar
+            leftCollapsed={leftCollapsed}
+            actors={actors}
+            rules={rules}
+            items={items}
+            tileset={tileset}
+            layers={layersObj}
+            exportStatus={exportStatus}
+            controls={controls}
+          />
+        )}
+
+        <EditorArea topBarProps={topBarProps} canvasCtx={canvasCtx} bottomToolbarProps={bottomToolbarProps} enemyPanelProps={enemyPanelProps} />
 
         <EngineSettingsDialog
           open={showSettings}
@@ -122,6 +129,7 @@ export default function AppMain() {
           isStartingMap={isStartingMap}
           updateStartingMap={updateStartingMap}
           handleMapResize={handleMapResize}
+          handleDeleteMap={handleDeleteMap}
         />
 
         <ClearLayerDialog open={showClearLayerDialog} onClose={handleClearLayerClose} onConfirm={handleClearLayerConfirm} />
@@ -129,8 +137,6 @@ export default function AppMain() {
         <ConfirmActionDialog {...confirmDialogProps} />
 
         <HelpDialog open={showHelp} activeTab={activeHelpTab} setActiveTab={setActiveHelpTab} onClose={handleHelpClose} />
-
-        <EditorArea topBarProps={topBarProps} canvasCtx={canvasCtx} bottomToolbarProps={bottomToolbarProps} enemyPanelProps={enemyPanelProps} />
       </main>
 
       <Toaster />

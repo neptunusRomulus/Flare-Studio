@@ -64,18 +64,29 @@ export function useEditorState(optsRef: React.RefObject<Partial<UseEditorStateOp
   const setupAutoSaveRef = useRef<null | ((editor: TileMapEditorType) => void)>(null);
   const updateLayersListRef = useRef<null | (() => void)>(null);
   const syncMapObjectsRef = useRef<null | (() => void)>(null);
+  const updateLayersListWrapperRef = useRef<(() => void) | null>(null);
+  const syncMapObjectsWrapperRef = useRef<(() => void) | null>(null);
 
   const setupAutoSaveWrapper = useCallback((target: TileMapEditorType) => {
     setupAutoSaveRef.current?.(target);
   }, []);
 
   const updateLayersListWrapper = useCallback(() => {
-    updateLayersListRef.current?.();
-  }, []);
+    const fn = updateLayersListRef.current;
+    if (fn && fn !== updateLayersListWrapperRef.current) {
+      fn();
+    }
+  }, [updateLayersListRef, updateLayersListWrapperRef]);
 
   const syncMapObjectsWrapper = useCallback(() => {
-    syncMapObjectsRef.current?.();
-  }, []);
+    const fn = syncMapObjectsRef.current;
+    if (fn && fn !== syncMapObjectsWrapperRef.current) {
+      fn();
+    }
+  }, [syncMapObjectsRef, syncMapObjectsWrapperRef]);
+
+  updateLayersListWrapperRef.current = updateLayersListWrapper;
+  syncMapObjectsWrapperRef.current = syncMapObjectsWrapper;
 
   // Editor command helpers — keep lifecycle and commands inside the hook
   const handlePlaceActorOnMap = useCallback((objectId: number, x?: number, y?: number) => {

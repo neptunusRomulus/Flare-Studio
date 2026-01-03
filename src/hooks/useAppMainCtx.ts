@@ -25,6 +25,7 @@ export default function buildAppMainCtx(params: Record<string, unknown>) {
     setShowActiveGid,
     setShowSidebarToggle,
     showMapSettingsOnly,
+    handleDeleteMap,
     handleCloseMapSettings,
     mapName,
     setMapName,

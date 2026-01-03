@@ -1,4 +1,6 @@
 import type React from 'react';
+import type React from 'react';
+import type { toast as ToastFn } from '@/hooks/use-toast';
 import type { TileMapEditor } from '../editor/TileMapEditor';
 import type { TileLayer, Stamp } from '../types';
 
@@ -22,8 +24,28 @@ export type TilesetSidebarParams = {
   } | null;
 };
 
-export default function useTilesetSidebar(params: TilesetSidebarParams) {
-  const p = params;
+const noopSetTabTick: React.Dispatch<React.SetStateAction<number>> = () => {};
+const noopFileUpload = (_e: React.ChangeEvent<HTMLInputElement>, _type: 'tileset' | 'layerTileset') => {};
+const noopToggleBrush = (_tool: BrushTool) => {};
+const noopDeleteTab = () => {};
+const noopToast = (() => ({ id: '', dismiss: () => {}, update: () => {} })) as unknown as ToastFn;
+
+export default function useTilesetSidebar(params?: Partial<TilesetSidebarParams>) {
+  const defaultParams: TilesetSidebarParams = {
+    editor: null,
+    activeLayer: null,
+    tabTick: 0,
+    setTabTick: noopSetTabTick,
+    brushTool: 'none',
+    isCollisionLayer: false,
+    handleFileUpload: noopFileUpload,
+    handleToggleBrushTool: noopToggleBrush,
+    handleDeleteActiveTab: noopDeleteTab,
+    toast: noopToast,
+    handleOpenActorDialogForTileset: undefined,
+    stampsState: null
+  };
+  const p: TilesetSidebarParams = { ...defaultParams, ...(params ?? {}) };
 
   const tileset = {
     editor: p.editor,

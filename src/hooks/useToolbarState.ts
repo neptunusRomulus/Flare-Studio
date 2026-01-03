@@ -4,7 +4,7 @@ import useStampState from './useStampState';
 
 export default function useToolbarState() {
   const toolbar = useToolbarAutoCollapse();
-  const bottomToolbar = useToolbarAutoCollapse();
+  const bottomToolbar = useToolbarAutoCollapse({ autoCollapse: false });
   const brushToolbar = useToolbarAutoCollapse({ autoCollapse: false });
 
   const [selectedTool, setSelectedTool] = useState<'brush' | 'selection' | 'shape' | 'eyedropper' | 'stamp'>('brush');

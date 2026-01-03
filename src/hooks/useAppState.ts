@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import type { EditorProjectData } from '../editor/TileMapEditor';
-import type { TileLayer } from '../types';
+import type { TileLayer, MapObject } from '../types';
 
 export default function useAppState() {
   const [showWelcome, setShowWelcome] = useState(true);
@@ -26,6 +26,7 @@ export default function useAppState() {
     screenX: number;
     screenY: number;
   } | null>(null);
+  const [mapObjects, setMapObjects] = useState<MapObject[]>([]);
 
   const createTabForRef = useRef<((name: string, projectPath: string | null, config: EditorProjectData) => void) | null>(null);
   const beforeCreateMapRef = useRef<(() => Promise<void>) | null>(null);
@@ -65,6 +66,8 @@ export default function useAppState() {
     setNpcHoverTooltip,
     npcDeletePopup,
     setNpcDeletePopup,
+    mapObjects,
+    setMapObjects,
     createTabForRef,
     beforeCreateMapRef
   } as const;

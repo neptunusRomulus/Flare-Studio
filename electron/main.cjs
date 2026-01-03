@@ -9,6 +9,35 @@ const path = require("path");
 const fs = require("fs");
 const isDev = !app.isPackaged;
 
+const sanitizeMapNameForFilename = (name) => {
+  return (
+    String(name || '')
+      .replace(/[<>:"/\\|?*]/g, '_')
+      .replace(/\s+/g, '_')
+      .replace(/_{2,}/g, '_')
+      .trim() || 'map'
+  );
+};
+
+const deleteMatchingFile = (dir, filename) => {
+  if (!dir || !filename) return false;
+  if (!fs.existsSync(dir)) return false;
+  try {
+    const entries = fs.readdirSync(dir);
+    const normalized = filename.toLowerCase();
+    const match = entries.find((entry) => entry.toLowerCase() === normalized);
+    if (!match) return false;
+    const targetPath = path.join(dir, match);
+    if (fs.existsSync(targetPath)) {
+      fs.unlinkSync(targetPath);
+      return true;
+    }
+  } catch (error) {
+    console.warn('deleteMatchingFile failed for', dir, filename, error);
+  }
+  return false;
+};
+
 const resolveRuntimePath = (packagedSegments, devSegments) => {
   const base = app.isPackaged
     ? process.resourcesPath
@@ -642,13 +671,7 @@ ipcMainLocal.handle("save-map-project", async (event, projectPath, mapData) => {
 
     // Use the map name to create the file (each map gets its own .json file)
     const mapName = mapData.name || "Untitled Map";
-    // Sanitize the map name for use as filename
-    const sanitizedName =
-      mapName
-        .replace(/[<>:"/\\|?*]/g, "_")
-        .replace(/\s+/g, "_")
-        .replace(/_{2,}/g, "_")
-        .trim() || "map";
+    const sanitizedName = sanitizeMapNameForFilename(mapName);
     const mapFile = `${sanitizedName}.json`;
 
     const mapConfigPath = path.join(projectPath, mapFile);
@@ -746,6 +769,25 @@ ipcMainLocal.handle("save-map-project", async (event, projectPath, mapData) => {
   } catch (error) {
     console.error("Error saving map project:", error);
     return false;
+  }
+});
+
+ipcMainLocal.handle("delete-map", async (_event, projectPath, mapName) => {
+  try {
+    if (!projectPath || !mapName) {
+      return { success: false, message: "Project path and map name are required" };
+    }
+    const sanitizedName = sanitizeMapNameForFilename(mapName);
+    deleteMatchingFile(projectPath, `${sanitizedName}.json`);
+    const mapsDir = path.join(projectPath, "maps");
+    deleteMatchingFile(mapsDir, `${sanitizedName}.txt`);
+    return { success: true };
+  } catch (error) {
+    console.error("delete-map failed:", error);
+    return {
+      success: false,
+      message: error?.message ?? "Failed to delete map file",
+    };
   }
 });
 

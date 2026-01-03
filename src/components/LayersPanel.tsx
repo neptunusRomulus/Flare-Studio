@@ -72,10 +72,9 @@ const LayersPanel: React.FC<Props> = ({
                       : 'bg-transparent border-transparent'
                   }`}
                   style={{
-                    opacity: visible ? 1 : 0.65,
+                    opacity: visible ? 1 : 0.85,
                     transform: visible ? 'scaleY(1) translateY(0)' : 'scaleY(0.98) translateY(0)',
                     transformOrigin: 'top',
-                    pointerEvents: visible ? 'auto' : 'none',
                     transition: 'transform 400ms cubic-bezier(.2,.9,.2,1), opacity 400ms ease, box-shadow 300ms ease, background-color 150ms ease',
                     boxShadow: isActive ? '0 6px 12px rgba(15,23,42,0.06)' : isHovered ? '0 2px 6px rgba(251,146,60,0.15)' : 'none',
                     zIndex: isActive ? 30 : isHovered ? 20 : 10,
@@ -86,6 +85,18 @@ const LayersPanel: React.FC<Props> = ({
                   <div
                     className="cursor-pointer w-full flex items-center"
                     onClick={() => handleSetActiveLayer(layer.id)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleSetActiveLayer(layer.id);
+                      }
+                    }}
+                    style={{
+                      transition: 'transform 180ms cubic-bezier(.2,.9,.2,1)',
+                      transform: isHovered ? 'translateY(-3px) scale(1.02)' : 'none'
+                    }}
                   >
                     <div className={`flex items-center gap-2 w-full ${isActive ? 'opacity-100' : isHovered ? 'opacity-95' : 'opacity-80'}`}> 
                       <Tooltip content={layer.visible ? 'Hide layer' : 'Show layer'}>

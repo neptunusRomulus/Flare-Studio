@@ -1,11 +1,11 @@
 import useProjectIO from './useProjectIO';
 import useProjectLoader from './useProjectLoader';
 
-export default function useProjectManager(params: unknown) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const projectIO = useProjectIO(params as any);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const projectLoader = useProjectLoader(params as any);
+export default function useProjectManager(
+  params: Parameters<typeof useProjectIO>[0] & Parameters<typeof useProjectLoader>[0]
+) {
+  const projectIO = useProjectIO(params);
+  const projectLoader = useProjectLoader(params);
 
   return { ...projectIO, ...projectLoader };
 }

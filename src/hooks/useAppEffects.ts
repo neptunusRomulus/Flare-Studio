@@ -92,11 +92,21 @@ export default function useAppEffects(params: unknown) {
   } = p;
 
   useEffect(() => {
-    createTabForRef.current = createTabFor;
+    if (createTabForRef) {
+      try {
+        createTabForRef.current = createTabFor;
+      } catch (e) {
+        console.warn('Failed to assign createTabForRef.current', e);
+      }
+    }
   }, [createTabFor, createTabForRef]);
 
   useEffect(() => {
-    beforeCreateMapRef.current = handleBeforeCreateMap;
+    // Intentionally do not assign `beforeCreateMapRef.current` here to avoid
+    // overwriting any external handler. The app-level `beforeCreateMapRef`
+    // should be set by the component that provides the real pre-create
+    // callback (e.g. map config). `handleBeforeCreateMap` below will call
+    // whatever is stored in that ref when needed.
   }, [handleBeforeCreateMap, beforeCreateMapRef]);
 
   useEffect(() => {
@@ -187,21 +197,41 @@ export default function useAppEffects(params: unknown) {
   }, [editor, setSelectionCount, setHasSelection]);
 
   useEffect(() => {
-    updateLayersListRef.current = updateLayersList;
+    if (updateLayersListRef) {
+      try {
+        updateLayersListRef.current = updateLayersList;
+      } catch (e) {
+        console.warn('Failed to assign updateLayersListRef.current', e);
+      }
+    }
   }, [updateLayersList, updateLayersListRef]);
 
   useEffect(() => {
-    syncMapObjectsRef.current = syncMapObjects;
+    if (syncMapObjectsRef) {
+      try {
+        syncMapObjectsRef.current = syncMapObjects;
+      } catch (e) {
+        console.warn('Failed to assign syncMapObjectsRef.current', e);
+      }
+    }
   }, [syncMapObjects, syncMapObjectsRef]);
 
   useEffect(() => {
     if (editor) {
-      updateLayersList();
+      try {
+        if (typeof updateLayersList === 'function') updateLayersList();
+      } catch (e) {
+        console.warn('updateLayersList invocation failed', e);
+      }
     }
   }, [editor, updateLayersList]);
 
   useEffect(() => {
-    syncMapObjects();
+    try {
+      if (typeof syncMapObjects === 'function') syncMapObjects();
+    } catch (e) {
+      console.warn('syncMapObjects invocation failed', e);
+    }
   }, [syncMapObjects]);
 
   useEffect(() => {
@@ -220,18 +250,37 @@ export default function useAppEffects(params: unknown) {
     };
   }, [showAddLayerDropdown, setShowAddLayerDropdown]);
 
-  useEffect(() => { if (handleUndo) handleUndoRef.current = handleUndo; }, [handleUndo, handleUndoRef]);
-  useEffect(() => { if (handleRedo) handleRedoRef.current = handleRedo; }, [handleRedo, handleRedoRef]);
-
-  useEffect(() => { if (handleOpenMap) handleOpenMapRef.current = handleOpenMap; }, [handleOpenMap, handleOpenMapRef]);
+  useEffect(() => {
+    if (handleUndo && handleUndoRef) {
+      try { handleUndoRef.current = handleUndo; } catch (e) { console.warn('Failed to assign handleUndoRef.current', e); }
+    }
+  }, [handleUndo, handleUndoRef]);
 
   useEffect(() => {
-    switchToTabHelpersRef.current = {
-      handleOpenMap: handleOpenMap,
-      loadProjectData: loadProjectData,
-      setupAutoSave: setupAutoSaveWrapper,
-      syncMapObjects: syncMapObjects,
-      updateLayersList: updateLayersList,
-    };
+    if (handleRedo && handleRedoRef) {
+      try { handleRedoRef.current = handleRedo; } catch (e) { console.warn('Failed to assign handleRedoRef.current', e); }
+    }
+  }, [handleRedo, handleRedoRef]);
+
+  useEffect(() => {
+    if (handleOpenMap && handleOpenMapRef) {
+      try { handleOpenMapRef.current = handleOpenMap; } catch (e) { console.warn('Failed to assign handleOpenMapRef.current', e); }
+    }
+  }, [handleOpenMap, handleOpenMapRef]);
+
+  useEffect(() => {
+    if (switchToTabHelpersRef) {
+      try {
+        switchToTabHelpersRef.current = {
+          handleOpenMap: handleOpenMap,
+          loadProjectData: loadProjectData,
+          setupAutoSave: setupAutoSaveWrapper,
+          syncMapObjects: syncMapObjects,
+          updateLayersList: updateLayersList,
+        };
+      } catch (e) {
+        console.warn('Failed to assign switchToTabHelpersRef.current', e);
+      }
+    }
   }, [handleOpenMap, loadProjectData, setupAutoSaveWrapper, syncMapObjects, updateLayersList, switchToTabHelpersRef]);
 }

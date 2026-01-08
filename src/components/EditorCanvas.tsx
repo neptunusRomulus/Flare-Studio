@@ -85,7 +85,7 @@ export default function EditorCanvas(props: Props) {
 
   return (
     <div
-      className={`bg-gray-100 flex-1 min-h-0 flex items-center justify-center overflow-hidden relative ${draggingNpcId ? 'ring-2 ring-orange-500 ring-inset' : ''}`}
+      className={`bg-gray-100 flex-1 min-h-0 flex overflow-hidden relative ${draggingNpcId ? 'ring-2 ring-orange-500 ring-inset' : ''}`}
           onDragOver={(e) => {
         if (draggingNpcId && editor) {
           e.preventDefault();
@@ -129,7 +129,7 @@ export default function EditorCanvas(props: Props) {
       <canvas
         ref={canvasRef}
         id="mapCanvas"
-        className={`tile-canvas w-full h-full max-w-full max-h-full canvas-fade ${leftTransitioning ? 'during-sidebar-transition' : ''}`}
+        className={`tile-canvas flex-1 canvas-fade ${leftTransitioning ? 'during-sidebar-transition' : ''}`}
       />
 
       <MapInitOverlay mapInitialized={mapInitialized} handleOpenCreateMapDialog={handleOpenCreateMapDialog} isPreparingNewMap={isPreparingNewMap} />

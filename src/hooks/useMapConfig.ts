@@ -316,6 +316,10 @@ const useMapConfig = ({
         } catch (e) {
           console.warn('Failed to create tab for new in-project map:', e);
         }
+      } else {
+        // Defensive warning: createTabFor ref may not be wired yet (mount order/race).
+        // In this case the map is still created in-memory but no UI tab will appear.
+        console.warn('createTabFor not available when creating new map — tab was not created.');
       }
 
       if (targetEditor && currentProjectPath) {

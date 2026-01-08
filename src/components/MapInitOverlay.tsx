@@ -11,7 +11,8 @@ type Props = {
 
 const MapInitOverlay: React.FC<Props> = ({ mapInitialized, handleOpenCreateMapDialog, isPreparingNewMap }) => {
   if (mapInitialized) return null;
-  const appCtx = useAppContext() as any;
+  type LocalAppCtx = { setShowCreateMapDialog?: (v: boolean) => void };
+  const appCtx = useAppContext() as LocalAppCtx;
   const openCreateFallback = () => {
     try {
       if (appCtx && typeof appCtx.setShowCreateMapDialog === 'function') {

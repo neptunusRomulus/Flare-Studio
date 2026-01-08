@@ -1221,22 +1221,28 @@ export class TileMapEditor {
   private resizeCanvas(): void {
     const container = this.mapCanvas.parentElement;
     if (container) {
-      // Use requestAnimationFrame to ensure proper sizing after layout changes
-      requestAnimationFrame(() => {
-        const rect = container.getBoundingClientRect();
-        // Ensure we don't exceed container bounds
-        const width = Math.max(1, Math.floor(rect.width));
-        const height = Math.max(1, Math.floor(rect.height));
+      const rect = container.getBoundingClientRect();
+      // Ensure we don't exceed container bounds, with minimum fallback dimensions
+      const width = Math.max(400, Math.floor(rect.width));
+      const height = Math.max(300, Math.floor(rect.height));
+      
+      // Only update if dimensions actually changed to avoid unnecessary redraws
+      if (this.mapCanvas.width !== width || this.mapCanvas.height !== height) {
+        this.mapCanvas.width = width;
+        this.mapCanvas.height = height;
         
-        // Only update if dimensions actually changed to avoid unnecessary redraws
-        if (this.mapCanvas.width !== width || this.mapCanvas.height !== height) {
-          this.mapCanvas.width = width;
-          this.mapCanvas.height = height;
-          
-          // Redraw after resize
-          this.draw();
-        }
-      });
+        // Redraw after resize
+        this.draw();
+      }
+    } else {
+      // Fallback if no container is found
+      const width = 400;
+      const height = 300;
+      if (this.mapCanvas.width !== width || this.mapCanvas.height !== height) {
+        this.mapCanvas.width = width;
+        this.mapCanvas.height = height;
+        this.draw();
+      }
     }
   }
 

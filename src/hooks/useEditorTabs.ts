@@ -47,6 +47,13 @@ const useEditorTabs = ({
     const safeConfig = config ? JSON.parse(JSON.stringify(config)) : null;
     const tab: EditorTab = { id, name, projectPath: projectPath ?? null, config: safeConfig };
     // created tab
+    try {
+      // debug: log tab creation
+      // eslint-disable-next-line no-console
+      console.log('createTabFor: creating tab', { id: tab.id, name: tab.name, projectPath: tab.projectPath });
+    } catch (e) {
+      // ignore
+    }
     setTabs((prev) => [...prev, tab]);
     setActiveTabId(id);
     setCurrentProjectPath(projectPath ?? null);

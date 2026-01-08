@@ -1,8 +1,9 @@
 import useToolbarState from './useToolbarState';
 import useBrushToolbar from './useBrushToolbar';
 import useToolbarHandlers from './useToolbarHandlers';
+import type { TileMapEditor } from '@/editor/TileMapEditor';
 
-export default function useToolbarSetup({ editor }: { editor: unknown }) {
+export default function useToolbarSetup({ editor }: { editor: TileMapEditor | null }) {
   const toolbarState = useToolbarState();
 
   const {
@@ -31,8 +32,7 @@ export default function useToolbarSetup({ editor }: { editor: unknown }) {
     handleSeparateBrush,
     confirmSeparateBrush
   } = useToolbarHandlers({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    editor: editor as any,
+    editor: editor ?? null,
     setSelectedTool,
     showBottomToolbarTemporarily,
     setBrushTool,

@@ -1,8 +1,6 @@
-import type React from 'react';
-import type React from 'react';
-import type { toast as ToastFn } from '@/hooks/use-toast';
-import type { TileMapEditor } from '../editor/TileMapEditor';
-import type { TileLayer, Stamp } from '../types';
+import * as React from 'react';
+import type { TileMapEditor } from '@/editor/TileMapEditor';
+import type { TileLayer, Stamp } from '@/types';
 
 type BrushTool = 'none' | 'move' | 'merge' | 'separate' | 'remove';
 
@@ -28,7 +26,7 @@ const noopSetTabTick: React.Dispatch<React.SetStateAction<number>> = () => {};
 const noopFileUpload = (_e: React.ChangeEvent<HTMLInputElement>, _type: 'tileset' | 'layerTileset') => {};
 const noopToggleBrush = (_tool: BrushTool) => {};
 const noopDeleteTab = () => {};
-const noopToast = (() => ({ id: '', dismiss: () => {}, update: () => {} })) as unknown as ToastFn;
+const noopToast: typeof import('@/hooks/use-toast').toast = (_props?: any) => ({ id: '', dismiss: () => {}, update: () => {} });
 
 export default function useTilesetSidebar(params?: Partial<TilesetSidebarParams>) {
   const defaultParams: TilesetSidebarParams = {

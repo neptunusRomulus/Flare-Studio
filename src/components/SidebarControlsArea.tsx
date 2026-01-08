@@ -11,6 +11,7 @@ type ControlsProps = {
   projectMaps: string[];
   setMapsSubOpen: React.Dispatch<React.SetStateAction<boolean>>;
   setMapsDropdownOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  setMapsDropdownPos: React.Dispatch<React.SetStateAction<{ left: number; top: number } | null>>;
   handleOpenCreateMapDialog: () => void;
   handleOpenMapFromMapsFolder: (p: string) => Promise<void>;
   toast: typeof import('@/hooks/use-toast').toast;
@@ -40,6 +41,7 @@ const SidebarControlsArea: React.FC<{ controls: ControlsProps }> = ({ controls }
         projectMaps={c.projectMaps}
         setMapsSubOpen={c.setMapsSubOpen}
         setMapsDropdownOpen={c.setMapsDropdownOpen}
+        setMapsDropdownPos={c.setMapsDropdownPos}
         handleOpenCreateMapDialog={c.handleOpenCreateMapDialog}
         handleOpenMap={c.handleOpenMapFromMapsFolder}
         toast={c.toast}

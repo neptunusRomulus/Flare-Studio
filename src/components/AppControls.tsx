@@ -14,6 +14,7 @@ type Props = {
   projectMaps: string[];
   setMapsSubOpen: React.Dispatch<React.SetStateAction<boolean>>;
   setMapsDropdownOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  setMapsDropdownPos: React.Dispatch<React.SetStateAction<{ left: number; top: number } | null>>;
   handleOpenCreateMapDialog: () => void;
   handleOpenMap: (path: string) => Promise<void>;
   toast: typeof import('@/hooks/use-toast').toast;
@@ -39,6 +40,7 @@ const AppControls: React.FC<Props> = ({
   projectMaps,
   setMapsSubOpen,
   setMapsDropdownOpen,
+  setMapsDropdownPos,
   handleOpenCreateMapDialog,
   handleOpenMap,
   toast,
@@ -61,6 +63,18 @@ const AppControls: React.FC<Props> = ({
           className="w-7 h-7 p-0 shadow-sm"
           onClick={async () => {
             if (!mapsDropdownOpen) await refreshProjectMaps();
+            try {
+              const btn = mapsButtonRef?.current;
+              if (!btn) {
+                setMapsDropdownOpen((s) => !s);
+                return;
+              }
+              const rect = btn.getBoundingClientRect();
+              // set position above the button
+              setMapsDropdownPos({ left: rect.left, top: rect.top - 8 });
+            } catch (e) {
+              console.warn('Failed to compute maps dropdown position', e);
+            }
             setMapsDropdownOpen((s) => !s);
           }}
           disabled={false}

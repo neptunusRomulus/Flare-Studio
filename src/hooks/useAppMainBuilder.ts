@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import useDialogsCtx from './useDialogsCtx';
 import buildConfirmDialogProps from './buildConfirmDialogProps';
 import useEditorRefs from './useEditorRefs';
@@ -10,27 +10,58 @@ import useDarkModeSync from './useDarkModeSync';
 import useAppState from './useAppState';
 import useToolbarState from './useToolbarState';
 import useMapConfig from './useMapConfig';
-import useEditorTabs, { type EditorTab } from './useEditorTabs';
+import useEditorTabs from './useEditorTabs';
 import useProjectManager from './useProjectManager';
+type ProjectManagerParams = Parameters<typeof useProjectManager>[0];
+import useLayerHandlers from './useLayerHandlers';
+import useAppEffects from './useAppEffects';
+import useNpcDrag from './useNpcDrag';
+import { normalizeItemsForState, type ItemSummary } from '@/utils/items';
+import { buildConstantStockString } from '@/utils/parsers';
+import type { ItemRole } from '@/editor/itemRoles';
+import { toast } from '@/hooks/use-toast';
 import useHelpState from './useHelpState';
+import type { TileMapEditor } from '@/editor/TileMapEditor';
 
 export default function useAppMainBuilder() {
   const dialogsCtx = useDialogsCtx({});
-  const editorRefs = useEditorRefs();
-  const editorSetup = useEditorSetup(editorRefs.editorOptsRef);
+  type EditorRefsType = ReturnType<typeof useEditorRefs>;
+  type EditorSetupType = ReturnType<typeof useEditorSetup>;
+  type EditorTabsType = ReturnType<typeof useEditorTabs>;
+  type ProjectManagerType = ReturnType<typeof useProjectManager>;
+  type ToolbarStateType = ReturnType<typeof useToolbarState>;
+  type ProjectManagerView = {
+    projectMaps?: string[];
+    handleOpenMapFromMapsFolder?: (filename: string) => Promise<void>;
+    handleManualSave?: () => Promise<void>;
+    refreshProjectMaps?: () => Promise<void>;
+    isExporting?: boolean;
+    exportProgress?: number;
+    isManuallySaving?: boolean;
+  };
+
+  const editorRefs = useEditorRefs() as EditorRefsType;
+  const editorSetup = useEditorSetup(editorRefs.editorOptsRef) as EditorSetupType;
   
   const { isDarkMode, setIsDarkMode, showSidebarToggle, setShowSidebarToggle } = usePreferences();
-  useDarkModeSync(isDarkMode, (editorSetup as unknown as Record<string, unknown>)['editor'] as any);
+  useDarkModeSync(isDarkMode, editorSetup.editor as TileMapEditor | null);
 
   const [autoSaveEnabled, setAutoSaveEnabledState] = useState<boolean>(false);
   const [showActiveGid, setShowActiveGid] = useState<boolean>(true);
 
   const appState = useAppState();
-  const toolbarState = useToolbarState();
+  const toolbarState = useToolbarState() as ToolbarStateType;
 
   const helpState = useHelpState();
 
   const [currentProjectPath, setCurrentProjectPath] = useState<string | null>(null);
+  const [itemsList, setItemsList] = useState<ItemSummary[]>([]);
+  const [expandedItemCategories, setExpandedItemCategories] = useState<Set<ItemRole>>(new Set());
+  const [mapsDropdownOpen, setMapsDropdownOpen] = useState(false);
+  const [mapsSubOpen, setMapsSubOpen] = useState(false);
+  const [mapsDropdownPos, setMapsDropdownPos] = useState<{ left: number; top: number } | null>(null);
+  const mapsButtonRef = useRef<HTMLButtonElement | null>(null);
+  const mapsPortalRef = useRef<HTMLDivElement | null>(null);
 
   const {
     editor,
@@ -44,7 +75,7 @@ export default function useAppMainBuilder() {
     handleFillSelection,
     handleDeleteSelection,
     handleClearSelection
-  } = editorSetup as unknown as Record<string, any>;
+  } = editorSetup as EditorSetupType;
 
   const mapConfig = useMapConfig({
     editor: editor ?? null,
@@ -81,52 +112,48 @@ export default function useAppMainBuilder() {
     setMapName: mapConfig.setMapName,
     setMapWidth: mapConfig.setMapWidth,
     setMapHeight: mapConfig.setMapHeight,
-    switchToTabHelpersRef: (editorRefs as any).switchToTabHelpersRef
+    switchToTabHelpersRef: editorRefs.switchToTabHelpersRef
   });
+  const { tabs, activeTabId, setTabs, setActiveTabId, switchToTab, createTabFor } = editorTabs as EditorTabsType;
 
-  const { tabs, activeTabId, setTabs, setActiveTabId, switchToTab } = editorTabs as unknown as Record<string, any>;
-  
-  useEffect(() => {
-    if (!mapConfig.mapInitialized) {
-      return;
+  // Wire internal app effects (sets createTabForRef, beforeCreateMapRef, and other app-level effects)
+  const _beforeCreateRunningRef = useRef(false);
+  const handleBeforeCreateMap = async () => {
+    if (_beforeCreateRunningRef.current) return;
+    _beforeCreateRunningRef.current = true;
+    try {
+      const fn = appState.beforeCreateMapRef?.current;
+      if (fn) await fn();
+    } finally {
+      _beforeCreateRunningRef.current = false;
     }
-    const name = (mapConfig.mapName ?? '').trim();
-    if (!name) return;
+  };
 
-    const projectPath = currentProjectPath ?? null;
-    const existing = tabs.find(
-      (tab) => tab.name === name && (tab.projectPath ?? null) === projectPath
-    );
-    if (existing) {
-      if (activeTabId !== existing.id) {
-        setActiveTabId(existing.id);
-      }
-      return;
-    }
-
-    const tabId = `map-${name}-${projectPath ?? 'project'}-${Date.now().toString(36)}`;
-    setTabs((prevTabs: EditorTab[]) => [...prevTabs, { id: tabId, name, projectPath }]);
-    setActiveTabId(tabId);
-  }, [
-    mapConfig.mapInitialized,
-    mapConfig.mapName,
-    currentProjectPath,
+  useAppEffects({
+    createTabForRef: appState.createTabForRef,
+    createTabFor,
+    beforeCreateMapRef: appState.beforeCreateMapRef,
+    handleBeforeCreateMap,
     tabs,
     activeTabId,
-    setTabs,
+    currentProjectPath,
     setActiveTabId
-  ]);
-  
+  });
   const { handleUndo, handleRedo, handleZoomIn, handleZoomOut, handleResetZoom } = useUndoRedoZoom({ editor, updateLayersList, syncMapObjects });
 
-  const { tooltip, showTooltipWithDelay, hideTooltip } = useTooltip({ toolbarRef: (editorRefs as any).toolbarRef, canvasRef });
+  const { tooltip, showTooltipWithDelay, hideTooltip } = useTooltip({ toolbarRef: toolbarState.toolbarContainerRef, canvasRef });
 
-  const [showClearLayerDialog, setShowClearLayerDialog] = useState(false);
+  const [, setShowClearLayerDialog] = useState(false);
 
   const projectManager = useProjectManager({
     editor,
     tabs,
     activeTabId,
+    currentProjectPath,
+    mapName: mapConfig.mapName,
+    mapObjects: appState.mapObjects,
+    buildConstantStockString,
+    toast,
     refreshProjectMaps: undefined,
     setIsOpeningProject: appState.setIsOpeningProject,
     setCurrentProjectPath,
@@ -160,27 +187,66 @@ export default function useAppMainBuilder() {
     setNewMapHeight: mapConfig.setNewMapHeight,
     showToolbarTemporarily: toolbarState.showToolbarTemporarily,
     showBottomToolbarTemporarily: toolbarState.showBottomToolbarTemporarily
-  } as unknown as Record<string, unknown>);
+  } as ProjectManagerParams);
+
+  const {
+    handleFileUpload,
+    handleSetActiveLayer,
+    handleToggleLayerVisibility,
+    handleLayerTransparencyChange
+  } = useLayerHandlers({
+    editor,
+    layers: appState.layers,
+    setLayers: appState.setLayers,
+    setActiveLayerId: appState.setActiveLayerId,
+    setItemsList,
+    normalizeItemsForState,
+    currentProjectPath,
+    updateLayersList
+  });
+
+  const { handleNpcDragStart, handleNpcDragEnd } = useNpcDrag({ editor, setDraggingNpcId: appState.setDraggingNpcId });
+
+  const activeLayer = useMemo(() => appState.layers.find((layer) => layer.id === appState.activeLayerId) ?? null, [appState.activeLayerId, appState.layers]);
+
+  const isNpcLayer = activeLayer?.type === 'npc';
+  const isEnemyLayer = activeLayer?.type === 'enemy';
+  const isRulesLayer = activeLayer?.type === 'rules';
+  const isItemsLayer = activeLayer?.type === 'items';
+
+  const handleToggleBrushTool = useCallback((tool: 'move' | 'merge' | 'separate' | 'remove') => {
+    toolbarState.setBrushTool((current) => (current === tool ? 'none' : tool));
+    toolbarState.showBrushToolbarTemporarily();
+  }, [toolbarState]);
+
+  const uiHelpers = useMemo(() => ({
+    tooltip,
+    toolbarRef: toolbarState.toolbarContainerRef,
+    canvasRef
+  }), [tooltip, canvasRef, toolbarState.toolbarContainerRef]);
+
+  const projectManagerRecord = projectManager as ProjectManagerType;
 
   useEffect(() => {
-    const switchToTabHelpersRef = (editorRefs as any).switchToTabHelpersRef;
+    const switchToTabHelpersRef = editorRefs.switchToTabHelpersRef;
     if (!switchToTabHelpersRef) return;
 
     switchToTabHelpersRef.current = {
-      handleOpenMap: async (projectDir: string, createTab?: boolean, mapName?: string) => {
-        const manager = projectManager as Record<string, any>;
+      handleOpenMap: async (...args: unknown[]) => {
+        const manager = projectManager as ProjectManagerType;
         if (manager && typeof manager.handleOpenMap === 'function') {
+          const [projectDir, createTab, mapName] = args as [string, boolean | undefined, string | undefined];
           await manager.handleOpenMap(projectDir, createTab, mapName);
         }
       },
       loadProjectData: async () => false,
       setupAutoSave: (editorInstance: unknown) => {
-        try {
-          setupAutoSave(editorInstance as any);
-        } catch (e) {
-          console.warn('setupAutoSave helper error:', e);
-        }
-      },
+          try {
+            setupAutoSave(editorInstance as TileMapEditor);
+          } catch (e) {
+            console.warn('setupAutoSave helper error:', e);
+          }
+        },
       syncMapObjects: () => void syncMapObjects(),
       updateLayersList: () => void updateLayersList()
     };
@@ -207,12 +273,166 @@ export default function useAppMainBuilder() {
   type AssembledSidebar = Record<string, unknown> | null;
 
   const [showSettings, setShowSettings] = useState(false);
+
+  const sidebarDeps = useMemo(() => {
+    const projectMapsList = (projectManagerRecord as ProjectManagerView)?.projectMaps ?? [];
+    const handleOpenMapFromMapsFolderFn =
+      typeof (projectManagerRecord as ProjectManagerView)?.handleOpenMapFromMapsFolder === 'function'
+        ? (projectManagerRecord as ProjectManagerView).handleOpenMapFromMapsFolder!
+        : async () => undefined;
+    const handleManualSaveFn =
+      typeof (projectManagerRecord as ProjectManagerView)?.handleManualSave === 'function'
+        ? (projectManagerRecord as ProjectManagerView).handleManualSave!
+        : async () => undefined;
+    const refreshProjectMapsFn =
+      typeof (projectManagerRecord as ProjectManagerView)?.refreshProjectMaps === 'function'
+        ? (projectManagerRecord as ProjectManagerView).refreshProjectMaps!
+        : async () => undefined;
+    const isExportingValue = Boolean((projectManagerRecord as ProjectManagerView)?.isExporting);
+    const exportProgressValue =
+      typeof (projectManagerRecord as ProjectManagerView)?.exportProgress === 'number'
+        ? (projectManagerRecord as ProjectManagerView).exportProgress!
+        : 0;
+    const isManuallySavingValue = Boolean((projectManagerRecord as ProjectManagerView)?.isManuallySaving);
+
+    return {
+      layers: appState.layers,
+      activeLayerId: appState.activeLayerId,
+      hoveredLayerId: appState.hoveredLayerId,
+      layersPanelExpanded: appState.layersPanelExpanded,
+      setLayersPanelExpanded: appState.setLayersPanelExpanded,
+      setHoveredLayerId: appState.setHoveredLayerId,
+      handleSetActiveLayer,
+      handleToggleLayerVisibility,
+      handleLayerTransparencyChange,
+      showTooltipWithDelay,
+      hideTooltip,
+      uiHelpers,
+      leftCollapsed: appState.leftCollapsed,
+      isNpcLayer,
+      isEnemyLayer,
+      actorEntries: appState.mapObjects,
+      draggingNpcId: appState.draggingNpcId,
+      handleEditObject: () => {},
+      setNpcHoverTooltip: appState.setNpcHoverTooltip,
+      handleNpcDragStart,
+      handleNpcDragEnd,
+      handleOpenActorDialog: () => {},
+      isRulesLayer,
+      rulesList: [],
+      handleAddRule: () => {},
+      isItemsLayer,
+      itemsList,
+      expandedItemCategories,
+      setExpandedItemCategories,
+      handleOpenItemEdit: () => {},
+      handleOpenItemDialog: () => {},
+      editor,
+      activeLayer,
+      tabTick: appState.tabTick,
+      setTabTick: appState.setTabTick,
+      brushTool: toolbarState.brushTool,
+      isCollisionLayer: activeLayer?.type === 'collision',
+      handleFileUpload,
+      handleToggleBrushTool,
+      handleDeleteActiveTab: (tabId?: string) => {
+        if (!tabId) return;
+        try {
+          setTabs((prev) => (prev ?? []).filter((t: { id?: string }) => (t.id ?? '') !== tabId));
+          if (activeTabId === tabId) {
+            const remaining = (tabs ?? []).filter((t: { id?: string }) => (t.id ?? '') !== tabId);
+            setActiveTabId(remaining.length ? (remaining[0].id as string) : null);
+          }
+        } catch (e) {
+          console.warn('handleDeleteActiveTab failed', e);
+        }
+      },
+      toast,
+      handleOpenActorDialogForTileset: () => {},
+      stampsState: {
+        stamps: toolbarState.stamps,
+        selectedStamp: toolbarState.selectedStamp,
+        stampMode: toolbarState.stampMode
+      },
+      isExporting: isExportingValue,
+      exportProgress: exportProgressValue,
+      mapsButtonRef,
+      mapsDropdownOpen,
+      mapsDropdownPos,
+      mapsPortalRef,
+      mapsSubOpen,
+      currentProjectPath,
+      projectMaps: projectMapsList,
+      setMapsSubOpen,
+      setMapsDropdownOpen,
+      setMapsDropdownPos,
+      handleOpenCreateMapDialog: mapConfig.handleOpenCreateMapDialog,
+      handleOpenMapFromMapsFolder: handleOpenMapFromMapsFolderFn,
+      handleManualSave: handleManualSaveFn,
+      isManuallySaving: isManuallySavingValue,
+      isPreparingNewMap: mapConfig.isPreparingNewMap,
+      hasUnsavedChanges: false,
+      setShowSettings,
+      refreshProjectMaps: refreshProjectMapsFn
+    };
+  }, [
+    appState.layers,
+    appState.activeLayerId,
+    appState.hoveredLayerId,
+    appState.layersPanelExpanded,
+    appState.setLayersPanelExpanded,
+    appState.setHoveredLayerId,
+    handleSetActiveLayer,
+    handleToggleLayerVisibility,
+    handleLayerTransparencyChange,
+    showTooltipWithDelay,
+    hideTooltip,
+    uiHelpers,
+    appState.leftCollapsed,
+    isNpcLayer,
+    isEnemyLayer,
+    appState.mapObjects,
+    appState.draggingNpcId,
+    appState.setNpcHoverTooltip,
+    handleNpcDragStart,
+    handleNpcDragEnd,
+    isRulesLayer,
+    isItemsLayer,
+    itemsList,
+    expandedItemCategories,
+    setExpandedItemCategories,
+    editor,
+    activeLayer,
+    appState.tabTick,
+    appState.setTabTick,
+    toolbarState.brushTool,
+    handleFileUpload,
+    handleToggleBrushTool,
+    tabs,
+    activeTabId,
+    setTabs,
+    setActiveTabId,
+    toolbarState.stamps,
+    toolbarState.selectedStamp,
+    toolbarState.stampMode,
+    mapsDropdownOpen,
+    mapsSubOpen,
+    mapsDropdownPos,
+    setMapsDropdownPos,
+    mapsButtonRef,
+    mapsPortalRef,
+    currentProjectPath,
+    mapConfig.handleOpenCreateMapDialog,
+    mapConfig.isPreparingNewMap,
+    setShowSettings,
+    projectManagerRecord
+  ]);
   const handleCloseSettings = useCallback(() => setShowSettings(false), []);
 
   function buildAppMainCtxFromSidebar(assembledSidebar: AssembledSidebar): Record<string, unknown> {
     const sb = (assembledSidebar ?? {}) as Record<string, unknown>;
 
-    const defaultEditor = (editorSetup as unknown as Record<string, unknown>)['editor'] ?? null;
+    const defaultEditor = editor ?? null;
 
     const defaultActors = {
       isNpcLayer: false,
@@ -268,6 +488,7 @@ export default function useAppMainBuilder() {
       stampsState: undefined
     };
 
+    const pmForDefaults = projectManager as ProjectManagerView;
     const defaultControls = {
       mapsButtonRef: { current: null } as React.RefObject<HTMLButtonElement>,
       mapsDropdownOpen: false,
@@ -275,17 +496,17 @@ export default function useAppMainBuilder() {
       mapsPortalRef: { current: null } as React.RefObject<HTMLDivElement>,
       mapsSubOpen: false,
       currentProjectPath: currentProjectPath,
-      projectMaps: (projectManager as any)?.projectMaps ?? [] as string[],
-      setMapsSubOpen: ((_v: boolean) => {}) as unknown as React.Dispatch<React.SetStateAction<boolean>>,
-      setMapsDropdownOpen: ((_v: boolean) => {}) as unknown as React.Dispatch<React.SetStateAction<boolean>>,
+      projectMaps: (projectManager as ProjectManagerView)?.projectMaps ?? [] as string[],
+      setMapsSubOpen: (() => {}) as React.Dispatch<React.SetStateAction<boolean>>,
+      setMapsDropdownOpen: (() => {}) as React.Dispatch<React.SetStateAction<boolean>>,
       handleOpenCreateMapDialog: () => { if (typeof mapConfig.setShowCreateMapDialog === 'function') mapConfig.setShowCreateMapDialog(true); },
-      handleOpenMapFromMapsFolder: async (filename?: string) => { try { if ((projectManager as any)?.handleOpenMapFromMapsFolder && currentProjectPath && filename) await (projectManager as any).handleOpenMapFromMapsFolder(filename); } catch (e) { console.warn(e); } },
-      handleManualSave: async () => { if ((projectManager as any)?.handleManualSave) await (projectManager as any).handleManualSave(); },
+      handleOpenMapFromMapsFolder: async (filename?: string) => { try { if (pmForDefaults?.handleOpenMapFromMapsFolder && currentProjectPath && filename) await pmForDefaults.handleOpenMapFromMapsFolder(filename); } catch (e) { console.warn(e); } },
+      handleManualSave: async () => { if (pmForDefaults?.handleManualSave) await pmForDefaults.handleManualSave(); },
       isManuallySaving: false,
       isPreparingNewMap: false,
       hasUnsavedChanges: false,
       setShowSettings: setShowSettings,
-      refreshProjectMaps: async () => { if ((projectManager as any)?.refreshProjectMaps) await (projectManager as any).refreshProjectMaps(); },
+      refreshProjectMaps: async () => { if (pmForDefaults?.refreshProjectMaps) await pmForDefaults.refreshProjectMaps(); },
       uiHelpers: undefined,
       toast: undefined
     } as unknown as Record<string, unknown>;
@@ -293,7 +514,7 @@ export default function useAppMainBuilder() {
     return {
       showWelcome: appState.showWelcome,
       handleCreateNewMap: handleCreateNewMap,
-      handleOpenMap: (projectPath?: string) => { try { if ((projectManager as any)?.handleOpenMap) void (projectManager as any).handleOpenMap(projectPath); } catch (e) { console.warn(e); } },
+      handleOpenMap: (projectPath?: string) => { try { const manager = projectManager as ProjectManagerType; if (manager && typeof manager.handleOpenMap === 'function' && typeof projectPath === 'string') void manager.handleOpenMap(projectPath); } catch (e) { console.warn(e); } },
       isDarkMode,
       titleBarProps: {
         tabs: tabs ?? [],
@@ -424,8 +645,7 @@ export default function useAppMainBuilder() {
         setNpcDeletePopup: appState.setNpcDeletePopup,
         handleUnplaceActorFromMap: handleUnplaceActorFromMap ?? (() => {}),
         npcHoverTooltip: appState.npcHoverTooltip,
-        uiHelpers: { tooltip, toolbarRef: (editorRefs as any).toolbarRef, canvasRef },
-        stampsState: toolbarState.stampsState,
+        uiHelpers: { tooltip, toolbarRef: toolbarState.toolbarContainerRef, canvasRef },
         hasSelection: toolbarState.hasSelection,
         selectionCount: toolbarState.selectionCount,
         handleFillSelection: handleFillSelection ?? (() => {}),
@@ -464,11 +684,11 @@ export default function useAppMainBuilder() {
         setStampMode: toolbarState.setStampMode,
         newStampName: toolbarState.newStampName,
         setNewStampName: toolbarState.setNewStampName,
-        handleCreateStamp: toolbarState.handleCreateStamp ?? (() => {}),
+        handleCreateStamp: () => { if (typeof toolbarState.setShowStampDialog === 'function') toolbarState.setShowStampDialog(true); },
         stamps: toolbarState.stamps ?? [],
         selectedStamp: toolbarState.selectedStamp,
-        handleStampSelect: toolbarState.handleStampSelect ?? (() => {}),
-        handleDeleteStamp: toolbarState.handleDeleteStamp ?? (() => {})
+        handleStampSelect: (id: string | null) => { if (typeof toolbarState.setSelectedStamp === 'function') toolbarState.setSelectedStamp(id); },
+        handleDeleteStamp: () => {}
       },
       bottomToolbarProps: {
         bottomToolbarExpanded: toolbarState.bottomToolbarExpanded,
@@ -501,12 +721,12 @@ export default function useAppMainBuilder() {
         setStampMode: toolbarState.setStampMode,
         newStampName: toolbarState.newStampName,
         setNewStampName: toolbarState.setNewStampName,
-        handleCreateStamp: toolbarState.handleCreateStamp ?? (() => {}),
+        handleCreateStamp: () => { if (typeof toolbarState.setShowStampDialog === 'function') toolbarState.setShowStampDialog(true); },
         stamps: toolbarState.stamps ?? [],
         selectedStamp: toolbarState.selectedStamp,
-        handleStampSelect: toolbarState.handleStampSelect ?? (() => {}),
-        handleDeleteStamp: toolbarState.handleDeleteStamp ?? (() => {}),
-        stampsState: toolbarState.stampsState
+        handleStampSelect: (id: string | null) => { if (typeof toolbarState.setSelectedStamp === 'function') toolbarState.setSelectedStamp(id); },
+        handleDeleteStamp: () => {},
+        stampsState: { stamps: toolbarState.stamps, selectedStamp: toolbarState.selectedStamp, stampMode: toolbarState.stampMode, newStampName: toolbarState.newStampName }
       },
       enemyPanelProps: {},
       dialogsCtx,
@@ -514,5 +734,5 @@ export default function useAppMainBuilder() {
     } as Record<string, unknown>;
   }
 
-  return { buildAppMainCtxFromSidebar };
+  return { sidebarDeps, buildAppMainCtxFromSidebar };
 }

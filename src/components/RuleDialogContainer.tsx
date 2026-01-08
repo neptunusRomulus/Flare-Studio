@@ -1,19 +1,34 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React from 'react';
 import RuleDialog from '@/components/RuleDialog';
+import type { RuleStartType } from '@/editor/ruleOptions';
+
+type RuleTriggerOption = {
+  id: string;
+  label: string;
+  tooltip: string;
+  icon: React.ComponentType<{ className?: string }>;
+  startType: RuleStartType;
+};
+
+type RuleActionSelection = {
+  groupId: string;
+  actionId: string;
+};
+
 type RuleDialogCtx = {
   showRuleDialog: boolean;
   ruleDialogStep?: number;
   ruleDialogError?: string | null;
   ruleNameInput: string;
-  setRuleNameInput: (v: string) => void;
-  ruleStartType?: string | null;
-  setRuleStartType: (v: string | null) => void;
+  setRuleNameInput: React.Dispatch<React.SetStateAction<string>>;
+  ruleStartType?: RuleStartType | null;
+  setRuleStartType: React.Dispatch<React.SetStateAction<RuleStartType | null>>;
   ruleTriggerId?: string | null;
-  setRuleTriggerId: (v: string | null) => void;
-  ruleActionSelection?: unknown;
-  setRuleActionSelection: (v: unknown) => void;
-  availableRuleTriggers?: unknown;
+  setRuleTriggerId: React.Dispatch<React.SetStateAction<string>>;
+  ruleActionSelection?: RuleActionSelection | null;
+  setRuleActionSelection: React.Dispatch<React.SetStateAction<RuleActionSelection | null>>;
+  availableRuleTriggers?: RuleTriggerOption[];
   onRuleClose: () => void;
   handleSaveRule: () => void;
   setRuleDialogStep: (n: number) => void;
@@ -27,14 +42,14 @@ export default function RuleDialogContainer({ ctx }: { ctx: unknown }) {
       ruleDialogStep={(c.ruleDialogStep === 1) ? 'actions' : 'start'}
       ruleDialogError={c.ruleDialogError ?? null}
       ruleNameInput={c.ruleNameInput}
-      setRuleNameInput={(v) => (typeof v === 'function' ? c.setRuleNameInput(v('')) : c.setRuleNameInput(v))}
-      ruleStartType={(c.ruleStartType as any) ?? null}
-      setRuleStartType={(v) => c.setRuleStartType ? c.setRuleStartType(v as any) : undefined}
+      setRuleNameInput={c.setRuleNameInput}
+      ruleStartType={c.ruleStartType ?? null}
+      setRuleStartType={(v) => (c.setRuleStartType ? c.setRuleStartType(v) : undefined)}
       ruleTriggerId={c.ruleTriggerId ?? ''}
-      setRuleTriggerId={(v) => c.setRuleTriggerId ? c.setRuleTriggerId(v as any) : undefined}
-      ruleActionSelection={c.ruleActionSelection as any ?? null}
+      setRuleTriggerId={(v) => (c.setRuleTriggerId ? c.setRuleTriggerId(v) : undefined)}
+      ruleActionSelection={c.ruleActionSelection ?? null}
       setRuleActionSelection={(v) => (c.setRuleActionSelection ? c.setRuleActionSelection(v) : undefined)}
-      availableRuleTriggers={(c.availableRuleTriggers as any) ?? []}
+      availableRuleTriggers={c.availableRuleTriggers ?? []}
       onClose={c.onRuleClose ?? (() => {})}
       onSave={c.handleSaveRule ?? (() => {})}
       onSetStep={(step) => { if (c.setRuleDialogStep) c.setRuleDialogStep(step === 'start' ? 0 : 1); }}

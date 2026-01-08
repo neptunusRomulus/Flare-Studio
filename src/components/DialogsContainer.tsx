@@ -16,39 +16,43 @@ import SeparateBrushDialog from '@/components/SeparateBrushDialog';
 // It's acceptable to allow a broad shape here; keep the exception narrow.
 export default function DialogsContainer({ ctx }: { ctx: unknown }) {
   // Allow a local cast here to avoid cascading type churn across many dialog props.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const c = ctx as any;
+  type LocalSeparateCtx = {
+    showSeparateDialog?: boolean;
+    setShowSeparateDialog?: (open: boolean) => void;
+    confirmSeparateBrush?: () => void;
+  };
+  const local = ctx as LocalSeparateCtx;
   // If no dialog context was assembled, avoid mounting dialog components
   // which expect many nested fields — return nothing until ctx is populated.
-  if (!c || (typeof c === 'object' && Object.keys(c).length === 0)) return null;
+  if (!ctx || (typeof ctx === 'object' && Object.keys(ctx).length === 0)) return null;
 
   return (
     <>
       <SeparateBrushDialog
-        open={c.showSeparateDialog}
-        onOpenChange={c.setShowSeparateDialog}
-        onConfirm={c.confirmSeparateBrush}
+        open={local.showSeparateDialog ?? false}
+        onOpenChange={local.setShowSeparateDialog ?? (() => {})}
+        onConfirm={local.confirmSeparateBrush ?? (() => {})}
       />
 
-      <VendorDialogsContainer ctx={c} />
+      <VendorDialogsContainer ctx={ctx as any} />
 
-      <RuleDialogContainer ctx={c} />
+      <RuleDialogContainer ctx={ctx as any} />
 
-      <AbilityDialogContainer ctx={c} />
+      <AbilityDialogContainer ctx={ctx as any} />
 
-      <ActorDialogContainer ctx={c} />
+      <ActorDialogContainer ctx={ctx as any} />
 
-      <ItemDialogContainer ctx={c} />
-      <ItemEditDialogContainer ctx={c} />
+      <ItemDialogContainer ctx={ctx as any} />
+      <ItemEditDialogContainer ctx={ctx as any} />
 
-      <ObjectManagementDialogContainer ctx={c} />
+      <ObjectManagementDialogContainer ctx={ctx as any} />
 
-      <DialogueTreeDialogContainer ctx={c} />
+      <DialogueTreeDialogContainer ctx={ctx as any} />
 
-      <MapDialogsContainer ctx={c} />
+      <MapDialogsContainer ctx={ctx as any} />
 
-      <OverwriteExportDialogContainer ctx={c} />
-      <ExportSuccessModalContainer ctx={c} />
+      <OverwriteExportDialogContainer ctx={ctx as any} />
+      <ExportSuccessModalContainer ctx={ctx as any} />
     </>
   );
 }

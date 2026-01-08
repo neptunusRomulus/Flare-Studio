@@ -40,12 +40,12 @@ export function useEditorState(optsRef: React.RefObject<Partial<UseEditorStateOp
 
   // read ref.current without invoking accessor getters (protect against malformed refs)
   const _safeReadSeen = new WeakSet<object>();
-  const safeReadRefCurrent = (r: React.RefObject<unknown> | null | undefined) => {
+    const safeReadRefCurrent = (r: React.RefObject<unknown> | null | undefined) => {
     try {
       if (!r || typeof r !== 'object') return undefined;
       // avoid re-entering for the same object
-      if (_safeReadSeen.has(r as object)) return undefined;
-      _safeReadSeen.add(r as object);
+          if (_safeReadSeen.has(r as object)) return undefined;
+          _safeReadSeen.add(r as object);
       // If the ref is not a plain object (likely a Proxy or exotic object), bail out.
       const proto = Object.getPrototypeOf(r as object);
       if (proto !== Object.prototype && proto !== null) {
@@ -53,7 +53,7 @@ export function useEditorState(optsRef: React.RefObject<Partial<UseEditorStateOp
         return undefined;
       }
       // Accessing .current directly; if this throws or re-enters it'll be caught.
-      const val = (r as any).current;
+          const val = (r as React.RefObject<unknown>).current;
       _safeReadSeen.delete(r as object);
       return val;
     } catch (e) {
@@ -94,8 +94,8 @@ export function useEditorState(optsRef: React.RefObject<Partial<UseEditorStateOp
     // safe read of optsRef.current to avoid recursive ref structures
     let opts: Partial<UseEditorStateOptions> = {};
     try {
-      const cand = safeReadRefCurrent(optsRef) as Partial<UseEditorStateOptions> | undefined;
-      if (cand === optsRef || (cand && (cand as any).current === optsRef)) {
+          const cand = safeReadRefCurrent(optsRef) as Partial<UseEditorStateOptions> | undefined;
+          if (cand === optsRef || (cand && (cand as React.RefObject<unknown>).current === optsRef)) {
         opts = {};
       } else {
         opts = cand ?? {};
@@ -135,8 +135,8 @@ export function useEditorState(optsRef: React.RefObject<Partial<UseEditorStateOp
     // safe read to avoid recursing into malformed refs
     let opts: Partial<UseEditorStateOptions> = {};
     try {
-      const cand = safeReadRefCurrent(optsRef) as Partial<UseEditorStateOptions> | undefined;
-      if (cand === optsRef || (cand && (cand as any).current === optsRef)) {
+          const cand = safeReadRefCurrent(optsRef) as Partial<UseEditorStateOptions> | undefined;
+          if (cand === optsRef || (cand && (cand as React.RefObject<unknown>).current === optsRef)) {
         opts = {};
       } else {
         opts = cand ?? {};
@@ -196,7 +196,7 @@ export function useEditorState(optsRef: React.RefObject<Partial<UseEditorStateOp
     // guard against malformed refs that recursively reference themselves
     let opts: Partial<UseEditorStateOptions> = {};
     try {
-      const candidate = safeReadRefCurrent(optsRef) as Partial<UseEditorStateOptions> | undefined;
+          const candidate = safeReadRefCurrent(optsRef) as Partial<UseEditorStateOptions> | undefined;
       if (candidate === optsRef) {
         console.warn('Detected recursive optsRef; ignoring to avoid stack overflow.');
         opts = {};

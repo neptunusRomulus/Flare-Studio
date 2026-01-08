@@ -27,7 +27,7 @@ export default function EditorTabs({
   onCreateNewMap
 }: Props) {
   return (
-    <div className="ml-2 flex items-center gap-2 overflow-x-auto max-w-[60vw] no-drag">
+    <div className="flex items-center gap-2 overflow-x-auto max-w-full min-w-0 no-drag">
       {tabs.map((tab) => (
         <TabItem
           key={tab.id}
@@ -41,7 +41,7 @@ export default function EditorTabs({
       <Tooltip content="Create a new map" side="right">
         <button
           onClick={onCreateNewMap}
-          className="ml-1 p-1 rounded-md hover:bg-slate-100 dark:hover:bg-neutral-800 no-drag"
+          className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-neutral-800 no-drag flex-shrink-0"
           aria-label="Create new map"
         >
           <Plus className="w-4 h-4 text-orange-600 dark:text-orange-400" />

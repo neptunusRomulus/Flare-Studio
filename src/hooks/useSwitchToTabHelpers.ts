@@ -1,24 +1,27 @@
 import { useEffect } from 'react';
 import type { MutableRefObject } from 'react';
+import type { TileMapEditor } from '@/editor/TileMapEditor';
+
+type SwitchHelpers = {
+  handleOpenMap: (...args: unknown[]) => Promise<void>;
+  loadProjectData: (...args: unknown[]) => Promise<boolean>;
+  setupAutoSave: (editor: TileMapEditor) => void;
+  syncMapObjects: () => void;
+  updateLayersList: () => void;
+};
 
 export default function useSwitchToTabHelpers(
-  switchRef: MutableRefObject<Record<string, unknown> | null>,
-  helpers: Record<string, unknown>
+  switchRef: MutableRefObject<SwitchHelpers | null>,
+  helpers: SwitchHelpers
 ) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   useEffect(() => {
     if (!switchRef) return;
     switchRef.current = {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      handleOpenMap: (helpers as any).handleOpenMap,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      loadProjectData: (helpers as any).loadProjectData,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      setupAutoSave: (helpers as any).setupAutoSave,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      syncMapObjects: (helpers as any).syncMapObjects,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      updateLayersList: (helpers as any).updateLayersList,
-    } as Record<string, unknown>;
+      handleOpenMap: helpers.handleOpenMap,
+      loadProjectData: helpers.loadProjectData,
+      setupAutoSave: helpers.setupAutoSave,
+      syncMapObjects: helpers.syncMapObjects,
+      updateLayersList: helpers.updateLayersList,
+    } as SwitchHelpers;
   }, [switchRef, helpers]);
 }

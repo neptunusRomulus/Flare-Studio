@@ -24,9 +24,25 @@ export default function useLayerHandlers({ editor, layers, setLayers, setActiveL
   }, [editor]);
 
   const handleSetActiveLayer = useCallback(async (layerId: number) => {
+    // Always update the active layer id in app state so the UI reflects
+    // the user's click even if the editor instance isn't available yet.
+    console.log('handleSetActiveLayer: requested', layerId);
+    setActiveLayerId(layerId);
+
     if (editor) {
-      editor.setActiveLayer(layerId);
-      setActiveLayerId(layerId);
+      try {
+        editor.setActiveLayer(layerId);
+      } catch (err) {
+        console.warn('editor.setActiveLayer failed', err);
+      }
+
+      // Ensure the layers/list state is refreshed from the editor after changing active layer
+      try {
+        updateLayersList();
+        if (editor && typeof editor.getActiveLayerId === 'function') console.log('handleSetActiveLayer: after updateLayersList, editorActive=', editor.getActiveLayerId());
+      } catch (err) {
+        console.warn('updateLayersList failed after setActiveLayer', err);
+      }
 
       const layer = layers.find(l => l.id === layerId);
       if (layer?.type === 'items' && currentProjectPath && window.electronAPI?.ensureItemsFolders) {
@@ -43,7 +59,7 @@ export default function useLayerHandlers({ editor, layers, setLayers, setActiveL
         }
       }
     }
-  }, [editor, layers, setActiveLayerId, setItemsList, normalizeItemsForState, currentProjectPath]);
+  }, [editor, layers, setActiveLayerId, setItemsList, normalizeItemsForState, currentProjectPath, updateLayersList]);
 
   const handleToggleLayerVisibility = useCallback((layerId: number) => {
     if (editor) {

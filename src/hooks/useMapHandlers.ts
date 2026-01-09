@@ -23,6 +23,7 @@ export default function useMapHandlers(args: {
       const currentLayers = editor.getLayers();
       setLayers([...currentLayers]);
       const activeId = editor.getActiveLayerId();
+      console.log('updateLayersList: editorActive=', activeId);
       setActiveLayerId(activeId);
       // caller may choose to call syncMapObjects separately
     }

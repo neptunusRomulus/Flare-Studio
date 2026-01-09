@@ -23,7 +23,8 @@ import { buildConstantStockString } from '@/utils/parsers';
 // ItemRole type intentionally not imported — unused in this module
 import { toast } from '@/hooks/use-toast';
 import useHelpState from './useHelpState';
-import type { TileMapEditor } from '@/editor/TileMapEditor';
+import { TileMapEditor } from '@/editor/TileMapEditor';
+import type { EditorProjectData } from '@/editor/TileMapEditor';
 
 export default function useAppMainBuilder() {
   const dialogsCtx = useDialogsCtx({});
@@ -71,7 +72,9 @@ export default function useAppMainBuilder() {
     canvasRef,
     setupAutoSaveWrapper: setupAutoSave,
     updateLayersListWrapper: updateLayersList,
+    updateLayersListRef,
     syncMapObjectsWrapper: syncMapObjects,
+    syncMapObjectsRef,
     handlePlaceActorOnMap,
     handleUnplaceActorFromMap,
     handleFillSelection,
@@ -107,18 +110,18 @@ export default function useAppMainBuilder() {
     setSelectionCount: toolbarState.setSelectionCount
   });
 
+  
   const editorTabs = useEditorTabs({
     editor: editor ?? null,
     currentProjectPath,
-    setCurrentProjectPath: setCurrentProjectPath,
+    setCurrentProjectPath,
     setMapName: mapConfig.setMapName,
     setMapWidth: mapConfig.setMapWidth,
     setMapHeight: mapConfig.setMapHeight,
     switchToTabHelpersRef: editorRefs.switchToTabHelpersRef
-  });
-  const { tabs, activeTabId, setTabs, setActiveTabId, switchToTab, createTabFor } = editorTabs as EditorTabsType;
+  }) as EditorTabsType;
+  const { tabs, activeTabId, setTabs, setActiveTabId, switchToTab, createTabFor } = editorTabs as unknown as EditorTabsType;
 
-  // Wire internal app effects (sets createTabForRef, beforeCreateMapRef, and other app-level effects)
   const _beforeCreateRunningRef = useRef(false);
   const handleBeforeCreateMap = async () => {
     if (_beforeCreateRunningRef.current) return;
@@ -139,8 +142,63 @@ export default function useAppMainBuilder() {
     tabs,
     activeTabId,
     currentProjectPath,
-    setActiveTabId
+    setActiveTabId,
+    updateLayersList,
+    updateLayersListRef,
+    syncMapObjects,
+    syncMapObjectsRef,
+    setupAutoSaveWrapper: setupAutoSave
   });
+  const { pendingMapConfig, setPendingMapConfig, showWelcome: appShowWelcome } = appState;
+
+  useEffect(() => {
+    const pending = pendingMapConfig;
+    if (!pending || editor || !canvasRef?.current || appShowWelcome) return;
+
+    const createEditorWithConfig = async () => {
+      try {
+        const newEditor = new TileMapEditor(canvasRef.current!);
+        if (pending.name) newEditor.setMapName((pending as EditorProjectData).name!);
+
+        try { newEditor.clearLocalStorageBackup?.(); } catch (err) { void err; }
+        newEditor.setMapSize((pending as EditorProjectData).width ?? 20, (pending as EditorProjectData).height ?? 15);
+
+        try {
+          newEditor.loadProjectData(pending as EditorProjectData);
+        } catch (err) {
+          console.warn('Failed to load project data into new editor:', err);
+        }
+
+        try { setupAutoSave(newEditor); } catch (err) { console.warn('Failed to setup autosave:', err); }
+        setEditor(newEditor);
+        try {
+          const restoredLayers = typeof newEditor.getLayers === 'function' ? newEditor.getLayers() : [];
+          try { appState.setLayers(Array.isArray(restoredLayers) ? [...restoredLayers] : []); } catch (e) { console.warn('setLayers failed', e); }
+          try { appState.setActiveLayerId?.(typeof newEditor.getActiveLayerId === 'function' ? newEditor.getActiveLayerId() : null); } catch (e) { console.warn('setActiveLayerId failed', e); }
+        } catch (err) {
+          console.warn('Failed to hydrate appState from new editor:', err);
+        }
+        mapConfig.setMapInitialized(true);
+        mapConfig.setShowCreateMapDialog(false);
+        toolbarState.showToolbarTemporarily?.();
+        toolbarState.showBottomToolbarTemporarily?.();
+
+        setTimeout(() => {
+          try { updateLayersList(); } catch (err) { console.warn(err); }
+          try { syncMapObjects(); } catch (err) { console.warn(err); }
+          try { newEditor.redraw(); } catch (err) { void err; }
+        }, 150);
+
+        setPendingMapConfig(null);
+      } catch (error) {
+        console.error('Failed to create editor with pending config:', error);
+        setPendingMapConfig(null);
+        mapConfig.setMapInitialized(false);
+      }
+    };
+
+    void createEditorWithConfig();
+  }, [pendingMapConfig, editor, canvasRef, appShowWelcome, setupAutoSave, mapConfig, updateLayersList, syncMapObjects, setEditor, setPendingMapConfig, toolbarState, appState]);
   const { handleUndo, handleRedo, handleZoomIn, handleZoomOut, handleResetZoom } = useUndoRedoZoom({ editor, updateLayersList, syncMapObjects });
 
   const { tooltip, showTooltipWithDelay, hideTooltip } = useTooltip({ toolbarRef: toolbarState.toolbarContainerRef, canvasRef });
@@ -618,10 +676,10 @@ export default function useAppMainBuilder() {
       handleClearLayerClose: () => {},
       handleClearLayerConfirm: () => {},
       confirmDialogProps: buildConfirmDialogProps({ confirmAction: null, setConfirmAction: () => {} }),
-      showHelp: false,
-      activeHelpTab: 0,
-      setActiveHelpTab: () => {},
-      handleHelpClose: () => {},
+      showHelp: helpState.showHelp,
+      activeHelpTab: helpState.activeHelpTab,
+      setActiveHelpTab: helpState.setActiveHelpTab,
+      handleHelpClose: () => { if (typeof helpState.setShowHelp === 'function') helpState.setShowHelp(false); },
       topBarProps: {
         toolbarExpanded: toolbarState.toolbarExpanded,
         containerRef: toolbarState.toolbarContainerRef,

@@ -16,9 +16,11 @@ type ProjectManagerParams = Parameters<typeof useProjectManager>[0];
 import useLayerHandlers from './useLayerHandlers';
 import useAppEffects from './useAppEffects';
 import useNpcDrag from './useNpcDrag';
-import { normalizeItemsForState, type ItemSummary } from '@/utils/items';
+import useObjectEditing from './useObjectEditing';
+import useItems from './useItems';
+import { normalizeItemsForState } from '@/utils/items';
 import { buildConstantStockString } from '@/utils/parsers';
-import type { ItemRole } from '@/editor/itemRoles';
+// ItemRole type intentionally not imported — unused in this module
 import { toast } from '@/hooks/use-toast';
 import useHelpState from './useHelpState';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
@@ -55,8 +57,8 @@ export default function useAppMainBuilder() {
   const helpState = useHelpState();
 
   const [currentProjectPath, setCurrentProjectPath] = useState<string | null>(null);
-  const [itemsList, setItemsList] = useState<ItemSummary[]>([]);
-  const [expandedItemCategories, setExpandedItemCategories] = useState<Set<ItemRole>>(new Set());
+  const itemsHook = useItems({ currentProjectPath, toast, normalizeItemsForState });
+  const { itemsList, expandedItemCategories, setExpandedItemCategories, handleOpenItemEdit, handleOpenItemDialog } = itemsHook;
   const [mapsDropdownOpen, setMapsDropdownOpen] = useState(false);
   const [mapsSubOpen, setMapsSubOpen] = useState(false);
   const [mapsDropdownPos, setMapsDropdownPos] = useState<{ left: number; top: number } | null>(null);
@@ -199,13 +201,19 @@ export default function useAppMainBuilder() {
     layers: appState.layers,
     setLayers: appState.setLayers,
     setActiveLayerId: appState.setActiveLayerId,
-    setItemsList,
+    setItemsList: itemsHook.setItemsList,
     normalizeItemsForState,
     currentProjectPath,
     updateLayersList
   });
 
   const { handleNpcDragStart, handleNpcDragEnd } = useNpcDrag({ editor, setDraggingNpcId: appState.setDraggingNpcId });
+
+  const objectEditing = useObjectEditing({ editor: null, syncMapObjects, createTabFor, switchToTab, currentProjectPath });
+
+  useEffect(() => {
+    console.log('appState.activeLayerId changed', appState.activeLayerId);
+  }, [appState.activeLayerId]);
 
   const activeLayer = useMemo(() => appState.layers.find((layer) => layer.id === appState.activeLayerId) ?? null, [appState.activeLayerId, appState.layers]);
 
@@ -313,20 +321,20 @@ export default function useAppMainBuilder() {
       isEnemyLayer,
       actorEntries: appState.mapObjects,
       draggingNpcId: appState.draggingNpcId,
-      handleEditObject: () => {},
+      handleEditObject: objectEditing.handleEditObject,
       setNpcHoverTooltip: appState.setNpcHoverTooltip,
       handleNpcDragStart,
       handleNpcDragEnd,
-      handleOpenActorDialog: () => {},
+      handleOpenActorDialog: objectEditing.handleOpenActorDialog,
       isRulesLayer,
       rulesList: [],
       handleAddRule: () => {},
       isItemsLayer,
-      itemsList,
+      itemsList: itemsList,
       expandedItemCategories,
       setExpandedItemCategories,
-      handleOpenItemEdit: () => {},
-      handleOpenItemDialog: () => {},
+      handleOpenItemEdit: handleOpenItemEdit,
+      handleOpenItemDialog: handleOpenItemDialog,
       editor,
       activeLayer,
       tabTick: appState.tabTick,
@@ -348,7 +356,7 @@ export default function useAppMainBuilder() {
         }
       },
       toast,
-      handleOpenActorDialogForTileset: () => {},
+      handleOpenActorDialogForTileset: objectEditing.handleOpenActorDialog,
       stampsState: {
         stamps: toolbarState.stamps,
         selectedStamp: toolbarState.selectedStamp,
@@ -425,6 +433,9 @@ export default function useAppMainBuilder() {
     mapConfig.handleOpenCreateMapDialog,
     mapConfig.isPreparingNewMap,
     setShowSettings,
+    objectEditing,
+    handleOpenItemEdit,
+    handleOpenItemDialog,
     projectManagerRecord
   ]);
   const handleCloseSettings = useCallback(() => setShowSettings(false), []);

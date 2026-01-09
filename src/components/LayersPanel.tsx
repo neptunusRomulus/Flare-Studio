@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import Tooltip from '@/components/ui/tooltip';
 import type { TileLayer } from '@/types';
@@ -47,6 +47,7 @@ const LayersPanel: React.FC<Props> = ({
   handleLayerTransparencyChange,
   leftCollapsed
 }) => {
+  const [lastClicked, setLastClicked] = useState<number | null>(null);
   return (
     <section
       className="mb-0 flex-shrink-0 flex flex-col justify-center h-auto"
@@ -55,6 +56,12 @@ const LayersPanel: React.FC<Props> = ({
       tabIndex={0}
     >
       <div className="mb-2 w-full flex flex-col justify-center h-full">
+        {/* Debug badge - temporary */}
+        <div style={{ position: 'absolute', left: 12, top: 12, zIndex: 1000 }}>
+          <div style={{ background: 'rgba(0,0,0,0.6)', color: 'white', padding: '4px 8px', borderRadius: 6, fontSize: 12 }}>
+            Active: {String(activeLayerId)} {lastClicked !== null ? `· Clicked: ${lastClicked}` : ''}
+          </div>
+        </div>
         <div className="h-auto overflow-hidden flex flex-col justify-center w-full">
           <div className="space-y-0.5 h-auto overflow-y-visible flex flex-col justify-center w-full">
             {layers.filter(layer => layer.type !== 'actions').map((layer) => {
@@ -84,7 +91,11 @@ const LayersPanel: React.FC<Props> = ({
                 >
                   <div
                     className="cursor-pointer w-full flex items-center"
-                    onClick={() => handleSetActiveLayer(layer.id)}
+                    onClick={(e) => {
+                      // debug: log click reaching LayersPanel
+                      try { console.log('LayersPanel clicked', layer.id); } catch (err) {}
+                      handleSetActiveLayer(layer.id);
+                    }}
                     role="button"
                     tabIndex={0}
                     onKeyDown={(e) => {
@@ -179,6 +190,7 @@ const LayersPanel: React.FC<Props> = ({
                         </Tooltip>
                         <span className={leftCollapsed ? 'sr-only text-xs font-medium' : 'text-xs font-medium truncate'} title={layer.name}>
                           {layer.name.replace(/ Layer$/i, '')}
+                          <span className="ml-2 text-[10px] text-gray-500">#{layer.id}</span>
                         </span>
                       </div>
                     </div>

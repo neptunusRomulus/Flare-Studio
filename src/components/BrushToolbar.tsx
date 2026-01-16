@@ -120,25 +120,39 @@ const BrushToolbar = ({
                         accept="image/png"
                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                         onChange={async (event) => {
-                          if (!editor || !activeLayer) return;
+                          console.log('[DEBUG] BrushToolbar file input onChange fired');
+                          if (!editor || !activeLayer) {
+                            console.log('[DEBUG] BrushToolbar: Missing editor or activeLayer, returning');
+                            return;
+                          }
                           const file = event.target.files?.[0];
+                          console.log('[DEBUG] BrushToolbar: file =', file?.name);
                           if (!file) return;
                           const layerType = activeLayer.type;
+                          console.log('[DEBUG] BrushToolbar: layerType =', layerType);
                           if (layerType === 'background' || layerType === 'object') {
+                            console.log('[DEBUG] BrushToolbar: Is background/object layer, using importBrushImageToLayerTab');
                             const tabs = editor.getLayerTabs ? editor.getLayerTabs(layerType) : [];
                             let targetTabId = editor.getActiveLayerTabId ? editor.getActiveLayerTabId(layerType) : null;
+                            console.log('[DEBUG] BrushToolbar: tabs count =', tabs?.length, 'activeTabId =', targetTabId);
                             if (typeof targetTabId !== 'number' || targetTabId === null) {
                               if (tabs && tabs.length >= 8) {
+                                console.log('[DEBUG] BrushToolbar: Max tabs reached');
                                 toast({ title: 'Maximum tabs reached', description: 'You can have up to 8 tabs per layer.', variant: 'destructive' });
                                 return;
                               }
+                              console.log('[DEBUG] BrushToolbar: Creating new tab');
                               targetTabId = editor.createLayerTab(layerType);
+                              console.log('[DEBUG] BrushToolbar: Created tab with id =', targetTabId);
                               editor.setActiveLayerTab(layerType, targetTabId);
                             }
+                            console.log('[DEBUG] BrushToolbar: Calling importBrushImageToLayerTab with tabId =', targetTabId);
                             await editor.importBrushImageToLayerTab(layerType, targetTabId, file);
+                            console.log('[DEBUG] BrushToolbar: importBrushImageToLayerTab completed, calling refreshTilePalette');
                             editor.refreshTilePalette(true);
                             setTabTick(t => t + 1);
                           } else {
+                            console.log('[DEBUG] BrushToolbar: Not background/object, using onFileUpload');
                             onFileUpload(event as React.ChangeEvent<HTMLInputElement>, 'layerTileset');
                           }
                         }}

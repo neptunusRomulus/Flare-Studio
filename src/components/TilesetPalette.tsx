@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import type { TileLayer } from '@/types';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 
@@ -20,6 +20,27 @@ const TilesetPalette = ({
   stampsState: _stampsState
 }: TilesetPaletteProps) => {
   void _stampsState;
+  useEffect(() => {
+    if (!editor) return;
+    console.log('[DEBUG] TilesetPalette useEffect: editor changed or activeLayer/tabTick changed, refreshing palette');
+    console.log('[DEBUG] TilesetPalette: activeLayer =', activeLayer?.type, 'tabTick =', tabTick);
+    try {
+      console.log('[DEBUG] TilesetPalette: Calling refreshTilePalette(true) immediately in useEffect');
+      editor.refreshTilePalette(true);
+      console.log('[DEBUG] TilesetPalette: refreshTilePalette(true) completed');
+    } catch (err) { console.warn('[DEBUG] TilesetPalette: refreshTilePalette failed immediately:', err); }
+
+    // Retry shortly in case the DOM container wasn't present when tileset was applied
+    const t1 = setTimeout(() => {
+      console.log('[DEBUG] TilesetPalette: Retrying refreshTilePalette after 75ms');
+      try { editor.refreshTilePalette(true); } catch (err) { console.warn('[DEBUG] TilesetPalette: Retry at 75ms failed:', err); }
+    }, 75);
+    const t2 = setTimeout(() => {
+      console.log('[DEBUG] TilesetPalette: Retrying refreshTilePalette after 300ms');
+      try { editor.refreshTilePalette(true); } catch (err) { console.warn('[DEBUG] TilesetPalette: Retry at 300ms failed:', err); }
+    }, 300);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [editor, activeLayer, tabTick]);
   return (
   <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-0 m-0">
     {(() => {

@@ -18,6 +18,7 @@ type SwitchToTabHelpers = {
   setupAutoSave: (editor: TileMapEditor) => void;
   syncMapObjects: () => void;
   updateLayersList: () => void;
+  setTabTick?: (fn?: (() => void)) => void;
 };
 
 type UseEditorTabsArgs = {
@@ -109,6 +110,14 @@ const useEditorTabs = ({
 
     setActiveTabId(tabId);
     setCurrentProjectPath(nextTab.projectPath ?? null);
+    // Ensure the editor shows a fresh/empty grid for the incoming tab
+    try {
+      if (editor && typeof (editor as any).clearMapGrid === 'function') {
+        try { (editor as any).clearMapGrid(); } catch (err) { void err; }
+      }
+    } catch (e) { void e; }
+
+    try { switchToTabHelpersRef.current.setTabTick?.(); } catch (e) { void e; }
 
     if (nextTab.tabType === 'enemy') {
       return;
@@ -242,6 +251,22 @@ const useEditorTabs = ({
             switchToTabHelpersRef.current.setupAutoSave(editor);
             switchToTabHelpersRef.current.updateLayersList();
             switchToTabHelpersRef.current.syncMapObjects();
+            // Force palette refresh after loading tab config to display imported brushes/tiles
+            try {
+              const activeLayerType = typeof editor.getActiveLayerType === 'function'
+                ? editor.getActiveLayerType()
+                : null;
+              if (activeLayerType && typeof editor.updateCurrentTileset === 'function') {
+                editor.updateCurrentTileset(activeLayerType);
+              }
+              if (typeof editor.refreshTilePalette === 'function') {
+                editor.refreshTilePalette(true);
+              }
+              console.log('Forced tileset palette refresh after tab switch');
+            } catch (e) {
+              console.warn('Palette refresh after tab switch failed:', e);
+            }
+            try { switchToTabHelpersRef.current.setTabTick?.(); } catch (e) { void e; }
           }
         }
       } catch (e) {
@@ -251,11 +276,20 @@ const useEditorTabs = ({
     }
 
     if (nextTab.projectPath && nextTab.name) {
-      await switchToTabHelpersRef.current.handleOpenMap(nextTab.projectPath, false, nextTab.name);
-      if (editor) {
-        switchToTabHelpersRef.current.setupAutoSave(editor);
-        switchToTabHelpersRef.current.updateLayersList();
-        switchToTabHelpersRef.current.syncMapObjects();
+      const normalize = (p: string | null | undefined) => (p ? p.replace(/\\/g, '/').toLowerCase() : '');
+      const nextNormalized = normalize(nextTab.projectPath);
+      const currentNormalized = normalize(currentProjectPath);
+      // Only trigger a full project open if the tab belongs to a different project
+      // or if there's no editor instance yet. Avoid re-opening the same project
+      // which can reset tabs and cause UI collapse.
+      if (nextNormalized !== currentNormalized || !editor) {
+        await switchToTabHelpersRef.current.handleOpenMap(nextTab.projectPath, false, nextTab.name);
+        if (editor) {
+          switchToTabHelpersRef.current.setupAutoSave(editor);
+          switchToTabHelpersRef.current.updateLayersList();
+          switchToTabHelpersRef.current.syncMapObjects();
+          try { switchToTabHelpersRef.current.setTabTick?.(); } catch (e) { void e; }
+        }
       }
     }
   }, [

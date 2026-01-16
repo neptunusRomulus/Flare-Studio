@@ -179,8 +179,14 @@ export class TileMapEditor {
 
   // Force regeneration of tile palette with current settings
   public refreshTilePalette(preserveOrder: boolean = false): void {
+    console.log('[DEBUG] TileMapEditor.refreshTilePalette: called with preserveOrder =', preserveOrder);
+    console.log('[DEBUG] TileMapEditor.refreshTilePalette: tilesetImage exists?', !!this.tilesetImage);
+    console.log('[DEBUG] TileMapEditor.refreshTilePalette: tilesetFileName =', this.tilesetFileName);
     if (this.tilesetImage) {
+      console.log('[DEBUG] TileMapEditor.refreshTilePalette: Calling createTilePalette');
       this.createTilePalette(preserveOrder);
+    } else {
+      console.log('[DEBUG] TileMapEditor.refreshTilePalette: No tilesetImage, skipping createTilePalette');
     }
   }
 
@@ -3088,21 +3094,27 @@ export class TileMapEditor {
 
   // Public methods for React to interact with
   public handleFileUpload(file: File, type: 'tileset' | 'layerTileset'): void {
+    console.log('[DEBUG] handleFileUpload called', { fileName: file.name, type });
     if (type === 'tileset') {
       // Treat uploads as layer-specific by default: assign to active layer's tileset
       const reader = new FileReader();
       reader.onload = (e) => {
+        console.log('[DEBUG] handleFileUpload: File loaded, creating image element');
         const img = new Image();
         img.onload = () => {
+          console.log('[DEBUG] handleFileUpload: Image onload fired, image size:', img.width, 'x', img.height);
           const columns = Math.max(1, Math.floor(img.width / this.tileSizeX));
           const rows = Math.max(1, Math.floor(img.height / this.tileSizeY));
           const count = columns * rows;
           const tileWidth = columns > 0 ? Math.round(img.width / columns) : this.tileSizeX;
           const tileHeight = rows > 0 ? Math.round(img.height / rows) : this.tileSizeY;
+          console.log('[DEBUG] handleFileUpload: Computed grid: columns=', columns, 'rows=', rows, 'count=', count);
 
           const activeLayer = this.tileLayers.find(l => l.id === this.activeLayerId);
+          console.log('[DEBUG] handleFileUpload: activeLayer.type =', activeLayer?.type);
           if (activeLayer) {
             // Store tileset under the active layer so tilesets are per-layer (and thus per-map/tab)
+            console.log('[DEBUG] handleFileUpload: Storing tileset in layerTilesets for layer type:', activeLayer.type);
             this.layerTilesets.set(activeLayer.type, {
               image: img,
               fileName: file.name,
@@ -3118,6 +3130,7 @@ export class TileMapEditor {
 
             // If there is no saved detected tile mapping for this layer, clear global detected data
             const hasLayerTileData = this.layerTileData.has(activeLayer.type);
+            console.log('[DEBUG] handleFileUpload: hasLayerTileData =', hasLayerTileData);
             if (!hasLayerTileData) {
               this.detectedTileData.clear();
             } else {
@@ -3135,9 +3148,12 @@ export class TileMapEditor {
             // `updateCurrentTileset` will load the layer tileset into the global display state
             // and rebuild the palette accordingly.
             try {
+              console.log('[DEBUG] handleFileUpload: Calling updateCurrentTileset');
               this.updateCurrentTileset(activeLayer.type);
-            } catch {
+              console.log('[DEBUG] handleFileUpload: updateCurrentTileset completed');
+            } catch (e) {
               // Fallback: attempt to create the palette directly if update fails
+              console.warn('[DEBUG] handleFileUpload: updateCurrentTileset failed, fallback to createTilePalette:', e);
               this.createTilePalette(hasLayerTileData);
             }
             this.draw();
@@ -3145,6 +3161,7 @@ export class TileMapEditor {
           }
 
           // Fallback: if no active layer, behave as legacy tileset upload
+          console.log('[DEBUG] handleFileUpload: No active layer, using legacy tileset mode');
           this.tilesetImage = img;
           this.tilesetFileName = file.name;
           this.tilesetColumns = columns;
@@ -3160,19 +3177,30 @@ export class TileMapEditor {
         };
         img.src = e.target?.result as string;
       };
-      reader.readAsDataURL(file);
+          reader.readAsDataURL(file);
+          console.log('[DEBUG] handleFileUpload: started reading file for tileset', file.name);
     } else if (type === 'layerTileset') {
       // Layer-specific tileset upload - preserve existing behavior (delegates to helper)
+      console.log('[DEBUG] handleFileUpload: layerTileset type');
       const activeLayer = this.tileLayers.find(l => l.id === this.activeLayerId);
       if (activeLayer) {
+        console.log('[DEBUG] handleFileUpload: Calling setLayerTileset');
         this.setLayerTileset(activeLayer.type, file);
       }
     }
   }
 
   private createTilePalette(preserveOrder: boolean = false): void {
+    console.log('[DEBUG] createTilePalette called', { preserveOrder });
     const container = document.getElementById('tilesContainer');
-    if (!container || !this.tilesetImage) return;
+    console.log('[DEBUG] createTilePalette: container found?', !!container, 'tilesetImage exists?', !!this.tilesetImage);
+    console.log('[DEBUG] createTilePalette: tilesetFileName =', this.tilesetFileName);
+    console.log('[DEBUG] createTilePalette: activeLayerId =', this.activeLayerId);
+    if (!container || !this.tilesetImage) {
+      console.log('[DEBUG] createTilePalette: ABORTING - container present=', !!container, 'tilesetImage=', !!this.tilesetImage, 'tilesetFileName=', this.tilesetFileName);
+      return;
+    }
+    console.log('[DEBUG] createTilePalette: PROCEEDING with palette creation');
     
     container.innerHTML = '';
     
@@ -3196,21 +3224,52 @@ export class TileMapEditor {
       // Clear previous tile data and detect new tiles
       this.detectedTileData.clear();
       
-      // Detect tiles with variable sizes
-      const detectedTiles = this.detectVariableSizedTiles();
-      
-      tilesToRender = detectedTiles.map(tile => {
-        // Store tile data for later use in drawing
-        this.detectedTileData.set(tile.index, {
-          sourceX: tile.sourceX,
-          sourceY: tile.sourceY,
-          width: tile.width,
-          height: tile.height,
-          originX: Math.floor(tile.width / 2),
-          originY: tile.height
+      // Prefer grid slicing when a tileset/columns/rows or explicit tile sizes are available.
+      const useGridSlice = !!(this.tilesetColumns > 0 && this.tilesetRows > 0 && this.tilesetTileWidth && this.tilesetTileHeight);
+      if (useGridSlice) {
+        const tileW = this.tilesetTileWidth || this.tileSizeX;
+        const tileH = this.tilesetTileHeight || this.tileSizeY;
+        const cols = this.tilesetColumns || Math.max(1, Math.floor(this.tilesetImage.width / tileW));
+        const rows = this.tilesetRows || Math.max(1, Math.floor(this.tilesetImage.height / tileH));
+        let idx = 1;
+        const gridTiles: Array<{ index: number; sourceX: number; sourceY: number; width: number; height: number }> = [];
+        for (let ry = 0; ry < rows; ry++) {
+          for (let cx = 0; cx < cols; cx++) {
+            const sx = Math.round(cx * tileW);
+            const sy = Math.round(ry * tileH);
+            const w = Math.min(tileW, this.tilesetImage.width - sx);
+            const h = Math.min(tileH, this.tilesetImage.height - sy);
+            gridTiles.push({ index: idx++, sourceX: sx, sourceY: sy, width: w, height: h });
+          }
+        }
+        tilesToRender = gridTiles.map(tile => {
+          this.detectedTileData.set(tile.index, {
+            sourceX: tile.sourceX,
+            sourceY: tile.sourceY,
+            width: tile.width,
+            height: tile.height,
+            originX: Math.floor(tile.width / 2),
+            originY: tile.height
+          });
+          return tile;
         });
-        return tile;
-      });
+      } else {
+        // Detect tiles with variable sizes
+        const detectedTiles = this.detectVariableSizedTiles();
+        
+        tilesToRender = detectedTiles.map(tile => {
+          // Store tile data for later use in drawing
+          this.detectedTileData.set(tile.index, {
+            sourceX: tile.sourceX,
+            sourceY: tile.sourceY,
+            width: tile.width,
+            height: tile.height,
+            originX: Math.floor(tile.width / 2),
+            originY: tile.height
+          });
+          return tile;
+        });
+      }
       
       // Also store the detected tiles in the current layer's data
       const activeLayer = this.tileLayers.find(l => l.id === this.activeLayerId);
@@ -3233,6 +3292,7 @@ export class TileMapEditor {
       }
     }
     
+  console.log('[DEBUG] createTilePalette: About to render', tilesToRender.length, 'tiles into container');
   let validTileIndex = 0;
 
   // Helper to find the brush-tool state element. Prefer a stable id added by React
@@ -3571,7 +3631,8 @@ export class TileMapEditor {
       validTileIndex++;
     }
     
-    console.log(`Created ${validTileIndex} variable-sized tiles from tileset`);
+    console.log('[DEBUG] createTilePalette: Successfully rendered', validTileIndex, 'tiles into container');
+    console.log(`[DEBUG] Created ${validTileIndex} variable-sized tiles from tileset`);
   }
 
   // Brush management interaction handlers
@@ -4647,6 +4708,28 @@ export class TileMapEditor {
     this.draw();
   }
 
+  // Clear all tile data and objects on the map (reset to empty grid)
+  public clearMapGrid(): void {
+    try {
+      this.collisionData = new Array(this.mapWidth * this.mapHeight).fill(0);
+      for (const layer of this.tileLayers) {
+        layer.data = new Array(this.mapWidth * this.mapHeight).fill(0);
+      }
+      // reset per-layer cell tileset keys
+      for (const key of Array.from(this.layerCellTilesetKey.keys())) {
+        this.layerCellTilesetKey.set(key, new Array(this.mapWidth * this.mapHeight).fill(null));
+      }
+      // clear objects and detected tiles
+      this.objects = [];
+      try { this.detectedTileData.clear(); } catch { /* ignore */ }
+      this.clearSelection();
+      this.draw();
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn('clearMapGrid failed', e);
+    }
+  }
+
   public renameLayer(layerId: number, newName: string): void {
     const layer = this.tileLayers.find(l => l.id === layerId);
     if (layer) {
@@ -5273,6 +5356,7 @@ export class TileMapEditor {
 
   // Layer-specific tileset management - now scoped per active tab
   public setLayerTileset(layerType: string, file: File): void {
+    console.log('setLayerTileset called', { layerType, fileName: file.name });
     const gidSnapshotBefore = this.snapshotLayerGids();
     const image = new Image();
     image.onload = () => {
@@ -5434,22 +5518,29 @@ export class TileMapEditor {
   }
 
   public importBrushImageToLayerTab(layerType: string, tabId: number, file: File): Promise<void> {
+    console.log('[DEBUG] importBrushImageToLayerTab: called with layerType=', layerType, 'tabId=', tabId, 'fileName=', file.name);
     return new Promise((resolve, reject) => {
       const img = new Image();
       img.onload = () => {
+        console.log('[DEBUG] importBrushImageToLayerTab: Image loaded, size:', img.width, 'x', img.height);
         const tabs = this.layerTabs.get(layerType) || [];
+        console.log('[DEBUG] importBrushImageToLayerTab: Found tabs count=', tabs.length);
         const tab = tabs.find(t => t.id === tabId);
+        console.log('[DEBUG] importBrushImageToLayerTab: Tab found?', !!tab);
         if (!tab) return reject(new Error('Tab not found'));
         if (!tab.brushes) tab.brushes = [];
         tab.brushes.push({ image: img as HTMLImageElement, fileName: file.name, width: img.width, height: img.height });
+        console.log(`[DEBUG] importBrushImageToLayerTab: added brush to tab ${tabId} on layer ${layerType} (brushes=${tab.brushes.length})`);
         const columns = Math.max(1, Math.floor(img.width / this.tileSizeX));
         const rows = Math.max(1, Math.floor(img.height / this.tileSizeY));
         const count = Math.max(1, columns * rows);
         const tileWidth = columns > 0 ? Math.round(img.width / columns) : this.tileSizeX;
         const tileHeight = rows > 0 ? Math.round(img.height / rows) : this.tileSizeY;
         const sourcePath = this.extractFileSourcePath(file);
+        console.log('[DEBUG] importBrushImageToLayerTab: Computed grid columns=', columns, 'rows=', rows);
         // If this tab has no tileset, optionally set it as tileset for quick use
         if (!tab.tileset) {
+          console.log('[DEBUG] importBrushImageToLayerTab: Setting tab tileset (no existing tileset)');
           tab.tileset = {
             image: img as HTMLImageElement,
             fileName: file.name,
@@ -5463,6 +5554,7 @@ export class TileMapEditor {
             sourcePath
           };
         } else {
+          console.log('[DEBUG] importBrushImageToLayerTab: Updating existing tab tileset');
           // Update tileset metadata so it stays in sync with latest import
           tab.tileset.image = img as HTMLImageElement;
           tab.tileset.fileName = file.name;
@@ -5477,12 +5569,19 @@ export class TileMapEditor {
         }
         // If this tab is active for the layer, update current tileset/palette
         const activeTabId = this.layerActiveTabId.get(layerType);
+        console.log('[DEBUG] importBrushImageToLayerTab: activeTabId =', activeTabId, 'tabId =', tabId, 'match?', activeTabId === tabId);
         if (activeTabId === tabId) {
+          console.log('[DEBUG] importBrushImageToLayerTab: Tab is active, calling setActiveLayerTab');
           this.setActiveLayerTab(layerType, tabId);
         }
+        console.log(`[DEBUG] importBrushImageToLayerTab: tab ${tabId} now has tileset=${!!tab.tileset}`);
         resolve();
       };
-      img.onerror = (_e) => reject(new Error('Failed to load brush image'));
+      img.onerror = (_e) => {
+        console.warn('[DEBUG] importBrushImageToLayerTab: Image load failed');
+        reject(new Error('Failed to load brush image'));
+      };
+      console.log('[DEBUG] importBrushImageToLayerTab: Setting img.src to blob URL');
       img.src = URL.createObjectURL(file);
     });
   }

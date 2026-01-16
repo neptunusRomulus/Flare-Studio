@@ -18,6 +18,7 @@ import useAppEffects from './useAppEffects';
 import useNpcDrag from './useNpcDrag';
 import useObjectEditing from './useObjectEditing';
 import useItems from './useItems';
+import useLoadProjectData from './useLoadProjectData';
 import { normalizeItemsForState } from '@/utils/items';
 import { buildConstantStockString } from '@/utils/parsers';
 // ItemRole type intentionally not imported — unused in this module
@@ -45,6 +46,7 @@ export default function useAppMainBuilder() {
 
   const editorRefs = useEditorRefs() as EditorRefsType;
   const editorSetup = useEditorSetup(editorRefs.editorOptsRef) as EditorSetupType;
+  const { loadProjectData } = useLoadProjectData();
   
   const { isDarkMode, setIsDarkMode, showSidebarToggle, setShowSidebarToggle } = usePreferences();
   useDarkModeSync(isDarkMode, editorSetup.editor as TileMapEditor | null);
@@ -148,6 +150,8 @@ export default function useAppMainBuilder() {
     syncMapObjects,
     syncMapObjectsRef,
     setupAutoSaveWrapper: setupAutoSave
+    ,
+    setTabTick: appState.setTabTick
   });
   const { pendingMapConfig, setPendingMapConfig, showWelcome: appShowWelcome } = appState;
 
@@ -169,6 +173,27 @@ export default function useAppMainBuilder() {
           console.warn('Failed to load project data into new editor:', err);
         }
 
+        // After loading project data, force refresh of tileset palette
+        // to ensure imported brushes/tiles display in the sidebar
+        try {
+          const activeLayerType = typeof newEditor.getActiveLayerType === 'function'
+            ? newEditor.getActiveLayerType()
+            : null;
+          console.log('[DEBUG] useAppMainBuilder: After loadProjectData, activeLayerType =', activeLayerType);
+          if (activeLayerType && typeof newEditor.updateCurrentTileset === 'function') {
+            console.log('[DEBUG] useAppMainBuilder: Calling updateCurrentTileset for', activeLayerType);
+            newEditor.updateCurrentTileset(activeLayerType);
+            console.log('[DEBUG] useAppMainBuilder: updateCurrentTileset completed');
+          }
+          if (typeof newEditor.refreshTilePalette === 'function') {
+            console.log('[DEBUG] useAppMainBuilder: Calling refreshTilePalette(true) immediately after load');
+            newEditor.refreshTilePalette(true);
+            console.log('[DEBUG] useAppMainBuilder: refreshTilePalette(true) completed');
+          }
+        } catch (e) {
+          console.warn('Palette refresh after loadProjectData failed:', e);
+        }
+
         try { setupAutoSave(newEditor); } catch (err) { console.warn('Failed to setup autosave:', err); }
         setEditor(newEditor);
         try {
@@ -186,6 +211,18 @@ export default function useAppMainBuilder() {
         setTimeout(() => {
           try { updateLayersList(); } catch (err) { console.warn(err); }
           try { syncMapObjects(); } catch (err) { console.warn(err); }
+          try {
+            // Re-refresh palette after a small delay to ensure DOM is ready
+            const activeLayerType = typeof newEditor.getActiveLayerType === 'function'
+              ? newEditor.getActiveLayerType()
+              : null;
+            if (activeLayerType && typeof newEditor.updateCurrentTileset === 'function') {
+              newEditor.updateCurrentTileset(activeLayerType);
+            }
+            if (typeof newEditor.refreshTilePalette === 'function') {
+              newEditor.refreshTilePalette(true);
+            }
+          } catch (err) { void err; }
           try { newEditor.redraw(); } catch (err) { void err; }
         }, 150);
 
@@ -305,7 +342,14 @@ export default function useAppMainBuilder() {
           await manager.handleOpenMap(projectDir, createTab, mapName);
         }
       },
-      loadProjectData: async () => false,
+      loadProjectData: async (...args: unknown[]) => {
+        try {
+          return await (loadProjectData as (...inner: unknown[]) => Promise<boolean>)(...(args as unknown[]));
+        } catch (e) {
+          console.warn('switchToTab loadProjectData helper failed', e);
+          return false;
+        }
+      },
       setupAutoSave: (editorInstance: unknown) => {
           try {
             setupAutoSave(editorInstance as TileMapEditor);
@@ -315,8 +359,12 @@ export default function useAppMainBuilder() {
         },
       syncMapObjects: () => void syncMapObjects(),
       updateLayersList: () => void updateLayersList()
+      ,
+      setTabTick: (_fn?: (() => void)) => {
+        try { appState.setTabTick((t: number) => (t || 0) + 1); } catch (e) { void e; }
+      }
     };
-  }, [editorRefs, projectManager, setupAutoSave, syncMapObjects, updateLayersList]);
+  }, [editorRefs, projectManager, setupAutoSave, syncMapObjects, updateLayersList, appState, loadProjectData]);
 
   const handleCreateNewMap = (config: { name?: string; width?: number; height?: number; isStartingMap?: boolean } , projectPath?: string | null) => {
     try {

@@ -51,6 +51,7 @@ type AppEffectsParams = {
   handleUndoRef: RefOrNull<(...args: unknown[]) => unknown>;
   handleRedoRef: RefOrNull<(...args: unknown[]) => unknown>;
   switchToTabHelpersRef: RefOrNull<unknown>;
+  setTabTick?: (fn?: (() => void)) => void;
 };
 
 export default function useAppEffects(params: unknown) {
@@ -277,6 +278,7 @@ export default function useAppEffects(params: unknown) {
           setupAutoSave: setupAutoSaveWrapper,
           syncMapObjects: syncMapObjects,
           updateLayersList: updateLayersList,
+          setTabTick: (typeof (p as any).setTabTick === 'function') ? (p as any).setTabTick : () => {},
         };
       } catch (e) {
         console.warn('Failed to assign switchToTabHelpersRef.current', e);

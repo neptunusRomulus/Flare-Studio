@@ -10,12 +10,14 @@ export default function useEditorRefs() {
     setupAutoSave: (editor: TileMapEditor) => void;
     syncMapObjects: () => void;
     updateLayersList: () => void;
+    setTabTick: (fn?: (() => void)) => void;
   }>({
     handleOpenMap: async () => {},
     loadProjectData: async () => false,
     setupAutoSave: () => {},
     syncMapObjects: () => {},
     updateLayersList: () => {},
+    setTabTick: () => {},
   });
 
   return { editorOptsRef, handleManualSaveRef, switchToTabHelpersRef };

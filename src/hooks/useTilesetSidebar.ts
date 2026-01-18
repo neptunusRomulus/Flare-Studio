@@ -29,6 +29,7 @@ const noopDeleteTab = () => {};
 const noopToast: typeof import('@/hooks/use-toast').toast = (_props?: any) => ({ id: '', dismiss: () => {}, update: () => {} });
 
 export default function useTilesetSidebar(params?: Partial<TilesetSidebarParams>) {
+  console.log('[DEBUG] useTilesetSidebar: params received =', params ? { editor: !!params.editor, activeLayer: !!params.activeLayer } : 'undefined');
   const defaultParams: TilesetSidebarParams = {
     editor: null,
     activeLayer: null,
@@ -44,6 +45,7 @@ export default function useTilesetSidebar(params?: Partial<TilesetSidebarParams>
     stampsState: null
   };
   const p: TilesetSidebarParams = { ...defaultParams, ...(params ?? {}) };
+  console.log('[DEBUG] useTilesetSidebar: p (merged) =', { editor: !!p.editor, activeLayer: !!p.activeLayer });
 
   const tileset = {
     editor: p.editor,
@@ -59,6 +61,7 @@ export default function useTilesetSidebar(params?: Partial<TilesetSidebarParams>
     handleOpenActorDialog: p.handleOpenActorDialogForTileset,
     stampsState: p.stampsState
   };
+  console.log('[DEBUG] useTilesetSidebar: returning tileset =', { editor: !!tileset.editor, activeLayer: !!tileset.activeLayer });
 
   return { tileset } as const;
 }

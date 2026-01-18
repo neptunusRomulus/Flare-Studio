@@ -7667,6 +7667,13 @@ export class TileMapEditor {
                   const fn = ts.fileName ?? '';
                   if (fn && projectData.tilesetImages && projectData.tilesetImages[fn]) {
                     const img = new Image();
+                    console.log('[DEBUG] loadProjectData: Created Image for tab tileset', { tabId, layerType, fileName: fn });
+                    img.onload = () => {
+                      console.log('[DEBUG] loadProjectData: Tab tileset image loaded', { tabId, layerType, fileName: fn, size: img.width + 'x' + img.height });
+                    };
+                    img.onerror = () => {
+                      console.error('[DEBUG] loadProjectData: Tab tileset image FAILED to load', { tabId, layerType, fileName: fn });
+                    };
                     img.src = projectData.tilesetImages[fn];
                     ts.image = img;
                   }

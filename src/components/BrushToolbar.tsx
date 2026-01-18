@@ -5,6 +5,7 @@ import { Link2, Scan, Scissors, Trash2, Upload, X } from 'lucide-react';
 import type { TileLayer } from '@/types';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 import useBrushToolbar from '@/hooks/useBrushToolbar';
+import { useAppContext } from '@/context/AppContext';
 
 type BrushToolbarProps = {
   editor: TileMapEditor | null;
@@ -37,10 +38,29 @@ const BrushToolbar = ({
   onDeleteActiveTab,
   toast
 }: BrushToolbarProps) => {
+  console.log('[DEBUG] BrushToolbar render: editor =', !!editor, 'activeLayer =', !!activeLayer);
+  
+  // Initialize refs with current prop values IMMEDIATELY
+  const editorRef = React.useRef<TileMapEditor | null>(editor);
+  const activeLayerRef = React.useRef<TileLayer | null>(activeLayer);
+  
   const fallback = useBrushToolbar();
   const expanded = typeof brushToolbarExpanded === 'boolean' ? brushToolbarExpanded : fallback.brushToolbarExpanded;
   const setNode = setBrushToolbarNode ?? fallback.setBrushToolbarNode;
   const showTemporarily = showBrushToolbarTemporarily ?? fallback.showBrushToolbarTemporarily;
+
+  // Keep refs synchronized with props in useEffect
+  React.useEffect(() => {
+    console.log('[DEBUG] BrushToolbar useEffect: Syncing refs - editor =', !!editor, 'activeLayer =', !!activeLayer);
+    editorRef.current = editor;
+    activeLayerRef.current = activeLayer;
+  }, [editor, activeLayer]);
+
+  // App context fallback so the handler can always get latest values
+  const appCtx = (() => {
+    try { return useAppContext() as any; } catch { return null; }
+  })();
+  console.log('[DEBUG] BrushToolbar: appCtx available =', !!appCtx, 'appCtx.tileset?.editor =', !!appCtx?.tileset?.editor, 'appCtx.tileset?.activeLayer =', !!appCtx?.tileset?.activeLayer);
 
   return (
   <div className="sticky bottom-0 z-10 bg-transparent py-2">
@@ -121,19 +141,45 @@ const BrushToolbar = ({
                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                         onChange={async (event) => {
                           console.log('[DEBUG] BrushToolbar file input onChange fired');
-                          if (!editor || !activeLayer) {
-                            console.log('[DEBUG] BrushToolbar: Missing editor or activeLayer, returning');
+                          let currentEditor = editorRef.current;
+                          let currentActiveLayer = activeLayerRef.current;
+                          console.log('[DEBUG] BrushToolbar: Using refs - editor =', !!currentEditor, 'activeLayer =', !!currentActiveLayer, 'activeLayer.type =', currentActiveLayer?.type);
+                          // If refs are not set (props were null/stale), attempt to read from app context
+                          if (!currentEditor || !currentActiveLayer) {
+                            console.log('[DEBUG] BrushToolbar: refs empty, trying app context fallback');
+                            if (appCtx) {
+                              currentEditor = (appCtx?.tileset?.editor ?? appCtx?.editor) as TileMapEditor | null;
+                              currentActiveLayer = (appCtx?.tileset?.activeLayer ?? appCtx?.activeLayer) as TileLayer | null;
+                              console.log('[DEBUG] BrushToolbar: appCtx fallback - editor =', !!currentEditor, 'activeLayer =', !!currentActiveLayer, 'activeLayer.type =', currentActiveLayer?.type);
+                            }
+                          }
+
+                          // Final fallback: attempt to derive active layer from editor internals
+                          if (!currentActiveLayer && currentEditor) {
+                            try {
+                              const currentLayerType = currentEditor.getCurrentLayerType ? currentEditor.getCurrentLayerType() : null;
+                              const byId = currentEditor.tileLayers ? currentEditor.tileLayers.find((l: any) => l.id === currentEditor.activeLayerId) : null;
+                              const byType = currentEditor.tileLayers ? currentEditor.tileLayers.find((l: any) => l.type === currentLayerType) : null;
+                              currentActiveLayer = byId || byType || null;
+                              console.log('[DEBUG] BrushToolbar: editor-derived fallback - activeLayer found byId=', !!byId, 'byType=', !!byType, 'currentLayerType=', currentLayerType);
+                            } catch (e) {
+                              console.warn('[DEBUG] BrushToolbar: editor-derived fallback failed', e);
+                            }
+                          }
+
+                          if (!currentEditor || !currentActiveLayer) {
+                            console.log('[DEBUG] BrushToolbar: Missing editor or activeLayer after fallback, returning - editor exists:', !!currentEditor, 'activeLayer exists:', !!currentActiveLayer);
                             return;
                           }
                           const file = event.target.files?.[0];
                           console.log('[DEBUG] BrushToolbar: file =', file?.name);
                           if (!file) return;
-                          const layerType = activeLayer.type;
+                          const layerType = currentActiveLayer.type;
                           console.log('[DEBUG] BrushToolbar: layerType =', layerType);
                           if (layerType === 'background' || layerType === 'object') {
                             console.log('[DEBUG] BrushToolbar: Is background/object layer, using importBrushImageToLayerTab');
-                            const tabs = editor.getLayerTabs ? editor.getLayerTabs(layerType) : [];
-                            let targetTabId = editor.getActiveLayerTabId ? editor.getActiveLayerTabId(layerType) : null;
+                            const tabs = currentEditor.getLayerTabs ? currentEditor.getLayerTabs(layerType) : [];
+                            let targetTabId = currentEditor.getActiveLayerTabId ? currentEditor.getActiveLayerTabId(layerType) : null;
                             console.log('[DEBUG] BrushToolbar: tabs count =', tabs?.length, 'activeTabId =', targetTabId);
                             if (typeof targetTabId !== 'number' || targetTabId === null) {
                               if (tabs && tabs.length >= 8) {
@@ -142,14 +188,14 @@ const BrushToolbar = ({
                                 return;
                               }
                               console.log('[DEBUG] BrushToolbar: Creating new tab');
-                              targetTabId = editor.createLayerTab(layerType);
+                              targetTabId = currentEditor.createLayerTab(layerType);
                               console.log('[DEBUG] BrushToolbar: Created tab with id =', targetTabId);
-                              editor.setActiveLayerTab(layerType, targetTabId);
+                              currentEditor.setActiveLayerTab(layerType, targetTabId);
                             }
                             console.log('[DEBUG] BrushToolbar: Calling importBrushImageToLayerTab with tabId =', targetTabId);
-                            await editor.importBrushImageToLayerTab(layerType, targetTabId, file);
+                            await currentEditor.importBrushImageToLayerTab(layerType, targetTabId, file);
                             console.log('[DEBUG] BrushToolbar: importBrushImageToLayerTab completed, calling refreshTilePalette');
-                            editor.refreshTilePalette(true);
+                            currentEditor.refreshTilePalette(true);
                             setTabTick(t => t + 1);
                           } else {
                             console.log('[DEBUG] BrushToolbar: Not background/object, using onFileUpload');

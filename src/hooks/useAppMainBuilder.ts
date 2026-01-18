@@ -389,6 +389,7 @@ export default function useAppMainBuilder() {
   const [showSettings, setShowSettings] = useState(false);
 
   const sidebarDeps = useMemo(() => {
+    console.log('[DEBUG] useAppMainBuilder sidebarDeps: editor =', !!editor, 'activeLayer =', !!activeLayer, 'activeLayer.type =', activeLayer?.type);
     const projectMapsList = (projectManagerRecord as ProjectManagerView)?.projectMaps ?? [];
     const handleOpenMapFromMapsFolderFn =
       typeof (projectManagerRecord as ProjectManagerView)?.handleOpenMapFromMapsFolder === 'function'

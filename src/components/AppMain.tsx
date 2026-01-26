@@ -115,6 +115,7 @@ export default function AppMain() {
           setShowActiveGid={setShowActiveGid}
           showSidebarToggle={showSidebarToggle}
           setShowSidebarToggle={setShowSidebarToggle}
+
         />
 
         <MapSettingsDialog

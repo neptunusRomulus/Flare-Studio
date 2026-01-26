@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useState, useRef } from 'react';
+import React, { useEffect, useCallback, useState, useRef, useLayoutEffect } from 'react';
 import type { TileLayer } from '@/types';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 import usePreferences from '@/hooks/usePreferences';
@@ -23,7 +23,9 @@ interface TileSelection {
   endRow: number;
 }
 
-const TILE_SIZE = 32; // Grid cell size in pixels
+// Default grid cell size; will be overridden by tileset/tab metadata when available
+const DEFAULT_TILE_WIDTH = 64; // Grid cell width in pixels
+const DEFAULT_TILE_HEIGHT = 32; // Grid cell height in pixels
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 4;
 
@@ -54,7 +56,11 @@ const TilesetPalette = ({
   const [selection, setSelection] = useState<TileSelection | null>(null);
   const [isSelecting, setIsSelecting] = useState(false);
   const [tilesetImage, setTilesetImage] = useState<HTMLImageElement | null>(null);
+  const [tileSize, setTileSize] = useState({ width: DEFAULT_TILE_WIDTH, height: DEFAULT_TILE_HEIGHT });
   const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
+  // Track the visible wrapper size so we can ensure the tileset viewport
+  // remains at least as large as the palette area regardless of image size.
+  const [wrapperSize, setWrapperSize] = useState({ width: 0, height: 0 });
   
   // Refs for panning
   const isPanningRef = useRef(false);
@@ -109,6 +115,16 @@ const TilesetPalette = ({
           
           // Set the image immediately
           setTilesetImage(img);
+          // If the tab provides explicit tile sizes, use them for palette math
+          try {
+            const tw = (tab as any).tileset?.tileWidth;
+            const th = (tab as any).tileset?.tileHeight;
+            if (typeof tw === 'number' && typeof th === 'number') {
+              setTileSize({ width: tw, height: th });
+            } else {
+              setTileSize({ width: DEFAULT_TILE_WIDTH, height: DEFAULT_TILE_HEIGHT });
+            }
+          } catch (e) { void e; }
           
           // Only set size if image is complete and has dimensions
           // Otherwise, let the image load listener handle the size update
@@ -231,15 +247,15 @@ const TilesetPalette = ({
     ctx.drawImage(tilesetImage, 0, 0);
 
     // Draw grid overlay
-    const cols = Math.ceil(imageSize.width / TILE_SIZE);
-    const rows = Math.ceil(imageSize.height / TILE_SIZE);
+    const cols = Math.ceil(imageSize.width / tileSize.width);
+    const rows = Math.ceil(imageSize.height / tileSize.height);
     
-    ctx.strokeStyle = prefs.isDarkMode ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = prefs.isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)';
+    ctx.lineWidth = 0.8;
 
     // Draw vertical lines
     for (let i = 0; i <= cols; i++) {
-      const x = i * TILE_SIZE;
+      const x = i * tileSize.width;
       ctx.beginPath();
       ctx.moveTo(x + 0.5, 0);
       ctx.lineTo(x + 0.5, imageSize.height);
@@ -248,7 +264,7 @@ const TilesetPalette = ({
 
     // Draw horizontal lines
     for (let i = 0; i <= rows; i++) {
-      const y = i * TILE_SIZE;
+      const y = i * tileSize.height;
       ctx.beginPath();
       ctx.moveTo(0, y + 0.5);
       ctx.lineTo(imageSize.width, y + 0.5);
@@ -262,10 +278,10 @@ const TilesetPalette = ({
       const minRow = Math.min(selection.startRow, selection.endRow);
       const maxRow = Math.max(selection.startRow, selection.endRow);
 
-      const x = minCol * TILE_SIZE;
-      const y = minRow * TILE_SIZE;
-      const w = (maxCol - minCol + 1) * TILE_SIZE;
-      const h = (maxRow - minRow + 1) * TILE_SIZE;
+      const x = minCol * tileSize.width;
+      const y = minRow * tileSize.height;
+      const w = (maxCol - minCol + 1) * tileSize.width;
+      const h = (maxRow - minRow + 1) * tileSize.height;
 
       // Selection fill
       ctx.fillStyle = 'rgba(59, 130, 246, 0.3)';
@@ -276,12 +292,24 @@ const TilesetPalette = ({
       ctx.lineWidth = 2;
       ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
     }
-  }, [tilesetImage, imageSize, selection, prefs.isDarkMode]);
+  }, [tilesetImage, imageSize, selection, prefs.isDarkMode, tileSize.width, tileSize.height]);
 
   // Redraw canvas when dependencies change
   useEffect(() => {
     drawTilesetCanvas();
   }, [drawTilesetCanvas]);
+
+  // Track wrapper size with a ResizeObserver so we can keep the tileset
+  // selector box at least as large as the viewport (users will zoom/pan).
+  useLayoutEffect(() => {
+    const wrapper = wrapperRef.current;
+    if (!wrapper) return;
+    const update = () => setWrapperSize({ width: wrapper.clientWidth, height: wrapper.clientHeight });
+    update();
+    const ro = new ResizeObserver(() => update());
+    ro.observe(wrapper);
+    return () => ro.disconnect();
+  }, [wrapperRef]);
 
   // Keyboard handlers for spacebar to enable panning
   useEffect(() => {
@@ -314,17 +342,17 @@ const TilesetPalette = ({
     const x = (e.clientX - rect.left) * scaleX;
     const y = (e.clientY - rect.top) * scaleY;
 
-    const col = Math.floor(x / TILE_SIZE);
-    const row = Math.floor(y / TILE_SIZE);
+    const col = Math.floor(x / tileSize.width);
+    const row = Math.floor(y / tileSize.height);
 
-    const maxCol = Math.ceil(imageSize.width / TILE_SIZE) - 1;
-    const maxRow = Math.ceil(imageSize.height / TILE_SIZE) - 1;
+    const maxCol = Math.ceil(imageSize.width / tileSize.width) - 1;
+    const maxRow = Math.ceil(imageSize.height / tileSize.height) - 1;
 
     return {
       col: Math.max(0, Math.min(col, maxCol)),
       row: Math.max(0, Math.min(row, maxRow))
     };
-  }, [imageSize]);
+  }, [imageSize, tileSize.width, tileSize.height]);
 
   // Selection handlers
   const handleCanvasMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -366,10 +394,12 @@ const TilesetPalette = ({
       const maxRow = Math.max(selection.startRow, selection.endRow);
 
       const selectedTiles = {
-        x: minCol * TILE_SIZE,
-        y: minRow * TILE_SIZE,
-        width: (maxCol - minCol + 1) * TILE_SIZE,
-        height: (maxRow - minRow + 1) * TILE_SIZE,
+        x: minCol * tileSize.width,
+        y: minRow * tileSize.height,
+        width: (maxCol - minCol + 1) * tileSize.width,
+        height: (maxRow - minRow + 1) * tileSize.height,
+        tileWidth: tileSize.width,
+        tileHeight: tileSize.height,
         cols: maxCol - minCol + 1,
         rows: maxRow - minRow + 1
       };
@@ -382,7 +412,7 @@ const TilesetPalette = ({
       }
     }
     setIsSelecting(false);
-  }, [isSelecting, selection, editor]);
+  }, [isSelecting, selection, editor, tileSize.width, tileSize.height]);
 
   // Panning handlers
   const handleMouseDownPan = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
@@ -447,7 +477,7 @@ const TilesetPalette = ({
   }, [setZoom]);
 
   return (
-    <div className="flex-1 flex flex-col min-h-0 overflow-hidden p-0 m-0">
+    <div className="flex-1 flex flex-col min-h-0 overflow-visible p-0 m-0">
       {/* Tab navigation */}
       {(() => {
         const activeLayerType = activeLayer?.type;
@@ -462,10 +492,10 @@ const TilesetPalette = ({
         return (
           <div key={tabTick} className="flex items-center gap-2 px-2 py-2 overflow-visible">
             <div
-              className={`flex-1 flex items-center gap-1 overflow-x-auto overflow-y-visible tabs-scroll ${(() => {
+              className={`flex-1 flex items-center gap-1 overflow-x-auto overflow-y-visible py-1 tabs-scroll ${(() => {
                 try {
                   const tabs = editor && activeLayerType ? (editor.getLayerTabs ? editor.getLayerTabs(activeLayerType) : []) : [];
-                  return tabs && tabs.length > 7 ? 'tabs-limited' : '';
+                  return tabs && tabs.length > 5 ? 'tabs-limited' : '';
                 } catch { return ''; }
               })()}`}
               onWheel={(event: React.WheelEvent<HTMLDivElement>) => {
@@ -482,13 +512,12 @@ const TilesetPalette = ({
                     key={tab.id}
                     title={tab.name ?? `Tab ${idx + 1}`}
                     aria-label={tab.name ? `${tab.name} (Tab ${idx + 1})` : `Tab ${idx + 1}`}
-                    className={`w-4 h-4 flex items-center justify-center rounded-full text-white text-[10px] font-semibold transition transform duration-150 ease-out ${editor && editor.getCurrentLayerType() === activeLayerType && editor.getActiveLayerTabId && editor.getActiveLayerTabId(activeLayerType) === tab.id ? 'bg-orange-600 opacity-100 scale-100 ring-2 ring-offset-0 ring-orange-600 relative z-10 focus:outline-none' : 'bg-orange-400/90 opacity-90 scale-95 hover:bg-orange-600 hover:scale-105 focus:outline-none'}`}
+                    className="tab-number"
                     onClick={() => {
                       if (!editor) return;
                       editor.setActiveLayerTab(activeLayerType!, tab.id);
-                      // Note: tabTick update triggers React-based refresh, no need for refreshTilePalette
                       setTabTick(t => t + 1);
-                      setSelection(null); // Clear selection when switching tabs
+                      setSelection(null);
                     }}
                   >
                     {idx + 1}
@@ -508,7 +537,7 @@ const TilesetPalette = ({
           {/* Scrollable wrapper with panning support */}
           <div
             ref={wrapperRef}
-            className="tile-palette flex-1 min-h-0 overflow-auto p-2"
+            className="tile-palette relative flex-1 min-h-0 overflow-auto p-2"
             style={{ cursor: isSpacePressed ? 'grab' : 'default' }}
             onMouseDown={handleMouseDownPan}
             onMouseMove={handleMouseMovePan}
@@ -516,22 +545,36 @@ const TilesetPalette = ({
             onMouseLeave={handleMouseUpPan}
           >
             {/* If we have a tileset image, show the interactive canvas-based selector */}
-            {tilesetImage && imageSize.width > 0 ? (
+              {tilesetImage && imageSize.width > 0 ? (
               <div 
-                className="tileset-selector relative inline-block"
+                className="tileset-selector"
                 style={{ 
+                  // Ensure selector box is at least as large as the wrapper viewport
+                  // so small images don't collapse the visible area. We compute
+                  // display dimensions in CSS pixels (before zoom) and then
+                  // scale the whole selector by `zoom` using transform.
+                  width: Math.max(imageSize.width, Math.max(1, Math.floor(wrapperSize.width / (zoom || 1)))),
+                  height: Math.max(imageSize.height, Math.max(1, Math.floor(wrapperSize.height / (zoom || 1)))),
                   transform: `scale(${zoom})`,
-                  transformOrigin: 'top left'
+                  transformOrigin: 'top left',
+                  position: 'absolute',
+                  left: 0,
+                  top: 0
                 }}
               >
-                {/* Canvas for tileset with grid and selection */}
+                {/* Canvas for tileset with grid and selection. We position the canvas
+                    at top-left of the selector so blank area (if any) remains visible
+                    for panning/zooming. */}
                 <canvas
                   ref={canvasRef}
                   className="tileset-canvas"
                   style={{ 
                     imageRendering: 'pixelated',
                     cursor: isSpacePressed ? 'grab' : 'crosshair',
-                    display: 'block'
+                    display: 'block',
+                    position: 'absolute',
+                    left: 0,
+                    top: 0
                   }}
                   onMouseDown={handleCanvasMouseDown}
                   onMouseMove={handleCanvasMouseMove}

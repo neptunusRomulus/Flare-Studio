@@ -1,10 +1,11 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import Tooltip from '@/components/ui/tooltip';
-import { Link2, Scan, Scissors, Trash2, Upload, X } from 'lucide-react';
+import { ZoomIn, ZoomOut, Trash2, Upload, X, XCircle } from 'lucide-react';
 import type { TileLayer } from '@/types';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 import useBrushToolbar from '@/hooks/useBrushToolbar';
+import usePreferences from '@/hooks/usePreferences';
 import { useAppContext } from '@/context/AppContext';
 
 type BrushToolbarProps = {
@@ -21,6 +22,12 @@ type BrushToolbarProps = {
   onToggleBrushTool: (tool: 'move' | 'merge' | 'separate' | 'remove') => void;
   onDeleteActiveTab: () => void;
   toast: (args: { title: string; description: string; variant?: 'default' | 'destructive' }) => void;
+  // New zoom and selection props
+  onZoomIn?: () => void;
+  onZoomOut?: () => void;
+  onClearSelection?: () => void;
+  hasSelection?: boolean;
+  zoom?: number;
 };
 
 const BrushToolbar = ({
@@ -36,7 +43,12 @@ const BrushToolbar = ({
   onFileUpload,
   onToggleBrushTool,
   onDeleteActiveTab,
-  toast
+  toast,
+  onZoomIn,
+  onZoomOut,
+  onClearSelection,
+  hasSelection,
+  zoom
 }: BrushToolbarProps) => {
   console.log('[DEBUG] BrushToolbar render: editor =', !!editor, 'activeLayer =', !!activeLayer);
   
@@ -62,6 +74,55 @@ const BrushToolbar = ({
   })();
   console.log('[DEBUG] BrushToolbar: appCtx available =', !!appCtx, 'appCtx.tileset?.editor =', !!appCtx?.tileset?.editor, 'appCtx.tileset?.activeLayer =', !!appCtx?.tileset?.activeLayer);
 
+  // Auto-slice feature removed; importing is currently disabled.
+
+  // Safe toast invoker — handles either function or useToast hook object
+  const toastInvoke = (opts: { title?: string; description?: string; variant?: 'default' | 'destructive' } = {}) => {
+    try {
+      if (!toast) return;
+      if (typeof toast === 'function') {
+        (toast as any)(opts);
+        return;
+      }
+      if (typeof (toast as any).toast === 'function') {
+        (toast as any).toast(opts);
+        return;
+      }
+      console.warn('[DEBUG] BrushToolbar: toast not callable, skipping', toast);
+    } catch (e) {
+      console.warn('[DEBUG] BrushToolbar: toast invocation failed', e);
+    }
+  };
+
+  // Safely increment the tab tick. Some callers pass a React state dispatcher, others
+  // provide a zero-arg increment helper. Try dispatcher form first, then zero-arg.
+  const safeIncrementTabTick = () => {
+    try {
+      if (typeof setTabTick === 'function') {
+        try {
+          // Prefer dispatcher/updater signature
+          (setTabTick as React.Dispatch<React.SetStateAction<number>>)((t: number) => (typeof t === 'number' ? t + 1 : 1));
+          return;
+        } catch (e) {
+          // Fallback to zero-arg function
+          try { (setTabTick as any)(); return; } catch (err) { void err; }
+        }
+      }
+
+      // Try app context tileset helper if present
+      if (appCtx && appCtx.tileset && typeof (appCtx.tileset as any).setTabTick === 'function') {
+        try {
+          (appCtx.tileset as any).setTabTick((t: number) => (typeof t === 'number' ? t + 1 : 1));
+          return;
+        } catch (e) {
+          try { (appCtx.tileset as any).setTabTick(); return; } catch (err) { void err; }
+        }
+      }
+    } catch (e) {
+      console.warn('[DEBUG] BrushToolbar: safeIncrementTabTick failed', e);
+    }
+  };
+
   return (
   <div className="sticky bottom-0 z-10 bg-transparent py-2">
     <div className="text-xs text-muted-foreground"></div>
@@ -83,7 +144,7 @@ const BrushToolbar = ({
                       if (!editor || !activeLayer) return;
                       const tabs = editor.getLayerTabs ? editor.getLayerTabs(activeLayer.type) : [];
                       if (tabs && tabs.length >= 8) {
-                        toast({ title: 'Maximum tabs reached', description: 'You can have up to 8 tabs per layer.', variant: 'destructive' });
+                        toastInvoke({ title: 'Maximum tabs reached', description: 'You can have up to 8 tabs per layer.', variant: 'destructive' });
                         return;
                       }
                       const newId = editor.createLayerTab(activeLayer.type);
@@ -115,7 +176,7 @@ const BrushToolbar = ({
                           if (isNpc) {
                             onOpenActorDialog('npc');
                           } else {
-                            toast({ title: 'Not implemented', description: 'Create Event will be implemented later.' });
+                                toastInvoke({ title: 'Not implemented', description: 'Create Event will be implemented later.' });
                           }
                         }}
                         role="button"
@@ -140,21 +201,27 @@ const BrushToolbar = ({
                         accept="image/png"
                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                         onChange={async (event) => {
-                          console.log('[DEBUG] BrushToolbar file input onChange fired');
+                          const file = event.target.files?.[0];
+                          if (!file) return;
+                          if (file.type !== 'image/png') {
+                            toastInvoke({ title: 'Invalid file', description: 'Please select a PNG image', variant: 'destructive' });
+                            return;
+                          }
+
+                          console.log('[DEBUG] BrushToolbar: importing PNG file', file.name);
+
+                          // Resolve current editor and active layer (fall back to appCtx/editor-derived)
                           let currentEditor = editorRef.current;
                           let currentActiveLayer = activeLayerRef.current;
-                          console.log('[DEBUG] BrushToolbar: Using refs - editor =', !!currentEditor, 'activeLayer =', !!currentActiveLayer, 'activeLayer.type =', currentActiveLayer?.type);
-                          // If refs are not set (props were null/stale), attempt to read from app context
                           if (!currentEditor || !currentActiveLayer) {
                             console.log('[DEBUG] BrushToolbar: refs empty, trying app context fallback');
                             if (appCtx) {
                               currentEditor = (appCtx?.tileset?.editor ?? appCtx?.editor) as TileMapEditor | null;
-                              currentActiveLayer = (appCtx?.tileset?.activeLayer ?? appCtx?.activeLayer) as TileLayer | null;
-                              console.log('[DEBUG] BrushToolbar: appCtx fallback - editor =', !!currentEditor, 'activeLayer =', !!currentActiveLayer, 'activeLayer.type =', currentActiveLayer?.type);
+                              currentActiveLayer = (appCtx?.tileset?.activeLayer ?? appCtx?.activeLayer) as any;
+                              console.log('[DEBUG] BrushToolbar: appCtx fallback - editor =', !!currentEditor, 'activeLayer =', !!currentActiveLayer);
                             }
                           }
-
-                          // Final fallback: attempt to derive active layer from editor internals
+                          // Final editor-derived fallback
                           if (!currentActiveLayer && currentEditor) {
                             try {
                               const currentLayerType = currentEditor.getCurrentLayerType ? currentEditor.getCurrentLayerType() : null;
@@ -162,44 +229,62 @@ const BrushToolbar = ({
                               const byType = currentEditor.tileLayers ? currentEditor.tileLayers.find((l: any) => l.type === currentLayerType) : null;
                               currentActiveLayer = byId || byType || null;
                               console.log('[DEBUG] BrushToolbar: editor-derived fallback - activeLayer found byId=', !!byId, 'byType=', !!byType, 'currentLayerType=', currentLayerType);
-                            } catch (e) {
-                              console.warn('[DEBUG] BrushToolbar: editor-derived fallback failed', e);
-                            }
+                            } catch (e) { console.warn('[DEBUG] BrushToolbar: editor-derived fallback failed', e); }
                           }
 
                           if (!currentEditor || !currentActiveLayer) {
-                            console.log('[DEBUG] BrushToolbar: Missing editor or activeLayer after fallback, returning - editor exists:', !!currentEditor, 'activeLayer exists:', !!currentActiveLayer);
+                            toastInvoke({ title: 'No editor', description: 'Editor or active layer not available', variant: 'destructive' });
                             return;
                           }
-                          const file = event.target.files?.[0];
-                          console.log('[DEBUG] BrushToolbar: file =', file?.name);
-                          if (!file) return;
-                          const layerType = currentActiveLayer.type;
-                          console.log('[DEBUG] BrushToolbar: layerType =', layerType);
-                          if (layerType === 'background' || layerType === 'object') {
-                            console.log('[DEBUG] BrushToolbar: Is background/object layer, using importBrushImageToLayerTab');
+
+                          try {
+                            const layerType = currentActiveLayer.type;
+                            // Ensure there is an active tab for the layer
                             const tabs = currentEditor.getLayerTabs ? currentEditor.getLayerTabs(layerType) : [];
                             let targetTabId = currentEditor.getActiveLayerTabId ? currentEditor.getActiveLayerTabId(layerType) : null;
-                            console.log('[DEBUG] BrushToolbar: tabs count =', tabs?.length, 'activeTabId =', targetTabId);
                             if (typeof targetTabId !== 'number' || targetTabId === null) {
                               if (tabs && tabs.length >= 8) {
-                                console.log('[DEBUG] BrushToolbar: Max tabs reached');
-                                toast({ title: 'Maximum tabs reached', description: 'You can have up to 8 tabs per layer.', variant: 'destructive' });
+                                toastInvoke({ title: 'Maximum tabs reached', description: 'You can have up to 8 tabs per layer.', variant: 'destructive' });
                                 return;
                               }
-                              console.log('[DEBUG] BrushToolbar: Creating new tab');
                               targetTabId = currentEditor.createLayerTab(layerType);
-                              console.log('[DEBUG] BrushToolbar: Created tab with id =', targetTabId);
                               currentEditor.setActiveLayerTab(layerType, targetTabId);
                             }
-                            console.log('[DEBUG] BrushToolbar: Calling importBrushImageToLayerTab with tabId =', targetTabId);
+
+                            // Import into the editor/tab so it persists
                             await currentEditor.importBrushImageToLayerTab(layerType, targetTabId, file);
-                            console.log('[DEBUG] BrushToolbar: importBrushImageToLayerTab completed, calling refreshTilePalette');
-                            currentEditor.refreshTilePalette(true);
-                            setTabTick(t => t + 1);
-                          } else {
-                            console.log('[DEBUG] BrushToolbar: Not background/object, using onFileUpload');
-                            onFileUpload(event as React.ChangeEvent<HTMLInputElement>, 'layerTileset');
+
+                            // Compute placement origin (snap to 32) based on current viewport/zoom and set on the tab
+                            try {
+                              const container = document.getElementById('tilesContainer');
+                              const wrapper = container ? container.closest('.tile-palette') as HTMLElement | null : null;
+                              const computed = wrapper ? getComputedStyle(wrapper) : null;
+                              const zoomVal = computed && computed.zoom ? parseFloat(computed.zoom as string) || 1 : 1;
+                              const scrollLeft = wrapper ? wrapper.scrollLeft : 0;
+                              const scrollTop = wrapper ? wrapper.scrollTop : 0;
+                              const contentX = Math.round((scrollLeft / zoomVal) / 32) * 32;
+                              const contentY = Math.round((scrollTop / zoomVal) / 32) * 32;
+                              const tabs = currentEditor.getLayerTabs ? currentEditor.getLayerTabs(layerType) : [];
+                              const tab = tabs.find(t => t.id === targetTabId);
+                              if (tab && tab.tileset) {
+                                (tab.tileset as unknown as { originX?: number }).originX = contentX;
+                                (tab.tileset as unknown as { originY?: number }).originY = contentY;
+                              }
+                            } catch (e) { console.warn('Failed to set tab origin after import', e); }
+
+                            // Ensure tab is active and refresh palette
+                            console.log('[DEBUG] BrushToolbar: After import, setting active tab and refreshing palette');
+                            currentEditor.setActiveLayerTab(layerType, targetTabId);
+                            // Note: We no longer call refreshTilePalette - React handles rendering via tabTick
+                            
+                            // Increment tabTick to trigger TilesetPalette effect
+                            console.log('[DEBUG] BrushToolbar: Incrementing tabTick to refresh TilesetPalette');
+                            safeIncrementTabTick();
+                            
+                            toastInvoke({ title: 'Imported', description: 'Imported tileset saved to layer tab.' });
+                          } catch (err) {
+                            console.warn('[DEBUG] BrushToolbar: Import into editor failed', err);
+                            toastInvoke({ title: 'Import failed', description: 'Unable to import into editor', variant: 'destructive' });
                           }
                         }}
                       />
@@ -208,43 +293,47 @@ const BrushToolbar = ({
                 );
               })()}
             </div>
+            {/* Zoom In button */}
             <div className="flex-shrink-0 overflow-visible transition-all duration-300 ease-out opacity-100 scale-100 max-w-[2.5rem] w-auto">
-              <Tooltip content="Move/Reorder brushes">
+              <Tooltip content={`Zoom In${zoom ? ` (${Math.round(zoom * 100)}%)` : ''}`}>
                 <Button
-                  variant={brushTool === 'move' ? 'default' : 'outline'}
+                  variant="outline"
                   size="sm"
                   className="text-xs px-1 py-1 h-6 shadow-sm"
-                  onClick={() => onToggleBrushTool('move')}
+                  onClick={() => onZoomIn?.()}
                 >
-                  <Scan className="w-3 h-3" />
+                  <ZoomIn className="w-3 h-3" />
                 </Button>
               </Tooltip>
             </div>
+            {/* Zoom Out button */}
             <div
-              className={`flex-shrink-0 overflow-hidden transition-all duration-300 ease-out ${expanded || brushTool === 'merge' ? 'opacity-100 scale-100 max-w-[2.5rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
+              className={`flex-shrink-0 overflow-hidden transition-all duration-300 ease-out ${expanded ? 'opacity-100 scale-100 max-w-[2.5rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
             >
-              <Tooltip content="Merge brushes">
+              <Tooltip content={`Zoom Out${zoom ? ` (${Math.round(zoom * 100)}%)` : ''}`}>
                 <Button
-                  variant={brushTool === 'merge' ? 'default' : 'outline'}
+                  variant="outline"
                   size="sm"
                   className="text-xs px-1 py-1 h-6 shadow-sm"
-                  onClick={() => onToggleBrushTool('merge')}
+                  onClick={() => onZoomOut?.()}
                 >
-                  <Link2 className="w-3 h-3" />
+                  <ZoomOut className="w-3 h-3" />
                 </Button>
               </Tooltip>
             </div>
+            {/* Clear Selection button */}
             <div
-              className={`flex-shrink-0 overflow-hidden transition-all duration-300 ease-out ${expanded || brushTool === 'separate' ? 'opacity-100 scale-100 max-w-[2.5rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
+              className={`flex-shrink-0 overflow-hidden transition-all duration-300 ease-out ${(expanded || hasSelection) ? 'opacity-100 scale-100 max-w-[2.5rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
             >
-              <Tooltip content="Separate brushes">
+              <Tooltip content="Clear Selection">
                 <Button
-                  variant={brushTool === 'separate' ? 'default' : 'outline'}
+                  variant={hasSelection ? 'default' : 'outline'}
                   size="sm"
                   className="text-xs px-1 py-1 h-6 shadow-sm"
-                  onClick={() => onToggleBrushTool('separate')}
+                  onClick={() => onClearSelection?.()}
+                  disabled={!hasSelection}
                 >
-                  <Scissors className="w-3 h-3" />
+                  <XCircle className="w-3 h-3" />
                 </Button>
               </Tooltip>
             </div>

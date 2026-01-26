@@ -25,24 +25,11 @@ export default function useTileset(editor: TileMapEditor | null, activeLayer: Ti
   }, [editor, layerType, setTabTick]);
 
   const handleFileUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>, type: 'tileset' | 'layerTileset') => {
+    // Importing is currently disabled per request — keep as a no-op to avoid accidental imports.
     const file = event.target.files?.[0];
     if (!file) return;
-    console.log('[DEBUG] useTileset.handleFileUpload: File selected -', file.name, 'type =', type);
-    try {
-      if (editor && typeof editor.handleFileUpload === 'function') {
-        console.log('[DEBUG] useTileset.handleFileUpload: Calling editor.handleFileUpload');
-        editor.handleFileUpload(file, type);
-        // In many cases the editor will load the image asynchronously; schedule a short
-        // delayed refresh so the palette is rebuilt once the image has loaded and the
-        // DOM container is available.
-        setTimeout(() => {
-          console.log('[DEBUG] useTileset.handleFileUpload: Delayed refresh after 120ms');
-          try { editor.refreshTilePalette(true); } catch (err) { console.warn('[DEBUG] useTileset: Delayed refresh failed:', err); }
-        }, 120);
-      }
-    } catch (e) {
-      console.warn('[DEBUG] useTileset.handleFileUpload: Exception:', e);
-    }
+    console.log('[DEBUG] useTileset.handleFileUpload: Import disabled - ignoring file', file.name);
+    return;
   }, [editor]);
 
   const deleteActiveTab = useCallback(() => {

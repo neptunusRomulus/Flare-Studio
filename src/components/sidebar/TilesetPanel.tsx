@@ -1,10 +1,14 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import TilesetPalette from '@/components/TilesetPalette';
 import BrushToolbar from '@/components/BrushToolbar';
 import type { TileLayer } from '@/types';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 
 import useTileset from '@/hooks/useTileset';
+
+const MIN_ZOOM = 0.25;
+const MAX_ZOOM = 4;
+const ZOOM_STEP = 0.25;
 
 type Props = {
   editor: TileMapEditor | null;
@@ -46,9 +50,44 @@ const TilesetPanel: React.FC<Props> = ({
   const handleFileUpload = propHandleFileUpload ?? tileset.handleFileUpload;
   const handleDeleteActiveTab = propHandleDeleteActiveTab ?? (() => { void tileset.deleteActiveTab(); });
 
+  // Zoom state lifted from TilesetPalette
+  const [zoom, setZoom] = useState<number>(1);
+  const [hasSelection, setHasSelection] = useState<boolean>(false);
+  const [clearSelectionFn, setClearSelectionFn] = useState<(() => void) | null>(null);
+
+  const handleZoomIn = useCallback(() => {
+    setZoom(prev => Math.min(MAX_ZOOM, prev + ZOOM_STEP));
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    setZoom(prev => Math.max(MIN_ZOOM, prev - ZOOM_STEP));
+  }, []);
+
+  const handleClearSelection = useCallback(() => {
+    if (clearSelectionFn) {
+      clearSelectionFn();
+    }
+  }, [clearSelectionFn]);
+
+  // Handler for selection changes from TilesetPalette
+  const handleSelectionChange = useCallback((hasSel: boolean, clearFn: () => void) => {
+    setHasSelection(hasSel);
+    setClearSelectionFn(() => clearFn);
+  }, []);
+
   return (
     <>
-      <TilesetPalette editor={editor} activeLayer={activeLayer} tabTick={tabTick} setTabTick={setTabTick} brushTool={brushTool} stampsState={stampsState} />
+      <TilesetPalette
+        editor={editor}
+        activeLayer={activeLayer}
+        tabTick={tabTick}
+        setTabTick={setTabTick}
+        brushTool={brushTool}
+        stampsState={stampsState}
+        zoom={zoom}
+        setZoom={setZoom}
+        onSelectionChange={handleSelectionChange}
+      />
 
       <BrushToolbar
         editor={editor}
@@ -61,6 +100,11 @@ const TilesetPanel: React.FC<Props> = ({
         onToggleBrushTool={handleToggleBrushTool}
         onDeleteActiveTab={handleDeleteActiveTab}
         toast={toast}
+        onZoomIn={handleZoomIn}
+        onZoomOut={handleZoomOut}
+        onClearSelection={handleClearSelection}
+        hasSelection={hasSelection}
+        zoom={zoom}
       />
     </>
   );

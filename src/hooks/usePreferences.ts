@@ -39,6 +39,6 @@ export default function usePreferences() {
     isDarkMode,
     setIsDarkMode,
     showSidebarToggle,
-    setShowSidebarToggle,
+    setShowSidebarToggle
   } as const;
 }

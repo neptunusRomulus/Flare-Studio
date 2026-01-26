@@ -1,5 +1,6 @@
 import { Button } from '@/components/ui/button';
-import { Moon, Sun, Target, X } from 'lucide-react';
+import { Moon, Sun, Target, X, HelpCircle } from 'lucide-react';
+import Tooltip from '@/components/ui/tooltip';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 import type { Dispatch, SetStateAction } from 'react';
 
@@ -30,7 +31,7 @@ const EngineSettingsDialog = ({
   showSidebarToggle,
   setShowSidebarToggle
 }: EngineSettingsDialogProps) => {
-  if (!open) return null;
+  if (!open) return null; 
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -155,6 +156,8 @@ const EngineSettingsDialog = ({
             </div>
             <p className="text-xs text-gray-500 mt-1">Toggle whether the Active GID badge is visible next to the hover coordinates.</p>
           </div>
+
+
           <div>
             <label className="block text-sm font-medium mb-2">Sidebar Collapse Button</label>
             <div className="flex items-center gap-2">

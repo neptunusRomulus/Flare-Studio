@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import Tooltip from '@/components/ui/tooltip';
 import type { TileLayer } from '@/types';
@@ -47,7 +47,10 @@ const LayersPanel: React.FC<Props> = ({
   handleLayerTransparencyChange,
   leftCollapsed
 }) => {
-  const [lastClicked, setLastClicked] = useState<number | null>(null);
+  useEffect(() => {
+    try { console.log('[DEBUG] LayersPanel: activeLayerId =', activeLayerId); } catch (e) { /* ignore */ }
+  }, [activeLayerId]);
+
   return (
     <section
       className="mb-0 flex-shrink-0 flex flex-col justify-center h-auto"
@@ -56,12 +59,7 @@ const LayersPanel: React.FC<Props> = ({
       tabIndex={0}
     >
       <div className="mb-2 w-full flex flex-col justify-center h-full">
-        {/* Debug badge - temporary */}
-        <div style={{ position: 'absolute', left: 12, top: 12, zIndex: 1000 }}>
-          <div style={{ background: 'rgba(0,0,0,0.6)', color: 'white', padding: '4px 8px', borderRadius: 6, fontSize: 12 }}>
-            Active: {String(activeLayerId)} {lastClicked !== null ? `· Clicked: ${lastClicked}` : ''}
-          </div>
-        </div>
+        {/* Active badge removed — using console log in useEffect instead */}
         <div className="h-auto overflow-hidden flex flex-col justify-center w-full">
           <div className="space-y-0.5 h-auto overflow-y-visible flex flex-col justify-center w-full">
             {layers.filter(layer => layer.type !== 'actions').map((layer) => {

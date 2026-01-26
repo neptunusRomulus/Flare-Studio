@@ -71,6 +71,8 @@ export interface SavedTilesetEntry {
   margin?: number;
   sourcePath?: string | null;
   detectedTiles?: SerializedDetectedTile[];
+  originX?: number;
+  originY?: number;
 }
 
 export interface EditorProjectData {
@@ -185,6 +187,17 @@ export class TileMapEditor {
     if (this.tilesetImage) {
       console.log('[DEBUG] TileMapEditor.refreshTilePalette: Calling createTilePalette');
       this.createTilePalette(preserveOrder);
+
+      // After palette is created, ensure any tab tileset origin overlay is rendered for user placement
+      try {
+        const container = document.getElementById('tilesContainer');
+        if (container) {
+          // Remove any leftover overlays or full-image/grid nodes, since
+          // the palette rendering path now owns adding the grid/image.
+          const prev = container.querySelectorAll('.tileset-overlay, .tileset-grid-overlay, .tileset-full-image, .tileset-grid-spacer');
+          prev.forEach(n => n.remove());
+        }
+      } catch (e) { console.warn('Failed to clean previous overlays', e); }
     } else {
       console.log('[DEBUG] TileMapEditor.refreshTilePalette: No tilesetImage, skipping createTilePalette');
     }
@@ -3093,8 +3106,8 @@ export class TileMapEditor {
   }
 
   // Public methods for React to interact with
-  public handleFileUpload(file: File, type: 'tileset' | 'layerTileset'): void {
-    console.log('[DEBUG] handleFileUpload called', { fileName: file.name, type });
+  public handleFileUpload(file: File, type: 'tileset' | 'layerTileset', options?: { skipAutoSlice?: boolean }): void {
+    console.log('[DEBUG] handleFileUpload called', { fileName: file.name, type, options });
     if (type === 'tileset') {
       // Treat uploads as layer-specific by default: assign to active layer's tileset
       const reader = new FileReader();
@@ -3113,6 +3126,37 @@ export class TileMapEditor {
           const activeLayer = this.tileLayers.find(l => l.id === this.activeLayerId);
           console.log('[DEBUG] handleFileUpload: activeLayer.type =', activeLayer?.type);
           if (activeLayer) {
+            // If caller requested to skip autoslice, store minimal tileset on the active tab
+            if (options && options.skipAutoSlice) {
+              console.log('[DEBUG] handleFileUpload: skipAutoSlice requested - storing minimal tab tileset only');
+              // Find active tab and set its tileset without applying to layerTilesets or palette
+              const tabs = this.layerTabs.get(activeLayer.type) || [];
+              const activeTabId = this.layerActiveTabId.get(activeLayer.type);
+              const tab = tabs.find(t => t.id === activeTabId);
+              const tilesetEntry: LayerTilesetEntry = {
+                image: img,
+                fileName: file.name,
+                columns,
+                rows,
+                count,
+                tileWidth,
+                tileHeight,
+                spacing: 0,
+                margin: 0,
+                sourcePath: this.extractFileSourcePath(file)
+              };
+              if (tab) {
+                tab.tileset = tilesetEntry;
+                console.log('[DEBUG] handleFileUpload: stored minimal tileset on active tab', { layerType: activeLayer.type, tabId: tab.id });
+              } else {
+                // fallback: store in layerTilesets but do not apply/palette
+                this.layerTilesets.set(activeLayer.type, tilesetEntry);
+                console.log('[DEBUG] handleFileUpload: no active tab, stored minimal tileset into layerTilesets for layer', activeLayer.type);
+              }
+              this.draw();
+              return;
+            }
+
             // Store tileset under the active layer so tilesets are per-layer (and thus per-map/tab)
             console.log('[DEBUG] handleFileUpload: Storing tileset in layerTilesets for layer type:', activeLayer.type);
             this.layerTilesets.set(activeLayer.type, {
@@ -3206,6 +3250,145 @@ export class TileMapEditor {
     
     this.hideCollisionBrushTooltip(true);
 
+    // If the active tab contains a full imported tileset image, show it large with
+    // a semi-transparent square grid overlay and enable scrolling instead of the
+    // standard sliced tile canvases. This makes the imported photo large and
+    // scrollable per the user's request.
+    try {
+      // Ensure container participates in layout and can scroll
+      container.style.position = 'relative';
+      container.style.overflow = 'auto';
+
+      const activeLayer = this.tileLayers.find(l => l.id === this.activeLayerId);
+      if (activeLayer) {
+        const tabs = this.layerTabs.get(activeLayer.type) || [];
+        const activeTabId = this.layerActiveTabId.get(activeLayer.type);
+        const tab = tabs.find(t => t.id === activeTabId);
+        if (tab && tab.tileset && tab.tileset.image) {
+          console.log('[DEBUG] createTilePalette: Found active tab with tileset image (using big-image view)');
+
+          // Append a full-size image so container scrollbars appear for large images
+          const fullImg = (tab.tileset.image.cloneNode(true) as HTMLImageElement);
+          fullImg.className = 'tileset-full-image';
+          fullImg.draggable = false;
+          fullImg.style.display = 'block';
+          fullImg.style.position = 'absolute';
+          fullImg.style.left = '0';
+          fullImg.style.top = '0';
+          fullImg.style.maxWidth = 'none';
+          fullImg.style.maxHeight = 'none';
+          fullImg.style.userSelect = 'none';
+          fullImg.style.pointerEvents = 'none';
+          // Ensure the full-size image sits above the UI overlay but below the SVG grid overlay
+          fullImg.style.zIndex = '500';
+
+          // Remove any previous grid overlay remnants
+          const prevGrid = container.querySelectorAll('.tileset-grid-overlay, .tileset-full-image');
+          prevGrid.forEach(n => n.remove());
+
+          // append image first so scrollbars appear
+          container.appendChild(fullImg);
+
+          // Use the original tab.tileset.image to read natural sizes (more reliable)
+          const srcImg = tab.tileset.image as HTMLImageElement;
+          const imgW = (srcImg.naturalWidth || srcImg.width || (fullImg.naturalWidth || (fullImg as HTMLImageElement).width || 0));
+          const imgH = (srcImg.naturalHeight || srcImg.height || (fullImg.naturalHeight || (fullImg as HTMLImageElement).height || 0));
+
+          console.log('[DEBUG] createTilePalette: tileset image size', { imgW, imgH });
+
+          // If sizes are not yet available, wait for the image to load and re-run overlay setup
+          if (imgW <= 0 || imgH <= 0) {
+            fullImg.addEventListener('load', () => { try { this.refreshTilePalette(true); } catch (err) { void err; } });
+            // still return; on next refresh we'll build the grid
+            return;
+          }
+
+          const NS = 'http://www.w3.org/2000/svg';
+          const svg = document.createElementNS(NS, 'svg');
+          svg.setAttribute('width', String(imgW));
+          svg.setAttribute('height', String(imgH));
+          svg.setAttribute('viewBox', `0 0 ${imgW} ${imgH}`);
+          svg.classList.add('tileset-grid-overlay');
+          svg.style.position = 'absolute';
+          svg.style.left = '0';
+          svg.style.top = '0';
+          svg.style.zIndex = '1000';
+          svg.style.pointerEvents = 'auto';
+
+          const cell = this.tileSizeX || 32; // square grid size (fallback 32)
+          const cols = Math.ceil(imgW / cell);
+          const rows = Math.ceil(imgH / cell);
+
+          // Base grid: lightweight rects with low contrast, pointer-events none so
+          // they do not intercept hover; we'll handle hover with a single highlight rect.
+          for (let ry = 0; ry < rows; ry++) {
+            for (let cx = 0; cx < cols; cx++) {
+              const r = document.createElementNS(NS, 'rect');
+              const x = cx * cell;
+              const y = ry * cell;
+              r.setAttribute('x', String(x));
+              r.setAttribute('y', String(y));
+              r.setAttribute('width', String(Math.min(cell, imgW - x)));
+              r.setAttribute('height', String(Math.min(cell, imgH - y)));
+// Base grid cell: no fill so underlying image remains visible; show light stroke lines
+                r.setAttribute('fill', 'rgba(255,255,255,0)');
+                r.setAttribute('stroke', 'rgba(0,0,0,0.12)');
+                r.setAttribute('stroke-width', '0.6');
+                r.style.pointerEvents = 'none';
+                svg.appendChild(r);
+              }
+            }
+
+            // Single highlight rect that moves on pointermove for hover effect
+            const highlight = document.createElementNS(NS, 'rect');
+            highlight.setAttribute('fill', 'rgba(255,255,255,0)');
+            highlight.setAttribute('stroke', 'rgba(0,0,0,0.14)');
+            highlight.setAttribute('stroke-width', '1');
+            highlight.style.transition = 'fill 120ms ease, stroke 120ms ease';
+            highlight.style.pointerEvents = 'none';
+            svg.appendChild(highlight);
+
+            const onPointerMove = (ev: PointerEvent) => {
+              const rect = svg.getBoundingClientRect();
+              const x = Math.floor((ev.clientX - rect.left) / cell) * cell;
+              const y = Math.floor((ev.clientY - rect.top) / cell) * cell;
+              if (x < 0 || y < 0 || x >= imgW || y >= imgH) {
+                highlight.setAttribute('fill', 'rgba(255,255,255,0)');
+                return;
+              }
+              highlight.setAttribute('x', String(x));
+              highlight.setAttribute('y', String(y));
+              highlight.setAttribute('width', String(Math.min(cell, imgW - x)));
+              highlight.setAttribute('height', String(Math.min(cell, imgH - y)));
+              // Slightly brighten the hovered square to indicate selection (50% requested on hover)
+              highlight.setAttribute('fill', 'rgba(255,255,255,0.5)');
+          };
+
+          const onPointerLeave = () => {
+            highlight.setAttribute('fill', 'rgba(255,255,255,0)');
+          };
+
+          svg.addEventListener('pointermove', onPointerMove);
+          svg.addEventListener('pointerleave', onPointerLeave);
+
+          container.appendChild(svg);
+
+          // Ensure scrollbars reflect full image size by expanding a spacer div
+          const spacer = document.createElement('div');
+          spacer.style.width = `${imgW}px`;
+          spacer.style.height = `${imgH}px`;
+          spacer.style.pointerEvents = 'none';
+          spacer.className = 'tileset-grid-spacer';
+          container.appendChild(spacer);
+
+          console.log('[DEBUG] createTilePalette: Appended full image + grid overlay');
+
+          // Skip the rest of the palette rendering - we're showing the big image view
+          return;
+        }
+      }
+    } catch (err) { void err; }
+
     const activePaletteLayer = this.tileLayers.find(l => l.id === this.activeLayerId);
     const isCollisionPalette = activePaletteLayer?.type === COLLISION_LAYER_TYPE;
 
@@ -3235,8 +3418,11 @@ export class TileMapEditor {
         const gridTiles: Array<{ index: number; sourceX: number; sourceY: number; width: number; height: number }> = [];
         for (let ry = 0; ry < rows; ry++) {
           for (let cx = 0; cx < cols; cx++) {
-            const sx = Math.round(cx * tileW);
-            const sy = Math.round(ry * tileH);
+            // Account for optional tileset origin offset when slicing
+            const originX = (this as unknown as { tilesetOriginX?: number }).tilesetOriginX ?? 0;
+            const originY = (this as unknown as { tilesetOriginY?: number }).tilesetOriginY ?? 0;
+            const sx = Math.round(originX + cx * tileW);
+            const sy = Math.round(originY + ry * tileH);
             const w = Math.min(tileW, this.tilesetImage.width - sx);
             const h = Math.min(tileH, this.tilesetImage.height - sy);
             gridTiles.push({ index: idx++, sourceX: sx, sourceY: sy, width: w, height: h });
@@ -5355,8 +5541,8 @@ export class TileMapEditor {
   }
 
   // Layer-specific tileset management - now scoped per active tab
-  public setLayerTileset(layerType: string, file: File): void {
-    console.log('setLayerTileset called', { layerType, fileName: file.name });
+  public setLayerTileset(layerType: string, file: File, options?: { skipApply?: boolean }): void {
+    console.log('setLayerTileset called', { layerType, fileName: file.name, options });
     const gidSnapshotBefore = this.snapshotLayerGids();
     const image = new Image();
     image.onload = () => {
@@ -5388,18 +5574,26 @@ export class TileMapEditor {
       if (activeTab) {
         console.log(`setLayerTileset: storing tileset in tab ${activeTabId} for layer ${layerType}`);
         activeTab.tileset = tilesetEntry;
-        // Also update the shared layerTilesets for immediate display
-        this.layerTilesets.set(layerType, tilesetEntry);
+        if (!options || !options.skipApply) {
+          // Also update the shared layerTilesets for immediate display
+          this.layerTilesets.set(layerType, tilesetEntry);
+        } else {
+          console.log('setLayerTileset: skipApply requested - not applying tileset to shared layer state');
+        }
       } else {
         // Fallback to shared state if no active tab (shouldn't happen normally)
         console.warn(`setLayerTileset: no active tab found for ${layerType}, using shared state`);
         this.layerTilesets.set(layerType, tilesetEntry);
       }
 
-      // Update current tileset if this is the active layer
-      const activeLayer = this.tileLayers.find(l => l.id === this.activeLayerId);
-      if (activeLayer && activeLayer.type === layerType) {
-        this.updateCurrentTileset(layerType);
+      // Update current tileset if this is the active layer (only if not skipping apply)
+      if ((!options || !options.skipApply)) {
+        const activeLayer = this.tileLayers.find(l => l.id === this.activeLayerId);
+        if (activeLayer && activeLayer.type === layerType) {
+          this.updateCurrentTileset(layerType);
+        }
+      } else {
+        console.log('setLayerTileset: not updating current tileset due to skipApply');
       }
 
       const gidSnapshotAfter = this.snapshotLayerGids();
@@ -5653,6 +5847,9 @@ export class TileMapEditor {
       this.tilesetSpacing = tileset.spacing ?? 0;
       this.tilesetMargin = tileset.margin ?? 0;
       this.tilesetSourcePath = tileset.sourcePath ?? this.tilesetSourcePath;
+      // Apply optional origin offset for palette placement (stored on tab.tileset.originX/Y)
+      (this as unknown as { tilesetOriginX?: number }).tilesetOriginX = (tileset as unknown as { originX?: number }).originX ?? 0;
+      (this as unknown as { tilesetOriginY?: number }).tilesetOriginY = (tileset as unknown as { originY?: number }).originY ?? 0;
       
       // Update the global detectedTileData to match this layer's tiles
       const layerTiles = this.layerTileData.get(layerType);
@@ -6936,7 +7133,9 @@ export class TileMapEditor {
               spacing: t.tileset.spacing,
               margin: t.tileset.margin,
               sourcePath: t.tileset.sourcePath ?? null,
-              detectedTiles: t.detectedTiles ? Array.from(t.detectedTiles.entries()) : undefined
+              detectedTiles: t.detectedTiles ? Array.from(t.detectedTiles.entries()) : undefined,
+              originX: (t.tileset as unknown as { originX?: number }).originX,
+              originY: (t.tileset as unknown as { originY?: number }).originY
             };
           } else if (t.detectedTiles && t.detectedTiles.size > 0) {
             ser.detectedTiles = Array.from(t.detectedTiles.entries());
@@ -7660,6 +7859,9 @@ export class TileMapEditor {
                   margin: t.tileset.margin ?? 0,
                   sourcePath: t.tileset.sourcePath ?? null
                 };
+                // restore optional origin if present
+                try { (ts as unknown as { originX?: number }).originX = (t.tileset as unknown as { originX?: number }).originX ?? 0; } catch (err) { void err; }
+                try { (ts as unknown as { originY?: number }).originY = (t.tileset as unknown as { originY?: number }).originY ?? 0; } catch (err) { void err; }
                 // If we have a tileset image embedded in projectData.tilesetImages,
                 // create an Image and attach to the tab so switching to the tab
                 // restores the palette without relying on global editor state.

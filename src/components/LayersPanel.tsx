@@ -55,7 +55,12 @@ const LayersPanel: React.FC<Props> = ({
     <section
       className="mb-0 flex-shrink-0 flex flex-col justify-center h-auto"
       onMouseEnter={() => setLayersPanelExpanded(true)}
-      onMouseLeave={() => setLayersPanelExpanded(false)}
+      onMouseLeave={() => {
+        try {
+          if ((window as any).__preventLayersAutoCollapse) return;
+        } catch (e) { /* ignore */ }
+        setLayersPanelExpanded(false);
+      }}
       tabIndex={0}
     >
       <div className="mb-2 w-full flex flex-col justify-center h-full">

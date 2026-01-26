@@ -1528,6 +1528,9 @@ export class TileMapEditor {
             this.handleActorDrag(tileCoords.x, tileCoords.y);
           } else if (this.tool === 'tiles') {
             this.handleTileClick(tileCoords.x, tileCoords.y, false);
+          } else if (this.tool === 'stamp' && this.currentStampMode === 'place' && this.activeStamp) {
+            // Allow painting with stamp while dragging (make selection behave like a brush)
+            this.placeStamp(tileCoords.x, tileCoords.y);
           } else if (this.isSelecting) {
             this.handleSelectionDrag(tileCoords.x, tileCoords.y);
           } else if (this.isDrawingShape) {
@@ -3332,8 +3335,8 @@ export class TileMapEditor {
               r.setAttribute('height', String(Math.min(cell, imgH - y)));
 // Base grid cell: no fill so underlying image remains visible; show light stroke lines
                 r.setAttribute('fill', 'rgba(255,255,255,0)');
-                r.setAttribute('stroke', 'rgba(0,0,0,0.12)');
-                r.setAttribute('stroke-width', '0.6');
+                r.setAttribute('stroke', 'rgba(0,0,0,0.06)');
+                r.setAttribute('stroke-width', '0.4');
                 r.style.pointerEvents = 'none';
                 svg.appendChild(r);
               }
@@ -3361,7 +3364,7 @@ export class TileMapEditor {
               highlight.setAttribute('width', String(Math.min(cell, imgW - x)));
               highlight.setAttribute('height', String(Math.min(cell, imgH - y)));
               // Slightly brighten the hovered square to indicate selection (50% requested on hover)
-              highlight.setAttribute('fill', 'rgba(255,255,255,0.5)');
+              highlight.setAttribute('fill', 'rgba(255,255,255,0.25)');
           };
 
           const onPointerLeave = () => {
@@ -5105,6 +5108,89 @@ export class TileMapEditor {
     return true;
   }
 
+  /**
+   * Create a stamp from a tileset palette selection and activate it for placement.
+   * Expected selection shape: { x, y, width, height, cols, rows } where sizes are pixels
+   */
+  public setTileSelection(selection: { x: number; y: number; width: number; height: number; cols: number; rows: number; tileWidth?: number; tileHeight?: number }): boolean {
+    if (!selection || !this.tilesetImage) return false;
+
+    // Prefer tile size provided by the palette selection (UI), then per-tileset metadata, then editor defaults
+    const tileW = selection.tileWidth ?? this.tilesetTileWidth ?? this.tileSizeX;
+    const tileH = selection.tileHeight ?? this.tilesetTileHeight ?? this.tileSizeY;
+    const cols = this.tilesetColumns || Math.max(1, Math.floor(this.tilesetImage.width / tileW));
+
+    // compute starting cell indices in the tileset
+    const startCol = Math.round(selection.x / tileW);
+    const startRow = Math.round(selection.y / tileH);
+
+    console.log('[DEBUG] setTileSelection: input=', selection);
+    console.log('[DEBUG] setTileSelection: tileW=', tileW, 'tileH=', tileH, 'tilesetCols=', cols);
+    console.log('[DEBUG] setTileSelection: startCol=', startCol, 'startRow=', startRow);
+    console.log('[DEBUG] setTileSelection: selection.cols=', selection.cols, 'selection.rows=', selection.rows);
+    console.log('[DEBUG] setTileSelection: detectedTileData.size=', this.detectedTileData.size);
+
+    const stampTiles: import('../types').StampTile[] = [];
+    const currentLayerId = this.activeLayerId || 0;
+
+    for (let ry = 0; ry < selection.rows; ry++) {
+      for (let cx = 0; cx < selection.cols; cx++) {
+        const cellCol = startCol + cx;
+        const cellRow = startRow + ry;
+        if (cellCol < 0 || cellRow < 0) continue;
+
+        // More robust mapping: match detected tiles by source coordinates
+        const expectedX = Math.round(cellCol * tileW);
+        const expectedY = Math.round(cellRow * tileH);
+        let foundGid: number | null = null;
+        for (const [dGid, data] of this.detectedTileData.entries()) {
+          if (Math.abs((data.sourceX || 0) - expectedX) <= 2 && Math.abs((data.sourceY || 0) - expectedY) <= 2) {
+            foundGid = dGid;
+            break;
+          }
+        }
+
+        if (foundGid !== null) {
+          console.log('[DEBUG] setTileSelection: found gid', foundGid, 'for cell (', cx, ',', ry, ') tilesetPos (', cellCol, ',', cellRow, ')');
+          stampTiles.push({ tileId: foundGid, layerId: currentLayerId, x: cx, y: ry });
+        } else {
+          // Fallback: if no detected tile mapping exists, compute gid by grid index
+          if (this.detectedTileData.size === 0) {
+            const gidFallback = cellRow * cols + cellCol + 1;
+            console.log('[DEBUG] setTileSelection: fallback gid', gidFallback, 'for cell (', cx, ',', ry, ') tilesetPos (', cellCol, ',', cellRow, ')');
+            stampTiles.push({ tileId: gidFallback, layerId: currentLayerId, x: cx, y: ry });
+          } else {
+            // No mapping for this cell; push a placeholder (tileId 0) to preserve shape but skip placement later
+            console.log('[DEBUG] setTileSelection: no mapping for cell (', cx, ',', ry, ') tilesetPos (', cellCol, ',', cellRow, ') - using placeholder');
+            stampTiles.push({ tileId: 0, layerId: currentLayerId, x: cx, y: ry });
+          }
+        }
+      }
+    }
+
+    if (stampTiles.length === 0) return false;
+
+    const stamp: import('../types').Stamp = {
+      id: `tileset-${Date.now()}`,
+      name: 'Tileset Selection',
+      width: selection.cols,
+      height: selection.rows,
+      tiles: stampTiles
+    };
+
+    console.log('[DEBUG] setTileSelection: created stamp', stamp.id, 'tiles:', stamp.tiles.filter(t=>t.tileId>0).length, '/', stamp.tiles.length);
+    console.log('[DEBUG] setTileSelection: stamp details', stamp);
+    this.stamps.set(stamp.id, stamp);
+    // Activate stamp for placement and switch tool to stamp
+    this.setActiveStamp(stamp.id);
+    this.setStampTool();
+    if (this.stampCallback) {
+      this.stampCallback(Array.from(this.stamps.values()));
+    }
+
+    return true;
+  }
+
   public setActiveStamp(stampId: string | null): void {
     if (stampId && this.stamps.has(stampId)) {
       this.activeStamp = this.stamps.get(stampId)!;
@@ -5159,9 +5245,37 @@ export class TileMapEditor {
     }
 
     // Place each tile from the stamp
+    // For isometric maps: tileset is flat (orthogonal) but map is isometric
+    // Vertical selection in tileset (ry increases) → diagonal on map: both X and Y decrease
+    // Horizontal selection in tileset (cx increases) → other diagonal: X increases, Y decreases
+    const nonZeroTiles = this.activeStamp.tiles.filter(t => t.tileId !== 0).length;
+    console.log('[DEBUG] placeStamp: placing stamp', this.activeStamp.id, 'at grid', gridX, gridY, 
+      'size:', this.activeStamp.width, 'x', this.activeStamp.height, 'nonZeroTiles=', nonZeroTiles);
+    
     for (const stampTile of this.activeStamp.tiles) {
-      const targetX = gridX + stampTile.x;
-      const targetY = gridY + stampTile.y;
+      let targetX: number;
+      let targetY: number;
+      
+      if (this.orientation === 'isometric') {
+        // Isometric mapping:
+        // - Tileset column offset (cx): moves along one diagonal (+X, -Y)
+        // - Tileset row offset (ry): moves along other diagonal (+X, +Y) so top tile is at top visually
+        const cx = stampTile.x;
+        const ry = stampTile.y;
+        targetX = gridX + cx + ry;
+        targetY = gridY - cx + ry;
+      } else {
+        // Orthogonal: direct mapping
+        targetX = gridX + stampTile.x;
+        targetY = gridY + stampTile.y;
+      }
+      
+      // Bounds check for each tile
+      if (targetX < 0 || targetX >= this.mapWidth || targetY < 0 || targetY >= this.mapHeight) {
+        console.log('[DEBUG] placeStamp: tile out of bounds', targetX, targetY);
+        continue;
+      }
+      
       const targetIndex = targetY * this.mapWidth + targetX;
 
       // Find the target layer by ID, or use current active layer
@@ -5173,7 +5287,10 @@ export class TileMapEditor {
       }
 
       if (targetLayer) {
-        targetLayer.data[targetIndex] = stampTile.tileId;
+        // Skip placeholder tiles (tileId 0) so selection gaps don't erase existing map tiles
+        if (stampTile.tileId !== 0) {
+          targetLayer.data[targetIndex] = stampTile.tileId;
+        }
       }
     }
 

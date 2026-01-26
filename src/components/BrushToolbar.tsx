@@ -143,8 +143,8 @@ const BrushToolbar = ({
                     onClick={() => {
                       if (!editor || !activeLayer) return;
                       const tabs = editor.getLayerTabs ? editor.getLayerTabs(activeLayer.type) : [];
-                      if (tabs && tabs.length >= 8) {
-                        toastInvoke({ title: 'Maximum tabs reached', description: 'You can have up to 8 tabs per layer.', variant: 'destructive' });
+                      if (tabs && tabs.length >= 5) {
+                        toastInvoke({ title: 'Maximum tabs reached', description: 'You can have up to 5 tabs per layer.', variant: 'destructive' });
                         return;
                       }
                       const newId = editor.createLayerTab(activeLayer.type);
@@ -208,6 +208,15 @@ const BrushToolbar = ({
                             return;
                           }
 
+                          // Keep layers panel visible while importing to avoid hover-collapse
+                          try {
+                            // Set a global guard so UI mouseleave handlers can opt out
+                            try { (window as any).__preventLayersAutoCollapse = true; } catch (e) { void e; }
+                            if (appCtx && (appCtx as any).layersObj && typeof (appCtx as any).layersObj.setLayersPanelExpanded === 'function') {
+                              (appCtx as any).layersObj.setLayersPanelExpanded(true);
+                            }
+                          } catch (e) { void e; }
+
                           console.log('[DEBUG] BrushToolbar: importing PNG file', file.name);
 
                           // Resolve current editor and active layer (fall back to appCtx/editor-derived)
@@ -243,10 +252,10 @@ const BrushToolbar = ({
                             const tabs = currentEditor.getLayerTabs ? currentEditor.getLayerTabs(layerType) : [];
                             let targetTabId = currentEditor.getActiveLayerTabId ? currentEditor.getActiveLayerTabId(layerType) : null;
                             if (typeof targetTabId !== 'number' || targetTabId === null) {
-                              if (tabs && tabs.length >= 8) {
-                                toastInvoke({ title: 'Maximum tabs reached', description: 'You can have up to 8 tabs per layer.', variant: 'destructive' });
-                                return;
-                              }
+                              if (tabs && tabs.length >= 5) {
+                                  toastInvoke({ title: 'Maximum tabs reached', description: 'You can have up to 5 tabs per layer.', variant: 'destructive' });
+                                  return;
+                                }
                               targetTabId = currentEditor.createLayerTab(layerType);
                               currentEditor.setActiveLayerTab(layerType, targetTabId);
                             }
@@ -285,6 +294,10 @@ const BrushToolbar = ({
                           } catch (err) {
                             console.warn('[DEBUG] BrushToolbar: Import into editor failed', err);
                             toastInvoke({ title: 'Import failed', description: 'Unable to import into editor', variant: 'destructive' });
+                          }
+                          finally {
+                            // Clear the temporary guard so hover behavior resumes
+                            try { (window as any).__preventLayersAutoCollapse = false; } catch (e) { void e; }
                           }
                         }}
                       />
@@ -337,20 +350,7 @@ const BrushToolbar = ({
                 </Button>
               </Tooltip>
             </div>
-            <div
-              className={`flex-shrink-0 overflow-hidden transition-all duration-300 ease-out ${expanded || brushTool === 'remove' ? 'opacity-100 scale-100 max-w-[2.5rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
-            >
-              <Tooltip content="Remove brushes">
-                <Button
-                  variant={brushTool === 'remove' ? 'default' : 'outline'}
-                  size="sm"
-                  className="text-xs px-1 py-1 h-6 shadow-sm"
-                  onClick={() => onToggleBrushTool('remove')}
-                >
-                  <Trash2 className="w-3 h-3" />
-                </Button>
-              </Tooltip>
-            </div>
+            {/* Remove brushes button removed */}
             <div
               className={`flex-shrink-0 overflow-hidden transition-all duration-300 ease-out ${expanded ? 'opacity-100 scale-100 max-w-[2.5rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
             >

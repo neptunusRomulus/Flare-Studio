@@ -465,6 +465,59 @@ button:active:not(.no-click-effect) {
     transition: transform 0.1s ease-in-out;
 }
 
+/* Prevent numeric tabs from shrinking on active/focus */
+.tabs-scroll button.no-click-effect:active,
+.tabs-scroll button.no-click-effect:focus,
+.tabs-scroll button.no-click-effect:focus-visible,
+.tabs-scroll button:active,
+.tabs-scroll button:focus,
+.tabs-scroll button:focus-visible {
+    transform: none !important;
+}
+
+/* Additional explicit rule to ensure tab buttons don't scale when pressed */
+.tabs-scroll button.prevent-active-scale:active,
+.tabs-scroll button.prevent-active-scale:focus,
+.tabs-scroll button.prevent-active-scale:focus-visible {
+    transform: none !important;
+}
+/* Even higher specificity to override utility or compiled rules that appear later
+   in the cascade: repeat the class names to increase specificity. */
+.tabs-scroll button.no-click-effect.prevent-active-scale.no-click-effect.prevent-active-scale:active,
+.tabs-scroll button.no-click-effect.prevent-active-scale.no-click-effect.prevent-active-scale:focus,
+.tabs-scroll button.no-click-effect.prevent-active-scale.no-click-effect.prevent-active-scale:focus-visible {
+    transform: none !important;
+}
+
+/* Plain numeric tab appearance: remove rounded/circular styling and active transforms */
+.tabs-scroll .tab-number {
+    all: unset;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    margin: 0 0.25rem;
+    background: #ea580c; /* Tailwind orange-600 */
+    color: white;
+    border-radius: 9999px;
+    font-weight: 700;
+    font-size: 0.7rem;
+    line-height: 1;
+    text-align: center;
+    cursor: pointer;
+    box-sizing: border-box;
+    transition: background-color 0.12s ease, filter 0.12s ease;
+}
+.tabs-scroll .tab-number:hover {
+    filter: brightness(1.05);
+}
+.tabs-scroll .tab-number:active,
+.tabs-scroll .tab-number:focus,
+.tabs-scroll .tab-number:focus-visible {
+    transform: none !important;
+    box-shadow: 0 0 0 3px rgba(234,88,12,0.18) !important;
+}
 /* Allow specific controls to opt out of the press-shift effect (useful for fixed-position UI over drag regions) */
 .no-press-shift:active {
     /* Preserve the vertical centering translation the button uses
@@ -563,12 +616,12 @@ button:active:not(.no-click-effect) {
 }
 .tabs-scroll::-webkit-scrollbar-corner { background: transparent; }
 
-/* Limit visible tabs to 7 items — when .tabs-limited is applied the container
+/* Limit visible tabs to 5 items — when .tabs-limited is applied the container
    will show a scrollbar even on wide screens so users can horizontally scroll
    through additional tabs. Assumes each tab ~1.25rem wide + 0.25rem gap = 1.5rem.
-   7 * 1.5rem = 10.5rem */
+   5 * 1.5rem = 7.5rem */
 .tabs-scroll.tabs-limited {
-    max-width: 10.5rem; /* show ~7 tabs worth of width */
+    max-width: 7.5rem; /* show ~5 tabs worth of width */
 }
 
 /* Smooth sidebar collapse: animate width and inner content opacity to avoid sudden layout jumps */

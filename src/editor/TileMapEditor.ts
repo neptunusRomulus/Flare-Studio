@@ -2958,29 +2958,22 @@ export class TileMapEditor {
     this.ctx.lineWidth = Math.max(1, Math.min(2, 2 / this.zoom));
     this.ctx.setLineDash([3, 3]);
 
-    // Draw preview outline for the stamp area
-    for (let dy = 0; dy < this.activeStamp.height; dy++) {
-      for (let dx = 0; dx < this.activeStamp.width; dx++) {
-        const x = this.stampPreview.x + dx;
-        const y = this.stampPreview.y + dy;
-        
-        if (x >= 0 && x < this.mapWidth && y >= 0 && y < this.mapHeight) {
-          const screenPos = this.mapToScreen(x, y);
-          const halfTileX = (this.tileSizeX / 2) * this.zoom;
-          const halfTileY = (this.tileSizeY / 2) * this.zoom;
-          
-          // Draw diamond shape for preview
-          this.ctx.beginPath();
-          this.ctx.moveTo(screenPos.x, screenPos.y - halfTileY); // Top
-          this.ctx.lineTo(screenPos.x + halfTileX, screenPos.y); // Right
-          this.ctx.lineTo(screenPos.x, screenPos.y + halfTileY); // Bottom
-          this.ctx.lineTo(screenPos.x - halfTileX, screenPos.y); // Left
-          this.ctx.closePath();
-          this.ctx.fill();
-          this.ctx.stroke();
-        }
-      }
-    }
+    const halfTileX = (this.tileSizeX / 2) * this.zoom;
+    const halfTileY = (this.tileSizeY / 2) * this.zoom;
+
+    // Draw only a single cell highlight at the hover position (anchor point)
+    // regardless of how many tiles are selected in the tileset palette
+    const screenPos = this.mapToScreen(this.stampPreview.x, this.stampPreview.y);
+
+    // Draw a single diamond outline for the anchor cell
+    this.ctx.beginPath();
+    this.ctx.moveTo(screenPos.x, screenPos.y - halfTileY); // Top
+    this.ctx.lineTo(screenPos.x + halfTileX, screenPos.y); // Right
+    this.ctx.lineTo(screenPos.x, screenPos.y + halfTileY); // Bottom
+    this.ctx.lineTo(screenPos.x - halfTileX, screenPos.y); // Left
+    this.ctx.closePath();
+    this.ctx.fill();
+    this.ctx.stroke();
 
     this.ctx.setLineDash([]); // Reset line dash
   }
@@ -5015,7 +5008,7 @@ export class TileMapEditor {
   // Stamp tool state
   private stamps: Map<string, import('../types').Stamp> = new Map();
   private activeStamp: import('../types').Stamp | null = null;
-  private stampPreview: { x: number; y: number; visible: boolean } = { x: 0, y: 0, visible: false };
+  private stampPreview: { x: number; y: number; width: number; height: number; visible: boolean } = { x: 0, y: 0, width: 0, height: 0, visible: false };
   private stampCallback: ((stamps: import('../types').Stamp[]) => void) | null = null;
   private heroEditCallback: ((currentX: number, currentY: number, mapWidth: number, mapHeight: number, onConfirm: (x: number, y: number) => void) => void) | null = null;
 
@@ -5038,7 +5031,7 @@ export class TileMapEditor {
   public setStampTool(): void {
     this.tool = 'stamp';
     this.mapCanvas.style.cursor = 'crosshair';
-    this.stampPreview.visible = false;
+    this.stampPreview = { x: 0, y: 0, width: 0, height: 0, visible: false };
   }
 
   public isStampActive(): boolean {
@@ -5237,11 +5230,36 @@ export class TileMapEditor {
   private placeStamp(gridX: number, gridY: number): void {
     if (!this.activeStamp) return;
 
-    // Check if placement is within bounds
-    if (gridX < 0 || gridY < 0 || 
-        gridX + this.activeStamp.width > this.mapWidth || 
-        gridY + this.activeStamp.height > this.mapHeight) {
-      return;
+    // Calculate the bounding box of the stamp in map coordinates to clamp placement
+    // so all tiles fit within the map bounds
+    if (this.orientation === 'isometric') {
+      // For isometric, we need to find the extent of all target positions
+      // Isometric mapping: targetX = gridX + cx + ry, targetY = gridY - cx + ry
+      let minOffsetX = 0, maxOffsetX = 0, minOffsetY = 0, maxOffsetY = 0;
+      
+      for (const stampTile of this.activeStamp.tiles) {
+        if (stampTile.tileId === 0) continue; // Skip placeholder tiles
+        const cx = stampTile.x;
+        const ry = stampTile.y;
+        const offsetX = cx + ry;
+        const offsetY = -cx + ry;
+        minOffsetX = Math.min(minOffsetX, offsetX);
+        maxOffsetX = Math.max(maxOffsetX, offsetX);
+        minOffsetY = Math.min(minOffsetY, offsetY);
+        maxOffsetY = Math.max(maxOffsetY, offsetY);
+      }
+      
+      // Clamp gridX and gridY so all tiles fit within map bounds
+      // gridX + minOffsetX >= 0  =>  gridX >= -minOffsetX
+      // gridX + maxOffsetX < mapWidth  =>  gridX < mapWidth - maxOffsetX
+      // gridY + minOffsetY >= 0  =>  gridY >= -minOffsetY
+      // gridY + maxOffsetY < mapHeight  =>  gridY < mapHeight - maxOffsetY
+      gridX = Math.max(-minOffsetX, Math.min(gridX, this.mapWidth - 1 - maxOffsetX));
+      gridY = Math.max(-minOffsetY, Math.min(gridY, this.mapHeight - 1 - maxOffsetY));
+    } else {
+      // Orthogonal: simple clamping based on stamp dimensions
+      gridX = Math.max(0, Math.min(gridX, this.mapWidth - this.activeStamp.width));
+      gridY = Math.max(0, Math.min(gridY, this.mapHeight - this.activeStamp.height));
     }
 
     // Place each tile from the stamp
@@ -5270,7 +5288,7 @@ export class TileMapEditor {
         targetY = gridY + stampTile.y;
       }
       
-      // Bounds check for each tile
+      // Bounds check for each tile (should pass after clamping, but keep as safety)
       if (targetX < 0 || targetX >= this.mapWidth || targetY < 0 || targetY >= this.mapHeight) {
         console.log('[DEBUG] placeStamp: tile out of bounds', targetX, targetY);
         continue;
@@ -5290,6 +5308,33 @@ export class TileMapEditor {
         // Skip placeholder tiles (tileId 0) so selection gaps don't erase existing map tiles
         if (stampTile.tileId !== 0) {
           targetLayer.data[targetIndex] = stampTile.tileId;
+          
+          // Update layerCellTilesetKey so the tile renders with the correct tileset
+          try {
+            const layerType = targetLayer.type;
+            let arr = this.layerCellTilesetKey.get(layerType);
+            if (!arr) {
+              arr = new Array(this.mapWidth * this.mapHeight).fill(null);
+              this.layerCellTilesetKey.set(layerType, arr);
+            }
+            // Determine current active tab tileset fileName if available
+            let tilesetFileName: string | null = null;
+            const activeTabId = this.layerActiveTabId.get(layerType);
+            const tabs = this.layerTabs.get(layerType) || [];
+            if (activeTabId) {
+              const tab = tabs.find(t => t.id === activeTabId);
+              if (tab && tab.tileset && tab.tileset.fileName) tilesetFileName = tab.tileset.fileName;
+            }
+            // Fallback to layer tileset or global tileset
+            if (!tilesetFileName) {
+              const lt = this.layerTilesets.get(layerType);
+              if (lt && lt.fileName) tilesetFileName = lt.fileName;
+            }
+            if (!tilesetFileName && this.tilesetFileName) tilesetFileName = this.tilesetFileName;
+            arr[targetIndex] = tilesetFileName;
+          } catch (e) {
+            console.warn('Failed to set layerCellTilesetKey for stamp tile', e);
+          }
         }
       }
     }
@@ -7853,7 +7898,7 @@ export class TileMapEditor {
     // Reset stamp data
     this.stamps.clear();
     this.activeStamp = null;
-    this.stampPreview = { x: 0, y: 0, visible: false };
+    this.stampPreview = { x: 0, y: 0, width: 0, height: 0, visible: false };
     
     // Reset auto-save state
     this.hasUnsavedChanges = false;

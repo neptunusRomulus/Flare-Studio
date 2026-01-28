@@ -762,6 +762,22 @@ export class TileMapEditor {
   private isDraggingActor: boolean = false;
   private draggingActorId: number | null = null;
 
+  // Placed sprite objects on object layers (background layer objects like trees, walls)
+  // These are rendered as single sprites, not per-cell tiles
+  // Key: layerType, Value: array of placed objects
+  private placedSpriteObjects: Map<string, Array<{
+    id: number;
+    anchorX: number;  // Grid cell X (anchor/footprint position)
+    anchorY: number;  // Grid cell Y
+    gid: number;      // The primary tile gid (for looking up sprite data)
+    tilesetKey: string | null;  // Which tileset this sprite came from
+    width: number;    // Sprite width in pixels
+    height: number;   // Sprite height in pixels
+    sourceX: number;  // Source X in tileset
+    sourceY: number;  // Source Y in tileset
+  }>> = new Map();
+  private nextSpriteObjectId: number = 1;
+
   // Hero position management
   private heroX: number = 0;
   private heroY: number = 0;
@@ -1721,6 +1737,8 @@ export class TileMapEditor {
         if (isRightClick) {
           // Right-click always acts as eraser
           newValue = 0;
+          // Also remove any sprite object at this position
+          this.removeSpriteObjectAt(layer.type, x, y);
         } else {
           // Left-click behavior depends on current tool
           switch (this.currentTool) {
@@ -1742,6 +1760,8 @@ export class TileMapEditor {
               break;
             case 'eraser':
               newValue = 0;
+              // Also remove any sprite object at this position
+              this.removeSpriteObjectAt(layer.type, x, y);
               break;
             case 'bucket':
               // Don't bucket fill if no tile is selected (activeGid is 0)
@@ -2371,16 +2391,61 @@ export class TileMapEditor {
     this.ctx.globalAlpha = 1; // Reset alpha
   }
 
+  // Object layers that need special rendering (Y-sorted, bottom-center anchor)
+  private readonly objectLayerTypes = ['object', 'npc', 'enemy', 'event'];
+  
+  // Threshold for determining if a sprite is a "tall object" vs a "ground tile"
+  // Sprites taller than this will be rendered as objects regardless of layer
+  private readonly tallSpriteThreshold = this.tileSizeY * 1.5; // > 48px height for 32px tiles
+
+  /**
+   * Check if a sprite should be rendered as an object (tall/oversized) or as a ground tile.
+   * Ground tiles are exactly tileSizeX x tileSizeY (64x32).
+   * Anything larger is considered a tall object (walls, trees, pillars).
+   */
+  private isTallSprite(width: number, height: number): boolean {
+    // A sprite is "tall" if it exceeds the base tile dimensions
+    // We allow small tolerance for sprites that are close to tile size
+    return height > this.tallSpriteThreshold || width > this.tileSizeX * 1.5;
+  }
+
   private drawTiles(): void {
     // Render layers in reverse priority order so higher priority layers appear on top
     // Background (priority 6) renders first, collision (priority 4) renders later and appears on top
     const layersReversed = [...this.tileLayers].reverse();
     
+    // Collect ALL tall sprites and object layer items for Y-sorted rendering
+    // This includes tall sprites from ANY layer (including background)
+    const objectsToRender: Array<{
+      x: number;
+      y: number;
+      gid: number;
+      layerType: string;
+      tileset: { image: HTMLImageElement | null; fileName: string | null; columns: number; rows: number; count: number };
+      tileData: Map<number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }>;
+      transparency: number;
+      sortKey: number; // For Y-sorting (isoX + isoY)
+    }> = [];
+    
     for (const layer of layersReversed) {
       if (!layer.visible) continue;
       
+      // Check if this is an explicit object layer
+      const isObjectLayer = this.objectLayerTypes.includes(layer.type);
+      
       // Get the default tileset for this layer type (used as a fallback)
       const layerTilesetFallback = this.getLayerTilesetOrFallback(layer.type) || { image: null, fileName: null, columns: 1, rows: 1, count: 1 };
+
+      // Get the active tab's detected tiles as a base source of tile data
+      const tabs = this.layerTabs.get(layer.type) || [];
+      const activeTabId = this.layerActiveTabId.get(layer.type);
+      let activeTabDetectedTiles: Map<number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }> | null = null;
+      if (activeTabId) {
+        const activeTab = tabs.find(t => t.id === activeTabId);
+        if (activeTab && activeTab.detectedTiles) {
+          activeTabDetectedTiles = activeTab.detectedTiles as Map<number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }>;
+        }
+      }
 
       // Set layer transparency
       this.ctx.globalAlpha = layer.transparency || 1.0;
@@ -2397,10 +2462,10 @@ export class TileMapEditor {
 
           // Resolve tileset info for this specific cell
           let tilesetForCell = layerTilesetFallback;
-          let layerTileDataForCell = this.layerTileData.get(layer.type) || new Map();
+          // Default to layer tile data, then active tab's detected tiles
+          let layerTileDataForCell = this.layerTileData.get(layer.type) || activeTabDetectedTiles || new Map();
 
           if (cellTilesetKey) {
-            const tabs = this.layerTabs.get(layer.type) || [];
             const tab = tabs.find(t => t.tileset && t.tileset.fileName === cellTilesetKey);
             if (tab && tab.tileset) {
               tilesetForCell = {
@@ -2414,45 +2479,125 @@ export class TileMapEditor {
                 layerTileDataForCell = tab.detectedTiles as Map<number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }>;
               }
             } else {
-              // If we can't find tab metadata, fall back to layer fallback
-              layerTileDataForCell = this.layerTileData.get(layer.type) || new Map();
+              // If we can't find tab metadata, fall back to layer fallback or active tab
+              layerTileDataForCell = this.layerTileData.get(layer.type) || activeTabDetectedTiles || new Map();
             }
           }
 
-          this.drawTileFromLayer(x, y, gid, tilesetForCell, layerTileDataForCell);
+          // Determine sprite dimensions to decide if it's a ground tile or tall object
+          const tileData = layerTileDataForCell.get(gid) || this.detectedTileData.get(gid);
+          let spriteWidth = this.tileSizeX;
+          let spriteHeight = this.tileSizeY;
+          
+          if (tileData) {
+            spriteWidth = tileData.width;
+            spriteHeight = tileData.height;
+          }
+          
+          // Determine rendering mode:
+          // 1. Explicit object layers -> always render as object
+          // 2. Tall sprites (height > threshold) -> render as object even if on background layer
+          // 3. Ground-sized sprites on non-object layers -> render as tile
+          const shouldRenderAsObject = isObjectLayer || this.isTallSprite(spriteWidth, spriteHeight);
+
+          if (shouldRenderAsObject) {
+            // Collect for Y-sorted object rendering
+            // Sort key: x + y gives depth order in isometric view (further = rendered first)
+            objectsToRender.push({
+              x,
+              y,
+              gid,
+              layerType: layer.type,
+              tileset: tilesetForCell,
+              tileData: layerTileDataForCell,
+              transparency: layer.transparency || 1.0,
+              sortKey: x + y
+            });
+          } else {
+            // Draw as ground tile (64x32 or smaller, clipped to tile rect)
+            this.drawGroundTile(x, y, gid, tilesetForCell, layerTileDataForCell);
+          }
         }
       }
+      
+      // Also render sprite objects for this layer from placedSpriteObjects
+      const spriteObjects = this.placedSpriteObjects.get(layer.type);
+      if (spriteObjects && spriteObjects.length > 0) {
+        for (const spriteObj of spriteObjects) {
+          // Resolve tileset for this sprite object
+          let tilesetForSprite = layerTilesetFallback;
+          if (spriteObj.tilesetKey) {
+            const tab = tabs.find(t => t.tileset && t.tileset.fileName === spriteObj.tilesetKey);
+            if (tab && tab.tileset) {
+              tilesetForSprite = {
+                image: tab.tileset.image ?? null,
+                fileName: tab.tileset.fileName ?? null,
+                columns: tab.tileset.columns ?? 1,
+                rows: tab.tileset.rows ?? 1,
+                count: tab.tileset.count ?? 1
+              };
+            }
+          }
+          
+          // Add to objects array for Y-sorted rendering
+          objectsToRender.push({
+            x: spriteObj.anchorX,
+            y: spriteObj.anchorY,
+            gid: spriteObj.gid,
+            layerType: layer.type,
+            tileset: tilesetForSprite,
+            tileData: new Map([[spriteObj.gid, {
+              sourceX: spriteObj.sourceX,
+              sourceY: spriteObj.sourceY,
+              width: spriteObj.width,
+              height: spriteObj.height
+            }]]),
+            transparency: layer.transparency || 1.0,
+            sortKey: spriteObj.anchorX + spriteObj.anchorY
+          });
+        }
+      }
+    }
+    
+    // Sort objects by depth (Y-sort: lower sortKey = further from camera = render first)
+    objectsToRender.sort((a, b) => a.sortKey - b.sortKey);
+    
+    // Render all objects with Y-sorting and bottom-center anchor (no clipping)
+    for (const obj of objectsToRender) {
+      this.ctx.globalAlpha = obj.transparency;
+      this.drawObjectSprite(obj.x, obj.y, obj.gid, obj.tileset, obj.tileData);
     }
     
     // Reset alpha for other drawing operations
     this.ctx.globalAlpha = 1.0;
   }
 
-  private drawTileFromLayer(
-    x: number, 
-    y: number, 
-    gid: number, 
+  /**
+   * Draw a ground tile - these are true isometric floor tiles (64x32).
+   * Ground tiles are clipped to tile boundaries and drawn in layer order.
+   */
+  private drawGroundTile(
+    x: number,
+    y: number,
+    gid: number,
     layerTileset: { image: HTMLImageElement | null; fileName: string | null; columns: number; rows: number; count: number },
     layerTileData: Map<number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }>
   ): void {
     if (!layerTileset.image || gid <= 0) return;
     
-    // Check if we have variable-sized tile data for this gid in this layer
-    const tileData = layerTileData.get(gid);
+    // Get tile data
+    const tileData = layerTileData.get(gid) || this.detectedTileData.get(gid);
     
-  let sourceX: number, sourceY: number, tileWidth: number, tileHeight: number;
-  let originX: number | undefined, originY: number | undefined;
+    let sourceX: number, sourceY: number, tileWidth: number, tileHeight: number;
     
     if (tileData) {
-      // Use variable-sized tile data
       sourceX = tileData.sourceX;
       sourceY = tileData.sourceY;
+      // For ground tiles, use actual dimensions but they should be ~64x32
       tileWidth = tileData.width;
       tileHeight = tileData.height;
-      originX = (tileData as { originX?: number; originY?: number }).originX;
-      originY = (tileData as { originX?: number; originY?: number }).originY;
     } else {
-      // Fallback to fixed grid layout using layer's tileset properties
+      // Fallback to fixed grid layout
       const tileIndex = gid - 1;
       sourceX = (tileIndex % layerTileset.columns) * this.tileSizeX;
       sourceY = Math.floor(tileIndex / layerTileset.columns) * this.tileSizeY;
@@ -2460,30 +2605,93 @@ export class TileMapEditor {
       tileHeight = this.tileSizeY;
     }
     
-  // Use isometric screen coordinates with zoom applied
-  const screenPos = this.mapToScreen(x, y);
-  const scaledTileX = tileWidth * this.zoom;
-  const scaledTileY = tileHeight * this.zoom;
+    // Get isometric screen position (center of the tile diamond)
+    const screenPos = this.mapToScreen(x, y);
+    const scaledTileX = tileWidth * this.zoom;
+    const scaledTileY = tileHeight * this.zoom;
 
-  // Compute ground (base) position for the tile diamond. We want the
-  // bottom-center of the sprite to sit on the tile base (so sprites don't
-  // appear to "float" above the grid lines). screenPos is the diamond
-  // center, so bottom of the diamond is screenPos.y + halfTileY.
-  const halfTileY = (this.tileSizeY / 2) * this.zoom;
-  const groundY = screenPos.y + halfTileY;
-
-  // Determine origin (fallback to center-bottom behavior if not present)
-  const finalOriginX = (typeof originX === 'number') ? originX : Math.floor(tileWidth / 2);
-  const finalOriginY = (typeof originY === 'number') ? originY : tileHeight; // default to bottom
-
-  // Draw image so its origin point aligns to the tile ground anchor
-  const destX = screenPos.x - (finalOriginX * this.zoom);
-  const destY = groundY - (finalOriginY * this.zoom);
+    // For ground tiles, position so the tile fills the diamond cell
+    // The sprite should be centered horizontally on the tile center
+    // and positioned so its bottom aligns with the diamond's bottom
+    const halfTileY = (this.tileSizeY / 2) * this.zoom;
+    const groundY = screenPos.y + halfTileY;
+    
+    // Center-bottom anchor for ground tiles
+    const destX = screenPos.x - (tileWidth / 2) * this.zoom;
+    const destY = groundY - tileHeight * this.zoom;
     
     this.ctx.drawImage(
       layerTileset.image,
       sourceX, sourceY, tileWidth, tileHeight,
       destX, destY, scaledTileX, scaledTileY
+    );
+  }
+
+  /**
+   * Draw an object sprite with bottom-center anchoring (no clipping).
+   * Objects can be larger than tiles and should be positioned so their
+   * bottom-center aligns with the tile's ground point.
+   */
+  private drawObjectSprite(
+    x: number,
+    y: number,
+    gid: number,
+    layerTileset: { image: HTMLImageElement | null; fileName: string | null; columns: number; rows: number; count: number },
+    layerTileData: Map<number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }>
+  ): void {
+    if (!layerTileset.image || gid <= 0) return;
+    
+    // Get tile/sprite data - check layer data first, then global detectedTileData
+    const tileData = layerTileData.get(gid) || this.detectedTileData.get(gid);
+    
+    let sourceX: number, sourceY: number, spriteWidth: number, spriteHeight: number;
+    let originX: number | undefined, originY: number | undefined;
+    
+    if (tileData) {
+      sourceX = tileData.sourceX;
+      sourceY = tileData.sourceY;
+      spriteWidth = tileData.width;
+      spriteHeight = tileData.height;
+      originX = tileData.originX;
+      originY = tileData.originY;
+    } else {
+      // Fallback to fixed grid layout
+      const tileIndex = gid - 1;
+      sourceX = (tileIndex % layerTileset.columns) * this.tileSizeX;
+      sourceY = Math.floor(tileIndex / layerTileset.columns) * this.tileSizeY;
+      spriteWidth = this.tileSizeX;
+      spriteHeight = this.tileSizeY;
+    }
+    
+    // Get isometric screen position (center of the tile diamond)
+    const screenPos = this.mapToScreen(x, y);
+    
+    // Calculate the ground point (bottom of the tile diamond)
+    const halfTileY = (this.tileSizeY / 2) * this.zoom;
+    const groundY = screenPos.y + halfTileY;
+    
+    // Scale sprite dimensions
+    const scaledWidth = spriteWidth * this.zoom;
+    const scaledHeight = spriteHeight * this.zoom;
+    
+    // Use custom origin if provided, otherwise default to bottom-center
+    // For objects, bottom-center anchoring means:
+    // - Horizontal: sprite center aligns with tile center
+    // - Vertical: sprite bottom aligns with tile ground
+    const finalOriginX = (typeof originX === 'number') ? originX : Math.floor(spriteWidth / 2);
+    const finalOriginY = (typeof originY === 'number') ? originY : spriteHeight;
+    
+    // Calculate destination position
+    // destX: tile center - scaled origin X
+    // destY: ground point - scaled origin Y
+    const destX = screenPos.x - (finalOriginX * this.zoom);
+    const destY = groundY - (finalOriginY * this.zoom);
+    
+    // Draw without any clipping - objects can extend beyond tile bounds
+    this.ctx.drawImage(
+      layerTileset.image,
+      sourceX, sourceY, spriteWidth, spriteHeight,
+      destX, destY, scaledWidth, scaledHeight
     );
   }
 
@@ -3080,6 +3288,20 @@ export class TileMapEditor {
             this.ctx.fillStyle = `hsl(${hue}, 55%, ${layerIndex === 0 ? '45%' : '60%'})`;
             this.ctx.fillRect(pixelX, pixelY, tilePixel, tilePixel);
           }
+        }
+      }
+      
+      // Also render sprite objects for this layer on minimap
+      const spriteObjects = this.placedSpriteObjects.get(layer.type);
+      if (spriteObjects && spriteObjects.length > 0) {
+        for (const spriteObj of spriteObjects) {
+          const pixelX = offsetX + spriteObj.anchorX * tilePixel;
+          const pixelY = offsetY + spriteObj.anchorY * tilePixel;
+          
+          // Use a slightly brighter color for sprite objects
+          const hue = (spriteObj.gid * 137.5) % 360;
+          this.ctx.fillStyle = `hsl(${hue}, 70%, ${layerIndex === 0 ? '50%' : '65%'})`;
+          this.ctx.fillRect(pixelX, pixelY, tilePixel, tilePixel);
         }
       }
     }
@@ -5104,6 +5326,7 @@ export class TileMapEditor {
   /**
    * Create a stamp from a tileset palette selection and activate it for placement.
    * Expected selection shape: { x, y, width, height, cols, rows } where sizes are pixels
+   * These stamps should always be placed as individual tiles, not sprite objects.
    */
   public setTileSelection(selection: { x: number; y: number; width: number; height: number; cols: number; rows: number; tileWidth?: number; tileHeight?: number }): boolean {
     if (!selection || !this.tilesetImage) return false;
@@ -5147,16 +5370,11 @@ export class TileMapEditor {
           console.log('[DEBUG] setTileSelection: found gid', foundGid, 'for cell (', cx, ',', ry, ') tilesetPos (', cellCol, ',', cellRow, ')');
           stampTiles.push({ tileId: foundGid, layerId: currentLayerId, x: cx, y: ry });
         } else {
-          // Fallback: if no detected tile mapping exists, compute gid by grid index
-          if (this.detectedTileData.size === 0) {
-            const gidFallback = cellRow * cols + cellCol + 1;
-            console.log('[DEBUG] setTileSelection: fallback gid', gidFallback, 'for cell (', cx, ',', ry, ') tilesetPos (', cellCol, ',', cellRow, ')');
-            stampTiles.push({ tileId: gidFallback, layerId: currentLayerId, x: cx, y: ry });
-          } else {
-            // No mapping for this cell; push a placeholder (tileId 0) to preserve shape but skip placement later
-            console.log('[DEBUG] setTileSelection: no mapping for cell (', cx, ',', ry, ') tilesetPos (', cellCol, ',', cellRow, ') - using placeholder');
-            stampTiles.push({ tileId: 0, layerId: currentLayerId, x: cx, y: ry });
-          }
+          // Fallback: always use grid-based formula if no detected mapping
+          // This ensures multi-cell selections work even if tile detection is incomplete
+          const gidFallback = cellRow * cols + cellCol + 1;
+          console.log('[DEBUG] setTileSelection: using fallback gid', gidFallback, 'for cell (', cx, ',', ry, ') tilesetPos (', cellCol, ',', cellRow, ')');
+          stampTiles.push({ tileId: gidFallback, layerId: currentLayerId, x: cx, y: ry });
         }
       }
     }
@@ -5168,7 +5386,8 @@ export class TileMapEditor {
       name: 'Tileset Selection',
       width: selection.cols,
       height: selection.rows,
-      tiles: stampTiles
+      tiles: stampTiles,
+      fromPaletteSelection: true  // Mark this so it places as individual tiles, not sprite objects
     };
 
     console.log('[DEBUG] setTileSelection: created stamp', stamp.id, 'tiles:', stamp.tiles.filter(t=>t.tileId>0).length, '/', stamp.tiles.length);
@@ -5230,6 +5449,13 @@ export class TileMapEditor {
   private placeStamp(gridX: number, gridY: number): void {
     if (!this.activeStamp) return;
 
+    // Get the target layer
+    const activeLayer = this.tileLayers.find(l => l.id === this.activeLayerId);
+    if (!activeLayer) return;
+    
+    // Check if this is an object layer that should use sprite-based rendering
+    const isObjectLayer = this.objectLayerTypes.includes(activeLayer.type) || activeLayer.type === 'background';
+
     // Calculate the bounding box of the stamp in map coordinates to clamp placement
     // so all tiles fit within the map bounds
     if (this.orientation === 'isometric') {
@@ -5249,88 +5475,180 @@ export class TileMapEditor {
         maxOffsetY = Math.max(maxOffsetY, offsetY);
       }
       
-      // Clamp gridX and gridY so all tiles fit within map bounds
-      // gridX + minOffsetX >= 0  =>  gridX >= -minOffsetX
-      // gridX + maxOffsetX < mapWidth  =>  gridX < mapWidth - maxOffsetX
-      // gridY + minOffsetY >= 0  =>  gridY >= -minOffsetY
-      // gridY + maxOffsetY < mapHeight  =>  gridY < mapHeight - maxOffsetY
-      gridX = Math.max(-minOffsetX, Math.min(gridX, this.mapWidth - 1 - maxOffsetX));
-      gridY = Math.max(-minOffsetY, Math.min(gridY, this.mapHeight - 1 - maxOffsetY));
+      // For isometric, don't clamp at all - let individual tiles skip out of bounds
+      // This allows free painting at all edges
+      // (The placement loop will skip any tiles that go outside map bounds)
     } else {
       // Orthogonal: simple clamping based on stamp dimensions
       gridX = Math.max(0, Math.min(gridX, this.mapWidth - this.activeStamp.width));
       gridY = Math.max(0, Math.min(gridY, this.mapHeight - this.activeStamp.height));
     }
 
-    // Place each tile from the stamp
-    // For isometric maps: tileset is flat (orthogonal) but map is isometric
-    // Vertical selection in tileset (ry increases) → diagonal on map: both X and Y decrease
-    // Horizontal selection in tileset (cx increases) → other diagonal: X increases, Y decreases
-    const nonZeroTiles = this.activeStamp.tiles.filter(t => t.tileId !== 0).length;
+    const nonZeroTiles = this.activeStamp.tiles.filter(t => t.tileId !== 0);
     console.log('[DEBUG] placeStamp: placing stamp', this.activeStamp.id, 'at grid', gridX, gridY, 
-      'size:', this.activeStamp.width, 'x', this.activeStamp.height, 'nonZeroTiles=', nonZeroTiles);
-    
+      'size:', this.activeStamp.width, 'x', this.activeStamp.height, 'nonZeroTiles=', nonZeroTiles.length,
+      'isObjectLayer=', isObjectLayer);
+
+    // Get the current tileset info
+    const layerType = activeLayer.type;
+    let tilesetFileName: string | null = null;
+    const activeTabId = this.layerActiveTabId.get(layerType);
+    const tabs = this.layerTabs.get(layerType) || [];
+    if (activeTabId) {
+      const tab = tabs.find(t => t.id === activeTabId);
+      if (tab && tab.tileset && tab.tileset.fileName) tilesetFileName = tab.tileset.fileName;
+    }
+    if (!tilesetFileName) {
+      const lt = this.layerTilesets.get(layerType);
+      if (lt && lt.fileName) tilesetFileName = lt.fileName;
+    }
+    if (!tilesetFileName && this.tilesetFileName) tilesetFileName = this.tilesetFileName;
+
+    // For object/background layers with multi-cell or tall stamps, create a single sprite object
+    // instead of writing individual tiles to each cell
+    if (isObjectLayer && nonZeroTiles.length > 0) {
+      // Check if any of the tiles are tall sprites
+      let hasTallSprites = false;
+      let combinedSourceX = Infinity, combinedSourceY = Infinity;
+      let combinedMaxX = 0, combinedMaxY = 0;
+      const primaryGid = nonZeroTiles[0].tileId;
+      
+      // Get tile data to determine if sprites are tall
+      const layerTileData = this.layerTileData.get(layerType) || new Map();
+      let activeTabDetectedTiles: Map<number, { sourceX: number; sourceY: number; width: number; height: number }> | null = null;
+      if (activeTabId) {
+        const activeTab = tabs.find(t => t.id === activeTabId);
+        if (activeTab && activeTab.detectedTiles) {
+          activeTabDetectedTiles = activeTab.detectedTiles as Map<number, { sourceX: number; sourceY: number; width: number; height: number }>;
+        }
+      }
+      
+      // Calculate the combined bounding box of all tiles in the stamp
+      console.log('[DEBUG] placeStamp: calculating combined bounds for', nonZeroTiles.length, 'tiles');
+      for (const stampTile of nonZeroTiles) {
+        const tileData = layerTileData.get(stampTile.tileId) || 
+                         activeTabDetectedTiles?.get(stampTile.tileId) ||
+                         this.detectedTileData.get(stampTile.tileId);
+        
+        console.log('[DEBUG] placeStamp: tile gid=', stampTile.tileId, 'tileData=', tileData);
+        
+        let sourceX: number, sourceY: number, width: number, height: number;
+        
+        if (tileData) {
+          if (tileData.height > this.tallSpriteThreshold) {
+            hasTallSprites = true;
+          }
+          sourceX = tileData.sourceX;
+          sourceY = tileData.sourceY;
+          width = tileData.width;
+          height = tileData.height;
+        } else {
+          // Fallback: calculate source position using grid-based formula
+          // This allows multi-cell stamps to combine even without explicit tile data
+          const gid = stampTile.tileId - 1; // Convert to 0-based
+          const cols = this.tilesetColumns || Math.max(1, Math.floor((this.tilesetImage?.width || this.tileSizeX) / this.tileSizeX));
+          sourceX = (gid % cols) * this.tileSizeX;
+          sourceY = Math.floor(gid / cols) * this.tileSizeY;
+          width = this.tileSizeX;
+          height = this.tileSizeY;
+        }
+        
+        // Track the combined source region in the tileset
+        combinedSourceX = Math.min(combinedSourceX, sourceX);
+        combinedSourceY = Math.min(combinedSourceY, sourceY);
+        combinedMaxX = Math.max(combinedMaxX, sourceX + width);
+        combinedMaxY = Math.max(combinedMaxY, sourceY + height);
+      }
+      console.log('[DEBUG] placeStamp: combined bounds sourceX=', combinedSourceX, 'sourceY=', combinedSourceY, 'width=', combinedMaxX - combinedSourceX, 'height=', combinedMaxY - combinedSourceY);
+      
+      // If this is a multi-tile stamp or has tall sprites, create a single sprite object
+      // But only if we have valid tile data for the stamps (combinedSourceX !== Infinity)
+      if ((nonZeroTiles.length > 1 || hasTallSprites) && combinedSourceX !== Infinity) {
+        // After bounds clamping above, gridX and gridY are already at the correct top-left position
+        // No need to add offsets again - they're already accounted for in the clamping
+        const anchorX = gridX;
+        const anchorY = gridY;
+        
+        // Use the combined source bounds from all tiles
+        const spriteWidth = combinedMaxX - combinedSourceX;
+        const spriteHeight = combinedMaxY - combinedSourceY;
+        const sourceX = combinedSourceX;
+        const sourceY = combinedSourceY;
+        
+        // Create a sprite object entry
+        let spriteObjects = this.placedSpriteObjects.get(layerType);
+        if (!spriteObjects) {
+          spriteObjects = [];
+          this.placedSpriteObjects.set(layerType, spriteObjects);
+        }
+        
+        // Remove any existing sprite object at this position
+        const existingIndex = spriteObjects.findIndex(obj => obj.anchorX === anchorX && obj.anchorY === anchorY);
+        if (existingIndex !== -1) {
+          spriteObjects.splice(existingIndex, 1);
+        }
+        
+        spriteObjects.push({
+          id: this.nextSpriteObjectId++,
+          anchorX,
+          anchorY,
+          gid: primaryGid,
+          tilesetKey: tilesetFileName,
+          width: spriteWidth,
+          height: spriteHeight,
+          sourceX,
+          sourceY
+        });
+        
+        console.log('[DEBUG] placeStamp: created sprite object at', anchorX, anchorY, 
+          'size:', spriteWidth, 'x', spriteHeight, 'source:', sourceX, sourceY);
+        
+        this.saveState();
+        this.draw();
+        return;
+      }
+    }
+
+    // Standard tile-based placement for ground tiles and non-tall sprites
+    console.log('[DEBUG] placeStamp: using standard tile-based placement for', nonZeroTiles.length, 'tiles');
     for (const stampTile of this.activeStamp.tiles) {
       let targetX: number;
       let targetY: number;
       
       if (this.orientation === 'isometric') {
-        // Isometric mapping:
-        // - Tileset column offset (cx): moves along one diagonal (+X, -Y)
-        // - Tileset row offset (ry): moves along other diagonal (+X, +Y) so top tile is at top visually
         const cx = stampTile.x;
         const ry = stampTile.y;
         targetX = gridX + cx + ry;
         targetY = gridY - cx + ry;
       } else {
-        // Orthogonal: direct mapping
         targetX = gridX + stampTile.x;
         targetY = gridY + stampTile.y;
       }
       
-      // Bounds check for each tile (should pass after clamping, but keep as safety)
       if (targetX < 0 || targetX >= this.mapWidth || targetY < 0 || targetY >= this.mapHeight) {
         console.log('[DEBUG] placeStamp: tile out of bounds', targetX, targetY);
         continue;
       }
       
       const targetIndex = targetY * this.mapWidth + targetX;
-
-      // Find the target layer by ID, or use current active layer
       let targetLayer = this.tileLayers.find(l => l.id === stampTile.layerId);
       
       if (!targetLayer && this.activeLayerId !== null) {
-        // If layer doesn't exist, use the active layer
         targetLayer = this.tileLayers.find(l => l.id === this.activeLayerId);
       }
 
       if (targetLayer) {
-        // Skip placeholder tiles (tileId 0) so selection gaps don't erase existing map tiles
         if (stampTile.tileId !== 0) {
           targetLayer.data[targetIndex] = stampTile.tileId;
+          console.log('[DEBUG] placeStamp: wrote tile gid=', stampTile.tileId, 'to targetIndex=', targetIndex, 'grid pos=', targetX, targetY);
           
-          // Update layerCellTilesetKey so the tile renders with the correct tileset
           try {
-            const layerType = targetLayer.type;
-            let arr = this.layerCellTilesetKey.get(layerType);
+            const lType = targetLayer.type;
+            let arr = this.layerCellTilesetKey.get(lType);
             if (!arr) {
               arr = new Array(this.mapWidth * this.mapHeight).fill(null);
-              this.layerCellTilesetKey.set(layerType, arr);
+              this.layerCellTilesetKey.set(lType, arr);
             }
-            // Determine current active tab tileset fileName if available
-            let tilesetFileName: string | null = null;
-            const activeTabId = this.layerActiveTabId.get(layerType);
-            const tabs = this.layerTabs.get(layerType) || [];
-            if (activeTabId) {
-              const tab = tabs.find(t => t.id === activeTabId);
-              if (tab && tab.tileset && tab.tileset.fileName) tilesetFileName = tab.tileset.fileName;
-            }
-            // Fallback to layer tileset or global tileset
-            if (!tilesetFileName) {
-              const lt = this.layerTilesets.get(layerType);
-              if (lt && lt.fileName) tilesetFileName = lt.fileName;
-            }
-            if (!tilesetFileName && this.tilesetFileName) tilesetFileName = this.tilesetFileName;
             arr[targetIndex] = tilesetFileName;
           } catch (e) {
             console.warn('Failed to set layerCellTilesetKey for stamp tile', e);
@@ -5341,6 +5659,21 @@ export class TileMapEditor {
 
     this.saveState();
     this.draw();
+  }
+
+  /**
+   * Remove a sprite object at a given position from the placedSpriteObjects storage.
+   * Used when erasing tiles on object layers.
+   */
+  private removeSpriteObjectAt(layerType: string, x: number, y: number): void {
+    const spriteObjects = this.placedSpriteObjects.get(layerType);
+    if (!spriteObjects) return;
+    
+    const index = spriteObjects.findIndex(obj => obj.anchorX === x && obj.anchorY === y);
+    if (index !== -1) {
+      spriteObjects.splice(index, 1);
+      console.log('[DEBUG] removeSpriteObjectAt: removed sprite object at', x, y, 'from layer', layerType);
+    }
   }
 
   /**
@@ -5362,6 +5695,7 @@ export class TileMapEditor {
       const sx = i % cols;
       const sy = Math.floor(i / cols);
       tiles.push({ tileId: gid, layerId: this.activeLayerId ?? 0, x: sx, y: sy });
+
     }
 
     return {

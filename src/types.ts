@@ -258,6 +258,7 @@ export interface Stamp {
   height: number;
   tiles: StampTile[];
   thumbnail?: string; // Base64 encoded image for preview
+  fromPaletteSelection?: boolean; // True if created from tileset palette - should place as individual tiles, not sprite objects
 }
 
 export type StampMode = 'select' | 'create' | 'place';

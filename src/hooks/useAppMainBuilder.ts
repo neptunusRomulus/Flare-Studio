@@ -19,6 +19,7 @@ import useNpcDrag from './useNpcDrag';
 import useObjectEditing from './useObjectEditing';
 import useItems from './useItems';
 import useLoadProjectData from './useLoadProjectData';
+import useClearLayerHandler from './useClearLayerHandler';
 import { normalizeItemsForState } from '@/utils/items';
 import { buildConstantStockString } from '@/utils/parsers';
 // ItemRole type intentionally not imported — unused in this module
@@ -149,9 +150,19 @@ export default function useAppMainBuilder() {
     updateLayersListRef,
     syncMapObjects,
     syncMapObjectsRef,
-    setupAutoSaveWrapper: setupAutoSave
-    ,
-    setTabTick: appState.setTabTick
+    setupAutoSaveWrapper: setupAutoSave,
+    setTabTick: appState.setTabTick,
+
+    // Editor and toolbar sync (ensure UI tool state is forwarded to the editor)
+    editor,
+    selectedTool: toolbarState.selectedTool,
+    selectedBrushTool: toolbarState.selectedBrushTool,
+    selectedSelectionTool: toolbarState.selectedSelectionTool,
+    selectedShapeTool: toolbarState.selectedShapeTool,
+    stampMode: toolbarState.stampMode,
+    selectedStamp: toolbarState.selectedStamp,
+    setSelectionCount: toolbarState.setSelectionCount,
+    setHasSelection: toolbarState.setHasSelection
   });
   const { pendingMapConfig, setPendingMapConfig, showWelcome: appShowWelcome } = appState;
 
@@ -235,7 +246,25 @@ export default function useAppMainBuilder() {
 
   const { tooltip, showTooltipWithDelay, hideTooltip } = useTooltip({ toolbarRef: toolbarState.toolbarContainerRef, canvasRef });
 
-  const [, setShowClearLayerDialog] = useState(false);
+  // Ensure editor always has the current canvas element reference. React may replace the
+  // canvas DOM node during re-renders; when that happens the editor must rebind its
+  // event listeners to the new canvas via `updateCanvas` otherwise mouse events will
+  // not be received and dragging/painting will fail.
+  useEffect(() => {
+    if (!editor || !canvasRef?.current) return;
+    try {
+      editor.updateCanvas(canvasRef.current);
+    } catch (e) {
+      console.warn('Failed to update editor canvas reference', e);
+    }
+  }, [editor, canvasRef?.current]);
+
+  const [showClearLayerDialog, setShowClearLayerDialog] = useState(false);
+  const { handleClearLayerClose, handleClearLayerConfirm } = useClearLayerHandler({
+    editor,
+    setSelectedBrushTool: toolbarState.setSelectedBrushTool,
+    setShowClearLayerDialog
+  });
 
   const projectManager = useProjectManager({
     editor,
@@ -714,9 +743,9 @@ export default function useAppMainBuilder() {
       isStartingMap: mapConfig.isStartingMap,
       updateStartingMap: mapConfig.updateStartingMap,
       handleMapResize: mapConfig.handleMapResize,
-      showClearLayerDialog: false,
-      handleClearLayerClose: () => {},
-      handleClearLayerConfirm: () => {},
+      showClearLayerDialog,
+      handleClearLayerClose,
+      handleClearLayerConfirm,
       confirmDialogProps: buildConfirmDialogProps({ confirmAction: null, setConfirmAction: () => {} }),
       showHelp: helpState.showHelp,
       activeHelpTab: helpState.activeHelpTab,

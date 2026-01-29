@@ -182,7 +182,7 @@ const BottomToolbar = ({
                 variant={selectedBrushTool === 'brush' ? 'default' : 'ghost'}
                 size="sm"
                 className="w-6 h-6 p-1 rounded-full sub-tool-button"
-                onClick={() => setSelectedBrushTool('brush')}
+                onClick={() => { setSelectedBrushTool('brush'); handleSelectTool('brush'); }}
               >
                 <Paintbrush2 className="w-3 h-3" />
               </Button>
@@ -192,7 +192,7 @@ const BottomToolbar = ({
                 variant={selectedBrushTool === 'bucket' ? 'default' : 'ghost'}
                 size="sm"
                 className="w-6 h-6 p-1 rounded-full sub-tool-button"
-                onClick={() => setSelectedBrushTool('bucket')}
+                onClick={() => { setSelectedBrushTool('bucket'); handleSelectTool('brush'); }}
               >
                 <PaintBucket className="w-3 h-3" />
               </Button>
@@ -202,7 +202,7 @@ const BottomToolbar = ({
                 variant={selectedBrushTool === 'eraser' ? 'default' : 'ghost'}
                 size="sm"
                 className="w-6 h-6 p-1 rounded-full sub-tool-button"
-                onClick={() => setSelectedBrushTool('eraser')}
+                onClick={() => { setSelectedBrushTool('eraser'); handleSelectTool('brush'); }}
               >
                 <Eraser className="w-3 h-3" />
               </Button>
@@ -212,11 +212,11 @@ const BottomToolbar = ({
                 variant={selectedBrushTool === 'clear' ? 'default' : 'ghost'}
                 size="sm"
                 className="w-6 h-6 p-1 rounded-full sub-tool-button border-red-500 hover:border-red-600 hover:bg-red-50"
-                onClick={() => setShowClearLayerDialog(true)}
+                onClick={() => { setShowClearLayerDialog(true); handleSelectTool('brush'); }}
               >
                 <X className="w-3 h-3 text-red-500" />
               </Button>
-            </Tooltip>
+            </Tooltip> 
           </div>
         )}
       </div>
@@ -253,7 +253,7 @@ const BottomToolbar = ({
                 variant={selectedSelectionTool === 'rectangular' ? 'default' : 'ghost'}
                 size="sm"
                 className="w-6 h-6 p-1 rounded-full sub-tool-button"
-                onClick={() => setSelectedSelectionTool('rectangular')}
+                onClick={() => { setSelectedSelectionTool('rectangular'); handleSelectTool('selection'); }}
               >
                 <Square className="w-3 h-3" />
               </Button>
@@ -263,7 +263,7 @@ const BottomToolbar = ({
                 variant={selectedSelectionTool === 'magic-wand' ? 'default' : 'ghost'}
                 size="sm"
                 className="w-6 h-6 p-1 rounded-full sub-tool-button"
-                onClick={() => setSelectedSelectionTool('magic-wand')}
+                onClick={() => { setSelectedSelectionTool('magic-wand'); handleSelectTool('selection'); }}
               >
                 <Wand2 className="w-3 h-3" />
               </Button>
@@ -273,7 +273,7 @@ const BottomToolbar = ({
                 variant={selectedSelectionTool === 'same-tile' ? 'default' : 'ghost'}
                 size="sm"
                 className="w-6 h-6 p-1 rounded-full sub-tool-button"
-                onClick={() => setSelectedSelectionTool('same-tile')}
+                onClick={() => { setSelectedSelectionTool('same-tile'); handleSelectTool('selection'); }}
               >
                 <Target className="w-3 h-3" />
               </Button>
@@ -283,7 +283,7 @@ const BottomToolbar = ({
                 variant={selectedSelectionTool === 'circular' ? 'default' : 'ghost'}
                 size="sm"
                 className="w-6 h-6 p-1 rounded-full sub-tool-button"
-                onClick={() => setSelectedSelectionTool('circular')}
+                onClick={() => { setSelectedSelectionTool('circular'); handleSelectTool('selection'); }}
               >
                 <Circle className="w-3 h-3" />
               </Button>
@@ -320,7 +320,7 @@ const BottomToolbar = ({
                 variant={selectedShapeTool === 'rectangle' ? 'default' : 'ghost'}
                 size="sm"
                 className="w-6 h-6 p-1 rounded-full sub-tool-button"
-                onClick={() => setSelectedShapeTool('rectangle')}
+                onClick={() => { setSelectedShapeTool('rectangle'); handleSelectTool('shape'); }}
               >
                 <Square className="w-3 h-3" />
               </Button>
@@ -330,7 +330,7 @@ const BottomToolbar = ({
                 variant={selectedShapeTool === 'circle' ? 'default' : 'ghost'}
                 size="sm"
                 className="w-6 h-6 p-1 rounded-full sub-tool-button"
-                onClick={() => setSelectedShapeTool('circle')}
+                onClick={() => { setSelectedShapeTool('circle'); handleSelectTool('shape'); }}
               >
                 <Circle className="w-3 h-3" />
               </Button>
@@ -340,7 +340,7 @@ const BottomToolbar = ({
                 variant={selectedShapeTool === 'line' ? 'default' : 'ghost'}
                 size="sm"
                 className="w-6 h-6 p-1 rounded-full sub-tool-button"
-                onClick={() => setSelectedShapeTool('line')}
+                onClick={() => { setSelectedShapeTool('line'); handleSelectTool('shape'); }}
               >
                 <Pen className="w-3 h-3" />
               </Button>
@@ -366,13 +366,13 @@ const BottomToolbar = ({
         {selectedTool === 'stamp' && (
           <StampsPanel
             stampMode={stampMode}
-            setStampMode={setStampMode}
+            setStampMode={(m) => { setStampMode(m); handleSelectTool('stamp'); }}
             newStampName={newStampName}
             setNewStampName={setNewStampName}
             handleCreateStamp={handleCreateStamp}
             stamps={stamps}
             selectedStamp={selectedStamp}
-            handleStampSelect={handleStampSelect}
+            handleStampSelect={(id) => { handleStampSelect(id); handleSelectTool('stamp'); }}
             handleDeleteStamp={handleDeleteStamp}
           />
         )}

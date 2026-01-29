@@ -1733,6 +1733,11 @@ export class TileMapEditor {
                 return; // Exit early, don't paint anything
               }
 
+              // Check if brush stroke is within selection
+              if (!this.isInSelection(x, y)) {
+                return; // Can't paint outside selection
+              }
+
               // If multiple brushes are selected, stamp them as a block
               if (this.multiSelectedBrushes.size > 1) {
                 this.saveState();
@@ -1744,6 +1749,10 @@ export class TileMapEditor {
               newValue = currentLayerActiveGid;
               break;
             case 'eraser':
+              // Check if erase stroke is within selection
+              if (!this.isInSelection(x, y)) {
+                return; // Can't erase outside selection
+              }
               newValue = 0;
               // Also remove any sprite object at this position
               this.removeSpriteObjectAt(layer.type, x, y);
@@ -5651,6 +5660,13 @@ export class TileMapEditor {
     return [...this.selection.tiles];
   }
 
+  private isInSelection(x: number, y: number): boolean {
+    if (!this.selection.active || this.selection.tiles.length === 0) {
+      return true; // If no selection, all tiles are "in selection"
+    }
+    return this.selection.tiles.some(tile => tile.x === x && tile.y === y);
+  }
+
   // Selection operations
   public selectAll(): void {
     const layer = this.tileLayers.find(l => l.id === this.activeLayerId);
@@ -5728,6 +5744,11 @@ export class TileMapEditor {
 
       // Check if this tile matches the target value
       if (layer.data[index] !== targetValue) {
+        continue;
+      }
+
+      // If a selection is active, only fill cells within the selection
+      if (!this.isInSelection(x, y)) {
         continue;
       }
 
@@ -6288,7 +6309,9 @@ export class TileMapEditor {
     if (this.activeLayerId !== null) {
       const layer = this.tileLayers.find(l => l.id === this.activeLayerId);
       if (layer) {
+        this.saveState();
         layer.data.fill(0);
+        this.markAsChanged();
       }
     }
     this.draw();

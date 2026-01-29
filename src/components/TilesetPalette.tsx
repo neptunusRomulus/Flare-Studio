@@ -331,6 +331,9 @@ const TilesetPalette = ({
     const pos = getGridPosition(e);
     if (!pos) return;
 
+    console.log(`[PALETTE_REACT] Canvas mouseDown at (${pos.col}, ${pos.row}), isSelecting=${isSelecting}`);
+    
+    // Normal single/drag selection only
     setIsSelecting(true);
     selectionStartRef.current = pos;
     setSelection({
@@ -339,7 +342,7 @@ const TilesetPalette = ({
       endCol: pos.col,
       endRow: pos.row
     });
-  }, [getGridPosition, isSpacePressed, isPanning]);
+  }, [getGridPosition, isSpacePressed, isPanning, isSelecting]);
 
   const handleCanvasMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!isSelecting) return;
@@ -355,7 +358,10 @@ const TilesetPalette = ({
   }, [getGridPosition, isSelecting]);
 
   const handleCanvasMouseUp = useCallback(() => {
+    console.log(`[PALETTE_REACT] Canvas mouseUp, isSelecting=${isSelecting}, selection=${selection ? 'set' : 'null'}`);
+    
     if (!isSelecting || !selection) {
+      console.log(`[PALETTE_REACT] Early return: isSelecting=${isSelecting}, selection=${selection}`);
       setIsSelecting(false);
       return;
     }
@@ -369,8 +375,31 @@ const TilesetPalette = ({
       const tilesetCols = Math.ceil(imageSize.width / tileSize.width);
       const gid = selection.startRow * tilesetCols + selection.startCol + 1; // GID is 1-indexed
       
+      // Clear multiSelectedBrushes when selecting a single tile
+      // This ensures we don't paint old multi-selection when we want a single brush
+      const editorAny = editor as unknown as Record<string, unknown>;
+      if (typeof editorAny.clearMultiSelectedBrushes === 'function') {
+        (editorAny.clearMultiSelectedBrushes as () => void)();
+        console.log(`[PALETTE_REACT] Single click: cleared multiSelectedBrushes via method`);
+      } else if (typeof editorAny.multiSelectedBrushes === 'object') {
+        const multiSet = editorAny.multiSelectedBrushes as Set<number>;
+        multiSet.clear();
+        console.log(`[PALETTE_REACT] Single click: cleared multiSelectedBrushes directly`);
+      }
+      
+      // Now set the active GID for this single tile
       if (typeof (editor as unknown as { setActiveGid?: (gid: number) => void }).setActiveGid === 'function') {
         (editor as unknown as { setActiveGid: (gid: number) => void }).setActiveGid(gid);
+      }
+      
+      // Switch back to brush tool and tiles mode (setCurrentTool sets both)
+      if (typeof (editor as unknown as { setCurrentTool?: (tool: string) => void }).setCurrentTool === 'function') {
+        (editor as unknown as { setCurrentTool: (tool: string) => void }).setCurrentTool('brush');
+      }
+      
+      // Force tile palette refresh to update the UI
+      if (typeof (editor as unknown as { updateTilePaletteSelection?: () => void }).updateTilePaletteSelection === 'function') {
+        (editor as unknown as { updateTilePaletteSelection: () => void }).updateTilePaletteSelection();
       }
     } else if (!isSingleClick && editor && selection) {
       // Drag selection: create a stamp from selected tiles
@@ -390,6 +419,22 @@ const TilesetPalette = ({
         rows: maxRow - minRow + 1
       };
       
+      // Also populate multiSelectedBrushes with all selected tiles
+      const editorAny = editor as unknown as Record<string, unknown>;
+      if (typeof editorAny.multiSelectedBrushes === 'object') {
+        const multiSet = editorAny.multiSelectedBrushes as Set<number>;
+        multiSet.clear();
+        const tilesetCols = Math.ceil(imageSize.width / tileSize.width);
+        
+        for (let row = minRow; row <= maxRow; row++) {
+          for (let col = minCol; col <= maxCol; col++) {
+            const gid = row * tilesetCols + col + 1; // GID is 1-indexed
+            multiSet.add(gid);
+          }
+        }
+        console.log(`[PALETTE_REACT] Drag selection: populated multiSelectedBrushes with ${multiSet.size} tiles`);
+      }
+      
       // If editor has a method to handle tile selection, call it
       if (typeof (editor as unknown as { setTileSelection?: (sel: typeof selectedTiles) => void }).setTileSelection === 'function') {
         (editor as unknown as { setTileSelection: (sel: typeof selectedTiles) => void }).setTileSelection(selectedTiles);
@@ -397,6 +442,10 @@ const TilesetPalette = ({
     }
 
     setIsSelecting(false);
+    // Also reset panning state if stuck to allow map clicks
+    isPanningRef.current = false;
+    // Keep selection visible! Don't clear it here
+    console.log(`[PALETTE_REACT] Canvas mouseUp complete: isSelecting reset, isPanning reset, selection kept visible`);
   }, [isSelecting, selection, editor, imageSize.width, tileSize.width, tileSize.height]);
 
   // Panning handlers

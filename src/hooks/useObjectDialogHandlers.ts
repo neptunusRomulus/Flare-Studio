@@ -61,7 +61,6 @@ export default function useObjectDialogHandlers({ editingObject, setEditingObjec
           const { npcFileContent } = serializeNpcToFlare(npcFull);
           const npcFilenameClean = existingFilename.replace(/^npcs\//, '');
           await window.electronAPI.writeNpcFile(currentProjectPath, npcFilenameClean, npcFileContent);
-          console.log(`NPC file updated: ${npcFilenameClean}`);
         } catch (error) {
           console.error('Failed to save NPC file:', error);
         }

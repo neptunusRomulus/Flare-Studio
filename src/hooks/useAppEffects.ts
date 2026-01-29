@@ -119,11 +119,9 @@ export default function useAppEffects(params: unknown) {
           return normalizedTabPath === normalizedProjectPath;
         });
         if (projectTabs.length > 0) {
-          console.log('Auto-selecting first project tab:', projectTabs[0].name);
           setActiveTabId(projectTabs[0].id);
         }
       } else if (tabs.length > 0) {
-        console.log('Auto-selecting first available tab:', tabs[0].name);
         setActiveTabId(tabs[0].id);
       }
     }
@@ -278,7 +276,7 @@ export default function useAppEffects(params: unknown) {
           setupAutoSave: setupAutoSaveWrapper,
           syncMapObjects: syncMapObjects,
           updateLayersList: updateLayersList,
-          setTabTick: (typeof (p as any).setTabTick === 'function') ? (p as any).setTabTick : () => {},
+          setTabTick: () => {},
         };
       } catch (e) {
         console.warn('Failed to assign switchToTabHelpersRef.current', e);

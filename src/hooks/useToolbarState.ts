@@ -1,6 +1,9 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useRef } from 'react';
 import useToolbarAutoCollapse from './useToolbarAutoCollapse';
 import useStampState from './useStampState';
+
+// Delay (in ms) before hiding option menus when mouse leaves
+const HIDE_OPTIONS_DELAY = 300;
 
 export default function useToolbarState() {
   const toolbar = useToolbarAutoCollapse();
@@ -14,6 +17,11 @@ export default function useToolbarState() {
   const [hoverCoords, setHoverCoords] = useState<{ x: number; y: number } | null>(null);
   const [selectionCount, setSelectionCount] = useState<number>(0);
   const [hasSelection, setHasSelection] = useState<boolean>(false);
+
+  // Refs for timeout management
+  const brushOptionsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const selectionOptionsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const shapeOptionsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const showToolbarTemporarily = useCallback(() => toolbar.showTemporarily(), [toolbar]);
   const showBottomToolbarTemporarily = useCallback(() => bottomToolbar.showTemporarily(), [bottomToolbar]);
@@ -37,16 +45,37 @@ export default function useToolbarState() {
   const setBrushToolbarNode = (node: HTMLDivElement | null) => { brushToolbar.setContainerRef(node); };
 
   const [showBrushOptions, setShowBrushOptions] = useState(false);
-  const handleShowBrushOptions = useCallback(() => setShowBrushOptions(true), []);
-  const handleHideBrushOptions = useCallback(() => setShowBrushOptions(false), []);
+  const handleShowBrushOptions = useCallback(() => {
+    if (brushOptionsTimeoutRef.current) clearTimeout(brushOptionsTimeoutRef.current);
+    setShowBrushOptions(true);
+  }, []);
+  const handleHideBrushOptions = useCallback(() => {
+    brushOptionsTimeoutRef.current = setTimeout(() => {
+      setShowBrushOptions(false);
+    }, HIDE_OPTIONS_DELAY);
+  }, []);
 
   const [showSelectionOptions, setShowSelectionOptions] = useState(false);
-  const handleShowSelectionOptions = useCallback(() => setShowSelectionOptions(true), []);
-  const handleHideSelectionOptions = useCallback(() => setShowSelectionOptions(false), []);
+  const handleShowSelectionOptions = useCallback(() => {
+    if (selectionOptionsTimeoutRef.current) clearTimeout(selectionOptionsTimeoutRef.current);
+    setShowSelectionOptions(true);
+  }, []);
+  const handleHideSelectionOptions = useCallback(() => {
+    selectionOptionsTimeoutRef.current = setTimeout(() => {
+      setShowSelectionOptions(false);
+    }, HIDE_OPTIONS_DELAY);
+  }, []);
 
   const [showShapeOptions, setShowShapeOptions] = useState(false);
-  const handleShowShapeOptions = useCallback(() => setShowShapeOptions(true), []);
-  const handleHideShapeOptions = useCallback(() => setShowShapeOptions(false), []);
+  const handleShowShapeOptions = useCallback(() => {
+    if (shapeOptionsTimeoutRef.current) clearTimeout(shapeOptionsTimeoutRef.current);
+    setShowShapeOptions(true);
+  }, []);
+  const handleHideShapeOptions = useCallback(() => {
+    shapeOptionsTimeoutRef.current = setTimeout(() => {
+      setShowShapeOptions(false);
+    }, HIDE_OPTIONS_DELAY);
+  }, []);
 
   const stampState = useStampState();
 

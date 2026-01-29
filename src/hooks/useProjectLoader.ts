@@ -153,7 +153,6 @@ export default function useProjectLoader(params: Params) {
       if (window.electronAPI?.readSession) {
         try {
           savedSession = await window.electronAPI.readSession(projectDir);
-          console.log('Loaded session from project:', savedSession?.tabs?.length || 0, 'tabs');
         } catch (e) {
           console.warn('Failed to load session from project:', e);
         }
@@ -184,7 +183,6 @@ export default function useProjectLoader(params: Params) {
             if (mapExists && !existingTabNames.has(savedTab.name)) {
               restoredTabs.push({ id: savedTab.id, name: savedTab.name, projectPath: projectDir, config: null });
               existingTabNames.add(savedTab.name);
-              console.log('Restored tab from session:', savedTab.name);
             }
           }
         }
@@ -195,7 +193,6 @@ export default function useProjectLoader(params: Params) {
           if (!existingTabNames.has(mapNameFromFile)) {
             const tabId = Date.now().toString() + '_' + Math.random().toString(36).substr(2, 9) + '_' + mapNameFromFile;
             newTabs.push({ id: tabId, name: mapNameFromFile, projectPath: projectDir, config: null });
-            console.log('Creating new tab for map:', mapNameFromFile);
           }
         }
 
@@ -207,7 +204,6 @@ export default function useProjectLoader(params: Params) {
           tabToActivate = allProjectTabs[0].id;
         }
 
-        console.log('Final tabs for project:', allProjectTabs.map(t => t.name), 'activating:', tabToActivate);
 
         return [...otherProjectTabs, ...allProjectTabs];
       });
@@ -248,7 +244,6 @@ export default function useProjectLoader(params: Params) {
                     const snapshot = await editor.getProjectData();
                     const safeSnapshot = JSON.parse(JSON.stringify(snapshot));
                     setTabs((prev: EditorTab[]) => prev.map((t: EditorTab) => t.id === prevTab.id ? { ...t, config: safeSnapshot } : t));
-                    console.log('Snapshot saved into prevTab.config before opening project:', { prevTabId: prevTab.id, snapshotKeys: Object.keys(safeSnapshot || {}) });
                   }
                 } catch (err) {
                   console.warn('Failed to persist current editor before opening project:', err);
@@ -260,7 +255,7 @@ export default function useProjectLoader(params: Params) {
           setPendingMapConfig(mapConfig);
         }
       } else {
-        console.log('Opening map project:', projectDir);
+        void 0;
       }
     } catch (error) {
       console.error('Error opening map project:', error);

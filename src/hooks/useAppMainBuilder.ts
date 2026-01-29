@@ -179,16 +179,11 @@ export default function useAppMainBuilder() {
           const activeLayerType = typeof newEditor.getActiveLayerType === 'function'
             ? newEditor.getActiveLayerType()
             : null;
-          console.log('[DEBUG] useAppMainBuilder: After loadProjectData, activeLayerType =', activeLayerType);
           if (activeLayerType && typeof newEditor.updateCurrentTileset === 'function') {
-            console.log('[DEBUG] useAppMainBuilder: Calling updateCurrentTileset for', activeLayerType);
             newEditor.updateCurrentTileset(activeLayerType);
-            console.log('[DEBUG] useAppMainBuilder: updateCurrentTileset completed');
           }
           if (typeof newEditor.refreshTilePalette === 'function') {
-            console.log('[DEBUG] useAppMainBuilder: Calling refreshTilePalette(true) immediately after load');
             newEditor.refreshTilePalette(true);
-            console.log('[DEBUG] useAppMainBuilder: refreshTilePalette(true) completed');
           }
         } catch (e) {
           console.warn('Palette refresh after loadProjectData failed:', e);
@@ -307,7 +302,6 @@ export default function useAppMainBuilder() {
   const objectEditing = useObjectEditing({ editor: null, syncMapObjects, createTabFor, switchToTab, currentProjectPath });
 
   useEffect(() => {
-    console.log('appState.activeLayerId changed', appState.activeLayerId);
   }, [appState.activeLayerId]);
 
   const activeLayer = useMemo(() => appState.layers.find((layer) => layer.id === appState.activeLayerId) ?? null, [appState.activeLayerId, appState.layers]);
@@ -389,7 +383,6 @@ export default function useAppMainBuilder() {
   const [showSettings, setShowSettings] = useState(false);
 
   const sidebarDeps = useMemo(() => {
-    console.log('[DEBUG] useAppMainBuilder sidebarDeps: editor =', !!editor, 'activeLayer =', !!activeLayer, 'activeLayer.type =', activeLayer?.type);
     const projectMapsList = (projectManagerRecord as ProjectManagerView)?.projectMaps ?? [];
     const handleOpenMapFromMapsFolderFn =
       typeof (projectManagerRecord as ProjectManagerView)?.handleOpenMapFromMapsFolder === 'function'

@@ -284,9 +284,6 @@ const useProjectIO = ({
 
             npcFiles.push({ filename, content: lines.join('\n') });
           }
-          if (npcFiles.length > 0) {
-            console.log(`Export: prepared ${npcFiles.length} NPC files`);
-          }
         } catch (npcErr) {
           console.warn('Failed to collect NPC files for export:', npcErr);
         }

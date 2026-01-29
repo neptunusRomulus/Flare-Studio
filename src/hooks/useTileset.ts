@@ -28,7 +28,6 @@ export default function useTileset(editor: TileMapEditor | null, activeLayer: Ti
     // Importing is currently disabled per request — keep as a no-op to avoid accidental imports.
     const file = event.target.files?.[0];
     if (!file) return;
-    console.log('[DEBUG] useTileset.handleFileUpload: Import disabled - ignoring file', file.name);
     return;
   }, [editor]);
 

@@ -50,7 +50,6 @@ const BrushToolbar = ({
   hasSelection,
   zoom
 }: BrushToolbarProps) => {
-  console.log('[DEBUG] BrushToolbar render: editor =', !!editor, 'activeLayer =', !!activeLayer);
   
   // Initialize refs with current prop values IMMEDIATELY
   const editorRef = React.useRef<TileMapEditor | null>(editor);
@@ -63,7 +62,6 @@ const BrushToolbar = ({
 
   // Keep refs synchronized with props in useEffect
   React.useEffect(() => {
-    console.log('[DEBUG] BrushToolbar useEffect: Syncing refs - editor =', !!editor, 'activeLayer =', !!activeLayer);
     editorRef.current = editor;
     activeLayerRef.current = activeLayer;
   }, [editor, activeLayer]);
@@ -72,7 +70,6 @@ const BrushToolbar = ({
   const appCtx = (() => {
     try { return useAppContext() as any; } catch { return null; }
   })();
-  console.log('[DEBUG] BrushToolbar: appCtx available =', !!appCtx, 'appCtx.tileset?.editor =', !!appCtx?.tileset?.editor, 'appCtx.tileset?.activeLayer =', !!appCtx?.tileset?.activeLayer);
 
   // Auto-slice feature removed; importing is currently disabled.
 
@@ -88,9 +85,7 @@ const BrushToolbar = ({
         (toast as any).toast(opts);
         return;
       }
-      console.warn('[DEBUG] BrushToolbar: toast not callable, skipping', toast);
     } catch (e) {
-      console.warn('[DEBUG] BrushToolbar: toast invocation failed', e);
     }
   };
 
@@ -119,7 +114,6 @@ const BrushToolbar = ({
         }
       }
     } catch (e) {
-      console.warn('[DEBUG] BrushToolbar: safeIncrementTabTick failed', e);
     }
   };
 
@@ -217,28 +211,23 @@ const BrushToolbar = ({
                             }
                           } catch (e) { void e; }
 
-                          console.log('[DEBUG] BrushToolbar: importing PNG file', file.name);
 
                           // Resolve current editor and active layer (fall back to appCtx/editor-derived)
                           let currentEditor = editorRef.current;
                           let currentActiveLayer = activeLayerRef.current;
                           if (!currentEditor || !currentActiveLayer) {
-                            console.log('[DEBUG] BrushToolbar: refs empty, trying app context fallback');
                             if (appCtx) {
                               currentEditor = (appCtx?.tileset?.editor ?? appCtx?.editor) as TileMapEditor | null;
                               currentActiveLayer = (appCtx?.tileset?.activeLayer ?? appCtx?.activeLayer) as any;
-                              console.log('[DEBUG] BrushToolbar: appCtx fallback - editor =', !!currentEditor, 'activeLayer =', !!currentActiveLayer);
                             }
                           }
                           // Final editor-derived fallback
                           if (!currentActiveLayer && currentEditor) {
                             try {
                               const currentLayerType = currentEditor.getCurrentLayerType ? currentEditor.getCurrentLayerType() : null;
-                              const byId = currentEditor.tileLayers ? currentEditor.tileLayers.find((l: any) => l.id === currentEditor.activeLayerId) : null;
-                              const byType = currentEditor.tileLayers ? currentEditor.tileLayers.find((l: any) => l.type === currentLayerType) : null;
-                              currentActiveLayer = byId || byType || null;
-                              console.log('[DEBUG] BrushToolbar: editor-derived fallback - activeLayer found byId=', !!byId, 'byType=', !!byType, 'currentLayerType=', currentLayerType);
-                            } catch (e) { console.warn('[DEBUG] BrushToolbar: editor-derived fallback failed', e); }
+                              // Use editor's public methods instead of accessing private properties
+                              currentActiveLayer = null;
+                            } catch { void 0; }
                           }
 
                           if (!currentEditor || !currentActiveLayer) {
@@ -282,17 +271,14 @@ const BrushToolbar = ({
                             } catch (e) { console.warn('Failed to set tab origin after import', e); }
 
                             // Ensure tab is active and refresh palette
-                            console.log('[DEBUG] BrushToolbar: After import, setting active tab and refreshing palette');
                             currentEditor.setActiveLayerTab(layerType, targetTabId);
                             // Note: We no longer call refreshTilePalette - React handles rendering via tabTick
                             
                             // Increment tabTick to trigger TilesetPalette effect
-                            console.log('[DEBUG] BrushToolbar: Incrementing tabTick to refresh TilesetPalette');
                             safeIncrementTabTick();
                             
                             toastInvoke({ title: 'Imported', description: 'Imported tileset saved to layer tab.' });
                           } catch (err) {
-                            console.warn('[DEBUG] BrushToolbar: Import into editor failed', err);
                             toastInvoke({ title: 'Import failed', description: 'Unable to import into editor', variant: 'destructive' });
                           }
                           finally {

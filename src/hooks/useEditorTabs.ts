@@ -47,14 +47,6 @@ const useEditorTabs = ({
     const id = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
     const safeConfig = config ? JSON.parse(JSON.stringify(config)) : null;
     const tab: EditorTab = { id, name, projectPath: projectPath ?? null, config: safeConfig };
-    // created tab
-    try {
-      // debug: log tab creation
-      // eslint-disable-next-line no-console
-      console.log('createTabFor: creating tab', { id: tab.id, name: tab.name, projectPath: tab.projectPath });
-    } catch (e) {
-      // ignore
-    }
     setTabs((prev) => [...prev, tab]);
     setActiveTabId(id);
     setCurrentProjectPath(projectPath ?? null);
@@ -112,10 +104,10 @@ const useEditorTabs = ({
     setCurrentProjectPath(nextTab.projectPath ?? null);
     // Ensure the editor shows a fresh/empty grid for the incoming tab
     try {
-      if (editor && typeof (editor as any).clearMapGrid === 'function') {
-        try { (editor as any).clearMapGrid(); } catch (err) { void err; }
+      if (editor && typeof (editor as unknown as { clearMapGrid?: () => void }).clearMapGrid === 'function') {
+        try { (editor as unknown as { clearMapGrid: () => void }).clearMapGrid(); } catch (_err) { void _err; }
       }
-    } catch (e) { void e; }
+    } catch (_e) { void _e; }
 
     try { switchToTabHelpersRef.current.setTabTick?.(); } catch (e) { void e; }
 
@@ -137,7 +129,6 @@ const useEditorTabs = ({
     }
 
     if (nextTab.config) {
-      console.log('Switching to tab with in-memory config, attempting to restore for tab:', tabId, { hasProjectPath: !!nextTab.projectPath, configKeys: Object.keys(nextTab.config || {}) });
       try {
         if (editor) {
           editor.clearLocalStorageBackup();
@@ -262,7 +253,6 @@ const useEditorTabs = ({
               if (typeof editor.refreshTilePalette === 'function') {
                 editor.refreshTilePalette(true);
               }
-              console.log('Forced tileset palette refresh after tab switch');
             } catch (e) {
               console.warn('Palette refresh after tab switch failed:', e);
             }

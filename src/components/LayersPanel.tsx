@@ -48,7 +48,6 @@ const LayersPanel: React.FC<Props> = ({
   leftCollapsed
 }) => {
   useEffect(() => {
-    try { console.log('[DEBUG] LayersPanel: activeLayerId =', activeLayerId); } catch (e) { /* ignore */ }
   }, [activeLayerId]);
 
   return (

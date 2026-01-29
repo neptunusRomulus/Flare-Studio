@@ -122,8 +122,18 @@ const TilesetPalette = ({
             // This prevents the canvas from being shown with 0 size
           }
         } else {
-          setTilesetImage(null);
-          setImageSize({ width: 0, height: 0 });
+          // Fallback: for layers without tabs (like collision), get the tileset from editor's global tilesetImage
+          const editorTilesetImage = (editor as unknown as { tilesetImage?: HTMLImageElement | null }).tilesetImage;
+          if (editorTilesetImage) {
+            setTilesetImage(editorTilesetImage);
+            setTileSize({ width: DEFAULT_TILE_WIDTH, height: DEFAULT_TILE_HEIGHT });
+            if (editorTilesetImage.complete && editorTilesetImage.naturalWidth > 0 && editorTilesetImage.naturalHeight > 0) {
+              setImageSize({ width: editorTilesetImage.naturalWidth, height: editorTilesetImage.naturalHeight });
+            }
+          } else {
+            setTilesetImage(null);
+            setImageSize({ width: 0, height: 0 });
+          }
         }
       } catch (_err) { void _err; }
     };
@@ -331,8 +341,6 @@ const TilesetPalette = ({
     const pos = getGridPosition(e);
     if (!pos) return;
 
-    console.log(`[PALETTE_REACT] Canvas mouseDown at (${pos.col}, ${pos.row}), isSelecting=${isSelecting}`);
-    
     // Normal single/drag selection only
     setIsSelecting(true);
     selectionStartRef.current = pos;
@@ -358,10 +366,7 @@ const TilesetPalette = ({
   }, [getGridPosition, isSelecting]);
 
   const handleCanvasMouseUp = useCallback(() => {
-    console.log(`[PALETTE_REACT] Canvas mouseUp, isSelecting=${isSelecting}, selection=${selection ? 'set' : 'null'}`);
-    
     if (!isSelecting || !selection) {
-      console.log(`[PALETTE_REACT] Early return: isSelecting=${isSelecting}, selection=${selection}`);
       setIsSelecting(false);
       return;
     }
@@ -380,11 +385,9 @@ const TilesetPalette = ({
       const editorAny = editor as unknown as Record<string, unknown>;
       if (typeof editorAny.clearMultiSelectedBrushes === 'function') {
         (editorAny.clearMultiSelectedBrushes as () => void)();
-        console.log(`[PALETTE_REACT] Single click: cleared multiSelectedBrushes via method`);
       } else if (typeof editorAny.multiSelectedBrushes === 'object') {
         const multiSet = editorAny.multiSelectedBrushes as Set<number>;
         multiSet.clear();
-        console.log(`[PALETTE_REACT] Single click: cleared multiSelectedBrushes directly`);
       }
       
       // Now set the active GID for this single tile
@@ -432,7 +435,6 @@ const TilesetPalette = ({
             multiSet.add(gid);
           }
         }
-        console.log(`[PALETTE_REACT] Drag selection: populated multiSelectedBrushes with ${multiSet.size} tiles`);
       }
       
       // If editor has a method to handle tile selection, call it
@@ -445,7 +447,6 @@ const TilesetPalette = ({
     // Also reset panning state if stuck to allow map clicks
     isPanningRef.current = false;
     // Keep selection visible! Don't clear it here
-    console.log(`[PALETTE_REACT] Canvas mouseUp complete: isSelecting reset, isPanning reset, selection kept visible`);
   }, [isSelecting, selection, editor, imageSize.width, tileSize.width, tileSize.height]);
 
   // Panning handlers

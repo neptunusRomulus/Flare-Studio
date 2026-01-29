@@ -861,48 +861,8 @@ export class TileMapEditor {
     if (this.layerTilesets.has(COLLISION_LAYER_TYPE) || this.collisionTilesetLoading) {
       return;
     }
-
-    const resolvedPath = this.resolveInternalAssetPath(INTERNAL_COLLISION_TILESET);
-    if (!resolvedPath) {
-      
-      return;
-    }
-
-    this.collisionTilesetLoading = true;
-
-    const image = new Image();
-    image.onload = () => {
-      const columns = Math.max(1, Math.floor(image.width / this.tileSizeX));
-      const rows = Math.max(1, Math.floor(image.height / this.tileSizeY));
-      const count = Math.max(1, columns * rows);
-
-      this.layerTilesets.set(COLLISION_LAYER_TYPE, {
-        image,
-        fileName: INTERNAL_COLLISION_TILESET,
-        columns,
-        rows,
-        count,
-        tileWidth: this.tileSizeX,
-        tileHeight: this.tileSizeY,
-        spacing: 0,
-        margin: 0,
-        sourcePath: resolvedPath
-      });
-
-      this.collisionTilesetLoading = false;
-
-      if (this.getCurrentLayerType() === COLLISION_LAYER_TYPE) {
-        this.updateCurrentTileset(COLLISION_LAYER_TYPE);
-        this.draw();
-      }
-    };
-
-    image.onerror = (_error) => {
-      void _error;
-      this.collisionTilesetLoading = false;
-    };
-
-    image.src = resolvedPath;
+    // Load collision tileset if not already loaded
+    this.loadDefaultCollisionTileset();
   }
 
 
@@ -1402,13 +1362,58 @@ export class TileMapEditor {
       }
     } catch (_e) { void _e; }
 
-    this.ensureCollisionTileset();
+    // Load collision tileset as default for every project
+    this.loadDefaultCollisionTileset();
 
     // Initialize per-layer cell tileset key arrays
     for (const l of this.tileLayers) {
       const arr = new Array(this.mapWidth * this.mapHeight).fill(null);
       this.layerCellTilesetKey.set(l.type, arr);
     }
+  }
+
+  private loadDefaultCollisionTileset(): void {
+    const resolvedPath = this.resolveInternalAssetPath(INTERNAL_COLLISION_TILESET);
+    if (!resolvedPath) {
+      return;
+    }
+
+    const image = new Image();
+    image.onload = () => {
+      const columns = Math.max(1, Math.floor(image.width / this.tileSizeX));
+      const rows = Math.max(1, Math.floor(image.height / this.tileSizeY));
+      const count = Math.max(1, columns * rows);
+
+      this.layerTilesets.set(COLLISION_LAYER_TYPE, {
+        image,
+        fileName: INTERNAL_COLLISION_TILESET,
+        columns,
+        rows,
+        count,
+        tileWidth: this.tileSizeX,
+        tileHeight: this.tileSizeY,
+        spacing: 0,
+        margin: 0,
+        sourcePath: resolvedPath
+      });
+
+      this.collisionTilesetLoading = false;
+
+      // If collision layer is currently active, refresh the palette
+      if (this.getCurrentLayerType() === COLLISION_LAYER_TYPE) {
+        this.updateCurrentTileset(COLLISION_LAYER_TYPE);
+        this.refreshTilePalette(true);
+        this.draw();
+      }
+    };
+
+    image.onerror = (_error) => {
+      void _error;
+      this.collisionTilesetLoading = false;
+    };
+
+    this.collisionTilesetLoading = true;
+    image.src = resolvedPath;
   }
 
   private getDraggableActorAt(x: number, y: number): MapObject | null {
@@ -1429,7 +1434,6 @@ export class TileMapEditor {
   }
 
   private handleMouseDown(event: MouseEvent): void {
-    console.log(`[MAP_MOUSEDOWN] handleMouseDown triggered, tool=${this.tool}, button=${event.button}`);
     const rect = this.mapCanvas.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
@@ -1475,23 +1479,18 @@ export class TileMapEditor {
         }
 
         if (this.tool === 'tiles') {
-          console.log(`[MAP_MOUSEDOWN] -> handleTileClick for tool=tiles`);
           this.handleTileClick(tileCoords.x, tileCoords.y, event.button === 2);
         } else if (this.tool === 'selection') {
-          console.log(`[MAP_MOUSEDOWN] -> handleSelectionStart for tool=selection`);
           this.handleSelectionStart(tileCoords.x, tileCoords.y, event.button === 2);
         } else if (this.tool === 'shape') {
-          console.log(`[MAP_MOUSEDOWN] -> handleShapeStart for tool=shape`);
           this.handleShapeStart(tileCoords.x, tileCoords.y, event.button === 2);
         } else if (this.tool === 'eyedropper') {
-          console.log(`[MAP_MOUSEDOWN] -> handleEyedropper for tool=eyedropper`);
           const sampledGid = this.handleEyedropper(tileCoords.x, tileCoords.y);
           if (sampledGid) {
             // Eyedropper was successful, no need to continue with mouse down
             this.isMouseDown = false;
           }
         } else if (this.tool === 'stamp') {
-          console.log(`[MAP_MOUSEDOWN] -> handleStampClick for tool=stamp`);
           this.handleStampClick(tileCoords.x, tileCoords.y, event.button === 2);
         }
       }
@@ -1697,8 +1696,6 @@ export class TileMapEditor {
   }
 
   private handleStampClick(x: number, y: number, isRightClick: boolean): void {
-    console.log(`[STAMP_CLICK] handleStampClick at (${x}, ${y}) rightClick=${isRightClick}, stampMode=${this.currentStampMode}, activeStamp=${this.activeStamp ? 'set' : 'null'}`);
-    
     if (isRightClick) {
       // Right-click clears stamp preview
       this.stampPreview.visible = false;
@@ -1711,14 +1708,11 @@ export class TileMapEditor {
       this.handleSelectionStart(x, y, isRightClick);
     } else if (this.currentStampMode === 'place' && this.activeStamp) {
       // Place the active stamp
-      console.log(`[STAMP_CLICK] Calling placeStamp at (${x}, ${y})`);
       this.placeStamp(x, y);
     }
   }
 
   private handleTileClick(x: number, y: number, isRightClick: boolean): void {
-    console.log(`[MAP_CLICK] handleTileClick at (${x}, ${y}) rightClick=${isRightClick}, multiSelectedBrushes.size=${this.multiSelectedBrushes.size}, multiSelectedBrushes=[${Array.from(this.multiSelectedBrushes.values()).join(',')}]`);
-    
     if (this.activeLayerId !== null) {
       const layer = this.tileLayers.find(l => l.id === this.activeLayerId);
       if (layer) {
@@ -1751,7 +1745,6 @@ export class TileMapEditor {
 
               // If multiple brushes are selected, stamp them as a block
               if (this.multiSelectedBrushes.size > 1) {
-                console.log(`[PAINT] Multi-selection paint triggered! multiSelectedBrushes=[${Array.from(this.multiSelectedBrushes.values()).join(',')}]`);
                 this.saveState();
                 this.placeMultiSelectionAt(x, y);
                 this.markAsChanged();
@@ -5513,8 +5506,6 @@ export class TileMapEditor {
   }
 
   private placeStamp(gridX: number, gridY: number): void {
-    console.log(`[STAMP_PLACE] placeStamp at (${gridX}, ${gridY}), activeStamp=${this.activeStamp ? this.activeStamp.id : 'null'}`);
-    
     if (!this.activeStamp) return;
 
     // Get the target layer
@@ -5663,7 +5654,6 @@ export class TileMapEditor {
             }
             // Clear the layer data (will be rendered via sprite object instead)
             activeLayer.data[targetIndex] = 0;
-            console.log(`[STAMP_PLACE] Cleared old tile at (${targetX}, ${targetY}) oldValue=${oldValue}`);
           }
         }
         
@@ -5715,13 +5705,11 @@ export class TileMapEditor {
         if (stampTile.tileId !== 0) {
           // Remove any existing sprite object at this position so the new stamp replaces it
           const existingValue = targetLayer.data[targetIndex];
-          console.log(`[STAMP_PLACE] Placing tile at (${targetX}, ${targetY}) index=${targetIndex}, oldValue=${existingValue}, newValue=${stampTile.tileId}`);
           if (existingValue && existingValue > 0) {
             this.removeSpriteObjectAt(targetLayer.type, targetX, targetY);
           }
           
           targetLayer.data[targetIndex] = stampTile.tileId;
-          console.log(`[STAMP_PLACE] After set: layer.data[${targetIndex}] = ${targetLayer.data[targetIndex]}`);
           try {
             const lType = targetLayer.type;
             let arr = this.layerCellTilesetKey.get(lType);
@@ -6473,6 +6461,20 @@ export class TileMapEditor {
   }
 
   public updateCurrentTileset(layerType: string): void {
+    // For collision layer, ensure tileset is loaded first
+    if (layerType === COLLISION_LAYER_TYPE && !this.layerTilesets.has(COLLISION_LAYER_TYPE)) {
+      // If collision tileset is not loaded yet, start loading it
+      if (!this.collisionTilesetLoading) {
+        this.ensureCollisionTileset();
+      }
+      // If still loading, defer the palette update until the image is loaded
+      // The image.onload callback will handle updating the palette
+      if (this.collisionTilesetLoading) {
+        console.log('updateCurrentTileset: collision tileset still loading, deferring palette update');
+        return;
+      }
+    }
+    
     const tileset = this.getLayerTilesetOrFallback(layerType);
     if (tileset) {
       console.log('updateCurrentTileset: applying tileset for layer', { layerType, file: tileset.fileName, columns: tileset.columns, rows: tileset.rows, count: tileset.count });

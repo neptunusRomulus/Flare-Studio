@@ -83,6 +83,19 @@ export default function EditorCanvas(props: Props) {
     leftTransitioning
   } = ctx;
 
+  // Ensure the editor is bound to the current canvas element. React may replace the canvas
+  // node during re-renders; call `editor.updateCanvas` when the DOM node is present so the
+  // editor rebinds its mouse events to the live canvas.
+  React.useEffect(() => {
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (!editor || !canvasRef?.current) return;
+    try {
+      editor.updateCanvas(canvasRef.current);
+    } catch (e) {
+      console.warn('EditorCanvas: failed to update editor canvas reference', e);
+    }
+  }, [editor, (canvasRef as any)?.current]);
+
   return (
     <div
       className={`bg-gray-100 flex-1 min-h-0 flex overflow-hidden relative ${draggingNpcId ? 'ring-2 ring-orange-500 ring-inset' : ''}`}

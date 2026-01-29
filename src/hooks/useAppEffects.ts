@@ -225,6 +225,8 @@ export default function useAppEffects(params: unknown) {
     }
   }, [editor, updateLayersList]);
 
+
+
   useEffect(() => {
     try {
       if (typeof syncMapObjects === 'function') syncMapObjects();

@@ -11,32 +11,44 @@ const ClearLayerDialog = ({ open, onClose, onConfirm }: ClearLayerDialogProps) =
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-background border border-border rounded-lg p-6 w-80">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold">Clear Layer</h3>
+    <>
+      {/* Dismissible overlay */}
+      <div className="fixed inset-0 z-40" onClick={onClose} />
+      
+      {/* Chat balloon - centered on screen */}
+      <div className="fixed bottom-16 left-1/2 transform -translate-x-1/2 z-50">
+        <div className="bg-foreground/5 border border-foreground/10 rounded-lg px-3 py-2 backdrop-blur-sm shadow-sm text-xs text-foreground whitespace-nowrap">
+          Are you sure?
+        </div>
+        
+        {/* Arrow pointer down */}
+        <div className="flex justify-center">
+          <div className="w-2 h-2 bg-foreground/5 border-b border-r border-foreground/10 transform rotate-45 -mt-1"></div>
+        </div>
+        
+        {/* Button controls */}
+        <div className="flex justify-center gap-1 mt-1">
           <Button
             variant="ghost"
             size="sm"
-            onClick={onClose}
-            className="w-8 h-8 p-0"
+            onClick={(e) => { e.stopPropagation(); onClose(); }}
+            className="w-6 h-6 p-0 hover:bg-foreground/10"
+            aria-label="Cancel"
           >
-            <X className="w-4 h-4" />
+            <X className="w-3 h-3 text-foreground/60" />
           </Button>
-        </div>
-        <div className="text-sm text-foreground mb-4">
-          Are you sure you want to clear all tiles from the current layer? This action cannot be undone.
-        </div>
-        <div className="flex gap-2 justify-end">
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={onConfirm}>
-            Clear
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={(e) => { e.stopPropagation(); onConfirm(); }}
+            className="w-6 h-6 p-0 hover:bg-foreground/10"
+            aria-label="Confirm"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3 text-foreground/60"><path d="M20 6L9 17l-5-5"/></svg>
           </Button>
         </div>
       </div>
-    </div>
+    </>
   );
 };
 

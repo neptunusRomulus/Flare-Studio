@@ -1429,6 +1429,7 @@ export class TileMapEditor {
   }
 
   private handleMouseDown(event: MouseEvent): void {
+    console.log(`[MAP_MOUSEDOWN] handleMouseDown triggered, tool=${this.tool}, button=${event.button}`);
     const rect = this.mapCanvas.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
@@ -1474,18 +1475,23 @@ export class TileMapEditor {
         }
 
         if (this.tool === 'tiles') {
+          console.log(`[MAP_MOUSEDOWN] -> handleTileClick for tool=tiles`);
           this.handleTileClick(tileCoords.x, tileCoords.y, event.button === 2);
         } else if (this.tool === 'selection') {
+          console.log(`[MAP_MOUSEDOWN] -> handleSelectionStart for tool=selection`);
           this.handleSelectionStart(tileCoords.x, tileCoords.y, event.button === 2);
         } else if (this.tool === 'shape') {
+          console.log(`[MAP_MOUSEDOWN] -> handleShapeStart for tool=shape`);
           this.handleShapeStart(tileCoords.x, tileCoords.y, event.button === 2);
         } else if (this.tool === 'eyedropper') {
+          console.log(`[MAP_MOUSEDOWN] -> handleEyedropper for tool=eyedropper`);
           const sampledGid = this.handleEyedropper(tileCoords.x, tileCoords.y);
           if (sampledGid) {
             // Eyedropper was successful, no need to continue with mouse down
             this.isMouseDown = false;
           }
         } else if (this.tool === 'stamp') {
+          console.log(`[MAP_MOUSEDOWN] -> handleStampClick for tool=stamp`);
           this.handleStampClick(tileCoords.x, tileCoords.y, event.button === 2);
         }
       }
@@ -1691,6 +1697,8 @@ export class TileMapEditor {
   }
 
   private handleStampClick(x: number, y: number, isRightClick: boolean): void {
+    console.log(`[STAMP_CLICK] handleStampClick at (${x}, ${y}) rightClick=${isRightClick}, stampMode=${this.currentStampMode}, activeStamp=${this.activeStamp ? 'set' : 'null'}`);
+    
     if (isRightClick) {
       // Right-click clears stamp preview
       this.stampPreview.visible = false;
@@ -1703,11 +1711,14 @@ export class TileMapEditor {
       this.handleSelectionStart(x, y, isRightClick);
     } else if (this.currentStampMode === 'place' && this.activeStamp) {
       // Place the active stamp
+      console.log(`[STAMP_CLICK] Calling placeStamp at (${x}, ${y})`);
       this.placeStamp(x, y);
     }
   }
 
   private handleTileClick(x: number, y: number, isRightClick: boolean): void {
+    console.log(`[MAP_CLICK] handleTileClick at (${x}, ${y}) rightClick=${isRightClick}, multiSelectedBrushes.size=${this.multiSelectedBrushes.size}, multiSelectedBrushes=[${Array.from(this.multiSelectedBrushes.values()).join(',')}]`);
+    
     if (this.activeLayerId !== null) {
       const layer = this.tileLayers.find(l => l.id === this.activeLayerId);
       if (layer) {
@@ -1740,6 +1751,7 @@ export class TileMapEditor {
 
               // If multiple brushes are selected, stamp them as a block
               if (this.multiSelectedBrushes.size > 1) {
+                console.log(`[PAINT] Multi-selection paint triggered! multiSelectedBrushes=[${Array.from(this.multiSelectedBrushes.values()).join(',')}]`);
                 this.saveState();
                 this.placeMultiSelectionAt(x, y);
                 this.markAsChanged();
@@ -1790,6 +1802,12 @@ export class TileMapEditor {
           console.log(`Current value: ${currentValue}, New value: ${newValue}`);
           console.log(`Active GID for this layer: ${currentLayerActiveGid}`);
           
+          // Remove any existing sprite object at this position when painting a new tile
+          // This ensures only one tile/sprite appears at each cell
+          if (currentValue > 0) {
+            this.removeSpriteObjectAt(layer.type, x, y);
+          }
+          
           layer.data[index] = newValue;
           // Record which tileset (tab) this painted cell came from so tabs don't collide
           try {
@@ -1828,6 +1846,10 @@ export class TileMapEditor {
           }
           
           this.markAsChanged();
+          try {
+            const nonZero = layer.data.reduce((acc, v) => acc + (v && v > 0 ? 1 : 0), 0);
+            console.log(`handleTileClick: applied change layer=${layer.name} id=${layer.id} index=${index} newValue=${newValue} nonZero=${nonZero}`);
+          } catch (e) { void e; }
           this.draw(); // Immediately reflect changes
         }
       }
@@ -1996,7 +2018,7 @@ export class TileMapEditor {
     return null;
   }
 
-  private updateTilePaletteSelection(): void {
+  public updateTilePaletteSelection(): void {
     // Update the active GID display
     const activeGidSpan = document.getElementById('activeGid');
     if (activeGidSpan) {
@@ -3428,9 +3450,137 @@ export class TileMapEditor {
     }
   }
 
-  private createTilePalette(preserveOrder: boolean = false): void {
+  private setupPaletteEventDelegation(): void {
+    console.log('[PALETTE_SETUP] *** CALLED *** Setting up delegated event listener on #tilesContainer');
     const container = document.getElementById('tilesContainer');
-    if (!container || !this.tilesetImage) {
+    console.log('[PALETTE_SETUP] Container found?', !!container, 'children:', container?.children.length);
+    if (!container) {
+      console.error('[PALETTE_SETUP] #tilesContainer not found!');
+      return;
+    }
+
+    // Remove old listeners if they exist
+    if (this.paletteClickListener) {
+      console.log('[PALETTE_SETUP] Removing old palette click listener');
+      container.removeEventListener('click', this.paletteClickListener);
+    }
+
+    // Create a single delegated click listener for all palette tiles
+    this.paletteClickListener = (e: Event) => {
+      console.log('[PALETTE_DELEGATED] Event fired on #tilesContainer, target:', (e.target as HTMLElement)?.tagName);
+      const event = e as MouseEvent;
+      const target = event.target as HTMLElement;
+      
+      // Find the closest wrapper div
+      const wrapper = target.closest('.brush-wrapper') as HTMLDivElement | null;
+      if (!wrapper) {
+        console.log('[PALETTE_DELEGATED] No .brush-wrapper found for target:', target.tagName);
+        return;
+      }
+
+      // Get the tile index from data attribute or nearby canvas
+      const canvas = wrapper.querySelector('canvas') as HTMLCanvasElement | null;
+      if (!canvas) {
+        console.error('[PALETTE_DELEGATED] No canvas found in wrapper');
+        return;
+      }
+
+      const indexStr = canvas.getAttribute('data-tile-index');
+      if (!indexStr) {
+        console.error('[PALETTE_DELEGATED] Canvas has no data-tile-index attribute');
+        return;
+      }
+
+      const tileIndex = parseInt(indexStr, 10);
+      console.log(`[PALETTE_DELEGATED] Click detected on tile ${tileIndex}, ctrlKey=${event.ctrlKey}, metaKey=${event.metaKey}`);
+
+      const brushToolElement = document.getElementById('brushToolState') || document.querySelector('[data-brush-tool]');
+      const currentBrushTool = brushToolElement?.getAttribute('data-brush-tool') || 'none';
+      console.log(`[PALETTE_DELEGATED] Brush tool: ${currentBrushTool}`);
+
+      if (currentBrushTool === 'merge') {
+        console.log('Handling merge tool selection (no auto-merge)');
+        this.handleBrushMerge(tileIndex, wrapper);
+        return;
+      }
+
+      if (currentBrushTool === 'separate') {
+        console.log('Handling separate tool');
+        this.handleBrushSeparate(tileIndex);
+        return;
+      }
+
+      if (currentBrushTool === 'remove') {
+        console.log('Handling remove tool');
+        this.handleBrushRemove(tileIndex);
+        return;
+      }
+
+      // Normal tile selection - support Ctrl/Cmd multi-select
+      const isCtrl = (event.ctrlKey || event.metaKey);
+      if (isCtrl) {
+        if (this.multiSelectedBrushes.has(tileIndex)) {
+          this.multiSelectedBrushes.delete(tileIndex);
+          console.log(`[PALETTE] Ctrl+Click: deselected tile ${tileIndex}, multiSelectedBrushes.size now = ${this.multiSelectedBrushes.size}`);
+        } else {
+          this.multiSelectedBrushes.add(tileIndex);
+          console.log(`[PALETTE] Ctrl+Click: selected tile ${tileIndex}, multiSelectedBrushes.size now = ${this.multiSelectedBrushes.size}`);
+        }
+
+        if (this.multiSelectedBrushes.size === 1) {
+          const only = Array.from(this.multiSelectedBrushes.values())[0];
+          this.setCurrentLayerActiveGid(only);
+        }
+        console.log(`[PALETTE] Current multiSelectedBrushes: [${Array.from(this.multiSelectedBrushes.values()).join(',')}]`);
+        this.updateActiveTile();
+        return;
+      }
+
+      // Single selection: clear multi-selection and select this tile
+      console.log(`[PALETTE] Single click on tile ${tileIndex}, clearing multiSelectedBrushes (was size=${this.multiSelectedBrushes.size})`);
+      this.multiSelectedBrushes.clear();
+      this.setCurrentLayerActiveGid(tileIndex);
+      this.updateActiveTile();
+    };
+
+    console.log('[PALETTE_SETUP] About to add event listener to container');
+    container.addEventListener('click', this.paletteClickListener as EventListener);
+    console.log('[PALETTE_DELEGATED] ✓ Event delegation listener successfully attached to #tilesContainer');
+  }
+
+  private paletteClickListener: ((e: Event) => void) | null = null;
+
+  private createTilePaletteRetries = 0;
+  private maxPaletteRetries = 10;
+
+  private createTilePalette(preserveOrder: boolean = false): void {
+    console.log('[PALETTE_SETUP] *** createTilePalette CALLED ***');
+    
+    // Try to find or create the tilesContainer
+    let container = document.getElementById('tilesContainer');
+    
+    if (!container) {
+      // Container doesn't exist - this app uses React palette now
+      // Try to find the palette wrapper or create a container
+      const appMain = document.querySelector('[class*="flex"]') || document.body;
+      
+      // Create the container if it doesn't exist
+      container = document.createElement('div');
+      container.id = 'tilesContainer';
+      container.className = 'tiles-grid';
+      container.style.display = 'none'; // Hidden - used only for event delegation
+      
+      if (appMain && appMain !== document.body) {
+        appMain.appendChild(container);
+      } else {
+        document.body.appendChild(container);
+      }
+      
+      console.log('[PALETTE_SETUP] Created new #tilesContainer');
+    }
+    
+    if (!this.tilesetImage) {
+      console.log('[PALETTE_SETUP] Exiting: no tilesetImage');
       return;
     }
     
@@ -3662,6 +3812,7 @@ export class TileMapEditor {
       canvas.width = tile.width;
       canvas.height = tile.height;
       canvas.className = 'palette-tile';
+      canvas.setAttribute('data-tile-index', tile.index.toString());
       
       // Add size information as CSS custom properties for consistent display
       canvas.style.setProperty('--tile-width', `${tile.width}px`);
@@ -3793,57 +3944,8 @@ export class TileMapEditor {
         this.handleBrushRemove(tile.index);
       });
       
-      canvas.addEventListener('click', (e: MouseEvent) => {
-        e.preventDefault();
-
-        const brushToolElement = getBrushToolEl();
-        const currentBrushTool = brushToolElement?.getAttribute('data-brush-tool') || 'none';
-
-        console.log(`Tile clicked! Index: ${tile.index}, Current brush tool: ${currentBrushTool}`);
-
-        if (currentBrushTool === 'merge') {
-          // Keep merge UI but do not auto-merge; allow manual merge via tool
-          console.log('Handling merge tool selection (no auto-merge)');
-          this.handleBrushMerge(tile.index, wrapper);
-          return;
-        }
-
-        if (currentBrushTool === 'separate') {
-          console.log('Handling separate tool');
-          this.handleBrushSeparate(tile.index);
-          return;
-        }
-
-        if (currentBrushTool === 'remove') {
-          console.log('Handling remove tool');
-          this.handleBrushRemove(tile.index);
-          return;
-        }
-
-        // Normal tile selection - support Ctrl/Cmd multi-select of palette tiles
-        const isCtrl = (e.ctrlKey || e.metaKey);
-        if (isCtrl) {
-          // Toggle inclusion in multi-selected set
-          if (this.multiSelectedBrushes.has(tile.index)) {
-            this.multiSelectedBrushes.delete(tile.index);
-          } else {
-            this.multiSelectedBrushes.add(tile.index);
-          }
-
-          // If there's exactly one selected, set it active; otherwise keep active as first
-          if (this.multiSelectedBrushes.size === 1) {
-            const only = Array.from(this.multiSelectedBrushes.values())[0];
-            this.setCurrentLayerActiveGid(only);
-          }
-          this.updateActiveTile();
-          return;
-        }
-
-        // Single selection: clear multi-selection and select this tile
-        this.multiSelectedBrushes.clear();
-        this.setCurrentLayerActiveGid(tile.index);
-        this.updateActiveTile();
-      });
+      // NOTE: Canvas click handling is now done via delegated event listener on #tilesContainer
+      // This ensures that Ctrl+Click for multi-selection and other palette interactions work properly
       
       // Add drag and drop functionality for move tool
       wrapper.draggable = false; // Will be set to true when move tool is active
@@ -3986,6 +4088,11 @@ export class TileMapEditor {
       wrapper.appendChild(mergeIcon);
       container.appendChild(wrapper);
     }
+
+    // Setup delegated event listener NOW that container is populated
+    console.log('[PALETTE_SETUP] About to call setupPaletteEventDelegation from createTilePalette');
+    this.setupPaletteEventDelegation();
+    console.log('[PALETTE_SETUP] Returned from setupPaletteEventDelegation');
   }
 
   // Brush management interaction handlers
@@ -5062,6 +5169,14 @@ export class TileMapEditor {
   // Clear all tile data and objects on the map (reset to empty grid)
   public clearMapGrid(): void {
     try {
+      // Log counts before clearing for debugging
+      try {
+        for (const layer of this.tileLayers) {
+          const nonZero = layer.data.reduce((acc, v) => acc + (v && v > 0 ? 1 : 0), 0);
+          console.log(`clearMapGrid: before clear layer=${layer.name} id=${layer.id} nonZero=${nonZero}`);
+        }
+      } catch (e) { void e; }
+
       this.collisionData = new Array(this.mapWidth * this.mapHeight).fill(0);
       for (const layer of this.tileLayers) {
         layer.data = new Array(this.mapWidth * this.mapHeight).fill(0);
@@ -5074,6 +5189,12 @@ export class TileMapEditor {
       this.objects = [];
       try { this.detectedTileData.clear(); } catch { /* ignore */ }
       this.clearSelection();
+      try {
+        for (const layer of this.tileLayers) {
+          const nonZero = layer.data.reduce((acc, v) => acc + (v && v > 0 ? 1 : 0), 0);
+          console.log(`clearMapGrid: after clear layer=${layer.name} id=${layer.id} nonZero=${nonZero}`);
+        }
+      } catch (e) { void e; }
       this.draw();
     } catch (_e) {
       // eslint-disable-next-line no-console
@@ -5137,6 +5258,15 @@ export class TileMapEditor {
 
   public getCurrentTool(): 'brush' | 'eraser' | 'bucket' {
     return this.currentTool;
+  }
+
+  // Clear any multi-selected brushes and reset to single brush selection
+  public clearMultiSelectedBrushes(): void {
+    if (this.multiSelectedBrushes.size > 0) {
+      this.multiSelectedBrushes.clear();
+      // Trigger a palette refresh to update the UI
+      this.updateTilePaletteSelection();
+    }
   }
 
   // Selection tool management methods
@@ -5383,6 +5513,8 @@ export class TileMapEditor {
   }
 
   private placeStamp(gridX: number, gridY: number): void {
+    console.log(`[STAMP_PLACE] placeStamp at (${gridX}, ${gridY}), activeStamp=${this.activeStamp ? this.activeStamp.id : 'null'}`);
+    
     if (!this.activeStamp) return;
 
     // Get the target layer
@@ -5517,6 +5649,24 @@ export class TileMapEditor {
           spriteObjects.splice(existingIndex, 1);
         }
         
+        // ALSO clear old tiles in layer.data for the stamp region
+        // This ensures old painted tiles are removed when placing a sprite object stamp
+        for (const stampTile of this.activeStamp.tiles) {
+          const targetX = gridX + stampTile.x;
+          const targetY = gridY + stampTile.y;
+          if (targetX >= 0 && targetX < this.mapWidth && targetY >= 0 && targetY < this.mapHeight) {
+            const targetIndex = targetY * this.mapWidth + targetX;
+            // Remove old sprite object at each cell
+            const oldValue = activeLayer.data[targetIndex];
+            if (oldValue && oldValue > 0) {
+              this.removeSpriteObjectAt(activeLayer.type, targetX, targetY);
+            }
+            // Clear the layer data (will be rendered via sprite object instead)
+            activeLayer.data[targetIndex] = 0;
+            console.log(`[STAMP_PLACE] Cleared old tile at (${targetX}, ${targetY}) oldValue=${oldValue}`);
+          }
+        }
+        
         spriteObjects.push({
           id: this.nextSpriteObjectId++,
           anchorX,
@@ -5563,7 +5713,15 @@ export class TileMapEditor {
 
       if (targetLayer) {
         if (stampTile.tileId !== 0) {
+          // Remove any existing sprite object at this position so the new stamp replaces it
+          const existingValue = targetLayer.data[targetIndex];
+          console.log(`[STAMP_PLACE] Placing tile at (${targetX}, ${targetY}) index=${targetIndex}, oldValue=${existingValue}, newValue=${stampTile.tileId}`);
+          if (existingValue && existingValue > 0) {
+            this.removeSpriteObjectAt(targetLayer.type, targetX, targetY);
+          }
+          
           targetLayer.data[targetIndex] = stampTile.tileId;
+          console.log(`[STAMP_PLACE] After set: layer.data[${targetIndex}] = ${targetLayer.data[targetIndex]}`);
           try {
             const lType = targetLayer.type;
             let arr = this.layerCellTilesetKey.get(lType);
@@ -5602,7 +5760,11 @@ export class TileMapEditor {
    * are placed in the order they were selected.
    */
   private buildStampFromMultiSelection(): Stamp | null {
-    if (this.multiSelectedBrushes.size === 0) return null;
+    console.log(`[STAMP] buildStampFromMultiSelection called, multiSelectedBrushes=[${Array.from(this.multiSelectedBrushes.values()).join(',')}]`);
+    if (this.multiSelectedBrushes.size === 0) {
+      console.log(`[STAMP] No brushes selected, returning null`);
+      return null;
+    }
     const gids = Array.from(this.multiSelectedBrushes.values());
     const n = gids.length;
     const cols = Math.ceil(Math.sqrt(n));
@@ -5617,6 +5779,8 @@ export class TileMapEditor {
 
     }
 
+    console.log(`[STAMP] Built stamp with ${tiles.length} tiles, ${cols}x${rows} layout`);
+
     return {
       id: `multiselection-${Date.now()}`,
       name: 'MultiSelectStamp',
@@ -5630,15 +5794,72 @@ export class TileMapEditor {
     const stamp = this.buildStampFromMultiSelection();
     if (!stamp) return;
 
+    console.log(`placeMultiSelectionAt: starting at gridX=${gridX} gridY=${gridY} with ${stamp.tiles.length} tiles`);
+
     // Place each tile relative to gridX/gridY
     for (const t of stamp.tiles) {
       const targetX = gridX + t.x;
       const targetY = gridY + t.y;
-      if (targetX < 0 || targetY < 0 || targetX >= this.mapWidth || targetY >= this.mapHeight) continue;
+      if (targetX < 0 || targetY < 0 || targetX >= this.mapWidth || targetY >= this.mapHeight) {
+        console.log(`  [SKIP] tile at (${targetX}, ${targetY}) is out of bounds`);
+        continue;
+      }
       const index = targetY * this.mapWidth + targetX;
       const layer = this.tileLayers.find(l => l.id === (t.layerId || this.activeLayerId));
       if (layer) {
+        const oldValue = layer.data[index];
+        console.log(`  [PLACE] layer=${layer.name} (${targetX},${targetY}) index=${index} oldValue=${oldValue} newValue=${t.tileId}`);
+        
+        // Remove any existing sprite/object at this position so the new stamp replaces it
+        try {
+          const existing = layer.data[index];
+          if (existing && existing > 0) {
+            console.log(`    [REMOVE_OBJECT] removing sprite object at (${targetX}, ${targetY})`);
+            this.removeSpriteObjectAt(layer.type, targetX, targetY);
+          }
+        } catch (e) { 
+          console.error(`    [ERROR] failed to remove object:`, e);
+          void e; 
+        }
+
         layer.data[index] = t.tileId;
+        console.log(`    [VERIFY] after set: layer.data[${index}] = ${layer.data[index]}`);
+
+        // Record which tileset (tab) this painted cell came from so tabs don't collide
+        try {
+          const layerType = layer.type;
+          let arr = this.layerCellTilesetKey.get(layerType);
+          if (!arr) {
+            arr = new Array(this.mapWidth * this.mapHeight).fill(null);
+            this.layerCellTilesetKey.set(layerType, arr);
+          }
+          // Determine current active tab tileset fileName if available
+          let tilesetFileName: string | null = null;
+          const activeTabId = this.layerActiveTabId.get(layerType);
+          const tabs = this.layerTabs.get(layerType) || [];
+          if (activeTabId) {
+            const tab = tabs.find(t2 => t2.id === activeTabId);
+            if (tab && tab.tileset && tab.tileset.fileName) tilesetFileName = tab.tileset.fileName;
+          }
+          // Fallback to layer tileset or global tileset
+          if (!tilesetFileName) {
+            const lt = this.layerTilesets.get(layerType);
+            if (lt && lt.fileName) tilesetFileName = lt.fileName;
+          }
+          if (!tilesetFileName && this.tilesetFileName) tilesetFileName = this.tilesetFileName;
+          arr[index] = tilesetFileName;
+        } catch (_e) { void _e; }
+
+        // Handle object creation based on layer type for placed tiles
+        try {
+          if (layer.type === 'event' || layer.type === 'enemy' || layer.type === 'npc' || layer.type === 'object') {
+            if (t.tileId > 0) {
+              this.createObjectFromTile(targetX, targetY, layer.type, t.tileId);
+            } else {
+              this.removeObjectAtPosition(targetX, targetY);
+            }
+          }
+        } catch (e) { void e; }
       }
     }
 
@@ -6311,6 +6532,13 @@ export class TileMapEditor {
       if (layer) {
         this.saveState();
         layer.data.fill(0);
+        
+        // Also remove all sprite objects for this layer to ensure a clean clear
+        const spriteObjects = this.placedSpriteObjects.get(layer.type);
+        if (spriteObjects) {
+          spriteObjects.length = 0; // Clear the array
+        }
+        
         this.markAsChanged();
       }
     }

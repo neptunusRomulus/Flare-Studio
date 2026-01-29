@@ -31,7 +31,6 @@ const useProjectSession = ({ tabs, activeTabId, currentProjectPath }: SessionOpt
       const uniqueTabs = projectTabs.filter(t => {
         const lowerName = t.name.toLowerCase();
         if (seenNames.has(lowerName)) {
-          console.log('Session save: removing duplicate tab:', t.name);
           return false;
         }
         seenNames.add(lowerName);
@@ -48,10 +47,7 @@ const useProjectSession = ({ tabs, activeTabId, currentProjectPath }: SessionOpt
           lastOpened: new Date().toISOString()
         };
         await window.electronAPI.writeSession(currentProjectPath, sessionData);
-        console.log('Session saved to project:', currentProjectPath, uniqueTabs.length, 'tabs');
-      } catch (e) {
-        console.warn('Failed to save session to project:', e);
-      }
+      } catch (_e) { void _e; }
     };
 
     void saveSession();

@@ -79,7 +79,6 @@ const useToolbarHandlers = ({
 
     try {
       editor.separateBrush(brushToSeparate);
-      console.log(`Separated brush with ID: ${brushToSeparate}`);
     } catch (error) {
       console.error('Failed to separate brush:', error);
     }

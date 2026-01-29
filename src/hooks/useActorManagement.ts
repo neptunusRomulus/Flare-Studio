@@ -120,7 +120,6 @@ export default function useActorManagement({
         });
         if (result.success && result.filename) {
           npcFilename = result.filename;
-          console.log('NPC file created:', result.filePath);
         } else if (result.error) {
           console.error('Failed to create NPC file:', result.error);
         }

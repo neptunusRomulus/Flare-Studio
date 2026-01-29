@@ -40,8 +40,6 @@ type BottomToolbarProps = {
   handleHideBrushOptions: () => void;
   selectedBrushTool: 'brush' | 'bucket' | 'eraser' | 'clear';
   setSelectedBrushTool: React.Dispatch<React.SetStateAction<'brush' | 'bucket' | 'eraser' | 'clear'>>;
-  showTooltipWithDelay: (text: React.ReactNode, target: HTMLElement) => void;
-  hideTooltip: () => void;
   setShowClearLayerDialog: React.Dispatch<React.SetStateAction<boolean>>;
   
   showSelectionOptions: boolean;
@@ -82,8 +80,6 @@ const BottomToolbar = ({
   handleHideBrushOptions,
   selectedBrushTool,
   setSelectedBrushTool,
-  showTooltipWithDelay,
-  hideTooltip,
   setShowClearLayerDialog,
   showSelectionOptions,
   handleShowSelectionOptions,
@@ -157,69 +153,70 @@ const BottomToolbar = ({
       <div
         className={`relative flex-shrink-0 transition-all duration-300 ease-out ${bottomToolbarExpanded || selectedTool === 'brush' ? 'opacity-100 scale-100 max-w-[3rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
       >
-        <Button
-          variant={selectedTool === 'brush' ? 'default' : 'ghost'}
-          size="sm"
-          className="w-7 h-7 p-1 rounded-full tool-button"
-          onClick={() => handleSelectTool('brush')}
-          onMouseEnter={(event) => {
-            handleShowBrushOptions();
-            showTooltipWithDelay('Brush Tool', event.currentTarget);
-          }}
-          onMouseLeave={() => {
-            handleHideBrushOptions();
-            hideTooltip();
-          }}
-        >
-          {renderBrushIcon()}
-        </Button>
+        <Tooltip content="Brush Tool" side="left">
+          <Button
+            variant={selectedTool === 'brush' ? 'default' : 'ghost'}
+            size="sm"
+            className="w-7 h-7 p-1 rounded-full tool-button"
+            onClick={() => handleSelectTool('brush')}
+            onMouseEnter={(event) => {
+              handleShowBrushOptions();
+            }}
+            onMouseLeave={() => {
+              handleHideBrushOptions();
+            }}
+          >
+            {renderBrushIcon()}
+          </Button>
+        </Tooltip>
 
         {showBrushOptions && (
           <div
-            className="absolute bottom-full left-0 mb-1 bg-white dark:bg-neutral-900 border border-border rounded shadow-lg p-1 flex gap-1 min-w-max z-50"
+            className="absolute bottom-full left-0 mb-1 bg-white dark:bg-neutral-900 border border-border rounded shadow-lg p-1 flex gap-1 min-w-max z-50 animate-in fade-in zoom-in-95 duration-200"
+            style={{ animation: 'fadeInUp 0.2s ease-out' }}
             onMouseEnter={handleShowBrushOptions}
             onMouseLeave={handleHideBrushOptions}
           >
-            <Button
-              variant={selectedBrushTool === 'brush' ? 'default' : 'ghost'}
-              size="sm"
-              className="w-6 h-6 p-1 rounded-full sub-tool-button"
-              onClick={() => setSelectedBrushTool('brush')}
-              onMouseEnter={(event) => showTooltipWithDelay('Brush Tool', event.currentTarget)}
-              onMouseLeave={hideTooltip}
-            >
-              <Paintbrush2 className="w-3 h-3" />
-            </Button>
-            <Button
-              variant={selectedBrushTool === 'bucket' ? 'default' : 'ghost'}
-              size="sm"
-              className="w-6 h-6 p-1 rounded-full sub-tool-button"
-              onClick={() => setSelectedBrushTool('bucket')}
-              onMouseEnter={(event) => showTooltipWithDelay('Bucket Fill', event.currentTarget)}
-              onMouseLeave={hideTooltip}
-            >
-              <PaintBucket className="w-3 h-3" />
-            </Button>
-            <Button
-              variant={selectedBrushTool === 'eraser' ? 'default' : 'ghost'}
-              size="sm"
-              className="w-6 h-6 p-1 rounded-full sub-tool-button"
-              onClick={() => setSelectedBrushTool('eraser')}
-              onMouseEnter={(event) => showTooltipWithDelay('Eraser', event.currentTarget)}
-              onMouseLeave={hideTooltip}
-            >
-              <Eraser className="w-3 h-3" />
-            </Button>
-            <Button
-              variant={selectedBrushTool === 'clear' ? 'default' : 'ghost'}
-              size="sm"
-              className="w-6 h-6 p-1 rounded-full sub-tool-button border-red-500 hover:border-red-600 hover:bg-red-50"
-              onClick={() => setShowClearLayerDialog(true)}
-              onMouseEnter={(event) => showTooltipWithDelay('Clear Layer', event.currentTarget)}
-              onMouseLeave={hideTooltip}
-            >
-              <X className="w-3 h-3 text-red-500" />
-            </Button>
+            <Tooltip content="Brush" side="top">
+              <Button
+                variant={selectedBrushTool === 'brush' ? 'default' : 'ghost'}
+                size="sm"
+                className="w-6 h-6 p-1 rounded-full sub-tool-button"
+                onClick={() => setSelectedBrushTool('brush')}
+              >
+                <Paintbrush2 className="w-3 h-3" />
+              </Button>
+            </Tooltip>
+            <Tooltip content="Bucket Fill" side="top">
+              <Button
+                variant={selectedBrushTool === 'bucket' ? 'default' : 'ghost'}
+                size="sm"
+                className="w-6 h-6 p-1 rounded-full sub-tool-button"
+                onClick={() => setSelectedBrushTool('bucket')}
+              >
+                <PaintBucket className="w-3 h-3" />
+              </Button>
+            </Tooltip>
+            <Tooltip content="Eraser" side="top">
+              <Button
+                variant={selectedBrushTool === 'eraser' ? 'default' : 'ghost'}
+                size="sm"
+                className="w-6 h-6 p-1 rounded-full sub-tool-button"
+                onClick={() => setSelectedBrushTool('eraser')}
+              >
+                <Eraser className="w-3 h-3" />
+              </Button>
+            </Tooltip>
+            <Tooltip content="Clear Layer" side="top">
+              <Button
+                variant={selectedBrushTool === 'clear' ? 'default' : 'ghost'}
+                size="sm"
+                className="w-6 h-6 p-1 rounded-full sub-tool-button border-red-500 hover:border-red-600 hover:bg-red-50"
+                onClick={() => setShowClearLayerDialog(true)}
+              >
+                <X className="w-3 h-3 text-red-500" />
+              </Button>
+            </Tooltip>
           </div>
         )}
       </div>
@@ -227,69 +224,70 @@ const BottomToolbar = ({
       <div
         className={`relative flex-shrink-0 transition-all duration-300 ease-out ${bottomToolbarExpanded || selectedTool === 'selection' ? 'opacity-100 scale-100 max-w-[3rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
       >
-        <Button
-          variant={selectedTool === 'selection' ? 'default' : 'ghost'}
-          size="sm"
-          className="w-7 h-7 p-1 rounded-full tool-button"
-          onClick={() => handleSelectTool('selection')}
-          onMouseEnter={(event) => {
-            handleShowSelectionOptions();
-            showTooltipWithDelay('Selection Tool', event.currentTarget);
-          }}
-          onMouseLeave={() => {
-            handleHideSelectionOptions();
-            hideTooltip();
-          }}
-        >
-          {renderSelectionIcon()}
-        </Button>
+        <Tooltip content="Selection Tool" side="left">
+          <Button
+            variant={selectedTool === 'selection' ? 'default' : 'ghost'}
+            size="sm"
+            className="w-7 h-7 p-1 rounded-full tool-button"
+            onClick={() => handleSelectTool('selection')}
+            onMouseEnter={() => {
+              handleShowSelectionOptions();
+            }}
+            onMouseLeave={() => {
+              handleHideSelectionOptions();
+            }}
+          >
+            {renderSelectionIcon()}
+          </Button>
+        </Tooltip>
 
         {showSelectionOptions && (
           <div
-            className="absolute bottom-full left-0 mb-1 bg-white dark:bg-neutral-900 border border-border rounded shadow-lg p-1 flex gap-1 min-w-max z-50"
+            className="absolute bottom-full left-0 mb-1 bg-white dark:bg-neutral-900 border border-border rounded shadow-lg p-1 flex gap-1 min-w-max z-50 animate-in fade-in zoom-in-95 duration-200"
+            style={{ animation: 'fadeInUp 0.2s ease-out' }}
             onMouseEnter={handleShowSelectionOptions}
             onMouseLeave={handleHideSelectionOptions}
           >
-            <Button
-              variant={selectedSelectionTool === 'rectangular' ? 'default' : 'ghost'}
-              size="sm"
-              className="w-6 h-6 p-1 rounded-full sub-tool-button"
-              onClick={() => setSelectedSelectionTool('rectangular')}
-              onMouseEnter={(event) => showTooltipWithDelay('Rectangular Selection', event.currentTarget)}
-              onMouseLeave={hideTooltip}
-            >
-              <Square className="w-3 h-3" />
-            </Button>
-            <Button
-              variant={selectedSelectionTool === 'magic-wand' ? 'default' : 'ghost'}
-              size="sm"
-              className="w-6 h-6 p-1 rounded-full sub-tool-button"
-              onClick={() => setSelectedSelectionTool('magic-wand')}
-              onMouseEnter={(event) => showTooltipWithDelay('Magic Wand', event.currentTarget)}
-              onMouseLeave={hideTooltip}
-            >
-              <Wand2 className="w-3 h-3" />
-            </Button>
-            <Button
-              variant={selectedSelectionTool === 'same-tile' ? 'default' : 'ghost'}
-              size="sm"
-              className="w-6 h-6 p-1 rounded-full sub-tool-button"
-              onClick={() => setSelectedSelectionTool('same-tile')}
-              onMouseEnter={(event) => showTooltipWithDelay('Select Same Tile', event.currentTarget)}
-              onMouseLeave={hideTooltip}
-            >
-              <Target className="w-3 h-3" />
-            </Button>
-            <Button
-              variant={selectedSelectionTool === 'circular' ? 'default' : 'ghost'}
-              size="sm"
-              className="w-6 h-6 p-1 rounded-full sub-tool-button"
-              onClick={() => setSelectedSelectionTool('circular')}
-              onMouseEnter={(event) => showTooltipWithDelay('Circular Select', event.currentTarget)}
-              onMouseLeave={hideTooltip}
-            >
-              <Circle className="w-3 h-3" />
-            </Button>
+            <Tooltip content="Rectangle" side="top">
+              <Button
+                variant={selectedSelectionTool === 'rectangular' ? 'default' : 'ghost'}
+                size="sm"
+                className="w-6 h-6 p-1 rounded-full sub-tool-button"
+                onClick={() => setSelectedSelectionTool('rectangular')}
+              >
+                <Square className="w-3 h-3" />
+              </Button>
+            </Tooltip>
+            <Tooltip content="Magic Wand" side="top">
+              <Button
+                variant={selectedSelectionTool === 'magic-wand' ? 'default' : 'ghost'}
+                size="sm"
+                className="w-6 h-6 p-1 rounded-full sub-tool-button"
+                onClick={() => setSelectedSelectionTool('magic-wand')}
+              >
+                <Wand2 className="w-3 h-3" />
+              </Button>
+            </Tooltip>
+            <Tooltip content="Select Same Tile" side="top">
+              <Button
+                variant={selectedSelectionTool === 'same-tile' ? 'default' : 'ghost'}
+                size="sm"
+                className="w-6 h-6 p-1 rounded-full sub-tool-button"
+                onClick={() => setSelectedSelectionTool('same-tile')}
+              >
+                <Target className="w-3 h-3" />
+              </Button>
+            </Tooltip>
+            <Tooltip content="Circle" side="top">
+              <Button
+                variant={selectedSelectionTool === 'circular' ? 'default' : 'ghost'}
+                size="sm"
+                className="w-6 h-6 p-1 rounded-full sub-tool-button"
+                onClick={() => setSelectedSelectionTool('circular')}
+              >
+                <Circle className="w-3 h-3" />
+              </Button>
+            </Tooltip>
           </div>
         )}
       </div>
@@ -297,24 +295,27 @@ const BottomToolbar = ({
       <div
         className={`relative flex-shrink-0 transition-all duration-300 ease-out ${bottomToolbarExpanded || selectedTool === 'shape' ? 'opacity-100 scale-100 max-w-[3rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
       >
-        <Button
-          variant={selectedTool === 'shape' ? 'default' : 'ghost'}
-          size="sm"
-          className="w-7 h-7 p-1 rounded-full tool-button"
-          onClick={() => handleSelectTool('shape')}
-          onMouseEnter={(event) => { handleShowShapeOptions(); showTooltipWithDelay('Shape Tool', event.currentTarget); }}
-          onMouseLeave={() => { handleHideShapeOptions(); hideTooltip(); }}
-        >
-          {renderShapeIcon()}
-        </Button>
+        <Tooltip content="Shape Tool" side="left">
+          <Button
+            variant={selectedTool === 'shape' ? 'default' : 'ghost'}
+            size="sm"
+            className="w-7 h-7 p-1 rounded-full tool-button"
+            onClick={() => handleSelectTool('shape')}
+            onMouseEnter={() => { handleShowShapeOptions(); }}
+            onMouseLeave={() => { handleHideShapeOptions(); }}
+          >
+            {renderShapeIcon()}
+          </Button>
+        </Tooltip>
 
         {showShapeOptions && (
           <div
-            className="absolute bottom-full left-0 mb-1 bg-white dark:bg-neutral-900 border border-border rounded shadow-lg p-1 flex gap-1 min-w-max z-50"
+            className="absolute bottom-full left-0 mb-1 bg-white dark:bg-neutral-900 border border-border rounded shadow-lg p-1 flex gap-1 min-w-max z-50 animate-in fade-in zoom-in-95 duration-200"
+            style={{ animation: 'fadeInUp 0.2s ease-out' }}
             onMouseEnter={handleShowShapeOptions}
             onMouseLeave={handleHideShapeOptions}
           >
-            <Tooltip content="Rectangle Shape">
+            <Tooltip content="Rectangle">
               <Button
                 variant={selectedShapeTool === 'rectangle' ? 'default' : 'ghost'}
                 size="sm"
@@ -324,7 +325,7 @@ const BottomToolbar = ({
                 <Square className="w-3 h-3" />
               </Button>
             </Tooltip>
-            <Tooltip content="Circle Shape">
+            <Tooltip content="Circle">
               <Button
                 variant={selectedShapeTool === 'circle' ? 'default' : 'ghost'}
                 size="sm"
@@ -334,7 +335,7 @@ const BottomToolbar = ({
                 <Circle className="w-3 h-3" />
               </Button>
             </Tooltip>
-            <Tooltip content="Line Shape">
+            <Tooltip content="Line">
               <Button
                 variant={selectedShapeTool === 'line' ? 'default' : 'ghost'}
                 size="sm"
@@ -351,16 +352,16 @@ const BottomToolbar = ({
       <div
         className={`relative flex-shrink-0 transition-all duration-300 ease-out ${bottomToolbarExpanded || selectedTool === 'stamp' ? 'opacity-100 scale-100 max-w-[3rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
       >
-        <Button
-          variant={selectedTool === 'stamp' ? 'default' : 'ghost'}
-          size="sm"
-          className="w-7 h-7 p-1 rounded-full tool-button"
-          onClick={() => handleSelectTool('stamp')}
-          onMouseEnter={(event) => showTooltipWithDelay('Stamp Tool - Group tiles into a stamp and place them together', event.currentTarget)}
-          onMouseLeave={hideTooltip}
-        >
-          <Stamp className="w-3 h-3" />
-        </Button>
+        <Tooltip content="Stamp Tool" side="left">
+          <Button
+            variant={selectedTool === 'stamp' ? 'default' : 'ghost'}
+            size="sm"
+            className="w-7 h-7 p-1 rounded-full tool-button"
+            onClick={() => handleSelectTool('stamp')}
+          >
+            <Stamp className="w-3 h-3" />
+          </Button>
+        </Tooltip>
 
         {selectedTool === 'stamp' && (
           <StampsPanel
@@ -380,16 +381,16 @@ const BottomToolbar = ({
       <div
         className={`flex-shrink-0 transition-all duration-300 ease-out ${bottomToolbarExpanded || selectedTool === 'eyedropper' ? 'opacity-100 scale-100 max-w-[3rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
       >
-        <Button
-          variant={selectedTool === 'eyedropper' ? 'default' : 'ghost'}
-          size="sm"
-          className="w-7 h-7 p-1 rounded-full tool-button"
-          onClick={() => handleSelectTool('eyedropper')}
-          onMouseEnter={(event) => showTooltipWithDelay('Eyedropper Tool - Pick a tile from the map to reuse', event.currentTarget)}
-          onMouseLeave={hideTooltip}
-        >
-          <Pipette className="w-3 h-3" />
-        </Button>
+        <Tooltip content="Eyedropper" side="left">
+          <Button
+            variant={selectedTool === 'eyedropper' ? 'default' : 'ghost'}
+            size="sm"
+            className="w-7 h-7 p-1 rounded-full tool-button"
+            onClick={() => handleSelectTool('eyedropper')}
+          >
+            <Pipette className="w-3 h-3" />
+          </Button>
+        </Tooltip>
       </div>
     </div>
     </div>

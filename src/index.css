@@ -664,3 +664,25 @@ button:active:not(.no-click-effect) {
     opacity: 0.97;
     transform: translateZ(0);
 }
+/* Smooth animations for hover menus */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeOutDown {
+    from {
+        opacity: 1;
+        transform: translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+}

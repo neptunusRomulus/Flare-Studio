@@ -83,11 +83,8 @@ const TilesetPalette = ({
 
   // Refresh tileset palette from editor
   useEffect(() => {
-    console.log('[DEBUG] TilesetPalette MAIN EFFECT TRIGGERED: editor=', !!editor, 'activeLayer=', activeLayer?.type, 'tabTick=', tabTick);
     
     if (!editor) return;
-    console.log('[DEBUG] TilesetPalette useEffect: editor changed or activeLayer/tabTick changed, refreshing palette');
-    console.log('[DEBUG] TilesetPalette: activeLayer =', activeLayer?.type, 'tabTick =', tabTick);
     
     // Get tileset image from editor and set up listeners for when it loads
     const fetchTilesetImage = () => {
@@ -98,52 +95,37 @@ const TilesetPalette = ({
         // Try to get image from active tab
         const tabs = editor.getLayerTabs ? editor.getLayerTabs(layerType) : [];
         const activeTabId = editor.getActiveLayerTabId ? editor.getActiveLayerTabId(layerType) : null;
-        console.log('[DEBUG] TilesetPalette.fetchTilesetImage: layerType=', layerType, 'activeTabId=', activeTabId, 'tabs.length=', tabs.length);
         const tab = tabs.find((t: { id: number }) => t.id === activeTabId);
-        console.log('[DEBUG] TilesetPalette.fetchTilesetImage: tab found?', !!tab, 'tab.tileset?', !!(tab as unknown as { tileset?: unknown })?.tileset);
         
         if (tab && (tab as { tileset?: { image?: HTMLImageElement } }).tileset?.image) {
           const img = (tab as { tileset: { image: HTMLImageElement } }).tileset.image;
-          console.log('[DEBUG] TilesetPalette.fetchTilesetImage: Found image on tab', { 
-            complete: img.complete, 
-            naturalWidth: img.naturalWidth, 
-            naturalHeight: img.naturalHeight,
-            width: img.width,
-            height: img.height,
-            src: img.src?.substring(0, 50)
-          });
           
           // Set the image immediately
           setTilesetImage(img);
           // If the tab provides explicit tile sizes, use them for palette math
           try {
-            const tw = (tab as any).tileset?.tileWidth;
-            const th = (tab as any).tileset?.tileHeight;
+            const tw = (tab as unknown as { tileWidth?: number }).tileWidth;
+            const th = (tab as unknown as { tileHeight?: number }).tileHeight;
             if (typeof tw === 'number' && typeof th === 'number') {
               setTileSize({ width: tw, height: th });
             } else {
               setTileSize({ width: DEFAULT_TILE_WIDTH, height: DEFAULT_TILE_HEIGHT });
             }
-          } catch (e) { void e; }
+          } catch (_e) { void _e; }
           
           // Only set size if image is complete and has dimensions
           // Otherwise, let the image load listener handle the size update
           if (img.complete && img.naturalWidth > 0 && img.naturalHeight > 0) {
-            console.log('[DEBUG] TilesetPalette.fetchTilesetImage: Image complete, setting size immediately');
             setImageSize({ width: img.naturalWidth, height: img.naturalHeight });
           } else {
-            console.log('[DEBUG] TilesetPalette.fetchTilesetImage: Image incomplete, deferring size to load listener');
             // Don't set imageSize here - let the load listener handle it
             // This prevents the canvas from being shown with 0 size
           }
         } else {
-          console.log('[DEBUG] TilesetPalette.fetchTilesetImage: No image found on active tab');
           setTilesetImage(null);
           setImageSize({ width: 0, height: 0 });
         }
-      } catch (err) {
-        console.warn('[DEBUG] TilesetPalette: Failed to get tileset image', err);
-      }
+      } catch (_err) { void _err; }
     };
 
     fetchTilesetImage();
@@ -154,11 +136,9 @@ const TilesetPalette = ({
 
     // Retry fetching tileset image in case it wasn't ready initially
     const t1 = setTimeout(() => {
-      console.log('[DEBUG] TilesetPalette: Retrying fetchTilesetImage after 75ms');
       fetchTilesetImage();
     }, 75);
     const t2 = setTimeout(() => {
-      console.log('[DEBUG] TilesetPalette: Retrying fetchTilesetImage after 300ms');
       fetchTilesetImage();
     }, 300);
     return () => { clearTimeout(t1); clearTimeout(t2); };
@@ -168,12 +148,10 @@ const TilesetPalette = ({
   useEffect(() => {
     if (!tilesetImage) return undefined;
     
-    console.log('[DEBUG] TilesetPalette: Image effect triggered, complete=', tilesetImage.complete, 'size=', { w: tilesetImage.naturalWidth, h: tilesetImage.naturalHeight });
     
     // If image is already complete, schedule an update
     if (tilesetImage.complete) {
       if (tilesetImage.naturalWidth > 0 && tilesetImage.naturalHeight > 0) {
-        console.log('[DEBUG] TilesetPalette: Image complete with dimensions');
         // Use a microtask to avoid synchronous setState in effect
         Promise.resolve().then(() => {
           setImageSize({
@@ -182,7 +160,6 @@ const TilesetPalette = ({
           });
         });
       } else {
-        console.log('[DEBUG] TilesetPalette: Image complete but has no dimensions, clearing');
         Promise.resolve().then(() => {
           setTilesetImage(null);
           setImageSize({ width: 0, height: 0 });
@@ -192,13 +169,8 @@ const TilesetPalette = ({
     }
     
     // Image is still loading - listen for load event
-    console.log('[DEBUG] TilesetPalette: Image is loading, setting up load listener');
     
     const handleLoad = () => {
-      console.log('[DEBUG] TilesetPalette: Image load event fired, dimensions=', { 
-        naturalWidth: tilesetImage.naturalWidth, 
-        naturalHeight: tilesetImage.naturalHeight 
-      });
       setImageSize({
         width: tilesetImage.naturalWidth,
         height: tilesetImage.naturalHeight
@@ -206,7 +178,6 @@ const TilesetPalette = ({
     };
     
     const handleError = () => {
-      console.warn('[DEBUG] TilesetPalette: Image load error');
       setTilesetImage(null);
       setImageSize({ width: 0, height: 0 });
     };
@@ -227,12 +198,10 @@ const TilesetPalette = ({
 
     // Wait for image to be loaded before drawing
     if (!tilesetImage.complete || tilesetImage.naturalWidth === 0 || tilesetImage.naturalHeight === 0) {
-      console.log('[DEBUG] TilesetPalette: drawTilesetCanvas skipped - image not ready');
       return;
     }
 
     if (imageSize.width === 0 || imageSize.height === 0) {
-      console.log('[DEBUG] TilesetPalette: drawTilesetCanvas skipped - imageSize is 0');
       return;
     }
 
@@ -386,8 +355,25 @@ const TilesetPalette = ({
   }, [getGridPosition, isSelecting]);
 
   const handleCanvasMouseUp = useCallback(() => {
-    if (isSelecting && selection && editor) {
-      // Notify editor about the selection
+    if (!isSelecting || !selection) {
+      setIsSelecting(false);
+      return;
+    }
+
+    // Check if this was a single click (start and end are the same)
+    const isSingleClick = selection.startCol === selection.endCol && selection.startRow === selection.endRow;
+
+    if (isSingleClick && editor) {
+      // Single click: set the active GID for this tile
+      // Calculate the GID based on tileset columns
+      const tilesetCols = Math.ceil(imageSize.width / tileSize.width);
+      const gid = selection.startRow * tilesetCols + selection.startCol + 1; // GID is 1-indexed
+      
+      if (typeof (editor as unknown as { setActiveGid?: (gid: number) => void }).setActiveGid === 'function') {
+        (editor as unknown as { setActiveGid: (gid: number) => void }).setActiveGid(gid);
+      }
+    } else if (!isSingleClick && editor && selection) {
+      // Drag selection: create a stamp from selected tiles
       const minCol = Math.min(selection.startCol, selection.endCol);
       const maxCol = Math.max(selection.startCol, selection.endCol);
       const minRow = Math.min(selection.startRow, selection.endRow);
@@ -403,16 +389,15 @@ const TilesetPalette = ({
         cols: maxCol - minCol + 1,
         rows: maxRow - minRow + 1
       };
-
-      console.log('[DEBUG] TilesetPalette: Selected tiles', selectedTiles);
       
       // If editor has a method to handle tile selection, call it
       if (typeof (editor as unknown as { setTileSelection?: (sel: typeof selectedTiles) => void }).setTileSelection === 'function') {
         (editor as unknown as { setTileSelection: (sel: typeof selectedTiles) => void }).setTileSelection(selectedTiles);
       }
     }
+
     setIsSelecting(false);
-  }, [isSelecting, selection, editor, tileSize.width, tileSize.height]);
+  }, [isSelecting, selection, editor, imageSize.width, tileSize.width, tileSize.height]);
 
   // Panning handlers
   const handleMouseDownPan = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
@@ -482,12 +467,6 @@ const TilesetPalette = ({
       {(() => {
         const activeLayerType = activeLayer?.type;
         const showTabs = activeLayerType === 'background' || activeLayerType === 'object';
-        if (editor && activeLayerType) {
-          const tabs = editor.getLayerTabs ? editor.getLayerTabs(activeLayerType) : [];
-          const activeTabId = editor.getActiveLayerTabId ? editor.getActiveLayerTabId(activeLayerType) : null;
-          console.log('[DEBUG UI] tabs for', activeLayerType, ':', tabs.length, 'tabs', JSON.stringify(tabs.map((t: { id: number; name?: string }) => ({ id: t.id, name: t.name }))));
-          console.log('[DEBUG UI] activeTabId for', activeLayerType, ':', activeTabId);
-        }
         if (!showTabs) return null;
         return (
           <div key={tabTick} className="flex items-center gap-2 px-2 py-2 overflow-visible">

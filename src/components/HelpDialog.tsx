@@ -1,14 +1,18 @@
 import { Button } from '@/components/ui/button';
-import { Eraser, Link2, Map, Paintbrush2, PaintBucket, Pipette, Save, Settings, Shield, Square, Target, Upload, Wand2, X } from 'lucide-react';
+import { Eraser, Link2, Map, Paintbrush2, PaintBucket, Pipette, Save, Settings, Shield, Square, Target, Upload, Wand2, X, Book } from 'lucide-react';
+import { useState } from 'react';
+import DocumentationViewer from './DocumentationViewer';
 
 type HelpDialogProps = {
   open: boolean;
-  activeTab: 'engine' | 'collisions';
-  setActiveTab: (tab: 'engine' | 'collisions') => void;
+  activeTab: 'engine' | 'collisions' | 'documentation';
+  setActiveTab: (tab: 'engine' | 'collisions' | 'documentation') => void;
   onClose: () => void;
 };
 
 const HelpDialog = ({ open, activeTab, setActiveTab, onClose }: HelpDialogProps) => {
+  const [showDocViewer, setShowDocViewer] = useState(false);
+
   if (!open) return null;
 
   return (
@@ -49,6 +53,13 @@ const HelpDialog = ({ open, activeTab, setActiveTab, onClose }: HelpDialogProps)
             >
               <Shield className="w-4 h-4 inline mr-2" />
               Collisions
+            </button>
+            <button
+              onClick={() => setShowDocViewer(true)}
+              className={`px-3 py-2 rounded-md text-sm font-medium transition-all text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-white/50 dark:hover:bg-neutral-700/50`}
+            >
+              <Book className="w-4 h-4 inline mr-2" />
+              Documentation
             </button>
           </div>
         </div>
@@ -312,6 +323,9 @@ const HelpDialog = ({ open, activeTab, setActiveTab, onClose }: HelpDialogProps)
           </div>
         </div>
       </div>
+
+      {/* Documentation Viewer Modal */}
+      <DocumentationViewer open={showDocViewer} onClose={() => setShowDocViewer(false)} />
     </div>
   );
 };

@@ -422,6 +422,20 @@ export default function useAppMainBuilder() {
     };
   }, [editorRefs, projectManager, setupAutoSave, syncMapObjects, updateLayersList, appState, loadProjectData]);
 
+  // Set manual save callback on editor for Ctrl+S keyboard shortcut
+  useEffect(() => {
+    if (editor && typeof editor.setManualSaveCallback === 'function') {
+      const handleManualSaveFn = typeof (projectManagerRecord as ProjectManagerView)?.handleManualSave === 'function'
+        ? (projectManagerRecord as ProjectManagerView).handleManualSave!
+        : undefined;
+      
+      if (handleManualSaveFn) {
+        editor.setManualSaveCallback(handleManualSaveFn);
+        console.log('[useAppMainBuilder] Manual save callback set on editor');
+      }
+    }
+  }, [editor, projectManagerRecord]);
+
   const handleCreateNewMap = (config: { name?: string; width?: number; height?: number; isStartingMap?: boolean } , projectPath?: string | null) => {
     try {
       setCurrentProjectPath(projectPath ?? null);

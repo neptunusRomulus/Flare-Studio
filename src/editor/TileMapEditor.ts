@@ -856,6 +856,9 @@ export class TileMapEditor {
   // Save locking to prevent edits during save
   private isSaveLocked: boolean = false;
   private saveLockCallback: ((locked: boolean) => void) | null = null;
+  
+  // Manual save callback (called when user presses Ctrl+S)
+  private manualSaveCallback: (() => Promise<void>) | null = null;
 
   private ensureCollisionTileset(): void {
     if (this.layerTilesets.has(COLLISION_LAYER_TYPE) || this.collisionTilesetLoading) {
@@ -1656,6 +1659,17 @@ export class TileMapEditor {
           // Ctrl+Y = Redo
           event.preventDefault();
           this.redo();
+          break;
+        case 'KeyS':
+          // Ctrl+S = Manual Save
+          event.preventDefault();
+          if (this.manualSaveCallback) {
+            this.manualSaveCallback().catch(err => {
+              console.error('[TileMapEditor] Manual save error:', err);
+            });
+          } else {
+            console.warn('[TileMapEditor] Manual save callback not set');
+          }
           break;
         case 'KeyA':
           event.preventDefault();
@@ -7646,6 +7660,10 @@ export class TileMapEditor {
 
   public setSaveLockCallback(callback: (locked: boolean) => void): void {
     this.saveLockCallback = callback;
+  }
+
+  public setManualSaveCallback(callback: (() => Promise<void>) | null): void {
+    this.manualSaveCallback = callback;
   }
 
   // Save complete project data

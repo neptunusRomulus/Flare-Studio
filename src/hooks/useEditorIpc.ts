@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import type { TileMapEditor } from '../editor/TileMapEditor';
+import { useSaveQueue } from '@/context/SaveQueueContext';
 
 type UseEditorIpcOptions = {
   handleManualSaveRef: React.RefObject<(() => Promise<void>) | undefined>;
@@ -32,6 +33,8 @@ export default function useEditorIpc(opts: UseEditorIpcOptions) {
   } = opts;
 
   const hasUnsavedRef = useRef<boolean>(hasUnsavedChanges);
+  const { waitForAllSaves } = useSaveQueue();
+  
   useEffect(() => { hasUnsavedRef.current = hasUnsavedChanges; }, [hasUnsavedChanges]);
 
   useEffect(() => {
@@ -97,6 +100,35 @@ export default function useEditorIpc(opts: UseEditorIpcOptions) {
         } catch (error) {
           console.error('Failed to save before close:', error);
           api.closeAfterSave?.();
+        }
+      });
+
+      // Handle graceful shutdown: flush pending saves before app quits
+      api.onAppBeforeQuit?.(async () => {
+        console.log('[Shutdown] Received app-before-quit event, waiting for all pending saves...');
+        try {
+          // Wait for all pending saves (with 30 second timeout)
+          const result = await waitForAllSaves(30000);
+          
+          if (result.timedOut) {
+            console.warn(`[Shutdown] Save queue timeout! Completed: ${result.completed}, Failed: ${result.failed}`);
+          } else {
+            console.log(`[Shutdown] All saves flushed. Completed: ${result.completed}, Failed: ${result.failed}`);
+          }
+          
+          // Also trigger one final manual save to be safe
+          try {
+            await handleManualSaveRef.current?.();
+            console.log('[Shutdown] Final manual save completed');
+          } catch (err) {
+            console.error('[Shutdown] Final manual save failed:', err);
+          }
+        } catch (error) {
+          console.error('[Shutdown] Error during save flush:', error);
+        } finally {
+          // Always notify main process we're done, even if saves failed
+          console.log('[Shutdown] Notifying main process shutdown is complete');
+          api.appShutdownComplete?.();
         }
       });
     } catch (err) {

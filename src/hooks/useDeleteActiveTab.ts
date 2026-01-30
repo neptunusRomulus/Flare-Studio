@@ -31,6 +31,14 @@ export default function useDeleteActiveTab(args: {
       toast({ title: 'No tab selected', description: 'There is no active tileset tab to delete for this layer.', variant: 'destructive' });
       return;
     }
+    
+    // Check if there's only one tab - prevent deletion
+    const tabs = editor.getLayerTabs ? editor.getLayerTabs(layerType) : [];
+    if (tabs && tabs.length <= 1) {
+      toast({ title: 'Cannot delete tab', description: 'You must have at least one tileset tab.', variant: 'destructive' });
+      return;
+    }
+    
     const payload = { layerType, tabId: activeTabId };
     confirmPayloadRef.current = payload;
     setTabToDelete(payload);

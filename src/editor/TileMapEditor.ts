@@ -104,12 +104,6 @@ export interface EditorProjectData {
 const INTERNAL_TILESET_FILENAMES = new Set<string>(['collision_tileset.png']);
 const COLLISION_LAYER_TYPE = 'collision';
 const INTERNAL_COLLISION_TILESET = 'collision_tileset.png';
-const COLLISION_BRUSH_TOOLTIPS: Record<number, string> = {
-  1: 'Blocks all, very visible at minimap',
-  2: 'Blocks ground units, less visible at minimap',
-  3: 'Blocks all, not visible at minimap',
-  4: 'Blocks ground units, not visible at minimap'
-};
 
 export class TileMapEditor {
   public isStartingMap: boolean = false;
@@ -853,9 +847,15 @@ export class TileMapEditor {
   private saveStatusCallback: ((status: 'saving' | 'saved' | 'error' | 'unsaved') => void) | null = null;
   // Callback to notify React app about active GID changes
   private activeGidCallback: ((gid: number) => void) | null = null;
+  // Callback to notify about undo stack changes (for persistence)
+  private undoStateChangeCallback: (() => void) | null = null;
   private readonly AUTO_SAVE_DELAY = 8000; // 8 seconds for tile changes
   private readonly IMMEDIATE_SAVE_DELAY = 2000; // 2 seconds for critical changes
   private autoSaveEnabled: boolean = true;
+
+  // Save locking to prevent edits during save
+  private isSaveLocked: boolean = false;
+  private saveLockCallback: ((locked: boolean) => void) | null = null;
 
   private ensureCollisionTileset(): void {
     if (this.layerTilesets.has(COLLISION_LAYER_TYPE) || this.collisionTilesetLoading) {
@@ -1434,6 +1434,12 @@ export class TileMapEditor {
   }
 
   private handleMouseDown(event: MouseEvent): void {
+    // Prevent editing while save is in progress
+    if (this.isSaveLocked) {
+      console.warn('[TileMapEditor] Edit blocked: save in progress');
+      return;
+    }
+
     const rect = this.mapCanvas.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
@@ -1713,6 +1719,12 @@ export class TileMapEditor {
   }
 
   private handleTileClick(x: number, y: number, isRightClick: boolean): void {
+    // Prevent editing while save is in progress
+    if (this.isSaveLocked) {
+      console.warn('[TileMapEditor] Edit blocked: save in progress');
+      return;
+    }
+
     if (this.activeLayerId !== null) {
       const layer = this.tileLayers.find(l => l.id === this.activeLayerId);
       if (layer) {
@@ -3706,9 +3718,6 @@ export class TileMapEditor {
       }
     } catch (_err) { void _err; }
 
-    const activePaletteLayer = this.tileLayers.find(l => l.id === this.activeLayerId);
-    const isCollisionPalette = activePaletteLayer?.type === COLLISION_LAYER_TYPE;
-
     let tilesToRender: Array<{index: number, sourceX: number, sourceY: number, width: number, height: number}>;
     
     if (preserveOrder && this.detectedTileData.size > 0) {
@@ -3840,8 +3849,6 @@ export class TileMapEditor {
       wrapper.style.position = 'relative';
       wrapper.style.display = 'inline-block';
       wrapper.style.margin = '2px';
-      
-      const tooltipText = isCollisionPalette ? COLLISION_BRUSH_TOOLTIPS[tile.index] : undefined;
       
       // Add selection number overlay for merge tool
       const selectionNumber = document.createElement('div');
@@ -4037,31 +4044,18 @@ export class TileMapEditor {
       }
       
       // Add hover effects for remove tool
-      wrapper.addEventListener('mouseenter', (event) => {
+      wrapper.addEventListener('mouseenter', (_event) => {
         const brushToolElement = document.querySelector('[data-brush-tool]');
         const currentBrushTool = brushToolElement?.getAttribute('data-brush-tool') || 'none';
         
         if (currentBrushTool === 'remove') {
           removeOverlay.style.display = 'flex';
         }
-        
-        if (tooltipText) {
-          this.showCollisionBrushTooltip(wrapper, tooltipText, event as MouseEvent);
-        }
       });
       
       wrapper.addEventListener('mouseleave', () => {
         removeOverlay.style.display = 'none';
-        if (tooltipText) {
-          this.hideCollisionBrushTooltip();
-        }
       });
-      
-      if (tooltipText) {
-        wrapper.addEventListener('mousemove', (event) => {
-          this.updateCollisionBrushTooltipPosition(wrapper, event as MouseEvent);
-        });
-      }
       
   // Add data attributes to track tile properties
   canvas.setAttribute('data-tile-index', tile.index.toString());
@@ -7270,6 +7264,11 @@ export class TileMapEditor {
       this.historyIndex--;
     }
 
+    // Notify about undo state change (for persistence)
+    if (this.undoStateChangeCallback) {
+      this.undoStateChangeCallback();
+    }
+
     // Mark as changed for auto-save (normal delay for undo/redo states)
     this.markAsChanged(false);
   }
@@ -7334,6 +7333,13 @@ export class TileMapEditor {
       clearTimeout(this.autoSaveTimeout);
       this.autoSaveTimeout = null;
     }
+  }
+
+  /**
+   * Set callback for undo state changes (used for persistence)
+   */
+  public setUndoStateChangeCallback(callback: (() => void) | null): void {
+    this.undoStateChangeCallback = callback;
   }
 
   public triggerAutoSave(immediate: boolean = false): void {
@@ -7401,6 +7407,22 @@ export class TileMapEditor {
 
   private saveToLocalStorage(): void {
     try {
+      // Convert layerTabs and layerActiveTabId Maps to serializable objects
+      // Note: We store minimal tab info (id and name) since the full tileset/brush data
+      // is reconstructed from the tileset when loaded
+      const layerTabsObj: Record<string, Array<{ id: number; name?: string }>> = {};
+      for (const [key, value] of this.layerTabs.entries()) {
+        layerTabsObj[key] = value.map(tab => ({
+          id: tab.id,
+          name: tab.name
+        }));
+      }
+      
+      const layerActiveTabIdObj: Record<string, number> = {};
+      for (const [key, value] of this.layerActiveTabId.entries()) {
+        layerActiveTabIdObj[key] = value;
+      }
+      
       const backupData = {
         timestamp: Date.now(),
         mapWidth: this.mapWidth,
@@ -7417,7 +7439,10 @@ export class TileMapEditor {
         // Save brush data for proper restoration
         detectedTileData: Array.from(this.detectedTileData.entries()),
         tileContentThreshold: this.tileContentThreshold,
-        objectSeparationSensitivity: this.objectSeparationSensitivity
+        objectSeparationSensitivity: this.objectSeparationSensitivity,
+        // Save tab state for proper restoration
+        layerTabs: layerTabsObj,
+        layerActiveTabId: layerActiveTabIdObj
       };
       
       localStorage.setItem('tilemap_autosave_backup', JSON.stringify(backupData));
@@ -7537,6 +7562,32 @@ export class TileMapEditor {
         }
       }
 
+      // Restore layer tabs if available (tab state: id and name)
+      if (data.layerTabs && typeof data.layerTabs === 'object') {
+        this.layerTabs.clear();
+        for (const [layerType, tabs] of Object.entries(data.layerTabs)) {
+          if (Array.isArray(tabs)) {
+            this.layerTabs.set(layerType, tabs.map(tab => ({
+              id: tab.id,
+              name: typeof tab.name === 'string' ? tab.name : '',
+              tileset: undefined,
+              detectedTiles: undefined,
+              brushes: undefined
+            })));
+          }
+        }
+      }
+
+      // Restore active tab id per layer if available
+      if (data.layerActiveTabId && typeof data.layerActiveTabId === 'object') {
+        this.layerActiveTabId.clear();
+        for (const [layerType, tabId] of Object.entries(data.layerActiveTabId)) {
+          if (typeof tabId === 'number') {
+            this.layerActiveTabId.set(layerType, tabId);
+          }
+        }
+      }
+
       // Restore tileset image if available
       if (data.tilesetImage) {
         const img = new Image();
@@ -7574,6 +7625,27 @@ export class TileMapEditor {
 
   public clearLocalStorageBackup(): void {
     localStorage.removeItem('tilemap_autosave_backup');
+  }
+
+  // Save locking methods to prevent edits during save
+  public lockSave(): void {
+    this.isSaveLocked = true;
+    this.saveLockCallback?.(true);
+    console.log('[TileMapEditor] Save locked - editing disabled');
+  }
+
+  public unlockSave(): void {
+    this.isSaveLocked = false;
+    this.saveLockCallback?.(false);
+    console.log('[TileMapEditor] Save unlocked - editing enabled');
+  }
+
+  public isSaveInProgress(): boolean {
+    return this.isSaveLocked;
+  }
+
+  public setSaveLockCallback(callback: (locked: boolean) => void): void {
+    this.saveLockCallback = callback;
   }
 
   // Save complete project data
@@ -8825,5 +8897,34 @@ export class TileMapEditor {
     this.draw();
     
     console.log('TileMapEditor: Canvas update complete - events rebound');
+  }
+
+  /**
+   * Get current undo/redo history state for persistence
+   */
+  public getUndoStackState(): { history: Array<{ layers: TileLayer[]; objects: MapObject[] }>; historyIndex: number } {
+    return {
+      history: this.history,
+      historyIndex: this.historyIndex
+    };
+  }
+
+  /**
+   * Restore undo/redo history state from persistence
+   */
+  public setUndoStackState(state: { history: Array<{ layers: TileLayer[]; objects: MapObject[] }>; historyIndex: number }): void {
+    if (!Array.isArray(state.history)) {
+      console.warn('Invalid history state provided to setUndoStackState');
+      return;
+    }
+
+    if (typeof state.historyIndex !== 'number' || state.historyIndex < -1) {
+      console.warn('Invalid history index provided to setUndoStackState');
+      return;
+    }
+
+    this.history = state.history;
+    this.historyIndex = state.historyIndex;
+    console.log(`[TileMapEditor] Restored undo stack: ${state.history.length} states at index ${state.historyIndex}`);
   }
 }

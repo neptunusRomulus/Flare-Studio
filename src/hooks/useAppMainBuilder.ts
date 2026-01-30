@@ -25,6 +25,8 @@ import { buildConstantStockString } from '@/utils/parsers';
 // ItemRole type intentionally not imported — unused in this module
 import { toast } from '@/hooks/use-toast';
 import useHelpState from './useHelpState';
+import useDeleteActiveTab from './useDeleteActiveTab';
+import buildConfirmActionHandlers from './useConfirmActionHandlers';
 import { TileMapEditor } from '@/editor/TileMapEditor';
 import type { EditorProjectData } from '@/editor/TileMapEditor';
 
@@ -43,6 +45,7 @@ export default function useAppMainBuilder() {
     isExporting?: boolean;
     exportProgress?: number;
     isManuallySaving?: boolean;
+    saveProgress?: number;
   };
 
   const editorRefs = useEditorRefs() as EditorRefsType;
@@ -53,6 +56,8 @@ export default function useAppMainBuilder() {
   useDarkModeSync(isDarkMode, editorSetup.editor as TileMapEditor | null);
 
   const [autoSaveEnabled, setAutoSaveEnabledState] = useState<boolean>(false);
+  const [autoSaveIntervalMs, setAutoSaveIntervalMs] = useState<number>(5000);
+  const [autoSaveDebounceMs, setAutoSaveDebounceMs] = useState<number>(2000);
   const [showActiveGid, setShowActiveGid] = useState<boolean>(true);
 
   const appState = useAppState();
@@ -335,6 +340,34 @@ export default function useAppMainBuilder() {
 
   const activeLayer = useMemo(() => appState.layers.find((layer) => layer.id === appState.activeLayerId) ?? null, [appState.activeLayerId, appState.layers]);
 
+  // Confirmation state for tileset tab deletion
+  type ConfirmPayload = { layerType: string; tabId: number };
+  type ConfirmActionType = null | { type: 'removeBrush' | 'removeTileset' | 'removeTab'; payload?: number | ConfirmPayload };
+  const [confirmAction, setConfirmAction] = useState<ConfirmActionType>(null);
+  const [tabToDelete, setTabToDelete] = useState<ConfirmPayload | null>(null);
+  const confirmPayloadRef = useRef<ConfirmPayload | null>(null);
+
+  // Hook to handle tileset tab deletion with confirmation
+  const { handleDeleteActiveTab: handleDeleteTilesetTab } = useDeleteActiveTab({
+    editor,
+    activeLayer,
+    toast,
+    confirmPayloadRef,
+    setTabToDelete,
+    setConfirmAction
+  });
+
+  // Handlers for the confirmation dialog
+  const { onCancel, onConfirm } = buildConfirmActionHandlers({
+    confirmAction,
+    tabToDelete,
+    confirmPayloadRef,
+    editor,
+    setTabTick: appState.setTabTick,
+    setTabToDelete,
+    setConfirmAction
+  });
+
   const isNpcLayer = activeLayer?.type === 'npc';
   const isEnemyLayer = activeLayer?.type === 'enemy';
   const isRulesLayer = activeLayer?.type === 'rules';
@@ -431,6 +464,10 @@ export default function useAppMainBuilder() {
         ? (projectManagerRecord as ProjectManagerView).exportProgress!
         : 0;
     const isManuallySavingValue = Boolean((projectManagerRecord as ProjectManagerView)?.isManuallySaving);
+    const saveProgressValue =
+      typeof (projectManagerRecord as ProjectManagerView)?.saveProgress === 'number'
+        ? (projectManagerRecord as ProjectManagerView).saveProgress!
+        : 0;
 
     return {
       layers: appState.layers,
@@ -472,18 +509,7 @@ export default function useAppMainBuilder() {
       isCollisionLayer: activeLayer?.type === 'collision',
       handleFileUpload,
       handleToggleBrushTool,
-      handleDeleteActiveTab: (tabId?: string) => {
-        if (!tabId) return;
-        try {
-          setTabs((prev) => (prev ?? []).filter((t: { id?: string }) => (t.id ?? '') !== tabId));
-          if (activeTabId === tabId) {
-            const remaining = (tabs ?? []).filter((t: { id?: string }) => (t.id ?? '') !== tabId);
-            setActiveTabId(remaining.length ? (remaining[0].id as string) : null);
-          }
-        } catch (e) {
-          console.warn('handleDeleteActiveTab failed', e);
-        }
-      },
+      handleDeleteActiveTab: handleDeleteTilesetTab,
       toast,
       handleOpenActorDialogForTileset: objectEditing.handleOpenActorDialog,
       stampsState: {
@@ -507,6 +533,7 @@ export default function useAppMainBuilder() {
       handleOpenMapFromMapsFolder: handleOpenMapFromMapsFolderFn,
       handleManualSave: handleManualSaveFn,
       isManuallySaving: isManuallySavingValue,
+      saveProgress: saveProgressValue,
       isPreparingNewMap: mapConfig.isPreparingNewMap,
       hasUnsavedChanges: false,
       setShowSettings,
@@ -545,6 +572,7 @@ export default function useAppMainBuilder() {
     toolbarState.brushTool,
     handleFileUpload,
     handleToggleBrushTool,
+    handleDeleteTilesetTab,
     tabs,
     activeTabId,
     setTabs,
@@ -637,8 +665,9 @@ export default function useAppMainBuilder() {
       mapsSubOpen: false,
       currentProjectPath: currentProjectPath,
       projectMaps: (projectManager as ProjectManagerView)?.projectMaps ?? [] as string[],
-      setMapsSubOpen: (() => {}) as React.Dispatch<React.SetStateAction<boolean>>,
-      setMapsDropdownOpen: (() => {}) as React.Dispatch<React.SetStateAction<boolean>>,
+      setMapsSubOpen: setMapsSubOpen,
+      setMapsDropdownOpen: setMapsDropdownOpen,
+      setMapsDropdownPos: setMapsDropdownPos,
       handleOpenCreateMapDialog: () => { if (typeof mapConfig.setShowCreateMapDialog === 'function') mapConfig.setShowCreateMapDialog(true); },
       handleOpenMapFromMapsFolder: async (filename?: string) => { try { if (pmForDefaults?.handleOpenMapFromMapsFolder && currentProjectPath && filename) await pmForDefaults.handleOpenMapFromMapsFolder(filename); } catch (e) { console.warn(e); } },
       handleManualSave: async () => { if (pmForDefaults?.handleManualSave) await pmForDefaults.handleManualSave(); },
@@ -715,6 +744,10 @@ export default function useAppMainBuilder() {
       editor: defaultEditor,
       autoSaveEnabled,
       setAutoSaveEnabledState,
+      autoSaveIntervalMs,
+      setAutoSaveIntervalMs,
+      autoSaveDebounceMs,
+      setAutoSaveDebounceMs,
       showActiveGid,
       setShowActiveGid,
       setShowSidebarToggle,
@@ -746,7 +779,7 @@ export default function useAppMainBuilder() {
       showClearLayerDialog,
       handleClearLayerClose,
       handleClearLayerConfirm,
-      confirmDialogProps: buildConfirmDialogProps({ confirmAction: null, setConfirmAction: () => {} }),
+      confirmDialogProps: buildConfirmDialogProps({ confirmAction, setConfirmAction, onCancel, onConfirm }),
       showHelp: helpState.showHelp,
       activeHelpTab: helpState.activeHelpTab,
       setActiveHelpTab: helpState.setActiveHelpTab,

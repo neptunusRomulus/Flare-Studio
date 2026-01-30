@@ -55,6 +55,9 @@ const BrushToolbar = ({
   const editorRef = React.useRef<TileMapEditor | null>(editor);
   const activeLayerRef = React.useRef<TileLayer | null>(activeLayer);
   
+  // Track tab count to disable delete button if only one tab
+  const [tabCount, setTabCount] = React.useState<number>(0);
+  
   const fallback = useBrushToolbar();
   const expanded = typeof brushToolbarExpanded === 'boolean' ? brushToolbarExpanded : fallback.brushToolbarExpanded;
   const setNode = setBrushToolbarNode ?? fallback.setBrushToolbarNode;
@@ -64,6 +67,16 @@ const BrushToolbar = ({
   React.useEffect(() => {
     editorRef.current = editor;
     activeLayerRef.current = activeLayer;
+  }, [editor, activeLayer]);
+  
+  // Update tab count when editor or active layer changes
+  React.useEffect(() => {
+    if (!editor || !activeLayer) {
+      setTabCount(0);
+      return;
+    }
+    const tabs = editor.getLayerTabs ? editor.getLayerTabs(activeLayer.type) : [];
+    setTabCount(tabs ? tabs.length : 0);
   }, [editor, activeLayer]);
 
   // App context fallback so the handler can always get latest values
@@ -340,15 +353,16 @@ const BrushToolbar = ({
             <div
               className={`flex-shrink-0 overflow-hidden transition-all duration-300 ease-out ${expanded ? 'opacity-100 scale-100 max-w-[2.5rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
             >
-              <Tooltip content="Delete tileset tab">
+              <Tooltip content={tabCount <= 1 ? 'Cannot delete - must have at least one tab' : 'Delete tileset tab'}>
                 <Button
                   variant="outline"
                   size="sm"
-                  className="text-xs px-1 py-1 h-6 border-red-500 hover:border-red-600 hover:bg-red-50 shadow-sm"
+                  className="text-xs px-1 py-1 h-6 border-red-500 hover:border-red-600 hover:bg-red-50 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   onClick={() => {
                     showTemporarily();
                     onDeleteActiveTab();
                   }}
+                  disabled={tabCount <= 1}
                 >
                   <X className="w-3 h-3 text-red-500" />
                 </Button>

@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useState, useRef, useLayoutEffect } from 'react';
+import React, { useEffect, useCallback, useState, useRef, useLayoutEffect, useMemo } from 'react';
 import type { TileLayer } from '@/types';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 import usePreferences from '@/hooks/usePreferences';
@@ -61,6 +61,7 @@ const TilesetPalette = ({
   // Track the visible wrapper size so we can ensure the tileset viewport
   // remains at least as large as the palette area regardless of image size.
   const [wrapperSize, setWrapperSize] = useState({ width: 0, height: 0 });
+  const [selectedTileInfo, setSelectedTileInfo] = useState<{ gid: number; description?: string } | null>(null);
   
   // Refs for panning
   const isPanningRef = useRef(false);
@@ -68,6 +69,14 @@ const TilesetPalette = ({
   const selectionStartRef = useRef({ col: 0, row: 0 });
   
   const prefs = usePreferences();
+  
+  // Collision tile descriptions
+  const COLLISION_TILE_DESCRIPTIONS = useMemo(() => ({
+    1: 'Full Collision: Nothing will able to pass from this cell.',
+    2: 'Ground Collision: Only flying units will pass from this cell',
+    3: 'Hidden Full Collision: Same as "Full Collision" but not visible on map.',
+    4: 'Hidden Ground Collision: Same as "Ground Collision" but not visible on map.'
+  }), []);
 
   // Create a clear selection function to pass to parent
   const clearSelection = useCallback(() => {
@@ -380,6 +389,15 @@ const TilesetPalette = ({
       const tilesetCols = Math.ceil(imageSize.width / tileSize.width);
       const gid = selection.startRow * tilesetCols + selection.startCol + 1; // GID is 1-indexed
       
+      // Set tile info with description if this is collision layer
+      const isCollisionLayer = activeLayer?.type === 'collision';
+      if (isCollisionLayer) {
+        setSelectedTileInfo({
+          gid,
+          description: COLLISION_TILE_DESCRIPTIONS[gid as keyof typeof COLLISION_TILE_DESCRIPTIONS]
+        });
+      }
+      
       // Clear multiSelectedBrushes when selecting a single tile
       // This ensures we don't paint old multi-selection when we want a single brush
       const editorAny = editor as unknown as Record<string, unknown>;
@@ -441,13 +459,16 @@ const TilesetPalette = ({
       if (typeof (editor as unknown as { setTileSelection?: (sel: typeof selectedTiles) => void }).setTileSelection === 'function') {
         (editor as unknown as { setTileSelection: (sel: typeof selectedTiles) => void }).setTileSelection(selectedTiles);
       }
+      
+      // Clear selected tile info for multi-selection
+      setSelectedTileInfo(null);
     }
 
     setIsSelecting(false);
     // Also reset panning state if stuck to allow map clicks
     isPanningRef.current = false;
     // Keep selection visible! Don't clear it here
-  }, [isSelecting, selection, editor, imageSize.width, tileSize.width, tileSize.height]);
+  }, [isSelecting, selection, editor, imageSize.width, tileSize.width, tileSize.height, activeLayer?.type, COLLISION_TILE_DESCRIPTIONS]);
 
   // Panning handlers
   const handleMouseDownPan = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
@@ -629,6 +650,13 @@ const TilesetPalette = ({
 
         <div data-brush-tool={brushTool} className="hidden"></div>
       </div>
+
+      {/* Selected tile info display */}
+      {selectedTileInfo?.description && (
+        <div className="px-3 py-2 bg-accent/50 border-t border-border text-sm text-foreground">
+          {selectedTileInfo.description}
+        </div>
+      )}
     </div>
   );
 };

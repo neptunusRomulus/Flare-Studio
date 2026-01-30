@@ -29,6 +29,7 @@ import useDeleteActiveTab from './useDeleteActiveTab';
 import buildConfirmActionHandlers from './useConfirmActionHandlers';
 import { TileMapEditor } from '@/editor/TileMapEditor';
 import type { EditorProjectData } from '@/editor/TileMapEditor';
+import useManualSave from './useManualSave';
 
 export default function useAppMainBuilder() {
   const dialogsCtx = useDialogsCtx({});
@@ -66,6 +67,14 @@ export default function useAppMainBuilder() {
   const helpState = useHelpState();
 
   const [currentProjectPath, setCurrentProjectPath] = useState<string | null>(null);
+  
+  // Manual save state
+  // State for manual save tracking (used by useManualSave internally)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [isManuallySaving, setIsManuallySaving] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [lastSaveTime, setLastSaveTime] = useState(0);
+  
   const itemsHook = useItems({ currentProjectPath, toast, normalizeItemsForState });
   const { itemsList, expandedItemCategories, setExpandedItemCategories, handleOpenItemEdit, handleOpenItemDialog } = itemsHook;
   const [mapsDropdownOpen, setMapsDropdownOpen] = useState(false);
@@ -129,6 +138,29 @@ export default function useAppMainBuilder() {
     switchToTabHelpersRef: editorRefs.switchToTabHelpersRef
   }) as EditorTabsType;
   const { tabs, activeTabId, setTabs, setActiveTabId, switchToTab, createTabFor } = editorTabs as unknown as EditorTabsType;
+
+  // Create manual save handler directly - this is the source of truth for Ctrl+S
+  const { handleManualSave: directHandleManualSave } = useManualSave({
+    editor: editor ?? null,
+    currentProjectPath: currentProjectPath ?? null,
+    setIsManuallySaving,
+    setLastSaveTime,
+    manualSaveRef: editorRefs.handleManualSaveRef
+  });
+
+  // Wire up the manual save callback to the editor for Ctrl+S support
+  useEffect(() => {
+    if (editor && directHandleManualSave && typeof editor.setManualSaveCallback === 'function') {
+      console.log('[useAppMainBuilder] Setting manual save callback on editor');
+      // Wrap to match expected Promise<void> signature
+      editor.setManualSaveCallback(async () => { await directHandleManualSave(); });
+    }
+    return () => {
+      if (editor && typeof editor.setManualSaveCallback === 'function') {
+        editor.setManualSaveCallback(async () => {});
+      }
+    };
+  }, [editor, directHandleManualSave]);
 
   const _beforeCreateRunningRef = useRef(false);
   const handleBeforeCreateMap = async () => {
@@ -422,20 +454,6 @@ export default function useAppMainBuilder() {
     };
   }, [editorRefs, projectManager, setupAutoSave, syncMapObjects, updateLayersList, appState, loadProjectData]);
 
-  // Set manual save callback on editor for Ctrl+S keyboard shortcut
-  useEffect(() => {
-    if (editor && typeof editor.setManualSaveCallback === 'function') {
-      const handleManualSaveFn = typeof (projectManagerRecord as ProjectManagerView)?.handleManualSave === 'function'
-        ? (projectManagerRecord as ProjectManagerView).handleManualSave!
-        : undefined;
-      
-      if (handleManualSaveFn) {
-        editor.setManualSaveCallback(handleManualSaveFn);
-        console.log('[useAppMainBuilder] Manual save callback set on editor');
-      }
-    }
-  }, [editor, projectManagerRecord]);
-
   const handleCreateNewMap = (config: { name?: string; width?: number; height?: number; isStartingMap?: boolean } , projectPath?: string | null) => {
     try {
       setCurrentProjectPath(projectPath ?? null);
@@ -671,13 +689,6 @@ export default function useAppMainBuilder() {
     };
 
     const pmForDefaults = projectManager as ProjectManagerView;
-    
-    // Set manual save callback on editor so Ctrl+S works
-    // This must be done here where we have both editor and handleManualSave
-    if (editor && pmForDefaults?.handleManualSave && typeof editor.setManualSaveCallback === 'function') {
-      editor.setManualSaveCallback(pmForDefaults.handleManualSave);
-      console.log('[useAppMainBuilder] Manual save callback set on editor');
-    }
     
     const defaultControls = {
       mapsButtonRef: { current: null } as React.RefObject<HTMLButtonElement>,

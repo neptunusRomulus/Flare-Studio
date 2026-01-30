@@ -29,7 +29,6 @@ import useDeleteActiveTab from './useDeleteActiveTab';
 import buildConfirmActionHandlers from './useConfirmActionHandlers';
 import { TileMapEditor } from '@/editor/TileMapEditor';
 import type { EditorProjectData } from '@/editor/TileMapEditor';
-import useManualSave from './useManualSave';
 
 export default function useAppMainBuilder() {
   const dialogsCtx = useDialogsCtx({});
@@ -67,13 +66,6 @@ export default function useAppMainBuilder() {
   const helpState = useHelpState();
 
   const [currentProjectPath, setCurrentProjectPath] = useState<string | null>(null);
-  
-  // Manual save state
-  // State for manual save tracking (used by useManualSave internally)
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [isManuallySaving, setIsManuallySaving] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [lastSaveTime, setLastSaveTime] = useState(0);
   
   const itemsHook = useItems({ currentProjectPath, toast, normalizeItemsForState });
   const { itemsList, expandedItemCategories, setExpandedItemCategories, handleOpenItemEdit, handleOpenItemDialog } = itemsHook;
@@ -138,29 +130,6 @@ export default function useAppMainBuilder() {
     switchToTabHelpersRef: editorRefs.switchToTabHelpersRef
   }) as EditorTabsType;
   const { tabs, activeTabId, setTabs, setActiveTabId, switchToTab, createTabFor } = editorTabs as unknown as EditorTabsType;
-
-  // Create manual save handler directly - this is the source of truth for Ctrl+S
-  const { handleManualSave: directHandleManualSave } = useManualSave({
-    editor: editor ?? null,
-    currentProjectPath: currentProjectPath ?? null,
-    setIsManuallySaving,
-    setLastSaveTime,
-    manualSaveRef: editorRefs.handleManualSaveRef
-  });
-
-  // Wire up the manual save callback to the editor for Ctrl+S support
-  useEffect(() => {
-    if (editor && directHandleManualSave && typeof editor.setManualSaveCallback === 'function') {
-      console.log('[useAppMainBuilder] Setting manual save callback on editor');
-      // Wrap to match expected Promise<void> signature
-      editor.setManualSaveCallback(async () => { await directHandleManualSave(); });
-    }
-    return () => {
-      if (editor && typeof editor.setManualSaveCallback === 'function') {
-        editor.setManualSaveCallback(async () => {});
-      }
-    };
-  }, [editor, directHandleManualSave]);
 
   const _beforeCreateRunningRef = useRef(false);
   const handleBeforeCreateMap = async () => {

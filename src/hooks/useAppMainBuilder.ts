@@ -657,6 +657,14 @@ export default function useAppMainBuilder() {
     };
 
     const pmForDefaults = projectManager as ProjectManagerView;
+    
+    // Set manual save callback on editor so Ctrl+S works
+    // This must be done here where we have both editor and handleManualSave
+    if (editor && pmForDefaults?.handleManualSave && typeof editor.setManualSaveCallback === 'function') {
+      editor.setManualSaveCallback(pmForDefaults.handleManualSave);
+      console.log('[useAppMainBuilder] Manual save callback set on editor');
+    }
+    
     const defaultControls = {
       mapsButtonRef: { current: null } as React.RefObject<HTMLButtonElement>,
       mapsDropdownOpen: false,

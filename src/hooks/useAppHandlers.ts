@@ -194,13 +194,6 @@ export default function useAppHandlers(params: UseAppHandlersParams) {
   };
   const { handleManualSave } = useManualSave(manualSaveParams as any);
 
-  // Set manual save callback on editor so Ctrl+S keyboard shortcut works
-  React.useEffect(() => {
-    if (p.editor && typeof p.editor.setManualSaveCallback === 'function') {
-      p.editor.setManualSaveCallback(handleManualSave);
-    }
-  }, [p.editor, handleManualSave]);
-
   return {
     handleRemoveBrush,
     handleBrushReorder,

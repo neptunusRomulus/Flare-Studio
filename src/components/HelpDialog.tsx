@@ -3,8 +3,8 @@ import { Eraser, Link2, Map, Paintbrush2, PaintBucket, Pipette, Save, Settings, 
 
 type HelpDialogProps = {
   open: boolean;
-  activeTab: 'engine' | 'collisions' | 'documentation';
-  setActiveTab: (tab: 'engine' | 'collisions' | 'documentation') => void;
+  activeTab: 'engine' | 'collisions' | 'saving';
+  setActiveTab: (tab: 'engine' | 'collisions' | 'saving') => void;
   onClose: () => void;
 };
 
@@ -52,15 +52,15 @@ const HelpDialog = ({ open, activeTab, setActiveTab, onClose }: HelpDialogProps)
               Collisions
             </button>
             <button
-              onClick={() => setActiveTab('documentation')}
+              onClick={() => setActiveTab('saving')}
               className={`px-3 py-2 rounded-md text-sm font-medium transition-all ${
-                activeTab === 'documentation'
+                activeTab === 'saving'
                   ? 'bg-white dark:bg-neutral-700 text-gray-900 dark:text-gray-100 shadow-sm'
                   : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
               }`}
             >
               <Book className="w-4 h-4 inline mr-2" />
-              Documentation
+              Saving
             </button>
           </div>
         </div>
@@ -317,7 +317,7 @@ const HelpDialog = ({ open, activeTab, setActiveTab, onClose }: HelpDialogProps)
             </>
           )}
 
-          {activeTab === 'documentation' && (
+          {activeTab === 'saving' && (
             <>
               <section>
                 <h4 className="text-xl font-semibold mb-3 flex items-center gap-2 text-gray-800 dark:text-gray-100">

@@ -1018,6 +1018,27 @@ ipcMainLocal.handle("check-project-exists", async (event, projectPath) => {
   }
 });
 
+// Get file stats for conflict detection (modified time and size)
+ipcMainLocal.handle("get-file-stats", async (_event, filePath) => {
+  try {
+    if (!filePath || !fs.existsSync(filePath)) {
+      console.warn("get-file-stats: File not found:", filePath);
+      return null;
+    }
+
+    const stats = fs.statSync(filePath);
+    return {
+      modifiedTime: stats.mtimeMs || stats.mtime.getTime(),
+      size: stats.size,
+      isDirectory: stats.isDirectory(),
+      isFile: stats.isFile()
+    };
+  } catch (e) {
+    console.warn("get-file-stats failed for", filePath, e);
+    return null;
+  }
+});
+
 function createMenu() {
   const template = [
     {
@@ -1122,6 +1143,54 @@ app.whenReady().then(createWindow);
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     app.quit();
+  }
+});
+
+// Handle graceful shutdown: prevent quit until pending saves are flushed
+let isSavingOnShutdown = false;
+let shutdownTimeoutId = null;
+
+app.on("before-quit", (event) => {
+  // If we're already in shutdown sequence, allow quit
+  if (isSavingOnShutdown) return;
+  
+  // Prevent immediate quit and initiate save sequence
+  event.preventDefault();
+  isSavingOnShutdown = true;
+  
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    console.log('[Shutdown] Requesting renderer to flush pending saves...');
+    // Send message to renderer to flush pending saves
+    mainWindow.webContents.send("app-before-quit");
+    
+    // Set a maximum timeout (15 seconds) to force quit if saves take too long
+    shutdownTimeoutId = setTimeout(() => {
+      console.log('[Shutdown] Timeout: forcing quit after 15 seconds');
+      app.quit();
+    }, 15000);
+  } else {
+    // No window, proceed with quit
+    app.quit();
+  }
+});
+
+// Handle the renderer confirming saves are complete
+ipcMainLocal.on("app-shutdown-complete", () => {
+  console.log('[Shutdown] Renderer confirmed all saves flushed, proceeding with quit');
+  if (shutdownTimeoutId) {
+    clearTimeout(shutdownTimeoutId);
+    shutdownTimeoutId = null;
+  }
+  isSavingOnShutdown = false;
+  app.quit();
+});
+
+// Handle will-quit event (final cleanup before app closes)
+app.on("will-quit", () => {
+  console.log('[Shutdown] App is about to quit - performing final cleanup');
+  if (shutdownTimeoutId) {
+    clearTimeout(shutdownTimeoutId);
+    shutdownTimeoutId = null;
   }
 });
 

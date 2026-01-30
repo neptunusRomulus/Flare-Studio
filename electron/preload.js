@@ -88,4 +88,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on("menu-undo", (_e) => callback && callback()),
   onMenuRedo: (callback) =>
     ipcRenderer.on("menu-redo", (_e) => callback && callback()),
+  // Graceful shutdown handlers
+  onAppBeforeQuit: (callback) =>
+    ipcRenderer.on("app-before-quit", () => callback && callback()),
+  appShutdownComplete: () =>
+    ipcRenderer.send("app-shutdown-complete"),
 });

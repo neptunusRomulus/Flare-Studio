@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import WelcomeScreen from '../components/WelcomeScreen';
 import AppShell from '@/components/AppShell';
@@ -8,13 +8,47 @@ import MapSettingsDialog from '@/components/MapSettingsDialog';
 import ClearLayerDialog from '@/components/ClearLayerDialog';
 import ConfirmActionDialog from '@/components/ConfirmActionDialog';
 import HelpDialog from '@/components/HelpDialog';
+import ConflictDialog from '@/components/ConflictDialog';
 import EditorArea from '@/components/EditorArea';
 import { Toaster } from '@/components/ui/toaster';
 import DialogsContainer from '@/components/DialogsContainer';
+import SessionRecoveryDialog from '@/components/SessionRecoveryDialog';
+import useCrashRecovery from '@/hooks/useCrashRecovery';
 
 export default function AppMain() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const c = useAppContext() as any;
+  
+  // Crash recovery state
+  const [showRecoveryDialog, setShowRecoveryDialog] = useState(false);
+  const {
+    hasCrashBackup,
+    backupTimestamp,
+    mapName: crashedMapName,
+    isRecovering,
+    recoveryError,
+    recoverSession,
+    dismissRecovery,
+    getCrashTimeFormatted,
+    getTimeSinceCrash
+  } = useCrashRecovery({
+    onRecoveryFound: () => setShowRecoveryDialog(true),
+    onRecoveryDismissed: () => setShowRecoveryDialog(false)
+  });
+
+  const handleRecover = async () => {
+    const success = await recoverSession();
+    if (success) {
+      // Close dialog and allow editor to use recovered state
+      setShowRecoveryDialog(false);
+    }
+  };
+
+  const handleDismiss = () => {
+    dismissRecovery();
+    setShowRecoveryDialog(false);
+  };
+
   const {
     showWelcome,
     handleCreateNewMap,
@@ -37,6 +71,10 @@ export default function AppMain() {
     editor,
     autoSaveEnabled,
     setAutoSaveEnabledState,
+    autoSaveIntervalMs,
+    setAutoSaveIntervalMs,
+    autoSaveDebounceMs,
+    setAutoSaveDebounceMs,
     showActiveGid,
     setShowActiveGid,
     setShowSidebarToggle,
@@ -111,6 +149,10 @@ export default function AppMain() {
           editor={editor}
           autoSaveEnabled={autoSaveEnabled}
           setAutoSaveEnabledState={setAutoSaveEnabledState}
+          autoSaveIntervalMs={autoSaveIntervalMs}
+          setAutoSaveIntervalMs={setAutoSaveIntervalMs}
+          autoSaveDebounceMs={autoSaveDebounceMs}
+          setAutoSaveDebounceMs={setAutoSaveDebounceMs}
           showActiveGid={showActiveGid}
           setShowActiveGid={setShowActiveGid}
           showSidebarToggle={showSidebarToggle}
@@ -138,11 +180,24 @@ export default function AppMain() {
         <ConfirmActionDialog {...confirmDialogProps} />
 
         <HelpDialog open={showHelp} activeTab={activeHelpTab} setActiveTab={setActiveHelpTab} onClose={handleHelpClose} />
+
+        <ConflictDialog />
       </main>
 
       <Toaster />
 
       <DialogsContainer ctx={c} />
+
+      <SessionRecoveryDialog
+        isOpen={showRecoveryDialog && hasCrashBackup}
+        mapName={crashedMapName}
+        crashTime={getCrashTimeFormatted()}
+        timeSinceCrash={getTimeSinceCrash()}
+        isRecovering={isRecovering}
+        error={recoveryError}
+        onRecover={handleRecover}
+        onDismiss={handleDismiss}
+      />
 
       {tooltip && (
         <div

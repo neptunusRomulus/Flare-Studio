@@ -1,6 +1,8 @@
 import { Button } from '@/components/ui/button';
-import { Moon, Sun, Target, X, HelpCircle } from 'lucide-react';
+import { Moon, Sun, Target, X } from 'lucide-react';
 import Tooltip from '@/components/ui/tooltip';
+import AutoSaveSettingsPanel from '@/components/AutoSaveSettingsPanel';
+import UndoPersistencePanel from '@/components/UndoPersistencePanel';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 import type { Dispatch, SetStateAction } from 'react';
 
@@ -12,10 +14,18 @@ type EngineSettingsDialogProps = {
   editor: TileMapEditor | null;
   autoSaveEnabled: boolean;
   setAutoSaveEnabledState: Dispatch<SetStateAction<boolean>>;
+  autoSaveIntervalMs?: number;
+  setAutoSaveIntervalMs?: Dispatch<SetStateAction<number>>;
+  autoSaveDebounceMs?: number;
+  setAutoSaveDebounceMs?: Dispatch<SetStateAction<number>>;
   showActiveGid: boolean;
   setShowActiveGid: Dispatch<SetStateAction<boolean>>;
   showSidebarToggle: boolean;
   setShowSidebarToggle: Dispatch<SetStateAction<boolean>>;
+  undoPersistenceEnabled?: boolean;
+  setUndoPersistenceEnabled?: Dispatch<SetStateAction<boolean>>;
+  onClearUndoHistory?: () => void;
+  undoStorageSizeKB?: number;
 };
 
 const EngineSettingsDialog = ({
@@ -26,10 +36,18 @@ const EngineSettingsDialog = ({
   editor,
   autoSaveEnabled,
   setAutoSaveEnabledState,
+  autoSaveIntervalMs = 5000,
+  setAutoSaveIntervalMs,
+  autoSaveDebounceMs = 2000,
+  setAutoSaveDebounceMs,
   showActiveGid,
   setShowActiveGid,
   showSidebarToggle,
-  setShowSidebarToggle
+  setShowSidebarToggle,
+  undoPersistenceEnabled = false,
+  setUndoPersistenceEnabled,
+  onClearUndoHistory,
+  undoStorageSizeKB
 }: EngineSettingsDialogProps) => {
   if (!open) return null; 
 
@@ -129,9 +147,37 @@ const EngineSettingsDialog = ({
               </span>
             </div>
             <p className="text-xs text-gray-500 mt-1">
-              Automatically saves your work every 8 seconds
+              Automatically saves your work at regular intervals
             </p>
+            
+            {autoSaveEnabled && setAutoSaveIntervalMs && setAutoSaveDebounceMs && (
+              <div className="mt-4 pt-4 border-t border-border">
+                <AutoSaveSettingsPanel
+                  autoSaveEnabled={autoSaveEnabled}
+                  intervalMs={autoSaveIntervalMs}
+                  debounceMs={autoSaveDebounceMs}
+                  onEnabledChange={setAutoSaveEnabledState}
+                  onIntervalChange={setAutoSaveIntervalMs}
+                  onDebounceChange={setAutoSaveDebounceMs}
+                />
+              </div>
+            )}
           </div>
+
+          {/* Undo Persistence Settings */}
+          <div>
+            <div className="mb-3 space-y-3">
+              {setUndoPersistenceEnabled && (
+                <UndoPersistencePanel
+                  enabled={undoPersistenceEnabled}
+                  onEnabledChange={setUndoPersistenceEnabled}
+                  onClearHistory={onClearUndoHistory}
+                  storageSizeKB={undoStorageSizeKB}
+                />
+              )}
+            </div>
+          </div>
+
           <div>
             <label className="block text-sm font-medium mb-2">Active GID Indicator</label>
             <div className="flex items-center gap-2">

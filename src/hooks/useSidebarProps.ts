@@ -58,7 +58,7 @@ export default function useSidebarProps(params: any) {
     leftCollapsed: p.leftCollapsed
   };
 
-  const exportStatus = { isExporting: p.isExporting, exportProgress: p.exportProgress };
+  const exportStatus = { isExporting: p.isExporting, exportProgress: p.exportProgress, isSaving: p.isManuallySaving, saveProgress: p.saveProgress };
 
   const controls = {
     mapsButtonRef: p.mapsButtonRef,

@@ -98,6 +98,9 @@ declare global {
       onMenuSaveMap: (callback: () => void) => void;
       onMenuUndo: (callback: () => void) => void;
       onMenuRedo: (callback: () => void) => void;
+      // Graceful shutdown handlers
+      onAppBeforeQuit: (callback: () => void) => void;
+      appShutdownComplete: () => void;
     };
   }
 }

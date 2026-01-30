@@ -2,7 +2,7 @@
 export default function useMapsSidebar(params: any) {
   const p: any = params || {};
 
-  const exportStatus = { isExporting: p.isExporting, exportProgress: p.exportProgress };
+  const exportStatus = { isExporting: p.isExporting, exportProgress: p.exportProgress, isSaving: p.isManuallySaving, saveProgress: p.saveProgress };
 
   const controls = {
     mapsButtonRef: p.mapsButtonRef,

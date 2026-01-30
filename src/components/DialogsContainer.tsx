@@ -11,6 +11,7 @@ import MapDialogsContainer from '@/components/MapDialogsContainer';
 import OverwriteExportDialogContainer from '@/components/OverwriteExportDialogContainer';
 import ExportSuccessModalContainer from '@/components/ExportSuccessModalContainer';
 import SeparateBrushDialog from '@/components/SeparateBrushDialog';
+import SaveErrorNotificationPanel from '@/components/SaveErrorNotificationPanel';
 
 // The dialog context is a large, aggregated object assembled in App.tsx.
 // It's acceptable to allow a broad shape here; keep the exception narrow.
@@ -28,6 +29,8 @@ export default function DialogsContainer({ ctx }: { ctx: unknown }) {
 
   return (
     <>
+      <SaveErrorNotificationPanel position="bottom" />
+
       <SeparateBrushDialog
         open={local.showSeparateDialog ?? false}
         onOpenChange={local.setShowSeparateDialog ?? (() => {})}

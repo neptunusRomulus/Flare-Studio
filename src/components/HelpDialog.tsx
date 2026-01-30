@@ -1,7 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { Eraser, Link2, Map, Paintbrush2, PaintBucket, Pipette, Save, Settings, Shield, Square, Target, Upload, Wand2, X, Book } from 'lucide-react';
-import { useState } from 'react';
-import DocumentationViewer from './DocumentationViewer';
+import { Eraser, Link2, Map, Paintbrush2, PaintBucket, Pipette, Save, Settings, Shield, Square, Target, Upload, Wand2, X, Book, AlertCircle, CheckCircle2, HardDrive, Zap } from 'lucide-react';
 
 type HelpDialogProps = {
   open: boolean;
@@ -11,7 +9,6 @@ type HelpDialogProps = {
 };
 
 const HelpDialog = ({ open, activeTab, setActiveTab, onClose }: HelpDialogProps) => {
-  const [showDocViewer, setShowDocViewer] = useState(false);
 
   if (!open) return null;
 
@@ -55,8 +52,12 @@ const HelpDialog = ({ open, activeTab, setActiveTab, onClose }: HelpDialogProps)
               Collisions
             </button>
             <button
-              onClick={() => setShowDocViewer(true)}
-              className={`px-3 py-2 rounded-md text-sm font-medium transition-all text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 hover:bg-white/50 dark:hover:bg-neutral-700/50`}
+              onClick={() => setActiveTab('documentation')}
+              className={`px-3 py-2 rounded-md text-sm font-medium transition-all ${
+                activeTab === 'documentation'
+                  ? 'bg-white dark:bg-neutral-700 text-gray-900 dark:text-gray-100 shadow-sm'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+              }`}
             >
               <Book className="w-4 h-4 inline mr-2" />
               Documentation
@@ -316,6 +317,107 @@ const HelpDialog = ({ open, activeTab, setActiveTab, onClose }: HelpDialogProps)
             </>
           )}
 
+          {activeTab === 'documentation' && (
+            <>
+              <section>
+                <h4 className="text-xl font-semibold mb-3 flex items-center gap-2 text-gray-800 dark:text-gray-100">
+                  <CheckCircle2 className="w-5 h-5 text-green-500" />
+                  Auto-Save System
+                </h4>
+                <div className="space-y-2 text-gray-700 dark:text-gray-400">
+                  <p className="font-medium">Your project auto-saves every 5 seconds to prevent data loss.</p>
+                  <ul className="list-disc list-inside space-y-1 ml-4">
+                    <li>All map layers, objects, and settings are saved automatically</li>
+                    <li>Progress bar shows when saving is in progress</li>
+                    <li>Errors appear as red notifications if something fails</li>
+                    <li>Click Retry button to save again if an error occurs</li>
+                  </ul>
+                </div>
+              </section>
+
+              <section>
+                <h4 className="text-xl font-semibold mb-3 flex items-center gap-2 text-gray-800 dark:text-gray-100">
+                  <HardDrive className="w-5 h-5 text-blue-500" />
+                  Backup & Recovery
+                </h4>
+                <div className="space-y-2 text-gray-700 dark:text-gray-400">
+                  <p className="font-medium">Your projects are protected with multiple backup layers:</p>
+                  <ul className="list-disc list-inside space-y-1 ml-4">
+                    <li><strong>.flare-backup.json</strong> - Full backup saved in your project folder</li>
+                    <li><strong>Session Recovery</strong> - Automatic recovery if app crashes</li>
+                    <li><strong>Emergency Backup</strong> - Browser storage fallback if file save fails</li>
+                    <li>Previous saves are always accessible in your project directory</li>
+                  </ul>
+                </div>
+              </section>
+
+              <section>
+                <h4 className="text-xl font-semibold mb-3 flex items-center gap-2 text-gray-800 dark:text-gray-100">
+                  <AlertCircle className="w-5 h-5 text-orange-500" />
+                  Understanding Error Notifications
+                </h4>
+                <div className="space-y-3">
+                  <p className="text-gray-700 dark:text-gray-400">Red notifications appear when saves fail. Common errors:</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 bg-red-50 dark:bg-red-900/20 p-3 rounded-lg">
+                    <div>
+                      <h5 className="font-medium text-red-800 dark:text-red-200 mb-1">Disk Full</h5>
+                      <p className="text-sm text-red-700 dark:text-red-300">Free up space, then click Retry</p>
+                    </div>
+                    <div>
+                      <h5 className="font-medium text-red-800 dark:text-red-200 mb-1">Permission Denied</h5>
+                      <p className="text-sm text-red-700 dark:text-red-300">Check file is not read-only, then Retry</p>
+                    </div>
+                    <div>
+                      <h5 className="font-medium text-red-800 dark:text-red-200 mb-1">File Conflict</h5>
+                      <p className="text-sm text-red-700 dark:text-red-300">Keep your version or reload external changes</p>
+                    </div>
+                    <div>
+                      <h5 className="font-medium text-red-800 dark:text-red-200 mb-1">Network Error</h5>
+                      <p className="text-sm text-red-700 dark:text-red-300">Check connection, then Retry save</p>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section>
+                <h4 className="text-xl font-semibold mb-3 flex items-center gap-2 text-gray-800 dark:text-gray-100">
+                  <Zap className="w-5 h-5 text-yellow-500" />
+                  Best Practices
+                </h4>
+                <div className="space-y-2 text-gray-700 dark:text-gray-400">
+                  <ul className="list-disc list-inside space-y-1 ml-4">
+                    <li>Save manually (Ctrl+S) before making major changes</li>
+                    <li>Monitor for error notifications and fix issues promptly</li>
+                    <li>Keep your project folder on fast storage (SSD recommended)</li>
+                    <li>Create project backups to external storage regularly</li>
+                    <li>Check auto-save is active: look for save indicator in toolbar</li>
+                    <li>Test exports before shipping your maps</li>
+                  </ul>
+                </div>
+              </section>
+
+              <section>
+                <h4 className="text-xl font-semibold mb-3 flex items-center gap-2 text-gray-800 dark:text-gray-100">
+                  <Target className="w-5 h-5 text-orange-500" />
+                  Quick Keyboard Shortcuts
+                </h4>
+                <div className="grid grid-cols-2 gap-2 bg-gray-50 dark:bg-neutral-900 p-4 rounded-lg text-sm">
+                  <div className="flex justify-between"><span className="font-mono bg-gray-200 dark:bg-neutral-800 px-2 py-1 rounded">Ctrl+S</span><span className="text-gray-400">Save</span></div>
+                  <div className="flex justify-between"><span className="font-mono bg-gray-200 dark:bg-neutral-800 px-2 py-1 rounded">Ctrl+Z</span><span className="text-gray-400">Undo</span></div>
+                  <div className="flex justify-between"><span className="font-mono bg-gray-200 dark:bg-neutral-800 px-2 py-1 rounded">Ctrl+Y</span><span className="text-gray-400">Redo</span></div>
+                  <div className="flex justify-between"><span className="font-mono bg-gray-200 dark:bg-neutral-800 px-2 py-1 rounded">Wheel</span><span className="text-gray-400">Zoom</span></div>
+                </div>
+              </section>
+
+              <section className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+                <h4 className="text-lg font-semibold text-blue-800 dark:text-blue-200 mb-2">📌 Remember</h4>
+                <p className="text-blue-700 dark:text-blue-300 text-sm">
+                  <strong>Your work is safe.</strong> Auto-save runs every 5 seconds with multiple backup layers. Even if something goes wrong, you have recovery options. Check for error notifications and fix them promptly to maintain smooth saving.
+                </p>
+              </section>
+            </>
+          )}
+
           <div className="pt-4 border-t border-gray-200 text-center">
             <p className="text-sm text-gray-600 dark:text-gray-400">
               Flare Studio | GUI for Flare Engine by ism.
@@ -323,9 +425,6 @@ const HelpDialog = ({ open, activeTab, setActiveTab, onClose }: HelpDialogProps)
           </div>
         </div>
       </div>
-
-      {/* Documentation Viewer Modal */}
-      <DocumentationViewer open={showDocViewer} onClose={() => setShowDocViewer(false)} />
     </div>
   );
 };

@@ -377,15 +377,6 @@ const useProjectIO = ({
   useEffect(() => { setMapInitializedRef.current = setMapInitialized; }, [setMapInitialized]);
   useEffect(() => { setMapNameRef.current = setMapName; }, [setMapName]);
 
-  // Set manual save callback on editor so Ctrl+S keyboard shortcut works
-  useEffect(() => {
-    if (editor && handleManualSave) {
-      if (typeof editor.setManualSaveCallback === 'function') {
-        editor.setManualSaveCallback(handleManualSave);
-      }
-    }
-  }, [editor, handleManualSave]);
-
   const handleOpenMapFromMapsFolder = useCallback(async (filename: string) => {
     if (!currentProjectPath) return;
     try {

@@ -14,6 +14,7 @@ import { Toaster } from '@/components/ui/toaster';
 import DialogsContainer from '@/components/DialogsContainer';
 import SessionRecoveryDialog from '@/components/SessionRecoveryDialog';
 import useCrashRecovery from '@/hooks/useCrashRecovery';
+import useManualSaveSetup from '@/hooks/useManualSaveSetup';
 
 export default function AppMain() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -105,6 +106,9 @@ export default function AppMain() {
     dialogsCtx,
     tooltip
   } = c;
+
+  // Set up manual save (Ctrl+S) support - must be called within SaveQueueProvider
+  useManualSaveSetup(editor, controls?.currentProjectPath);
 
   const hasMap = canvasCtx.mapInitialized;
 

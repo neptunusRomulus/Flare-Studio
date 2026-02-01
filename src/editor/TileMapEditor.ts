@@ -87,7 +87,8 @@ export interface EditorProjectData {
   tilesets?: SavedTilesetEntry[];
   tilesetImages?: Record<string, string>;
   // Persist per-layer tab layout so each map can restore its own tab/palette state
-  layerTabs?: Record<string, Array<{ id: number; name?: string; tileset?: SavedTilesetEntry; detectedTiles?: SerializedDetectedTile[] }>>;
+  // Now includes per-tab painted data arrays to preserve painting data across tabs
+  layerTabs?: Record<string, Array<{ id: number; name?: string; data?: number[]; tileset?: SavedTilesetEntry; detectedTiles?: SerializedDetectedTile[] }>>;
   // Persist which tab id was active per layer type
   layerActiveTabId?: Record<string, number>;
   // Persist active layer selection for tab switching
@@ -699,11 +700,12 @@ export class TileMapEditor {
   private collisionTooltipEl: HTMLDivElement | null = null;
   private collisionTooltipHideTimeout: number | null = null;
   
-  // Layer tab system: each layer type may have multiple tabs, each with its own tileset and detected tiles/brushes
+  // Layer tab system: each layer type may have multiple tabs, each with its own tileset, detected tiles/brushes, AND painted data
   private nextLayerTabId: number = 1;
   private layerTabs: Map<string, Array<{
     id: number;
     name: string;
+    data?: number[]; // Painted tile data specific to this tab
     tileset?: LayerTilesetEntry;
     detectedTiles?: Map<number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }>;
     brushes?: Array<{ image: HTMLImageElement; fileName: string; width: number; height: number }>;
@@ -1828,12 +1830,6 @@ export class TileMapEditor {
         if (currentValue !== newValue) {
           this.saveState();
           
-          // Debug: Log layer information
-          console.log(`Painting on layer: ${layer.name} (ID: ${layer.id}, Type: ${layer.type})`);
-          console.log(`Position: (${x}, ${y}), Index: ${index}`);
-          console.log(`Current value: ${currentValue}, New value: ${newValue}`);
-          console.log(`Active GID for this layer: ${currentLayerActiveGid}`);
-          
           // Always try to remove any sprite object at this position when painting a new tile
           // This ensures single tile painting removes multi-tile sprites that cover this cell
           // Note: sprite objects set layer.data to 0, so we can't rely on currentValue > 0
@@ -1877,10 +1873,6 @@ export class TileMapEditor {
           }
           
           this.markAsChanged();
-          try {
-            const nonZero = layer.data.reduce((acc, v) => acc + (v && v > 0 ? 1 : 0), 0);
-            //console.log(`handleTileClick: applied change layer=${layer.name} id=${layer.id} index=${index} newValue=${newValue} nonZero=${nonZero}`);
-          } catch (e) { void e; }
           this.draw(); // Immediately reflect changes
         }
       }
@@ -3482,52 +3474,42 @@ export class TileMapEditor {
   }
 
   private setupPaletteEventDelegation(): void {
-    console.log('[PALETTE_SETUP] *** CALLED *** Setting up delegated event listener on #tilesContainer');
     const container = document.getElementById('tilesContainer');
-    console.log('[PALETTE_SETUP] Container found?', !!container, 'children:', container?.children.length);
     if (!container) {
-      console.error('[PALETTE_SETUP] #tilesContainer not found!');
       return;
     }
 
     // Remove old listeners if they exist
     if (this.paletteClickListener) {
-      console.log('[PALETTE_SETUP] Removing old palette click listener');
       container.removeEventListener('click', this.paletteClickListener);
     }
 
     // Create a single delegated click listener for all palette tiles
     this.paletteClickListener = (e: Event) => {
-      console.log('[PALETTE_DELEGATED] Event fired on #tilesContainer, target:', (e.target as HTMLElement)?.tagName);
       const event = e as MouseEvent;
       const target = event.target as HTMLElement;
       
       // Find the closest wrapper div
       const wrapper = target.closest('.brush-wrapper') as HTMLDivElement | null;
       if (!wrapper) {
-        console.log('[PALETTE_DELEGATED] No .brush-wrapper found for target:', target.tagName);
         return;
       }
 
       // Get the tile index from data attribute or nearby canvas
       const canvas = wrapper.querySelector('canvas') as HTMLCanvasElement | null;
       if (!canvas) {
-        console.error('[PALETTE_DELEGATED] No canvas found in wrapper');
         return;
       }
 
       const indexStr = canvas.getAttribute('data-tile-index');
       if (!indexStr) {
-        console.error('[PALETTE_DELEGATED] Canvas has no data-tile-index attribute');
         return;
       }
 
       const tileIndex = parseInt(indexStr, 10);
-      console.log(`[PALETTE_DELEGATED] Click detected on tile ${tileIndex}, ctrlKey=${event.ctrlKey}, metaKey=${event.metaKey}`);
 
       const brushToolElement = document.getElementById('brushToolState') || document.querySelector('[data-brush-tool]');
       const currentBrushTool = brushToolElement?.getAttribute('data-brush-tool') || 'none';
-      console.log(`[PALETTE_DELEGATED] Brush tool: ${currentBrushTool}`);
 
       if (currentBrushTool === 'merge') {
         console.log('Handling merge tool selection (no auto-merge)');
@@ -3574,9 +3556,7 @@ export class TileMapEditor {
       this.updateActiveTile();
     };
 
-    console.log('[PALETTE_SETUP] About to add event listener to container');
     container.addEventListener('click', this.paletteClickListener as EventListener);
-    console.log('[PALETTE_DELEGATED] ✓ Event delegation listener successfully attached to #tilesContainer');
   }
 
   private paletteClickListener: ((e: Event) => void) | null = null;
@@ -3585,7 +3565,6 @@ export class TileMapEditor {
   private maxPaletteRetries = 10;
 
   private createTilePalette(preserveOrder: boolean = false): void {
-    console.log('[PALETTE_SETUP] *** createTilePalette CALLED ***');
     
     // Try to find or create the tilesContainer
     let container = document.getElementById('tilesContainer');
@@ -3606,12 +3585,9 @@ export class TileMapEditor {
       } else {
         document.body.appendChild(container);
       }
-      
-      console.log('[PALETTE_SETUP] Created new #tilesContainer');
     }
     
     if (!this.tilesetImage) {
-      console.log('[PALETTE_SETUP] Exiting: no tilesetImage');
       return;
     }
     
@@ -4103,9 +4079,7 @@ export class TileMapEditor {
     }
 
     // Setup delegated event listener NOW that container is populated
-    console.log('[PALETTE_SETUP] About to call setupPaletteEventDelegation from createTilePalette');
     this.setupPaletteEventDelegation();
-    console.log('[PALETTE_SETUP] Returned from setupPaletteEventDelegation');
   }
 
   // Brush management interaction handlers
@@ -6315,9 +6289,11 @@ export class TileMapEditor {
   const tabs = this.layerTabs.get(layerType) || [];
   const id = this.nextLayerTabId++;
   // Initialize new tab with empty tileset/brush/detectedTiles to avoid inheriting previous tab data
-  const tab: { id: number; name: string; tileset?: LayerTilesetEntry; detectedTiles?: Map<number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }>; brushes?: Array<{ image: HTMLImageElement; fileName: string; width: number; height: number }>; } = {
+  const tab: { id: number; name: string; data?: number[]; tileset?: LayerTilesetEntry; detectedTiles?: Map<number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }>; brushes?: Array<{ image: HTMLImageElement; fileName: string; width: number; height: number }>; } = {
     id,
     name: name || `Tab ${tabs.length + 1}`,
+    // Initialize with empty painted tile data array for this tab
+    data: new Array(this.mapWidth * this.mapHeight).fill(0),
     // explicit empty structures so setActiveLayerTab clears palette when switching to this tab
     detectedTiles: new Map(),
     brushes: []
@@ -6336,11 +6312,40 @@ export class TileMapEditor {
   }
 
   public setActiveLayerTab(layerType: string, tabId: number): void {
+    // First, save current layer's painting data to the previously active tab
+    const currentActiveTabId = this.layerActiveTabId.get(layerType);
+    if (currentActiveTabId !== undefined) {
+      const tabs = this.layerTabs.get(layerType);
+      const currentActiveTab = tabs?.find(t => t.id === currentActiveTabId);
+      const layer = this.tileLayers.find(l => l.type === layerType);
+      
+      if (currentActiveTab && layer) {
+        // Save the current layer's painting data to the current active tab
+        currentActiveTab.data = [...layer.data];
+        console.log(`[TAB] Saving painting data for tab ${currentActiveTabId} (${currentActiveTab.data.filter(v => v > 0).length} painted tiles)`);
+      }
+    }
+
+    // Now switch to the new tab
     this.layerActiveTabId.set(layerType, tabId);
+    
     // When switching active tab, update current tileset/palette to reflect tab's tileset if present
     const tabs = this.layerTabs.get(layerType);
     if (tabs) {
       const tab = tabs.find(t => t.id === tabId);
+      const layer = this.tileLayers.find(l => l.type === layerType);
+      
+      if (tab && layer) {
+        // Restore the tab's painting data to the layer
+        if (tab.data) {
+          layer.data = [...tab.data];
+          console.log(`[TAB] Restored painting data for tab ${tabId} (${layer.data.filter(v => v > 0).length} painted tiles)`);
+        } else {
+          layer.data = new Array(this.mapWidth * this.mapHeight).fill(0);
+          console.log(`[TAB] No painting data for tab ${tabId}, initialized empty`);
+        }
+      }
+      
       if (tab && tab.tileset && tab.tileset.image) {
         const columns = tab.tileset.columns ?? (tab.tileset.image ? Math.max(1, Math.floor(tab.tileset.image.width / this.tileSizeX)) : 1);
         const rows = tab.tileset.rows ?? (tab.tileset.image ? Math.max(1, Math.floor(tab.tileset.image.height / this.tileSizeY)) : 1);
@@ -6405,8 +6410,11 @@ export class TileMapEditor {
         this.updateActiveGid(0);
         this.clearTilePalette();
         this.draw();
+        return;
       }
     }
+    
+    this.draw();
   }
 
   public importBrushImageToLayerTab(layerType: string, tabId: number, file: File): Promise<void> {
@@ -7766,6 +7774,23 @@ export class TileMapEditor {
   // structure used by saveProjectData but is returned directly so the UI can
   // persist an in-memory snapshot (for tabs) without requiring a file save.
   public getProjectData(): EditorProjectData {
+    // CRITICAL: Sync current layer's painting data to the active tab before saving
+    // This ensures any unpainted tiles are included in the save
+    for (const [layerType, _] of this.layerTabs.entries()) {
+      const activeTabId = this.layerActiveTabId.get(layerType);
+      if (activeTabId !== undefined) {
+        const tabs = this.layerTabs.get(layerType);
+        const activeTab = tabs?.find(t => t.id === activeTabId);
+        const layer = this.tileLayers.find(l => l.type === layerType);
+        
+        if (activeTab && layer) {
+          // Save the current layer's painted tiles to the active tab
+          activeTab.data = [...layer.data];
+          console.log(`[SAVE-SYNC] Synced painting data for tab ${activeTabId} (${activeTab.data.filter(v => v > 0).length} painted tiles)`);
+        }
+      }
+    }
+
     const tilesetImages: Record<string, string> = {};
     const tilesets: SavedTilesetEntry[] = [];
 
@@ -7863,12 +7888,19 @@ export class TileMapEditor {
       activeLayerId: this.activeLayerId
     };
 
-    // Serialize per-layer tabs (tab names, tab-specific tileset metadata, detected tiles)
+    // Serialize per-layer tabs (tab names, per-tab painting data, tab-specific tileset metadata, detected tiles)
     try {
-      const tabsObj: Record<string, Array<{ id: number; name?: string; tileset?: SavedTilesetEntry; detectedTiles?: SerializedDetectedTile[] }>> = {};
+      const tabsObj: Record<string, Array<{ id: number; name?: string; data?: number[]; tileset?: SavedTilesetEntry; detectedTiles?: SerializedDetectedTile[] }>> = {};
       for (const [layerType, tabs] of this.layerTabs.entries()) {
         tabsObj[layerType] = tabs.map(t => {
-          const ser: { id: number; name?: string; tileset?: SavedTilesetEntry; detectedTiles?: SerializedDetectedTile[] } = { id: t.id, name: t.name };
+          const ser: { id: number; name?: string; data?: number[]; tileset?: SavedTilesetEntry; detectedTiles?: SerializedDetectedTile[] } = { id: t.id, name: t.name };
+          
+          // Save per-tab painting data
+          if (t.data && t.data.length > 0) {
+            ser.data = [...t.data];
+            console.log(`[SAVE] Tab ${t.id} (${t.name}): saving ${t.data.filter(v => v > 0).length} painted tiles`);
+          }
+          
           if (t.tileset) {
             // Embed the tab's tileset image into tilesetImages if available
             const fileName = t.tileset.fileName;
@@ -8558,6 +8590,7 @@ export class TileMapEditor {
             type RestoredTab = {
               id: number;
               name: string;
+              data?: number[]; // Restored per-tab painting data
               tileset?: LayerTilesetEntry;
               detectedTiles?: Map<number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }>;
               brushes?: Array<{ image: HTMLImageElement; fileName: string; width: number; height: number }>;
@@ -8568,6 +8601,18 @@ export class TileMapEditor {
               const tabId = typeof t.id === 'number' ? t.id : (maxTabId++);
               const tabName = t.name || `Tab ${tabId}`;
               const tabObj: RestoredTab = { id: tabId, name: tabName };
+              
+              // Restore per-tab painting data if available
+              if (t.data && Array.isArray(t.data)) {
+                tabObj.data = [...t.data];
+                console.log(`[LOAD] Tab ${tabId} (${tabName}): restored ${t.data.filter(v => v > 0).length} painted tiles`);
+              } else {
+                // Initialize with empty data if not present
+                const mapWidth = projectData.width || 20;
+                const mapHeight = projectData.height || 15;
+                tabObj.data = new Array(mapWidth * mapHeight).fill(0);
+              }
+              
               // Rehydrate tileset metadata (do not embed large data URLs here)
               if (t.tileset && t.tileset.fileName) {
                 const ts: LayerTilesetEntry = {
@@ -8634,7 +8679,7 @@ export class TileMapEditor {
           this.nextLayerTabId = (maxTabId || 1) + 1;
         }
       } catch (_e) { void _e; }
-      
+
       // Load tilesets first (both legacy and per-layer)
       if (projectData.tilesets && Array.isArray(projectData.tilesets)) {
         let loadedCount = 0;
@@ -8828,6 +8873,23 @@ export class TileMapEditor {
       }
       
       this.ensureCollisionTileset();
+      
+      // CRITICAL: Load active tab's data into layer data for display AFTER all setup/clearing
+      // This must happen after clearMapGrid() and all UI initialization
+      for (const layerType of this.layerTabs.keys()) {
+        const activeTabId = this.layerActiveTabId.get(layerType);
+        if (activeTabId !== undefined) {
+          const tabs = this.layerTabs.get(layerType);
+          const activeTab = tabs?.find(t => t.id === activeTabId);
+          const layer = this.tileLayers.find(l => l.type === layerType);
+          
+          if (activeTab && layer && activeTab.data) {
+            layer.data = [...activeTab.data];
+            console.log(`[LOAD-SYNC] Loaded active tab ${activeTabId} data for layer type "${layerType}" (${activeTab.data.filter(v => v > 0).length} painted tiles)`);
+          }
+        }
+      }
+      
       console.log('Project data loaded successfully');
       this.draw();
     } catch (_error) { void _error; }

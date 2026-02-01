@@ -1879,7 +1879,7 @@ export class TileMapEditor {
           this.markAsChanged();
           try {
             const nonZero = layer.data.reduce((acc, v) => acc + (v && v > 0 ? 1 : 0), 0);
-            console.log(`handleTileClick: applied change layer=${layer.name} id=${layer.id} index=${index} newValue=${newValue} nonZero=${nonZero}`);
+            //console.log(`handleTileClick: applied change layer=${layer.name} id=${layer.id} index=${index} newValue=${newValue} nonZero=${nonZero}`);
           } catch (e) { void e; }
           this.draw(); // Immediately reflect changes
         }
@@ -6533,14 +6533,12 @@ export class TileMapEditor {
       // If still loading, defer the palette update until the image is loaded
       // The image.onload callback will handle updating the palette
       if (this.collisionTilesetLoading) {
-        console.log('updateCurrentTileset: collision tileset still loading, deferring palette update');
         return;
       }
     }
     
     const tileset = this.getLayerTilesetOrFallback(layerType);
     if (tileset) {
-      console.log('updateCurrentTileset: applying tileset for layer', { layerType, file: tileset.fileName, columns: tileset.columns, rows: tileset.rows, count: tileset.count });
       this.tilesetImage = tileset.image;
       this.tilesetFileName = tileset.fileName;
       this.tilesetColumns = tileset.columns;

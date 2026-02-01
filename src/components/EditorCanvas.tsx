@@ -27,6 +27,8 @@ type EditorContext = {
   isPreparingNewMap: boolean;
   hoverCoords: { x: number; y: number } | null;
   showActiveGid: boolean;
+  activeGidValue: string;
+  hoverGidValue: string;
   npcDeletePopup: { npcId: number; screenX: number; screenY: number } | null;
   setNpcDeletePopup: (v: { npcId: number; screenX: number; screenY: number } | null) => void;
   handleUnplaceActorFromMap: (objectId: number) => void;
@@ -71,6 +73,8 @@ export default function EditorCanvas(props: Props) {
     isPreparingNewMap,
     hoverCoords,
     showActiveGid,
+    activeGidValue,
+    hoverGidValue,
     npcDeletePopup,
     setNpcDeletePopup,
     handleUnplaceActorFromMap,
@@ -147,7 +151,7 @@ export default function EditorCanvas(props: Props) {
 
       <MapInitOverlay mapInitialized={mapInitialized} handleOpenCreateMapDialog={handleOpenCreateMapDialog} isPreparingNewMap={isPreparingNewMap} />
 
-      <MapHoverDisplay hoverCoords={hoverCoords} showActiveGid={showActiveGid} isEnemyTabActive={isEnemyTabActive} />
+      <MapHoverDisplay hoverCoords={hoverCoords} showActiveGid={showActiveGid} activeGidValue={activeGidValue} hoverGidValue={hoverGidValue} isEnemyTabActive={isEnemyTabActive} />
 
       <NpcDeletePopup npcDeletePopup={npcDeletePopup} onConfirm={handleUnplaceActorFromMap} onCancel={() => setNpcDeletePopup(null)} />
 

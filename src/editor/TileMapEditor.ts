@@ -235,6 +235,10 @@ export class TileMapEditor {
           this.activeGidCallback(this.activeGid);
         } catch (_e) { void _e; }
       }
+      // Clear any multi-tile selection when a single tile is selected
+      this.clearSelection();
+      // Force redraw to ensure selection highlight is cleared
+      this.draw();
     }
   }
 
@@ -1120,6 +1124,15 @@ export class TileMapEditor {
 
   // Public method to set the active GID for the current layer
   public setActiveGid(gid: number): void {
+    // Hide stamp preview when selecting a single tile
+    this.stampPreview.visible = false;
+    // Clear multi-selected brushes so single tile painting works correctly
+    this.multiSelectedBrushes.clear();
+    // Clear active stamp so we use single tile painting, not stamp placement
+    this.activeStamp = null;
+    this.currentStampMode = 'select';
+    // Set tool to tiles mode for brush painting
+    this.tool = 'tiles';
     this.setCurrentLayerActiveGid(gid);
   }
 
@@ -1821,11 +1834,10 @@ export class TileMapEditor {
           console.log(`Current value: ${currentValue}, New value: ${newValue}`);
           console.log(`Active GID for this layer: ${currentLayerActiveGid}`);
           
-          // Remove any existing sprite object at this position when painting a new tile
-          // This ensures only one tile/sprite appears at each cell
-          if (currentValue > 0) {
-            this.removeSpriteObjectAt(layer.type, x, y);
-          }
+          // Always try to remove any sprite object at this position when painting a new tile
+          // This ensures single tile painting removes multi-tile sprites that cover this cell
+          // Note: sprite objects set layer.data to 0, so we can't rely on currentValue > 0
+          this.removeSpriteObjectAt(layer.type, x, y);
           
           layer.data[index] = newValue;
           // Record which tileset (tab) this painted cell came from so tabs don't collide
@@ -2888,8 +2900,10 @@ export class TileMapEditor {
 
     // Draw active selection
     if (this.selection.active && this.selection.tiles.length > 0) {
-      this.ctx.strokeStyle = '#00ff00';
-      this.ctx.lineWidth = Math.max(1, Math.min(2, 2 / this.zoom));
+      // Draw light blue fill for selected tiles
+      this.ctx.fillStyle = 'rgba(59, 130, 246, 0.2)';
+      this.ctx.strokeStyle = '#007acc';
+      this.ctx.lineWidth = Math.max(1, Math.min(2.5, 2.5 / this.zoom));
       
       // Draw outline around each selected tile
       this.selection.tiles.forEach(tile => {
@@ -2903,6 +2917,7 @@ export class TileMapEditor {
         this.ctx.lineTo(screenPos.x, screenPos.y + halfTileY); // Bottom
         this.ctx.lineTo(screenPos.x - halfTileX, screenPos.y); // Left
         this.ctx.closePath();
+        this.ctx.fill();
         this.ctx.stroke();
       });
     }
@@ -3194,10 +3209,9 @@ export class TileMapEditor {
   private drawStampPreview(): void {
     if (!this.stampPreview.visible || !this.activeStamp) return;
 
-    this.ctx.strokeStyle = '#00ff00';
-    this.ctx.fillStyle = 'rgba(0, 255, 0, 0.2)';
-    this.ctx.lineWidth = Math.max(1, Math.min(2, 2 / this.zoom));
-    this.ctx.setLineDash([3, 3]);
+    this.ctx.strokeStyle = '#007acc';
+    this.ctx.fillStyle = 'rgba(59, 130, 246, 0.2)';
+    this.ctx.lineWidth = Math.max(1, Math.min(2.5, 2.5 / this.zoom));
 
     const halfTileX = (this.tileSizeX / 2) * this.zoom;
     const halfTileY = (this.tileSizeY / 2) * this.zoom;
@@ -3215,8 +3229,6 @@ export class TileMapEditor {
     this.ctx.closePath();
     this.ctx.fill();
     this.ctx.stroke();
-
-    this.ctx.setLineDash([]); // Reset line dash
   }
 
   private drawMiniMap(): void {
@@ -5244,6 +5256,20 @@ export class TileMapEditor {
     return null;
   }
 
+  public getGidAtHover(): number {
+    const layer = this.getActiveLayer();
+    if (!layer || this.hoverX < 0 || this.hoverY < 0) return 0;
+    const index = this.hoverY * this.mapWidth + this.hoverX;
+    return layer.data[index] || 0;
+  }
+
+  public getGidAt(x: number, y: number): number {
+    const layer = this.getActiveLayer();
+    if (!layer || x < 0 || y < 0 || x >= this.mapWidth || y >= this.mapHeight) return 0;
+    const index = y * this.mapWidth + x;
+    return layer.data[index] || 0;
+  }
+
   public getActiveLayer(): TileLayer | null {
     if (this.activeLayerId !== null) {
       return this.tileLayers.find(l => l.id === this.activeLayerId) || null;
@@ -5743,9 +5769,38 @@ export class TileMapEditor {
     const spriteObjects = this.placedSpriteObjects.get(layerType);
     if (!spriteObjects) return;
     
-    const index = spriteObjects.findIndex(obj => obj.anchorX === x && obj.anchorY === y);
-    if (index !== -1) {
-      spriteObjects.splice(index, 1);
+    // Remove sprite objects that:
+    // 1. Have their anchor at this exact position, OR
+    // 2. Cover this position (for multi-cell sprites)
+    const indicesToRemove: number[] = [];
+    
+    for (let i = 0; i < spriteObjects.length; i++) {
+      const obj = spriteObjects[i];
+      
+      // Check exact anchor match
+      if (obj.anchorX === x && obj.anchorY === y) {
+        indicesToRemove.push(i);
+        continue;
+      }
+      
+      // Check if this sprite covers the given position
+      // Calculate sprite bounds in map cells
+      const spriteWidthInCells = Math.ceil((obj.width || this.tileSizeX) / this.tileSizeX);
+      const spriteHeightInCells = Math.ceil((obj.height || this.tileSizeY) / this.tileSizeY);
+      
+      const minX = obj.anchorX;
+      const maxX = obj.anchorX + spriteWidthInCells - 1;
+      const minY = obj.anchorY;
+      const maxY = obj.anchorY + spriteHeightInCells - 1;
+      
+      if (x >= minX && x <= maxX && y >= minY && y <= maxY) {
+        indicesToRemove.push(i);
+      }
+    }
+    
+    // Remove in reverse order to maintain correct indices
+    for (let i = indicesToRemove.length - 1; i >= 0; i--) {
+      spriteObjects.splice(indicesToRemove[i], 1);
     }
   }
 

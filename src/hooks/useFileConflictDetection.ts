@@ -61,19 +61,52 @@ export default function useFileConflictDetection() {
   /**
    * Register a successful file save
    * Updates the tracked metadata to match newly saved file
+   * Optionally fetches actual file stats from disk to ensure accuracy
    */
-  const registerFileSave = useCallback((filePath: string, fileSize: number, metadata?: {contentHash?: string}) => {
+  const registerFileSave = useCallback((filePath: string, fileSize: number, metadata?: {contentHash?: string; getFileStats?: () => Promise<{modifiedTime: number; size: number} | null>}) => {
     if (!filePath) return;
     
-    const nowMs = Date.now();
-    fileMetadataRef.current.set(filePath, {
-      filePath,
-      lastModifiedTime: nowMs,
-      fileSize,
-      contentHash: metadata?.contentHash
+    // Try to get actual file modification time from disk for accuracy
+    const handleSaveRegistration = async () => {
+      let actualModifiedTime = Date.now();
+      let actualSize = fileSize;
+
+      // If a getFileStats function is provided, use it to get actual file stats
+      if (metadata?.getFileStats && typeof metadata.getFileStats === 'function') {
+        try {
+          const stats = await metadata.getFileStats();
+          if (stats) {
+            actualModifiedTime = stats.modifiedTime;
+            actualSize = stats.size;
+            console.log(`[FileConflict] Using actual file stats for registration: modTime=${actualModifiedTime}, size=${actualSize}B`);
+          }
+        } catch (err) {
+          console.warn(`[FileConflict] Failed to get actual file stats for ${filePath}, using current time:`, err);
+          // Fall back to current time
+        }
+      }
+
+      fileMetadataRef.current.set(filePath, {
+        filePath,
+        lastModifiedTime: actualModifiedTime,
+        fileSize: actualSize,
+        contentHash: metadata?.contentHash
+      });
+      
+      console.log(`[FileConflict] Registered file save: ${filePath} (size: ${actualSize}B)`);
+    };
+
+    // Execute async stats retrieval
+    handleSaveRegistration().catch(err => {
+      console.warn(`[FileConflict] Error during file save registration:`, err);
+      // Fallback: just register with current time
+      fileMetadataRef.current.set(filePath, {
+        filePath,
+        lastModifiedTime: Date.now(),
+        fileSize,
+        contentHash: metadata?.contentHash
+      });
     });
-    
-    console.log(`[FileConflict] Registered file save: ${filePath} (size: ${fileSize}B)`);
   }, []);
 
   /**

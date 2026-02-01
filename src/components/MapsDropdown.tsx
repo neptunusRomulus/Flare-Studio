@@ -66,7 +66,14 @@ const MapsDropdown: React.FC<Props> = ({
                 className="w-full text-left p-2 hover:bg-gray-100 dark:hover:bg-neutral-800 text-xs flex items-center gap-2"
                 onClick={async () => {
                   try {
-                    await handleOpenMap(m);
+                    // Extract map name from filename (e.g., "m1.json" -> "m1")
+                    const mapName = m.replace(/\.(json|txt)$/i, '');
+                    // Pass currentProjectPath, createTab flag, and mapName correctly
+                    if (currentProjectPath) {
+                      await handleOpenMap(currentProjectPath, false, mapName);
+                    } else {
+                      toast({ title: 'Error', description: 'No project path available.', variant: 'destructive' });
+                    }
                     setMapsDropdownOpen(false);
                   } catch (err) {
                     console.error('Open map failed', err);

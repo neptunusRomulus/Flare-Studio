@@ -154,7 +154,8 @@ export default function useAutosave(opts: {
             // Don't fail save if conflict check fails
           }
 
-          // Register this save with conflict detection system
+          // Register this save with conflict detection system AFTER conflict check passes
+          // This ensures the timestamp is only updated if we proceed with the save
           registerFileSave(currentFilePath, currentFileSize);
         }
         
@@ -202,6 +203,28 @@ export default function useAutosave(opts: {
           setHasUnsavedChanges(false);
           setLastErrorMessage('');
           resolveError(lastErrorId);
+
+          // Update file conflict detection tracking after successful save
+          if (currentFilePath) {
+            const getFileStats = async (): Promise<{ modifiedTime: number; size: number } | null> => {
+              if (typeof window !== 'undefined' && (window as unknown as {electronAPI?: {getFileStats?: unknown}}).electronAPI) {
+                const api = (window as unknown as {electronAPI: {getFileStats: (path: string) => Promise<{modifiedTime: number; size: number} | null>}}).electronAPI;
+                if (typeof api.getFileStats === 'function') {
+                  try {
+                    return await api.getFileStats(currentFilePath);
+                  } catch (err) {
+                    console.warn('[Autosave] Failed to get file stats:', err);
+                    return null;
+                  }
+                }
+              }
+              return null;
+            };
+
+            registerFileSave(currentFilePath, currentFileSize, { getFileStats });
+            console.log('[Autosave] Updated file conflict tracking after successful save');
+          }
+
           console.log(
             `[Autosave] Save succeeded (${result.attempts} attempt${result.attempts > 1 ? 's' : ''}) - Map data + Settings`
           );

@@ -159,8 +159,8 @@
 }
 
 .palette-tile.multi-selected {
-    outline: 3px dashed rgba(0, 122, 204, 0.6);
-    outline-offset: -3px;
+    border: 2px solid #3b82f6;
+    box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.5) inset;
 }
 
 /* Brush management styles */

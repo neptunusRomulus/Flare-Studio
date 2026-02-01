@@ -17,6 +17,8 @@ export default function useToolbarState() {
   const [hoverCoords, setHoverCoords] = useState<{ x: number; y: number } | null>(null);
   const [selectionCount, setSelectionCount] = useState<number>(0);
   const [hasSelection, setHasSelection] = useState<boolean>(false);
+  const [activeGidValue, setActiveGidValue] = useState<string>('(none)');
+  const [hoverGidValue, setHoverGidValue] = useState<string>('(none)');
 
   // Refs for timeout management
   const brushOptionsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -118,6 +120,10 @@ export default function useToolbarState() {
     setSelectionCount,
     hasSelection,
     setHasSelection,
+    activeGidValue,
+    setActiveGidValue,
+    hoverGidValue,
+    setHoverGidValue,
 
     // option popovers
     showBrushOptions,

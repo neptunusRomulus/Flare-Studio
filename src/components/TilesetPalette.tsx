@@ -271,13 +271,13 @@ const TilesetPalette = ({
       const w = (maxCol - minCol + 1) * tileSize.width;
       const h = (maxRow - minRow + 1) * tileSize.height;
 
-      // Selection fill
-      ctx.fillStyle = 'rgba(59, 130, 246, 0.3)';
+      // Selection fill - light blue background
+      ctx.fillStyle = 'rgba(59, 130, 246, 0.2)';
       ctx.fillRect(x, y, w, h);
 
-      // Selection border
-      ctx.strokeStyle = 'rgba(59, 130, 246, 0.9)';
-      ctx.lineWidth = 2;
+      // Selection border - solid blue
+      ctx.strokeStyle = 'rgba(59, 130, 246, 1)';
+      ctx.lineWidth = 2.5;
       ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
     }
   }, [tilesetImage, imageSize, selection, prefs.isDarkMode, tileSize.width, tileSize.height]);
@@ -467,7 +467,8 @@ const TilesetPalette = ({
     setIsSelecting(false);
     // Also reset panning state if stuck to allow map clicks
     isPanningRef.current = false;
-    // Keep selection visible! Don't clear it here
+    // Keep selection visible - don't clear it
+    // The selection will persist until the user makes a new selection or clears it
   }, [isSelecting, selection, editor, imageSize.width, tileSize.width, tileSize.height, activeLayer?.type, COLLISION_TILE_DESCRIPTIONS]);
 
   // Panning handlers

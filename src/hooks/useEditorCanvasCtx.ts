@@ -32,6 +32,8 @@ type UseEditorCanvasDeps = {
   isPreparingNewMap: boolean;
   hoverCoords: { x: number; y: number } | null;
   showActiveGid: boolean;
+  activeGidValue: string;
+  hoverGidValue: string;
   npcDeletePopup: NpcDeletePopup;
   setNpcDeletePopup: (p: NpcDeletePopup) => void;
   handleUnplaceActorFromMap: (objectId: number) => void;
@@ -101,6 +103,8 @@ export default function useEditorCanvasCtx(deps: UseEditorCanvasDeps) {
     isPreparingNewMap: deps.isPreparingNewMap,
     hoverCoords: deps.hoverCoords,
     showActiveGid: deps.showActiveGid,
+    activeGidValue: deps.activeGidValue,
+    hoverGidValue: deps.hoverGidValue,
     npcDeletePopup: deps.npcDeletePopup,
     setNpcDeletePopup: deps.setNpcDeletePopup,
     handleUnplaceActorFromMap: deps.handleUnplaceActorFromMap,

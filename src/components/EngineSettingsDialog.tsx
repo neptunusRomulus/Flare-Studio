@@ -1,10 +1,12 @@
 import { Button } from '@/components/ui/button';
-import { Moon, Sun, Target, X } from 'lucide-react';
+import { Moon, Sun, Target, X, Save, Settings, Eye, PanelLeft, History } from 'lucide-react';
 import Tooltip from '@/components/ui/tooltip';
 import AutoSaveSettingsPanel from '@/components/AutoSaveSettingsPanel';
 import UndoPersistencePanel from '@/components/UndoPersistencePanel';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
-import type { Dispatch, SetStateAction } from 'react';
+import { useState, type Dispatch, type SetStateAction } from 'react';
+
+type SettingsTab = 'general' | 'save' | 'display';
 
 type EngineSettingsDialogProps = {
   open: boolean;
@@ -49,12 +51,21 @@ const EngineSettingsDialog = ({
   onClearUndoHistory,
   undoStorageSizeKB
 }: EngineSettingsDialogProps) => {
+  const [activeTab, setActiveTab] = useState<SettingsTab>('general');
+
   if (!open) return null; 
+
+  const tabs: { id: SettingsTab; icon: React.ReactNode; label: string }[] = [
+    { id: 'general', icon: <Settings className="w-4 h-4" />, label: 'General' },
+    { id: 'save', icon: <Save className="w-4 h-4" />, label: 'Save & History' },
+    { id: 'display', icon: <Eye className="w-4 h-4" />, label: 'Display' },
+  ];
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-background border border-border rounded-lg p-6 w-96">
-        <div className="flex justify-between items-center mb-4">
+      <div className="bg-background border border-border rounded-lg w-[420px] max-h-[80vh] flex flex-col">
+        {/* Header */}
+        <div className="flex justify-between items-center p-4 border-b border-border">
           <h3 className="text-lg font-semibold">Engine Settings</h3>
           <Button
             variant="ghost"
@@ -65,166 +76,198 @@ const EngineSettingsDialog = ({
             <X className="w-4 h-4" />
           </Button>
         </div>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-2">Theme (Experimental)</label>
-            <div className="flex items-center gap-2">
-              <span className="text-sm">Light Mode</span>
-              <button
-                onClick={() => setIsDarkMode(!isDarkMode)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  isDarkMode ? 'bg-orange-600' : 'bg-gray-200'
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    isDarkMode ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-                <span className="sr-only">Toggle dark mode</span>
-              </button>
-              <span className="text-sm flex items-center gap-1">
-                {isDarkMode ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
-                Dark Mode
-              </span>
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-2">Debug Mode</label>
-            <div className="flex items-center gap-2">
-              <span className="text-sm">Disabled</span>
-              <button
-                onClick={() => {
-                  if (editor) {
-                    editor.toggleDebugMode();
-                  }
-                }}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  editor?.getDebugMode() ? 'bg-orange-600' : 'bg-gray-200'
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    editor?.getDebugMode() ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-                <span className="sr-only">Toggle debug mode</span>
-              </button>
-              <span className="text-sm flex items-center gap-1">
-                <Target className="w-4 h-4" />
-                Debug Tiles
-              </span>
-            </div>
-            <p className="text-xs text-gray-500 mt-1">
-              Shows tile boundaries and coordinates for debugging
-            </p>
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-2">Auto-Save</label>
-            <div className="flex items-center gap-2">
-              <span className="text-sm">Disabled</span>
-              <button
-                onClick={() => {
-                  const newEnabled = !autoSaveEnabled;
-                  setAutoSaveEnabledState(newEnabled);
-                  if (editor) {
-                    editor.setAutoSaveEnabled(newEnabled);
-                  }
-                }}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  autoSaveEnabled ? 'bg-orange-600' : 'bg-gray-200'
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    autoSaveEnabled ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-                <span className="sr-only">Toggle auto-save</span>
-              </button>
-              <span className="text-sm">
-                Enabled
-              </span>
-            </div>
-            <p className="text-xs text-gray-500 mt-1">
-              Automatically saves your work at regular intervals
-            </p>
-            
-            {autoSaveEnabled && setAutoSaveIntervalMs && setAutoSaveDebounceMs && (
-              <div className="mt-4 pt-4 border-t border-border">
-                <AutoSaveSettingsPanel
-                  autoSaveEnabled={autoSaveEnabled}
-                  intervalMs={autoSaveIntervalMs}
-                  debounceMs={autoSaveDebounceMs}
-                  onEnabledChange={setAutoSaveEnabledState}
-                  onIntervalChange={setAutoSaveIntervalMs}
-                  onDebounceChange={setAutoSaveDebounceMs}
-                />
-              </div>
-            )}
-          </div>
 
-          {/* Undo Persistence Settings */}
-          <div>
-            <div className="mb-3 space-y-3">
+        {/* Tab Navigation - Icon only with tooltips */}
+        <div className="flex items-center gap-1 p-2 border-b border-border bg-muted/30">
+          {tabs.map((tab) => (
+            <Tooltip key={tab.id} content={tab.label} side="top">
+              <button
+                onClick={() => setActiveTab(tab.id)}
+                className={`p-2 rounded-md transition-colors ${
+                  activeTab === tab.id
+                    ? 'bg-orange-600 text-white'
+                    : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                {tab.icon}
+              </button>
+            </Tooltip>
+          ))}
+        </div>
+
+        {/* Tab Content */}
+        <div className="flex-1 overflow-y-auto p-4">
+          {/* General Tab */}
+          {activeTab === 'general' && (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Theme (Experimental)</label>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">Light Mode</span>
+                  <button
+                    onClick={() => setIsDarkMode(!isDarkMode)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      isDarkMode ? 'bg-orange-600' : 'bg-gray-200'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        isDarkMode ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                    <span className="sr-only">Toggle dark mode</span>
+                  </button>
+                  <span className="text-sm flex items-center gap-1">
+                    {isDarkMode ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+                    Dark Mode
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Debug Mode</label>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">Disabled</span>
+                  <button
+                    onClick={() => {
+                      if (editor) {
+                        editor.toggleDebugMode();
+                      }
+                    }}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      editor?.getDebugMode() ? 'bg-orange-600' : 'bg-gray-200'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        editor?.getDebugMode() ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                    <span className="sr-only">Toggle debug mode</span>
+                  </button>
+                  <span className="text-sm flex items-center gap-1">
+                    <Target className="w-4 h-4" />
+                    Debug Tiles
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Shows tile boundaries and coordinates for debugging
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Save Tab */}
+          {activeTab === 'save' && (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Auto-Save</label>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">Disabled</span>
+                  <button
+                    onClick={() => {
+                      const newEnabled = !autoSaveEnabled;
+                      setAutoSaveEnabledState(newEnabled);
+                      if (editor) {
+                        editor.setAutoSaveEnabled(newEnabled);
+                      }
+                    }}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      autoSaveEnabled ? 'bg-orange-600' : 'bg-gray-200'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        autoSaveEnabled ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                    <span className="sr-only">Toggle auto-save</span>
+                  </button>
+                  <span className="text-sm">Enabled</span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Automatically saves your work at regular intervals
+                </p>
+                
+                {autoSaveEnabled && setAutoSaveIntervalMs && setAutoSaveDebounceMs && (
+                  <div className="mt-4 pt-4 border-t border-border">
+                    <AutoSaveSettingsPanel
+                      autoSaveEnabled={autoSaveEnabled}
+                      intervalMs={autoSaveIntervalMs}
+                      debounceMs={autoSaveDebounceMs}
+                      onEnabledChange={setAutoSaveEnabledState}
+                      onIntervalChange={setAutoSaveIntervalMs}
+                      onDebounceChange={setAutoSaveDebounceMs}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Undo Persistence Settings */}
               {setUndoPersistenceEnabled && (
-                <UndoPersistencePanel
-                  enabled={undoPersistenceEnabled}
-                  onEnabledChange={setUndoPersistenceEnabled}
-                  onClearHistory={onClearUndoHistory}
-                  storageSizeKB={undoStorageSizeKB}
-                />
+                <div className="pt-4 border-t border-border">
+                  <UndoPersistencePanel
+                    enabled={undoPersistenceEnabled}
+                    onEnabledChange={setUndoPersistenceEnabled}
+                    onClearHistory={onClearUndoHistory}
+                    storageSizeKB={undoStorageSizeKB}
+                  />
+                </div>
               )}
             </div>
-          </div>
+          )}
 
-          <div>
-            <label className="block text-sm font-medium mb-2">Active GID Indicator</label>
-            <div className="flex items-center gap-2">
-              <span className="text-sm">Show</span>
-              <button
-                onClick={() => {
-                  const newVal = !showActiveGid;
-                  setShowActiveGid(newVal);
-                }}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  showActiveGid ? 'bg-orange-600' : 'bg-gray-200'
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    showActiveGid ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-                <span className="sr-only">Toggle Active GID Indicator</span>
-              </button>
-              <span className="text-sm">{showActiveGid ? 'Shown' : 'Hidden'}</span>
+          {/* Display Tab */}
+          {activeTab === 'display' && (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Active GID Indicator</label>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">Show</span>
+                  <button
+                    onClick={() => {
+                      const newVal = !showActiveGid;
+                      setShowActiveGid(newVal);
+                    }}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      showActiveGid ? 'bg-orange-600' : 'bg-gray-200'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        showActiveGid ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                    <span className="sr-only">Toggle Active GID Indicator</span>
+                  </button>
+                  <span className="text-sm">{showActiveGid ? 'Shown' : 'Hidden'}</span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">Toggle whether the Active GID badge is visible next to the hover coordinates.</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Sidebar Collapse Button</label>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">Show toggle</span>
+                  <button
+                    onClick={() => setShowSidebarToggle((s: boolean) => !s)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      showSidebarToggle ? 'bg-orange-600' : 'bg-gray-200'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        showSidebarToggle ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                    <span className="sr-only">Toggle sidebar collapse button</span>
+                  </button>
+                  <span className="text-sm">{showSidebarToggle ? 'Shown' : 'Hidden'}</span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">Show or hide the left-edge sidebar collapse/expand toggle.</p>
+              </div>
             </div>
-            <p className="text-xs text-gray-500 mt-1">Toggle whether the Active GID badge is visible next to the hover coordinates.</p>
-          </div>
-
-
-          <div>
-            <label className="block text-sm font-medium mb-2">Sidebar Collapse Button</label>
-            <div className="flex items-center gap-2">
-              <span className="text-sm">Show toggle</span>
-              <button
-                onClick={() => setShowSidebarToggle((s: boolean) => !s)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  showSidebarToggle ? 'bg-orange-600' : 'bg-gray-200'
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    showSidebarToggle ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-                <span className="sr-only">Toggle sidebar collapse button</span>
-              </button>
-              <span className="text-sm">{showSidebarToggle ? 'Shown' : 'Hidden'}</span>
-            </div>
-            <p className="text-xs text-gray-500 mt-1">Show or hide the left-edge sidebar collapse/expand toggle.</p>
-          </div>
+          )}
         </div>
       </div>
     </div>

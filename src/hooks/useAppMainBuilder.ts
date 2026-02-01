@@ -25,6 +25,8 @@ import { buildConstantStockString } from '@/utils/parsers';
 // ItemRole type intentionally not imported — unused in this module
 import { toast } from '@/hooks/use-toast';
 import useHelpState from './useHelpState';
+import useActiveGidCallback from './useActiveGidCallback';
+import useHoverGidCallback from './useHoverGidCallback';
 import useDeleteActiveTab from './useDeleteActiveTab';
 import buildConfirmActionHandlers from './useConfirmActionHandlers';
 import { TileMapEditor } from '@/editor/TileMapEditor';
@@ -90,6 +92,12 @@ export default function useAppMainBuilder() {
     handleDeleteSelection,
     handleClearSelection
   } = editorSetup as EditorSetupType;
+
+  // Wire up active GID callback to track current brush GID
+  useActiveGidCallback(editor as TileMapEditor | null, toolbarState.setActiveGidValue);
+
+  // Wire up hover GID callback to track GID under cursor
+  useHoverGidCallback(editor as TileMapEditor | null, toolbarState.hoverCoords, toolbarState.setHoverGidValue);
 
   const mapConfig = useMapConfig({
     editor: editor ?? null,
@@ -816,6 +824,8 @@ export default function useAppMainBuilder() {
         isPreparingNewMap: mapConfig.isPreparingNewMap,
         hoverCoords: toolbarState.hoverCoords,
         showActiveGid: showActiveGid,
+        activeGidValue: toolbarState.activeGidValue,
+        hoverGidValue: toolbarState.hoverGidValue,
         npcDeletePopup: appState.npcDeletePopup,
         setNpcDeletePopup: appState.setNpcDeletePopup,
         handleUnplaceActorFromMap: handleUnplaceActorFromMap ?? (() => {}),

@@ -22,6 +22,7 @@ type Props = {
   toast: typeof import('@/hooks/use-toast').toast;
   handleOpenActorDialog: (type: 'npc' | 'enemy') => void;
   stampsState?: unknown;
+  currentProjectPath?: string | null;
 };
 
 const TilesetPanel: React.FC<Props> = ({
@@ -39,7 +40,8 @@ const TilesetPanel: React.FC<Props> = ({
   handleDeleteActiveTab: propHandleDeleteActiveTab,
   toast,
   handleOpenActorDialog,
-  stampsState
+  stampsState,
+  currentProjectPath
 }) => {
   const tileset = useTileset(editor, activeLayer, setTabTick);
 
@@ -61,6 +63,7 @@ const TilesetPanel: React.FC<Props> = ({
         onToggleBrushTool={handleToggleBrushTool}
         onDeleteActiveTab={handleDeleteActiveTab}
         toast={toast}
+        currentProjectPath={currentProjectPath}
       />
     </>
   );

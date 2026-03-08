@@ -139,8 +139,10 @@ export default function useManualSave(args: {
             name: 'Save Map Painting Data & Layer Info',
             execute: async () => {
               const api = (typeof window !== 'undefined') ? (window as unknown as { electronAPI?: { save?: () => void } }).electronAPI : undefined;
-              if (api && currentProjectPath) {
-                const success = await editor.saveProjectData(currentProjectPath);
+              // Use provided currentProjectPath, or fall back to editor's stored path
+              const projectPath = currentProjectPath || (editor?.getCurrentProjectPath?.() ?? null);
+              if (api && projectPath) {
+                const success = await editor!.saveProjectData(projectPath);
                 await new Promise(resolve => setTimeout(resolve, 300));
                 if (!success) {
                   throw new Error('saveProjectData returned false');

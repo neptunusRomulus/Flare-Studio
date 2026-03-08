@@ -111,11 +111,12 @@ const TilesetPalette = ({
           
           // Set the image immediately
           setTilesetImage(img);
-          // If the tab provides explicit tile sizes, use them for palette math
+          // If the tab's tileset provides explicit tile sizes, use them for palette math
           try {
-            const tw = (tab as unknown as { tileWidth?: number }).tileWidth;
-            const th = (tab as unknown as { tileHeight?: number }).tileHeight;
-            if (typeof tw === 'number' && typeof th === 'number') {
+            const tabTileset = (tab as { tileset?: { tileWidth?: number; tileHeight?: number } }).tileset;
+            const tw = tabTileset?.tileWidth;
+            const th = tabTileset?.tileHeight;
+            if (typeof tw === 'number' && tw > 0 && typeof th === 'number' && th > 0) {
               setTileSize({ width: tw, height: th });
             } else {
               setTileSize({ width: DEFAULT_TILE_WIDTH, height: DEFAULT_TILE_HEIGHT });
@@ -153,14 +154,13 @@ const TilesetPalette = ({
     // manipulates the DOM which conflicts with React's reconciliation.
     // The canvas-based rendering is now handled entirely by React state.
 
-    // Retry fetching tileset image in case it wasn't ready initially
-    const t1 = setTimeout(() => {
-      fetchTilesetImage();
-    }, 75);
-    const t2 = setTimeout(() => {
-      fetchTilesetImage();
-    }, 300);
-    return () => { clearTimeout(t1); clearTimeout(t2); };
+    // Retry fetching tileset image in case it wasn't ready initially.
+    // Images loaded from data URLs are async; retries catch frames where the
+    // Image element exists but hasn't fired onload yet.
+    const t1 = setTimeout(fetchTilesetImage, 75);
+    const t2 = setTimeout(fetchTilesetImage, 300);
+    const t3 = setTimeout(fetchTilesetImage, 800);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
   }, [editor, activeLayer, tabTick]);
 
   // Listen for when tileset image loads - updates size when ready

@@ -5241,8 +5241,9 @@ export class TileMapEditor {
       for (const key of Array.from(this.layerCellTilesetKey.keys())) {
         this.layerCellTilesetKey.set(key, new Array(this.mapWidth * this.mapHeight).fill(null));
       }
-      // clear objects and detected tiles
+      // clear objects, sprite objects and detected tiles
       this.objects = [];
+      this.placedSpriteObjects.clear();
       try { this.detectedTileData.clear(); } catch { /* ignore */ }
       this.clearSelection();
       try {
@@ -8817,6 +8818,8 @@ export class TileMapEditor {
       this.activeLayerId = null;
       this.layerTilesets.clear();
       this.objects = [];
+      // Clear placed sprite objects so they don't bleed across map tabs
+      this.placedSpriteObjects.clear();
       this.selectedObjectId = null;
       this.selection = {
         active: false,
@@ -8828,6 +8831,11 @@ export class TileMapEditor {
       };
       this.stamps.clear();
       this.activeStamp = null;
+      // Clear per-layer tile data (gid→sprite-rect mapping) so stale lookups
+      // from the previous map don't affect rendering of the newly loaded map
+      this.layerTileData.clear();
+      // Clear per-cell tileset key overrides left over from the previous map
+      this.layerCellTilesetKey.clear();
       
       // Clear preloaded tileset cache to prevent contamination from previous maps
       this._preloadedTilesetImages.clear();

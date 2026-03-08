@@ -156,6 +156,16 @@ const useEditorTabs = ({
               switchToTabHelpersRef.current.syncMapObjects();
               try { switchToTabHelpersRef.current.setTabTick?.(); } catch (e) { void e; }
             }
+          } else {
+            // File not found for this tab. Update the editor's map name so that any
+            // subsequent save (manual or auto) targets THIS tab's file rather than the
+            // previously-loaded map's file. Without this fix the editor keeps the old
+            // mapName (e.g. "Map 1") and SAVE-SYNC writes the current layer data into
+            // the wrong JSON, causing painting from one map to bleed into another.
+            console.warn(`[TAB SWITCH] Map file not found for tab "${nextTab.name}" — updating mapName to prevent cross-map save contamination`);
+            if (typeof editor.setMapName === 'function') {
+              editor.setMapName(nextTab.name);
+            }
           }
         } else {
           // Fallback to full load if no loadProjectData available

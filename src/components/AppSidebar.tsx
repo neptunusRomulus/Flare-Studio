@@ -64,6 +64,7 @@ type SidebarProps = {
     toast: typeof import('@/hooks/use-toast').toast;
     handleOpenActorDialog: (type: 'npc' | 'enemy') => void;
       stampsState?: unknown;
+      currentProjectPath?: string | null;
   };
 
   layers: {
@@ -144,6 +145,7 @@ export default function AppSidebar(p: SidebarProps) {
             toast={p.tileset.toast}
             handleOpenActorDialog={p.tileset.handleOpenActorDialog}
             stampsState={p.tileset.stampsState}
+            currentProjectPath={p.tileset.currentProjectPath}
           />
         )}
       </section>

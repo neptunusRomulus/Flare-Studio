@@ -1,12 +1,10 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import Tooltip from '@/components/ui/tooltip';
-import { ZoomIn, ZoomOut, Trash2, Upload, X, XCircle } from 'lucide-react';
+import { ZoomIn, ZoomOut, Upload, X, XCircle } from 'lucide-react';
 import type { TileLayer } from '@/types';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 import useBrushToolbar from '@/hooks/useBrushToolbar';
-import usePreferences from '@/hooks/usePreferences';
-import { useAppContext } from '@/context/AppContext';
 
 type BrushToolbarProps = {
   editor: TileMapEditor | null;
@@ -28,27 +26,26 @@ type BrushToolbarProps = {
   onClearSelection?: () => void;
   hasSelection?: boolean;
   zoom?: number;
+  currentProjectPath?: string | null;
 };
 
 const BrushToolbar = ({
   editor,
   activeLayer,
   isCollisionLayer,
-  brushTool,
   brushToolbarExpanded,
   showBrushToolbarTemporarily,
   setTabTick,
   setBrushToolbarNode,
   onOpenActorDialog,
-  onFileUpload,
-  onToggleBrushTool,
   onDeleteActiveTab,
   toast,
   onZoomIn,
   onZoomOut,
   onClearSelection,
   hasSelection,
-  zoom
+  zoom,
+  currentProjectPath
 }: BrushToolbarProps) => {
   
   // Initialize refs with current prop values IMMEDIATELY
@@ -79,31 +76,32 @@ const BrushToolbar = ({
     setTabCount(tabs ? tabs.length : 0);
   }, [editor, activeLayer]);
 
-  // App context fallback so the handler can always get latest values
-  const appCtx = (() => {
-    try { return useAppContext() as any; } catch { return null; }
-  })();
+  // App context fallback - not calling useAppContext here to avoid hook rules violation
+  // This is only used as a last resort fallback
+  const appCtx = null;
 
   // Auto-slice feature removed; importing is currently disabled.
 
   // Safe toast invoker — handles either function or useToast hook object
-  const toastInvoke = (opts: { title?: string; description?: string; variant?: 'default' | 'destructive' } = {}) => {
+  type ToastOptions = { title?: string; description?: string; variant?: 'default' | 'destructive' };
+  const toastInvoke = (opts: ToastOptions = {}) => {
     try {
       if (!toast) return;
       if (typeof toast === 'function') {
-        (toast as any)(opts);
+        (toast as (opts: ToastOptions) => void)(opts);
         return;
       }
-      if (typeof (toast as any).toast === 'function') {
-        (toast as any).toast(opts);
+      const toastObj = toast as { toast?: (opts: ToastOptions) => void };
+      if (typeof toastObj?.toast === 'function') {
+        toastObj.toast(opts);
         return;
       }
     } catch (e) {
+      void e; // Intentionally swallow errors
     }
   };
 
-  // Safely increment the tab tick. Some callers pass a React state dispatcher, others
-  // provide a zero-arg increment helper. Try dispatcher form first, then zero-arg.
+  // Safely increment the tab tick. Some callers pass a React state dispatcher
   const safeIncrementTabTick = () => {
     try {
       if (typeof setTabTick === 'function') {
@@ -111,22 +109,13 @@ const BrushToolbar = ({
           // Prefer dispatcher/updater signature
           (setTabTick as React.Dispatch<React.SetStateAction<number>>)((t: number) => (typeof t === 'number' ? t + 1 : 1));
           return;
-        } catch (e) {
+        } catch {
           // Fallback to zero-arg function
-          try { (setTabTick as any)(); return; } catch (err) { void err; }
-        }
-      }
-
-      // Try app context tileset helper if present
-      if (appCtx && appCtx.tileset && typeof (appCtx.tileset as any).setTabTick === 'function') {
-        try {
-          (appCtx.tileset as any).setTabTick((t: number) => (typeof t === 'number' ? t + 1 : 1));
-          return;
-        } catch (e) {
-          try { (appCtx.tileset as any).setTabTick(); return; } catch (err) { void err; }
+          try { (setTabTick as () => void)(); return; } catch { void 0; }
         }
       }
     } catch (e) {
+      void e; // Intentionally swallow errors
     }
   };
 
@@ -218,29 +207,22 @@ const BrushToolbar = ({
                           // Keep layers panel visible while importing to avoid hover-collapse
                           try {
                             // Set a global guard so UI mouseleave handlers can opt out
-                            try { (window as any).__preventLayersAutoCollapse = true; } catch (e) { void e; }
-                            if (appCtx && (appCtx as any).layersObj && typeof (appCtx as any).layersObj.setLayersPanelExpanded === 'function') {
-                              (appCtx as any).layersObj.setLayersPanelExpanded(true);
+                            try { (window as unknown as { __preventLayersAutoCollapse?: boolean }).__preventLayersAutoCollapse = true; } catch { void 0; }
+                            if (appCtx && (appCtx as unknown as { layersObj?: { setLayersPanelExpanded?: (v: boolean) => void } }).layersObj && typeof (appCtx as unknown as { layersObj: { setLayersPanelExpanded?: (v: boolean) => void } }).layersObj.setLayersPanelExpanded === 'function') {
+                              (appCtx as unknown as { layersObj: { setLayersPanelExpanded: (v: boolean) => void } }).layersObj.setLayersPanelExpanded(true);
                             }
                           } catch (e) { void e; }
 
 
-                          // Resolve current editor and active layer (fall back to appCtx/editor-derived)
-                          let currentEditor = editorRef.current;
-                          let currentActiveLayer = activeLayerRef.current;
-                          if (!currentEditor || !currentActiveLayer) {
-                            if (appCtx) {
-                              currentEditor = (appCtx?.tileset?.editor ?? appCtx?.editor) as TileMapEditor | null;
-                              currentActiveLayer = (appCtx?.tileset?.activeLayer ?? appCtx?.activeLayer) as any;
-                            }
-                          }
+                          // Resolve current editor and active layer (fall back to refs)
+                          const currentEditor = editorRef.current;
+                          const currentActiveLayer = activeLayerRef.current;
+                          // appCtx is null to avoid React hook violations, so we can't use it as fallback
                           // Final editor-derived fallback
                           if (!currentActiveLayer && currentEditor) {
-                            try {
-                              const currentLayerType = currentEditor.getCurrentLayerType ? currentEditor.getCurrentLayerType() : null;
-                              // Use editor's public methods instead of accessing private properties
-                              currentActiveLayer = null;
-                            } catch { void 0; }
+                            // currentLayerType could be used in future enhancements
+                            // No fallback available since appCtx is null
+                            void 0;
                           }
 
                           if (!currentEditor || !currentActiveLayer) {
@@ -263,7 +245,7 @@ const BrushToolbar = ({
                             }
 
                             // Import into the editor/tab so it persists
-                            await currentEditor.importBrushImageToLayerTab(layerType, targetTabId, file);
+                            await currentEditor.importBrushImageToLayerTab(layerType, targetTabId, file, currentProjectPath ?? undefined);
 
                             // Compute placement origin (snap to 32) based on current viewport/zoom and set on the tab
                             try {
@@ -291,12 +273,12 @@ const BrushToolbar = ({
                             safeIncrementTabTick();
                             
                             toastInvoke({ title: 'Imported', description: 'Imported tileset saved to layer tab.' });
-                          } catch (err) {
+                          } catch {
                             toastInvoke({ title: 'Import failed', description: 'Unable to import into editor', variant: 'destructive' });
                           }
                           finally {
                             // Clear the temporary guard so hover behavior resumes
-                            try { (window as any).__preventLayersAutoCollapse = false; } catch (e) { void e; }
+                            try { (window as unknown as { __preventLayersAutoCollapse?: boolean }).__preventLayersAutoCollapse = false; } catch { void 0; }
                           }
                         }}
                       />

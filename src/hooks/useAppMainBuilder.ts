@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import useDialogsCtx from './useDialogsCtx';
 import buildConfirmDialogProps from './buildConfirmDialogProps';
 import useEditorRefs from './useEditorRefs';
@@ -29,6 +29,7 @@ import useActiveGidCallback from './useActiveGidCallback';
 import useHoverGidCallback from './useHoverGidCallback';
 import useDeleteActiveTab from './useDeleteActiveTab';
 import buildConfirmActionHandlers from './useConfirmActionHandlers';
+import useBeforeCreateMap from './useBeforeCreateMap';
 import { TileMapEditor } from '@/editor/TileMapEditor';
 import type { EditorProjectData } from '@/editor/TileMapEditor';
 
@@ -139,6 +140,21 @@ export default function useAppMainBuilder() {
   }) as EditorTabsType;
   const { tabs, activeTabId, setTabs, setActiveTabId, switchToTab, createTabFor } = editorTabs as unknown as EditorTabsType;
 
+  // Wire up the before-create-map callback so that when the user creates a new map,
+  // the CURRENT map's full state (including any imported tileset images) is saved to
+  // disk BEFORE the editor is reset for the new map.
+  const { handleBeforeCreateMap: beforeCreateMapFn } = useBeforeCreateMap({
+    editor: editor ?? null,
+    activeTabId: activeTabId ?? null,
+    setTabs: setTabs as React.Dispatch<React.SetStateAction<import('./useEditorTabs').EditorTab[]>>,
+    currentProjectPath
+  });
+  useEffect(() => {
+    if (appState.beforeCreateMapRef) {
+      appState.beforeCreateMapRef.current = beforeCreateMapFn;
+    }
+  }, [appState.beforeCreateMapRef, beforeCreateMapFn]);
+
   const _beforeCreateRunningRef = useRef(false);
   const handleBeforeCreateMap = async () => {
     if (_beforeCreateRunningRef.current) return;
@@ -188,6 +204,11 @@ export default function useAppMainBuilder() {
       try {
         const newEditor = new TileMapEditor(canvasRef.current!);
         if (pending.name) newEditor.setMapName((pending as EditorProjectData).name!);
+        
+        // Set the current project path so tilesets store full paths when imported
+        if (currentProjectPath) {
+          newEditor.setCurrentProjectPath(currentProjectPath);
+        }
 
         try { newEditor.clearLocalStorageBackup?.(); } catch (err) { void err; }
         newEditor.setMapSize((pending as EditorProjectData).width ?? 20, (pending as EditorProjectData).height ?? 15);
@@ -244,6 +265,9 @@ export default function useAppMainBuilder() {
             }
           } catch (err) { void err; }
           try { newEditor.redraw(); } catch (err) { void err; }
+          // Bump tabTick so TilesetPalette re-polls the newly loaded tileset images.
+          // This fires after the 150ms delay, giving data-URL images time to decode.
+          try { appState.setTabTick((t: number) => (t || 0) + 1); } catch (err) { void err; }
         }, 150);
 
         setPendingMapConfig(null);
@@ -255,7 +279,7 @@ export default function useAppMainBuilder() {
     };
 
     void createEditorWithConfig();
-  }, [pendingMapConfig, editor, canvasRef, appShowWelcome, setupAutoSave, mapConfig, updateLayersList, syncMapObjects, setEditor, setPendingMapConfig, toolbarState, appState]);
+  }, [pendingMapConfig, editor, canvasRef, appShowWelcome, setupAutoSave, mapConfig, updateLayersList, syncMapObjects, setEditor, setPendingMapConfig, toolbarState, appState, currentProjectPath]);
   const { handleUndo, handleRedo, handleZoomIn, handleZoomOut, handleResetZoom } = useUndoRedoZoom({ editor, updateLayersList, syncMapObjects });
 
   const { tooltip, showTooltipWithDelay, hideTooltip } = useTooltip({ toolbarRef: toolbarState.toolbarContainerRef, canvasRef });
@@ -271,7 +295,7 @@ export default function useAppMainBuilder() {
     } catch (e) {
       console.warn('Failed to update editor canvas reference', e);
     }
-  }, [editor, canvasRef?.current]);
+  }, [editor, canvasRef]);
 
   const [showClearLayerDialog, setShowClearLayerDialog] = useState(false);
   const { handleClearLayerClose, handleClearLayerConfirm } = useClearLayerHandler({
@@ -582,10 +606,6 @@ export default function useAppMainBuilder() {
     handleFileUpload,
     handleToggleBrushTool,
     handleDeleteTilesetTab,
-    tabs,
-    activeTabId,
-    setTabs,
-    setActiveTabId,
     toolbarState.stamps,
     toolbarState.selectedStamp,
     toolbarState.stampMode,

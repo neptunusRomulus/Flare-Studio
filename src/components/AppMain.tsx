@@ -136,7 +136,10 @@ export default function AppMain() {
             actors={actors}
             rules={rules}
             items={items}
-            tileset={tileset}
+            tileset={{
+              ...tileset,
+              currentProjectPath: controls?.currentProjectPath
+            }}
             layers={layersObj}
             exportStatus={exportStatus}
             controls={controls}

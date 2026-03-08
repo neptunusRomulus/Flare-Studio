@@ -65,7 +65,7 @@ export default function useTileset(editor: TileMapEditor | null, activeLayer: Ti
         const dataUrl = await window.electronAPI.readFileAsDataURL(selected);
         if (dataUrl) {
           const fileName = selected.split(/[\\/]/).pop() || selected;
-          await editor.loadTilesetFromDataURL(dataUrl, fileName);
+          await editor.loadTilesetFromDataURL(dataUrl, fileName, selected);
           refreshTilePalette(true);
         }
       }

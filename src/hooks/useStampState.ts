@@ -50,7 +50,7 @@ const useStampState = () => {
         const dataUrl = await window.electronAPI.readFileAsDataURL(selected);
         if (dataUrl) {
           const fileName = selected.split(/[\\/]/).pop() || selected;
-          await editor.loadTilesetFromDataURL(dataUrl, fileName);
+          await editor.loadTilesetFromDataURL(dataUrl, fileName, selected);
           setActiveTilesetFile(fileName);
           refreshTilesetInfos(editor);
           return selected;

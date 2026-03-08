@@ -559,6 +559,26 @@ ipcMainLocal.handle("open-map-project", async (event, projectPath, mapName) => {
           )}`;
         };
 
+        // Helper: try to load a tileset filename from any search directory
+        const tryLoadTilesetFile = (fileName) => {
+          if (!fileName || ensureTilesetImages[fileName]) return;
+          console.log(`[DEBUG:load] tryLoadTilesetFile("${fileName}") - searching in:`, searchDirs);
+          for (const dir of searchDirs) {
+            if (!dir) continue;
+            const candidatePath = path.join(dir, fileName);
+            const exists = fs.existsSync(candidatePath);
+            console.log(`[DEBUG:load]   check ${candidatePath} -> exists=${exists}`);
+            if (exists) {
+              ensureTilesetImages[fileName] = toDataUrl(candidatePath);
+              console.log(`[DEBUG:load] FOUND tileset: ${path.relative(projectPath, candidatePath)} -> ${fileName}`);
+              return;
+            }
+          }
+          console.warn(`[DEBUG:load] NOT FOUND: "${fileName}" in any search dir`);
+        };
+
+        // Load tilesets referenced in tilesets[]
+        console.log(`[DEBUG:load] tilesets[] count=${mapData.tilesets?.length ?? 0}, layerTabs keys=${Object.keys(mapData.layerTabs || {}).join(',')}`);
         if (Array.isArray(mapData.tilesets)) {
           for (const ts of mapData.tilesets) {
             const fileName = ts?.fileName || ts?.name;
@@ -583,6 +603,23 @@ ipcMainLocal.handle("open-map-project", async (event, projectPath, mapName) => {
             }
           }
         }
+
+        // Also load per-tab tilesets stored in layerTabs (tab-specific tilesets are
+        // NOT included in tilesets[] but are saved as separate files with the key
+        // format "layerType_tabN_filename.png" in images/tilesets/).
+        if (mapData.layerTabs && typeof mapData.layerTabs === "object") {
+          for (const [layerType, tabs] of Object.entries(mapData.layerTabs)) {
+            if (!Array.isArray(tabs)) continue;
+            for (const tab of tabs) {
+              const fileName = tab?.tileset?.fileName;
+              console.log(`[DEBUG:load] layerTab ${layerType}/tab${tab?.id} tileset.fileName="${fileName}"`);
+              if (fileName) tryLoadTilesetFile(fileName);
+            }
+          }
+        } else {
+          console.log('[DEBUG:load] No layerTabs in mapData');
+        }
+        console.log('[DEBUG:load] ensureTilesetImages keys after scan:', Object.keys(ensureTilesetImages));
 
         const haveAnyEmbedded = Object.keys(ensureTilesetImages).length > 0;
         if (
@@ -697,18 +734,16 @@ ipcMainLocal.handle("save-map-project", async (event, projectPath, mapData) => {
       layers: completeMapData.layers.length,
     });
 
-    // Write the map data
-    fs.writeFileSync(mapConfigPath, JSON.stringify(completeMapData, null, 2));
-    console.log("Map configuration saved successfully");
-
-    // Save tileset images to images/tilesets if they exist
-    if (mapData.tilesetImages) {
+    // Save tileset images as separate files BEFORE writing JSON.
+    // Each tileset image is stored in images/tilesets/ so the per-map JSON
+    // does not need to carry the large base64 blobs.
+    const imagesPath = path.join(projectPath, "images");
+    const tilesetsPath = path.join(imagesPath, "tilesets");
+    if (mapData.tilesetImages && Object.keys(mapData.tilesetImages).length > 0) {
       console.log(
         "Processing tileset images:",
         Object.keys(mapData.tilesetImages)
       );
-      const imagesPath = path.join(projectPath, "images");
-      const tilesetsPath = path.join(imagesPath, "tilesets");
       if (!fs.existsSync(imagesPath)) {
         fs.mkdirSync(imagesPath, { recursive: true });
         console.log("Created images directory");
@@ -722,24 +757,41 @@ ipcMainLocal.handle("save-map-project", async (event, projectPath, mapData) => {
         mapData.tilesetImages
       )) {
         if (imageData && typeof imageData === "string") {
-          console.log(
-            "Saving image:",
-            filename,
-            "Data length:",
-            imageData.length
-          );
           const base64Data = imageData.replace(
             /^data:image\/[a-z]+;base64,/,
             ""
           );
           const imagePath = path.join(tilesetsPath, filename);
-          fs.writeFileSync(imagePath, base64Data, "base64");
-          console.log("Image saved to:", imagePath);
+          // Only write if file doesn't exist or content has changed (avoid unnecessary writes)
+          let needsWrite = true;
+          try {
+            if (fs.existsSync(imagePath)) {
+              const existingSize = fs.statSync(imagePath).size;
+              const newSize = Buffer.byteLength(base64Data, "base64");
+              needsWrite = existingSize !== newSize;
+            }
+          } catch (_e) { /* always write on error */ }
+          if (needsWrite) {
+            fs.writeFileSync(imagePath, base64Data, "base64");
+            console.log("Saved tileset image:", path.relative(projectPath, imagePath));
+          } else {
+            console.log("Tileset image unchanged, skipping write:", filename);
+          }
         }
       }
     } else {
       console.log("No tileset images to save");
     }
+
+    // Strip base64 image data from the JSON — images are stored as separate
+    // files in images/tilesets/ so embedding them in the map JSON is redundant
+    // and makes the .json file extremely large.
+    const jsonData = { ...completeMapData };
+    jsonData.tilesetImages = {};
+
+    // Write the map data (lean JSON, no embedded base64 images)
+    fs.writeFileSync(mapConfigPath, JSON.stringify(jsonData, null, 2));
+    console.log("Map configuration saved successfully (tileset images stored separately)");
 
     // Save minimap image if provided in mapData.minimap
     try {

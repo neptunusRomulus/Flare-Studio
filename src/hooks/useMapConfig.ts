@@ -265,7 +265,52 @@ const useMapConfig = ({
       }
 
       if (targetEditor) {
+        // --- DEBUG: snapshot tileset state before any save ---
+        console.log('[DEBUG:createMap] Step 1 - pre-save snapshot', {
+          mapName: (targetEditor as unknown as { mapName?: string }).mapName,
+          currentProjectPath,
+          layerTabs: (() => {
+            try {
+              const lt = (targetEditor as unknown as { layerTabs?: Map<string, unknown[]> }).layerTabs;
+              if (!lt) return 'no layerTabs';
+              const summary: Record<string, unknown> = {};
+              for (const [k, tabs] of lt.entries()) {
+                summary[k] = tabs.map((t: unknown) => {
+                  const tab = t as { id?: number; tileset?: { fileName?: string; image?: unknown } };
+                  return { id: tab?.id, fileName: tab?.tileset?.fileName, hasImage: !!tab?.tileset?.image };
+                });
+              }
+              return summary;
+            } catch { return 'error reading layerTabs'; }
+          })()
+        });
+
+        // Always save the current map to disk BEFORE resetting the editor.
+        // This persists any imported tilesets so they survive a tab switch back.
+        if (currentProjectPath) {
+          try {
+            if (typeof targetEditor.ensureTilesetsLoaded === 'function') {
+              await targetEditor.ensureTilesetsLoaded();
+            }
+            // Capture project data to check what tilesets will be saved
+            const previewData = (targetEditor as unknown as { getProjectData?: () => { tilesetImages?: Record<string, string>; tilesets?: unknown[] } }).getProjectData?.();
+            console.log('[DEBUG:createMap] Step 2 - about to saveProjectData', {
+              tilesetImageKeys: Object.keys(previewData?.tilesetImages ?? {}),
+              tilesetCount: previewData?.tilesets?.length ?? 0,
+              targetPath: currentProjectPath
+            });
+            await targetEditor.saveProjectData(currentProjectPath);
+            console.log('[DEBUG:createMap] Step 2 - saveProjectData completed');
+          } catch (saveErr) {
+            console.warn('[DEBUG:createMap] Step 2 - FAILED to save before create:', saveErr);
+          }
+        } else {
+          console.warn('[DEBUG:createMap] Step 2 - SKIPPED save: currentProjectPath is null/empty');
+        }
+
+        // Also call the external before-create hook if wired (e.g. to update tab cache)
         const beforeCreateMap = getBeforeCreateMap();
+        console.log('[DEBUG:createMap] Step 3 - beforeCreateMap hook wired?', !!beforeCreateMap);
         if (beforeCreateMap) {
           await beforeCreateMap();
         }

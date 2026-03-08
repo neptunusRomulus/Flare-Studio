@@ -8838,18 +8838,6 @@ export class TileMapEditor {
         const imgKeys = projectData.tilesetImages ? Object.keys(projectData.tilesetImages) : [];
         const imgInfo = imgKeys.map(k => ({ file: k, size: projectData.tilesetImages?.[k]?.length ?? 0 }));
         console.log('loadProjectData: incoming tileset summary', { tilesetsProvided: Array.isArray(projectData.tilesets) ? projectData.tilesets.length : 0, tilesetImageCount: imgKeys.length, imgInfo });
-        // DEBUG: show per-tab tileset filenames in incoming layerTabs
-        if (projectData.layerTabs && typeof projectData.layerTabs === 'object') {
-          const tabSummary: Record<string, unknown> = {};
-          for (const [lt, tabs] of Object.entries(projectData.layerTabs)) {
-            tabSummary[lt] = (tabs as Array<{ id?: number; tileset?: { fileName?: string } }>).map(t => ({
-              id: t?.id, tilesetFileName: t?.tileset?.fileName ?? '(none)'
-            }));
-          }
-          console.log('[DEBUG:loadProjectData] incoming layerTabs tileset filenames:', tabSummary);
-        } else {
-          console.log('[DEBUG:loadProjectData] NO layerTabs in incoming projectData');
-        }
       } catch (_e) { void _e; }
       
       // Restore brush-related settings and mapping if available

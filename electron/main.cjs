@@ -507,13 +507,21 @@ ipcMainLocal.handle("open-map-project", async (event, projectPath, mapName) => {
     const files = fs.readdirSync(projectPath);
     let mapFile = null;
     if (mapName && typeof mapName === "string") {
-      const candidate = `${mapName}.json`;
+      // Sanitize the map name the same way save does, so "Untitled Map" → "Untitled_Map.json"
+      const sanitizedName = sanitizeMapNameForFilename(mapName);
+      const candidate = `${sanitizedName}.json`;
       if (files.includes(candidate)) {
         mapFile = candidate;
       } else {
-        console.log("Requested map file not found:", candidate);
-        // Return null instead of falling back to wrong file
-        return null;
+        // Also try the raw (unsanitized) name for backward compat with files saved by older builds
+        const rawCandidate = `${mapName}.json`;
+        if (files.includes(rawCandidate)) {
+          mapFile = rawCandidate;
+        } else {
+          console.log("Requested map file not found:", candidate);
+          // Return null instead of falling back to wrong file
+          return null;
+        }
       }
     } else {
       // No specific map requested - find the first valid map file
@@ -562,23 +570,18 @@ ipcMainLocal.handle("open-map-project", async (event, projectPath, mapName) => {
         // Helper: try to load a tileset filename from any search directory
         const tryLoadTilesetFile = (fileName) => {
           if (!fileName || ensureTilesetImages[fileName]) return;
-          console.log(`[DEBUG:load] tryLoadTilesetFile("${fileName}") - searching in:`, searchDirs);
           for (const dir of searchDirs) {
             if (!dir) continue;
             const candidatePath = path.join(dir, fileName);
-            const exists = fs.existsSync(candidatePath);
-            console.log(`[DEBUG:load]   check ${candidatePath} -> exists=${exists}`);
-            if (exists) {
+            if (fs.existsSync(candidatePath)) {
               ensureTilesetImages[fileName] = toDataUrl(candidatePath);
-              console.log(`[DEBUG:load] FOUND tileset: ${path.relative(projectPath, candidatePath)} -> ${fileName}`);
               return;
             }
           }
-          console.warn(`[DEBUG:load] NOT FOUND: "${fileName}" in any search dir`);
+          console.warn(`Tileset not found: "${fileName}"`);
         };
 
         // Load tilesets referenced in tilesets[]
-        console.log(`[DEBUG:load] tilesets[] count=${mapData.tilesets?.length ?? 0}, layerTabs keys=${Object.keys(mapData.layerTabs || {}).join(',')}`);
         if (Array.isArray(mapData.tilesets)) {
           for (const ts of mapData.tilesets) {
             const fileName = ts?.fileName || ts?.name;
@@ -612,14 +615,10 @@ ipcMainLocal.handle("open-map-project", async (event, projectPath, mapName) => {
             if (!Array.isArray(tabs)) continue;
             for (const tab of tabs) {
               const fileName = tab?.tileset?.fileName;
-              console.log(`[DEBUG:load] layerTab ${layerType}/tab${tab?.id} tileset.fileName="${fileName}"`);
               if (fileName) tryLoadTilesetFile(fileName);
             }
           }
-        } else {
-          console.log('[DEBUG:load] No layerTabs in mapData');
         }
-        console.log('[DEBUG:load] ensureTilesetImages keys after scan:', Object.keys(ensureTilesetImages));
 
         const haveAnyEmbedded = Object.keys(ensureTilesetImages).length > 0;
         if (

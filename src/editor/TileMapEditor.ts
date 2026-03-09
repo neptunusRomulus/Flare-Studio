@@ -100,6 +100,18 @@ export interface EditorProjectData {
   detectedTileData?: SerializedDetectedTile[];
   isStartingMap?: boolean;
   lastSaved?: string;
+  // Serialized sprite objects placed on object/background layers (multi-cell palette paintings)
+  placedSpriteObjects?: Record<string, Array<{
+    id: number;
+    anchorX: number;
+    anchorY: number;
+    gid: number;
+    tilesetKey: string | null;
+    width: number;
+    height: number;
+    sourceX: number;
+    sourceY: number;
+  }>>;
 }
 
 const INTERNAL_TILESET_FILENAMES = new Set<string>(['collision_tileset.png']);
@@ -871,6 +883,10 @@ export class TileMapEditor {
   // Save locking to prevent edits during save
   private isSaveLocked: boolean = false;
   private saveLockCallback: ((locked: boolean) => void) | null = null;
+
+  // Tab-switching flag: true while the grid is cleared and the next map is loading.
+  // Auto-save checks this and skips to prevent overwriting a previous map with an empty grid.
+  private isTabSwitching: boolean = false;
   
   // Manual save callback (called when user presses Ctrl+S)
   private manualSaveCallback: (() => Promise<void>) | null = null;
@@ -7886,6 +7902,20 @@ export class TileMapEditor {
     return this.isSaveLocked;
   }
 
+  /** Mark the start/end of a tab switch so auto-save knows to stand down. */
+  public setTabSwitching(switching: boolean): void {
+    this.isTabSwitching = switching;
+    if (switching) {
+      console.log('[TileMapEditor] Tab switch started — auto-save blocked until load completes');
+    } else {
+      console.log('[TileMapEditor] Tab switch ended — auto-save unblocked');
+    }
+  }
+
+  public getTabSwitching(): boolean {
+    return this.isTabSwitching;
+  }
+
   public setSaveLockCallback(callback: (locked: boolean) => void): void {
     this.saveLockCallback = callback;
   }
@@ -7934,6 +7964,17 @@ export class TileMapEditor {
   // Save complete project data
   public async saveProjectData(projectPath: string): Promise<boolean> {
     try {
+      // Log the state of all layer data BEFORE starting the save
+      try {
+        for (const layer of this.tileLayers) {
+          const nonZero = layer.data.filter(v => v > 0).length;
+          if (nonZero > 0) {
+            const activeTabId = this.layerActiveTabId.get(layer.type);
+            console.log(`[SAVE-PRE] layer="${layer.type}" has ${nonZero} painted tiles, activeTab=${activeTabId}`);
+          }
+        }
+      } catch (_e) { void _e; }
+
       // Use getProjectData() to ensure all data (including layerTabs) is included
       await this.ensureTilesetsLoaded();
       const projectData = this.getProjectData();
@@ -8197,6 +8238,19 @@ export class TileMapEditor {
       console.log('getProjectData: summary', { tilesetCount: tilesets.length, tilesetImageCount: imageKeys.length, imgSummary });
     } catch (_err) {
       void _err;
+    }
+
+    // Serialize placed sprite objects (multi-cell palette paintings on object/background layers)
+    if (this.placedSpriteObjects.size > 0) {
+      const spriteObj: NonNullable<EditorProjectData['placedSpriteObjects']> = {};
+      for (const [layerType, objs] of this.placedSpriteObjects.entries()) {
+        if (objs.length > 0) {
+          spriteObj[layerType] = objs.map(o => ({ ...o }));
+        }
+      }
+      if (Object.keys(spriteObj).length > 0) {
+        projectData.placedSpriteObjects = spriteObj;
+      }
     }
 
     return projectData;
@@ -9375,6 +9429,19 @@ export class TileMapEditor {
       // Each map should be self-contained with its own tileset data in layerTabs
       // If a map has explicit tileset data, it will be restored above
       
+      // Restore placed sprite objects (multi-cell palette paintings on object/background layers)
+      if (projectData.placedSpriteObjects && typeof projectData.placedSpriteObjects === 'object') {
+        for (const [layerType, objs] of Object.entries(projectData.placedSpriteObjects)) {
+          if (Array.isArray(objs) && objs.length > 0) {
+            this.placedSpriteObjects.set(layerType, objs.map(o => ({ ...o })));
+            // Keep nextSpriteObjectId above any restored ids
+            for (const o of objs) {
+              if (o.id >= this.nextSpriteObjectId) this.nextSpriteObjectId = o.id + 1;
+            }
+          }
+        }
+      }
+
       console.log('Project data loaded successfully');
       this.draw();
     } catch (_error) { void _error; }

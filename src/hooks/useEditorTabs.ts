@@ -104,81 +104,94 @@ const useEditorTabs = ({
     if (editor && typeof editor.setCurrentProjectPath === 'function') {
       editor.setCurrentProjectPath(nextTab.projectPath ?? null);
     }
-    // Ensure the editor shows a fresh/empty grid for the incoming tab
+
+    // Block auto-save for the entire clear→load window so that a periodic timer cannot
+    // fire between clearMapGrid() and loadProjectData() and overwrite the previously-saved
+    // map file with an empty grid (the root-cause of "paintings gone after tab switch").
+    type EditorWithTabSwitch = { setTabSwitching?: (v: boolean) => void };
+    const editorWithSwitch = editor as unknown as EditorWithTabSwitch;
+    editorWithSwitch.setTabSwitching?.(true);
+
     try {
-      if (editor && typeof (editor as unknown as { clearMapGrid?: () => void }).clearMapGrid === 'function') {
-        try { (editor as unknown as { clearMapGrid: () => void }).clearMapGrid(); } catch (_err) { void _err; }
-      }
-    } catch (_e) { void _e; }
-
-    try { switchToTabHelpersRef.current.setTabTick?.(); } catch (e) { void e; }
-
-    if (nextTab.tabType === 'enemy') {
-      return;
-    }
-
-    if (nextTab.config && !editor) {
+      // Ensure the editor shows a fresh/empty grid for the incoming tab
       try {
-        const cfgCheck = nextTab.config as EditorProjectData;
-        if (nextTab.projectPath && (!cfgCheck.tilesetImages || Object.keys(cfgCheck.tilesetImages || {}).length === 0) && nextTab.name) {
-          await switchToTabHelpersRef.current.handleOpenMap(nextTab.projectPath, false, nextTab.name);
-          if (editor) switchToTabHelpersRef.current.setupAutoSave(editor);
-          return;
+        if (editor && typeof (editor as unknown as { clearMapGrid?: () => void }).clearMapGrid === 'function') {
+          try { (editor as unknown as { clearMapGrid: () => void }).clearMapGrid(); } catch (_err) { void _err; }
         }
-      } catch {
-        // ignore and fall back to normal restore
-      }
-    }
+      } catch (_e) { void _e; }
 
-    // ALWAYS load from disk when switching tabs - disable config caching to prevent
-    // state contamination where the latest tileset appears on all tabs
-    if (nextTab.projectPath && nextTab.name) {
-      const normalize = (p: string | null | undefined) => (p ? p.replace(/\\/g, '/').toLowerCase() : '');
-      const nextNormalized = normalize(nextTab.projectPath);
-      const prevNormalized = prevTab ? normalize(prevTab.projectPath) : '';
-      const isDifferentProject = nextNormalized !== prevNormalized;
-      
-      console.log(`[TAB LOAD] Loading from disk: ${nextTab.name}, isDifferentProject=${isDifferentProject}`);
-      
-      if (isDifferentProject) {
-        // Different project - need full project load which resets editor
-        await switchToTabHelpersRef.current.handleOpenMap(nextTab.projectPath, false, nextTab.name);
-      } else {
-        // Same project - load map without resetting editor to preserve UI state (tabs, etc.)
-        if (editor && typeof switchToTabHelpersRef.current.loadProjectData === 'function') {
-          // Load from disk file directly
-          const mapData = await window.electronAPI?.openMapProject?.(nextTab.projectPath, nextTab.name);
-          if (mapData) {
-            const loaded = await switchToTabHelpersRef.current.loadProjectData(editor, mapData);
-            if (loaded) {
-              switchToTabHelpersRef.current.setupAutoSave(editor);
-              switchToTabHelpersRef.current.updateLayersList();
-              switchToTabHelpersRef.current.syncMapObjects();
-              try { switchToTabHelpersRef.current.setTabTick?.(); } catch (e) { void e; }
+      try { switchToTabHelpersRef.current.setTabTick?.(); } catch (e) { void e; }
+
+      if (nextTab.tabType === 'enemy') {
+        return;
+      }
+
+      if (nextTab.config && !editor) {
+        try {
+          const cfgCheck = nextTab.config as EditorProjectData;
+          if (nextTab.projectPath && (!cfgCheck.tilesetImages || Object.keys(cfgCheck.tilesetImages || {}).length === 0) && nextTab.name) {
+            await switchToTabHelpersRef.current.handleOpenMap(nextTab.projectPath, false, nextTab.name);
+            if (editor) switchToTabHelpersRef.current.setupAutoSave(editor);
+            return;
+          }
+        } catch {
+          // ignore and fall back to normal restore
+        }
+      }
+
+      // ALWAYS load from disk when switching tabs - disable config caching to prevent
+      // state contamination where the latest tileset appears on all tabs
+      if (nextTab.projectPath && nextTab.name) {
+        const normalize = (p: string | null | undefined) => (p ? p.replace(/\\/g, '/').toLowerCase() : '');
+        const nextNormalized = normalize(nextTab.projectPath);
+        const prevNormalized = prevTab ? normalize(prevTab.projectPath) : '';
+        const isDifferentProject = nextNormalized !== prevNormalized;
+        
+        console.log(`[TAB LOAD] Loading from disk: ${nextTab.name}, isDifferentProject=${isDifferentProject}`);
+        
+        if (isDifferentProject) {
+          // Different project - need full project load which resets editor
+          await switchToTabHelpersRef.current.handleOpenMap(nextTab.projectPath, false, nextTab.name);
+        } else {
+          // Same project - load map without resetting editor to preserve UI state (tabs, etc.)
+          if (editor && typeof switchToTabHelpersRef.current.loadProjectData === 'function') {
+            // Load from disk file directly
+            const mapData = await window.electronAPI?.openMapProject?.(nextTab.projectPath, nextTab.name);
+            if (mapData) {
+              const loaded = await switchToTabHelpersRef.current.loadProjectData(editor, mapData);
+              if (loaded) {
+                switchToTabHelpersRef.current.setupAutoSave(editor);
+                switchToTabHelpersRef.current.updateLayersList();
+                switchToTabHelpersRef.current.syncMapObjects();
+                try { switchToTabHelpersRef.current.setTabTick?.(); } catch (e) { void e; }
+              }
+            } else {
+              // File not found for this tab. Update the editor's map name so that any
+              // subsequent save (manual or auto) targets THIS tab's file rather than the
+              // previously-loaded map's file. Without this fix the editor keeps the old
+              // mapName (e.g. "Map 1") and SAVE-SYNC writes the current layer data into
+              // the wrong JSON, causing painting from one map to bleed into another.
+              console.warn(`[TAB SWITCH] Map file not found for tab "${nextTab.name}" — updating mapName to prevent cross-map save contamination`);
+              if (typeof editor.setMapName === 'function') {
+                editor.setMapName(nextTab.name);
+              }
             }
           } else {
-            // File not found for this tab. Update the editor's map name so that any
-            // subsequent save (manual or auto) targets THIS tab's file rather than the
-            // previously-loaded map's file. Without this fix the editor keeps the old
-            // mapName (e.g. "Map 1") and SAVE-SYNC writes the current layer data into
-            // the wrong JSON, causing painting from one map to bleed into another.
-            console.warn(`[TAB SWITCH] Map file not found for tab "${nextTab.name}" — updating mapName to prevent cross-map save contamination`);
-            if (typeof editor.setMapName === 'function') {
-              editor.setMapName(nextTab.name);
-            }
+            // Fallback to full load if no loadProjectData available
+            await switchToTabHelpersRef.current.handleOpenMap(nextTab.projectPath, false, nextTab.name);
           }
-        } else {
-          // Fallback to full load if no loadProjectData available
-          await switchToTabHelpersRef.current.handleOpenMap(nextTab.projectPath, false, nextTab.name);
+        }
+        
+        if (editor) {
+          // Ensure currentProjectPath is set after loading the map
+          if (typeof editor.setCurrentProjectPath === 'function') {
+            editor.setCurrentProjectPath(nextTab.projectPath ?? null);
+          }
         }
       }
-      
-      if (editor) {
-        // Ensure currentProjectPath is set after loading the map
-        if (typeof editor.setCurrentProjectPath === 'function') {
-          editor.setCurrentProjectPath(nextTab.projectPath ?? null);
-        }
-      }
+    } finally {
+      // Always unblock auto-save when the tab switch completes (or fails).
+      editorWithSwitch.setTabSwitching?.(false);
     }
   }, [
     activeTabId,

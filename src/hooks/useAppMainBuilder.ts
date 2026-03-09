@@ -58,9 +58,6 @@ export default function useAppMainBuilder() {
   const { isDarkMode, setIsDarkMode, showSidebarToggle, setShowSidebarToggle } = usePreferences();
   useDarkModeSync(isDarkMode, editorSetup.editor as TileMapEditor | null);
 
-  const [autoSaveEnabled, setAutoSaveEnabledState] = useState<boolean>(false);
-  const [autoSaveIntervalMs, setAutoSaveIntervalMs] = useState<number>(5000);
-  const [autoSaveDebounceMs, setAutoSaveDebounceMs] = useState<number>(2000);
   const [showActiveGid, setShowActiveGid] = useState<boolean>(true);
 
   const appState = useAppState();
@@ -457,7 +454,26 @@ export default function useAppMainBuilder() {
 
   const handleCreateNewMap = (config: { name?: string; width?: number; height?: number; isStartingMap?: boolean } , projectPath?: string | null) => {
     try {
-      setCurrentProjectPath(projectPath ?? null);
+      if (projectPath) {
+        // The project folder and its initial map file were already created on disk by
+        // Electron (via createMapProject). Open it directly so that the editor name,
+        // tabs, and all state are derived from what's on disk.
+        // This avoids the stale-React-state bug where `newMapName` hadn't updated
+        // yet when `handleConfirmCreateMap` was called, which previously caused the
+        // editor to initialise with the default name "Untitled Map" — eventually
+        // writing an unwanted "Untitled_Map.json" into the project folder.
+        const manager = projectManager as ProjectManagerType;
+        if (manager && typeof manager.handleOpenMap === 'function') {
+          void manager.handleOpenMap(projectPath);
+        }
+        if (typeof appState.setShowWelcome === 'function') appState.setShowWelcome(false);
+        return;
+      }
+
+      // Fallback path (no projectPath — e.g. pure-web mode or legacy callers):
+      // set the dialog state and confirm synchronously. We still call setNewMapName
+      // here for consistency, but this path is not used in the normal Electron flow.
+      setCurrentProjectPath(null);
       if (typeof mapConfig.setNewMapWidth === 'function') mapConfig.setNewMapWidth(config.width ?? 20);
       if (typeof mapConfig.setNewMapHeight === 'function') mapConfig.setNewMapHeight(config.height ?? 15);
       if (typeof mapConfig.setNewMapName === 'function') mapConfig.setNewMapName(config.name ?? 'Map Name');
@@ -772,12 +788,6 @@ export default function useAppMainBuilder() {
       handleCloseSettings,
       setIsDarkMode,
       editor: defaultEditor,
-      autoSaveEnabled,
-      setAutoSaveEnabledState,
-      autoSaveIntervalMs,
-      setAutoSaveIntervalMs,
-      autoSaveDebounceMs,
-      setAutoSaveDebounceMs,
       showActiveGid,
       setShowActiveGid,
       setShowSidebarToggle,

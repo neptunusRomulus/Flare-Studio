@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { TileMapEditor } from '@/editor/TileMapEditor';
 import useManualSave from './useManualSave';
 
@@ -11,11 +11,13 @@ export default function useManualSaveSetup(
   currentProjectPath: string | null | undefined,
   handleManualSaveRef?: React.MutableRefObject<(() => Promise<void>) | undefined>
 ) {
+  const [isManuallySaving, setIsManuallySaving] = useState(false);
+
   // Create manual save handler - this uses useSaveQueue which requires SaveQueueProvider
   const { handleManualSave } = useManualSave({
     editor: editor ?? null,
     currentProjectPath: currentProjectPath ?? null,
-    setIsManuallySaving: () => {}, // State managed internally
+    setIsManuallySaving,
     setLastSaveTime: () => {},
     manualSaveRef: handleManualSaveRef
   });
@@ -34,5 +36,5 @@ export default function useManualSaveSetup(
     };
   }, [editor, handleManualSave]);
 
-  return { handleManualSave };
+  return { handleManualSave, isManuallySaving };
 }

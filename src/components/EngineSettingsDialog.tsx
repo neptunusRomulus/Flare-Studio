@@ -1,7 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Moon, Sun, Target, X, Save, Settings, Eye, PanelLeft, History } from 'lucide-react';
 import Tooltip from '@/components/ui/tooltip';
-import AutoSaveSettingsPanel from '@/components/AutoSaveSettingsPanel';
 import UndoPersistencePanel from '@/components/UndoPersistencePanel';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 import { useState, type Dispatch, type SetStateAction } from 'react';
@@ -14,12 +13,6 @@ type EngineSettingsDialogProps = {
   isDarkMode: boolean;
   setIsDarkMode: Dispatch<SetStateAction<boolean>>;
   editor: TileMapEditor | null;
-  autoSaveEnabled: boolean;
-  setAutoSaveEnabledState: Dispatch<SetStateAction<boolean>>;
-  autoSaveIntervalMs?: number;
-  setAutoSaveIntervalMs?: Dispatch<SetStateAction<number>>;
-  autoSaveDebounceMs?: number;
-  setAutoSaveDebounceMs?: Dispatch<SetStateAction<number>>;
   showActiveGid: boolean;
   setShowActiveGid: Dispatch<SetStateAction<boolean>>;
   showSidebarToggle: boolean;
@@ -36,12 +29,6 @@ const EngineSettingsDialog = ({
   isDarkMode,
   setIsDarkMode,
   editor,
-  autoSaveEnabled,
-  setAutoSaveEnabledState,
-  autoSaveIntervalMs = 5000,
-  setAutoSaveIntervalMs,
-  autoSaveDebounceMs = 2000,
-  setAutoSaveDebounceMs,
   showActiveGid,
   setShowActiveGid,
   showSidebarToggle,
@@ -160,59 +147,16 @@ const EngineSettingsDialog = ({
           {/* Save Tab */}
           {activeTab === 'save' && (
             <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-2">Auto-Save</label>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm">Disabled</span>
-                  <button
-                    onClick={() => {
-                      const newEnabled = !autoSaveEnabled;
-                      setAutoSaveEnabledState(newEnabled);
-                      if (editor) {
-                        editor.setAutoSaveEnabled(newEnabled);
-                      }
-                    }}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      autoSaveEnabled ? 'bg-orange-600' : 'bg-gray-200'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        autoSaveEnabled ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
-                    <span className="sr-only">Toggle auto-save</span>
-                  </button>
-                  <span className="text-sm">Enabled</span>
-                </div>
-                <p className="text-xs text-gray-500 mt-1">
-                  Automatically saves your work at regular intervals
-                </p>
-                
-                {autoSaveEnabled && setAutoSaveIntervalMs && setAutoSaveDebounceMs && (
-                  <div className="mt-4 pt-4 border-t border-border">
-                    <AutoSaveSettingsPanel
-                      autoSaveEnabled={autoSaveEnabled}
-                      intervalMs={autoSaveIntervalMs}
-                      debounceMs={autoSaveDebounceMs}
-                      onEnabledChange={setAutoSaveEnabledState}
-                      onIntervalChange={setAutoSaveIntervalMs}
-                      onDebounceChange={setAutoSaveDebounceMs}
-                    />
-                  </div>
-                )}
-              </div>
-
               {/* Undo Persistence Settings */}
-              {setUndoPersistenceEnabled && (
-                <div className="pt-4 border-t border-border">
-                  <UndoPersistencePanel
-                    enabled={undoPersistenceEnabled}
-                    onEnabledChange={setUndoPersistenceEnabled}
-                    onClearHistory={onClearUndoHistory}
-                    storageSizeKB={undoStorageSizeKB}
-                  />
-                </div>
+              {setUndoPersistenceEnabled ? (
+                <UndoPersistencePanel
+                  enabled={undoPersistenceEnabled}
+                  onEnabledChange={setUndoPersistenceEnabled}
+                  onClearHistory={onClearUndoHistory}
+                  storageSizeKB={undoStorageSizeKB}
+                />
+              ) : (
+                <p className="text-sm text-muted-foreground">Save manually using the Save button in the sidebar or Ctrl+S.</p>
               )}
             </div>
           )}

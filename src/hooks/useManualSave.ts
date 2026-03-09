@@ -43,9 +43,21 @@ export default function useManualSave(args: {
   const saveCounterRef = useRef(0);
 
   const handleManualSave = useCallback(async () => {
-    if (!editor) return;
-    
+    if (!editor) {
+      console.warn('[ManualSave] Skipping — editor is null');
+      return;
+    }
+
+    // Skip if a tab switch is currently in progress. Between clearMapGrid() and loadProjectData()
+    // the editor holds an empty grid, and saving now would overwrite the previously-saved map
+    // file with zero tile data. The auto-save will fire again after the switch completes.
+    if ((editor as unknown as { getTabSwitching?: () => boolean }).getTabSwitching?.()) {
+      console.log('[ManualSave] Skipping — tab switch in progress (grid is being reloaded)');
+      return;
+    }
+
     const saveId = `manual-save-${++saveCounterRef.current}`;
+    console.log('[ManualSave] ▶ Starting save. id:', saveId, '| projectPath:', currentProjectPath, '| mapName:', typeof editor.getMapName === 'function' ? editor.getMapName() : '(unknown)');
     
     const savePromise = (async () => {
       // Lock save to prevent edits during save
@@ -141,13 +153,18 @@ export default function useManualSave(args: {
               const api = (typeof window !== 'undefined') ? (window as unknown as { electronAPI?: { save?: () => void } }).electronAPI : undefined;
               // Use provided currentProjectPath, or fall back to editor's stored path
               const projectPath = currentProjectPath || (editor?.getCurrentProjectPath?.() ?? null);
+              console.log('[ManualSave][JSON] Starting JSON project save. projectPath:', projectPath, '| electronAPI available:', !!api);
               if (api && projectPath) {
+                console.log('[ManualSave][JSON] Calling saveProjectData...');
                 const success = await editor!.saveProjectData(projectPath);
                 await new Promise(resolve => setTimeout(resolve, 300));
                 if (!success) {
+                  console.error('[ManualSave][JSON] saveProjectData returned false');
                   throw new Error('saveProjectData returned false');
                 }
+                console.log('[ManualSave][JSON] ✓ JSON project data saved to', projectPath);
               } else {
+                console.warn('[ManualSave][JSON] Skipping Electron save — api:', !!api, 'path:', projectPath);
                 try {
                   const maybe = editor as unknown as { forceSave?: () => void };
                   if (typeof maybe.forceSave === 'function') maybe.forceSave();
@@ -162,6 +179,46 @@ export default function useManualSave(args: {
             },
             critical: true,
             priority: 10
+          },
+          {
+            name: 'Export Flare .txt map file to maps/ folder',
+            execute: async () => {
+              const projectPath = currentProjectPath || (editor?.getCurrentProjectPath?.() ?? null);
+              console.log('[ManualSave][TXT] Starting Flare .txt export. projectPath:', projectPath);
+              if (!editor) {
+                console.warn('[ManualSave][TXT] Skipping — editor is null');
+                return;
+              }
+              if (!projectPath) {
+                console.warn('[ManualSave][TXT] Skipping — no project path');
+                return;
+              }
+              const electronAPI = (typeof window !== 'undefined')
+                ? (window as unknown as { electronAPI?: typeof window.electronAPI }).electronAPI
+                : undefined;
+              if (!electronAPI?.saveExportFiles) {
+                console.warn('[ManualSave][TXT] Skipping — electronAPI.saveExportFiles not available');
+                return;
+              }
+              const mapName = typeof editor.getMapName === 'function' ? editor.getMapName() : 'Map';
+              console.log('[ManualSave][TXT] Map name:', mapName, '| Generating Flare map text...');
+              const mapTxt = editor.generateFlareMapTxt({ mapName });
+              const tilesetDef = editor.generateFlareTilesetDef();
+              console.log('[ManualSave][TXT] Generated mapTxt length:', mapTxt.length, '| tilesetDef length:', tilesetDef.length);
+              console.log('[ManualSave][TXT] Calling saveExportFiles — path:', projectPath, '| mapName:', mapName);
+              const ok = await electronAPI.saveExportFiles(projectPath, mapName, mapTxt, tilesetDef, {});
+              if (ok) {
+                console.log('[ManualSave][TXT] ✓ Flare .txt saved to', projectPath + '/maps/' + mapName + '.txt');
+              } else {
+                console.error('[ManualSave][TXT] saveExportFiles returned false for', projectPath + '/maps/' + mapName + '.txt');
+                throw new Error('saveExportFiles returned false for Flare .txt export');
+              }
+            },
+            rollback: async () => {
+              console.warn('[ManualSave][TXT] Rollback of Flare .txt export — no action taken');
+            },
+            critical: false,
+            priority: 9
           },
           {
             name: 'Save Tileset Palettes & Images',
@@ -284,6 +341,7 @@ export default function useManualSave(args: {
           setLastErrorMessage('');
           setPartialFailureWarning('');
           resolveError(lastErrorId);
+          editor.markAsSaved?.();
           
           // Update file conflict detection tracking after successful save
           if (currentProjectPath) {

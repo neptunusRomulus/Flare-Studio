@@ -278,7 +278,20 @@ ipcMainLocal.handle("list-maps", async (event, projectPath) => {
           const isOldProjectConfig =
             baseName.toLowerCase() === projectFolderName && !hasLayers;
 
-          if (hasLayers && !isOldProjectConfig) {
+          // Skip phantom "Untitled_Map.json" files that were created by a stale-state
+          // bug during project creation. Such files have the default name 'Untitled Map'
+          // and contain only empty (all-zero) tile data — no real content painted by the user.
+          // If any layer has at least one non-zero tile the file is kept (user may have used it).
+          const isPhantomUntitledMap = (() => {
+            if (content.name !== 'Untitled Map') return false;
+            if (!Array.isArray(content.layers) || content.layers.length === 0) return true;
+            const hasAnyPaintedTile = content.layers.some(
+              (layer) => Array.isArray(layer.data) && layer.data.some((v) => v !== 0)
+            );
+            return !hasAnyPaintedTile;
+          })();
+
+          if (hasLayers && !isOldProjectConfig && !isPhantomUntitledMap) {
             maps.push(f);
             console.log(
               "Found valid map file:",
@@ -289,15 +302,21 @@ ipcMainLocal.handle("list-maps", async (event, projectPath) => {
               content.layers?.length || 0
             );
           } else {
-            console.log(
-              "Skipping non-map JSON file:",
-              f,
-              "(isOldProjectConfig:",
-              isOldProjectConfig,
-              "hasLayers:",
-              hasLayers,
-              ")"
-            );
+            if (isPhantomUntitledMap) {
+              console.log(
+                "Skipping phantom Untitled_Map.json (empty default map from old bug):", f
+              );
+            } else {
+              console.log(
+                "Skipping non-map JSON file:",
+                f,
+                "(isOldProjectConfig:",
+                isOldProjectConfig,
+                "hasLayers:",
+                hasLayers,
+                ")"
+              );
+            }
           }
         } catch (e) {
           console.warn("Could not read/parse JSON file:", f, e.message);

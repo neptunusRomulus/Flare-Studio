@@ -7610,10 +7610,10 @@ export class TileMapEditor {
   }
 
   private markAsChanged(immediate: boolean = false): void {
-    if (!this.autoSaveEnabled) return;
-
     this.hasUnsavedChanges = true;
     this.updateSaveStatus('unsaved');
+
+    if (!this.autoSaveEnabled) return;
 
     // Clear existing timeout
     if (this.autoSaveTimeout) {
@@ -7625,6 +7625,12 @@ export class TileMapEditor {
     this.autoSaveTimeout = window.setTimeout(() => {
       this.performAutoSave();
     }, delay);
+  }
+
+  public markAsSaved(): void {
+    this.hasUnsavedChanges = false;
+    this.lastSaveTimestamp = Date.now();
+    this.updateSaveStatus('saved');
   }
 
   private async performAutoSave(): Promise<void> {

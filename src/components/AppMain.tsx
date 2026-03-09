@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import WelcomeScreen from '../components/WelcomeScreen';
 import AppShell from '@/components/AppShell';
@@ -70,12 +70,6 @@ export default function AppMain() {
     handleCloseSettings,
     setIsDarkMode,
     editor,
-    autoSaveEnabled,
-    setAutoSaveEnabledState,
-    autoSaveIntervalMs,
-    setAutoSaveIntervalMs,
-    autoSaveDebounceMs,
-    setAutoSaveDebounceMs,
     showActiveGid,
     setShowActiveGid,
     setShowSidebarToggle,
@@ -108,7 +102,23 @@ export default function AppMain() {
   } = c;
 
   // Set up manual save (Ctrl+S) support - must be called within SaveQueueProvider
-  useManualSaveSetup(editor, controls?.currentProjectPath);
+  const { handleManualSave, isManuallySaving } = useManualSaveSetup(editor, controls?.currentProjectPath);
+
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  useEffect(() => {
+    if (!editor) return;
+    editor.setSaveStatusCallback((status) => {
+      setHasUnsavedChanges(status === 'unsaved' || status === 'error');
+    });
+  }, [editor]);
+
+  const enhancedControls = useMemo(() => ({
+    ...(controls ?? {}),
+    handleManualSave,
+    isManuallySaving,
+    hasUnsavedChanges
+  }), [controls, handleManualSave, isManuallySaving, hasUnsavedChanges]);
 
   const hasMap = canvasCtx.mapInitialized;
 
@@ -142,7 +152,7 @@ export default function AppMain() {
             }}
             layers={layersObj}
             exportStatus={exportStatus}
-            controls={controls}
+            controls={enhancedControls}
           />
         )}
 
@@ -154,17 +164,10 @@ export default function AppMain() {
           isDarkMode={isDarkMode}
           setIsDarkMode={setIsDarkMode}
           editor={editor}
-          autoSaveEnabled={autoSaveEnabled}
-          setAutoSaveEnabledState={setAutoSaveEnabledState}
-          autoSaveIntervalMs={autoSaveIntervalMs}
-          setAutoSaveIntervalMs={setAutoSaveIntervalMs}
-          autoSaveDebounceMs={autoSaveDebounceMs}
-          setAutoSaveDebounceMs={setAutoSaveDebounceMs}
           showActiveGid={showActiveGid}
           setShowActiveGid={setShowActiveGid}
           showSidebarToggle={showSidebarToggle}
           setShowSidebarToggle={setShowSidebarToggle}
-
         />
 
         <MapSettingsDialog

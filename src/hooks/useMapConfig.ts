@@ -265,9 +265,11 @@ const useMapConfig = ({
       }
 
       if (targetEditor) {
-        // Always save the current map to disk BEFORE resetting the editor.
-        // This persists any imported tilesets so they survive a tab switch back.
-        if (currentProjectPath) {
+        // Save the current map to disk BEFORE resetting the editor, but ONLY if a real
+        // map was previously loaded (mapInitialized=true). Skipping this when
+        // mapInitialized=false prevents a blank auto-created editor (mapName='Untitled Map')
+        // from writing an unwanted Untitled_Map.json file to the project folder.
+        if (currentProjectPath && mapInitialized) {
           try {
             if (typeof targetEditor.ensureTilesetsLoaded === 'function') {
               await targetEditor.ensureTilesetsLoaded();
@@ -362,6 +364,7 @@ const useMapConfig = ({
     isDarkMode,
     isDuplicateMapName,
     isPreparingNewMap,
+    mapInitialized,
     newMapHeight,
     newMapName,
     newMapStarting,

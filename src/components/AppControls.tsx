@@ -99,21 +99,25 @@ const AppControls: React.FC<Props> = ({
         )}
       </div>
 
-      <Tooltip content={hasUnsavedChanges ? 'Save changes' : 'All changes saved'}>
-        <Button
-          onClick={handleManualSave}
-          className={`w-7 h-7 p-0 shadow-sm transition-colors ${
-            isManuallySaving ? 'bg-blue-500 hover:bg-blue-600' : hasUnsavedChanges ? 'bg-orange-500 hover:bg-orange-600 text-white' : 'bg-green-500 hover:bg-green-600 text-white'
-          }`}
-          disabled={isManuallySaving || isPreparingNewMap}
-          size="sm"
-        >
-          {isManuallySaving ? (
-            <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-          ) : (
-            <Save className="w-3 h-3" />
+      <Tooltip content={hasUnsavedChanges ? 'Unsaved changes — click to save (Ctrl+S)' : 'All changes saved'}>
+        <div className="relative inline-flex">
+          <Button
+            onClick={handleManualSave}
+            className="w-7 h-7 p-0 shadow-sm"
+            variant="outline"
+            disabled={isManuallySaving || isPreparingNewMap}
+            size="sm"
+          >
+            {isManuallySaving ? (
+              <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Save className="w-3 h-3" />
+            )}
+          </Button>
+          {hasUnsavedChanges && !isManuallySaving && (
+            <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border border-background pointer-events-none" />
           )}
-        </Button>
+        </div>
       </Tooltip>
 
       <Tooltip content="Engine Settings">

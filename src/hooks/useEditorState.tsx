@@ -13,7 +13,6 @@ export type HeroEditData = {
 export type NpcDeletePopup = { npcId: number; screenX: number; screenY: number } | null;
 
 type UseEditorStateOptions = {
-  autoSaveEnabled: boolean;
   currentProjectPath: string | null;
   isDarkMode: boolean;
   showWelcome: boolean;
@@ -144,24 +143,10 @@ export function useEditorState(optsRef: React.RefObject<Partial<UseEditorStateOp
     } catch (e) {
       opts = {};
     }
-    editorInstance.setAutoSaveCallback(async () => {
-      try {
-        if (window.electronAPI && opts.currentProjectPath) {
-          await editorInstance.saveProjectData(opts.currentProjectPath);
-        }
-      } catch (e) {
-        // eslint-disable-next-line no-console
-        console.warn('Auto-save to disk failed:', e);
-      }
-      opts.setLastSaveTime?.(Date.now());
-    });
-
     editorInstance.setSaveStatusCallback((status) => {
       opts.setSaveStatus?.(status as 'saving' | 'saved' | 'error' | 'unsaved');
       opts.setHasUnsavedChanges?.(status === 'unsaved' || status === 'error');
     });
-
-    editorInstance.setAutoSaveEnabled(Boolean(opts.autoSaveEnabled));
 
     editorInstance.setEyedropperCallback(() => {
       opts.handleSelectTool?.('brush');

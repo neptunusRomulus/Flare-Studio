@@ -1825,6 +1825,7 @@ export class TileMapEditor {
             case 'brush':
               // Don't paint if no tile is selected (activeGid is 0)
               if (currentLayerActiveGid === 0 && this.multiSelectedBrushes.size === 0) {
+                console.warn(`[PAINT-BLOCKED] GID=0 for layer type="${layer.type}" activeLayerId=${this.activeLayerId} layerActiveGid=${JSON.stringify(Object.fromEntries(this.layerActiveGid))} activeGid=${this.activeGid}`);
                 return; // Exit early, don't paint anything
               }
 
@@ -1885,6 +1886,10 @@ export class TileMapEditor {
           this.removeSpriteObjectAt(layer.type, x, y);
           
           layer.data[index] = newValue;
+          if (newValue > 0) {
+            const totalPainted = layer.data.filter(v => v > 0).length;
+            console.log(`[PAINTED] tile(${x},${y})=GID${newValue} layer="${layer.type}" total=${totalPainted} activeTab=${this.layerActiveTabId.get(layer.type)}`);
+          }
           // Record which tileset (tab) this painted cell came from so tabs don't collide
           try {
             const layerType = layer.type;
@@ -6724,8 +6729,16 @@ export class TileMapEditor {
         }
       }
       
-  // Restore the active GID for this layer
-  const layerActiveGid = this.layerActiveGid.get(layerType) || 0;
+  // Restore the active GID for this layer.
+  // If no tile has ever been selected for this layer type, auto-select GID=1
+  // so that painting is not silently blocked by getCurrentLayerActiveGid() === 0.
+  let layerActiveGid = this.layerActiveGid.get(layerType) || 0;
+  if (layerActiveGid === 0 && this.tileCount > 0) {
+    layerActiveGid = 1;
+    this.layerActiveGid.set(layerType, 1);
+    console.log(`[GID-AUTO] Auto-selected GID=1 for layer "${layerType}" (tileCount=${this.tileCount})`);
+  }
+  console.log(`[GID-STATE] updateCurrentTileset layer="${layerType}" layerActiveGid=${layerActiveGid} (all: ${JSON.stringify(Object.fromEntries(this.layerActiveGid))})`);
   this.updateActiveGid(layerActiveGid);
       
       this.createTilePalette();
@@ -8750,6 +8763,11 @@ export class TileMapEditor {
     // Reset layer-specific tilesets (per-map data)
     this.layerTilesets.clear();
     
+    // Reset per-layer active GID so the new map starts with no tile pre-selected.
+    // Without this, GIDs from the previous map bleed into the new map and may paint
+    // with a GID that belongs to a different tileset.
+    this.layerActiveGid.clear();
+    
     // Reset legacy tileset data
     this.tilesets = [];
     
@@ -8836,6 +8854,9 @@ export class TileMapEditor {
       this.layerTileData.clear();
       // Clear per-cell tileset key overrides left over from the previous map
       this.layerCellTilesetKey.clear();
+      // Clear per-layer active GID so loading a new map starts fresh (the auto-select
+      // in updateCurrentTileset will pick GID=1 again when the tileset loads).
+      this.layerActiveGid.clear();
       
       // Clear preloaded tileset cache to prevent contamination from previous maps
       this._preloadedTilesetImages.clear();

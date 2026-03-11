@@ -75,6 +75,11 @@ const useMapConfig = ({
   const [startingMapIntermap, setStartingMapIntermap] = useState<string | null>(null);
   const [isPreparingNewMap, setIsPreparingNewMap] = useState(false);
   const previousMapNameRef = useRef(mapName);
+  // Keep a ref to the editor that is always current so writeSpawnFile never
+  // reads a stale closure value of editor (e.g. when editor was briefly null
+  // during a tab-switch initialisation cycle).
+  const editorRef = useRef<TileMapEditor | null>(null);
+  useEffect(() => { editorRef.current = editor; }, [editor]);
 
   const writeSpawnFile = useCallback(async (starting: boolean, mapNameOverride?: string) => {
     const effectiveName = mapNameOverride ?? mapName;
@@ -83,7 +88,7 @@ const useMapConfig = ({
       setStartingMapIntermap(intermapTarget);
       return;
     }
-    const heroPos = editor?.getHeroPosition?.() ?? { x: 0, y: 0 };
+    const heroPos = editorRef.current?.getHeroPosition?.() ?? { x: 0, y: 0 };
     const spawnContent = buildSpawnContent(intermapTarget, heroPos);
     try {
       const success = await window.electronAPI.updateSpawnFile(currentProjectPath, spawnContent);
@@ -93,7 +98,7 @@ const useMapConfig = ({
     } catch (error) {
       console.error('Failed to update spawn file:', error);
     }
-  }, [currentProjectPath, mapName, editor]);
+  }, [currentProjectPath, mapName]);
 
   const updateStartingMap = useCallback(
     (nextValue: boolean, options?: { propagate?: boolean; mapNameOverride?: string }) => {

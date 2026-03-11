@@ -8153,7 +8153,9 @@ export class TileMapEditor {
       detectedTileData: this.detectedTileData.size > 0 ? Array.from(this.detectedTileData.entries()) : undefined,
       isStartingMap: this.isStartingMap,
       lastSaved: new Date().toISOString(),
-      activeLayerId: this.activeLayerId
+      activeLayerId: this.activeLayerId,
+      heroX: this.heroX,
+      heroY: this.heroY
     };
 
     // Serialize per-layer tabs (tab names, per-tab painting data, tab-specific tileset metadata, detected tiles)

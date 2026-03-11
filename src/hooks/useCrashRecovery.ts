@@ -45,6 +45,10 @@ export default function useCrashRecovery(options: CrashRecoveryOptions = {}) {
     lastHeartbeat: Date.now()
   });
 
+  // Keep callback refs stable so the crash-detection effect only runs once on mount
+  const onRecoveryFoundRef = useRef(onRecoveryFound);
+  onRecoveryFoundRef.current = onRecoveryFound;
+
   const crashMarkerKey = 'app_session_active';
   const lastCrashTimeKey = 'app_last_crash_time';
 
@@ -78,7 +82,7 @@ export default function useCrashRecovery(options: CrashRecoveryOptions = {}) {
             }));
 
             // Notify parent component of recovery option
-            onRecoveryFound?.(backup);
+            onRecoveryFoundRef.current?.(backup);
           } catch (err) {
             const error = err instanceof Error ? err.message : String(err);
             console.error('[CrashRecovery] Failed to parse backup data:', error);
@@ -98,7 +102,7 @@ export default function useCrashRecovery(options: CrashRecoveryOptions = {}) {
     };
 
     detectCrash();
-  }, [onRecoveryFound]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- runs once on mount; callback accessed via ref
 
   // Session heartbeat to track app health
   useEffect(() => {

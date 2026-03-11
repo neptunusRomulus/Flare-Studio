@@ -79,6 +79,7 @@ export default function buildAppMainCtx(params: Record<string, unknown>) {
     setShowSidebarToggle,
     showMapSettingsOnly,
     handleCloseMapSettings,
+    handleDeleteMap,
     mapName,
     setMapName,
     mapWidth,

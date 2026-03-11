@@ -25,9 +25,8 @@ type UseEditorTabsArgs = {
   editor: TileMapEditor | null;
   currentProjectPath: string | null;
   setCurrentProjectPath: (path: string | null) => void;
-  setMapName: (name: string) => void;
-  setMapWidth: (width: number) => void;
-  setMapHeight: (height: number) => void;
+  /** Called after a same-project tab switch to keep mapConfig state in sync. */
+  syncMapConfigForTab?: (name: string, width: number, height: number) => void;
   switchToTabHelpersRef: MutableRefObject<SwitchToTabHelpers>;
 };
 
@@ -35,9 +34,7 @@ const useEditorTabs = ({
   editor,
   currentProjectPath: _currentProjectPath, // Unused - always stale by switchToTab callback time. Use prevTab?.projectPath instead.
   setCurrentProjectPath,
-  setMapName: _setMapName,
-  setMapWidth: _setMapWidth,
-  setMapHeight: _setMapHeight,
+  syncMapConfigForTab,
   switchToTabHelpersRef
 }: UseEditorTabsArgs) => {
   const [tabs, setTabs] = useState<EditorTab[]>([]);
@@ -160,6 +157,12 @@ const useEditorTabs = ({
             if (mapData) {
               const loaded = await switchToTabHelpersRef.current.loadProjectData(editor, mapData);
               if (loaded) {
+                // Keep mapConfig state in sync with the newly-loaded tab so that
+                // handleMapResize / MapSettingsDialog always operate on the correct map.
+                const loadedName = (mapData as { name?: string }).name?.trim() || nextTab.name;
+                const loadedWidth = typeof (mapData as { width?: number }).width === 'number' ? (mapData as { width: number }).width : 20;
+                const loadedHeight = typeof (mapData as { height?: number }).height === 'number' ? (mapData as { height: number }).height : 15;
+                syncMapConfigForTab?.(loadedName, loadedWidth, loadedHeight);
                 switchToTabHelpersRef.current.setupAutoSave(editor);
                 switchToTabHelpersRef.current.updateLayersList();
                 switchToTabHelpersRef.current.syncMapObjects();
@@ -198,6 +201,7 @@ const useEditorTabs = ({
     editor,
     setActiveTabId,
     setCurrentProjectPath,
+    syncMapConfigForTab,
     switchToTabHelpersRef,
     tabs
   ]);

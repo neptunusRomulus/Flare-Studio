@@ -74,6 +74,7 @@ const useMapConfig = ({
   const [isStartingMap, setIsStartingMap] = useState(false);
   const [startingMapIntermap, setStartingMapIntermap] = useState<string | null>(null);
   const [isPreparingNewMap, setIsPreparingNewMap] = useState(false);
+  const previousMapNameRef = useRef(mapName);
 
   const writeSpawnFile = useCallback(async (starting: boolean, mapNameOverride?: string) => {
     const effectiveName = mapNameOverride ?? mapName;
@@ -130,14 +131,60 @@ const useMapConfig = ({
     };
   }, [currentProjectPath]);
 
-  // Derive isStartingMap reactively: whenever startingMapIntermap or mapName changes,
-  // recompute whether THIS map is the starting map. This ensures that when any other
-  // map is set as starting (updating startingMapIntermap), the current map's checkbox
-  // automatically reflects the new state without requiring a tab switch.
+  // Keep a ref to isStartingMap so the rename-tracking effect below can read it
+  // without having it as a dep (which would cause the effect to fire on checkbox
+  // changes and potentially overwrite spawn.txt with a stale mapName).
+  const isStartingMapRef = useRef(false);
   useEffect(() => {
-    const expected = mapName ? computeIntermapTarget(true, mapName) : null;
-    setIsStartingMap(expected !== null && startingMapIntermap === expected);
-  }, [startingMapIntermap, mapName]);
+    isStartingMapRef.current = isStartingMap;
+  });
+
+  // When a tab switch calls setMapName we must NOT treat it as a rename of the
+  // current starting map.  This ref is set to true for the duration of a
+  // tab-switch update so the rename-tracking effect below can skip it.
+  const isTabSwitchNameUpdateRef = useRef(false);
+
+  // Convenience setter for tab switches: updates mapName state without
+  // triggering the starting-map rename logic.
+  const setMapNameFromTabSwitch = useCallback((name: string) => {
+    isTabSwitchNameUpdateRef.current = true;
+    setMapName(name);
+  }, []);
+
+  // Update all map settings state at once for a tab switch.  Suppresses the
+  // rename-tracking effect and correctly derives isStartingMap from spawn.txt.
+  const syncMapConfigForTab = useCallback((name: string, width: number, height: number) => {
+    isTabSwitchNameUpdateRef.current = true;
+    setMapName(name);
+    setMapWidth(width);
+    setMapHeight(height);
+    // Derive isStartingMap by comparing this map's intermap target with spawn.txt
+    const target = computeIntermapTarget(true, name);
+    setIsStartingMap(Boolean(target && startingMapIntermap && target === startingMapIntermap));
+  }, [startingMapIntermap]);
+
+  // When the current map is renamed while it IS the starting map, update spawn.txt
+  // so the intermap= line reflects the new file name.
+  // NOTE: isStartingMap is intentionally read via ref, NOT listed as a dep, to
+  // prevent this effect from firing when just the checkbox state changes.
+  // NOTE: isTabSwitchNameUpdate is read via ref to skip tab-switch name updates.
+  useEffect(() => {
+    if (isTabSwitchNameUpdateRef.current) {
+      isTabSwitchNameUpdateRef.current = false;
+      previousMapNameRef.current = mapName;
+      return;
+    }
+    const previous = previousMapNameRef.current;
+    if (previous === mapName) return;
+    previousMapNameRef.current = mapName;
+    if (!isStartingMapRef.current) return;
+    const previousTarget = computeIntermapTarget(true, previous);
+    const nextTarget = computeIntermapTarget(true, mapName);
+    if (previousTarget !== nextTarget) {
+      updateStartingMap(true, { mapNameOverride: mapName });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapName, updateStartingMap]);
 
   useEffect(() => {
     if (editor) {
@@ -409,6 +456,8 @@ const useMapConfig = ({
     setNewMapStarting,
     mapName,
     setMapName,
+    setMapNameFromTabSwitch,
+    syncMapConfigForTab,
     isStartingMap,
     setIsStartingMap,
     startingMapIntermap,

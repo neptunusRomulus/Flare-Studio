@@ -131,9 +131,7 @@ export default function useAppMainBuilder() {
     editor: editor ?? null,
     currentProjectPath,
     setCurrentProjectPath,
-    setMapName: mapConfig.setMapName,
-    setMapWidth: mapConfig.setMapWidth,
-    setMapHeight: mapConfig.setMapHeight,
+    syncMapConfigForTab: mapConfig.syncMapConfigForTab,
     switchToTabHelpersRef: editorRefs.switchToTabHelpersRef
   }) as EditorTabsType;
   const { tabs, activeTabId, setTabs, setActiveTabId, switchToTab, createTabFor, closeEditorTab } = editorTabs as unknown as EditorTabsType;
@@ -650,10 +648,6 @@ export default function useAppMainBuilder() {
       setTabs((prev: EditorTab[]) =>
         prev.map((t) => t.id === activeTabId ? { ...t, name: mapConfig.mapName } : t)
       );
-    }
-    // If this is the starting map, update spawn.txt with the (possibly renamed) map name
-    if (mapConfig.isStartingMap) {
-      mapConfig.updateStartingMap(true, { mapNameOverride: mapConfig.mapName });
     }
   }, [mapConfig, activeTabId, setTabs]);
   const handleDeleteMap = useCallback(async (): Promise<boolean> => {

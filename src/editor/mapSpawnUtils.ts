@@ -18,28 +18,38 @@ const computeIntermapTarget = (starting: boolean, rawName: string | undefined | 
   return `maps/${sanitized}.txt`;
 };
 
-const buildSpawnContent = (intermapTarget: string | null): string => [
-  '# this file is automatically loaded when a New Game starts.',
-  "# it's a dummy map to send the player to the actual starting point.",
-  '',
-  '[header]',
-  'width=1',
-  'height=1',
-  'hero_pos=0,0',
-  '',
-  '[event]',
-  'type=event',
-  'location=0,0,1,1',
-  'activate=on_load',
-  `intermap=${intermapTarget ?? ''}`,
-  ''
-].join('\n');
+const buildSpawnContent = (
+  intermapTarget: string | null,
+  heroPos?: { x: number; y: number }
+): string => {
+  let intermapLine = `intermap=${intermapTarget ?? ''}`;
+  if (intermapTarget && heroPos !== undefined) {
+    intermapLine = `intermap=${intermapTarget},${heroPos.x},${heroPos.y}`;
+  }
+  return [
+    '# this file is automatically loaded when a New Game starts.',
+    "# it's a dummy map to send the player to the actual starting point.",
+    '',
+    '[header]',
+    'width=1',
+    'height=1',
+    'hero_pos=0,0',
+    '',
+    '[event]',
+    'type=event',
+    'location=0,0,1,1',
+    'activate=on_load',
+    intermapLine,
+    ''
+  ].join('\n');
+};
 
 const extractSpawnIntermapValue = (content: string | null | undefined): string | null => {
   if (!content) return null;
   const match = content.match(/^\s*intermap\s*=\s*(.*)$/m);
   if (!match) return null;
-  const value = match[1].trim();
+  // Strip optional trailing hero coords (e.g. "maps/foo.txt,20,20" → "maps/foo.txt")
+  const value = match[1].trim().replace(/,\s*-?\d+\s*,\s*-?\d+\s*$/, '');
   return value ? value : null;
 };
 

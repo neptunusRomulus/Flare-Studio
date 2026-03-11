@@ -5067,15 +5067,17 @@ export class TileMapEditor {
   }
 
   public resizeMap(width: number, height: number): void {
+    const oldWidth = this.mapWidth;
+    const oldHeight = this.mapHeight;
     this.mapWidth = width;
     this.mapHeight = height;
     
-    // Resize layer data
+    // Resize layer data — tiles outside the new bounds are dropped (filled with 0)
     for (const layer of this.tileLayers) {
       const newData = new Array(width * height).fill(0);
-      for (let y = 0; y < Math.min(height, this.mapHeight); y++) {
-        for (let x = 0; x < Math.min(width, this.mapWidth); x++) {
-          const oldIndex = y * this.mapWidth + x;
+      for (let y = 0; y < Math.min(height, oldHeight); y++) {
+        for (let x = 0; x < Math.min(width, oldWidth); x++) {
+          const oldIndex = y * oldWidth + x;
           const newIndex = y * width + x;
           if (oldIndex < layer.data.length) {
             newData[newIndex] = layer.data[oldIndex];
@@ -5223,22 +5225,17 @@ export class TileMapEditor {
     // Reinitialize collision data
     this.collisionData = new Array(width * height).fill(0);
     
-    // Resize all existing layers
+    // Initialize all layers with fresh empty data for the new dimensions.
+    // This method is called during new-map creation (after resetForNewProject),
+    // so layer data must always start clean — never carry over from a previous map.
     this.tileLayers.forEach(layer => {
-      const oldData = layer.data;
       layer.data = new Array(width * height).fill(0);
-      
-      // Copy existing data if possible
-      for (let y = 0; y < Math.min(height, 15); y++) { // 15 was the old default height
-        for (let x = 0; x < Math.min(width, 20); x++) { // 20 was the old default width
-          const oldIndex = y * 20 + x; // Old width
-          const newIndex = y * width + x; // New width
-          if (oldIndex < oldData.length) {
-            layer.data[newIndex] = oldData[oldIndex];
-          }
-        }
-      }
     });
+
+    // Re-initialize per-layer cell tileset key arrays for the new dimensions
+    for (const l of this.tileLayers) {
+      this.layerCellTilesetKey.set(l.type, new Array(width * height).fill(null));
+    }
     
     this.draw();
   }
@@ -8822,6 +8819,16 @@ export class TileMapEditor {
     
     // Reset layer-specific tilesets (per-map data)
     this.layerTilesets.clear();
+
+    // Clear placed sprite objects so they don't bleed into the new map visually
+    this.placedSpriteObjects.clear();
+
+    // Clear per-layer tile data (gid→sprite-rect mapping) to prevent stale
+    // tile lookups from the previous map rendering on the new map
+    this.layerTileData.clear();
+
+    // Clear per-cell tileset key overrides from the previous map
+    this.layerCellTilesetKey.clear();
     
     // Reset per-layer active GID so the new map starts with no tile pre-selected.
     // Without this, GIDs from the previous map bleed into the new map and may paint

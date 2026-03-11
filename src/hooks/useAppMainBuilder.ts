@@ -11,6 +11,7 @@ import useAppState from './useAppState';
 import useToolbarState from './useToolbarState';
 import useMapConfig from './useMapConfig';
 import useEditorTabs from './useEditorTabs';
+import type { EditorTab } from './useEditorTabs';
 import useProjectManager from './useProjectManager';
 type ProjectManagerParams = Parameters<typeof useProjectManager>[0];
 import useLayerHandlers from './useLayerHandlers';
@@ -135,7 +136,7 @@ export default function useAppMainBuilder() {
     setMapHeight: mapConfig.setMapHeight,
     switchToTabHelpersRef: editorRefs.switchToTabHelpersRef
   }) as EditorTabsType;
-  const { tabs, activeTabId, setTabs, setActiveTabId, switchToTab, createTabFor } = editorTabs as unknown as EditorTabsType;
+  const { tabs, activeTabId, setTabs, setActiveTabId, switchToTab, createTabFor, closeEditorTab } = editorTabs as unknown as EditorTabsType;
 
   // Wire up the before-create-map callback so that when the user creates a new map,
   // the CURRENT map's full state (including any imported tileset images) is saved to
@@ -492,6 +493,7 @@ export default function useAppMainBuilder() {
   type AssembledSidebar = Record<string, unknown> | null;
 
   const [showSettings, setShowSettings] = useState(false);
+  const [showMapSettingsOnly, setShowMapSettingsOnly] = useState(false);
 
   const sidebarDeps = useMemo(() => {
     const projectMapsList = (projectManagerRecord as ProjectManagerView)?.projectMaps ?? [];
@@ -641,6 +643,39 @@ export default function useAppMainBuilder() {
     projectManagerRecord
   ]);
   const handleCloseSettings = useCallback(() => setShowSettings(false), []);
+  const handleCloseMapSettings = useCallback(() => setShowMapSettingsOnly(false), []);
+  const handleMapResize = useCallback(() => {
+    mapConfig.handleMapResize();
+    if (activeTabId) {
+      setTabs((prev: EditorTab[]) =>
+        prev.map((t) => t.id === activeTabId ? { ...t, name: mapConfig.mapName } : t)
+      );
+    }
+    // If this is the starting map, update spawn.txt with the (possibly renamed) map name
+    if (mapConfig.isStartingMap) {
+      mapConfig.updateStartingMap(true, { mapNameOverride: mapConfig.mapName });
+    }
+  }, [mapConfig, activeTabId, setTabs]);
+  const handleDeleteMap = useCallback(async (): Promise<boolean> => {
+    if (!currentProjectPath || !mapConfig.mapName) return false;
+    try {
+      const result = await window.electronAPI?.deleteMap?.(currentProjectPath, mapConfig.mapName);
+      if (result?.success) {
+        // Clear autosave backup so crash-recovery doesn't restore a deleted map
+        editor?.clearLocalStorageBackup?.();
+        // Clear spawn.txt reference if this was the starting map
+        if (mapConfig.isStartingMap) {
+          mapConfig.updateStartingMap(false);
+        }
+        if (activeTabId) closeEditorTab(activeTabId);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      console.warn('handleDeleteMap failed', e);
+      return false;
+    }
+  }, [currentProjectPath, mapConfig, activeTabId, closeEditorTab, editor]);
 
   function buildAppMainCtxFromSidebar(assembledSidebar: AssembledSidebar): Record<string, unknown> {
     const sb = (assembledSidebar ?? {}) as Record<string, unknown>;
@@ -735,7 +770,7 @@ export default function useAppMainBuilder() {
         tabs: tabs ?? [],
         activeTabId: activeTabId ?? null,
         onSwitchTab: (id: string) => { void switchToTab(id); },
-        onOpenMapSettings: () => {},
+        onOpenMapSettings: () => setShowMapSettingsOnly(true),
         onCloseEnemyTab: () => {},
         onCreateNewMap: () => { if (typeof mapConfig.setShowCreateMapDialog === 'function') mapConfig.setShowCreateMapDialog(true); },
         saveStatus: 'saved',
@@ -805,8 +840,9 @@ export default function useAppMainBuilder() {
       setCreateMapError: mapConfig.setCreateMapError,
       isPreparingNewMap: mapConfig.isPreparingNewMap,
       handleConfirmCreateMap: mapConfig.handleConfirmCreateMap,
-      showMapSettingsOnly: false,
-      handleCloseMapSettings: () => {},
+      showMapSettingsOnly,
+      handleCloseMapSettings,
+      handleDeleteMap,
       mapName: mapConfig.mapName,
       setMapName: mapConfig.setMapName,
       mapWidth: mapConfig.mapWidth,
@@ -815,7 +851,7 @@ export default function useAppMainBuilder() {
       setMapHeight: mapConfig.setMapHeight,
       isStartingMap: mapConfig.isStartingMap,
       updateStartingMap: mapConfig.updateStartingMap,
-      handleMapResize: mapConfig.handleMapResize,
+      handleMapResize: handleMapResize,
       showClearLayerDialog,
       handleClearLayerClose,
       handleClearLayerConfirm,

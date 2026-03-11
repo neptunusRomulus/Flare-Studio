@@ -74,7 +74,6 @@ const useMapConfig = ({
   const [isStartingMap, setIsStartingMap] = useState(false);
   const [startingMapIntermap, setStartingMapIntermap] = useState<string | null>(null);
   const [isPreparingNewMap, setIsPreparingNewMap] = useState(false);
-  const previousMapNameRef = useRef(mapName);
 
   const writeSpawnFile = useCallback(async (starting: boolean, mapNameOverride?: string) => {
     const effectiveName = mapNameOverride ?? mapName;
@@ -83,7 +82,8 @@ const useMapConfig = ({
       setStartingMapIntermap(intermapTarget);
       return;
     }
-    const spawnContent = buildSpawnContent(intermapTarget);
+    const heroPos = editor?.getHeroPosition?.() ?? { x: 0, y: 0 };
+    const spawnContent = buildSpawnContent(intermapTarget, heroPos);
     try {
       const success = await window.electronAPI.updateSpawnFile(currentProjectPath, spawnContent);
       if (success) {
@@ -92,7 +92,7 @@ const useMapConfig = ({
     } catch (error) {
       console.error('Failed to update spawn file:', error);
     }
-  }, [currentProjectPath, mapName]);
+  }, [currentProjectPath, mapName, editor]);
 
   const updateStartingMap = useCallback(
     (nextValue: boolean, options?: { propagate?: boolean; mapNameOverride?: string }) => {
@@ -130,21 +130,14 @@ const useMapConfig = ({
     };
   }, [currentProjectPath]);
 
+  // Derive isStartingMap reactively: whenever startingMapIntermap or mapName changes,
+  // recompute whether THIS map is the starting map. This ensures that when any other
+  // map is set as starting (updating startingMapIntermap), the current map's checkbox
+  // automatically reflects the new state without requiring a tab switch.
   useEffect(() => {
-    const previous = previousMapNameRef.current;
-    if (previous === mapName) {
-      return;
-    }
-    previousMapNameRef.current = mapName;
-    if (!isStartingMap) {
-      return;
-    }
-    const previousTarget = computeIntermapTarget(true, previous);
-    const nextTarget = computeIntermapTarget(true, mapName);
-    if (previousTarget !== nextTarget) {
-      updateStartingMap(true, { mapNameOverride: mapName });
-    }
-  }, [mapName, isStartingMap, updateStartingMap]);
+    const expected = mapName ? computeIntermapTarget(true, mapName) : null;
+    setIsStartingMap(expected !== null && startingMapIntermap === expected);
+  }, [startingMapIntermap, mapName]);
 
   useEffect(() => {
     if (editor) {

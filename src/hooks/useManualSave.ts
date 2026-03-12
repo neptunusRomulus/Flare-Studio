@@ -15,6 +15,7 @@ export default function useManualSave(args: {
   setIsManuallySaving: (v: boolean) => void;
   setLastSaveTime: (t: number) => void;
   manualSaveRef?: React.MutableRefObject<(() => Promise<void>) | undefined>;
+  onAfterSave?: () => void | Promise<void>;
 }) {
   const { editor, currentProjectPath, setIsManuallySaving, setLastSaveTime } = args;
   const { registerSave } = useSaveQueue();
@@ -342,6 +343,9 @@ export default function useManualSave(args: {
           setPartialFailureWarning('');
           resolveError(lastErrorId);
           editor.markAsSaved?.();
+          // Refresh spawn.txt with the current hero position after every successful save
+          // so moving the hero and saving (Ctrl+S) updates the intermap= line.
+          try { await args.onAfterSave?.(); } catch (_e) { void _e; }
           
           // Update file conflict detection tracking after successful save
           if (currentProjectPath) {

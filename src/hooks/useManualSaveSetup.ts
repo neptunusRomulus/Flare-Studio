@@ -9,7 +9,8 @@ import useManualSave from './useManualSave';
 export default function useManualSaveSetup(
   editor: TileMapEditor | null | undefined,
   currentProjectPath: string | null | undefined,
-  handleManualSaveRef?: React.MutableRefObject<(() => Promise<void>) | undefined>
+  handleManualSaveRef?: React.MutableRefObject<(() => Promise<void>) | undefined>,
+  onAfterSave?: () => void | Promise<void>
 ) {
   const [isManuallySaving, setIsManuallySaving] = useState(false);
 
@@ -19,7 +20,8 @@ export default function useManualSaveSetup(
     currentProjectPath: currentProjectPath ?? null,
     setIsManuallySaving,
     setLastSaveTime: () => {},
-    manualSaveRef: handleManualSaveRef
+    manualSaveRef: handleManualSaveRef,
+    onAfterSave
   });
 
   // Wire up the manual save callback to the editor for Ctrl+S support

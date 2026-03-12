@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import WelcomeScreen from '../components/WelcomeScreen';
 import AppShell from '@/components/AppShell';
@@ -102,7 +102,12 @@ export default function AppMain() {
   } = c;
 
   // Set up manual save (Ctrl+S) support - must be called within SaveQueueProvider
-  const { handleManualSave, isManuallySaving } = useManualSaveSetup(editor, controls?.currentProjectPath);
+  // After every successful save, refresh spawn.txt if this map is the starting map
+  // so hero-position changes are persisted without needing to re-toggle the checkbox.
+  const onAfterSave = useCallback(() => {
+    if (isStartingMap) updateStartingMap(true);
+  }, [isStartingMap, updateStartingMap]);
+  const { handleManualSave, isManuallySaving } = useManualSaveSetup(editor, controls?.currentProjectPath, undefined, onAfterSave);
 
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 

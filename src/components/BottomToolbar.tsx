@@ -14,7 +14,8 @@ import {
   Stamp,
   Target,
   Wand2,
-  X
+  X,
+  SquareDashed
 } from 'lucide-react';
 
 import StampsPanel from './StampsPanel';
@@ -45,8 +46,8 @@ type BottomToolbarProps = {
   showSelectionOptions: boolean;
   handleShowSelectionOptions: () => void;
   handleHideSelectionOptions: () => void;
-  selectedSelectionTool: 'rectangular' | 'magic-wand' | 'same-tile' | 'circular';
-  setSelectedSelectionTool: React.Dispatch<React.SetStateAction<'rectangular' | 'magic-wand' | 'same-tile' | 'circular'>>;
+  selectedSelectionTool: 'rectangular' | 'multi-cell' | 'magic-wand' | 'same-tile' | 'circular';
+  setSelectedSelectionTool: React.Dispatch<React.SetStateAction<'rectangular' | 'multi-cell' | 'magic-wand' | 'same-tile' | 'circular'>>;
   
   showShapeOptions: boolean;
   handleShowShapeOptions: () => void;
@@ -114,6 +115,8 @@ const BottomToolbar = ({
 
   const renderSelectionIcon = () => {
     switch (selectedSelectionTool) {
+      case 'multi-cell':
+        return <SquareDashed className="w-4 h-4" />;
       case 'magic-wand':
         return <Wand2 className="w-4 h-4" />;
       case 'same-tile':
@@ -159,7 +162,7 @@ const BottomToolbar = ({
             size="sm"
             className="w-7 h-7 p-1 rounded-full tool-button"
             onClick={() => handleSelectTool('brush')}
-            onMouseEnter={(event) => {
+            onMouseEnter={() => {
               handleShowBrushOptions();
             }}
             onMouseLeave={() => {
@@ -256,6 +259,16 @@ const BottomToolbar = ({
                 onClick={() => { setSelectedSelectionTool('rectangular'); handleSelectTool('selection'); }}
               >
                 <Square className="w-3 h-3" />
+              </Button>
+            </Tooltip>
+            <Tooltip content="Multi-Cell" side="top">
+              <Button
+                variant={selectedSelectionTool === 'multi-cell' ? 'default' : 'ghost'}
+                size="sm"
+                className="w-6 h-6 p-1 rounded-full sub-tool-button"
+                onClick={() => { setSelectedSelectionTool('multi-cell'); handleSelectTool('selection'); }}
+              >
+                <SquareDashed className="w-3 h-3" />
               </Button>
             </Tooltip>
             <Tooltip content="Magic Wand" side="top">

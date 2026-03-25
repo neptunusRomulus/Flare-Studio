@@ -1,4 +1,4 @@
-import { useCallback, useState, useRef } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import useToolbarAutoCollapse from './useToolbarAutoCollapse';
 import useStampState from './useStampState';
 
@@ -11,8 +11,9 @@ export default function useToolbarState() {
   const brushToolbar = useToolbarAutoCollapse({ autoCollapse: false });
 
   const [selectedTool, setSelectedTool] = useState<'brush' | 'selection' | 'shape' | 'eyedropper' | 'stamp'>('brush');
+  const [isCtrlSelectionActive, setIsCtrlSelectionActive] = useState(false);
   const [selectedBrushTool, setSelectedBrushTool] = useState<'brush' | 'bucket' | 'eraser' | 'clear'>('brush');
-  const [selectedSelectionTool, setSelectedSelectionTool] = useState<'rectangular' | 'magic-wand' | 'same-tile' | 'circular'>('rectangular');
+  const [selectedSelectionTool, setSelectedSelectionTool] = useState<'rectangular' | 'multi-cell' | 'magic-wand' | 'same-tile' | 'circular'>('rectangular');
   const [selectedShapeTool, setSelectedShapeTool] = useState<'rectangle' | 'circle' | 'line'>('rectangle');
   const [hoverCoords, setHoverCoords] = useState<{ x: number; y: number } | null>(null);
   const [selectionCount, setSelectionCount] = useState<number>(0);
@@ -81,6 +82,45 @@ export default function useToolbarState() {
 
   const stampState = useStampState();
 
+  useEffect(() => {
+    const isTypingTarget = (target: EventTarget | null): boolean => {
+      if (!(target instanceof HTMLElement)) return false;
+      if (target.isContentEditable) return true;
+      const tag = target.tagName;
+      return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Control') return;
+      if (event.altKey || event.metaKey || event.shiftKey) return;
+      if (isTypingTarget(event.target)) return;
+      setIsCtrlSelectionActive(true);
+    };
+
+    const handleKeyUp = (event: KeyboardEvent) => {
+      if (event.key === 'Control') {
+        setIsCtrlSelectionActive(false);
+      }
+    };
+
+    const handleWindowBlur = () => setIsCtrlSelectionActive(false);
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', handleWindowBlur);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', handleWindowBlur);
+    };
+  }, []);
+
+  const effectiveSelectedTool: 'brush' | 'selection' | 'shape' | 'eyedropper' | 'stamp' =
+    isCtrlSelectionActive ? 'selection' : selectedTool;
+  const effectiveSelectedSelectionTool: 'rectangular' | 'multi-cell' | 'magic-wand' | 'same-tile' | 'circular' =
+    isCtrlSelectionActive ? 'multi-cell' : selectedSelectionTool;
+
   return {
     // raw controls for compatibility with existing visibility hook
     toolbarControls: toolbar,
@@ -107,10 +147,12 @@ export default function useToolbarState() {
 
     // selection/tool state
     selectedTool,
+    effectiveSelectedTool,
     setSelectedTool,
     selectedBrushTool,
     setSelectedBrushTool,
     selectedSelectionTool,
+    effectiveSelectedSelectionTool,
     setSelectedSelectionTool,
     selectedShapeTool,
     setSelectedShapeTool,

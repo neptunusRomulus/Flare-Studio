@@ -146,8 +146,9 @@ export default function useAppEffects(params: unknown) {
       const editorTool = toolMap[selectedBrushTool as string] || 'brush';
       editorLocal.setCurrentTool?.(editorTool);
     } else if (editorLocal && selectedTool === 'selection') {
-      const selectionToolMap: { [key: string]: 'rectangular' | 'magic-wand' | 'same-tile' | 'circular' } = {
+      const selectionToolMap: { [key: string]: 'rectangular' | 'multi-cell' | 'magic-wand' | 'same-tile' | 'circular' } = {
         'rectangular': 'rectangular',
+        'multi-cell': 'multi-cell',
         'magic-wand': 'magic-wand',
         'same-tile': 'same-tile',
         'circular': 'circular'

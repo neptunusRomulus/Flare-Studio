@@ -8,7 +8,7 @@ export interface UISettings {
   brushSettings: {
     selectedBrushTool?: 'brush' | 'bucket' | 'eraser' | 'clear';
     selectedTool?: 'brush' | 'selection' | 'shape' | 'stamp' | 'eyedropper';
-    selectedSelectionTool?: 'rectangular' | 'magic-wand' | 'same-tile' | 'circular';
+    selectedSelectionTool?: 'rectangular' | 'multi-cell' | 'magic-wand' | 'same-tile' | 'circular';
     selectedShapeTool?: string;
   };
 

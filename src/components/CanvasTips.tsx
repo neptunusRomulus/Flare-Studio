@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import Tooltip from '@/components/ui/tooltip';
-import { HelpCircle, X, MousePointer2, Mouse, Move, Circle } from 'lucide-react';
+import { HelpCircle, X, MousePointer2, Mouse, Move, Circle, SquareDashed } from 'lucide-react';
 
 type Props = {
   tipsMinimized: boolean;
@@ -43,22 +43,37 @@ const CanvasTips: React.FC<Props> = ({ tipsMinimized, setTipsMinimized, setShowH
         <div className="space-y-2 pr-6">
           <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
             <MousePointer2 className="w-4 h-4" />
-            <span>Left Click to Paint</span>
+            <span>
+              <kbd className="mr-1 rounded border border-gray-300 dark:border-neutral-700 bg-gray-100 dark:bg-neutral-800 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-gray-800 dark:text-gray-100">Left Click</kbd>
+              to Paint
+            </span>
           </div>
           <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
-            <Mouse className="w-4 h-4" />
-            <span>Right Click to Delete</span>
+            <SquareDashed className="w-4 h-4" />
+            <span>
+              Hold
+              {' '}
+              <kbd className="mx-1 rounded border border-gray-300 dark:border-neutral-700 bg-gray-100 dark:bg-neutral-800 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-gray-800 dark:text-gray-100">CTRL</kbd>
+              {' '}
+              to Select
+            </span>
           </div>
           <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
             <Move className="w-4 h-4" />
-            <span>Spacebar + Mouse to Pan</span>
+            <span>
+              <kbd className="mr-1 rounded border border-gray-300 dark:border-neutral-700 bg-gray-100 dark:bg-neutral-800 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-gray-800 dark:text-gray-100">Spacebar</kbd>
+              + Mouse to Pan
+            </span>
           </div>
           <div className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300">
             <div className="relative">
               <Mouse className="w-4 h-4" />
               <Circle className="w-2 h-2 absolute top-1 left-1.5 opacity-60" />
             </div>
-            <span>Mouse Wheel to Zoom In-Out</span>
+            <span>
+              <kbd className="mr-1 rounded border border-gray-300 dark:border-neutral-700 bg-gray-100 dark:bg-neutral-800 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-gray-800 dark:text-gray-100">Mouse Wheel</kbd>
+              to Zoom In-Out
+            </span>
           </div>
           <button
             className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300 hover:text-orange-500 transition-colors w-full text-left mt-1 pt-1 border-t border-gray-100 dark:border-neutral-800"

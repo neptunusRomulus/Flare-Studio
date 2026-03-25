@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 type PrimaryTool = 'brush' | 'selection' | 'shape' | 'stamp' | 'eyedropper';
 type BrushTool = 'brush' | 'eraser' | 'bucket' | 'clear';
-type SelectionTool = 'rectangular' | 'magic-wand' | 'same-tile' | 'circular';
+type SelectionTool = 'rectangular' | 'multi-cell' | 'magic-wand' | 'same-tile' | 'circular';
 type ShapeTool = 'rectangle' | 'circle' | 'line';
 
 type ToolSelectionOptions = {

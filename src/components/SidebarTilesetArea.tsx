@@ -22,6 +22,17 @@ type Props = {
   toast: typeof import('@/hooks/use-toast').toast;
   handleOpenActorDialog: (type: 'npc' | 'enemy') => void;
   stampsState?: unknown;
+  onShowImportReview?: (data: {
+    tilesetFileName: string;
+    detectedAssets: Array<{
+      gid: number;
+      sourceX: number;
+      sourceY: number;
+      width: number;
+      height: number;
+      confidence?: number;
+    }>;
+  }) => void;
 };
 
 const SidebarTilesetArea: React.FC<Props> = ({
@@ -39,7 +50,8 @@ const SidebarTilesetArea: React.FC<Props> = ({
   handleDeleteActiveTab: propHandleDeleteActiveTab,
   toast,
   handleOpenActorDialog,
-  stampsState
+  stampsState,
+  onShowImportReview
 }) => {
   const tileset = useTileset(editor, activeLayer, setTabTick);
 
@@ -61,6 +73,7 @@ const SidebarTilesetArea: React.FC<Props> = ({
         onToggleBrushTool={handleToggleBrushTool}
         onDeleteActiveTab={handleDeleteActiveTab}
         toast={toast}
+        onShowImportReview={onShowImportReview}
       />
     </>
   );

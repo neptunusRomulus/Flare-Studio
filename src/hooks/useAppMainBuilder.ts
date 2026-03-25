@@ -67,6 +67,36 @@ export default function useAppMainBuilder() {
   const helpState = useHelpState();
 
   const [currentProjectPath, setCurrentProjectPath] = useState<string | null>(null);
+
+  // Phase 3: Import Review Modal state
+  type ImportReviewData = {
+    tilesetFileName: string;
+    detectedAssets: Array<{
+      gid: number;
+      sourceX: number;
+      sourceY: number;
+      width: number;
+      height: number;
+      confidence?: number;
+    }>;
+    _meta?: {
+      file: File;
+      layerType: string;
+      tabId: number;
+      projectPath?: string | null;
+      manualTileWidth?: number;
+      manualTileHeight?: number;
+      forceGridSlicing?: boolean;
+    };
+  };
+
+  type AssetOriginPreset = 'top-left' | 'top-center' | 'center' | 'bottom-left' | 'bottom-center';
+
+  const [showImportReview, setShowImportReview] = useState<boolean>(false);
+  const [importReviewTileWidth, setImportReviewTileWidth] = useState<number>(64);
+  const [importReviewTileHeight, setImportReviewTileHeight] = useState<number>(64);
+  const [importReviewOriginPreset, setImportReviewOriginPreset] = useState<AssetOriginPreset>('bottom-center');
+  const [importReviewData, setImportReviewData] = useState<ImportReviewData | null>(null);
   
   const itemsHook = useItems({ currentProjectPath, toast, normalizeItemsForState });
   const { itemsList, expandedItemCategories, setExpandedItemCategories, handleOpenItemEdit, handleOpenItemDialog } = itemsHook;
@@ -727,7 +757,17 @@ export default function useAppMainBuilder() {
       handleDeleteActiveTab: () => {},
       toast: undefined,
       handleOpenActorDialog: () => {},
-      stampsState: undefined
+      stampsState: undefined,
+      onShowImportReview: (data: unknown) => {
+        const parsedData = data as ImportReviewData;
+        const defaultWidth = parsedData?._meta?.manualTileWidth ?? 64;
+        const defaultHeight = parsedData?._meta?.manualTileHeight ?? 64;
+        setImportReviewTileWidth(defaultWidth);
+        setImportReviewTileHeight(defaultHeight);
+        setImportReviewOriginPreset('bottom-center');
+        setImportReviewData(parsedData);
+        setShowImportReview(true);
+      }
     };
 
     const pmForDefaults = projectManager as ProjectManagerView;
@@ -786,7 +826,10 @@ export default function useAppMainBuilder() {
       actors: sb['actors'] ?? defaultActors,
       rules: sb['rules'] ?? defaultRules,
       items: sb['items'] ?? defaultItems,
-      tileset: sb['tileset'] ?? defaultTileset,
+      tileset: {
+        ...defaultTileset,
+        ...(sb['tileset'] ?? {})
+      },
       layersObj: sb['layersObj'] ?? {
         ...defaultLayers,
         layers: appState.layers,
@@ -974,10 +1017,218 @@ export default function useAppMainBuilder() {
         stampsState: { stamps: toolbarState.stamps, selectedStamp: toolbarState.selectedStamp, stampMode: toolbarState.stampMode, newStampName: toolbarState.newStampName }
       },
       enemyPanelProps: {},
-      dialogsCtx,
+      dialogsCtx: {
+        ...(dialogsCtx as Record<string, unknown>),
+        // Phase 3: Import Review Modal
+        showImportReview,
+        setShowImportReview,
+        importReviewData,
+        setImportReviewData,
+        importReviewTileWidth,
+        setImportReviewTileWidth,
+        importReviewTileHeight,
+        setImportReviewTileHeight,
+        importReviewOriginPreset,
+        setImportReviewOriginPreset,
+        handleImportReviewConfirm: (
+          profile: { id: string },
+          options?: { tileWidth: number; tileHeight: number; originPreset: AssetOriginPreset }
+        ) => {
+          const meta = importReviewData?._meta;
+          const effectiveTileWidth = options?.tileWidth ?? importReviewTileWidth;
+          const effectiveTileHeight = options?.tileHeight ?? importReviewTileHeight;
+          const effectiveOriginPreset = options?.originPreset ?? importReviewOriginPreset;
+          const hasTileSizeChange =
+            effectiveTileWidth !== (meta?.manualTileWidth ?? 64) ||
+            effectiveTileHeight !== (meta?.manualTileHeight ?? 64);
+
+          const resolveOrigin = (
+            asset: { sourceX: number; sourceY: number; width: number; height: number },
+            preset: AssetOriginPreset
+          ) => {
+            switch (preset) {
+              case 'top-left':
+                return { originX: asset.sourceX, originY: asset.sourceY };
+              case 'top-center':
+                return { originX: asset.sourceX + Math.floor(asset.width / 2), originY: asset.sourceY };
+              case 'center':
+                return {
+                  originX: asset.sourceX + Math.floor(asset.width / 2),
+                  originY: asset.sourceY + Math.floor(asset.height / 2)
+                };
+              case 'bottom-left':
+                return { originX: asset.sourceX, originY: asset.sourceY + asset.height };
+              case 'bottom-center':
+              default:
+                return { originX: asset.sourceX + Math.floor(asset.width / 2), originY: asset.sourceY + asset.height };
+            }
+          };
+
+          const resetImportReviewState = () => {
+            setShowImportReview(false);
+            setImportReviewData(null);
+            setImportReviewTileWidth(64);
+            setImportReviewTileHeight(64);
+            setImportReviewOriginPreset('bottom-center');
+          };
+          
+          if (editor && meta && meta.file && hasTileSizeChange) {
+            // Re-import with selected fixed-grid tile size.
+            editor.importBrushImageToLayerTab(
+              meta.layerType,
+              meta.tabId,
+              meta.file,
+              meta.projectPath ?? undefined,
+              undefined,
+              undefined,
+              effectiveTileWidth,
+              effectiveTileHeight,
+              true
+            ).then(() => {
+              // Keep the same tab active and force React palette refresh.
+              try {
+                if (typeof editor.setActiveLayerTab === 'function') {
+                  editor.setActiveLayerTab(meta.layerType, meta.tabId);
+                }
+              } catch (e) { void e; }
+              try { appState.setTabTick((t: number) => (t || 0) + 1); } catch (e) { void e; }
+
+              // Pull fresh detected assets from the just re-imported tab.
+              let refreshedDetectedAssets: Array<{ gid: number; sourceX: number; sourceY: number; width: number; height: number; confidence?: number }> = [];
+              try {
+                const tabs = typeof editor.getLayerTabs === 'function' ? editor.getLayerTabs(meta.layerType) : [];
+                const tab = tabs.find((t) => t.id === meta.tabId);
+                if (tab?.detectedTiles && typeof tab.detectedTiles === 'object') {
+                  refreshedDetectedAssets = Array.from(
+                    tab.detectedTiles as Map<number, { sourceX: number; sourceY: number; width: number; height: number }>
+                  ).map(([gid, data]) => ({
+                    gid,
+                    sourceX: data.sourceX,
+                    sourceY: data.sourceY,
+                    width: data.width,
+                    height: data.height,
+                    confidence: 0.95
+                  }));
+                }
+              } catch (e) { void e; }
+
+              // Update modal state with refreshed assets for consistency.
+              setImportReviewData((prev) => {
+                if (!prev) return prev;
+                return {
+                  ...prev,
+                  detectedAssets: refreshedDetectedAssets,
+                  _meta: prev._meta
+                    ? {
+                        ...prev._meta,
+                        manualTileWidth: effectiveTileWidth,
+                        manualTileHeight: effectiveTileHeight,
+                        forceGridSlicing: true
+                      }
+                    : prev._meta
+                };
+              });
+
+              // Rebuild profile assets from refreshed detections so saved data matches re-import.
+              const profileToSave = {
+                ...profile,
+                assets: refreshedDetectedAssets.map((asset, idx) => ({
+                  ...resolveOrigin(asset, effectiveOriginPreset),
+                  id: `asset_${idx + 1}`,
+                  profileId: profile.id,
+                  name: `Asset ${idx + 1}`,
+                  sourceX: asset.sourceX,
+                  sourceY: asset.sourceY,
+                  width: asset.width,
+                  height: asset.height,
+                  anchorX: 1,
+                  anchorY: 1,
+                  footprintWidth: 1,
+                  footprintHeight: 1,
+                  category: 'ground',
+                  detectionConfidence: asset.confidence ?? 0.95,
+                  userVerified: true,
+                  createdAt: new Date().toISOString()
+                })),
+                lastModified: new Date().toISOString()
+              };
+
+              // After re-import succeeds, proceed to save profile
+              toast({
+                title: 'Re-imported with new tile size',
+                description: `Tileset re-sliced at ${effectiveTileWidth}x${effectiveTileHeight} (${refreshedDetectedAssets.length} assets).`
+              });
+              
+              // Save profile to project
+              if (window.electronAPI?.saveTilesetProfiles) {
+                const profilesToSave = { [profile.id]: profileToSave };
+                window.electronAPI.saveTilesetProfiles(currentProjectPath || '', profilesToSave).then(result => {
+                  if (result.success) {
+                    toast({
+                      title: 'Profile Saved',
+                      description: `Asset definitions for ${importReviewData?.tilesetFileName} have been saved.`
+                    });
+                    resetImportReviewState();
+                  } else {
+                    toast({
+                      title: 'Save Failed',
+                      description: result.error || 'Failed to save tileset profile',
+                      variant: 'destructive'
+                    });
+                  }
+                });
+              }
+            }).catch((err: unknown) => {
+              toast({
+                title: 'Re-import Failed',
+                description: `Failed to re-import with tile size ${effectiveTileWidth}x${effectiveTileHeight}: ${String(err)}`,
+                variant: 'destructive'
+              });
+            });
+          } else {
+            // Save profile to project (default flow)
+            if (editor && window.electronAPI?.saveTilesetProfiles) {
+              const profilesToSave = { [profile.id]: profile };
+              window.electronAPI.saveTilesetProfiles(currentProjectPath || '', profilesToSave).then(result => {
+                if (result.success) {
+                  toast({
+                    title: 'Profile Saved',
+                    description: `Asset definitions for ${importReviewData?.tilesetFileName} have been saved.`
+                  });
+                  resetImportReviewState();
+                } else {
+                  toast({
+                    title: 'Save Failed',
+                    description: result.error || 'Failed to save tileset profile',
+                    variant: 'destructive'
+                  });
+                }
+              });
+            } else {
+              // Fallback: just close the modal
+              toast({
+                title: 'Profile Confirmed',
+                description: 'Asset definitions have been confirmed (profile persistence not available).'
+              });
+              resetImportReviewState();
+            }
+          }
+        },
+        handleImportReviewCancel: () => {
+          setShowImportReview(false);
+          setImportReviewData(null);
+          setImportReviewTileWidth(64);
+          setImportReviewTileHeight(64);
+          setImportReviewOriginPreset('bottom-center');
+        }
+      } as Record<string, unknown>,
       tooltip: null
     } as Record<string, unknown>;
   }
 
+  // Note: When state (showImportReview, importReviewData) changes, this hook triggers a re-render
+  // which causes SidebarProvider to re-render, which calls buildAppMainCtxFromSidebar again
+  // with fresh state, so the context automatically gets the updated values
+  
   return { sidebarDeps, buildAppMainCtxFromSidebar };
 }

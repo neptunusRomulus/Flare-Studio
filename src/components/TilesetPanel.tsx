@@ -23,6 +23,17 @@ type Props = {
   handleOpenActorDialog: (type: 'npc' | 'enemy') => void;
   stampsState?: unknown;
   currentProjectPath?: string | null;
+  onShowImportReview?: (data: {
+    tilesetFileName: string;
+    detectedAssets: Array<{
+      gid: number;
+      sourceX: number;
+      sourceY: number;
+      width: number;
+      height: number;
+      confidence?: number;
+    }>;
+  }) => void;
 };
 
 const TilesetPanel: React.FC<Props> = ({
@@ -41,7 +52,8 @@ const TilesetPanel: React.FC<Props> = ({
   toast,
   handleOpenActorDialog,
   stampsState,
-  currentProjectPath
+  currentProjectPath,
+  onShowImportReview
 }) => {
   const tileset = useTileset(editor, activeLayer, setTabTick);
 
@@ -64,6 +76,7 @@ const TilesetPanel: React.FC<Props> = ({
         onDeleteActiveTab={handleDeleteActiveTab}
         toast={toast}
         currentProjectPath={currentProjectPath}
+        onShowImportReview={onShowImportReview}
       />
     </>
   );

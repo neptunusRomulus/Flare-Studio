@@ -54,6 +54,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
   readSession: (projectPath) => ipcRenderer.invoke("read-session", projectPath),
   writeSession: (projectPath, sessionData) =>
     ipcRenderer.invoke("write-session", projectPath, sessionData),
+  saveCrashBackup: (projectPath, backupData) =>
+    ipcRenderer.invoke("save-crash-backup", projectPath, backupData),
+  readCrashBackup: (projectPath) =>
+    ipcRenderer.invoke("read-crash-backup", projectPath),
+  clearCrashBackup: (projectPath) =>
+    ipcRenderer.invoke("clear-crash-backup", projectPath),
   // NPC file management
   createNpcFile: (projectPath, npcData) =>
     ipcRenderer.invoke("create-npc-file", projectPath, npcData),

@@ -9,8 +9,10 @@ interface SessionRecoveryState {
 }
 
 interface CrashRecoveryOptions {
+  projectPath?: string | null;
   onRecoveryFound?: (backup: unknown) => void;
   onRecoveryDismissed?: () => void;
+  onRecoverBackup?: (backup: unknown) => boolean | Promise<boolean>;
   checkInterval?: number; // How often to check session health (ms)
 }
 
@@ -30,7 +32,7 @@ interface CrashRecoveryOptions {
  * @returns Recovery state and control functions
  */
 export default function useCrashRecovery(options: CrashRecoveryOptions = {}) {
-  const { onRecoveryFound, onRecoveryDismissed, checkInterval = 30000 } = options;
+  const { projectPath, onRecoveryFound, onRecoveryDismissed, onRecoverBackup, checkInterval = 30000 } = options;
   
   const [recoveryState, setRecoveryState] = useState<SessionRecoveryState>({
     hasCrashBackup: false,
@@ -49,24 +51,53 @@ export default function useCrashRecovery(options: CrashRecoveryOptions = {}) {
   const onRecoveryFoundRef = useRef(onRecoveryFound);
   onRecoveryFoundRef.current = onRecoveryFound;
 
+  const onRecoverBackupRef = useRef(onRecoverBackup);
+  onRecoverBackupRef.current = onRecoverBackup;
+
+  const backupRef = useRef<unknown | null>(null);
+
   const crashMarkerKey = 'app_session_active';
   const lastCrashTimeKey = 'app_last_crash_time';
 
+  const readCrashBackup = async (): Promise<unknown | null> => {
+    try {
+      if (!projectPath || !window.electronAPI?.readCrashBackup) {
+        return null;
+      }
+      return await window.electronAPI.readCrashBackup(projectPath);
+    } catch (err) {
+      console.warn('[CrashRecovery] Failed to read crash backup:', err);
+      return null;
+    }
+  };
+
+  const clearCrashBackupFile = async (): Promise<void> => {
+    try {
+      if (!projectPath || !window.electronAPI?.clearCrashBackup) {
+        return;
+      }
+      await window.electronAPI.clearCrashBackup(projectPath);
+    } catch (err) {
+      console.warn('[CrashRecovery] Failed to clear crash backup file:', err);
+    }
+  };
+
   // Detect if app crashed (crash marker exists from previous session)
   useEffect(() => {
-    const detectCrash = () => {
+    const detectCrash = async () => {
       try {
         const sessionActive = sessionStorage.getItem(crashMarkerKey);
-        const backupData = localStorage.getItem('tilemap_autosave_backup');
+        const backup = await readCrashBackup();
 
-        if (sessionActive && backupData) {
+        if (sessionActive && backup) {
           // Previous session was active when this session started → likely crash
           console.log('[CrashRecovery] Detected crash from previous session');
           
           try {
-            const backup = JSON.parse(backupData);
-            const backupTimestamp = backup.timestamp || Date.now();
-            const mapName = backup.mapName || 'Unknown Map';
+            const parsedBackup = backup as { timestamp?: number; mapName?: string };
+            const backupTimestamp = parsedBackup.timestamp || Date.now();
+            const mapName = parsedBackup.mapName || 'Unknown Map';
+            backupRef.current = backup;
 
             // Update crash time marker
             const now = Date.now();
@@ -101,8 +132,8 @@ export default function useCrashRecovery(options: CrashRecoveryOptions = {}) {
       }
     };
 
-    detectCrash();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- runs once on mount; callback accessed via ref
+    void detectCrash();
+  }, [projectPath]); // eslint-disable-line react-hooks/exhaustive-deps -- callback accessed via ref
 
   // Session heartbeat to track app health
   useEffect(() => {
@@ -132,22 +163,29 @@ export default function useCrashRecovery(options: CrashRecoveryOptions = {}) {
     }));
 
     try {
-      const backupData = localStorage.getItem('tilemap_autosave_backup');
-      if (!backupData) {
-        throw new Error('Backup data not found in localStorage');
+      const backup = backupRef.current ?? await readCrashBackup();
+      if (!backup) {
+        throw new Error('Backup data not found in project backup folder');
       }
-
-      const backup = JSON.parse(backupData);
+      backupRef.current = backup;
 
       // Validate backup data
-      if (!backup.mapWidth || !backup.mapHeight) {
+      const parsedBackup = backup as { mapWidth?: number; mapHeight?: number };
+      if (!parsedBackup.mapWidth || !parsedBackup.mapHeight) {
         throw new Error('Invalid backup format: missing map dimensions');
+      }
+
+      const recovered = await onRecoverBackupRef.current?.(backup);
+      if (recovered !== true) {
+        throw new Error('Failed to restore backup into editor state');
       }
 
       console.log('[CrashRecovery] Session recovered from crash backup');
 
       // Clear crash marker now that recovery is complete
       clearCrashMarker();
+      await clearCrashBackupFile();
+      backupRef.current = null;
 
       setRecoveryState(prev => ({
         ...prev,
@@ -174,6 +212,8 @@ export default function useCrashRecovery(options: CrashRecoveryOptions = {}) {
   const dismissRecovery = (): void => {
     console.log('[CrashRecovery] User dismissed crash recovery');
     clearCrashMarker();
+    void clearCrashBackupFile();
+    backupRef.current = null;
 
     setRecoveryState(prev => ({
       ...prev,
@@ -208,7 +248,8 @@ export default function useCrashRecovery(options: CrashRecoveryOptions = {}) {
         // Only clear if crash was more than 1 hour ago
         if (timeSinceCrash > 60 * 60 * 1000) {
           console.log('[CrashRecovery] Clearing old crash backups (>1 hour old)');
-          localStorage.removeItem('tilemap_autosave_backup');
+          void clearCrashBackupFile();
+          backupRef.current = null;
         }
       }
     } catch (err) {

@@ -27,6 +27,27 @@ type BrushToolbarProps = {
   hasSelection?: boolean;
   zoom?: number;
   currentProjectPath?: string | null;
+  // Import Review Modal callback
+  onShowImportReview?: (data: {
+    tilesetFileName: string;
+    detectedAssets: Array<{
+      gid: number;
+      sourceX: number;
+      sourceY: number;
+      width: number;
+      height: number;
+      confidence?: number;
+    }>;
+    _meta?: {
+      file: File;
+      layerType: string;
+      tabId: number;
+      projectPath?: string | null;
+      manualTileWidth?: number;
+      manualTileHeight?: number;
+      forceGridSlicing?: boolean;
+    };
+  }) => void;
 };
 
 const BrushToolbar = ({
@@ -45,7 +66,8 @@ const BrushToolbar = ({
   onClearSelection,
   hasSelection,
   zoom,
-  currentProjectPath
+  currentProjectPath,
+  onShowImportReview
 }: BrushToolbarProps) => {
   
   // Initialize refs with current prop values IMMEDIATELY
@@ -74,6 +96,17 @@ const BrushToolbar = ({
     }
     const tabs = editor.getLayerTabs ? editor.getLayerTabs(activeLayer.type) : [];
     setTabCount(tabs ? tabs.length : 0);
+  }, [editor, activeLayer]);
+
+  // Enforce per-layer paint mode:
+  // - background (and other non-object layers): ground/grid
+  // - object layer: object instances
+  React.useEffect(() => {
+    if (!editor || !activeLayer) return;
+    const nextMode = activeLayer.type === 'object' ? 'object' : 'ground';
+    if (editor.getPaintMode() !== nextMode) {
+      editor.setPaintMode(nextMode);
+    }
   }, [editor, activeLayer]);
 
   // App context fallback - not calling useAppContext here to avoid hook rules violation
@@ -244,8 +277,34 @@ const BrushToolbar = ({
                               currentEditor.setActiveLayerTab(layerType, targetTabId);
                             }
 
-                            // Import into the editor/tab so it persists
-                            await currentEditor.importBrushImageToLayerTab(layerType, targetTabId, file, currentProjectPath ?? undefined);
+                            // Import starts with default fixed-grid slicing (64x64).
+                            // Users can adjust tile width/height in the review window and re-import.
+                            const manualTileWidth = 64;
+                            const manualTileHeight = 64;
+
+                            // Import into the editor/tab with fixed-grid slicing.
+                            // Fall back to legacy import call if runtime class shape differs.
+                            try {
+                              await currentEditor.importBrushImageToLayerTab(
+                                layerType,
+                                targetTabId,
+                                file,
+                                currentProjectPath ?? undefined,
+                                undefined,
+                                undefined,
+                                manualTileWidth,
+                                manualTileHeight,
+                                true
+                              );
+                            } catch (importErr) {
+                              console.error('[BrushToolbar] Fixed-grid import failed, retrying legacy import', importErr);
+                              await currentEditor.importBrushImageToLayerTab(
+                                layerType,
+                                targetTabId,
+                                file,
+                                currentProjectPath ?? undefined
+                              );
+                            }
 
                             // Compute placement origin (snap to 32) based on current viewport/zoom and set on the tab
                             try {
@@ -272,9 +331,62 @@ const BrushToolbar = ({
                             // Increment tabTick to trigger TilesetPalette effect
                             safeIncrementTabTick();
                             
-                            toastInvoke({ title: 'Imported', description: 'Imported tileset saved to layer tab.' });
-                          } catch {
-                            toastInvoke({ title: 'Import failed', description: 'Unable to import into editor', variant: 'destructive' });
+                            // Phase 3: Show import review modal to confirm asset definitions
+                            // Refetch tabs to get the latest data after import
+                            const refreshedTabs = currentEditor.getLayerTabs ? currentEditor.getLayerTabs(layerType) : [];
+                            const activeTab = refreshedTabs.find(t => t.id === targetTabId);
+
+                            // Extract detected assets if available (may be empty)
+                            let detectedTilesArray: Array<{
+                              gid: number;
+                              sourceX: number;
+                              sourceY: number;
+                              width: number;
+                              height: number;
+                              confidence?: number;
+                            }> = [];
+                            
+                            if (activeTab?.detectedTiles && typeof activeTab.detectedTiles === 'object') {
+                              try {
+                                detectedTilesArray = Array.from(
+                                  activeTab.detectedTiles as Map<number, { sourceX: number; sourceY: number; width: number; height: number }>
+                                ).map(([gid, data]) => ({
+                                  gid,
+                                  sourceX: data.sourceX,
+                                  sourceY: data.sourceY,
+                                  width: data.width,
+                                  height: data.height,
+                                  confidence: 0.95 // Default high confidence for auto-detected
+                                }));
+                              } catch (e) {
+                                console.warn('Failed to extract detected tiles:', e);
+                              }
+                            }
+                            
+                            // Always show the modal after import to allow user to confirm/customize
+                            // Notify parent to sync to global context
+                            onShowImportReview?.({
+                              tilesetFileName: file.name,
+                              detectedAssets: detectedTilesArray,
+                              // Metadata for re-import on tile-size change
+                              _meta: {
+                                file,
+                                layerType,
+                                tabId: targetTabId,
+                                projectPath: currentProjectPath,
+                                manualTileWidth,
+                                manualTileHeight,
+                                forceGridSlicing: true
+                              }
+                            });
+                            if (detectedTilesArray.length > 0) {
+                              toastInvoke({ title: 'Review Import', description: 'Please review detected tileset assets.' });
+                            } else {
+                              toastInvoke({ title: 'Review Import', description: 'No assets auto-detected. Confirm or add assets manually.' });
+                            }
+                          } catch (err) {
+                            console.error('[BrushToolbar] Import flow failed', err);
+                            toastInvoke({ title: 'Import failed', description: `Unable to import into editor: ${String(err)}`, variant: 'destructive' });
                           }
                           finally {
                             // Clear the temporary guard so hover behavior resumes

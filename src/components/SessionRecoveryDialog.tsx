@@ -48,20 +48,20 @@ const SessionRecoveryDialog: React.FC<SessionRecoveryDialogProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl max-w-md w-full mx-4">
+      <div className="bg-background border border-border rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
         {/* Header */}
-        <div className="bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-800 px-6 py-4 flex items-start gap-3">
-          <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+        <div className="border-b border-border px-6 py-4 flex items-start gap-3 bg-card">
+          <AlertTriangle className="w-5 h-5 text-foreground/80 flex-shrink-0 mt-0.5" />
           <div>
-            <h2 className="font-semibold text-red-900 dark:text-red-100">App Crashed</h2>
-            <p className="text-sm text-red-800 dark:text-red-200 mt-1">
+            <h2 className="font-semibold text-foreground">App Crashed</h2>
+            <p className="text-sm text-muted-foreground mt-1">
               We detected an unexpected crash. Would you like to recover your work?
             </p>
           </div>
           {!isRecovering && !error && (
             <button
               onClick={onDismiss}
-              className="ml-auto text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
+              className="ml-auto text-muted-foreground hover:text-foreground transition-colors"
               aria-label="Close"
             >
               <X className="w-5 h-5" />
@@ -73,11 +73,11 @@ const SessionRecoveryDialog: React.FC<SessionRecoveryDialogProps> = ({
         <div className="px-6 py-4 space-y-3">
           {/* Map Name */}
           {mapName && (
-            <div className="bg-slate-50 dark:bg-slate-800 rounded p-3">
-              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+            <div className="bg-muted/40 rounded-xl p-3 border border-border">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Map
               </p>
-              <p className="text-sm font-medium text-slate-900 dark:text-slate-100 mt-1">
+              <p className="text-sm font-medium text-foreground mt-1">
                 {mapName}
               </p>
             </div>
@@ -85,14 +85,14 @@ const SessionRecoveryDialog: React.FC<SessionRecoveryDialogProps> = ({
 
           {/* Crash Time */}
           {crashTime && timeSinceCrash && (
-            <div className="bg-slate-50 dark:bg-slate-800 rounded p-3">
-              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+            <div className="bg-muted/40 rounded-xl p-3 border border-border">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Crash Time
               </p>
-              <p className="text-sm font-medium text-slate-900 dark:text-slate-100 mt-1">
+              <p className="text-sm font-medium text-foreground mt-1">
                 {timeSinceCrash}
               </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              <p className="text-xs text-muted-foreground mt-1">
                 {crashTime}
               </p>
             </div>
@@ -100,8 +100,8 @@ const SessionRecoveryDialog: React.FC<SessionRecoveryDialogProps> = ({
 
           {/* Error Message */}
           {error && (
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded p-3">
-              <p className="text-sm text-red-800 dark:text-red-200">
+            <div className="bg-muted/40 border border-border rounded-xl p-3">
+              <p className="text-sm text-foreground">
                 <span className="font-semibold">Recovery Error: </span>
                 {error}
               </p>
@@ -110,8 +110,8 @@ const SessionRecoveryDialog: React.FC<SessionRecoveryDialogProps> = ({
 
           {/* Info Message */}
           {!isRecovering && !error && (
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded p-3">
-              <p className="text-sm text-blue-800 dark:text-blue-200">
+            <div className="bg-muted/40 border border-border rounded-xl p-3">
+              <p className="text-sm text-muted-foreground">
                 A backup of your work has been automatically saved. You can recover from the last known state or start fresh.
               </p>
             </div>
@@ -119,10 +119,10 @@ const SessionRecoveryDialog: React.FC<SessionRecoveryDialogProps> = ({
 
           {/* Recovering State */}
           {isRecovering && (
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded p-3">
+            <div className="bg-muted/40 border border-border rounded-xl p-3">
               <div className="flex items-center gap-2">
-                <div className="w-4 h-4 border-2 border-blue-400 border-t-blue-600 rounded-full animate-spin" />
-                <p className="text-sm text-blue-800 dark:text-blue-200">
+                <div className="w-4 h-4 border-2 border-muted-foreground/30 border-t-foreground rounded-full animate-spin" />
+                <p className="text-sm text-muted-foreground">
                   Recovering your session...
                 </p>
               </div>
@@ -131,7 +131,7 @@ const SessionRecoveryDialog: React.FC<SessionRecoveryDialogProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="bg-slate-50 dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 px-6 py-4 flex gap-3 justify-end">
+        <div className="bg-card border-t border-border px-6 py-4 flex gap-3 justify-end">
           {!isRecovering && !error && (
             <>
               <Button
@@ -144,7 +144,7 @@ const SessionRecoveryDialog: React.FC<SessionRecoveryDialogProps> = ({
               <Button
                 onClick={handleRecover}
                 disabled={isRecovering}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
+                className="rounded-xl"
               >
                 <RotateCcw className="w-4 h-4 mr-2" />
                 Recover Session
@@ -155,7 +155,8 @@ const SessionRecoveryDialog: React.FC<SessionRecoveryDialogProps> = ({
             <Button
               onClick={onDismiss}
               disabled={isRecovering}
-              className="bg-slate-600 hover:bg-slate-700 text-white"
+              variant="outline"
+              className="rounded-xl"
             >
               {isRecovering ? 'Recovering...' : 'Close'}
             </Button>

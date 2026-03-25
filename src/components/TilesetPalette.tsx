@@ -273,7 +273,7 @@ const TilesetPalette = ({
 
     if (hasDetectedAssets) {
       // Draw asset rectangles so successful detection is visually distinct from cell grid mode.
-      ctx.strokeStyle = prefs.isDarkMode ? 'rgba(34,197,94,0.65)' : 'rgba(22,163,74,0.55)';
+      ctx.strokeStyle = 'rgba(156,163,175,0.3)';
       ctx.lineWidth = 1.5;
       for (const tile of detectedTiles) {
         ctx.strokeRect(tile.sourceX + 0.5, tile.sourceY + 0.5, Math.max(1, tile.width - 1), Math.max(1, tile.height - 1));

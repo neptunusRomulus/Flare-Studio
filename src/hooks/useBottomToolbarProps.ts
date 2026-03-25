@@ -21,8 +21,8 @@ type Params = {
   showSelectionOptions: boolean;
   handleShowSelectionOptions: () => void;
   handleHideSelectionOptions: () => void;
-  selectedSelectionTool: 'rectangular' | 'magic-wand' | 'same-tile' | 'circular';
-  setSelectedSelectionTool: React.Dispatch<React.SetStateAction<'rectangular' | 'magic-wand' | 'same-tile' | 'circular'>>;
+  selectedSelectionTool: 'rectangular' | 'multi-cell' | 'magic-wand' | 'same-tile' | 'circular';
+  setSelectedSelectionTool: React.Dispatch<React.SetStateAction<'rectangular' | 'multi-cell' | 'magic-wand' | 'same-tile' | 'circular'>>;
   showShapeOptions: boolean;
   handleShowShapeOptions: () => void;
   handleHideShapeOptions: () => void;

@@ -820,7 +820,7 @@ export class TileMapEditor {
   // Tool and interaction state
   private tool: Tool = 'tiles';
   private currentTool: 'brush' | 'eraser' | 'bucket' = 'brush';
-  private currentSelectionTool: 'rectangular' | 'magic-wand' | 'same-tile' | 'circular' = 'rectangular';
+  private currentSelectionTool: 'rectangular' | 'multi-cell' | 'magic-wand' | 'same-tile' | 'circular' = 'rectangular';
   private currentShapeTool: 'rectangle' | 'circle' | 'line' = 'rectangle';
   private currentStampMode: 'select' | 'create' | 'place' = 'select';
   private activeGid: number = 0;
@@ -2044,8 +2044,12 @@ export class TileMapEditor {
     this.selection.endX = x;
     this.selection.endY = y;
 
+    // Multi-cell toggles a single cell and keeps existing selection for non-adjacent picks.
+    if (this.currentSelectionTool === 'multi-cell') {
+      this.toggleSelectionCell(layer, x, y);
+      this.draw();
     // For instant selection tools (magic wand, same tile), execute immediately
-    if (this.currentSelectionTool === 'magic-wand') {
+    } else if (this.currentSelectionTool === 'magic-wand') {
       this.selectMagicWand(layer, x, y);
       this.draw();
     } else if (this.currentSelectionTool === 'same-tile') {
@@ -5971,12 +5975,12 @@ export class TileMapEditor {
   }
 
   // Selection tool management methods
-  public setCurrentSelectionTool(tool: 'rectangular' | 'magic-wand' | 'same-tile' | 'circular'): void {
+  public setCurrentSelectionTool(tool: 'rectangular' | 'multi-cell' | 'magic-wand' | 'same-tile' | 'circular'): void {
     this.currentSelectionTool = tool;
     this.tool = 'selection'; // Set main tool mode to selection
   }
 
-  public getCurrentSelectionTool(): 'rectangular' | 'magic-wand' | 'same-tile' | 'circular' {
+  public getCurrentSelectionTool(): 'rectangular' | 'multi-cell' | 'magic-wand' | 'same-tile' | 'circular' {
     return this.currentSelectionTool;
   }
 
@@ -6732,6 +6736,22 @@ export class TileMapEditor {
   }
 
   // Selection algorithms
+  private toggleSelectionCell(layer: TileLayer, x: number, y: number): void {
+    if (x < 0 || x >= this.mapWidth || y < 0 || y >= this.mapHeight) return;
+
+    const existingIndex = this.selection.tiles.findIndex((tile) => tile.x === x && tile.y === y);
+
+    if (existingIndex >= 0) {
+      this.selection.tiles.splice(existingIndex, 1);
+    } else {
+      const index = y * this.mapWidth + x;
+      const gid = layer.data[index];
+      this.selection.tiles.push({ x, y, gid });
+    }
+
+    this.selection.active = this.selection.tiles.length > 0;
+  }
+
   private selectRectangular(layer: TileLayer, startX: number, startY: number, endX: number, endY: number): void {
     this.selection.tiles = [];
     
@@ -7481,11 +7501,32 @@ export class TileMapEditor {
       (this as unknown as { tilesetOriginX?: number }).tilesetOriginX = (tileset as unknown as { originX?: number }).originX ?? 0;
       (this as unknown as { tilesetOriginY?: number }).tilesetOriginY = (tileset as unknown as { originY?: number }).originY ?? 0;
       
-      // Update the global detectedTileData to match this layer's tiles
+      // Update global detectedTileData using layer-level data first, then active-tab data.
+      // On project reopen, sliced metadata may exist only on the active tab payload.
       const layerTiles = this.layerTileData.get(layerType);
+      const tabs = this.layerTabs.get(layerType) || [];
+      const activeTabId = this.layerActiveTabId.get(layerType);
+      const activeTab = tabs.find(t => t.id === activeTabId);
+      const activeTabTiles = activeTab?.detectedTiles as Map<number, {
+        sourceX: number;
+        sourceY: number;
+        width: number;
+        height: number;
+        originX?: number;
+        originY?: number;
+      }> | undefined;
+      const detectedTilesSource = (layerTiles && layerTiles.size > 0)
+        ? layerTiles
+        : activeTabTiles;
+
+      if ((!layerTiles || layerTiles.size === 0) && activeTabTiles && activeTabTiles.size > 0) {
+        // Keep layer cache in sync so subsequent refreshes don't regress to legacy grid slicing.
+        this.layerTileData.set(layerType, new Map(activeTabTiles));
+      }
+
       this.detectedTileData.clear();
-      if (layerTiles) {
-        for (const [gid, data] of layerTiles.entries()) {
+      if (detectedTilesSource) {
+        for (const [gid, data] of detectedTilesSource.entries()) {
           this.detectedTileData.set(gid, data);
         }
       }
@@ -10185,9 +10226,14 @@ export class TileMapEditor {
                     }
                     
                     // Skip the async image loading since we have it cached
-                    if (t.detectedTiles && Array.isArray(t.detectedTiles)) {
+                    const serializedDetectedTiles =
+                      (Array.isArray(t.detectedTiles)
+                        ? t.detectedTiles
+                        : (Array.isArray(t.tileset?.detectedTiles) ? t.tileset.detectedTiles : undefined)) as SerializedDetectedTile[] | undefined;
+
+                    if (serializedDetectedTiles) {
                       const m = new Map<number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }>();
-                      for (const pair of t.detectedTiles) {
+                      for (const pair of serializedDetectedTiles) {
                         const [gid, data] = pair as SerializedDetectedTile;
                         m.set(gid, {
                           sourceX: data.sourceX,
@@ -10287,9 +10333,14 @@ export class TileMapEditor {
               }
 
               // Detected tiles serialized as arrays -> convert to Map for runtime use
-              if (t.detectedTiles && Array.isArray(t.detectedTiles)) {
+              const serializedDetectedTiles =
+                (Array.isArray(t.detectedTiles)
+                  ? t.detectedTiles
+                  : (Array.isArray(t.tileset?.detectedTiles) ? t.tileset.detectedTiles : undefined)) as SerializedDetectedTile[] | undefined;
+
+              if (serializedDetectedTiles) {
                 const m = new Map<number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }>();
-                for (const pair of t.detectedTiles) {
+                for (const pair of serializedDetectedTiles) {
                   const [gid, data] = pair as SerializedDetectedTile;
                   m.set(gid, {
                     sourceX: data.sourceX,

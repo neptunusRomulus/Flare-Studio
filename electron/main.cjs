@@ -173,6 +173,59 @@ ipcMainLocal.handle(
   }
 );
 
+// Crash backup file management (project scoped)
+const CRASH_BACKUP_DIRNAME = "backup";
+const CRASH_BACKUP_FILENAME = "crash-backup.json";
+
+ipcMainLocal.handle("save-crash-backup", async (_event, projectPath, backupData) => {
+  try {
+    if (!projectPath || !backupData) return false;
+
+    const backupDir = path.join(projectPath, CRASH_BACKUP_DIRNAME);
+    if (!fs.existsSync(backupDir)) {
+      fs.mkdirSync(backupDir, { recursive: true });
+    }
+
+    const backupFile = path.join(backupDir, CRASH_BACKUP_FILENAME);
+    fs.writeFileSync(backupFile, JSON.stringify(backupData, null, 2), "utf8");
+    return true;
+  } catch (error) {
+    console.error("save-crash-backup failed:", error);
+    return false;
+  }
+});
+
+ipcMainLocal.handle("read-crash-backup", async (_event, projectPath) => {
+  try {
+    if (!projectPath) return null;
+
+    const backupFile = path.join(projectPath, CRASH_BACKUP_DIRNAME, CRASH_BACKUP_FILENAME);
+    if (!fs.existsSync(backupFile)) return null;
+
+    const content = fs.readFileSync(backupFile, "utf8");
+    return JSON.parse(content);
+  } catch (error) {
+    console.error("read-crash-backup failed:", error);
+    return null;
+  }
+});
+
+ipcMainLocal.handle("clear-crash-backup", async (_event, projectPath) => {
+  try {
+    if (!projectPath) return false;
+
+    const backupFile = path.join(projectPath, CRASH_BACKUP_DIRNAME, CRASH_BACKUP_FILENAME);
+    if (fs.existsSync(backupFile)) {
+      fs.unlinkSync(backupFile);
+    }
+
+    return true;
+  } catch (error) {
+    console.error("clear-crash-backup failed:", error);
+    return false;
+  }
+});
+
 // Enemy preset management
 ipcMainLocal.handle("list-enemies", async (event, projectPath) => {
   try {
@@ -704,6 +757,68 @@ ipcMainLocal.handle("open-map-project", async (event, projectPath, mapName) => {
     return null;
   } catch (error) {
     console.error("Error opening map project:", error);
+    return null;
+  }
+});
+
+// ============================================================================
+// Phase 2: Tileset Profile Persistence
+// ============================================================================
+
+/**
+ * Save tileset profiles to {projectPath}/.tileset-profiles.json
+ * Profiles store persistent asset record definitions to avoid re-detection on reload
+ */
+ipcMainLocal.handle("save-tileset-profiles", async (event, projectPath, profiles) => {
+  try {
+    if (!projectPath) {
+      console.error("Project path required for saving tileset profiles");
+      return { success: false, error: "Project path is required" };
+    }
+
+    const profilePath = path.join(projectPath, ".tileset-profiles.json");
+    const profileData = {
+      version: "1.1", // profiles introduced in schema v1.1
+      profiles: profiles || {},
+      lastModified: new Date().toISOString()
+    };
+
+    fs.writeFileSync(profilePath, JSON.stringify(profileData, null, 2));
+    console.log(`[PROFILE SAVE] Saved tileset profiles to: ${profilePath}`);
+    return { success: true, path: profilePath };
+  } catch (error) {
+    console.error("[PROFILE SAVE] Error saving tileset profiles:", error);
+    return { success: false, error: error?.message || "Unknown error" };
+  }
+});
+
+/**
+ * Load tileset profiles from {projectPath}/.tileset-profiles.json
+ * Returns profile registry if available, null if file doesn't exist or error occurs
+ */
+ipcMainLocal.handle("load-tileset-profiles", async (event, projectPath) => {
+  try {
+    if (!projectPath) {
+      console.warn("Project path required for loading tileset profiles");
+      return null;
+    }
+
+    const profilePath = path.join(projectPath, ".tileset-profiles.json");
+    
+    // If profile file doesn't exist, return null (will fall back to legacy tileset/detectedTiles)
+    if (!fs.existsSync(profilePath)) {
+      console.log(`[PROFILE LOAD] Profile file not found: ${profilePath}`);
+      return null;
+    }
+
+    const profileData = JSON.parse(fs.readFileSync(profilePath, "utf8"));
+    console.log(`[PROFILE LOAD] Loaded tileset profiles from: ${profilePath}`);
+    console.log(`[PROFILE LOAD] Profile version: ${profileData.version}, count: ${Object.keys(profileData.profiles || {}).length}`);
+    
+    return profileData.profiles || {};
+  } catch (error) {
+    console.warn("[PROFILE LOAD] Error loading tileset profiles:", error);
+    // Return null on error so caller can fall back to legacy detection
     return null;
   }
 });

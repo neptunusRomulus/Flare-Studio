@@ -63,8 +63,19 @@ type SidebarProps = {
     handleDeleteActiveTab: () => void;
     toast: typeof import('@/hooks/use-toast').toast;
     handleOpenActorDialog: (type: 'npc' | 'enemy') => void;
-      stampsState?: unknown;
-      currentProjectPath?: string | null;
+    stampsState?: unknown;
+    currentProjectPath?: string | null;
+    onShowImportReview?: (data: {
+      tilesetFileName: string;
+      detectedAssets: Array<{
+        gid: number;
+        sourceX: number;
+        sourceY: number;
+        width: number;
+        height: number;
+        confidence?: number;
+      }>;
+    }) => void;
   };
 
   layers: {
@@ -146,6 +157,7 @@ export default function AppSidebar(p: SidebarProps) {
             handleOpenActorDialog={p.tileset.handleOpenActorDialog}
             stampsState={p.tileset.stampsState}
             currentProjectPath={p.tileset.currentProjectPath}
+            onShowImportReview={p.tileset.onShowImportReview}
           />
         )}
       </section>

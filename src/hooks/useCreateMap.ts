@@ -55,7 +55,13 @@ export default function useCreateMap(params: Params) {
   } = params;
 
   const handleCreateNewMap = useCallback((config: MapConfig, newProjectPath?: string) => {
-    try { localStorage.removeItem('tilemap_autosave_backup'); } catch (e) { console.warn('Failed to clear autosave backup', e); }
+    try {
+      if (newProjectPath && window.electronAPI?.clearCrashBackup) {
+        void window.electronAPI.clearCrashBackup(newProjectPath);
+      }
+    } catch (e) {
+      console.warn('Failed to clear project crash backup', e);
+    }
     setCurrentProjectPath(newProjectPath ?? null);
     updateStartingMap(Boolean(config.isStartingMap), { propagate: false });
     setNewMapName('Map Name');

@@ -2,6 +2,7 @@ import React, { useEffect, useCallback, useState, useRef, useLayoutEffect, useMe
 import type { TileLayer } from '@/types';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 import usePreferences from '@/hooks/usePreferences';
+import { Check, X, FlipHorizontal2, FlipVertical2 } from 'lucide-react';
 
 type TilesetPaletteProps = {
   editor: TileMapEditor | null;
@@ -21,6 +22,14 @@ interface TileSelection {
   startRow: number;
   endCol: number;
   endRow: number;
+}
+
+interface DetectedTileRect {
+  gid: number;
+  sourceX: number;
+  sourceY: number;
+  width: number;
+  height: number;
 }
 
 // Default grid cell size; will be overridden by tileset/tab metadata when available
@@ -62,6 +71,8 @@ const TilesetPalette = ({
   // remains at least as large as the palette area regardless of image size.
   const [wrapperSize, setWrapperSize] = useState({ width: 0, height: 0 });
   const [selectedTileInfo, setSelectedTileInfo] = useState<{ gid: number; description?: string } | null>(null);
+  const [detectedTiles, setDetectedTiles] = useState<DetectedTileRect[]>([]);
+  const [selectedDetectedGids, setSelectedDetectedGids] = useState<number[]>([]);
   
   // Refs for panning
   const isPanningRef = useRef(false);
@@ -108,6 +119,26 @@ const TilesetPalette = ({
         
         if (tab && (tab as { tileset?: { image?: HTMLImageElement } }).tileset?.image) {
           const img = (tab as { tileset: { image: HTMLImageElement } }).tileset.image;
+
+          // Pull detected tile rectangles from active tab so palette can select assets
+          // by their detected bounds instead of fixed cell grid.
+          try {
+            const dt = (tab as { detectedTiles?: Map<number, { sourceX: number; sourceY: number; width: number; height: number }> }).detectedTiles;
+            if (dt && typeof dt.entries === 'function' && dt.size > 0) {
+              const entries: DetectedTileRect[] = Array.from(dt.entries()).map(([gid, data]) => ({
+                gid,
+                sourceX: data.sourceX,
+                sourceY: data.sourceY,
+                width: data.width,
+                height: data.height
+              }));
+              setDetectedTiles(entries);
+              setSelectedDetectedGids([]);
+            } else {
+              setDetectedTiles([]);
+              setSelectedDetectedGids([]);
+            }
+          } catch (_e) { void _e; setDetectedTiles([]); setSelectedDetectedGids([]); }
           
           // Set the image immediately
           setTilesetImage(img);
@@ -140,9 +171,13 @@ const TilesetPalette = ({
             if (editorTilesetImage.complete && editorTilesetImage.naturalWidth > 0 && editorTilesetImage.naturalHeight > 0) {
               setImageSize({ width: editorTilesetImage.naturalWidth, height: editorTilesetImage.naturalHeight });
             }
+            setDetectedTiles([]);
+            setSelectedDetectedGids([]);
           } else {
             setTilesetImage(null);
             setImageSize({ width: 0, height: 0 });
+            setDetectedTiles([]);
+            setSelectedDetectedGids([]);
           }
         }
       } catch (_err) { void _err; }
@@ -234,32 +269,55 @@ const TilesetPalette = ({
     // Draw the tileset image
     ctx.drawImage(tilesetImage, 0, 0);
 
-    // Draw grid overlay
-    const cols = Math.ceil(imageSize.width / tileSize.width);
-    const rows = Math.ceil(imageSize.height / tileSize.height);
-    
-    ctx.strokeStyle = prefs.isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)';
-    ctx.lineWidth = 0.8;
+    const hasDetectedAssets = detectedTiles.length > 0;
 
-    // Draw vertical lines
-    for (let i = 0; i <= cols; i++) {
-      const x = i * tileSize.width;
-      ctx.beginPath();
-      ctx.moveTo(x + 0.5, 0);
-      ctx.lineTo(x + 0.5, imageSize.height);
-      ctx.stroke();
+    if (hasDetectedAssets) {
+      // Draw asset rectangles so successful detection is visually distinct from cell grid mode.
+      ctx.strokeStyle = prefs.isDarkMode ? 'rgba(34,197,94,0.65)' : 'rgba(22,163,74,0.55)';
+      ctx.lineWidth = 1.5;
+      for (const tile of detectedTiles) {
+        ctx.strokeRect(tile.sourceX + 0.5, tile.sourceY + 0.5, Math.max(1, tile.width - 1), Math.max(1, tile.height - 1));
+      }
+    } else {
+      // Draw standard fixed grid overlay when no detected assets are available.
+      const cols = Math.ceil(imageSize.width / tileSize.width);
+      const rows = Math.ceil(imageSize.height / tileSize.height);
+
+      ctx.strokeStyle = prefs.isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)';
+      ctx.lineWidth = 0.8;
+
+      for (let i = 0; i <= cols; i++) {
+        const x = i * tileSize.width;
+        ctx.beginPath();
+        ctx.moveTo(x + 0.5, 0);
+        ctx.lineTo(x + 0.5, imageSize.height);
+        ctx.stroke();
+      }
+
+      for (let i = 0; i <= rows; i++) {
+        const y = i * tileSize.height;
+        ctx.beginPath();
+        ctx.moveTo(0, y + 0.5);
+        ctx.lineTo(imageSize.width, y + 0.5);
+        ctx.stroke();
+      }
     }
 
-    // Draw horizontal lines
-    for (let i = 0; i <= rows; i++) {
-      const y = i * tileSize.height;
-      ctx.beginPath();
-      ctx.moveTo(0, y + 0.5);
-      ctx.lineTo(imageSize.width, y + 0.5);
-      ctx.stroke();
+    // Draw selected detected asset highlights (single or ctrl-multi).
+    if (selectedDetectedGids.length > 0) {
+      ctx.fillStyle = 'rgba(59, 130, 246, 0.2)';
+      ctx.strokeStyle = 'rgba(59, 130, 246, 1)';
+      ctx.lineWidth = 2.5;
+
+      for (const gid of selectedDetectedGids) {
+        const selectedAsset = detectedTiles.find(t => t.gid === gid);
+        if (!selectedAsset) continue;
+        ctx.fillRect(selectedAsset.sourceX, selectedAsset.sourceY, selectedAsset.width, selectedAsset.height);
+        ctx.strokeRect(selectedAsset.sourceX + 1, selectedAsset.sourceY + 1, Math.max(1, selectedAsset.width - 2), Math.max(1, selectedAsset.height - 2));
+      }
     }
 
-    // Draw selection if present
+    // Draw grid selection if present (grid mode / drag mode)
     if (selection) {
       const minCol = Math.min(selection.startCol, selection.endCol);
       const maxCol = Math.max(selection.startCol, selection.endCol);
@@ -280,7 +338,130 @@ const TilesetPalette = ({
       ctx.lineWidth = 2.5;
       ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
     }
-  }, [tilesetImage, imageSize, selection, prefs.isDarkMode, tileSize.width, tileSize.height]);
+  }, [tilesetImage, imageSize, selection, prefs.isDarkMode, tileSize.width, tileSize.height, detectedTiles, selectedDetectedGids]);
+
+  const getCanvasPixelPosition = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    return {
+      x: (e.clientX - rect.left) * scaleX,
+      y: (e.clientY - rect.top) * scaleY
+    };
+  }, []);
+
+  const getDetectedGidAtPosition = useCallback((x: number, y: number): number | null => {
+    for (const tile of detectedTiles) {
+      const withinX = x >= tile.sourceX && x <= (tile.sourceX + tile.width);
+      const withinY = y >= tile.sourceY && y <= (tile.sourceY + tile.height);
+      if (withinX && withinY) return tile.gid;
+    }
+    return null;
+  }, [detectedTiles]);
+
+  const applyDetectedTilesToActiveTab = useCallback((nextTiles: DetectedTileRect[]) => {
+    if (!editor || !activeLayer?.type) return;
+
+    const layerType = activeLayer.type;
+    const tabs = editor.getLayerTabs ? editor.getLayerTabs(layerType) : [];
+    const activeTabId = editor.getActiveLayerTabId ? editor.getActiveLayerTabId(layerType) : null;
+    const activeTab = tabs.find((t: { id: number }) => t.id === activeTabId) as ({
+      id: number;
+      detectedTiles?: Map<number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }>;
+      tileset?: { count?: number };
+    } | undefined);
+
+    if (!activeTab) return;
+
+    const nextMap = new Map<number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }>();
+    for (const tile of nextTiles) {
+      nextMap.set(tile.gid, {
+        sourceX: tile.sourceX,
+        sourceY: tile.sourceY,
+        width: tile.width,
+        height: tile.height,
+        originX: Math.floor(tile.width / 2),
+        originY: tile.height
+      });
+    }
+
+    activeTab.detectedTiles = nextMap;
+    if (activeTab.tileset) {
+      activeTab.tileset.count = nextMap.size;
+    }
+
+    const editorAny = editor as unknown as { layerTileData?: Map<string, Map<number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }>> };
+    if (editorAny.layerTileData instanceof Map) {
+      editorAny.layerTileData.set(layerType, new Map(nextMap));
+    }
+
+    setDetectedTiles(nextTiles);
+    setTabTick(t => t + 1);
+  }, [editor, activeLayer, setTabTick]);
+
+  const handleMergeSelectedAssets = useCallback(() => {
+    if (selectedDetectedGids.length < 2) return;
+    const selectedSet = new Set(selectedDetectedGids);
+    const selectedAssets = detectedTiles.filter(t => selectedSet.has(t.gid));
+    if (selectedAssets.length < 2) return;
+
+    const minX = Math.min(...selectedAssets.map(a => a.sourceX));
+    const minY = Math.min(...selectedAssets.map(a => a.sourceY));
+    const maxX = Math.max(...selectedAssets.map(a => a.sourceX + a.width));
+    const maxY = Math.max(...selectedAssets.map(a => a.sourceY + a.height));
+    const targetGid = Math.min(...selectedAssets.map(a => a.gid));
+
+    const remaining = detectedTiles.filter(t => !selectedSet.has(t.gid));
+    const merged: DetectedTileRect = {
+      gid: targetGid,
+      sourceX: minX,
+      sourceY: minY,
+      width: maxX - minX,
+      height: maxY - minY
+    };
+
+    const nextTiles = [...remaining, merged].sort((a, b) => a.gid - b.gid);
+    applyDetectedTilesToActiveTab(nextTiles);
+    setSelectedDetectedGids([targetGid]);
+  }, [selectedDetectedGids, detectedTiles, applyDetectedTilesToActiveTab]);
+
+  const handleSliceSelectedAsset = useCallback((direction: 'horizontal' | 'vertical') => {
+    if (selectedDetectedGids.length !== 1) return;
+    const gid = selectedDetectedGids[0];
+    const asset = detectedTiles.find(t => t.gid === gid);
+    if (!asset) return;
+
+    const existingGids = detectedTiles.map(t => t.gid);
+    const newGid = (existingGids.length > 0 ? Math.max(...existingGids) : gid) + 1;
+    let first: DetectedTileRect | null = null;
+    let second: DetectedTileRect | null = null;
+
+    if (direction === 'horizontal') {
+      if (asset.width < 2) return;
+      const leftWidth = Math.floor(asset.width / 2);
+      const rightWidth = asset.width - leftWidth;
+      first = { ...asset, width: leftWidth };
+      second = { ...asset, gid: newGid, sourceX: asset.sourceX + leftWidth, width: rightWidth };
+    } else {
+      if (asset.height < 2) return;
+      const topHeight = Math.floor(asset.height / 2);
+      const bottomHeight = asset.height - topHeight;
+      first = { ...asset, height: topHeight };
+      second = { ...asset, gid: newGid, sourceY: asset.sourceY + topHeight, height: bottomHeight };
+    }
+
+    if (!first || !second || first.width <= 0 || first.height <= 0 || second.width <= 0 || second.height <= 0) return;
+
+    const nextTiles = detectedTiles
+      .filter(t => t.gid !== gid)
+      .concat([first, second])
+      .sort((a, b) => a.gid - b.gid);
+
+    applyDetectedTilesToActiveTab(nextTiles);
+    setSelectedDetectedGids([first.gid, second.gid]);
+  }, [selectedDetectedGids, detectedTiles, applyDetectedTilesToActiveTab]);
 
   // Redraw canvas when dependencies change
   useEffect(() => {
@@ -347,6 +528,60 @@ const TilesetPalette = ({
     if (isSpacePressed || isPanning) return; // Don't start selection while panning
     if (e.button !== 0) return; // Only left click
 
+    // Asset mode: select by detected rectangle hit-test instead of grid cell.
+    if (detectedTiles.length > 0 && editor) {
+      const pos = getCanvasPixelPosition(e);
+      if (!pos) return;
+      const gid = getDetectedGidAtPosition(pos.x, pos.y);
+      if (gid === null) return;
+
+      const isMultiSelect = e.ctrlKey || e.metaKey;
+
+      if (isMultiSelect) {
+        setSelection(null);
+        setIsSelecting(false);
+        setSelectedDetectedGids(prev => {
+          const has = prev.includes(gid);
+          const next = has ? prev.filter(v => v !== gid) : [...prev, gid];
+          return next;
+        });
+        return;
+      }
+
+      setSelection(null);
+      setIsSelecting(false);
+      setSelectedDetectedGids([gid]);
+
+      const isCollisionLayer = activeLayer?.type === 'collision';
+      if (isCollisionLayer) {
+        setSelectedTileInfo({
+          gid,
+          description: COLLISION_TILE_DESCRIPTIONS[gid as keyof typeof COLLISION_TILE_DESCRIPTIONS]
+        });
+      } else {
+        setSelectedTileInfo({ gid });
+      }
+
+      const editorAny = editor as unknown as Record<string, unknown>;
+      if (typeof editorAny.clearMultiSelectedBrushes === 'function') {
+        (editorAny.clearMultiSelectedBrushes as () => void)();
+      } else if (typeof editorAny.multiSelectedBrushes === 'object') {
+        const multiSet = editorAny.multiSelectedBrushes as Set<number>;
+        multiSet.clear();
+      }
+
+      if (typeof (editor as unknown as { setActiveGid?: (assetGid: number) => void }).setActiveGid === 'function') {
+        (editor as unknown as { setActiveGid: (assetGid: number) => void }).setActiveGid(gid);
+      }
+      if (typeof (editor as unknown as { setCurrentTool?: (tool: string) => void }).setCurrentTool === 'function') {
+        (editor as unknown as { setCurrentTool: (tool: string) => void }).setCurrentTool('brush');
+      }
+      if (typeof (editor as unknown as { updateTilePaletteSelection?: () => void }).updateTilePaletteSelection === 'function') {
+        (editor as unknown as { updateTilePaletteSelection: () => void }).updateTilePaletteSelection();
+      }
+      return;
+    }
+
     const pos = getGridPosition(e);
     if (!pos) return;
 
@@ -359,9 +594,10 @@ const TilesetPalette = ({
       endCol: pos.col,
       endRow: pos.row
     });
-  }, [getGridPosition, isSpacePressed, isPanning, isSelecting]);
+  }, [getGridPosition, isSpacePressed, isPanning, detectedTiles, editor, getCanvasPixelPosition, getDetectedGidAtPosition, activeLayer?.type, COLLISION_TILE_DESCRIPTIONS]);
 
   const handleCanvasMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (detectedTiles.length > 0) return;
     if (!isSelecting) return;
 
     const pos = getGridPosition(e);
@@ -372,9 +608,13 @@ const TilesetPalette = ({
       endCol: pos.col,
       endRow: pos.row
     } : null);
-  }, [getGridPosition, isSelecting]);
+  }, [getGridPosition, isSelecting, detectedTiles]);
 
   const handleCanvasMouseUp = useCallback(() => {
+    if (detectedTiles.length > 0) {
+      setIsSelecting(false);
+      return;
+    }
     if (!isSelecting || !selection) {
       setIsSelecting(false);
       return;
@@ -469,7 +709,7 @@ const TilesetPalette = ({
     isPanningRef.current = false;
     // Keep selection visible - don't clear it
     // The selection will persist until the user makes a new selection or clears it
-  }, [isSelecting, selection, editor, imageSize.width, tileSize.width, tileSize.height, activeLayer?.type, COLLISION_TILE_DESCRIPTIONS]);
+  }, [isSelecting, selection, editor, imageSize.width, tileSize.width, tileSize.height, activeLayer?.type, COLLISION_TILE_DESCRIPTIONS, detectedTiles]);
 
   // Panning handlers
   const handleMouseDownPan = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
@@ -648,6 +888,63 @@ const TilesetPalette = ({
             )}
           </div>
         </div>
+
+        {detectedTiles.length > 0 && selectedDetectedGids.length > 1 && (
+          <div className="absolute bottom-3 right-3 z-20 bg-background/95 border border-border shadow-md rounded-md px-2 py-1.5 text-xs flex items-center gap-2">
+            <span className="text-muted-foreground">merge this assets?</span>
+            <button
+              type="button"
+              onClick={handleMergeSelectedAssets}
+              className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-accent"
+              aria-label="Merge selected assets"
+              title="Merge selected assets"
+            >
+              <Check className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => { setSelectedDetectedGids([]); }}
+              className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-accent"
+              aria-label="Cancel merge"
+              title="Cancel"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
+
+        {detectedTiles.length > 0 && selectedDetectedGids.length === 1 && (
+          <div className="absolute bottom-3 right-3 z-20 bg-background/95 border border-border shadow-md rounded-md px-2 py-1.5 text-xs flex items-center gap-2">
+            <span className="text-muted-foreground">slice this asset?</span>
+            <button
+              type="button"
+              onClick={() => handleSliceSelectedAsset('horizontal')}
+              className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-accent"
+              aria-label="Slice horizontally"
+              title="Slice horizontally"
+            >
+              <FlipHorizontal2 className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSliceSelectedAsset('vertical')}
+              className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-accent"
+              aria-label="Slice vertically"
+              title="Slice vertically"
+            >
+              <FlipVertical2 className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => { setSelectedDetectedGids([]); }}
+              className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-accent"
+              aria-label="Cancel slice"
+              title="Cancel"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
 
         <div data-brush-tool={brushTool} className="hidden"></div>
       </div>

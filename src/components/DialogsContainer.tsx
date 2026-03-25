@@ -10,6 +10,7 @@ import DialogueTreeDialogContainer from '@/components/DialogueTreeDialogContaine
 import MapDialogsContainer from '@/components/MapDialogsContainer';
 import OverwriteExportDialogContainer from '@/components/OverwriteExportDialogContainer';
 import ExportSuccessModalContainer from '@/components/ExportSuccessModalContainer';
+import ImportReviewModalContainer from '@/components/ImportReviewModalContainer';
 import SeparateBrushDialog from '@/components/SeparateBrushDialog';
 import SaveErrorNotificationPanel from '@/components/SaveErrorNotificationPanel';
 
@@ -53,6 +54,8 @@ export default function DialogsContainer({ ctx }: { ctx: unknown }) {
       <DialogueTreeDialogContainer ctx={ctx as any} />
 
       <MapDialogsContainer ctx={ctx as any} />
+
+      <ImportReviewModalContainer ctx={ctx as any} />
 
       <OverwriteExportDialogContainer ctx={ctx as any} />
       <ExportSuccessModalContainer ctx={ctx as any} />

@@ -20,36 +20,6 @@ export default function AppMain() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const c = useAppContext() as any;
   
-  // Crash recovery state
-  const [showRecoveryDialog, setShowRecoveryDialog] = useState(false);
-  const {
-    hasCrashBackup,
-    backupTimestamp,
-    mapName: crashedMapName,
-    isRecovering,
-    recoveryError,
-    recoverSession,
-    dismissRecovery,
-    getCrashTimeFormatted,
-    getTimeSinceCrash
-  } = useCrashRecovery({
-    onRecoveryFound: () => setShowRecoveryDialog(true),
-    onRecoveryDismissed: () => setShowRecoveryDialog(false)
-  });
-
-  const handleRecover = async () => {
-    const success = await recoverSession();
-    if (success) {
-      // Close dialog and allow editor to use recovered state
-      setShowRecoveryDialog(false);
-    }
-  };
-
-  const handleDismiss = () => {
-    dismissRecovery();
-    setShowRecoveryDialog(false);
-  };
-
   const {
     showWelcome,
     handleCreateNewMap,
@@ -100,6 +70,71 @@ export default function AppMain() {
     dialogsCtx,
     tooltip
   } = c;
+
+  // Crash recovery state
+  const [showRecoveryDialog, setShowRecoveryDialog] = useState(false);
+  const {
+    hasCrashBackup,
+    backupTimestamp,
+    mapName: crashedMapName,
+    isRecovering,
+    recoveryError,
+    recoverSession,
+    dismissRecovery,
+    getCrashTimeFormatted,
+    getTimeSinceCrash
+  } = useCrashRecovery({
+    projectPath: controls?.currentProjectPath ?? null,
+    onRecoveryFound: () => setShowRecoveryDialog(true),
+    onRecoveryDismissed: () => setShowRecoveryDialog(false),
+    onRecoverBackup: async (backup: unknown) => {
+      if (!editor || typeof editor.loadFromBackupData !== 'function') {
+        return false;
+      }
+
+      const loaded = editor.loadFromBackupData(backup);
+      if (!loaded) {
+        return false;
+      }
+
+      const restored = backup as {
+        mapName?: unknown;
+        mapWidth?: unknown;
+        mapHeight?: unknown;
+      };
+
+      if (typeof restored.mapName === 'string') {
+        setMapName(restored.mapName);
+      }
+      if (typeof restored.mapWidth === 'number') {
+        setMapWidth(restored.mapWidth);
+      }
+      if (typeof restored.mapHeight === 'number') {
+        setMapHeight(restored.mapHeight);
+      }
+
+      try {
+        editor.redraw?.();
+      } catch (err) {
+        void err;
+      }
+
+      return true;
+    }
+  });
+
+  const handleRecover = async () => {
+    const success = await recoverSession();
+    if (success) {
+      // Close dialog and allow editor to use recovered state
+      setShowRecoveryDialog(false);
+    }
+  };
+
+  const handleDismiss = () => {
+    dismissRecovery();
+    setShowRecoveryDialog(false);
+  };
 
   // Set up manual save (Ctrl+S) support - must be called within SaveQueueProvider
   // After every successful save, refresh spawn.txt if this map is the starting map

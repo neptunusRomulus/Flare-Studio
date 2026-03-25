@@ -5,7 +5,10 @@
   Tool,
   Orientation,
   Stamp,
-  StampTile
+  StampTile,
+  AssetRecord,
+  ObjectInstance,
+  PaintMode
 } from '../types';
 
 interface LayerTilesetEntry {
@@ -112,6 +115,13 @@ export interface EditorProjectData {
     sourceX: number;
     sourceY: number;
   }>>;
+  // Schema versioning for backward-compatible migrations
+  dataSchemaVersion?: string; // e.g., "1.0" (legacy), "1.1" (profiles), future "2.0"
+  dataSchemaRevision?: number; // incremental counter within a version for refinements
+  // Phase 1: Asset records and object instances (non-breaking additions)
+  assetRecords?: Array<AssetRecord>;  // Serialized asset definitions
+  objectInstances?: Array<ObjectInstance>; // Serialized placed objects
+  paintMode?: PaintMode;  // Current paint mode (ground/object)
 }
 
 const INTERNAL_TILESET_FILENAMES = new Set<string>(['collision_tileset.png']);
@@ -789,6 +799,17 @@ export class TileMapEditor {
     sourceY: number;  // Source Y in tileset
   }>> = new Map();
   private nextSpriteObjectId: number = 1;
+
+  // Phase 1: Asset Record and Object Instance storage containers (non-breaking additions)
+  // These run in parallel with legacy placedSpriteObjects during migration
+  private assetRecords: Map<string, AssetRecord> = new Map();      // id -> AssetRecord
+  private objectInstances: Map<string, ObjectInstance> = new Map(); // id -> ObjectInstance
+  // Phase 8: Spatial index for fast instance lookups by occupied grid cell
+  private objectInstanceCellIndex: Map<string, Set<string>> = new Map(); // "x,y" -> instance ids
+  private objectInstanceIndexCells: Map<string, string[]> = new Map();   // instance id -> occupied cell keys
+  private nextAssetRecordId: number = 1;
+  private nextObjectInstanceId: number = 1;
+  private paintMode: 'ground' | 'object' = 'ground';               // Current paint mode
 
   // Hero position management
   private heroX: number = 0;
@@ -1822,6 +1843,7 @@ export class TileMapEditor {
     if (this.activeLayerId !== null) {
       const layer = this.tileLayers.find(l => l.id === this.activeLayerId);
       if (layer) {
+        const effectivePaintMode = this.getEffectivePaintModeForLayer(layer.type);
         const index = y * this.mapWidth + x;
         const currentValue = layer.data[index];
         let newValue: number;
@@ -1832,9 +1854,24 @@ export class TileMapEditor {
         // Determine the action based on right-click or current tool
         if (isRightClick) {
           // Right-click always acts as eraser
-          newValue = 0;
-          // Also remove any sprite object at this position
-          this.removeSpriteObjectAt(layer.type, x, y);
+          // Phase 4: Paint mode affects what gets erased
+          if (effectivePaintMode === 'object') {
+            // Object mode: only remove ObjectInstances at this position
+            const instancesToRemove = this.getAllObjectInstances()
+              .filter(inst => inst.gridX === x && inst.gridY === y && inst.layerId === layer.id.toString());
+            for (const inst of instancesToRemove) {
+              this.removeObjectInstance(inst.id);
+            }
+            console.log(`[PAINT-MODE] Object mode eraser: removed ${instancesToRemove.length} instances at (${x}, ${y})`);
+            this.saveState();
+            this.markAsChanged();
+            return; // Don't write to layer.data in object mode
+          } else {
+            // Ground mode: erase from layer.data and remove sprite objects
+            newValue = 0;
+            // Also remove any sprite object at this position
+            this.removeSpriteObjectAt(layer.type, x, y);
+          }
         } else {
           // Left-click behavior depends on current tool
           switch (this.currentTool) {
@@ -1865,9 +1902,25 @@ export class TileMapEditor {
               if (!this.isInSelection(x, y)) {
                 return; // Can't erase outside selection
               }
-              newValue = 0;
-              // Also remove any sprite object at this position
-              this.removeSpriteObjectAt(layer.type, x, y);
+              // Phase 4: Paint mode affects eraser behavior
+              if (effectivePaintMode === 'object') {
+                // Object mode eraser: only remove ObjectInstances
+                const instancesToRemove = this.getAllObjectInstances()
+                  .filter(inst => inst.gridX === x && inst.gridY === y && inst.layerId === layer.id.toString());
+                if (instancesToRemove.length > 0) {
+                  this.saveState();
+                  for (const inst of instancesToRemove) {
+                    this.removeObjectInstance(inst.id);
+                  }
+                  this.markAsChanged();
+                }
+                return; // Skip ground layer erasing in object mode
+              } else {
+                // Ground mode eraser: erase from layer.data and remove sprite objects
+                newValue = 0;
+                // Also remove any sprite object at this position
+                this.removeSpriteObjectAt(layer.type, x, y);
+              }
               break;
             case 'bucket':
               // Don't bucket fill if no tile is selected (activeGid is 0)
@@ -1896,43 +1949,69 @@ export class TileMapEditor {
         if (currentValue !== newValue) {
           this.saveState();
           
-          // Always try to remove any sprite object at this position when painting a new tile
-          // This ensures single tile painting removes multi-tile sprites that cover this cell
-          // Note: sprite objects set layer.data to 0, so we can't rely on currentValue > 0
-          this.removeSpriteObjectAt(layer.type, x, y);
-          
-          layer.data[index] = newValue;
-          if (newValue > 0) {
-            const totalPainted = layer.data.filter(v => v > 0).length;
-            console.log(`[PAINTED] tile(${x},${y})=GID${newValue} layer="${layer.type}" total=${totalPainted} activeTab=${this.layerActiveTabId.get(layer.type)}`);
+          // Phase 4: Paint mode branching
+          if (effectivePaintMode === 'object' && newValue > 0) {
+            // Object mode: create ObjectInstance instead of painting to layer.data
+            // Don't destructively clear neighboring cells - user must explicitly request that
+            const asset = this.resolveOrCreateAssetRecordForGid(newValue, layer.type);
+            if (asset) {
+              const instance: ObjectInstance = {
+                id: `obj_${this.nextObjectInstanceId++}`,
+                assetRecordId: asset.id,
+                gridX: x,
+                gridY: y,
+                layerId: layer.id.toString(),
+                properties: {}
+              };
+              this.addObjectInstance(instance);
+              console.log(`[PAINT-MODE] Object mode: placed ObjectInstance at (${x}, ${y})`);
+            } else {
+              console.warn(`[PAINT-MODE] Object mode: asset not found for GID ${newValue}`);
+            }
+            this.markAsChanged();
+          } else if (effectivePaintMode === 'ground' || newValue === 0) {
+            // Ground mode: paint to layer.data as normal (or erase)
+            // Always try to remove any sprite object at this position when painting a new tile
+            // This ensures single tile painting removes multi-tile sprites that cover this cell
+            // Note: sprite objects set layer.data to 0, so we can't rely on currentValue > 0
+            this.removeSpriteObjectAt(layer.type, x, y);
+            
+            layer.data[index] = newValue;
+            if (newValue > 0) {
+              const totalPainted = layer.data.filter(v => v > 0).length;
+              console.log(`[PAINTED] tile(${x},${y})=GID${newValue} layer="${layer.type}" total=${totalPainted} activeTab=${this.layerActiveTabId.get(layer.type)}`);
+            }
+            // Record which tileset (tab) this painted cell came from so tabs don't collide
+            try {
+              const layerType = layer.type;
+              let arr = this.layerCellTilesetKey.get(layerType);
+              if (!arr) {
+                arr = new Array(this.mapWidth * this.mapHeight).fill(null);
+                this.layerCellTilesetKey.set(layerType, arr);
+              }
+              // Determine current active tab tileset fileName if available
+              let tilesetFileName: string | null = null;
+              const activeTabId = this.layerActiveTabId.get(layerType);
+              const tabs = this.layerTabs.get(layerType) || [];
+              if (activeTabId) {
+                const tab = tabs.find(t => t.id === activeTabId);
+                if (tab && tab.tileset && tab.tileset.fileName) tilesetFileName = tab.tileset.fileName;
+              }
+              // Fallback to layer tileset or global tileset
+              if (!tilesetFileName) {
+                const lt = this.layerTilesets.get(layerType);
+                if (lt && lt.fileName) tilesetFileName = lt.fileName;
+              }
+              if (!tilesetFileName && this.tilesetFileName) tilesetFileName = this.tilesetFileName;
+              arr[index] = tilesetFileName;
+            } catch (_e) { void _e; }
+            
+            this.markAsChanged();
           }
-          // Record which tileset (tab) this painted cell came from so tabs don't collide
-          try {
-            const layerType = layer.type;
-            let arr = this.layerCellTilesetKey.get(layerType);
-            if (!arr) {
-              arr = new Array(this.mapWidth * this.mapHeight).fill(null);
-              this.layerCellTilesetKey.set(layerType, arr);
-            }
-            // Determine current active tab tileset fileName if available
-            let tilesetFileName: string | null = null;
-            const activeTabId = this.layerActiveTabId.get(layerType);
-            const tabs = this.layerTabs.get(layerType) || [];
-            if (activeTabId) {
-              const tab = tabs.find(t => t.id === activeTabId);
-              if (tab && tab.tileset && tab.tileset.fileName) tilesetFileName = tab.tileset.fileName;
-            }
-            // Fallback to layer tileset or global tileset
-            if (!tilesetFileName) {
-              const lt = this.layerTilesets.get(layerType);
-              if (lt && lt.fileName) tilesetFileName = lt.fileName;
-            }
-            if (!tilesetFileName && this.tilesetFileName) tilesetFileName = this.tilesetFileName;
-            arr[index] = tilesetFileName;
-          } catch (_e) { void _e; }
           
-          // Handle object creation/removal based on layer type
-          if (layer.type === 'event' || layer.type === 'enemy' || layer.type === 'npc' || layer.type === 'object') {
+          // Legacy map-object creation/removal applies to event/enemy/npc layers only.
+          // Object layer now uses ObjectInstances and should not create placeholder map objects.
+          if (layer.type === 'event' || layer.type === 'enemy' || layer.type === 'npc') {
             if (newValue > 0) {
               // Create object when placing tile
               this.createObjectFromTile(x, y, layer.type, newValue);
@@ -2578,9 +2657,21 @@ export class TileMapEditor {
               tilesetForCell = {
                 image: tab.tileset.image ?? null,
                 fileName: tab.tileset.fileName ?? null,
-                columns: tab.tileset.columns ?? Math.max(1, Math.floor((tab.tileset.image ? tab.tileset.image.width : this.tileSizeX) / this.tileSizeX)),
-                rows: tab.tileset.rows ?? Math.max(1, Math.floor((tab.tileset.image ? tab.tileset.image.height : this.tileSizeY) / this.tileSizeY)),
-                count: tab.tileset.count ?? Math.max(1, (tab.tileset.columns ?? 1) * (tab.tileset.rows ?? 1))
+                columns: (typeof tab.tileset.columns === 'number' && tab.tileset.columns > 0)
+                  ? tab.tileset.columns
+                  : Math.max(1, Math.floor((tab.tileset.image ? tab.tileset.image.width : this.tileSizeX) / this.tileSizeX)),
+                rows: (typeof tab.tileset.rows === 'number' && tab.tileset.rows > 0)
+                  ? tab.tileset.rows
+                  : Math.max(1, Math.floor((tab.tileset.image ? tab.tileset.image.height : this.tileSizeY) / this.tileSizeY)),
+                count: (typeof tab.tileset.count === 'number' && tab.tileset.count > 0)
+                  ? tab.tileset.count
+                  : Math.max(1,
+                    ((typeof tab.tileset.columns === 'number' && tab.tileset.columns > 0)
+                      ? tab.tileset.columns
+                      : 1) *
+                    ((typeof tab.tileset.rows === 'number' && tab.tileset.rows > 0)
+                      ? tab.tileset.rows
+                      : 1))
               };
               if (tab.detectedTiles) {
                 layerTileDataForCell = tab.detectedTiles as Map<number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }>;
@@ -2630,38 +2721,92 @@ export class TileMapEditor {
       // Also render sprite objects for this layer from placedSpriteObjects
       const spriteObjects = this.placedSpriteObjects.get(layer.type);
       if (spriteObjects && spriteObjects.length > 0) {
-        for (const spriteObj of spriteObjects) {
-          // Resolve tileset for this sprite object
-          let tilesetForSprite = layerTilesetFallback;
-          if (spriteObj.tilesetKey) {
-            const tab = tabs.find(t => t.tileset && t.tileset.fileName === spriteObj.tilesetKey);
+        const hasInstanceOnLayer = this.getObjectInstancesByLayer(layer.id.toString()).length > 0;
+        if (!hasInstanceOnLayer) {
+          for (const spriteObj of spriteObjects) {
+            // Resolve tileset for this sprite object
+            let tilesetForSprite = layerTilesetFallback;
+            if (spriteObj.tilesetKey) {
+              const tab = tabs.find(t => t.tileset && t.tileset.fileName === spriteObj.tilesetKey);
+              if (tab && tab.tileset) {
+                tilesetForSprite = {
+                  image: tab.tileset.image ?? null,
+                  fileName: tab.tileset.fileName ?? null,
+                  columns: (typeof tab.tileset.columns === 'number' && tab.tileset.columns > 0) ? tab.tileset.columns : 1,
+                  rows: (typeof tab.tileset.rows === 'number' && tab.tileset.rows > 0) ? tab.tileset.rows : 1,
+                  count: (typeof tab.tileset.count === 'number' && tab.tileset.count > 0) ? tab.tileset.count : 1
+                };
+              }
+            }
+            
+            // Add to objects array for Y-sorted rendering
+            objectsToRender.push({
+              x: spriteObj.anchorX,
+              y: spriteObj.anchorY,
+              gid: spriteObj.gid,
+              layerType: layer.type,
+              tileset: tilesetForSprite,
+              tileData: new Map([[spriteObj.gid, {
+                sourceX: spriteObj.sourceX,
+                sourceY: spriteObj.sourceY,
+                width: spriteObj.width,
+                height: spriteObj.height
+              }]]),
+              transparency: layer.transparency || 1.0,
+              sortKey: spriteObj.anchorX + spriteObj.anchorY
+            });
+          }
+        }
+      }
+
+      // Phase 5: Render ObjectInstances for this layer
+      if (this.objectInstances.size > 0) {
+        for (const instance of this.objectInstances.values()) {
+          // Only render instances on this layer
+          if (instance.layerId !== layer.id.toString()) continue;
+
+          const asset = this.assetRecords.get(instance.assetRecordId);
+          if (!asset) {
+            console.warn(`[RENDER] ObjectInstance ${instance.id} references missing AssetRecord ${instance.assetRecordId}`);
+            continue;
+          }
+
+          // Try to find the tileset that contains this asset
+          let tilesetForInstance = layerTilesetFallback;
+          const profile = asset.profileId ? asset.profileId : null;
+          if (profile) {
+            // Find tab with matching profile
+            const tab = tabs.find(t => (t.tileset as unknown as { profileId?: string })?.profileId === profile);
             if (tab && tab.tileset) {
-              tilesetForSprite = {
+              tilesetForInstance = {
                 image: tab.tileset.image ?? null,
                 fileName: tab.tileset.fileName ?? null,
-                columns: tab.tileset.columns ?? 1,
-                rows: tab.tileset.rows ?? 1,
-                count: tab.tileset.count ?? 1
+                columns: (typeof tab.tileset.columns === 'number' && tab.tileset.columns > 0) ? tab.tileset.columns : 1,
+                rows: (typeof tab.tileset.rows === 'number' && tab.tileset.rows > 0) ? tab.tileset.rows : 1,
+                count: (typeof tab.tileset.count === 'number' && tab.tileset.count > 0) ? tab.tileset.count : 1
               };
             }
           }
-          
-          // Add to objects array for Y-sorted rendering
+
+          // Add instance to render queue with Y-sort key
           objectsToRender.push({
-            x: spriteObj.anchorX,
-            y: spriteObj.anchorY,
-            gid: spriteObj.gid,
+            x: instance.gridX,
+            y: instance.gridY,
+            gid: 1, // Use GID 1 as placeholder (will use asset source rect directly)
             layerType: layer.type,
-            tileset: tilesetForSprite,
-            tileData: new Map([[spriteObj.gid, {
-              sourceX: spriteObj.sourceX,
-              sourceY: spriteObj.sourceY,
-              width: spriteObj.width,
-              height: spriteObj.height
+            tileset: tilesetForInstance,
+            tileData: new Map([[1, {
+              sourceX: asset.sourceX,
+              sourceY: asset.sourceY,
+              width: asset.width,
+              height: asset.height,
+              originX: asset.originX,
+              originY: asset.originY
             }]]),
             transparency: layer.transparency || 1.0,
-            sortKey: spriteObj.anchorX + spriteObj.anchorY
+            sortKey: instance.gridX + instance.gridY
           });
+          console.log(`[RENDER] ObjectInstance ${instance.id} at (${instance.gridX}, ${instance.gridY}), sortKey=${instance.gridX + instance.gridY}`);
         }
       }
     }
@@ -2708,6 +2853,26 @@ export class TileMapEditor {
       const tileIndex = gid - 1;
       sourceX = (tileIndex % layerTileset.columns) * this.tileSizeX;
       sourceY = Math.floor(tileIndex / layerTileset.columns) * this.tileSizeY;
+      tileWidth = this.tileSizeX;
+      tileHeight = this.tileSizeY;
+    }
+
+    // If restored detected-tile metadata is stale/corrupt (out-of-bounds source rect),
+    // fall back to grid slicing so painted data still renders on the main canvas.
+    const imgW = layerTileset.image.naturalWidth || layerTileset.image.width;
+    const imgH = layerTileset.image.naturalHeight || layerTileset.image.height;
+    const invalidRect =
+      sourceX < 0 ||
+      sourceY < 0 ||
+      tileWidth <= 0 ||
+      tileHeight <= 0 ||
+      sourceX + tileWidth > imgW ||
+      sourceY + tileHeight > imgH;
+    if (invalidRect) {
+      const safeColumns = Math.max(1, layerTileset.columns || Math.floor(imgW / this.tileSizeX) || 1);
+      const tileIndex = gid - 1;
+      sourceX = (tileIndex % safeColumns) * this.tileSizeX;
+      sourceY = Math.floor(tileIndex / safeColumns) * this.tileSizeY;
       tileWidth = this.tileSizeX;
       tileHeight = this.tileSizeY;
     }
@@ -2768,6 +2933,27 @@ export class TileMapEditor {
       sourceY = Math.floor(tileIndex / layerTileset.columns) * this.tileSizeY;
       spriteWidth = this.tileSizeX;
       spriteHeight = this.tileSizeY;
+    }
+
+    // Same safety guard as ground tiles: if source rect is invalid, recover using grid slicing.
+    const imgW = layerTileset.image.naturalWidth || layerTileset.image.width;
+    const imgH = layerTileset.image.naturalHeight || layerTileset.image.height;
+    const invalidRect =
+      sourceX < 0 ||
+      sourceY < 0 ||
+      spriteWidth <= 0 ||
+      spriteHeight <= 0 ||
+      sourceX + spriteWidth > imgW ||
+      sourceY + spriteHeight > imgH;
+    if (invalidRect) {
+      const safeColumns = Math.max(1, layerTileset.columns || Math.floor(imgW / this.tileSizeX) || 1);
+      const tileIndex = gid - 1;
+      sourceX = (tileIndex % safeColumns) * this.tileSizeX;
+      sourceY = Math.floor(tileIndex / safeColumns) * this.tileSizeY;
+      spriteWidth = this.tileSizeX;
+      spriteHeight = this.tileSizeY;
+      originX = Math.floor(this.tileSizeX / 2);
+      originY = this.tileSizeY;
     }
     
     // Get isometric screen position (center of the tile diamond)
@@ -3684,7 +3870,8 @@ export class TileMapEditor {
         const tabs = this.layerTabs.get(activeLayer.type) || [];
         const activeTabId = this.layerActiveTabId.get(activeLayer.type);
         const tab = tabs.find(t => t.id === activeTabId);
-        if (tab && tab.tileset && tab.tileset.image) {
+        const hasDetectedAssets = Boolean(tab && tab.detectedTiles && tab.detectedTiles.size > 0);
+        if (tab && tab.tileset && tab.tileset.image && !hasDetectedAssets) {
           // Append a full-size image so container scrollbars appear for large images
           const fullImg = (tab.tileset.image.cloneNode(true) as HTMLImageElement);
           fullImg.className = 'tileset-full-image';
@@ -3803,7 +3990,7 @@ export class TileMapEditor {
 
     let tilesToRender: Array<{index: number, sourceX: number, sourceY: number, width: number, height: number}>;
     
-    if (preserveOrder && this.detectedTileData.size > 0) {
+    if ((preserveOrder || this.detectedTileData.size > 0) && this.detectedTileData.size > 0) {
       // Use existing ordered data
       tilesToRender = Array.from(this.detectedTileData.entries()).map(([index, data]) => ({
         index, // This is now the current Map key (sequential)
@@ -4215,7 +4402,69 @@ export class TileMapEditor {
     document.dispatchEvent(event);
   }
 
-  private detectVariableSizedTiles(): Array<{
+  /**
+   * Detect if a tileset has isometric (diamond-shaped) tiles
+   * by sampling several regions for diamond-like patterns
+   */
+  private detectIsometricLayout(imgWidth: number, imgHeight: number): boolean {
+    if (!this.tilesetImage) return false;
+    
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = imgWidth;
+    tempCanvas.height = imgHeight;
+    const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
+    if (!tempCtx) return false;
+    
+    tempCtx.drawImage(this.tilesetImage, 0, 0);
+    const imageData = tempCtx.getImageData(0, 0, imgWidth, imgHeight);
+    const data = imageData.data;
+    
+    // Sample bounding boxes of detected objects and check for diamond-like aspect ratios
+    // Isometric tiles typically have width > height (2:1 or wider when rotated corners)
+    const sampleSize = Math.min(10, Math.ceil(Math.sqrt(imgWidth * imgHeight / 10000)));
+    let diamondCount = 0;
+    let sampleCount = 0;
+    
+    for (let sy = 0; sy < imgHeight && sampleCount < sampleSize; sy += Math.max(1, Math.floor(imgHeight / sampleSize))) {
+      for (let sx = 0; sx < imgWidth && sampleCount < sampleSize; sx += Math.max(1, Math.floor(imgWidth / sampleSize))) {
+        sampleCount++;
+        
+        // Try to find a non-transparent region starting here
+        let minX = imgWidth, maxX = sx, minY = imgHeight, maxY = sy;
+        let found = false;
+        
+        // Quick scan for bounds
+        for (let y = sy; y < Math.min(sy + 50, imgHeight); y++) {
+          for (let x = sx; x < Math.min(sx + 50, imgWidth); x++) {
+            const alpha = data[(y * imgWidth + x) * 4 + 3];
+            if (alpha > this.tileContentThreshold) {
+              minX = Math.min(minX, x);
+              maxX = Math.max(maxX, x);
+              minY = Math.min(minY, y);
+              maxY = Math.max(maxY, y);
+              found = true;
+            }
+          }
+        }
+        
+        if (found && maxX > minX && maxY > minY) {
+          const w = maxX - minX + 1;
+          const h = maxY - minY + 1;
+          // Isometric tiles commonly have width >= 1.3x height (diamond/rotated squares)
+          if (w >= h * 1.3) {
+            diamondCount++;
+          }
+        }
+      }
+    }
+    
+    // If >50% of samples look isometric-ish, mark as isometric
+    const isIsometric = sampleCount > 0 && diamondCount / sampleCount > 0.5;
+    console.log(`Isometric detection: ${diamondCount}/${sampleCount} samples -> ${isIsometric ? 'YES' : 'NO'}`);
+    return isIsometric;
+  }
+
+  private detectVariableSizedTiles(overrideSensitivity?: number, forceIsometric: boolean = false): Array<{
     index: number;
     sourceX: number;
     sourceY: number;
@@ -4232,7 +4481,12 @@ export class TileMapEditor {
     const totalPixels = imgWidth * imgHeight;
     const useFastMode = totalPixels > 500000; // > ~700x700 pixels
     
-    console.log(`Tile detection: ${imgWidth}x${imgHeight} (${totalPixels} pixels), fastMode: ${useFastMode}`);
+    // Determine if tileset appears to be isometric (diamond-shaped tiles)
+    // Helps reduce false unions from diagonal adjacency
+    const isIsometric = forceIsometric || this.detectIsometricLayout(imgWidth, imgHeight);
+    const sensitivity = overrideSensitivity ?? this.objectSeparationSensitivity;
+    
+    console.log(`Tile detection: ${imgWidth}x${imgHeight} (${totalPixels} pixels), fastMode: ${useFastMode}, isometric: ${isIsometric}, sensitivity: ${sensitivity.toFixed(2)}`);
     const startTime = performance.now();
     
     const detectedTiles: Array<{
@@ -4274,18 +4528,34 @@ export class TileMapEditor {
           }
           
           // Fast flood fill that only tracks bounds, not individual pixels
-          const bounds = this.floodFillBoundsOnly(data, imgWidth, imgHeight, x, y, visited);
+          // Use 4-connectivity for isometric to avoid diagonal false unions
+          const bounds = this.floodFillBoundsOnly(data, imgWidth, imgHeight, x, y, visited, isIsometric);
           
           if (bounds && this.isValidObjectSize(bounds)) {
-            // For fast mode, don't do intelligent splitting - just use the bounds
-            // This is a trade-off: faster but less intelligent splitting
-            detectedTiles.push({
-              index: tileIndex++,
-              sourceX: bounds.x,
-              sourceY: bounds.y,
-              width: bounds.width,
-              height: bounds.height
-            });
+            const likelyMerged = bounds.width > this.tileSizeX * 1.8 || bounds.height > this.tileSizeY * 1.8;
+
+            // Step 1: run a local second-pass split even in fast mode for likely merged blobs.
+            if (likelyMerged) {
+              const localObjectData = this.buildObjectDataFromBounds(data, imgWidth, imgHeight, bounds);
+              const splitObjects = this.intelligentObjectSplit(localObjectData, sensitivity, isIsometric);
+              for (const splitObj of splitObjects) {
+                detectedTiles.push({
+                  index: tileIndex++,
+                  sourceX: splitObj.x,
+                  sourceY: splitObj.y,
+                  width: splitObj.width,
+                  height: splitObj.height
+                });
+              }
+            } else {
+              detectedTiles.push({
+                index: tileIndex++,
+                sourceX: bounds.x,
+                sourceY: bounds.y,
+                width: bounds.width,
+                height: bounds.height
+              });
+            }
           }
         }
       }
@@ -4306,7 +4576,7 @@ export class TileMapEditor {
             continue;
           }
           
-          const objectData = this.floodFillObjectData(data, imgWidth, imgHeight, x, y, visited);
+          const objectData = this.floodFillObjectData(data, imgWidth, imgHeight, x, y, visited, isIsometric);
           
           if (objectData && this.isValidObjectSize(objectData.bounds)) {
             allObjects.push(objectData);
@@ -4316,7 +4586,7 @@ export class TileMapEditor {
       
       // Second pass: intelligently split objects that should be separate
       for (const obj of allObjects) {
-        const splitObjects = this.intelligentObjectSplit(obj);
+        const splitObjects = this.intelligentObjectSplit(obj, sensitivity, isIsometric);
         
         for (const splitObj of splitObjects) {
           detectedTiles.push({
@@ -4349,7 +4619,8 @@ export class TileMapEditor {
     imageHeight: number,
     startX: number,
     startY: number,
-    visited: Uint8Array
+    visited: Uint8Array,
+    use4Connectivity: boolean = false
   ): { x: number; y: number; width: number; height: number } | null {
     let minX = startX, maxX = startX, minY = startY, maxY = startY;
     let pixelCount = 0;
@@ -4384,6 +4655,14 @@ export class TileMapEditor {
       if (x - 1 >= 0) stack.push(idx - 1);
       if (y + 1 < imageHeight) stack.push(idx + imageWidth);
       if (y - 1 >= 0) stack.push(idx - imageWidth);
+
+      // Optional diagonals when not enforcing strict 4-connectivity.
+      if (!use4Connectivity) {
+        if (x + 1 < imageWidth && y + 1 < imageHeight) stack.push(idx + imageWidth + 1);
+        if (x + 1 < imageWidth && y - 1 >= 0) stack.push(idx - imageWidth + 1);
+        if (x - 1 >= 0 && y + 1 < imageHeight) stack.push(idx + imageWidth - 1);
+        if (x - 1 >= 0 && y - 1 >= 0) stack.push(idx - imageWidth - 1);
+      }
     }
     
     if (pixelCount === 0) return null;
@@ -4409,7 +4688,8 @@ export class TileMapEditor {
     imageHeight: number,
     startX: number,
     startY: number,
-    visited: boolean[]
+    visited: boolean[],
+    use4Connectivity: boolean = false
   ): { bounds: { x: number; y: number; width: number; height: number }; pixels: Array<{x: number, y: number}> } | null {
     const stack: Array<{x: number, y: number}> = [{x: startX, y: startY}];
     let minX = startX, maxX = startX, minY = startY, maxY = startY;
@@ -4441,15 +4721,19 @@ export class TileMapEditor {
       minY = Math.min(minY, y);
       maxY = Math.max(maxY, y);
       
-      // Add neighboring pixels to stack (8-connectivity for initial detection)
+      // Add neighboring pixels to stack (4-connectivity for isometric, 8 for general)
       stack.push({x: x + 1, y: y});
       stack.push({x: x - 1, y: y});
       stack.push({x: x, y: y + 1});
       stack.push({x: x, y: y - 1});
-      stack.push({x: x + 1, y: y + 1});
-      stack.push({x: x + 1, y: y - 1});
-      stack.push({x: x - 1, y: y + 1});
-      stack.push({x: x - 1, y: y - 1});
+      
+      // Add diagonals only if not using strict 4-connectivity (isometric mode)
+      if (!use4Connectivity) {
+        stack.push({x: x + 1, y: y + 1});
+        stack.push({x: x + 1, y: y - 1});
+        stack.push({x: x - 1, y: y + 1});
+        stack.push({x: x - 1, y: y - 1});
+      }
     }
     
     if (pixelCount === 0) return null;
@@ -4472,10 +4756,14 @@ export class TileMapEditor {
     };
   }
 
-  private intelligentObjectSplit(objectData: {
-    bounds: { x: number; y: number; width: number; height: number };
-    pixels: Array<{x: number, y: number}>;
-  }): Array<{ x: number; y: number; width: number; height: number }> {
+  private intelligentObjectSplit(
+    objectData: {
+      bounds: { x: number; y: number; width: number; height: number };
+      pixels: Array<{x: number, y: number}>;
+    },
+    sensitivity: number = 0.5,
+    isIsometric: boolean = false
+  ): Array<{ x: number; y: number; width: number; height: number }> {
     const { bounds, pixels } = objectData;
     const { width, height } = bounds;
     
@@ -4483,19 +4771,46 @@ export class TileMapEditor {
     const area = pixels.length;
     const boundingArea = width * height;
     const density = area / boundingArea;
-    // const aspectRatio = Math.max(width / height, height / width);
     
     // Determine if this looks like a repeating pattern (multiple similar objects)
     const gridSize = Math.max(this.tileSizeX, this.tileSizeY);
-    const shouldSplitHorizontally = this.shouldSplitDirection(pixels, bounds, 'horizontal', gridSize);
-    const shouldSplitVertically = this.shouldSplitDirection(pixels, bounds, 'vertical', gridSize);
+    
+    // Adjust thresholds based on sensitivity.
+    // Higher sensitivity => split more aggressively.
+    const sparseDensityThreshold = Math.max(0.18, 0.55 - (sensitivity * 0.25));
+    const largeObjectDensityThreshold = Math.max(0.35, 0.9 - (sensitivity * 0.2));
+
+    const shouldSplitHorizontally = this.shouldSplitDirection(pixels, bounds, 'horizontal', gridSize, sensitivity);
+    const shouldSplitVertically = this.shouldSplitDirection(pixels, bounds, 'vertical', gridSize, sensitivity);
     
     // Check for specific object types
     const isFloorPattern = this.isFloorPattern(bounds, pixels);
     const isVerticalWall = this.isVerticalWall(bounds, pixels);
     const isHorizontalWall = this.isHorizontalWall(bounds, pixels);
+
+    // Additional split stage for high-sensitivity runs: break thin pixel bridges
+    // that commonly merge neighboring atlas assets into one component.
+    const shouldTryBridgeSplit = sensitivity >= 0.95 && (width > this.tileSizeX * 1.6 || height > this.tileSizeY * 1.6);
+    if (shouldTryBridgeSplit) {
+      const bridgeSplit = this.splitObjectByBridgeBreaking(objectData, sensitivity);
+      if (bridgeSplit && bridgeSplit.length > 1) {
+        console.log(`Bridge-breaking split produced ${bridgeSplit.length} components`);
+        return bridgeSplit;
+      }
+    }
     
-    console.log(`Object analysis: ${width}x${height}, density: ${density.toFixed(2)}, floor: ${isFloorPattern}, vWall: ${isVerticalWall}, hWall: ${isHorizontalWall}`);
+    // For isometric tilesets, check for vertical gaps (wrongly-merged diamonds)
+    const isometricValleys = isIsometric ? this.detectIsometricValleys(pixels, bounds, sensitivity) : { rowGaps: [], colGaps: [] };
+    
+    console.log(
+      `Object analysis: ${width}x${height}, density: ${density.toFixed(2)}, floor: ${isFloorPattern}, vWall: ${isVerticalWall}, hWall: ${isHorizontalWall}, rowGaps: ${isometricValleys.rowGaps.length}, colGaps: ${isometricValleys.colGaps.length}`
+    );
+    
+    // Case 0: Isometric with detected gaps - split on the gaps
+    if (isIsometric && (isometricValleys.rowGaps.length > 0 || isometricValleys.colGaps.length > 0) && !isVerticalWall && !isHorizontalWall) {
+      console.log(`Detected isometric valleys (rows=${isometricValleys.rowGaps.length}, cols=${isometricValleys.colGaps.length}) - splitting on valleys`);
+      return this.splitObjectByGaps(objectData, isometricValleys.rowGaps, isometricValleys.colGaps);
+    }
     
     // Case 1: Floor/ground patterns - always split into individual tiles
     if (isFloorPattern) {
@@ -4528,16 +4843,25 @@ export class TileMapEditor {
     }
     
     // Case 6: Large sparse objects - likely multiple separate items
-    if (density < 0.4 && boundingArea > gridSize * gridSize * 2) {
+    if (density < sparseDensityThreshold && boundingArea > gridSize * gridSize * 2) {
       console.log('Splitting sparse large object');
       return this.splitObjectByDensity(objectData);
     }
     
     // Case 7: Objects that span multiple tile-sized regions but aren't walls
     if ((width > this.tileSizeX * 1.8 || height > this.tileSizeY * 1.8) && 
-        !isVerticalWall && !isHorizontalWall && density < 0.8) {
+        !isVerticalWall && !isHorizontalWall && density < largeObjectDensityThreshold) {
       console.log('Splitting large non-wall object into tile-sized pieces');
       return this.splitObjectByGrid(objectData, width > height ? 'horizontal' : 'vertical');
+    }
+
+    // Step 3: force split very large blobs to avoid multi-asset merges surviving heuristics.
+    if (!isVerticalWall && !isHorizontalWall && (width > this.tileSizeX * 2.6 || height > this.tileSizeY * 2.6)) {
+      console.log('Force splitting oversized blob');
+      if (width > this.tileSizeX * 2.6 && height > this.tileSizeY * 2.6) {
+        return this.splitObjectByDensity(objectData);
+      }
+      return this.splitObjectByGrid(objectData, width >= height ? 'horizontal' : 'vertical');
     }
     
     // Default: keep as single object
@@ -4833,11 +5157,68 @@ export class TileMapEditor {
     return middleDensity > edgeDensity * 1.2; // Middle should be at least 20% denser
   }
 
+  /**
+   * For isometric tilesets, detect vertical gaps between diamond rows
+   * This allows splitting wrongly-merged adjacent isometric tiles
+   */
+  private detectIsometricValleys(
+    pixels: Array<{x: number, y: number}>,
+    bounds: { x: number; y: number; width: number; height: number },
+    sensitivity: number
+  ): { rowGaps: number[]; colGaps: number[] } {
+    const { x: minX, y: minY, width, height } = bounds;
+    const minGapSize = sensitivity >= 0.9 ? 1 : 2;
+    const gapRowRatio = Math.max(0.08, 0.28 - (sensitivity * 0.10));
+    const gapColRatio = Math.max(0.08, 0.28 - (sensitivity * 0.10));
+    
+    const rowDensities: number[] = [];
+    for (let y = 0; y < height; y++) {
+      const rowPixels = pixels.filter(p => p.y === minY + y).length;
+      rowDensities.push(rowPixels);
+    }
+    
+    const rowGaps: number[] = [];
+    let rowGapStart = -1;
+    
+    for (let y = 0; y < rowDensities.length; y++) {
+      if (rowDensities[y] < rowDensities.length * gapRowRatio) {
+        if (rowGapStart === -1) rowGapStart = y;
+      } else {
+        if (rowGapStart !== -1 && (y - rowGapStart) >= minGapSize) {
+          rowGaps.push(rowGapStart);
+        }
+        rowGapStart = -1;
+      }
+    }
+
+    const colDensities: number[] = [];
+    for (let x = 0; x < width; x++) {
+      const colPixels = pixels.filter(p => p.x === minX + x).length;
+      colDensities.push(colPixels);
+    }
+
+    const colGaps: number[] = [];
+    let colGapStart = -1;
+    for (let x = 0; x < colDensities.length; x++) {
+      if (colDensities[x] < colDensities.length * gapColRatio) {
+        if (colGapStart === -1) colGapStart = x;
+      } else {
+        if (colGapStart !== -1 && (x - colGapStart) >= minGapSize) {
+          colGaps.push(colGapStart);
+        }
+        colGapStart = -1;
+      }
+    }
+
+    return { rowGaps, colGaps };
+  }
+
   private shouldSplitDirection(
     pixels: Array<{x: number, y: number}>,
     bounds: { x: number; y: number; width: number; height: number },
     direction: 'horizontal' | 'vertical',
-    gridSize: number
+    gridSize: number,
+    sensitivity: number
   ): boolean {
     const { x: minX, y: minY, width, height } = bounds;
     
@@ -4856,24 +5237,33 @@ export class TileMapEditor {
         columnDensities.push(columnPixels);
       }
       
+      // Higher sensitivity means looser split requirements.
+      const gapFactor = Math.max(0.12, 0.42 - (sensitivity * 0.15));
+      const denseFactor = Math.min(0.92, 0.58 + (sensitivity * 0.12));
+      const minDenseRegions = sensitivity >= 0.95 ? 1 : 2;
+
       // Look for significant gaps between dense areas
       let gapCount = 0;
       let denseRegions = 0;
       const avgDensity = columnDensities.reduce((a, b) => a + b, 0) / columnDensities.length;
       
       for (let i = 0; i < columnDensities.length; i++) {
-        if (columnDensities[i] < avgDensity * 0.3) {
+        if (columnDensities[i] < avgDensity * gapFactor) {
           gapCount++;
-        } else if (columnDensities[i] > avgDensity * 0.7) {
+        } else if (columnDensities[i] > avgDensity * denseFactor) {
           denseRegions++;
         }
       }
       
-      return denseRegions >= 2 && gapCount >= 1;
+      return denseRegions >= minDenseRegions && gapCount >= 1;
     } else {
       // Similar logic for vertical
       const rowDensities: number[] = [];
       const step = Math.max(1, Math.floor(height / (height / gridSize)));
+
+      const gapFactor = Math.max(0.12, 0.42 - (sensitivity * 0.15));
+      const denseFactor = Math.min(0.92, 0.58 + (sensitivity * 0.12));
+      const minDenseRegions = sensitivity >= 0.95 ? 1 : 2;
       
       for (let y = 0; y < height; y += step) {
         let rowPixels = 0;
@@ -4890,15 +5280,112 @@ export class TileMapEditor {
       const avgDensity = rowDensities.reduce((a, b) => a + b, 0) / rowDensities.length;
       
       for (let i = 0; i < rowDensities.length; i++) {
-        if (rowDensities[i] < avgDensity * 0.3) {
+        if (rowDensities[i] < avgDensity * gapFactor) {
           gapCount++;
-        } else if (rowDensities[i] > avgDensity * 0.7) {
+        } else if (rowDensities[i] > avgDensity * denseFactor) {
           denseRegions++;
         }
       }
       
-      return denseRegions >= 2 && gapCount >= 1;
+      return denseRegions >= minDenseRegions && gapCount >= 1;
     }
+  }
+
+  /**
+   * Split object by detected vertical gaps (for isometric tilesets)
+   * Gaps indicate separate objects that were wrongly merged
+   */
+  private splitObjectByGaps(
+    objectData: { bounds: { x: number; y: number; width: number; height: number }; pixels: Array<{x: number, y: number}> },
+    rowGapPositions: number[],
+    colGapPositions: number[] = []
+  ): Array<{ x: number; y: number; width: number; height: number }> {
+    const { bounds } = objectData;
+    const results: Array<{ x: number; y: number; width: number; height: number }> = [];
+    
+    if (rowGapPositions.length === 0 && colGapPositions.length === 0) return [bounds];
+
+    // Step 2: split on both axes (row/column valleys) to avoid multi-object merges.
+    const yCuts = [bounds.y, ...rowGapPositions.map(g => bounds.y + g), bounds.y + bounds.height]
+      .sort((a, b) => a - b)
+      .filter((v, idx, arr) => idx === 0 || v !== arr[idx - 1]);
+    const xCuts = [bounds.x, ...colGapPositions.map(g => bounds.x + g), bounds.x + bounds.width]
+      .sort((a, b) => a - b)
+      .filter((v, idx, arr) => idx === 0 || v !== arr[idx - 1]);
+
+    for (let yi = 0; yi < yCuts.length - 1; yi++) {
+      for (let xi = 0; xi < xCuts.length - 1; xi++) {
+        const topY = yCuts[yi];
+        const bottomY = yCuts[yi + 1];
+        const leftX = xCuts[xi];
+        const rightX = xCuts[xi + 1];
+
+        if (bottomY > topY && rightX > leftX) {
+          const region = this.findContentInRegion(objectData.pixels, {
+            x: leftX,
+            y: topY,
+            width: rightX - leftX,
+            height: bottomY - topY
+          });
+
+          if (region) {
+            results.push(region);
+          }
+        }
+      }
+    }
+
+    if (results.length === 0) return [bounds];
+    const unique = new Map<string, { x: number; y: number; width: number; height: number }>();
+    for (const r of results) {
+      unique.set(`${r.x}:${r.y}:${r.width}:${r.height}`, r);
+    }
+    return Array.from(unique.values());
+  }
+
+  private buildObjectDataFromBounds(
+    data: Uint8ClampedArray,
+    imageWidth: number,
+    imageHeight: number,
+    bounds: { x: number; y: number; width: number; height: number }
+  ): { bounds: { x: number; y: number; width: number; height: number }; pixels: Array<{x: number, y: number}> } {
+    const pixels: Array<{x: number, y: number}> = [];
+
+    const startX = Math.max(0, bounds.x);
+    const startY = Math.max(0, bounds.y);
+    const endX = Math.min(imageWidth, bounds.x + bounds.width);
+    const endY = Math.min(imageHeight, bounds.y + bounds.height);
+
+    let minX = Number.MAX_SAFE_INTEGER;
+    let minY = Number.MAX_SAFE_INTEGER;
+    let maxX = Number.MIN_SAFE_INTEGER;
+    let maxY = Number.MIN_SAFE_INTEGER;
+
+    for (let y = startY; y < endY; y++) {
+      for (let x = startX; x < endX; x++) {
+        if (!this.isPixelTransparent(data, x, y, imageWidth)) {
+          pixels.push({ x, y });
+          if (x < minX) minX = x;
+          if (y < minY) minY = y;
+          if (x > maxX) maxX = x;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+
+    if (pixels.length === 0) {
+      return { bounds, pixels: [] };
+    }
+
+    return {
+      bounds: {
+        x: minX,
+        y: minY,
+        width: (maxX - minX + 1),
+        height: (maxY - minY + 1)
+      },
+      pixels
+    };
   }
 
   private splitObjectByGrid(
@@ -4968,6 +5455,131 @@ export class TileMapEditor {
     }
     
     return results.length > 0 ? results : [bounds];
+  }
+
+  private splitObjectByBridgeBreaking(
+    objectData: { bounds: { x: number; y: number; width: number; height: number }; pixels: Array<{x: number, y: number}> },
+    sensitivity: number
+  ): Array<{ x: number; y: number; width: number; height: number }> | null {
+    const { bounds, pixels } = objectData;
+    const w = bounds.width;
+    const h = bounds.height;
+
+    if (w < 4 || h < 4 || pixels.length < 12) return null;
+
+    const toIndex = (x: number, y: number) => y * w + x;
+    const mask = new Uint8Array(w * h);
+
+    for (const p of pixels) {
+      const lx = p.x - bounds.x;
+      const ly = p.y - bounds.y;
+      if (lx >= 0 && lx < w && ly >= 0 && ly < h) {
+        mask[toIndex(lx, ly)] = 1;
+      }
+    }
+
+    // Higher sensitivity applies stronger erosion to break 1-pixel bridges.
+    const erosionPasses = sensitivity >= 1.25 ? 2 : 1;
+    let work = mask;
+
+    for (let pass = 0; pass < erosionPasses; pass++) {
+      const next = new Uint8Array(w * h);
+      for (let y = 1; y < h - 1; y++) {
+        for (let x = 1; x < w - 1; x++) {
+          const idx = toIndex(x, y);
+          if (!work[idx]) continue;
+
+          const up = work[toIndex(x, y - 1)];
+          const down = work[toIndex(x, y + 1)];
+          const left = work[toIndex(x - 1, y)];
+          const right = work[toIndex(x + 1, y)];
+
+          // Cross-erosion preserves thicker regions while removing thin links.
+          if (up && down && left && right) {
+            next[idx] = 1;
+          }
+        }
+      }
+      work = next;
+    }
+
+    const visited = new Uint8Array(w * h);
+    const components: Array<{ minX: number; minY: number; maxX: number; maxY: number; count: number }> = [];
+
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const start = toIndex(x, y);
+        if (!work[start] || visited[start]) continue;
+
+        const stack: number[] = [start];
+        visited[start] = 1;
+
+        let minX = x;
+        let maxX = x;
+        let minY = y;
+        let maxY = y;
+        let count = 0;
+
+        while (stack.length > 0) {
+          const idx = stack.pop()!;
+          const cx = idx % w;
+          const cy = Math.floor(idx / w);
+          count++;
+
+          if (cx < minX) minX = cx;
+          if (cx > maxX) maxX = cx;
+          if (cy < minY) minY = cy;
+          if (cy > maxY) maxY = cy;
+
+          const neighbors = [
+            [cx + 1, cy],
+            [cx - 1, cy],
+            [cx, cy + 1],
+            [cx, cy - 1]
+          ];
+
+          for (const [nx, ny] of neighbors) {
+            if (nx < 0 || nx >= w || ny < 0 || ny >= h) continue;
+            const nIdx = toIndex(nx, ny);
+            if (!work[nIdx] || visited[nIdx]) continue;
+            visited[nIdx] = 1;
+            stack.push(nIdx);
+          }
+        }
+
+        components.push({ minX, minY, maxX, maxY, count });
+      }
+    }
+
+    if (components.length <= 1) return null;
+
+    const minComponentPixels = 3;
+    const pad = 2 + erosionPasses;
+    const results: Array<{ x: number; y: number; width: number; height: number }> = [];
+
+    for (const c of components) {
+      if (c.count < minComponentPixels) continue;
+
+      const region = this.findContentInRegion(pixels, {
+        x: Math.max(bounds.x, bounds.x + c.minX - pad),
+        y: Math.max(bounds.y, bounds.y + c.minY - pad),
+        width: Math.min(bounds.x + bounds.width, bounds.x + c.maxX + pad + 1) - Math.max(bounds.x, bounds.x + c.minX - pad),
+        height: Math.min(bounds.y + bounds.height, bounds.y + c.maxY + pad + 1) - Math.max(bounds.y, bounds.y + c.minY - pad)
+      });
+
+      if (region) {
+        results.push(region);
+      }
+    }
+
+    if (results.length <= 1) return null;
+
+    const unique = new Map<string, { x: number; y: number; width: number; height: number }>();
+    for (const r of results) {
+      unique.set(`${r.x}:${r.y}:${r.width}:${r.height}`, r);
+    }
+
+    return Array.from(unique.values());
   }
 
   private findContentInRegion(
@@ -5799,22 +6411,42 @@ export class TileMapEditor {
 
       if (targetLayer) {
         if (stampTile.tileId !== 0) {
-          // Remove any existing sprite object at this position so the new stamp replaces it
-          const existingValue = targetLayer.data[targetIndex];
-          if (existingValue && existingValue > 0) {
-            this.removeSpriteObjectAt(targetLayer.type, targetX, targetY);
-          }
-          
-          targetLayer.data[targetIndex] = stampTile.tileId;
-          try {
-            const lType = targetLayer.type;
-            let arr = this.layerCellTilesetKey.get(lType);
-            if (!arr) {
-              arr = new Array(this.mapWidth * this.mapHeight).fill(null);
-              this.layerCellTilesetKey.set(lType, arr);
+          const effectivePaintMode = this.getEffectivePaintModeForLayer(targetLayer.type);
+          // Phase 4: Paint mode branching
+          if (effectivePaintMode === 'object') {
+            // Object mode: create ObjectInstance for each stamp tile
+            // instead of painting to layer.data
+            const asset = this.resolveOrCreateAssetRecordForGid(stampTile.tileId, targetLayer.type);
+            if (asset) {
+              const instance: ObjectInstance = {
+                id: `obj_${this.nextObjectInstanceId++}`,
+                assetRecordId: asset.id,
+                gridX: targetX,
+                gridY: targetY,
+                layerId: targetLayer.id.toString(),
+                properties: {}
+              };
+              this.addObjectInstance(instance);
             }
-            arr[targetIndex] = tilesetFileName;
-          } catch (_e) { void _e; }
+          } else {
+            // Ground mode: paint to layer.data as normal
+            // Remove any existing sprite object at this position so the new stamp replaces it
+            const existingValue = targetLayer.data[targetIndex];
+            if (existingValue && existingValue > 0) {
+              this.removeSpriteObjectAt(targetLayer.type, targetX, targetY);
+            }
+
+            targetLayer.data[targetIndex] = stampTile.tileId;
+            try {
+              const lType = targetLayer.type;
+              let arr = this.layerCellTilesetKey.get(lType);
+              if (!arr) {
+                arr = new Array(this.mapWidth * this.mapHeight).fill(null);
+                this.layerCellTilesetKey.set(lType, arr);
+              }
+              arr[targetIndex] = tilesetFileName;
+            } catch (_e) { void _e; }
+          }
         }
       }
     }
@@ -5963,9 +6595,10 @@ export class TileMapEditor {
           arr[index] = tilesetFileName;
         } catch (_e) { void _e; }
 
-        // Handle object creation based on layer type for placed tiles
+        // Legacy map-object creation applies to event/enemy/npc layers only.
+        // Object layer uses ObjectInstances and should not create placeholder map objects.
         try {
-          if (layer.type === 'event' || layer.type === 'enemy' || layer.type === 'npc' || layer.type === 'object') {
+          if (layer.type === 'event' || layer.type === 'enemy' || layer.type === 'npc') {
             if (t.tileId > 0) {
               this.createObjectFromTile(targetX, targetY, layer.type, t.tileId);
             } else {
@@ -6438,11 +7071,21 @@ export class TileMapEditor {
       if (tab && tab.tileset) {
         if (tab.tileset.image) {
           // Image is ready - apply tileset immediately
-          const columns = tab.tileset.columns ?? (tab.tileset.image ? Math.max(1, Math.floor(tab.tileset.image.width / this.tileSizeX)) : 1);
-          const rows = tab.tileset.rows ?? (tab.tileset.image ? Math.max(1, Math.floor(tab.tileset.image.height / this.tileSizeY)) : 1);
-          const count = tab.tileset.count ?? Math.max(1, columns * rows);
-          const tileWidth = tab.tileset.tileWidth ?? (tab.tileset.image ? Math.round(tab.tileset.image.width / columns) : this.tileSizeX);
-          const tileHeight = tab.tileset.tileHeight ?? (tab.tileset.image ? Math.round(tab.tileset.image.height / rows) : this.tileSizeY);
+          const columns = (typeof tab.tileset.columns === 'number' && tab.tileset.columns > 0)
+            ? tab.tileset.columns
+            : (tab.tileset.image ? Math.max(1, Math.floor(tab.tileset.image.width / this.tileSizeX)) : 1);
+          const rows = (typeof tab.tileset.rows === 'number' && tab.tileset.rows > 0)
+            ? tab.tileset.rows
+            : (tab.tileset.image ? Math.max(1, Math.floor(tab.tileset.image.height / this.tileSizeY)) : 1);
+          const count = (typeof tab.tileset.count === 'number' && tab.tileset.count > 0)
+            ? tab.tileset.count
+            : Math.max(1, columns * rows);
+          const tileWidth = (typeof tab.tileset.tileWidth === 'number' && tab.tileset.tileWidth > 0)
+            ? tab.tileset.tileWidth
+            : (tab.tileset.image ? Math.round(tab.tileset.image.width / Math.max(1, columns)) : this.tileSizeX);
+          const tileHeight = (typeof tab.tileset.tileHeight === 'number' && tab.tileset.tileHeight > 0)
+            ? tab.tileset.tileHeight
+            : (tab.tileset.image ? Math.round(tab.tileset.image.height / Math.max(1, rows)) : this.tileSizeY);
           this.layerTilesets.set(layerType, {
             image: tab.tileset.image,
             fileName: tab.tileset.fileName ?? null,
@@ -6472,11 +7115,21 @@ export class TileMapEditor {
             console.log(`[TAB] Tab ${tabId} - using cached image for tileset "${tab.tileset.fileName}"`);
             // Use cached image - apply tileset immediately
             tab.tileset.image = cachedTileset.image;
-            const columns = tab.tileset.columns ?? Math.max(1, Math.floor(cachedTileset.image.width / this.tileSizeX));
-            const rows = tab.tileset.rows ?? Math.max(1, Math.floor(cachedTileset.image.height / this.tileSizeY));
-            const count = tab.tileset.count ?? Math.max(1, columns * rows);
-            const tileWidth = tab.tileset.tileWidth ?? Math.round(cachedTileset.image.width / columns);
-            const tileHeight = tab.tileset.tileHeight ?? Math.round(cachedTileset.image.height / rows);
+            const columns = (typeof tab.tileset.columns === 'number' && tab.tileset.columns > 0)
+              ? tab.tileset.columns
+              : Math.max(1, Math.floor(cachedTileset.image.width / this.tileSizeX));
+            const rows = (typeof tab.tileset.rows === 'number' && tab.tileset.rows > 0)
+              ? tab.tileset.rows
+              : Math.max(1, Math.floor(cachedTileset.image.height / this.tileSizeY));
+            const count = (typeof tab.tileset.count === 'number' && tab.tileset.count > 0)
+              ? tab.tileset.count
+              : Math.max(1, columns * rows);
+            const tileWidth = (typeof tab.tileset.tileWidth === 'number' && tab.tileset.tileWidth > 0)
+              ? tab.tileset.tileWidth
+              : Math.round(cachedTileset.image.width / Math.max(1, columns));
+            const tileHeight = (typeof tab.tileset.tileHeight === 'number' && tab.tileset.tileHeight > 0)
+              ? tab.tileset.tileHeight
+              : Math.round(cachedTileset.image.height / Math.max(1, rows));
             this.layerTilesets.set(layerType, {
               image: cachedTileset.image,
               fileName: tab.tileset.fileName ?? null,
@@ -6571,7 +7224,17 @@ export class TileMapEditor {
     this.draw();
   }
 
-  public importBrushImageToLayerTab(layerType: string, tabId: number, file: File, projectPath?: string): Promise<void> {
+  public importBrushImageToLayerTab(
+    layerType: string,
+    tabId: number,
+    file: File,
+    projectPath?: string,
+    overrideSensitivity?: number,
+    forceIsometric?: boolean,
+    manualTileWidth?: number,
+    manualTileHeight?: number,
+    forceGridSlicing?: boolean
+  ): Promise<void> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -6582,11 +7245,13 @@ export class TileMapEditor {
           if (!tab) return reject(new Error('Tab not found'));
           if (!tab.brushes) tab.brushes = [];
           tab.brushes.push({ image: img as HTMLImageElement, fileName: file.name, width: img.width, height: img.height });
-          const columns = Math.max(1, Math.floor(img.width / this.tileSizeX));
-          const rows = Math.max(1, Math.floor(img.height / this.tileSizeY));
+          const effectiveTileWidth = typeof manualTileWidth === 'number' && manualTileWidth > 0 ? manualTileWidth : this.tileSizeX;
+          const effectiveTileHeight = typeof manualTileHeight === 'number' && manualTileHeight > 0 ? manualTileHeight : this.tileSizeY;
+          const columns = Math.max(1, Math.floor(img.width / effectiveTileWidth));
+          const rows = Math.max(1, Math.floor(img.height / effectiveTileHeight));
           const count = Math.max(1, columns * rows);
-          const tileWidth = columns > 0 ? Math.round(img.width / columns) : this.tileSizeX;
-          const tileHeight = rows > 0 ? Math.round(img.height / rows) : this.tileSizeY;
+          const tileWidth = effectiveTileWidth;
+          const tileHeight = effectiveTileHeight;
           const sourcePath = this.extractFileSourcePath(file);
           
           // Store just the filename (not full path) for tilesetImages key
@@ -6620,6 +7285,71 @@ export class TileMapEditor {
             tab.tileset.margin = 0;
             tab.tileset.sourcePath = sourcePath;
           }
+
+          // Populate detected tiles on import.
+          // Prefer variable-size detection unless fixed-grid slicing is explicitly requested.
+          const importedDetectedTiles = new Map<number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }>();
+          let gidCounter = 1;
+
+          if (!forceGridSlicing) {
+            try {
+              const prevTilesetImage = this.tilesetImage;
+              this.tilesetImage = img as HTMLImageElement;
+              const variableDetected = this.detectVariableSizedTiles(overrideSensitivity, forceIsometric);
+              this.tilesetImage = prevTilesetImage;
+
+              const maxReasonable = Math.max(count * 4, 64);
+              if (variableDetected.length > 0 && variableDetected.length <= maxReasonable) {
+                for (const tile of variableDetected) {
+                  importedDetectedTiles.set(gidCounter, {
+                    sourceX: tile.sourceX,
+                    sourceY: tile.sourceY,
+                    width: tile.width,
+                    height: tile.height,
+                    originX: Math.floor(tile.width / 2),
+                    originY: tile.height
+                  });
+                  gidCounter++;
+                }
+              }
+            } catch (_e) {
+              void _e;
+            }
+          }
+
+          if (importedDetectedTiles.size === 0) {
+            for (let row = 0; row < rows; row++) {
+              for (let col = 0; col < columns; col++) {
+                const sourceX = col * tileWidth;
+                const sourceY = row * tileHeight;
+                const width = Math.min(tileWidth, img.width - sourceX);
+                const height = Math.min(tileHeight, img.height - sourceY);
+                if (width <= 0 || height <= 0) continue;
+                importedDetectedTiles.set(gidCounter, {
+                  sourceX,
+                  sourceY,
+                  width,
+                  height,
+                  originX: Math.floor(width / 2),
+                  originY: height
+                });
+                gidCounter++;
+              }
+            }
+          }
+
+          tab.detectedTiles = importedDetectedTiles;
+          this.layerTileData.set(layerType, new Map(importedDetectedTiles));
+
+          // If this is currently the active layer, keep global detected map in sync too.
+          const activeLayer = this.tileLayers.find(l => l.id === this.activeLayerId);
+          if (activeLayer?.type === layerType) {
+            this.detectedTileData.clear();
+            for (const [gid, data] of importedDetectedTiles.entries()) {
+              this.detectedTileData.set(gid, data);
+            }
+          }
+
           // If this tab is active for the layer, update current tileset/palette
           const activeTabId = this.layerActiveTabId.get(layerType);
           if (activeTabId === tabId) {
@@ -6719,13 +7449,31 @@ export class TileMapEditor {
     
     const tileset = this.getLayerTilesetOrFallback(layerType);
     if (tileset) {
+      const normalizedTileWidth = (typeof tileset.tileWidth === 'number' && tileset.tileWidth > 0)
+        ? tileset.tileWidth
+        : this.tileSizeX;
+      const normalizedTileHeight = (typeof tileset.tileHeight === 'number' && tileset.tileHeight > 0)
+        ? tileset.tileHeight
+        : this.tileSizeY;
+      const imgWidth = tileset.image?.width || 0;
+      const imgHeight = tileset.image?.height || 0;
+      const normalizedColumns = (typeof tileset.columns === 'number' && tileset.columns > 0)
+        ? tileset.columns
+        : Math.max(1, Math.floor(imgWidth / Math.max(1, normalizedTileWidth)));
+      const normalizedRows = (typeof tileset.rows === 'number' && tileset.rows > 0)
+        ? tileset.rows
+        : Math.max(1, Math.floor(imgHeight / Math.max(1, normalizedTileHeight)));
+      const normalizedCount = (typeof tileset.count === 'number' && tileset.count > 0)
+        ? tileset.count
+        : Math.max(1, normalizedColumns * normalizedRows);
+
       this.tilesetImage = tileset.image;
       this.tilesetFileName = tileset.fileName;
-      this.tilesetColumns = tileset.columns;
-      this.tilesetRows = tileset.rows;
-      this.tileCount = tileset.count;
-      this.tilesetTileWidth = tileset.tileWidth ?? this.tileSizeX;
-      this.tilesetTileHeight = tileset.tileHeight ?? this.tileSizeY;
+      this.tilesetColumns = normalizedColumns;
+      this.tilesetRows = normalizedRows;
+      this.tileCount = normalizedCount;
+      this.tilesetTileWidth = normalizedTileWidth;
+      this.tilesetTileHeight = normalizedTileHeight;
       this.tilesetSpacing = tileset.spacing ?? 0;
       this.tilesetMargin = tileset.margin ?? 0;
       this.tilesetSourcePath = tileset.sourcePath ?? this.tilesetSourcePath;
@@ -6788,6 +7536,11 @@ export class TileMapEditor {
         const spriteObjects = this.placedSpriteObjects.get(layer.type);
         if (spriteObjects) {
           spriteObjects.length = 0; // Clear the array
+        }
+
+        const instanceIds = this.getObjectInstancesByLayer(layer.id.toString()).map(inst => inst.id);
+        for (const id of instanceIds) {
+          this.removeObjectInstance(id);
         }
         
         this.markAsChanged();
@@ -7705,8 +8458,12 @@ export class TileMapEditor {
         layerTabs: layerTabsObj,
         layerActiveTabId: layerActiveTabIdObj
       };
-      
-      localStorage.setItem('tilemap_autosave_backup', JSON.stringify(backupData));
+
+      // Crash backup is project-scoped and stored on disk: {projectPath}/backup/crash-backup.json
+      const projectPath = this.currentProjectPath;
+      if (projectPath && window.electronAPI?.saveCrashBackup) {
+        void window.electronAPI.saveCrashBackup(projectPath, backupData);
+      }
     } catch (_error) { void _error; }
   }
   
@@ -7771,27 +8528,26 @@ export class TileMapEditor {
     }
   }
 
-  public loadFromLocalStorage(): boolean {
+  public loadFromBackupData(backup: unknown): boolean {
     try {
-      const backupData = localStorage.getItem('tilemap_autosave_backup');
-      if (!backupData) return false;
-
-      const data = JSON.parse(backupData);
+      const data = backup as Record<string, unknown>;
+      if (!data) return false;
       
       // Check if backup is recent (within last 24 hours)
-      const age = Date.now() - data.timestamp;
+      const timestamp = typeof data.timestamp === 'number' ? data.timestamp : 0;
+      const age = Date.now() - timestamp;
       if (age > 24 * 60 * 60 * 1000) return false;
 
-      this.mapWidth = data.mapWidth;
-      this.mapHeight = data.mapHeight;
-      this.tileLayers = data.layers;
-      const loadedObjects = this.normalizeLoadedObjects(data.objects);
+      this.mapWidth = typeof data.mapWidth === 'number' ? data.mapWidth : this.mapWidth;
+      this.mapHeight = typeof data.mapHeight === 'number' ? data.mapHeight : this.mapHeight;
+      this.tileLayers = (Array.isArray(data.layers) ? data.layers : this.tileLayers) as TileLayer[];
+      const loadedObjects = this.normalizeLoadedObjects((Array.isArray(data.objects) ? data.objects : []) as MapObject[]);
       this.objects = loadedObjects;
       this.nextObjectId = this.calculateNextObjectId(loadedObjects);
       this.notifyObjectsChanged();
-      this.tilesetFileName = data.tilesetFileName;
+      this.tilesetFileName = (typeof data.tilesetFileName === 'string' ? data.tilesetFileName : null);
       if (typeof data.mapName === 'string') {
-        this.setMapName(data.mapName);
+        this.setMapName(data.mapName as string);
       } else if (this.tilesetFileName) {
         this.setMapName(this.tilesetFileName.replace(/\.[^/.]+$/, ''));
       } else {
@@ -7799,7 +8555,7 @@ export class TileMapEditor {
       }
 
       // Restore hero position if available
-      if (data.heroX !== undefined && data.heroY !== undefined) {
+      if (typeof data.heroX === 'number' && typeof data.heroY === 'number') {
         this.heroX = Math.max(0, Math.min(data.heroX, this.mapWidth - 1));
         this.heroY = Math.max(0, Math.min(data.heroY, this.mapHeight - 1));
       } else {
@@ -7808,29 +8564,31 @@ export class TileMapEditor {
       }
 
       // Restore brush-related settings if available
-      if (data.tileContentThreshold !== undefined) {
+      if (typeof data.tileContentThreshold === 'number') {
         this.tileContentThreshold = data.tileContentThreshold;
       }
-      if (data.objectSeparationSensitivity !== undefined) {
+      if (typeof data.objectSeparationSensitivity === 'number') {
         this.objectSeparationSensitivity = data.objectSeparationSensitivity;
       }
 
       // Restore detectedTileData if available
-      if (data.detectedTileData) {
+      if (Array.isArray(data.detectedTileData)) {
         this.detectedTileData.clear();
-        for (const [key, value] of data.detectedTileData) {
-          this.detectedTileData.set(key, value);
+        for (const entry of data.detectedTileData) {
+          if (Array.isArray(entry) && entry.length === 2 && typeof entry[0] === 'number') {
+            this.detectedTileData.set(entry[0], entry[1] as { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number });
+          }
         }
       }
 
       // Restore layer tabs if available (tab state: id and name)
       if (data.layerTabs && typeof data.layerTabs === 'object') {
         this.layerTabs.clear();
-        for (const [layerType, tabs] of Object.entries(data.layerTabs)) {
+        for (const [layerType, tabs] of Object.entries(data.layerTabs as Record<string, unknown>)) {
           if (Array.isArray(tabs)) {
             this.layerTabs.set(layerType, tabs.map(tab => ({
-              id: tab.id,
-              name: typeof tab.name === 'string' ? tab.name : '',
+              id: (tab as { id: number }).id,
+              name: typeof (tab as { name?: string }).name === 'string' ? (tab as { name: string }).name : '',
               tileset: undefined,
               detectedTiles: undefined,
               brushes: undefined
@@ -7842,7 +8600,7 @@ export class TileMapEditor {
       // Restore active tab id per layer if available
       if (data.layerActiveTabId && typeof data.layerActiveTabId === 'object') {
         this.layerActiveTabId.clear();
-        for (const [layerType, tabId] of Object.entries(data.layerActiveTabId)) {
+        for (const [layerType, tabId] of Object.entries(data.layerActiveTabId as Record<string, unknown>)) {
           if (typeof tabId === 'number') {
             this.layerActiveTabId.set(layerType, tabId);
           }
@@ -7850,7 +8608,7 @@ export class TileMapEditor {
       }
 
       // Restore tileset image if available
-      if (data.tilesetImage) {
+      if (typeof data.tilesetImage === 'string' && data.tilesetImage.length > 0) {
         const img = new Image();
         img.onload = () => {
           this.tilesetImage = img;
@@ -7860,7 +8618,7 @@ export class TileMapEditor {
           this.tileCount = this.tilesetColumns * this.tilesetRows;
           
           // Create tile palette using preserved brush data if available
-          if (data.detectedTileData && data.detectedTileData.length > 0) {
+          if (Array.isArray(data.detectedTileData) && data.detectedTileData.length > 0) {
             // Use preserved brush data - don't regenerate
             this.createTilePalette(true);
           } else {
@@ -7884,8 +8642,14 @@ export class TileMapEditor {
     }
   }
 
-  public clearLocalStorageBackup(): void {
-    localStorage.removeItem('tilemap_autosave_backup');
+  public clearCrashBackup(): void {
+    try {
+      if (this.currentProjectPath && window.electronAPI?.clearCrashBackup) {
+        void window.electronAPI.clearCrashBackup(this.currentProjectPath);
+      }
+    } catch (_error) {
+      void _error;
+    }
   }
 
   // Save locking methods to prevent edits during save
@@ -8245,8 +9009,9 @@ export class TileMapEditor {
       void _err;
     }
 
-    // Serialize placed sprite objects (multi-cell palette paintings on object/background layers)
-    if (this.placedSpriteObjects.size > 0) {
+    // Serialize placed sprite objects only during transition when no objectInstances exist.
+    // Once instances are present, avoid writing legacy sprite objects back out.
+    if (this.placedSpriteObjects.size > 0 && this.objectInstances.size === 0) {
       const spriteObj: NonNullable<EditorProjectData['placedSpriteObjects']> = {};
       for (const [layerType, objs] of this.placedSpriteObjects.entries()) {
         if (objs.length > 0) {
@@ -8258,7 +9023,360 @@ export class TileMapEditor {
       }
     }
 
+    // Phase 1: Serialize asset records and object instances
+    if (this.assetRecords.size > 0) {
+      projectData.assetRecords = Array.from(this.assetRecords.values());
+      console.log(`[SAVE] Serialized ${projectData.assetRecords.length} asset records`);
+    }
+    if (this.objectInstances.size > 0) {
+      projectData.objectInstances = Array.from(this.objectInstances.values());
+      console.log(`[SAVE] Serialized ${projectData.objectInstances.length} object instances`);
+    }
+    if (this.paintMode) {
+      projectData.paintMode = this.paintMode;
+    }
+
+    // Phase 7: Bump schema to indicate object-instance migration support.
+    projectData.dataSchemaVersion = '1.2';
+    projectData.dataSchemaRevision = 2;
+
     return projectData;
+  }
+
+  // ============================================================================
+  // Phase 2: Asset Record & Object Instance Accessors
+  // ============================================================================
+
+  private getSpatialCellKey(x: number, y: number): string {
+    return `${x},${y}`;
+  }
+
+  private getAssetFootprint(asset: AssetRecord): { width: number; height: number } {
+    return {
+      width: Math.max(1, asset.footprintWidth ?? 1),
+      height: Math.max(1, asset.footprintHeight ?? 1)
+    };
+  }
+
+  private getCollisionFootprintSize(instance: ObjectInstance, asset: AssetRecord): { width: number; height: number } {
+    return {
+      width: Math.max(1, instance.collisionFootprintWidth ?? asset.collisionFootprintWidth ?? asset.footprintWidth ?? 1),
+      height: Math.max(1, instance.collisionFootprintHeight ?? asset.collisionFootprintHeight ?? asset.footprintHeight ?? 1)
+    };
+  }
+
+  private deindexObjectInstance(instanceId: string): void {
+    const occupied = this.objectInstanceIndexCells.get(instanceId);
+    if (!occupied) return;
+    for (const cellKey of occupied) {
+      const ids = this.objectInstanceCellIndex.get(cellKey);
+      if (!ids) continue;
+      ids.delete(instanceId);
+      if (ids.size === 0) {
+        this.objectInstanceCellIndex.delete(cellKey);
+      }
+    }
+    this.objectInstanceIndexCells.delete(instanceId);
+  }
+
+  private indexObjectInstance(instance: ObjectInstance): void {
+    const asset = this.assetRecords.get(instance.assetRecordId);
+    if (!asset) return;
+
+    const footprint = this.getAssetFootprint(asset);
+    const occupied: string[] = [];
+    for (let dx = 0; dx < footprint.width; dx++) {
+      for (let dy = 0; dy < footprint.height; dy++) {
+        const cellKey = this.getSpatialCellKey(instance.gridX + dx, instance.gridY + dy);
+        let ids = this.objectInstanceCellIndex.get(cellKey);
+        if (!ids) {
+          ids = new Set<string>();
+          this.objectInstanceCellIndex.set(cellKey, ids);
+        }
+        ids.add(instance.id);
+        occupied.push(cellKey);
+      }
+    }
+    this.objectInstanceIndexCells.set(instance.id, occupied);
+  }
+
+  private rebuildObjectInstanceSpatialIndex(): void {
+    this.objectInstanceCellIndex.clear();
+    this.objectInstanceIndexCells.clear();
+    for (const instance of this.objectInstances.values()) {
+      this.indexObjectInstance(instance);
+    }
+  }
+
+  private migrateLegacyPlacedSpriteObjectsToInstances(): { migratedAssets: number; migratedInstances: number } {
+    const legacyAssetIdBySignature = new Map<string, string>();
+    let migratedAssets = 0;
+    let migratedInstances = 0;
+
+    for (const [layerType, legacyObjects] of this.placedSpriteObjects.entries()) {
+      if (!Array.isArray(legacyObjects) || legacyObjects.length === 0) continue;
+      const layer = this.tileLayers.find(l => l.type === layerType);
+      if (!layer) continue;
+
+      for (const legacyObj of legacyObjects) {
+        const signature = [
+          layerType,
+          legacyObj.tilesetKey ?? 'legacy',
+          legacyObj.sourceX,
+          legacyObj.sourceY,
+          legacyObj.width,
+          legacyObj.height
+        ].join('|');
+
+        let assetId = legacyAssetIdBySignature.get(signature);
+        if (!assetId) {
+          assetId = `asset_${this.nextAssetRecordId++}`;
+          const nowIso = new Date().toISOString();
+          const asset: AssetRecord = {
+            id: assetId,
+            profileId: `legacy_${legacyObj.tilesetKey ?? layerType}`,
+            name: `Migrated ${layerType} asset`,
+            sourceX: legacyObj.sourceX,
+            sourceY: legacyObj.sourceY,
+            width: legacyObj.width,
+            height: legacyObj.height,
+            originX: Math.floor(legacyObj.width / 2),
+            originY: legacyObj.height,
+            anchorX: 1,
+            anchorY: 1,
+            footprintWidth: Math.max(1, Math.ceil(legacyObj.width / this.tileSizeX)),
+            footprintHeight: Math.max(1, Math.ceil(legacyObj.height / this.tileSizeY)),
+            category: layerType === 'collision' ? 'collision' : (layerType === 'background' ? 'ground' : 'object'),
+            detectionConfidence: 1,
+            userVerified: true,
+            createdAt: nowIso,
+            lastModified: nowIso
+          };
+          this.assetRecords.set(assetId, asset);
+          legacyAssetIdBySignature.set(signature, assetId);
+          migratedAssets++;
+        }
+
+        const instance: ObjectInstance = {
+          id: `obj_${this.nextObjectInstanceId++}`,
+          assetRecordId: assetId,
+          gridX: legacyObj.anchorX,
+          gridY: legacyObj.anchorY,
+          layerId: layer.id.toString(),
+          properties: {
+            migratedFromLegacy: true,
+            legacySpriteObjectId: legacyObj.id
+          },
+          createdAt: new Date().toISOString()
+        };
+        this.objectInstances.set(instance.id, instance);
+        migratedInstances++;
+      }
+    }
+
+    if (migratedInstances > 0) {
+      this.rebuildObjectInstanceSpatialIndex();
+    }
+
+    return { migratedAssets, migratedInstances };
+  }
+
+  /**
+   * Add or update an asset record
+   */
+  public addAssetRecord(asset: AssetRecord): void {
+    if (!asset.id) {
+      asset.id = `asset_${this.nextAssetRecordId++}`;
+    } else {
+      const m = String(asset.id).match(/(\d+)$/);
+      if (m) {
+        const n = parseInt(m[1], 10);
+        if (!Number.isNaN(n) && n >= this.nextAssetRecordId) {
+          this.nextAssetRecordId = n + 1;
+        }
+      }
+    }
+    this.assetRecords.set(asset.id, asset);
+    // Asset footprint/category edits can affect indexed bounds; rebuild to avoid stale occupancy.
+    this.rebuildObjectInstanceSpatialIndex();
+    console.log(`[ASSET] Added asset record: ${asset.id} (${asset.name || 'unnamed'})`);
+  }
+
+  /**
+   * Get a single asset record by ID
+   */
+  public getAssetRecord(id: string): AssetRecord | undefined {
+    return this.assetRecords.get(id);
+  }
+
+  /**
+   * Get all asset records
+   */
+  public getAllAssetRecords(): AssetRecord[] {
+    return Array.from(this.assetRecords.values());
+  }
+
+  /**
+   * Add or update an object instance
+   */
+  public addObjectInstance(instance: ObjectInstance): void {
+    if (instance.id) {
+      this.deindexObjectInstance(instance.id);
+    }
+    if (!instance.id) {
+      instance.id = `obj_${this.nextObjectInstanceId++}`;
+    } else {
+      const m = String(instance.id).match(/(\d+)$/);
+      if (m) {
+        const n = parseInt(m[1], 10);
+        if (!Number.isNaN(n) && n >= this.nextObjectInstanceId) {
+          this.nextObjectInstanceId = n + 1;
+        }
+      }
+    }
+    this.objectInstances.set(instance.id, instance);
+    this.indexObjectInstance(instance);
+    console.log(`[OBJECT] Added object instance: ${instance.id} at (${instance.gridX}, ${instance.gridY})`);
+  }
+
+  /**
+   * Get a single object instance by ID
+   */
+  public getObjectInstance(id: string): ObjectInstance | undefined {
+    return this.objectInstances.get(id);
+  }
+
+  /**
+   * Get all object instances
+   */
+  public getAllObjectInstances(): ObjectInstance[] {
+    return Array.from(this.objectInstances.values());
+  }
+
+  /**
+   * Get all object instances on a specific layer
+   */
+  public getObjectInstancesByLayer(layerId: string): ObjectInstance[] {
+    const matches: ObjectInstance[] = [];
+    for (const inst of this.objectInstances.values()) {
+      if (inst.layerId === layerId) matches.push(inst);
+    }
+    return matches;
+  }
+
+  /**
+   * Remove an object instance by ID
+   */
+  public removeObjectInstance(id: string): boolean {
+    this.deindexObjectInstance(id);
+    const success = this.objectInstances.delete(id);
+    if (success) {
+      console.log(`[OBJECT] Removed object instance: ${id}`);
+    }
+    return success;
+  }
+
+  /**
+   * Set the current paint mode
+   */
+  public setPaintMode(mode: PaintMode): void {
+    if (this.paintMode !== mode) {
+      this.paintMode = mode;
+      console.log(`[PAINT] Paint mode changed to: ${mode}`);
+    }
+  }
+
+  /**
+   * Get the current paint mode
+   */
+  public getPaintMode(): PaintMode {
+    return this.paintMode;
+  }
+
+  private resolveOrCreateAssetRecordForGid(gid: number, layerType: string): AssetRecord | undefined {
+    const id = `asset_${gid}`;
+    const existing = this.getAssetRecord(id);
+    if (existing) return existing;
+
+    const tabs = this.layerTabs.get(layerType) || [];
+    const activeTabId = this.layerActiveTabId.get(layerType);
+    const activeTab = tabs.find(t => t.id === activeTabId);
+    const tileData = activeTab?.detectedTiles?.get(gid) || this.detectedTileData.get(gid);
+    if (!tileData) return undefined;
+
+    const profileId = activeTab?.tileset?.fileName
+      ? `profile_${activeTab.tileset.fileName}`
+      : `profile_${layerType}`;
+
+    const asset: AssetRecord = {
+      id,
+      profileId,
+      name: `Asset ${gid}`,
+      sourceX: tileData.sourceX,
+      sourceY: tileData.sourceY,
+      width: tileData.width,
+      height: tileData.height,
+      originX: tileData.originX ?? Math.floor(tileData.width / 2),
+      originY: tileData.originY ?? tileData.height,
+      anchorX: 1,
+      anchorY: 1,
+      footprintWidth: 1,
+      footprintHeight: 1,
+      category: layerType === 'object' ? 'object' : 'ground',
+      detectionConfidence: 0.95,
+      userVerified: false,
+      createdAt: new Date().toISOString(),
+      lastModified: new Date().toISOString()
+    };
+
+    this.addAssetRecord(asset);
+    return asset;
+  }
+
+  private getEffectivePaintModeForLayer(layerType: string): PaintMode {
+    return layerType === 'object' ? 'object' : 'ground';
+  }
+
+  /**
+   * Get all object instances at or overlapping a specific grid coordinate
+   * Phase 6: Used for collision/selection/eraser targeting with footprint-based bounds
+   */
+  public getObjectInstancesAtGridCoord(gridX: number, gridY: number): ObjectInstance[] {
+    const ids = this.objectInstanceCellIndex.get(this.getSpatialCellKey(gridX, gridY));
+    if (!ids || ids.size === 0) return [];
+    const instances: ObjectInstance[] = [];
+    for (const id of ids) {
+      const inst = this.objectInstances.get(id);
+      if (inst) instances.push(inst);
+    }
+    return instances;
+  }
+
+  /**
+   * Get collision footprint for a grid cell
+   * Phase 6: Returns the footprint cells occupied by collision assets at this location
+   */
+  public getCollisionFootprint(gridX: number, gridY: number): Array<{ x: number; y: number }> {
+    const footprint: Array<{ x: number; y: number }> = [];
+    
+    // Check for ObjectInstances with collision footprints
+    const instances = this.getObjectInstancesAtGridCoord(gridX, gridY);
+    for (const instance of instances) {
+      const asset = this.assetRecords.get(instance.assetRecordId);
+      if (!asset) continue;
+
+      const collisionSize = this.getCollisionFootprintSize(instance, asset);
+      const footprintWidth = collisionSize.width;
+      const footprintHeight = collisionSize.height;
+
+      for (let fx = 0; fx < footprintWidth; fx++) {
+        for (let fy = 0; fy < footprintHeight; fy++) {
+          footprint.push({ x: instance.gridX + fx, y: instance.gridY + fy });
+        }
+      }
+    }
+
+    return footprint;
   }
 
   // Ensure any tileset images currently loading are finished before
@@ -8782,10 +9900,10 @@ export class TileMapEditor {
     }
   }
 
-  // Reset editor for a new project - clears all data and localStorage
+  // Reset editor for a new project - clears all data and crash backup file
   public resetForNewProject(): void {
-    // Clear localStorage backup to prevent loading old data
-    this.clearLocalStorageBackup();
+    // Clear project crash backup to prevent loading old data
+    this.clearCrashBackup();
     
     // NOTE: Do NOT save tilesets to project-level here
     // Each map's tilesets should be stored in its own layerTabs
@@ -8908,6 +10026,12 @@ export class TileMapEditor {
       // Clear placed sprite objects so they don't bleed across map tabs
       this.placedSpriteObjects.clear();
       this.selectedObjectId = null;
+      // Phase 1: Clear asset records and object instances from previous loading
+      this.assetRecords.clear();
+      this.objectInstances.clear();
+      this.objectInstanceCellIndex.clear();
+      this.objectInstanceIndexCells.clear();
+      this.paintMode = 'ground'; // Reset to default paint mode
       this.selection = {
         active: false,
         startX: -1,
@@ -8937,6 +10061,13 @@ export class TileMapEditor {
         const imgInfo = imgKeys.map(k => ({ file: k, size: projectData.tilesetImages?.[k]?.length ?? 0 }));
         console.log('loadProjectData: incoming tileset summary', { tilesetsProvided: Array.isArray(projectData.tilesets) ? projectData.tilesets.length : 0, tilesetImageCount: imgKeys.length, imgInfo });
       } catch (_e) { void _e; }
+
+      // Phase 0: Check schema version for backward-compatibility
+      const schemaVersion = projectData.dataSchemaVersion || '1.0'; // Default to legacy if missing
+      console.log(`[MIGRATION] Loading project with schema version: ${schemaVersion} (revision: ${projectData.dataSchemaRevision ?? 'undefined'})`);
+      if (!projectData.dataSchemaVersion) {
+        console.warn('[MIGRATION] Legacy map detected (no schema version). Will load using legacy tileset/detectedTiles data.');
+      }
       
       // Restore brush-related settings and mapping if available
       if (projectData.tileContentThreshold !== undefined) {
@@ -9455,6 +10586,36 @@ export class TileMapEditor {
             }
           }
         }
+      }
+
+      // Phase 1: Restore asset records and object instances
+      if (projectData.assetRecords && Array.isArray(projectData.assetRecords)) {
+        for (const asset of projectData.assetRecords) {
+          this.assetRecords.set(asset.id, asset);
+          const m = String(asset.id).match(/(\d+)$/);
+          if (m) {
+            const numId = parseInt(m[1], 10);
+            if (!isNaN(numId) && numId >= this.nextAssetRecordId) {
+              this.nextAssetRecordId = numId + 1;
+            }
+          }
+        }
+        console.log(`[LOAD] Restored ${projectData.assetRecords.length} asset records`);
+      }
+      if (projectData.objectInstances && Array.isArray(projectData.objectInstances)) {
+        for (const instance of projectData.objectInstances) {
+          this.objectInstances.set(instance.id, instance);
+          // Keep nextObjectInstanceId above any restored ids
+          const numId = parseInt(instance.id, 10);
+          if (!isNaN(numId) && numId >= this.nextObjectInstanceId) {
+            this.nextObjectInstanceId = numId + 1;
+          }
+        }
+        console.log(`[LOAD] Restored ${projectData.objectInstances.length} object instances`);
+      }
+      if (projectData.paintMode) {
+        this.paintMode = projectData.paintMode;
+        console.log(`[LOAD] Restored paint mode: ${this.paintMode}`);
       }
 
       console.log('Project data loaded successfully');

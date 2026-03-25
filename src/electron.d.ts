@@ -49,6 +49,9 @@ declare global {
       createMapProject: (config: MapConfig) => Promise<boolean>;
       openMapProject: (projectPath: string, mapName?: string) => Promise<EditorProjectData | null>;
       saveMapProject: (projectPath: string, mapData: ProjectMapData) => Promise<boolean>;
+      // Phase 2: Tileset profile persistence
+      saveTilesetProfiles: (projectPath: string, profiles: Record<string, any>) => Promise<{ success: boolean; path?: string; error?: string }>;
+      loadTilesetProfiles: (projectPath: string) => Promise<Record<string, any> | null>;
       deleteMap: (projectPath: string, mapName: string) => Promise<{ success: boolean; message?: string }>;
       saveExportFiles: (projectPath: string, mapName: string, mapTxt: string, tilesetDef: string, options?: { spawn?: { enabled: boolean; content: string; filename?: string }; tilesetImages?: Record<string, string>; npcFiles?: Array<{ filename: string; content: string }> }) => Promise<boolean>;
       discoverTilesetImages: (projectPath: string) => Promise<{ tilesetImages: { [key: string]: string }; tilesets: { name: string; fileName: string }[] }>;
@@ -63,6 +66,9 @@ declare global {
       // Session management (per-project)
       readSession: (projectPath: string) => Promise<SessionData | null>;
       writeSession: (projectPath: string, sessionData: SessionData) => Promise<boolean>;
+      saveCrashBackup: (projectPath: string, backupData: unknown) => Promise<boolean>;
+      readCrashBackup: (projectPath: string) => Promise<unknown | null>;
+      clearCrashBackup: (projectPath: string) => Promise<boolean>;
       readFileAsDataURL: (filePath: string) => Promise<string | null>;
       // NPC file management
       createNpcFile: (projectPath: string, npcData: {

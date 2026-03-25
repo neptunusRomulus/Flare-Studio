@@ -7840,6 +7840,75 @@ export class TileMapEditor {
     return 'tileset.png';
   }
 
+  private getGidFromAssetRecordId(assetRecordId: string): number {
+    const match = /^asset_(\d+)$/.exec(assetRecordId || '');
+    if (!match) return 0;
+    const gid = parseInt(match[1], 10);
+    return Number.isFinite(gid) && gid > 0 ? gid : 0;
+  }
+
+  private inferTilesetKeyFromAssetProfileId(profileId: string | undefined, layerType: string): string | null {
+    if (profileId && profileId.startsWith('profile_')) {
+      const key = profileId.slice('profile_'.length).trim();
+      if (key) return key;
+    }
+    if (profileId && profileId.startsWith('legacy_')) {
+      const key = profileId.slice('legacy_'.length).trim();
+      if (key) return key;
+    }
+    const fallback = this.getLayerTilesetOrFallback(layerType);
+    return fallback?.fileName ?? null;
+  }
+
+  private buildObjectLayerExportState(layer: TileLayer): { data: number[]; cellTilesetKeys: Array<string | null> } {
+    const data = [...layer.data];
+    const size = this.mapWidth * this.mapHeight;
+    const existingKeys = this.layerCellTilesetKey.get(layer.type);
+    const cellTilesetKeys: Array<string | null> = existingKeys ? [...existingKeys] : new Array(size).fill(null);
+
+    const objectInstances = this.getObjectInstancesByLayer(layer.id.toString());
+    for (const instance of objectInstances) {
+      if (instance.gridX < 0 || instance.gridY < 0 || instance.gridX >= this.mapWidth || instance.gridY >= this.mapHeight) {
+        continue;
+      }
+
+      const localGid = this.getGidFromAssetRecordId(instance.assetRecordId);
+      if (localGid <= 0) {
+        continue;
+      }
+
+      const index = instance.gridY * this.mapWidth + instance.gridX;
+      data[index] = localGid;
+
+      const asset = this.getAssetRecord(instance.assetRecordId);
+      const tilesetKey = this.inferTilesetKeyFromAssetProfileId(asset?.profileId, layer.type);
+      if (tilesetKey) {
+        cellTilesetKeys[index] = tilesetKey;
+      }
+    }
+
+    // Backward compatibility for projects that still use legacy sprite objects.
+    if (objectInstances.length === 0) {
+      const legacyObjects = this.placedSpriteObjects.get(layer.type) || [];
+      for (const legacy of legacyObjects) {
+        if (legacy.anchorX < 0 || legacy.anchorY < 0 || legacy.anchorX >= this.mapWidth || legacy.anchorY >= this.mapHeight) {
+          continue;
+        }
+        if (legacy.gid <= 0) {
+          continue;
+        }
+
+        const index = legacy.anchorY * this.mapWidth + legacy.anchorX;
+        data[index] = legacy.gid;
+        if (legacy.tilesetKey) {
+          cellTilesetKeys[index] = legacy.tilesetKey;
+        }
+      }
+    }
+
+    return { data, cellTilesetKeys };
+  }
+
   public generateFlareMapTxt(options: FlareExportOptions = {}): string {
     const lines: string[] = [];
 
@@ -7896,17 +7965,24 @@ export class TileMapEditor {
 
       const layerTileset = this.getLayerTilesetOrFallback(layerType);
       const isCollisionLayer = layerType === COLLISION_LAYER_TYPE;
+      let exportLayerData = layer.data;
+      let exportCellTilesetKeys = this.layerCellTilesetKey.get(layerType);
+
+      if (layerType === 'object') {
+        const objectExportState = this.buildObjectLayerExportState(layer);
+        exportLayerData = objectExportState.data;
+        exportCellTilesetKeys = objectExportState.cellTilesetKeys;
+      }
 
       for (let y = 0; y < this.mapHeight; y++) {
         const row: string[] = [];
         for (let x = 0; x < this.mapWidth; x++) {
           const index = y * this.mapWidth + x;
-          const localTileId = layer.data[index];
+          const localTileId = exportLayerData[index];
           let globalTileId = 0;
           if (localTileId > 0) {
             // Determine which tileset this specific cell belongs to (per-cell key set at paint time)
-            const keyArr = this.layerCellTilesetKey.get(layerType);
-            const cellTilesetKey = keyArr ? keyArr[index] : (layerTileset ? layerTileset.fileName ?? null : null);
+            const cellTilesetKey = exportCellTilesetKeys ? exportCellTilesetKeys[index] : (layerTileset ? layerTileset.fileName ?? null : null);
             let tilesetOffset = undefined as number | undefined;
             if (!isCollisionLayer && cellTilesetKey) {
               tilesetOffset = tilesetOffsets.get(cellTilesetKey);

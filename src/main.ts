@@ -220,15 +220,15 @@ export class TileMapEditor {
       this.drawLayer(layer);
     });
 
-    // Draw collision overlay if collision tool is active
-    if (this.tool === 'collision') {
-      this.drawCollisionOverlay();
-    }
-
     // Draw grid, objects, and hover effect
     this.drawGrid();
     this.drawObjects();
     this.drawHoverEffect();
+
+    // Draw collision overlay last so it stays visually on top
+    if (this.tool === 'collision') {
+      this.drawCollisionOverlay();
+    }
   }
 
   private drawLayer(layer: TileLayer): void {
@@ -275,14 +275,36 @@ export class TileMapEditor {
         const screenX = this.elements.mapCanvas.width / 2 + (x - y) * this.tileSizeX / 2;
         const screenY = this.tileSizeY * 2 + (x + y) * this.tileSizeY / 2;
 
-        this.ctx.fillStyle = 'rgba(255, 0, 0, 0.3)';
-        this.ctx.beginPath();
-        this.ctx.moveTo(screenX, screenY - this.tileSizeY / 2);
+        this.ctx.lineWidth = 2;
+        this.ctx.setLineDash([]);
+        this.ctx.globalAlpha = 1;
+
+        switch (this.collisionData[index]) {
+          case 1:
+            this.ctx.strokeStyle = 'rgba(255, 255, 255, 1)';
+            break;
+          case 2:
+            this.ctx.strokeStyle = 'rgba(255, 255, 255, 1)';
+            this.ctx.setLineDash([6, 4]);
+            break;
+          case 3:
+            this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+            break;
+          case 4:
+            this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+            this.ctx.setLineDash([6, 4]);
+            break;
+          default:
+            this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+            break;
+        }
+
+        this.ctx.beginPath();        this.ctx.moveTo(screenX, screenY - this.tileSizeY / 2);
         this.ctx.lineTo(screenX + this.tileSizeX / 2, screenY);
         this.ctx.lineTo(screenX, screenY + this.tileSizeY / 2);
         this.ctx.lineTo(screenX - this.tileSizeX / 2, screenY);
         this.ctx.closePath();
-        this.ctx.fill();
+        this.ctx.stroke();
       }
     }
   }

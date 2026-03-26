@@ -2230,10 +2230,6 @@ export class TileMapEditor {
     // Draw tiles
     this.drawTiles();
 
-    // Collision tiles can be visually subtle depending on the map tileset.
-    // Render a dedicated overlay so painted collision cells remain obvious.
-    this.drawCollisionOverlay();
-    
     // Draw hover
     if (this.hoverX >= 0 && this.hoverY >= 0) {
       this.drawHover();
@@ -2255,6 +2251,9 @@ export class TileMapEditor {
 
     // Draw shape preview
     this.drawShapePreview();
+
+    // Draw collision overlay last so collision borders are always on top.
+    this.drawCollisionOverlay();
     
     // Restore context state
     this.ctx.restore();
@@ -2269,21 +2268,6 @@ export class TileMapEditor {
     this.drawDebugInfo();
   }
 
-  private getCollisionOverlayStyle(gid: number): { fill: string; stroke: string } {
-    switch (gid) {
-      case 1:
-        return { fill: 'rgba(239, 68, 68, 0.28)', stroke: 'rgba(185, 28, 28, 0.9)' }; // blocked
-      case 2:
-        return { fill: 'rgba(245, 158, 11, 0.28)', stroke: 'rgba(180, 83, 9, 0.9)' }; // one-way/partial
-      case 3:
-        return { fill: 'rgba(34, 197, 94, 0.28)', stroke: 'rgba(21, 128, 61, 0.9)' }; // walkable marker
-      case 4:
-        return { fill: 'rgba(59, 130, 246, 0.28)', stroke: 'rgba(29, 78, 216, 0.9)' }; // special
-      default:
-        return { fill: 'rgba(244, 63, 94, 0.24)', stroke: 'rgba(136, 19, 55, 0.85)' };
-    }
-  }
-
   private drawCollisionOverlay(): void {
     const collisionLayer = this.tileLayers.find(l => l.type === COLLISION_LAYER_TYPE && l.visible);
     if (!collisionLayer) return;
@@ -2292,7 +2276,7 @@ export class TileMapEditor {
     const halfTileY = (this.tileSizeY / 2) * this.zoom;
 
     this.ctx.save();
-    this.ctx.globalAlpha = Math.max(0.2, Math.min(1, collisionLayer.transparency || 1));
+    this.ctx.globalAlpha = 1;
     this.ctx.lineWidth = Math.max(1, Math.min(2.5, 1.4 / this.zoom));
 
     for (let y = 0; y < this.mapHeight; y++) {
@@ -2301,7 +2285,6 @@ export class TileMapEditor {
         const gid = collisionLayer.data[index];
         if (gid <= 0) continue;
 
-        const style = this.getCollisionOverlayStyle(gid);
         const p = this.mapToScreen(x, y);
 
         this.ctx.beginPath();
@@ -2311,18 +2294,35 @@ export class TileMapEditor {
         this.ctx.lineTo(p.x - halfTileX, p.y);
         this.ctx.closePath();
 
-        this.ctx.fillStyle = style.fill;
-        this.ctx.strokeStyle = style.stroke;
-        this.ctx.fill();
-        this.ctx.stroke();
+        this.ctx.lineWidth = 2;
+        this.ctx.setLineDash([]);
+        this.ctx.globalAlpha = 1;
 
-        if (this.zoom >= 0.75) {
-          this.ctx.fillStyle = 'rgba(17, 24, 39, 0.9)';
-          this.ctx.font = `${Math.max(10, Math.floor(10 * this.zoom))}px Segoe UI`;
-          this.ctx.textAlign = 'center';
-          this.ctx.textBaseline = 'middle';
-          this.ctx.fillText(String(gid), p.x, p.y);
+        switch (gid) {
+          case 1:
+            // full bold white stroke
+            this.ctx.strokeStyle = 'rgba(255, 255, 255, 1)';
+            break;
+          case 2:
+            // full bold white dashed stroke
+            this.ctx.strokeStyle = 'rgba(255, 255, 255, 1)';
+            this.ctx.setLineDash([6, 4]);
+            break;
+          case 3:
+            // half opacity bold white stroke
+            this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+            break;
+          case 4:
+            // half opacity bold white dashed stroke
+            this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+            this.ctx.setLineDash([6, 4]);
+            break;
+          default:
+            this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+            break;
         }
+
+        this.ctx.stroke();
       }
     }
 
@@ -2683,6 +2683,7 @@ export class TileMapEditor {
     
     for (const layer of layersReversed) {
       if (!layer.visible) continue;
+      if (layer.type === COLLISION_LAYER_TYPE) continue;
       
       // Check if this is an explicit object layer
       const isObjectLayer = this.objectLayerTypes.includes(layer.type);

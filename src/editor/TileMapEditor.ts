@@ -2300,13 +2300,17 @@ export class TileMapEditor {
 
         switch (gid) {
           case 1:
-            // full bold white stroke
+            // full bold white stroke + 30% white fill overlay
+            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
             this.ctx.strokeStyle = 'rgba(255, 255, 255, 1)';
+            this.ctx.fill();
             break;
           case 2:
-            // full bold white dashed stroke
+            // full bold white dashed stroke + 30% white fill overlay
+            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
             this.ctx.strokeStyle = 'rgba(255, 255, 255, 1)';
             this.ctx.setLineDash([6, 4]);
+            this.ctx.fill();
             break;
           case 3:
             // half opacity bold white stroke

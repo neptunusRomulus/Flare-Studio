@@ -136,7 +136,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
 
   const dialogContent = (
     <div className="fixed inset-0 flex items-center justify-center z-50">
-      <div className="bg-background border border-border/70 rounded-lg w-[90vw] h-[90vh] max-w-6xl flex flex-col">
+      <div className="bg-background border border-border/70 rounded-lg w-[45vw] h-[45vh] max-w-3xl flex flex-col">
         <div className="sticky top-0 z-10 border-b border-border/50 bg-background px-6 py-3 flex items-center justify-between">
           <h3 className="text-lg font-semibold">Event at {titleCoords}</h3>
           <Button

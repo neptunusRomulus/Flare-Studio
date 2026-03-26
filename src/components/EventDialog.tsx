@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { HelpCircle, X, Save } from 'lucide-react';
@@ -133,7 +134,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
 
   if (!open) return null;
 
-  return (
+  const dialogContent = (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-background border border-border/70 rounded-lg w-[90vw] h-[90vh] max-w-6xl flex flex-col">
         <div className="sticky top-0 z-10 border-b border-border/50 bg-background px-6 py-3 flex items-center justify-between">
@@ -765,6 +766,8 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
       </div>
     </div>
   );
+
+  return createPortal(dialogContent, document.body);
 };
 
 export default EventDialog;

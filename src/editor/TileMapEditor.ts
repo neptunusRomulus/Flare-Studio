@@ -136,7 +136,8 @@ export class TileMapEditor {
    * Call this after export. Updates description with project name.
    */
   public exportSettingsTxt(projectRoot: string) {
-    const fs = window.require ? window.require('fs') : null;
+    const w = window as unknown as { require?: (module: string) => unknown };
+    const fs = w.require ? w.require('fs') as { existsSync: (path: string) => boolean, writeFileSync: (path: string, content: string, encoding: string) => void } : null;
     if (!fs) {
       
       return;

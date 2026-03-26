@@ -281,11 +281,15 @@ export class TileMapEditor {
 
         switch (this.collisionData[index]) {
           case 1:
+            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
             this.ctx.strokeStyle = 'rgba(255, 255, 255, 1)';
+            this.ctx.fill();
             break;
           case 2:
+            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
             this.ctx.strokeStyle = 'rgba(255, 255, 255, 1)';
             this.ctx.setLineDash([6, 4]);
+            this.ctx.fill();
             break;
           case 3:
             this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';

@@ -134,7 +134,16 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex flex-col h-[90vh] w-[90vw] sm:h-[90vh] sm:w-auto sm:max-w-6xl bg-background border-border/70 p-0 fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+      <DialogContent 
+        className="flex flex-col h-[90vh] w-[90vw] sm:h-[90vh] sm:w-auto sm:max-w-6xl bg-background border-border/70 p-0"
+        style={{
+          position: 'fixed',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          zIndex: 9999,
+        }}
+      >
         <div className="sticky top-0 z-10 border-b border-border/50 bg-background px-6 py-3 flex items-center justify-between">
           <DialogTitle className="text-lg font-semibold">Event at {titleCoords}</DialogTitle>
           <Button

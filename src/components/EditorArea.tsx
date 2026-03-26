@@ -31,9 +31,10 @@ type Props = {
   canvasCtx: React.ComponentProps<typeof EditorCanvas>['ctx'];
   bottomToolbarProps: React.ComponentProps<typeof EditorCanvas>['bottomToolbarProps'];
   enemyPanelProps: EnemyPanelProps;
+  isDarkMode: boolean;
 };
 
-const EditorArea: React.FC<Props> = ({ topBarProps, canvasCtx, bottomToolbarProps, enemyPanelProps }) => {
+const EditorArea: React.FC<Props> = ({ topBarProps, canvasCtx, bottomToolbarProps, enemyPanelProps, isDarkMode }) => {
   if (enemyPanelProps.isEnemyActive) {
     return (
       <section className="flex-1 min-w-0 flex flex-col relative">
@@ -65,7 +66,7 @@ const EditorArea: React.FC<Props> = ({ topBarProps, canvasCtx, bottomToolbarProp
         handleResetZoom={topBarProps.handleResetZoom}
       />
 
-      <EditorCanvas ctx={canvasCtx} bottomToolbarProps={bottomToolbarProps} />
+      <EditorCanvas ctx={canvasCtx} bottomToolbarProps={bottomToolbarProps} isDarkMode={isDarkMode} />
     </section>
   );
 };

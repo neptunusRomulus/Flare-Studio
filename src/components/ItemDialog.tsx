@@ -47,7 +47,7 @@ const ItemDialog = ({
       }
     }}
   >
-    <DialogContent className="sm:max-w-[425px]">
+    <DialogContent className="w-full sm:max-w-sm" style={{ maxWidth: '100px' }}>
       <DialogHeader>
         <DialogTitle className="flex items-center gap-2">
           <Sword className="w-5 h-5 text-orange-500" />

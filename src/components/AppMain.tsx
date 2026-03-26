@@ -196,7 +196,7 @@ export default function AppMain() {
           />
         )}
 
-        <EditorArea topBarProps={topBarProps} canvasCtx={canvasCtx} bottomToolbarProps={bottomToolbarProps} enemyPanelProps={enemyPanelProps} />
+        <EditorArea topBarProps={topBarProps} canvasCtx={canvasCtx} bottomToolbarProps={bottomToolbarProps} enemyPanelProps={enemyPanelProps} isDarkMode={isDarkMode} />
 
         <EngineSettingsDialog
           open={showSettings}

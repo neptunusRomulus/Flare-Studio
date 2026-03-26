@@ -1545,6 +1545,8 @@ export class TileMapEditor {
       return;
     }
 
+    console.log('[TileMapEditor] handleMouseDown - button:', event.button, 'tool:', this.tool);
+
     const rect = this.mapCanvas.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
@@ -1560,6 +1562,7 @@ export class TileMapEditor {
       this.isMouseDown = true;
       const tileCoords = this.screenToTile(x, y);
       if (tileCoords) {
+        console.log('[TileMapEditor] Tile coords:', tileCoords, 'button:', event.button);
         // Check if clicking on hero position
         if (this.isHeroAtPosition(tileCoords.x, tileCoords.y)) {
           this.handleHeroClick(tileCoords.x, tileCoords.y, event);
@@ -1570,6 +1573,7 @@ export class TileMapEditor {
         if (actorAtPosition) {
           // Right-click on NPC/actor - show delete confirmation
           if (event.button === 2 && actorAtPosition.type === 'npc' && this.npcRightClickCallback) {
+            console.log('[TileMapEditor] Right-click on NPC:', actorAtPosition.id);
             this.isMouseDown = false;
             // Get screen position of the actor for popup placement
             const actorScreenPos = this.mapToScreen(actorAtPosition.x, actorAtPosition.y);
@@ -1590,10 +1594,40 @@ export class TileMapEditor {
         }
 
         if (this.tool === 'tiles') {
+          console.log('[TileMapEditor] Tool is tiles, button:', event.button, 'callback exists:', !!this.cellRightClickCallback);
+          if (event.button === 2 && this.cellRightClickCallback) {
+            // Right-click on tile cell - show context menu
+            console.log('[TileMapEditor] Triggering context menu for tiles tool at', tileCoords);
+            this.isMouseDown = false;
+            const screenX = event.clientX;
+            const screenY = event.clientY;
+            this.cellRightClickCallback(tileCoords.x, tileCoords.y, screenX, screenY);
+            return;
+          }
           this.handleTileClick(tileCoords.x, tileCoords.y, event.button === 2);
         } else if (this.tool === 'selection') {
+          console.log('[TileMapEditor] Tool is selection, button:', event.button, 'callback exists:', !!this.cellRightClickCallback);
+          if (event.button === 2 && this.cellRightClickCallback) {
+            // Right-click on tile cell - show context menu
+            console.log('[TileMapEditor] Triggering context menu for selection tool at', tileCoords);
+            this.isMouseDown = false;
+            const screenX = event.clientX;
+            const screenY = event.clientY;
+            this.cellRightClickCallback(tileCoords.x, tileCoords.y, screenX, screenY);
+            return;
+          }
           this.handleSelectionStart(tileCoords.x, tileCoords.y, event.button === 2);
         } else if (this.tool === 'shape') {
+          console.log('[TileMapEditor] Tool is shape, button:', event.button, 'callback exists:', !!this.cellRightClickCallback);
+          if (event.button === 2 && this.cellRightClickCallback) {
+            // Right-click on tile cell - show context menu
+            console.log('[TileMapEditor] Triggering context menu for shape tool at', tileCoords);
+            this.isMouseDown = false;
+            const screenX = event.clientX;
+            const screenY = event.clientY;
+            this.cellRightClickCallback(tileCoords.x, tileCoords.y, screenX, screenY);
+            return;
+          }
           this.handleShapeStart(tileCoords.x, tileCoords.y, event.button === 2);
         } else if (this.tool === 'eyedropper') {
           const sampledGid = this.handleEyedropper(tileCoords.x, tileCoords.y);
@@ -1602,6 +1636,16 @@ export class TileMapEditor {
             this.isMouseDown = false;
           }
         } else if (this.tool === 'stamp') {
+          console.log('[TileMapEditor] Tool is stamp, button:', event.button, 'callback exists:', !!this.cellRightClickCallback);
+          if (event.button === 2 && this.cellRightClickCallback) {
+            // Right-click on tile cell - show context menu
+            console.log('[TileMapEditor] Triggering context menu for stamp tool at', tileCoords);
+            this.isMouseDown = false;
+            const screenX = event.clientX;
+            const screenY = event.clientY;
+            this.cellRightClickCallback(tileCoords.x, tileCoords.y, screenX, screenY);
+            return;
+          }
           this.handleStampClick(tileCoords.x, tileCoords.y, event.button === 2);
         }
       }
@@ -1782,6 +1826,11 @@ export class TileMapEditor {
     
     // Other shortcuts
     switch (event.code) {
+      case 'Enter':
+      case 'NumpadEnter':
+        event.preventDefault();
+        this.fillSelection();
+        break;
       case 'Delete':
       case 'Backspace':
         event.preventDefault();
@@ -2350,6 +2399,10 @@ export class TileMapEditor {
     };
   }
 
+  public getTileScreenPosition(mapX: number, mapY: number): { x: number, y: number } {
+    return this.mapToScreen(mapX, mapY);
+  }
+
   public screenToMap(screenX: number, screenY: number): { x: number, y: number } {
     // Apply inverse transformations in reverse order
     // First, apply inverse zoom
@@ -2841,7 +2894,6 @@ export class TileMapEditor {
 
           const asset = this.assetRecords.get(instance.assetRecordId);
           if (!asset) {
-            console.warn(`[RENDER] ObjectInstance ${instance.id} references missing AssetRecord ${instance.assetRecordId}`);
             continue;
           }
 
@@ -2880,7 +2932,6 @@ export class TileMapEditor {
             transparency: layer.transparency || 1.0,
             sortKey: instance.gridX + instance.gridY
           });
-          console.log(`[RENDER] ObjectInstance ${instance.id} at (${instance.gridX}, ${instance.gridY}), sortKey=${instance.gridX + instance.gridY}`);
         }
       }
     }
@@ -6084,6 +6135,7 @@ export class TileMapEditor {
   private eyedropperCallback: (() => void) | null = null;
   private objectsChangedCallback: ((objects: MapObject[]) => void) | null = null;
   private npcRightClickCallback: ((npcId: number, screenX: number, screenY: number) => void) | null = null;
+  private cellRightClickCallback: ((cellX: number, cellY: number, screenX: number, screenY: number) => void) | null = null;
 
   // Stamp tool state
   private stamps: Map<string, import('../types').Stamp> = new Map();
@@ -6105,6 +6157,10 @@ export class TileMapEditor {
 
   public setNpcRightClickCallback(callback: ((npcId: number, screenX: number, screenY: number) => void) | null): void {
     this.npcRightClickCallback = callback;
+  }
+
+  public setCellRightClickCallback(callback: ((cellX: number, cellY: number, screenX: number, screenY: number) => void) | null): void {
+    this.cellRightClickCallback = callback;
   }
 
   // Stamp tool management methods

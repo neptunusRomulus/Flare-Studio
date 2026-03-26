@@ -205,9 +205,48 @@ export default function useManualSave(args: {
               console.log('[ManualSave][TXT] Map name:', mapName, '| Generating Flare map text...');
               const mapTxt = editor.generateFlareMapTxt({ mapName });
               const tilesetDef = editor.generateFlareTilesetDef();
+              const tilesetImages: Record<string, string> = {};
+              type MaybeTilesetEntry = { fileName?: string; image?: HTMLImageElement | null };
+              try {
+                const exportInfo = editor.getTilesetExportInfo();
+                for (const info of exportInfo) {
+                  let matchedEntry: MaybeTilesetEntry | undefined;
+                  if (editor['layerTilesets'] && typeof editor['layerTilesets'].forEach === 'function') {
+                    editor['layerTilesets'].forEach((val: unknown) => {
+                      const candidate = val as MaybeTilesetEntry | undefined;
+                      if (candidate?.fileName === info.fileName) {
+                        matchedEntry = candidate;
+                      }
+                    });
+                  }
+
+                  let imgEl: HTMLImageElement | null = null;
+                  const entryImage = matchedEntry?.image ?? null;
+                  if (entryImage) {
+                    imgEl = entryImage;
+                  }
+                  if (!imgEl && editor['tilesetFileName'] === info.fileName) {
+                    const editorImage = editor['tilesetImage'] as HTMLImageElement | null | undefined;
+                    if (editorImage) {
+                      imgEl = editorImage;
+                    }
+                  }
+
+                  if (imgEl) {
+                    try {
+                      const dataUrl = editor['canvasToDataURL'](imgEl);
+                      tilesetImages[info.fileName] = dataUrl;
+                    } catch (imgErr) {
+                      console.warn('[ManualSave][TXT] Failed to serialize tileset image', info.fileName, imgErr);
+                    }
+                  }
+                }
+              } catch (err) {
+                console.warn('[ManualSave][TXT] Failed to collect tileset images:', err);
+              }
               console.log('[ManualSave][TXT] Generated mapTxt length:', mapTxt.length, '| tilesetDef length:', tilesetDef.length);
               console.log('[ManualSave][TXT] Calling saveExportFiles — path:', projectPath, '| mapName:', mapName);
-              const ok = await electronAPI.saveExportFiles(projectPath, mapName, mapTxt, tilesetDef, {});
+              const ok = await electronAPI.saveExportFiles(projectPath, mapName, mapTxt, tilesetDef, { tilesetImages });
               if (ok) {
                 console.log('[ManualSave][TXT] ✓ Flare .txt saved to', projectPath + '/maps/' + mapName + '.txt');
               } else {

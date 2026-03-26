@@ -123,9 +123,23 @@ const TilesetPalette = ({
           // Pull detected tile rectangles from active tab so palette can select assets
           // by their detected bounds instead of fixed cell grid.
           try {
-            const dt = (tab as { detectedTiles?: Map<number, { sourceX: number; sourceY: number; width: number; height: number }> }).detectedTiles;
-            if (dt && typeof dt.entries === 'function' && dt.size > 0) {
-              const entries: DetectedTileRect[] = Array.from(dt.entries()).map(([gid, data]) => ({
+            type DetectedMap = Map<number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }>;
+            const tabDetected = (tab as { detectedTiles?: DetectedMap }).detectedTiles;
+            let detectedSource: DetectedMap | null = null;
+
+            if (tabDetected && typeof tabDetected.entries === 'function' && tabDetected.size > 0) {
+              detectedSource = tabDetected;
+            } else if (typeof (editor as unknown as { getDetectedTilesForLayer?: (lt: string) => Array<[number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }]> }).getDetectedTilesForLayer === 'function') {
+              const fallbackEntries = (editor as unknown as { getDetectedTilesForLayer: (lt: string) => Array<[number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }]> }).getDetectedTilesForLayer(layerType);
+              if (Array.isArray(fallbackEntries) && fallbackEntries.length > 0) {
+                detectedSource = new Map(fallbackEntries);
+                // Keep tab-level data in sync so subsequent refreshes remain in asset mode.
+                (tab as { detectedTiles?: DetectedMap }).detectedTiles = detectedSource;
+              }
+            }
+
+            if (detectedSource && detectedSource.size > 0) {
+              const entries: DetectedTileRect[] = Array.from(detectedSource.entries()).map(([gid, data]) => ({
                 gid,
                 sourceX: data.sourceX,
                 sourceY: data.sourceY,
@@ -280,8 +294,8 @@ const TilesetPalette = ({
       }
     } else {
       // Draw standard fixed grid overlay when no detected assets are available.
-      const cols = Math.ceil(imageSize.width / tileSize.width);
-      const rows = Math.ceil(imageSize.height / tileSize.height);
+      const cols = Math.max(1, Math.floor(imageSize.width / tileSize.width));
+      const rows = Math.max(1, Math.floor(imageSize.height / tileSize.height));
 
       ctx.strokeStyle = prefs.isDarkMode ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.08)';
       ctx.lineWidth = 0.8;
@@ -514,8 +528,8 @@ const TilesetPalette = ({
     const col = Math.floor(x / tileSize.width);
     const row = Math.floor(y / tileSize.height);
 
-    const maxCol = Math.ceil(imageSize.width / tileSize.width) - 1;
-    const maxRow = Math.ceil(imageSize.height / tileSize.height) - 1;
+    const maxCol = Math.max(1, Math.floor(imageSize.width / tileSize.width)) - 1;
+    const maxRow = Math.max(1, Math.floor(imageSize.height / tileSize.height)) - 1;
 
     return {
       col: Math.max(0, Math.min(col, maxCol)),
@@ -626,7 +640,7 @@ const TilesetPalette = ({
     if (isSingleClick && editor) {
       // Single click: set the active GID for this tile
       // Calculate the GID based on tileset columns
-      const tilesetCols = Math.ceil(imageSize.width / tileSize.width);
+      const tilesetCols = Math.max(1, Math.floor(imageSize.width / tileSize.width));
       const gid = selection.startRow * tilesetCols + selection.startCol + 1; // GID is 1-indexed
       
       // Set tile info with description if this is collision layer
@@ -685,7 +699,7 @@ const TilesetPalette = ({
       if (typeof editorAny.multiSelectedBrushes === 'object') {
         const multiSet = editorAny.multiSelectedBrushes as Set<number>;
         multiSet.clear();
-        const tilesetCols = Math.ceil(imageSize.width / tileSize.width);
+        const tilesetCols = Math.max(1, Math.floor(imageSize.width / tileSize.width));
         
         for (let row = minRow; row <= maxRow; row++) {
           for (let col = minCol; col <= maxCol; col++) {

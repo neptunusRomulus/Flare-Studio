@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { HelpCircle, X } from 'lucide-react';
+import { HelpCircle, X, Save } from 'lucide-react';
 import Tooltip from '@/components/ui/tooltip';
 
 type EventActivation = 'Trigger' | 'Interact' | 'Load' | 'Leave' | 'Mapexit' | 'Clear' | 'Static';
@@ -134,12 +134,20 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl bg-background border-border/70">
-        <DialogHeader>
+      <DialogContent className="flex flex-col h-[90vh] sm:max-w-2xl bg-background border-border/70 p-0">
+        <div className="sticky top-0 z-10 border-b border-border/50 bg-background px-6 py-3 flex items-center justify-between">
           <DialogTitle className="text-lg font-semibold">Event at {titleCoords}</DialogTitle>
-        </DialogHeader>
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => onOpenChange(false)}
+            className="h-6 w-6 text-foreground/60 hover:text-foreground"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
 
-        <div className="space-y-6 py-4">
+        <div className="flex-1 overflow-y-auto space-y-6 px-6 py-4">
           {/* Positioning and Timing Section */}
           <div className="space-y-4 border-b border-border/50 pb-4">
             <h3 className="text-sm font-semibold text-foreground">Positioning and Timing</h3>
@@ -742,13 +750,16 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-border/50 pt-4">
-          <Button variant="outline" onClick={() => onOpenChange(false)} className="h-8 text-xs">
-            Close
-          </Button>
-          <Button onClick={() => onOpenChange(false)} className="h-8 text-xs bg-orange-500 hover:bg-orange-600">
-            Save Event
-          </Button>
+        <div className="sticky bottom-0 border-t border-border/50 bg-background px-6 py-3 flex justify-end">
+          <Tooltip content="Save event">
+            <Button
+              size="icon"
+              onClick={() => onOpenChange(false)}
+              className="h-7 w-7 text-foreground/80 hover:text-foreground hover:bg-muted"
+            >
+              <Save className="h-4 w-4" />
+            </Button>
+          </Tooltip>
         </div>
       </DialogContent>
     </Dialog>

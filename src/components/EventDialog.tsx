@@ -134,7 +134,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex flex-col h-[90vh] sm:max-w-2xl bg-background border-border/70 p-0">
+      <DialogContent className="flex flex-col h-[90vh] sm:max-w-5xl bg-background border-border/70 p-0">
         <div className="sticky top-0 z-10 border-b border-border/50 bg-background px-6 py-3 flex items-center justify-between">
           <DialogTitle className="text-lg font-semibold">Event at {titleCoords}</DialogTitle>
           <Button
@@ -147,7 +147,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
           </Button>
         </div>
 
-        <div className="flex-1 overflow-y-auto space-y-6 px-6 py-4">
+        <div className="flex-1 overflow-y-auto space-y-6 px-6 py-4 scrollbar-thin scrollbar-thumb-rounded-md scrollbar-thumb-muted/50 scrollbar-track-transparent hover:scrollbar-thumb-muted/70">
           {/* Positioning and Timing Section */}
           <div className="space-y-4 border-b border-border/50 pb-4">
             <h3 className="text-sm font-semibold text-foreground">Positioning and Timing</h3>

@@ -120,16 +120,22 @@ const LayersPanel: React.FC<Props> = ({
                             e.stopPropagation();
                             handleToggleLayerVisibility(layer.id);
                           }}
-                          className="w-4 h-4 p-0 hover:bg-gray-200 dark:hover:bg-gray-700"
+                          className="w-5 h-5 p-0 hover:bg-gray-200 dark:hover:bg-gray-700"
                         >
-                          {layer.visible ? <Eye className="w-2.5 h-2.5" /> : <EyeOff className="w-2.5 h-2.5 text-gray-400 dark:text-gray-500" />}
+                          {layer.visible ? <Eye className="w-4 h-4" strokeWidth={2} /> : <EyeOff className="w-4 h-4 text-gray-400 dark:text-gray-500" strokeWidth={2} />}
                         </Button>
                       </Tooltip>
 
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="w-4 h-4 p-0 hover:bg-gray-200 dark:hover:bg-gray-700"
+                      <Tooltip content={
+                        <div className="flex items-center gap-1 text-xs">
+                          <Mouse className="w-3 h-3" />
+                          Use wheel to change opacity
+                        </div>
+                      }>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-5 h-5 p-0 hover:bg-gray-200 dark:hover:bg-gray-700"
                         onMouseEnter={(e) => {
                           const transparencyPercent = Math.round((layer.transparency || 0) * 100);
                           showTooltipWithDelay(
@@ -157,8 +163,9 @@ const LayersPanel: React.FC<Props> = ({
                           );
                         }}
                       >
-                        <Blend className="w-2.5 h-2.5" />
-                      </Button>
+                            <Blend className="w-4 h-4" strokeWidth={2} />
+                        </Button>
+                      </Tooltip>
 
                       <div className="flex items-center gap-2">
                         <Tooltip content={layer.type === 'rules' ? 'When this happens → do this' : layer.name}>
@@ -192,7 +199,6 @@ const LayersPanel: React.FC<Props> = ({
                         </Tooltip>
                         <span className={leftCollapsed ? 'sr-only text-xs font-medium' : 'text-xs font-medium truncate'} title={layer.name}>
                           {layer.name.replace(/ Layer$/i, '')}
-                          <span className="ml-2 text-[10px] text-gray-500">#{layer.id}</span>
                         </span>
                       </div>
                     </div>

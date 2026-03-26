@@ -6,6 +6,12 @@ import NpcDeletePopup from '@/components/NpcDeletePopup';
 import NpcHoverTooltip from '@/components/NpcHoverTooltip';
 import SelectionInfo from '@/components/SelectionInfo';
 import BottomToolbar from '@/components/BottomToolbar';
+import {
+  CellContextMenu,
+  CellContextMenuContent,
+  CellContextMenuItem,
+  useContextMenu,
+} from '@/components/contextMenu';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 
 type BottomToolbarProps = React.ComponentProps<typeof BottomToolbar>;
@@ -47,15 +53,18 @@ type EditorContext = {
   handleDeleteSelection: () => void;
   handleClearSelection: () => void;
   leftTransitioning: boolean;
+  isDarkMode: boolean;
 };
 
 type Props = {
   ctx: EditorContext;
   bottomToolbarProps: BottomToolbarProps;
+  isDarkMode: boolean;
 };
 
 export default function EditorCanvas(props: Props) {
-  const { ctx, bottomToolbarProps } = props;
+  const { ctx, bottomToolbarProps, isDarkMode } = props;
+  const canvasAreaRef = React.useRef<HTMLDivElement | null>(null);
   const {
     editor,
     canvasRef,
@@ -87,6 +96,9 @@ export default function EditorCanvas(props: Props) {
     leftTransitioning
   } = ctx;
 
+  // Context menu state
+  const contextMenu = useContextMenu();
+
   // Ensure the editor is bound to the current canvas element. React may replace the canvas
   // node during re-renders; call `editor.updateCanvas` when the DOM node is present so the
   // editor rebinds its mouse events to the live canvas.
@@ -100,8 +112,33 @@ export default function EditorCanvas(props: Props) {
     }
   }, [editor, (canvasRef as any)?.current]);
 
+  // Set up cell right-click context menu callback
+  React.useEffect(() => {
+    if (!editor) {
+      console.log('[EditorCanvas] No editor available');
+      return;
+    }
+
+    console.log('[EditorCanvas] Setting up cell right-click callback');
+
+    const handleCellRightClick = (cellX: number, cellY: number, screenX: number, screenY: number) => {
+      console.log('[EditorCanvas] Cell right-click triggered at:', { cellX, cellY, screenX, screenY });
+      contextMenu.setCellCoords({ x: cellX, y: cellY });
+      contextMenu.openAtPosition(screenX, screenY);
+    };
+
+    editor.setCellRightClickCallback(handleCellRightClick);
+    console.log('[EditorCanvas] Cell right-click callback set');
+
+    return () => {
+      console.log('[EditorCanvas] Cleaning up cell right-click callback');
+      editor.setCellRightClickCallback(null);
+    };
+  }, [editor, contextMenu]);
+
   return (
     <div
+      ref={canvasAreaRef}
       className={`bg-gray-100 flex-1 min-h-0 flex overflow-hidden relative ${draggingNpcId ? 'ring-2 ring-orange-500 ring-inset' : ''}`}
           onDragOver={(e) => {
         if (draggingNpcId && editor) {
@@ -157,7 +194,40 @@ export default function EditorCanvas(props: Props) {
 
       <NpcHoverTooltip npcHoverTooltip={npcHoverTooltip} />
 
-      <SelectionInfo hasSelection={hasSelection} selectionCount={selectionCount} handleFillSelection={handleFillSelection} handleDeleteSelection={handleDeleteSelection} handleClearSelection={handleClearSelection} />
+      <SelectionInfo
+        editor={editor}
+        canvasRef={canvasRef}
+        containerRef={canvasAreaRef}
+        hasSelection={hasSelection}
+        selectionCount={selectionCount}
+        handleFillSelection={handleFillSelection}
+        handleDeleteSelection={handleDeleteSelection}
+        handleClearSelection={handleClearSelection}
+      />
+
+      <CellContextMenu
+        isOpen={contextMenu.isOpen}
+        position={contextMenu.position}
+        onClose={contextMenu.close}
+        isDarkMode={isDarkMode}
+      >
+        <CellContextMenuContent>
+          <CellContextMenuItem
+            label="Item 1"
+            onClick={() => {
+              console.log('Context menu item 1 clicked at', contextMenu.cellCoords);
+              contextMenu.close();
+            }}
+          />
+          <CellContextMenuItem
+            label="Item 2"
+            onClick={() => {
+              console.log('Context menu item 2 clicked at', contextMenu.cellCoords);
+              contextMenu.close();
+            }}
+          />
+        </CellContextMenuContent>
+      </CellContextMenu>
 
           <BottomToolbar {...bottomToolbarProps} />
     </div>

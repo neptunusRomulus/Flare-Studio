@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { HelpCircle, X, Save } from 'lucide-react';
@@ -132,27 +131,13 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
 
   const titleCoords = eventLocation ? `${eventLocation.x},${eventLocation.y}` : '0,0';
 
+  if (!open) return null;
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent 
-        className="flex flex-col bg-background border-border/70 p-0"
-        style={{
-          position: 'fixed',
-          top: '50%',
-          left: '50%',
-          width: '90vw',
-          height: '90vh',
-          maxWidth: '88rem',
-          transform: 'translate(-50%, -50%)',
-          zIndex: 99999,
-          margin: 0,
-          padding: 0,
-          pointerEvents: 'auto',
-          willChange: 'transform',
-        }}
-      >
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-background border border-border/70 rounded-lg w-[90vw] h-[90vh] max-w-6xl flex flex-col">
         <div className="sticky top-0 z-10 border-b border-border/50 bg-background px-6 py-3 flex items-center justify-between">
-          <DialogTitle className="text-lg font-semibold">Event at {titleCoords}</DialogTitle>
+          <h3 className="text-lg font-semibold">Event at {titleCoords}</h3>
           <Button
             size="icon"
             variant="ghost"
@@ -777,8 +762,8 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
             </Button>
           </Tooltip>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   );
 };
 

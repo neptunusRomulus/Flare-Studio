@@ -694,6 +694,8 @@ export class TileMapEditor {
   private boundMouseLeave: ((event: MouseEvent) => void) | null = null;
   private boundWheel: ((event: WheelEvent) => void) | null = null;
   private boundContextMenu: ((event: Event) => void) | null = null;
+  private boundKeyDown: ((event: KeyboardEvent) => void) | null = null;
+  private boundKeyUp: ((event: KeyboardEvent) => void) | null = null;
 
   // State variables
   private mapWidth: number = 20;
@@ -1303,6 +1305,16 @@ export class TileMapEditor {
       this.mapCanvas.removeEventListener('contextmenu', this.boundContextMenu);
       this.boundContextMenu = null;
     }
+
+    if (this.boundKeyDown) {
+      window.removeEventListener('keydown', this.boundKeyDown, true);
+      this.boundKeyDown = null;
+    }
+
+    if (this.boundKeyUp) {
+      window.removeEventListener('keyup', this.boundKeyUp, true);
+      this.boundKeyUp = null;
+    }
   }
 
   private resizeCanvas(): void {
@@ -1360,9 +1372,11 @@ export class TileMapEditor {
     // Zoom events
     this.mapCanvas.addEventListener('wheel', this.boundWheel);
     
-    // Keyboard events for panning (need to be on document for spacebar)
-    document.addEventListener('keydown', this.handleKeyDown.bind(this));
-    document.addEventListener('keyup', this.handleKeyUp.bind(this));
+    // Keyboard events on window capture so shortcuts stay reliable across focus shifts.
+    this.boundKeyDown = this.handleKeyDown.bind(this);
+    this.boundKeyUp = this.handleKeyUp.bind(this);
+    window.addEventListener('keydown', this.boundKeyDown, true);
+    window.addEventListener('keyup', this.boundKeyUp, true);
     
     // Focus the canvas to receive keyboard events
     this.mapCanvas.tabIndex = 0;
@@ -1787,6 +1801,13 @@ export class TileMapEditor {
       this.spacePressed = true;
       this.mapCanvas.style.cursor = 'grab';
     }
+
+    const isEnterShortcut = event.key === 'Enter' || event.code === 'Enter' || event.code === 'NumpadEnter';
+    if (isEnterShortcut) {
+      event.preventDefault();
+      this.fillSelection();
+      return;
+    }
     
     // Undo/Redo shortcuts
     if (event.ctrlKey || event.metaKey) {
@@ -1826,11 +1847,6 @@ export class TileMapEditor {
     
     // Other shortcuts
     switch (event.code) {
-      case 'Enter':
-      case 'NumpadEnter':
-        event.preventDefault();
-        this.fillSelection();
-        break;
       case 'Delete':
       case 'Backspace':
         event.preventDefault();

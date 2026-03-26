@@ -1,5 +1,5 @@
 import React from 'react';
-import { Eraser, MousePointerBan, PaintBucket, Square } from 'lucide-react';
+import { Eraser, MousePointerBan, PaintBucket, SlidersHorizontal, Square } from 'lucide-react';
 import Tooltip from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
@@ -92,6 +92,17 @@ const SelectionInfo: React.FC<Props> = ({
           <Square className="h-3.5 w-3.5 text-muted-foreground" />
           <span>{hasSelection ? selectionCount : ''}</span>
         </div>
+
+        <Tooltip content="Open properties of this cell">
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-7 w-7 text-foreground/80 hover:bg-muted hover:text-foreground"
+            onClick={() => {}}
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+          </Button>
+        </Tooltip>
 
         <Tooltip
           content={(

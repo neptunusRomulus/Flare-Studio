@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import Tooltip from '@/components/ui/tooltip';
 import type { TileLayer } from '@/types';
@@ -15,7 +15,11 @@ import {
   Users,
   Locate,
   Clock,
-  Map as MapIcon
+  Map as MapIcon,
+  ChevronDown,
+  ChevronRight,
+  Circle,
+  Zap
 } from 'lucide-react';
 
 type Props = {
@@ -47,6 +51,8 @@ const LayersPanel: React.FC<Props> = ({
   handleLayerTransparencyChange,
   leftCollapsed
 }) => {
+  const [isObjectExpanded, setIsObjectExpanded] = useState(false);
+
   useEffect(() => {
   }, [activeLayerId]);
 
@@ -56,8 +62,8 @@ const LayersPanel: React.FC<Props> = ({
       onMouseEnter={() => setLayersPanelExpanded(true)}
       onMouseLeave={() => {
         try {
-          if ((window as any).__preventLayersAutoCollapse) return;
-        } catch (e) { /* ignore */ }
+          if ((window as { __preventLayersAutoCollapse?: boolean }).__preventLayersAutoCollapse) return;
+        } catch { /* ignore */ }
         setLayersPanelExpanded(false);
       }}
       tabIndex={0}
@@ -93,9 +99,9 @@ const LayersPanel: React.FC<Props> = ({
                 >
                   <div
                     className="cursor-pointer w-full flex items-center"
-                    onClick={(e) => {
+                    onClick={() => {
                       // debug: log click reaching LayersPanel
-                      try { console.log('LayersPanel clicked', layer.id); } catch (err) {}
+                      try { console.log('LayersPanel clicked', layer.id); } catch { /* ignore */ }
                       handleSetActiveLayer(layer.id);
                     }}
                     role="button"
@@ -197,12 +203,45 @@ const LayersPanel: React.FC<Props> = ({
                             })()}
                           </span>
                         </Tooltip>
-                        <span className={leftCollapsed ? 'sr-only text-xs font-medium' : 'text-xs font-medium truncate'} title={layer.name}>
+                        <span className={leftCollapsed ? 'sr-only text-xs font-medium' : 'text-xs font-medium truncate flex-1'} title={layer.name}>
                           {layer.name.replace(/ Layer$/i, '')}
                         </span>
+                        {!leftCollapsed && (layer.type === 'objects' || layer.name.toLowerCase() === 'object') && (
+                          <div 
+                            className="ml-auto p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md transition-colors"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setIsObjectExpanded(!isObjectExpanded);
+                            }}
+                          >
+                            {isObjectExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
+                  {/* Collapsible Content for Objects */}
+                  {isObjectExpanded && (layer.type === 'objects' || layer.name.toLowerCase() === 'object') && (
+                    <div className="pl-6 pt-1 space-y-1">
+                      {/* Static Sub-layer */}
+                      <div className="flex items-center gap-2 p-1 rounded hover:bg-orange-100/50 dark:hover:bg-orange-800/20 cursor-pointer text-xs group" onClick={(e) => { e.stopPropagation(); /* handle click */ }}>
+                        <Circle className="w-3 h-3 text-gray-500 group-hover:text-orange-500 transition-colors" />
+                        <span className={leftCollapsed ? 'sr-only' : 'text-gray-600 dark:text-gray-300 group-hover:text-orange-600 dark:group-hover:text-orange-400'}>Static</span>
+                      </div>
+                      {/* Interactive Sub-layer */}
+                      <div className="flex items-center gap-2 p-1 rounded hover:bg-orange-100/50 dark:hover:bg-orange-800/20 cursor-pointer text-xs group" onClick={(e) => { e.stopPropagation(); /* handle click */ }}>
+                        <Zap className="w-3 h-3 text-yellow-500 group-hover:text-orange-500 transition-colors" />
+                        <span className={leftCollapsed ? 'sr-only' : 'text-gray-600 dark:text-gray-300 group-hover:text-orange-600 dark:group-hover:text-orange-400'}>Interactive</span>
+                      </div>
+                      {/* Empty elements */}
+                      {[1, 2, 3, 4, 5].map((i) => (
+                        <div key={`empty-${i}`} className="flex items-center gap-2 p-1 rounded hover:bg-orange-100/50 dark:hover:bg-orange-800/20 cursor-pointer text-xs group text-gray-400 dark:text-gray-500" onClick={(e) => e.stopPropagation()}>
+                          <Box className="w-3 h-3 opacity-50" />
+                          <span className={leftCollapsed ? 'sr-only' : ''}>Empty {i}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               );
             })}

@@ -114,26 +114,37 @@ const Tooltip: React.FC<TooltipProps> = ({ content, side = 'top', className = ''
   // recompute when the tooltip becomes visible via hover/focus. We attach handlers
   // on the wrapper to trigger measurement.
   const onTriggerEnter = () => {
+    console.log('[Tooltip] onTriggerEnter triggered');
     clearTimer();
     // measure on next frame so layout is stable
-    requestAnimationFrame(() => computeOffset());
+    requestAnimationFrame(() => {
+      console.log('[Tooltip] computeOffset called');
+      computeOffset();
+    });
     setHovered(true);
     setIsExpanded(true);
     setVisiblePortal(true);
   };
 
   const onTriggerLeave = () => {
+    console.log('[Tooltip] onTriggerLeave triggered');
     startCloseTimer(1500);
   };
 
   const onPortalEnter = () => {
+    console.log('[Tooltip] onPortalEnter triggered');
     clearTimer();
     setHovered(true);
   };
 
   const onPortalLeave = () => {
+    console.log('[Tooltip] onPortalLeave triggered');
     startCloseTimer(800);
   };
+
+  React.useEffect(() => {
+    console.log('[Tooltip] State changed - hovered:', hovered, 'visiblePortal:', visiblePortal, 'pos:', pos, 'isExpanded:', isExpanded);
+  }, [hovered, visiblePortal, pos, isExpanded]);
 
   React.useEffect(() => {
     return () => clearTimer();
@@ -141,6 +152,7 @@ const Tooltip: React.FC<TooltipProps> = ({ content, side = 'top', className = ''
 
   // after portal tooltip renders, measure and clamp its position
   React.useEffect(() => {
+    console.log('[Tooltip] Positioning effect - running with hovered:', hovered, 'pos:', pos, 'portalRef:', !!portalRef.current, 'wrapperRef:', !!wrapperRef.current);
     if (!hovered || !portalRef.current || !wrapperRef.current) return;
     const portalRect = portalRef.current.getBoundingClientRect();
     const trig = wrapperRef.current.getBoundingClientRect();
@@ -191,7 +203,10 @@ const Tooltip: React.FC<TooltipProps> = ({ content, side = 'top', className = ''
       >
         {trigger}
       </span>
-      {typeof document !== 'undefined' && pos && visiblePortal && createPortal(
+      {(() => {
+        const shouldRender = typeof document !== 'undefined' && pos && visiblePortal;
+        console.log('[Tooltip] Render portal check - document:', typeof document !== 'undefined', 'pos:', !!pos, 'visiblePortal:', visiblePortal, 'shouldRender:', shouldRender);
+        return shouldRender && createPortal(
         <div
           ref={portalRef}
           id={id}
@@ -239,7 +254,8 @@ const Tooltip: React.FC<TooltipProps> = ({ content, side = 'top', className = ''
           )}
         </div>,
         document.body
-      )}
+      );
+      })()}
     </>
   );
 };

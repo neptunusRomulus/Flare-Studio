@@ -2,10 +2,10 @@ import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { HelpCircle, X, Save } from 'lucide-react';
+import { HelpCircle, X, Save, MapPinPlus, MousePointerClick, MapPinMinus, LogIn, LogOut, SquareCheckBig, Repeat2 } from 'lucide-react';
 import Tooltip from '@/components/ui/tooltip';
 
-type EventActivation = 'Trigger' | 'Interact' | 'Load' | 'Leave' | 'Mapexit' | 'Clear' | 'Static';
+type EventActivation = 'Trigger' | 'Interact' | 'Load' | 'Leave' | 'MapExit' | 'MapClear' | 'Loop';
 
 type EventData = {
   positioning: {
@@ -49,7 +49,45 @@ type EventDialogProps = {
   eventLocation: { x: number; y: number } | null;
 };
 
-const ACTIVATION_OPTIONS: EventActivation[] = ['Trigger', 'Interact', 'Load', 'Leave', 'Mapexit', 'Clear', 'Static'];
+const ACTIVATION_OPTIONS: EventActivation[] = ['Trigger', 'Interact', 'Load', 'Leave', 'MapExit', 'MapClear', 'Loop'];
+
+const ACTIVATION_CONFIG: Record<EventActivation, { icon: React.ComponentType<any>; tooltip: string; label: string }> = {
+  Trigger: {
+    icon: MapPinPlus,
+    tooltip: 'Activated when the player stands in the event area or interacts with a defined hotspot',
+    label: 'Trigger',
+  },
+  Interact: {
+    icon: MousePointerClick,
+    tooltip: 'Activated specifically when the player interacts with the hotspot',
+    label: 'Interact',
+  },
+  Load: {
+    icon: LogIn,
+    tooltip: 'Activated as the player enters a map',
+    label: 'Load',
+  },
+  Leave: {
+    icon: MapPinMinus,
+    tooltip: 'Activated as the player leaves a event spot they were previously inside',
+    label: 'Leave',
+  },
+  MapExit: {
+    icon: LogOut,
+    tooltip: 'Activated as the player leaves the map',
+    label: 'Map Exit',
+  },
+  MapClear: {
+    icon: SquareCheckBig,
+    tooltip: 'Activated when all enemies on a map have been defeated',
+    label: 'Map Clear',
+  },
+  Loop: {
+    icon: Repeat2,
+    tooltip: 'Activated constantly, every frame',
+    label: 'Loop',
+  },
+};
 
 const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLocation }) => {
   const [eventData, setEventData] = useState<EventData>({
@@ -162,20 +200,25 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                   <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
                 </Tooltip>
               </div>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {ACTIVATION_OPTIONS.map(activation => (
-                  <button
-                    key={activation}
-                    onClick={() => toggleActivation(activation)}
-                    className={`rounded-md border px-3 py-2 text-xs font-medium transition-colors ${
-                      eventData.timing.activations.includes(activation)
-                        ? 'border-orange-500/50 bg-orange-500/10 text-foreground'
-                        : 'border-border/50 bg-muted/30 text-foreground/60 hover:bg-muted/50'
-                    }`}
-                  >
-                    {activation}
-                  </button>
-                ))}
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-7">
+                {ACTIVATION_OPTIONS.map(activation => {
+                  const config = ACTIVATION_CONFIG[activation];
+                  const IconComponent = config.icon;
+                  return (
+                    <Tooltip key={activation} content={config.tooltip}>
+                      <button
+                        onClick={() => toggleActivation(activation)}
+                        className={`rounded-md border p-2 transition-colors ${
+                          eventData.timing.activations.includes(activation)
+                            ? 'border-orange-500/50 bg-orange-500/10 text-orange-600'
+                            : 'border-border/50 bg-muted/30 text-foreground/60 hover:bg-muted/50'
+                        }`}
+                      >
+                        <IconComponent className="h-5 w-5" />
+                      </button>
+                    </Tooltip>
+                  );
+                })}
               </div>
             </div>
 

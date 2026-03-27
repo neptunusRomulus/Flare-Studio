@@ -143,8 +143,12 @@ const Tooltip: React.FC<TooltipProps> = ({ content, side = 'top', className = ''
   };
 
   React.useEffect(() => {
-    console.log('[Tooltip] State changed - hovered:', hovered, 'visiblePortal:', visiblePortal, 'pos:', pos, 'isExpanded:', isExpanded);
-  }, [hovered, visiblePortal, pos, isExpanded]);
+    console.log('[Tooltip] Component rendered - wrapperRef:', !!wrapperRef.current);
+    if (wrapperRef.current) {
+      console.log('[Tooltip] Wrapper element:', wrapperRef.current.tagName, wrapperRef.current.className);
+      console.log('[Tooltip] Wrapper pointer-events:', window.getComputedStyle(wrapperRef.current).pointerEvents);
+    }
+  }, []);
 
   React.useEffect(() => {
     return () => clearTimer();
@@ -195,11 +199,18 @@ const Tooltip: React.FC<TooltipProps> = ({ content, side = 'top', className = ''
     <>
       <span
         ref={wrapperRef}
-        onMouseEnter={onTriggerEnter}
+        onMouseEnter={(e) => {
+          console.log('[Tooltip] Mouse ENTER detected on wrapper', e);
+          onTriggerEnter();
+        }}
+        onMouseLeave={(e) => {
+          console.log('[Tooltip] Mouse LEAVE detected on wrapper', e);
+          onTriggerLeave();
+        }}
         onFocus={onTriggerEnter}
-        onMouseLeave={onTriggerLeave}
         onBlur={onTriggerLeave}
         className={`relative inline-flex cursor-help ${className}`}
+        style={{ pointerEvents: 'auto' }}
       >
         {trigger}
       </span>

@@ -27,7 +27,6 @@ export default function useManualSaveSetup(
   // Wire up the manual save callback to the editor for Ctrl+S support
   useEffect(() => {
     if (editor && handleManualSave && typeof editor.setManualSaveCallback === 'function') {
-      console.log('[useManualSaveSetup] Setting manual save callback on editor');
       // Wrap to match expected Promise<void> signature
       editor.setManualSaveCallback(async () => { await handleManualSave(); });
     }

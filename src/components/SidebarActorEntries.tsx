@@ -198,6 +198,7 @@ const SidebarActorEntries = ({
             onClick={(event) => {
               event.stopPropagation();
               event.preventDefault();
+              console.log('[UI] Add NPC button clicked');
               onAddNpc();
             }}
           >
@@ -218,6 +219,7 @@ const SidebarActorEntries = ({
             onClick={(event) => {
               event.stopPropagation();
               event.preventDefault();
+              console.log('[UI] Add Enemy button clicked');
               onAddEnemy();
             }}
           >

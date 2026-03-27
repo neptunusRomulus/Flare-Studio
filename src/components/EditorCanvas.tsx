@@ -115,23 +115,17 @@ export default function EditorCanvas(props: Props) {
   // Set up cell right-click context menu callback
   React.useEffect(() => {
     if (!editor) {
-      console.log('[EditorCanvas] No editor available');
       return;
     }
 
-    console.log('[EditorCanvas] Setting up cell right-click callback');
-
     const handleCellRightClick = (cellX: number, cellY: number, screenX: number, screenY: number) => {
-      console.log('[EditorCanvas] Cell right-click triggered at:', { cellX, cellY, screenX, screenY });
       contextMenu.setCellCoords({ x: cellX, y: cellY });
       contextMenu.openAtPosition(screenX, screenY);
     };
 
     editor.setCellRightClickCallback(handleCellRightClick);
-    console.log('[EditorCanvas] Cell right-click callback set');
 
     return () => {
-      console.log('[EditorCanvas] Cleaning up cell right-click callback');
       editor.setCellRightClickCallback(null);
     };
   }, [editor, contextMenu]);

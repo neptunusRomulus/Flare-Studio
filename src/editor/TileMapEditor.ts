@@ -1089,7 +1089,6 @@ export class TileMapEditor {
   private cacheTilesetImage(layerType: string, tabId: number, image: HTMLImageElement, dataUrl: string): void {
     const key = this.getTilesetCacheKey(layerType, tabId);
     TileMapEditor.tilesetImageCache.set(key, { image, dataUrl });
-    console.log(`[CACHE] Stored tileset image: ${key}`);
   }
 
   /**
@@ -1099,7 +1098,6 @@ export class TileMapEditor {
     const key = this.getTilesetCacheKey(layerType, tabId);
     const cached = TileMapEditor.tilesetImageCache.get(key);
     if (cached) {
-      console.log(`[CACHE] Retrieved tileset image: ${key}`);
       return cached;
     }
     return null;
@@ -7254,7 +7252,6 @@ export class TileMapEditor {
       if (currentActiveTab && layer) {
         // Save the current layer's painting data to the current active tab
         currentActiveTab.data = [...layer.data];
-        console.log(`[TAB] Saving painting data for tab ${currentActiveTabId} (${currentActiveTab.data.filter(v => v > 0).length} painted tiles)`);
       }
     }
 
@@ -7271,10 +7268,8 @@ export class TileMapEditor {
         // Restore the tab's painting data to the layer
         if (tab.data) {
           layer.data = [...tab.data];
-          console.log(`[TAB] Restored painting data for tab ${tabId} (${layer.data.filter(v => v > 0).length} painted tiles)`);
         } else {
           layer.data = new Array(this.mapWidth * this.mapHeight).fill(0);
-          console.log(`[TAB] No painting data for tab ${tabId}, initialized empty`);
         }
       }
       
@@ -7323,7 +7318,6 @@ export class TileMapEditor {
           // Check the cache first before waiting
           const cachedTileset = this.getCachedTilesetImage(layerType, tabId);
           if (cachedTileset) {
-            console.log(`[TAB] Tab ${tabId} - using cached image for tileset "${tab.tileset.fileName}"`);
             // Use cached image - apply tileset immediately
             tab.tileset.image = cachedTileset.image;
             const columns = (typeof tab.tileset.columns === 'number' && tab.tileset.columns > 0)
@@ -7364,8 +7358,6 @@ export class TileMapEditor {
             this.updateCurrentTileset(layerType);
           } else {
             // No cache available - wait for async loading
-            console.log(`[TAB] Tab ${tabId} has tileset "${tab.tileset.fileName}" but image is still loading - waiting...`);
-          
             // Store the tileset entry in layerTilesets even without image
             // The image will be updated when it finishes loading via the onload callback in loadProjectData
             this.layerTilesets.set(layerType, {
@@ -7739,9 +7731,7 @@ export class TileMapEditor {
   if (layerActiveGid === 0 && this.tileCount > 0) {
     layerActiveGid = 1;
     this.layerActiveGid.set(layerType, 1);
-    console.log(`[GID-AUTO] Auto-selected GID=1 for layer "${layerType}" (tileCount=${this.tileCount})`);
   }
-  console.log(`[GID-STATE] updateCurrentTileset layer="${layerType}" layerActiveGid=${layerActiveGid} (all: ${JSON.stringify(Object.fromEntries(this.layerActiveGid))})`);
   this.updateActiveGid(layerActiveGid);
       
       this.createTilePalette();
@@ -10469,7 +10459,6 @@ export class TileMapEditor {
       
       // Clear preloaded tileset cache to prevent contamination from previous maps
       this._preloadedTilesetImages.clear();
-      console.log('[LOAD] Cleared preloaded tileset cache');
       
       // Log incoming tileset summary for debugging (keys and approximate sizes)
       try {
@@ -10537,7 +10526,6 @@ export class TileMapEditor {
               // Restore per-tab painting data if available
               if (t.data && Array.isArray(t.data)) {
                 tabObj.data = [...t.data];
-                console.log(`[LOAD] Tab ${tabId} (${tabName}): restored ${t.data.filter(v => v > 0).length} painted tiles`);
               } else {
                 // Initialize with empty data if not present
                 const mapWidth = projectData.width || 20;
@@ -10584,12 +10572,9 @@ export class TileMapEditor {
                     plainFileName = plainFileName.split('/').pop()?.split('\\').pop() || plainFileName;
                   }
                   
-                  console.log(`[LOAD] Tab tileset: layer=${layerType} tab=${t.id} fileName=${fn} lookupKey=${lookupKey} availableImages=${Object.keys(projectData.tilesetImages || {}).join(',')}`);
-                  
                   // FIRST: Check if we have this tileset cached in memory (fastest)
                   const cachedTileset = this.getCachedTilesetImage(layerType, tabId);
                   if (cachedTileset) {
-                    console.log(`[LOAD] Using cached tileset image for ${layerType}_tab${tabId}`);
                     ts.image = cachedTileset.image;
                     tabObj.tileset = ts;
                     
@@ -10630,16 +10615,13 @@ export class TileMapEditor {
                   let imageDataUrl: string | null = null;
                   if (projectData.tilesetImages && projectData.tilesetImages[lookupKey]) {
                     imageDataUrl = projectData.tilesetImages[lookupKey];
-                    console.log(`[LOAD] Found tileset with unique key: ${lookupKey}`);
                   } else if (projectData.tilesetImages && projectData.tilesetImages[plainFileName]) {
                     imageDataUrl = projectData.tilesetImages[plainFileName];
-                    console.log(`[LOAD] Found tileset with filename (backward compat): ${plainFileName}`);
                   } else {
                     // Also try the original stored fileName in case it has a different unique key
                     const originalFn = ts.fileName ?? '';
                     if (projectData.tilesetImages && projectData.tilesetImages[originalFn]) {
                       imageDataUrl = projectData.tilesetImages[originalFn];
-                      console.log(`[LOAD] Found tileset with original fileName: ${originalFn}`);
                     }
                   }
                   
@@ -10652,7 +10634,6 @@ export class TileMapEditor {
                     const capturedTabId = tabId;
                     const capturedDataUrl = imageDataUrl;
                     img.onload = () => {
-                      console.log(`[LOAD] Tab tileset image loaded: ${fn}`);
                       // Cache the loaded image for future tab switches
                       this.cacheTilesetImage(capturedLayerType, capturedTabId, img, capturedDataUrl);
                       // If this tab is active for the layer, apply its tileset immediately
@@ -10665,11 +10646,9 @@ export class TileMapEditor {
                       } catch (_e) { void _e; }
                     };
                     img.onerror = () => {
-                      console.warn(`[LOAD] Failed to load tab tileset image: ${fn}`);
                     };
                     img.src = imageDataUrl;
                   } else {
-                    console.log(`[LOAD] Tab tileset not found in tilesetImages: lookupKey=${lookupKey} fn=${fn} available=${Object.keys(projectData.tilesetImages || {}).join(',')}`);
                     // Fallback: load from sourcePath if available
                     const sourcePath = t.tileset.sourcePath;
                     if (sourcePath && window.electronAPI?.readFileAsDataURL) {
@@ -10682,7 +10661,6 @@ export class TileMapEditor {
                           const capturedLayerType = layerType;
                           const capturedTabId = tabId;
                           img.onload = () => {
-                            console.log(`[LOAD] Tab tileset image loaded from sourcePath: ${fn}`);
                             // Cache the loaded image for future tab switches
                             this.cacheTilesetImage(capturedLayerType, capturedTabId, img, dataUrl);
                             try {
@@ -10694,12 +10672,10 @@ export class TileMapEditor {
                             } catch (_e) { void _e; }
                           };
                           img.onerror = () => {
-                            console.warn(`[LOAD] Failed to load tab tileset image from sourcePath: ${fn}`);
                           };
                           img.src = dataUrl;
                         })
-                        .catch((err: unknown) => {
-                          console.warn('[LOAD] readFileAsDataURL failed for tileset sourcePath:', sourcePath, err);
+                        .catch((_err: unknown) => {
                         });
                     }
                   }
@@ -10847,10 +10823,6 @@ export class TileMapEditor {
             // Only restore if image has loaded (width > 0)
             if (img.width > 0 || img.height > 0) {
               this.layerTilesets.set(layerType, tileset);
-              console.log(`[LOAD] Restored active tab ${activeTabId} tileset for layer "${layerType}"`);
-            } else {
-              // Image still loading, it will be handled by the image onload callback later
-              console.log(`[LOAD] Deferring active tab ${activeTabId} tileset for layer "${layerType}" - image still loading`);
             }
           }
         }
@@ -10969,7 +10941,6 @@ export class TileMapEditor {
           
           if (activeTab && layer && activeTab.data) {
             layer.data = [...activeTab.data];
-            console.log(`[LOAD-SYNC] Loaded active tab ${activeTabId} data for layer type "${layerType}" (${activeTab.data.filter(v => v > 0).length} painted tiles)`);
           }
 
           // If tab-level detected metadata is missing but layer-level metadata exists,
@@ -10988,14 +10959,12 @@ export class TileMapEditor {
             // Ensure the image is loaded before applying (width should be > 0)
             if (img.width > 0 || img.height > 0) {
               this.layerTilesets.set(layerType, tileset);
-              console.log(`[LOAD-SYNC] Restored active tab ${activeTabId} tileset for layer "${layerType}"`);
               // Refresh palette display
               this.updateCurrentTileset(layerType);
             } else {
               // Image still loading, schedule restoration for when image loads
               const onImageLoad = () => {
                 this.layerTilesets.set(layerType, tileset);
-                console.log(`[LOAD-SYNC] Restored active tab ${activeTabId} tileset for layer "${layerType}" (after image loaded)`);
                 img.removeEventListener('load', onImageLoad);
                 // Refresh palette display after image loads
                 this.updateCurrentTileset(layerType);
@@ -11035,7 +11004,6 @@ export class TileMapEditor {
             }
           }
         }
-        console.log(`[LOAD] Restored ${projectData.assetRecords.length} asset records`);
       }
       if (projectData.objectInstances && Array.isArray(projectData.objectInstances)) {
         for (const instance of projectData.objectInstances) {
@@ -11046,11 +11014,9 @@ export class TileMapEditor {
             this.nextObjectInstanceId = numId + 1;
           }
         }
-        console.log(`[LOAD] Restored ${projectData.objectInstances.length} object instances`);
       }
       if (projectData.paintMode) {
         this.paintMode = projectData.paintMode;
-        console.log(`[LOAD] Restored paint mode: ${this.paintMode}`);
       }
 
       console.log('Project data loaded successfully');
@@ -11189,8 +11155,6 @@ export class TileMapEditor {
 
   // Method to update canvas reference when DOM element changes
   public updateCanvas(newCanvas: HTMLCanvasElement): void {
-    console.log('TileMapEditor: Updating canvas reference and rebinding events');
-    
     // Clean up observers and events from the old canvas
     this.cleanupCanvasObservers();
     this.cleanupCanvasEvents();
@@ -11209,8 +11173,6 @@ export class TileMapEditor {
     
     // Redraw to restore the content
     this.draw();
-    
-    console.log('TileMapEditor: Canvas update complete - events rebound');
   }
 
   /**

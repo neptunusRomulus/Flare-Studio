@@ -1,6 +1,7 @@
 import React from 'react';
 import SidebarLayout from '@/components/SidebarLayout';
 import SidebarActorArea from '@/components/SidebarActorArea';
+import SidebarEventArea from '@/components/SidebarEventArea';
 import SidebarRulesArea from '@/components/SidebarRulesArea';
 import SidebarItemsArea from '@/components/SidebarItemsArea';
 import TilesetPanel from '@/components/sidebar/TilesetPanel';
@@ -10,6 +11,7 @@ import type { MapObject, TileLayer } from '@/types';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 import type { RuleStartType } from '@/editor/ruleOptions';
 import type { ItemRole, ItemResourceSubtype } from '@/editor/itemRoles';
+import type { Event } from '@/EditorCore';
 
 type ItemSummary = {
   id: number;
@@ -33,6 +35,17 @@ type SidebarProps = {
     handleNpcDragStart: (e: React.DragEvent, actorId: number) => void;
     handleNpcDragEnd: () => void;
     handleOpenActorDialog: (type: 'npc' | 'enemy') => void;
+  };
+
+  events: {
+    isEventLayer: boolean;
+    eventEntries: Event[];
+    draggingEventId: string | null;
+    handleEditEvent: (id: string) => void;
+    setEventHoverTooltip: (p: { x: number; y: number } | null) => void;
+    handleEventDragStart: (e: React.DragEvent, eventId: string) => void;
+    handleEventDragEnd: () => void;
+    handleOpenEventDialog: () => void;
   };
 
   rules: {
@@ -127,6 +140,20 @@ export default function AppSidebar(p: SidebarProps) {
           />
         )}
 
+        {p.events.isEventLayer && (
+          <SidebarEventArea
+            isEventLayer={p.events.isEventLayer}
+            eventEntries={p.events.eventEntries}
+            leftCollapsed={p.leftCollapsed}
+            draggingEventId={p.events.draggingEventId}
+            handleEditEvent={p.events.handleEditEvent}
+            setEventHoverTooltip={p.events.setEventHoverTooltip}
+            handleEventDragStart={p.events.handleEventDragStart}
+            handleEventDragEnd={p.events.handleEventDragEnd}
+            handleOpenEventDialog={p.events.handleOpenEventDialog}
+          />
+        )}
+
         {p.rules.isRulesLayer && (
           <SidebarRulesArea rulesList={p.rules.rulesList} handleAddRule={p.rules.handleAddRule} />
         )}
@@ -141,7 +168,7 @@ export default function AppSidebar(p: SidebarProps) {
           />
         )}
 
-        {!p.actors.isNpcLayer && !p.actors.isEnemyLayer && !p.items.isItemsLayer && !p.rules.isRulesLayer && (
+        {!p.actors.isNpcLayer && !p.actors.isEnemyLayer && !p.events.isEventLayer && !p.items.isItemsLayer && !p.rules.isRulesLayer && (
           <TilesetPanel
             editor={p.tileset.editor}
             activeLayer={p.tileset.activeLayer}

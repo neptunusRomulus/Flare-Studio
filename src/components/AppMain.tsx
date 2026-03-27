@@ -5,6 +5,7 @@ import AppShell from '@/components/AppShell';
 import AppSidebar from '@/components/AppSidebar';
 import EngineSettingsDialog from '@/components/EngineSettingsDialog';
 import MapSettingsDialog from '@/components/MapSettingsDialog';
+import EventDialog from '@/components/EventDialog';
 import ClearLayerDialog from '@/components/ClearLayerDialog';
 import ConfirmActionDialog from '@/components/ConfirmActionDialog';
 import HelpDialog from '@/components/HelpDialog';
@@ -32,6 +33,7 @@ export default function AppMain() {
     actors,
     rules,
     items,
+    events,
     tileset,
     layersObj,
     exportStatus,
@@ -58,6 +60,9 @@ export default function AppMain() {
     showClearLayerDialog,
     handleClearLayerClose,
     handleClearLayerConfirm,
+    eventDialogOpen,
+    setEventDialogOpen,
+    eventDialogLocation,
     confirmDialogProps,
     showHelp,
     activeHelpTab,
@@ -186,6 +191,7 @@ export default function AppMain() {
             actors={actors}
             rules={rules}
             items={items}
+            events={events}
             tileset={{
               ...tileset,
               currentProjectPath: controls?.currentProjectPath
@@ -224,6 +230,8 @@ export default function AppMain() {
           handleMapResize={handleMapResize}
           handleDeleteMap={handleDeleteMap}
         />
+
+        <EventDialog open={eventDialogOpen} onOpenChange={setEventDialogOpen} eventLocation={eventDialogLocation} />
 
         <ClearLayerDialog open={showClearLayerDialog} onClose={handleClearLayerClose} onConfirm={handleClearLayerConfirm} />
 

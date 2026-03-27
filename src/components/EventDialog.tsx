@@ -15,7 +15,7 @@ type EventData = {
     hotspot: { x: number; y: number; width: number; height: number };
   };
   timing: {
-    activation: EventActivation | null;
+    activeActivation: EventActivation | null;
     cooldown: number;
     delay: number;
   };
@@ -51,7 +51,7 @@ type EventDialogProps = {
 
 const ACTIVATION_OPTIONS: EventActivation[] = ['Trigger', 'Interact', 'Load', 'Leave', 'MapExit', 'MapClear', 'Loop'];
 
-const ACTIVATION_CONFIG: Record<EventActivation, { icon: React.ComponentType<{ className?: string }>; tooltip: string; label: string }> = {
+const ACTIVATION_CONFIG: Record<EventActivation, { icon: React.ComponentType<any>; tooltip: string; label: string }> = {
   Trigger: {
     icon: MapPinPlus,
     tooltip: 'Activated when the player stands in the event area or interacts with a defined hotspot',
@@ -98,7 +98,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
       hotspot: { x: 0, y: 0, width: 1, height: 1 },
     },
     timing: {
-      activation: null,
+      activeActivation: null,
       cooldown: 0,
       delay: 0,
     },
@@ -126,12 +126,12 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
     },
   });
 
-  const setActivation = (activation: EventActivation | null) => {
+  const setActivation = (activation: EventActivation) => {
     setEventData(prev => ({
       ...prev,
       timing: {
         ...prev.timing,
-        activation: prev.timing.activation === activation ? null : activation,
+        activeActivation: prev.timing.activeActivation === activation ? null : activation,
       },
     }));
   };
@@ -198,16 +198,16 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                   <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
                 </Tooltip>
               </div>
-              <div className="flex flex-wrap items-center gap-1">
+              <div className="flex flex-wrap gap-1 items-start">
                 {ACTIVATION_OPTIONS.map(activation => {
                   const config = ACTIVATION_CONFIG[activation];
                   const IconComponent = config.icon;
-                  const isActive = eventData.timing.activation === activation;
+                  const isActive = eventData.timing.activeActivation === activation;
                   return (
-                    <Tooltip key={activation} content={config.tooltip} side="bottom">
+                    <Tooltip key={activation} content={config.tooltip}>
                       <button
                         onClick={() => setActivation(activation)}
-                        className={`rounded-md border p-2 transition-all duration-200 ${
+                        className={`rounded-md border p-2 transition-colors ${
                           isActive
                             ? 'border-orange-500/50 bg-orange-500/10 text-orange-600'
                             : 'border-border/50 bg-muted/30 text-foreground/60 hover:bg-muted/50'

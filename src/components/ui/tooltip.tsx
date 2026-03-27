@@ -107,7 +107,7 @@ const Tooltip: React.FC<TooltipProps> = ({ content, side = 'top', className = ''
     timerRef.current = window.setTimeout(() => {
       setHovered(false);
       setIsExpanded(false);
-      window.setTimeout(() => setVisiblePortal(false), 220);
+      window.setTimeout(() => setVisiblePortal(false), 100);
     }, delay);
   }, [clearTimer]);
 
@@ -116,33 +116,44 @@ const Tooltip: React.FC<TooltipProps> = ({ content, side = 'top', className = ''
   const onTriggerEnter = () => {
     clearTimer();
     // measure on next frame so layout is stable
-    requestAnimationFrame(() => {
-      computeOffset();
-    });
+    requestAnimationFrame(() => computeOffset());
     setHovered(true);
-    setIsExpanded(true);
     setVisiblePortal(true);
   };
 
   const onTriggerLeave = () => {
-    // Don't immediately close - mouse might be moving to portal
-    // Only set hovered to false if mouse also leaves portal
+    if (isExpanded) {
+      startCloseTimer(1500);
+    } else {
+      setHovered(false);
+      // allow fade-out animation before removing portal
+      window.setTimeout(() => setVisiblePortal(false), 100);
+    }
   };
 
   const onPortalEnter = () => {
-    clearTimer();
-    setHovered(true);
+    if (isExpanded) {
+      clearTimer();
+      setHovered(true);
+    }
   };
 
   const onPortalLeave = () => {
-    // Close tooltip when actually leaving the portal area
-    setHovered(false);
-    window.setTimeout(() => setVisiblePortal(false), 220);
+    if (isExpanded) {
+      startCloseTimer(1500);
+    }
   };
 
   React.useEffect(() => {
     return () => clearTimer();
   }, [clearTimer]);
+
+  const handleToggleExpand = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsExpanded(!isExpanded);
+    // re-measure since size changed
+    requestAnimationFrame(() => computeOffset());
+  };
 
   // after portal tooltip renders, measure and clamp its position
   React.useEffect(() => {
@@ -192,42 +203,36 @@ const Tooltip: React.FC<TooltipProps> = ({ content, side = 'top', className = ''
         onFocus={onTriggerEnter}
         onMouseLeave={onTriggerLeave}
         onBlur={onTriggerLeave}
+        onClick={handleToggleExpand}
         className={`relative inline-flex cursor-help ${className}`}
-        style={{ pointerEvents: 'auto' }}
       >
         {trigger}
       </span>
-      {(() => {
-        const shouldRender = typeof document !== 'undefined' && pos && visiblePortal;
-        return shouldRender && createPortal(
+      {typeof document !== 'undefined' && pos && visiblePortal && createPortal(
         <div
           ref={portalRef}
           id={id}
           role="tooltip"
           onMouseEnter={onPortalEnter}
           onMouseLeave={onPortalLeave}
-          className={`custom-tooltip transition-all duration-200 ${hovered ? 'opacity-100' : 'opacity-0'}`}
+          className={`custom-tooltip transition-all duration-100 ${hovered ? 'visible' : 'fade-out'}`}
           style={(() => {
-            const base: React.CSSProperties = {
-              position: 'fixed',
-              left: pos.left,
-              top: pos.top,
-              pointerEvents: 'auto',
-              zIndex: 9999,
-            };
+            const base = side === 'right' || side === 'left' 
+              ? { left: pos.left, top: pos.top, transform: 'translateY(-50%)' } 
+              : { left: pos.left, top: pos.top, transform: 'translateX(-50%)' };
             
-            if (side === 'right' || side === 'left') {
-              base.transform = 'translateY(-50%)';
-            } else {
-              base.transform = 'translateX(-50%)';
+            if (isExpanded) {
+              return { 
+                ...base, 
+                zIndex: 100,
+              } as React.CSSProperties;
             }
-            
-            return base;
+            return base as React.CSSProperties;
           })()}
         >
           <span
             ref={tooltipRef}
-            className={`inline-block text-xs px-3 py-2 rounded-md shadow-xl transition-all duration-200 break-words bg-black text-white border border-white/10 ${isExpanded ? 'max-w-xs' : 'max-w-[10rem]'}`}
+            className={`inline-block text-xs px-3 py-2 rounded-md shadow-xl transition-all duration-100 break-words bg-black text-white border border-white/10 ${isExpanded ? 'max-w-[24rem]' : 'max-w-[18rem]'}`}
             style={{
               display: isExpanded ? 'block' : '-webkit-box',
               WebkitLineClamp: isExpanded ? 'none' : 2,
@@ -249,8 +254,7 @@ const Tooltip: React.FC<TooltipProps> = ({ content, side = 'top', className = ''
           )}
         </div>,
         document.body
-      );
-      })()}
+      )}
     </>
   );
 };

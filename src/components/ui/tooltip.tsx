@@ -118,42 +118,26 @@ const Tooltip: React.FC<TooltipProps> = ({ content, side = 'top', className = ''
     // measure on next frame so layout is stable
     requestAnimationFrame(() => computeOffset());
     setHovered(true);
+    setIsExpanded(true);
     setVisiblePortal(true);
   };
 
   const onTriggerLeave = () => {
-    if (isExpanded) {
-      startCloseTimer(1500);
-    } else {
-      setHovered(false);
-      // allow fade-out animation before removing portal
-      window.setTimeout(() => setVisiblePortal(false), 220);
-    }
+    startCloseTimer(1500);
   };
 
   const onPortalEnter = () => {
-    if (isExpanded) {
-      clearTimer();
-      setHovered(true);
-    }
+    clearTimer();
+    setHovered(true);
   };
 
   const onPortalLeave = () => {
-    if (isExpanded) {
-      startCloseTimer(1500);
-    }
+    startCloseTimer(800);
   };
 
   React.useEffect(() => {
     return () => clearTimer();
   }, [clearTimer]);
-
-  const handleToggleExpand = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIsExpanded(!isExpanded);
-    // re-measure since size changed
-    requestAnimationFrame(() => computeOffset());
-  };
 
   // after portal tooltip renders, measure and clamp its position
   React.useEffect(() => {
@@ -203,7 +187,6 @@ const Tooltip: React.FC<TooltipProps> = ({ content, side = 'top', className = ''
         onFocus={onTriggerEnter}
         onMouseLeave={onTriggerLeave}
         onBlur={onTriggerLeave}
-        onClick={handleToggleExpand}
         className={`relative inline-flex cursor-help ${className}`}
       >
         {trigger}
@@ -215,24 +198,18 @@ const Tooltip: React.FC<TooltipProps> = ({ content, side = 'top', className = ''
           role="tooltip"
           onMouseEnter={onPortalEnter}
           onMouseLeave={onPortalLeave}
-          className={`custom-tooltip transition-all duration-200 ${hovered ? 'visible' : 'fade-out'}`}
+          className={`custom-tooltip transition-all duration-200 ${hovered ? 'opacity-100' : 'opacity-0'}`}
           style={(() => {
             const base = side === 'right' || side === 'left' 
               ? { left: pos.left, top: pos.top, transform: 'translateY(-50%)' } 
               : { left: pos.left, top: pos.top, transform: 'translateX(-50%)' };
             
-            if (isExpanded) {
-              return { 
-                ...base, 
-                zIndex: 100,
-              } as React.CSSProperties;
-            }
             return base as React.CSSProperties;
           })()}
         >
           <span
             ref={tooltipRef}
-            className={`inline-block text-xs px-3 py-2 rounded-md shadow-xl transition-all duration-200 break-words bg-black text-white border border-white/10 ${isExpanded ? 'max-w-[24rem]' : 'max-w-[18rem]'}`}
+            className={`inline-block text-xs px-3 py-2 rounded-md shadow-xl transition-all duration-200 break-words bg-black text-white border border-white/10 ${isExpanded ? 'max-w-xs' : 'max-w-[10rem]'}`}
             style={{
               display: isExpanded ? 'block' : '-webkit-box',
               WebkitLineClamp: isExpanded ? 'none' : 2,

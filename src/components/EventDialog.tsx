@@ -15,7 +15,7 @@ type EventData = {
     hotspot: { x: number; y: number; width: number; height: number };
   };
   timing: {
-    activations: EventActivation[];
+    activation: EventActivation | null;
     cooldown: number;
     delay: number;
   };
@@ -98,7 +98,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
       hotspot: { x: 0, y: 0, width: 1, height: 1 },
     },
     timing: {
-      activations: [],
+      activation: null,
       cooldown: 0,
       delay: 0,
     },
@@ -126,14 +126,12 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
     },
   });
 
-  const toggleActivation = (activation: EventActivation) => {
+  const setActivation = (activation: EventActivation | null) => {
     setEventData(prev => ({
       ...prev,
       timing: {
         ...prev.timing,
-        activations: prev.timing.activations.includes(activation)
-          ? prev.timing.activations.filter(a => a !== activation)
-          : [...prev.timing.activations, activation],
+        activation: prev.timing.activation === activation ? null : activation,
       },
     }));
   };
@@ -200,16 +198,17 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                   <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
                 </Tooltip>
               </div>
-              <div className="grid grid-cols-3 gap-2 sm:grid-cols-7">
+              <div className="flex flex-wrap items-center gap-1">
                 {ACTIVATION_OPTIONS.map(activation => {
                   const config = ACTIVATION_CONFIG[activation];
                   const IconComponent = config.icon;
+                  const isActive = eventData.timing.activation === activation;
                   return (
-                    <Tooltip key={activation} content={config.tooltip}>
+                    <Tooltip key={activation} content={config.tooltip} side="bottom">
                       <button
-                        onClick={() => toggleActivation(activation)}
-                        className={`rounded-md border p-2 transition-colors ${
-                          eventData.timing.activations.includes(activation)
+                        onClick={() => setActivation(activation)}
+                        className={`rounded-md border p-2 transition-all duration-200 ${
+                          isActive
                             ? 'border-orange-500/50 bg-orange-500/10 text-orange-600'
                             : 'border-border/50 bg-muted/30 text-foreground/60 hover:bg-muted/50'
                         }`}

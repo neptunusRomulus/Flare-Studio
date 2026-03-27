@@ -128,7 +128,8 @@ const Tooltip: React.FC<TooltipProps> = ({ content, side = 'top', className = ''
 
   const onTriggerLeave = () => {
     console.log('[Tooltip] onTriggerLeave triggered');
-    startCloseTimer(1500);
+    // Don't immediately close - mouse might be moving to portal
+    // Only set hovered to false if mouse also leaves portal
   };
 
   const onPortalEnter = () => {
@@ -139,8 +140,7 @@ const Tooltip: React.FC<TooltipProps> = ({ content, side = 'top', className = ''
 
   const onPortalLeave = () => {
     console.log('[Tooltip] onPortalLeave triggered');
-    // Don't close immediately, let the trigger handle it
-    // Only close if the user actually moved away, not because portal isn't interactive
+    // Close tooltip when actually leaving the portal area
     setHovered(false);
     window.setTimeout(() => setVisiblePortal(false), 220);
   };

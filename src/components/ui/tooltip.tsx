@@ -139,7 +139,10 @@ const Tooltip: React.FC<TooltipProps> = ({ content, side = 'top', className = ''
 
   const onPortalLeave = () => {
     console.log('[Tooltip] onPortalLeave triggered');
-    startCloseTimer(800);
+    // Don't close immediately, let the trigger handle it
+    // Only close if the user actually moved away, not because portal isn't interactive
+    setHovered(false);
+    window.setTimeout(() => setVisiblePortal(false), 220);
   };
 
   React.useEffect(() => {
@@ -230,6 +233,8 @@ const Tooltip: React.FC<TooltipProps> = ({ content, side = 'top', className = ''
               position: 'fixed',
               left: pos.left,
               top: pos.top,
+              pointerEvents: 'auto',
+              zIndex: 9999,
             };
             
             if (side === 'right' || side === 'left') {

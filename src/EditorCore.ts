@@ -6,6 +6,13 @@ export interface Item {
   id: number;
 }
 
+export interface Event {
+  id: string;
+  type: string;
+  x: number;
+  y: number;
+}
+
 export type EntityKey = string | number;
 
 export type CoreChange =
@@ -41,6 +48,7 @@ export interface EntityRepository<TEntity, TKey extends EntityKey> {
 export interface EditorCoreInit<TNpc extends Npc, TItem extends Item> {
   npcs?: Iterable<TNpc>;
   items?: Iterable<TItem>;
+  events?: Iterable<Event>;
 }
 
 type KeyNormalizer<TKey extends EntityKey> = (key: TKey) => TKey;
@@ -161,6 +169,7 @@ class EntityStore<TEntity, TKey extends EntityKey> implements EntityRepository<T
 export class EditorCore<TNpc extends Npc = Npc, TItem extends Item = Item> {
   public readonly npcs: EntityRepository<TNpc, string>;
   public readonly items: EntityRepository<TItem, number>;
+  public readonly events: EntityRepository<Event, string>;
   // Optional hook for UI / persistence layers to react to data changes without putting any UI state into the core.
   public onChange?: (change: CoreChange) => void;
 
@@ -175,8 +184,10 @@ export class EditorCore<TNpc extends Npc = Npc, TItem extends Item = Item> {
 
     const npcStore = new EntityStore<TNpc, string>({ kind: 'NPC', getKey: npc => npc.name, onChange: emitChange }, initial?.npcs);
     const itemStore = new EntityStore<TItem, number>({ kind: 'Item', getKey: item => item.id, onChange: emitChange }, initial?.items);
+    const eventStore = new EntityStore<Event, string>({ kind: 'Event', getKey: event => event.id, onChange: emitChange }, initial?.events);
 
     this.npcs = npcStore;
     this.items = itemStore;
+    this.events = eventStore;
   }
 }

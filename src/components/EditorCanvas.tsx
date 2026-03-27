@@ -21,6 +21,8 @@ type EditorContext = {
   canvasRef: React.RefObject<HTMLCanvasElement>;
   draggingNpcId: number | null;
   setDraggingNpcId: (id: number | null) => void;
+  draggingEventId: string | null;
+  setDraggingEventId: (id: string | null) => void;
   tipsMinimized: boolean;
   setTipsMinimized: (v: boolean) => void;
   setShowHelp: (v: boolean) => void;
@@ -28,6 +30,7 @@ type EditorContext = {
   mapWidth: number;
   mapHeight: number;
   handlePlaceActorOnMap: (objectId: number, x?: number, y?: number) => void;
+  handlePlaceEventOnMap: (eventId: string, x: number, y: number) => void;
   mapInitialized: boolean;
   handleOpenCreateMapDialog: () => void;
   isPreparingNewMap: boolean;
@@ -70,6 +73,8 @@ export default function EditorCanvas(props: Props) {
     canvasRef,
     draggingNpcId,
     setDraggingNpcId,
+    draggingEventId,
+    setDraggingEventId,
     tipsMinimized,
     setTipsMinimized,
     setShowHelp,
@@ -77,6 +82,7 @@ export default function EditorCanvas(props: Props) {
     mapWidth,
     mapHeight,
     handlePlaceActorOnMap,
+    handlePlaceEventOnMap,
     mapInitialized,
     handleOpenCreateMapDialog,
     isPreparingNewMap,
@@ -133,38 +139,64 @@ export default function EditorCanvas(props: Props) {
   return (
     <div
       ref={canvasAreaRef}
-      className={`bg-gray-100 flex-1 min-h-0 flex overflow-hidden relative ${draggingNpcId ? 'ring-2 ring-orange-500 ring-inset' : ''}`}
-          onDragOver={(e) => {
-        if (draggingNpcId && editor) {
-          e.preventDefault();
-          e.dataTransfer.dropEffect = 'move';
-          const canvas = canvasRef.current;
-          if (canvas) {
-            const rect = canvas.getBoundingClientRect();
-            const canvasX = e.clientX - rect.left;
-            const canvasY = e.clientY - rect.top;
+      className={`bg-gray-100 flex-1 min-h-0 flex overflow-hidden relative ${draggingNpcId || draggingEventId ? 'ring-2 ring-orange-500 ring-inset' : ''}`}
+      onDragOver={(e) => {
+        if (editor && canvasRef.current) {
+          const rect = canvasRef.current.getBoundingClientRect();
+          const canvasX = e.clientX - rect.left;
+          const canvasY = e.clientY - rect.top;
+
+          if (draggingNpcId) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
             editor.setNpcDragHover(canvasX, canvasY);
+          } else if (draggingEventId) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            editor.setEventDragHover(canvasX, canvasY);
           }
         }
       }}
-      onDragLeave={() => { if (draggingNpcId && editor) editor.clearNpcDragHover(); }}
+      onDragLeave={() => {
+        if (draggingNpcId && editor) editor.clearNpcDragHover();
+        if (draggingEventId && editor) editor.clearEventDragHover();
+      }}
       onDrop={(e) => {
         e.preventDefault();
-        const npcIdStr = e.dataTransfer.getData('npc-id');
-        if (!npcIdStr || !editor) return;
-        const npcId = parseInt(npcIdStr, 10);
-        if (isNaN(npcId)) return;
         const canvas = canvasRef.current;
-        if (!canvas) return;
-        const rect = canvas.getBoundingClientRect();
-        const canvasX = e.clientX - rect.left;
-        const canvasY = e.clientY - rect.top;
-        const mapCoords = editor.screenToTile(canvasX, canvasY);
-        if (mapCoords && mapCoords.x >= 0 && mapCoords.x < mapWidth && mapCoords.y >= 0 && mapCoords.y < mapHeight) {
-          handlePlaceActorOnMap(npcId, mapCoords.x, mapCoords.y);
+        if (!canvas || !editor) return;
+
+        // Handle NPC drop
+        const npcIdStr = e.dataTransfer.getData('npc-id');
+        if (npcIdStr) {
+          const npcId = parseInt(npcIdStr, 10);
+          if (!isNaN(npcId)) {
+            const rect = canvas.getBoundingClientRect();
+            const canvasX = e.clientX - rect.left;
+            const canvasY = e.clientY - rect.top;
+            const mapCoords = editor.screenToTile(canvasX, canvasY);
+            if (mapCoords && mapCoords.x >= 0 && mapCoords.x < mapWidth && mapCoords.y >= 0 && mapCoords.y < mapHeight) {
+              handlePlaceActorOnMap(npcId, mapCoords.x, mapCoords.y);
+            }
+          }
+          editor.clearNpcDragHover();
+          setDraggingNpcId(null);
+          return;
         }
-        editor.clearNpcDragHover();
-        setDraggingNpcId(null);
+
+        // Handle Event drop
+        const eventIdStr = e.dataTransfer.getData('event-id');
+        if (eventIdStr) {
+          const rect = canvas.getBoundingClientRect();
+          const canvasX = e.clientX - rect.left;
+          const canvasY = e.clientY - rect.top;
+          const mapCoords = editor.screenToTile(canvasX, canvasY);
+          if (mapCoords && mapCoords.x >= 0 && mapCoords.x < mapWidth && mapCoords.y >= 0 && mapCoords.y < mapHeight) {
+            handlePlaceEventOnMap(eventIdStr, mapCoords.x, mapCoords.y);
+          }
+          editor.clearEventDragHover();
+          setDraggingEventId(null);
+        }
       }}
     >
       <CanvasTips

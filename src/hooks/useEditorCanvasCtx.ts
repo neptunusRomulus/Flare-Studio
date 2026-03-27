@@ -20,6 +20,8 @@ type UseEditorCanvasDeps = {
   canvasRef: React.RefObject<HTMLCanvasElement>;
   draggingNpcId: number | null;
   setDraggingNpcId: React.Dispatch<React.SetStateAction<number | null>>;
+  draggingEventId: string | null;
+  setDraggingEventId: React.Dispatch<React.SetStateAction<string | null>>;
   tipsMinimized: boolean;
   setTipsMinimized: React.Dispatch<React.SetStateAction<boolean>>;
   setShowHelp: (b: boolean) => void;
@@ -27,6 +29,7 @@ type UseEditorCanvasDeps = {
   mapWidth: number;
   mapHeight: number;
   handlePlaceActorOnMap: (objectId: number, x?: number, y?: number) => void;
+  handlePlaceEventOnMap: (eventId: string, x: number, y: number) => void;
   mapInitialized: boolean;
   handleOpenCreateMapDialog: () => Promise<void> | void;
   isPreparingNewMap: boolean;
@@ -91,6 +94,8 @@ export default function useEditorCanvasCtx(deps: UseEditorCanvasDeps) {
     canvasRef: deps.canvasRef,
     draggingNpcId: deps.draggingNpcId,
     setDraggingNpcId: deps.setDraggingNpcId,
+    draggingEventId: deps.draggingEventId,
+    setDraggingEventId: deps.setDraggingEventId,
     tipsMinimized: deps.tipsMinimized,
     setTipsMinimized: deps.setTipsMinimized,
     setShowHelp: deps.setShowHelp,
@@ -98,6 +103,7 @@ export default function useEditorCanvasCtx(deps: UseEditorCanvasDeps) {
     mapWidth: deps.mapWidth,
     mapHeight: deps.mapHeight,
     handlePlaceActorOnMap: deps.handlePlaceActorOnMap,
+    handlePlaceEventOnMap: deps.handlePlaceEventOnMap,
     mapInitialized: deps.mapInitialized,
     handleOpenCreateMapDialog: deps.handleOpenCreateMapDialog,
     isPreparingNewMap: deps.isPreparingNewMap,

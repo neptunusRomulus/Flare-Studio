@@ -875,6 +875,10 @@ export class TileMapEditor {
   private npcDragHoverX: number = -1;
   private npcDragHoverY: number = -1;
 
+  // Event drag hover state (for external drag-drop from Event list)
+  private eventDragHoverX: number = -1;
+  private eventDragHoverY: number = -1;
+
   // Zoom and pan state
   private zoom: number = 1;
   private panX: number = 0;
@@ -2303,6 +2307,11 @@ export class TileMapEditor {
     if (this.npcDragHoverX >= 0 && this.npcDragHoverY >= 0) {
       this.drawNpcDragHover();
     }
+
+    // Draw event drag hover (external drag-drop from Event list)
+    if (this.eventDragHoverX >= 0 && this.eventDragHoverY >= 0) {
+      this.drawEventDragHover();
+    }
     
     // Draw selection
     this.drawSelection();
@@ -2312,6 +2321,9 @@ export class TileMapEditor {
 
     // Draw NPC/enemy placeholders when no tile assigned
     this.drawActorPlaceholders();
+
+    // Draw events when event layer is active
+    this.drawEvents();
 
     // Draw shape preview
     this.drawShapePreview();
@@ -2478,6 +2490,40 @@ export class TileMapEditor {
     if (this.npcDragHoverX !== -1 || this.npcDragHoverY !== -1) {
       this.npcDragHoverX = -1;
       this.npcDragHoverY = -1;
+      this.draw();
+    }
+  }
+
+  // Event drag hover methods for external drag-drop
+  public setEventDragHover(screenX: number, screenY: number): { x: number, y: number } | null {
+    // Use the same tile detection as normal hover (screenToTile)
+    const mapCoords = this.screenToTile(screenX, screenY);
+    
+    // Check if coordinates are valid and within map bounds
+    if (mapCoords && mapCoords.x >= 0 && mapCoords.x < this.mapWidth && 
+        mapCoords.y >= 0 && mapCoords.y < this.mapHeight) {
+      // Only redraw if position changed
+      if (this.eventDragHoverX !== mapCoords.x || this.eventDragHoverY !== mapCoords.y) {
+        this.eventDragHoverX = mapCoords.x;
+        this.eventDragHoverY = mapCoords.y;
+        this.draw();
+      }
+      return mapCoords;
+    } else {
+      // Only redraw if was previously valid
+      if (this.eventDragHoverX !== -1 || this.eventDragHoverY !== -1) {
+        this.eventDragHoverX = -1;
+        this.eventDragHoverY = -1;
+        this.draw();
+      }
+      return null;
+    }
+  }
+
+  public clearEventDragHover(): void {
+    if (this.eventDragHoverX !== -1 || this.eventDragHoverY !== -1) {
+      this.eventDragHoverX = -1;
+      this.eventDragHoverY = -1;
       this.draw();
     }
   }
@@ -3267,6 +3313,30 @@ export class TileMapEditor {
     this.ctx.lineTo(screenPos.x - halfTileX, screenPos.y); // Left
     this.ctx.closePath();
     this.ctx.stroke();
+  }
+
+  private drawEventDragHover(): void {
+    const screenPos = this.mapToScreen(this.eventDragHoverX, this.eventDragHoverY);
+    const halfTileX = (this.tileSizeX / 2) * this.zoom;
+    const halfTileY = (this.tileSizeY / 2) * this.zoom;
+    
+    // Blue hover outline - same as NPC hover (for consistency)
+    this.ctx.strokeStyle = '#007acc';
+    this.ctx.lineWidth = Math.max(1, Math.min(3, 2 / this.zoom));
+    
+    this.ctx.beginPath();
+    this.ctx.moveTo(screenPos.x, screenPos.y - halfTileY); // Top
+    this.ctx.lineTo(screenPos.x + halfTileX, screenPos.y); // Right
+    this.ctx.lineTo(screenPos.x, screenPos.y + halfTileY); // Bottom
+    this.ctx.lineTo(screenPos.x - halfTileX, screenPos.y); // Left
+    this.ctx.closePath();
+    this.ctx.stroke();
+  }
+
+  private drawEvents(): void {
+    // Draw event placeholders from EditorCore events repository
+    // This will be integrated once EditorCore is connected to the TileMapEditor
+    // For now, this is a placeholder method that will be populated in the integration phase
   }
 
   private drawSelection(): void {

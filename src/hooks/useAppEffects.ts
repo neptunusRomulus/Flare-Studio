@@ -209,10 +209,14 @@ export default function useAppEffects(params: unknown) {
   useEffect(() => {
     if (syncMapObjectsRef) {
       try {
+        console.log('[DEBUG-Ref] Setting syncMapObjectsRef.current, syncMapObjects type:', typeof syncMapObjects);
         syncMapObjectsRef.current = syncMapObjects;
+        console.log('[DEBUG-Ref] syncMapObjectsRef.current is now set');
       } catch (e) {
         console.warn('Failed to assign syncMapObjectsRef.current', e);
       }
+    } else {
+      console.log('[DEBUG-Ref] syncMapObjectsRef is null/undefined');
     }
   }, [syncMapObjects, syncMapObjectsRef]);
 

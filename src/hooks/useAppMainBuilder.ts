@@ -15,8 +15,10 @@ import type { EditorTab } from './useEditorTabs';
 import useProjectManager from './useProjectManager';
 type ProjectManagerParams = Parameters<typeof useProjectManager>[0];
 import useLayerHandlers from './useLayerHandlers';
+import useMapHandlers from './useMapHandlers';
 import useAppEffects from './useAppEffects';
 import useNpcDrag from './useNpcDrag';
+import useEventDrag from './useEventDrag';
 import useObjectEditing from './useObjectEditing';
 import useItems from './useItems';
 import useLoadProjectData from './useLoadProjectData';
@@ -117,6 +119,7 @@ export default function useAppMainBuilder() {
     syncMapObjectsRef,
     handlePlaceActorOnMap,
     handleUnplaceActorFromMap,
+    handlePlaceEventOnMap,
     handleFillSelection,
     handleDeleteSelection,
     handleClearSelection
@@ -127,6 +130,15 @@ export default function useAppMainBuilder() {
 
   // Wire up hover GID callback to track GID under cursor
   useHoverGidCallback(editor as TileMapEditor | null, toolbarState.hoverCoords, toolbarState.setHoverGidValue);
+
+  // Get the REAL syncMapObjects from useMapHandlers - not the wrapper
+  // This needs to be before useAppEffects so the ref gets the real function
+  const { syncMapObjects: realSyncMapObjects, updateLayersList: realUpdateLayersList } = useMapHandlers({
+    editor: editor ?? undefined,
+    setMapObjects: appState.setMapObjects,
+    setLayers: appState.setLayers,
+    setActiveLayerId: appState.setActiveLayerId
+  });
 
   const mapConfig = useMapConfig({
     editor: editor ?? null,
@@ -145,7 +157,7 @@ export default function useAppMainBuilder() {
     setActiveLayerId: appState.setActiveLayerId,
     setStamps: toolbarState.setStamps,
     setSelectedStamp: () => {},
-    setMapObjects: () => {},
+    setMapObjects: appState.setMapObjects,
     setHoverCoords: toolbarState.setHoverCoords,
     setBrushTool: () => {},
     setShowSeparateDialog: () => {},
@@ -202,9 +214,9 @@ export default function useAppMainBuilder() {
     activeTabId,
     currentProjectPath,
     setActiveTabId,
-    updateLayersList,
+    updateLayersList: realUpdateLayersList,
     updateLayersListRef,
-    syncMapObjects,
+    syncMapObjects: realSyncMapObjects,
     syncMapObjectsRef,
     setupAutoSaveWrapper: setupAutoSave,
     setTabTick: appState.setTabTick,
@@ -357,7 +369,7 @@ export default function useAppMainBuilder() {
     setLayers: appState.setLayers,
     setActiveLayerId: appState.setActiveLayerId,
     setStamps: toolbarState.setStamps,
-    setMapObjects: () => {},
+    setMapObjects: appState.setMapObjects,
     setHoverCoords: toolbarState.setHoverCoords,
     setReservedMapNames: mapConfig.setReservedMapNames,
     setHasSelection: toolbarState.setHasSelection,
@@ -391,13 +403,27 @@ export default function useAppMainBuilder() {
 
   const { handleNpcDragStart, handleNpcDragEnd } = useNpcDrag({ editor, setDraggingNpcId: appState.setDraggingNpcId });
 
+  const { handleEventDragStart, handleEventDragEnd } = useEventDrag({ editor, setDraggingEventId: appState.setDraggingEventId });
+
+  const handleOpenEventDialog = useCallback((location?: { x: number; y: number } | null) => {
+    appState.setEventDialogLocation(location ?? null);
+    appState.setEventDialogOpen(true);
+  }, [appState]);
+
   const objectEditing = useObjectEditing({ 
-    editor: undefined, 
-    syncMapObjects, 
+    editor: editor ?? undefined, 
+    syncMapObjects: realSyncMapObjects,
     createTabFor, 
     switchToTab, 
     currentProjectPath 
   });
+
+  useEffect(() => {
+    console.log('[DEBUG-AppState] mapObjects updated:', appState.mapObjects.length, 'objects');
+    if (appState.mapObjects.length > 0) {
+      console.log('[DEBUG-AppState] mapObjects:', appState.mapObjects.map(o => ({ id: o.id, name: o.name, type: o.type })));
+    }
+  }, [appState.mapObjects]);
 
   useEffect(() => {
   }, [appState.activeLayerId]);
@@ -554,74 +580,117 @@ export default function useAppMainBuilder() {
         : 0;
 
     return {
-      layers: appState.layers,
-      activeLayerId: appState.activeLayerId,
-      hoveredLayerId: appState.hoveredLayerId,
-      layersPanelExpanded: appState.layersPanelExpanded,
-      setLayersPanelExpanded: appState.setLayersPanelExpanded,
-      setHoveredLayerId: appState.setHoveredLayerId,
-      handleSetActiveLayer,
-      handleToggleLayerVisibility,
-      handleLayerTransparencyChange,
-      showTooltipWithDelay,
-      hideTooltip,
-      uiHelpers,
       leftCollapsed: appState.leftCollapsed,
-      isNpcLayer,
-      isEnemyLayer,
-      actorEntries: appState.mapObjects,
-      draggingNpcId: appState.draggingNpcId,
-      handleEditObject: objectEditing.handleEditObject,
-      setNpcHoverTooltip: appState.setNpcHoverTooltip,
-      handleNpcDragStart,
-      handleNpcDragEnd,
-      handleOpenActorDialog: objectEditing.handleOpenActorDialog,
-      isRulesLayer,
-      rulesList: [],
-      handleAddRule: () => {},
-      isItemsLayer,
-      itemsList: itemsList,
-      expandedItemCategories,
-      setExpandedItemCategories,
-      handleOpenItemEdit: handleOpenItemEdit,
-      handleOpenItemDialog: handleOpenItemDialog,
-      editor,
-      activeLayer,
-      tabTick: appState.tabTick,
-      setTabTick: appState.setTabTick,
-      brushTool: toolbarState.brushTool,
-      isCollisionLayer: activeLayer?.type === 'collision',
-      handleFileUpload,
-      handleToggleBrushTool,
-      handleDeleteActiveTab: handleDeleteTilesetTab,
-      toast,
-      handleOpenActorDialogForTileset: objectEditing.handleOpenActorDialog,
-      stampsState: {
-        stamps: toolbarState.stamps,
-        selectedStamp: toolbarState.selectedStamp,
-        stampMode: toolbarState.stampMode
+      actors: {
+        isNpcLayer,
+        isEnemyLayer,
+        actorEntries: (() => {
+          const filtered = isNpcLayer 
+            ? appState.mapObjects.filter((obj) => obj.type === 'npc')
+            : isEnemyLayer
+            ? appState.mapObjects.filter((obj) => obj.type === 'enemy')
+            : [];
+          console.log('[DEBUG-SidebarDeps] isNpcLayer:', isNpcLayer, 'isEnemyLayer:', isEnemyLayer, 'allMapObjects:', appState.mapObjects.length, 'filtered actorEntries:', filtered.length);
+          if (filtered.length > 0) {
+            console.log('[DEBUG-SidebarDeps] Filtered entries:', filtered.map(a => ({ id: a.id, name: a.name, type: a.type })));
+          }
+          return filtered;
+        })(),
+        draggingNpcId: appState.draggingNpcId,
+        handleEditObject: objectEditing.handleEditObject,
+        setNpcHoverTooltip: appState.setNpcHoverTooltip,
+        handleNpcDragStart,
+        handleNpcDragEnd,
+        handleOpenActorDialog: objectEditing.handleOpenActorDialog,
       },
-      isExporting: isExportingValue,
-      exportProgress: exportProgressValue,
-      mapsButtonRef,
-      mapsDropdownOpen,
-      mapsDropdownPos,
-      mapsPortalRef,
-      mapsSubOpen,
-      currentProjectPath,
-      projectMaps: projectMapsList,
-      setMapsSubOpen,
-      setMapsDropdownOpen,
-      setMapsDropdownPos,
-      handleOpenCreateMapDialog: mapConfig.handleOpenCreateMapDialog,
-      handleOpenMapFromMapsFolder: handleOpenMapFromMapsFolderFn,
-      handleManualSave: handleManualSaveFn,
-      isManuallySaving: isManuallySavingValue,
-      saveProgress: saveProgressValue,
-      isPreparingNewMap: mapConfig.isPreparingNewMap,
-      hasUnsavedChanges: false,
-      setShowSettings,
-      refreshProjectMaps: refreshProjectMapsFn
+      events: {
+        isEventLayer: activeLayer?.type === 'event',
+        eventEntries: [],  // TODO: Populate from EditorCore.events once integrated
+        draggingEventId: appState.draggingEventId,
+        handleEditEvent: () => {},  // TODO: Wire up to open EventDialog for editing
+        setEventHoverTooltip: () => {},  // TODO: Implement event hover tooltip
+        handleEventDragStart,
+        handleEventDragEnd,
+        handleOpenEventDialog,
+      },
+      rules: {
+        isRulesLayer,
+        rulesList: [],
+        handleAddRule: () => {},
+      },
+      items: {
+        isItemsLayer,
+        itemsList: itemsList,
+        expandedItemCategories,
+        setExpandedItemCategories,
+        handleOpenItemEdit: handleOpenItemEdit,
+        handleOpenItemDialog: handleOpenItemDialog,
+      },
+      tileset: {
+        layers: appState.layers,
+        activeLayerId: appState.activeLayerId,
+        hoveredLayerId: appState.hoveredLayerId,
+        layersPanelExpanded: appState.layersPanelExpanded,
+        setLayersPanelExpanded: appState.setLayersPanelExpanded,
+        setHoveredLayerId: appState.setHoveredLayerId,
+        handleSetActiveLayer,
+        handleToggleLayerVisibility,
+        handleLayerTransparencyChange,
+        showTooltipWithDelay,
+        hideTooltip,
+        uiHelpers,
+        editor,
+        activeLayer,
+        tabTick: appState.tabTick,
+        setTabTick: appState.setTabTick,
+        brushTool: toolbarState.brushTool,
+        isCollisionLayer: activeLayer?.type === 'collision',
+        handleFileUpload,
+        handleToggleBrushTool,
+        handleDeleteActiveTab: handleDeleteTilesetTab,
+        toast,
+        handleOpenActorDialog: objectEditing.handleOpenActorDialog,
+        stampsState: {
+          stamps: toolbarState.stamps,
+          selectedStamp: toolbarState.selectedStamp,
+          stampMode: toolbarState.stampMode
+        },
+        currentProjectPath,
+        onShowImportReview: undefined,
+        isExporting: isExportingValue,
+        exportProgress: exportProgressValue,
+        mapsButtonRef,
+        mapsDropdownOpen,
+        mapsDropdownPos,
+        mapsPortalRef,
+        mapsSubOpen,
+        projectMaps: projectMapsList,
+        setMapsSubOpen,
+        setMapsDropdownOpen,
+        setMapsDropdownPos,
+        handleOpenCreateMapDialog: mapConfig.handleOpenCreateMapDialog,
+        handleOpenMapFromMapsFolder: handleOpenMapFromMapsFolderFn,
+        handleManualSave: handleManualSaveFn,
+        isManuallySaving: isManuallySavingValue,
+        saveProgress: saveProgressValue,
+        isPreparingNewMap: mapConfig.isPreparingNewMap,
+        refreshProjectMaps: refreshProjectMapsFn
+      },
+      layers: {
+        layers: appState.layers,
+        activeLayerId: appState.activeLayerId,
+        hoveredLayerId: appState.hoveredLayerId,
+        layersPanelExpanded: appState.layersPanelExpanded,
+        setLayersPanelExpanded: appState.setLayersPanelExpanded,
+        setHoveredLayerId: appState.setHoveredLayerId,
+        handleSetActiveLayer,
+        handleToggleLayerVisibility,
+        handleLayerTransparencyChange,
+        showTooltipWithDelay,
+        hideTooltip,
+        uiHelpers,
+        leftCollapsed: appState.leftCollapsed
+      }
     };
   }, [
     appState.layers,
@@ -641,9 +710,12 @@ export default function useAppMainBuilder() {
     isEnemyLayer,
     appState.mapObjects,
     appState.draggingNpcId,
+    appState.draggingEventId,
     appState.setNpcHoverTooltip,
     handleNpcDragStart,
     handleNpcDragEnd,
+    handleEventDragStart,
+    handleEventDragEnd,
     isRulesLayer,
     isItemsLayer,
     itemsList,
@@ -730,6 +802,17 @@ export default function useAppMainBuilder() {
       setExpandedItemCategories: () => {},
       handleOpenItemEdit: () => {},
       handleOpenItemDialog: () => {}
+    };
+
+    const defaultEvents = {
+      isEventLayer: false,
+      eventEntries: [],
+      draggingEventId: null,
+      handleEditEvent: () => {},
+      setEventHoverTooltip: () => {},
+      handleEventDragStart: () => {},
+      handleEventDragEnd: () => {},
+      handleOpenEventDialog: () => {}
     };
 
     const defaultLayers = {
@@ -829,6 +912,7 @@ export default function useAppMainBuilder() {
       actors: sb['actors'] ?? defaultActors,
       rules: sb['rules'] ?? defaultRules,
       items: sb['items'] ?? defaultItems,
+      events: sb['events'] ?? defaultEvents,
       tileset: {
         ...defaultTileset,
         ...(sb['tileset'] ?? {})
@@ -895,6 +979,10 @@ export default function useAppMainBuilder() {
       showClearLayerDialog,
       handleClearLayerClose,
       handleClearLayerConfirm,
+      eventDialogOpen: appState.eventDialogOpen,
+      setEventDialogOpen: appState.setEventDialogOpen,
+      eventDialogLocation: appState.eventDialogLocation,
+      setEventDialogLocation: appState.setEventDialogLocation,
       confirmDialogProps: buildConfirmDialogProps({ confirmAction, setConfirmAction, onCancel, onConfirm }),
       showHelp: helpState.showHelp,
       activeHelpTab: helpState.activeHelpTab,
@@ -918,6 +1006,8 @@ export default function useAppMainBuilder() {
         canvasRef,
         draggingNpcId: appState.draggingNpcId,
         setDraggingNpcId: appState.setDraggingNpcId,
+        draggingEventId: appState.draggingEventId,
+        setDraggingEventId: appState.setDraggingEventId,
         tipsMinimized: appState.tipsMinimized,
         setTipsMinimized: appState.setTipsMinimized,
         setShowHelp: helpState.setShowHelp,
@@ -925,6 +1015,7 @@ export default function useAppMainBuilder() {
         mapWidth: mapConfig.mapWidth,
         mapHeight: mapConfig.mapHeight,
         handlePlaceActorOnMap: handlePlaceActorOnMap ?? (() => {}),
+        handlePlaceEventOnMap: handlePlaceEventOnMap ?? (() => {}),
         mapInitialized: mapConfig.mapInitialized,
         handleOpenCreateMapDialog: mapConfig.handleOpenCreateMapDialog,
         isPreparingNewMap: mapConfig.isPreparingNewMap,

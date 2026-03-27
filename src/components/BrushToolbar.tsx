@@ -189,9 +189,8 @@ const BrushToolbar = ({
               {(() => {
                 const isNpc = activeLayer?.type === 'npc';
                 const isEventLayer = activeLayer?.type === 'event';
-                const isActorLayer = isNpc || isEventLayer;
-                const tooltip = isActorLayer ? `Add ${isEventLayer ? 'Event' : 'NPC'}` : 'Import a PNG tileset or brush for the active layer tab';
-                if (isNpc || isEventLayer) {
+                const tooltip = 'Add NPC';
+                if (isNpc) {
                   return (
                     <Tooltip content={tooltip} side="bottom">
                       <Button
@@ -202,11 +201,7 @@ const BrushToolbar = ({
                         onClick={(event) => {
                           event.stopPropagation();
                           event.preventDefault();
-                          if (isNpc) {
-                            onOpenActorDialog('npc');
-                          } else {
-                                toastInvoke({ title: 'Not implemented', description: 'Create Event will be implemented later.' });
-                          }
+                          onOpenActorDialog('npc');
                         }}
                         role="button"
                       >
@@ -214,6 +209,10 @@ const BrushToolbar = ({
                       </Button>
                     </Tooltip>
                   );
+                }
+                if (isEventLayer) {
+                  // Event creation is now handled through the sidebar
+                  return null;
                 }
 
                 return (

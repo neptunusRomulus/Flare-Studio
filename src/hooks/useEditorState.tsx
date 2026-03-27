@@ -79,10 +79,17 @@ export function useEditorState(optsRef: React.RefObject<Partial<UseEditorStateOp
 
   const syncMapObjectsWrapper = useCallback(() => {
     const fn = syncMapObjectsRef.current;
-    if (fn && fn !== syncMapObjectsWrapperRef.current) {
+    console.log('[DEBUG-Wrapper] syncMapObjectsWrapper called, fn exists:', !!fn, 'fn type:', typeof fn);
+    if (fn && typeof fn === 'function') {
+      // Always call the function if it exists and is a function
+      // Don't compare to wrapper to avoid skipping legitimate calls
+      console.log('[DEBUG-Wrapper] Calling syncMapObjectsRef.current');
       fn();
+      console.log('[DEBUG-Wrapper] syncMapObjectsRef.current completed');
+    } else {
+      console.log('[DEBUG-Wrapper] Skipped: fn is not a valid function', fn);
     }
-  }, [syncMapObjectsRef, syncMapObjectsWrapperRef]);
+  }, [syncMapObjectsRef]);
 
   updateLayersListWrapperRef.current = updateLayersListWrapper;
   syncMapObjectsWrapperRef.current = syncMapObjectsWrapper;
@@ -113,6 +120,12 @@ export function useEditorState(optsRef: React.RefObject<Partial<UseEditorStateOp
     editor.updateMapObject(objectId, { x: -1, y: -1 });
     syncMapObjectsWrapper();
   }, [editor, syncMapObjectsWrapper]);
+
+  const handlePlaceEventOnMap = useCallback((eventId: string, x: number, y: number) => {
+    // TODO: Integrate with EditorCore.events to update event position
+    // For now, this is a placeholder that will be enhanced once EditorCore integration is complete
+    console.log('[DEBUG] Event placed on map:', { eventId, x, y });
+  }, []);
 
   const handleFillSelection = useCallback(() => {
     if (!editor) return;
@@ -240,6 +253,7 @@ export function useEditorState(optsRef: React.RefObject<Partial<UseEditorStateOp
     ,
     handlePlaceActorOnMap,
     handleUnplaceActorFromMap,
+    handlePlaceEventOnMap,
     handleFillSelection,
     handleClearSelection,
     handleDeleteSelection

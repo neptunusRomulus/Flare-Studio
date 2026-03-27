@@ -168,7 +168,14 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
 
     // Run any provided sync callback
     console.log('[DEBUG-ActorSubmit] Created actor:', newObject?.id, newObject?.name, 'Calling syncMapObjects');
-    if (typeof syncMapObjects === 'function') syncMapObjects();
+    console.log('[DEBUG-ActorSubmit] syncMapObjects type:', typeof syncMapObjects);
+    if (typeof syncMapObjects === 'function') {
+      console.log('[DEBUG-ActorSubmit] About to call syncMapObjects...');
+      syncMapObjects();
+      console.log('[DEBUG-ActorSubmit] syncMapObjects call completed');
+    } else {
+      console.log('[DEBUG-ActorSubmit] syncMapObjects is not a function!');
+    }
     console.log('[DEBUG-ActorSubmit] syncMapObjects completed');
 
     handleCloseActorDialog();

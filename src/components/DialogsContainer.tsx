@@ -22,6 +22,8 @@ export default function DialogsContainer({ ctx }: { ctx: unknown }) {
     showSeparateDialog?: boolean;
     setShowSeparateDialog?: (open: boolean) => void;
     confirmSeparateBrush?: () => void;
+    actorDialogState?: unknown;
+    itemDialogState?: unknown;
   };
   const local = ctx as LocalSeparateCtx;
   // If no dialog context was assembled, avoid mounting dialog components

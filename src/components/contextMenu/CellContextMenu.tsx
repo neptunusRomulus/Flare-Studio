@@ -20,12 +20,9 @@ export const CellContextMenu = React.forwardRef<HTMLDivElement, CellContextMenuP
     const [adjustedPos, setAdjustedPos] = useState<CellContextMenuPosition | null>(null);
     const [visiblePortal, setVisiblePortal] = useState(isOpen);
 
-    console.log('[CellContextMenu] render - isOpen:', isOpen, 'position:', position);
-
     // Manage portal visibility
     // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(() => {
-      console.log('[CellContextMenu] useEffect - portal visibility, isOpen:', isOpen);
       if (isOpen) {
         setVisiblePortal(true);
         return;
@@ -38,22 +35,18 @@ export const CellContextMenu = React.forwardRef<HTMLDivElement, CellContextMenuP
     // Adjust position to ensure menu stays within viewport
     // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(() => {
-      console.log('[CellContextMenu] Adjust position effect - isOpen:', isOpen, 'position:', position, 'menuRef.current:', menuRef.current);
       if (!isOpen || !position) {
-        console.log('[CellContextMenu] Adjust position effect - early return, setting adjustedPos to null');
         setAdjustedPos(null);
         return;
       }
 
       // If menuRef hasn't been created yet, use position directly to allow portal to render
       if (!menuRef.current) {
-        console.log('[CellContextMenu] menuRef not ready yet, using position directly:', position);
         setAdjustedPos(position);
         return;
       }
 
       const rect = menuRef.current.getBoundingClientRect();
-      console.log('[CellContextMenu] Menu rect:', { width: rect.width, height: rect.height, top: rect.top, left: rect.left });
       let x = position.x;
       let y = position.y;
 
@@ -63,36 +56,28 @@ export const CellContextMenu = React.forwardRef<HTMLDivElement, CellContextMenuP
         height: window.innerHeight,
       };
 
-      console.log('[CellContextMenu] Viewport:', viewport, 'Initial pos:', { x, y });
-
       if (x + rect.width + padding > viewport.width) {
         x = Math.max(0, viewport.width - rect.width - padding);
-        console.log('[CellContextMenu] Adjusted X:', x);
       }
 
       if (y + rect.height + padding > viewport.height) {
         y = Math.max(0, viewport.height - rect.height - padding);
-        console.log('[CellContextMenu] Adjusted Y:', y);
       }
 
       const finalPos = { x, y };
-      console.log('[CellContextMenu] Setting adjustedPos to:', finalPos);
       setAdjustedPos(finalPos);
     }, [isOpen, position]);
 
     // After DOM is painted, measure and adjust position if needed
     useLayoutEffect(() => {
       if (!isOpen || !position || !menuRef.current || !adjustedPos) {
-        console.log('[CellContextMenu] Measurement effect - early return');
         return;
       }
 
       const rect = menuRef.current.getBoundingClientRect();
-      console.log('[CellContextMenu] [LAYOUT] Menu rect:', { width: rect.width, height: rect.height });
       
       // Only adjust if the element has real dimensions now
       if (rect.width === 0 || rect.height === 0) {
-        console.log('[CellContextMenu] [LAYOUT] Menu not yet measured, skipping adjustment');
         return;
       }
 
@@ -109,22 +94,16 @@ export const CellContextMenu = React.forwardRef<HTMLDivElement, CellContextMenuP
         (y + rect.height + padding > viewport.height);
 
       if (needsAdjust) {
-        console.log('[CellContextMenu] [LAYOUT] Menu needs adjustment after measurement');
         if (x + rect.width + padding > viewport.width) {
           x = Math.max(0, viewport.width - rect.width - padding);
-          console.log('[CellContextMenu] [LAYOUT] Adjusted X:', x);
         }
 
         if (y + rect.height + padding > viewport.height) {
           y = Math.max(0, viewport.height - rect.height - padding);
-          console.log('[CellContextMenu] [LAYOUT] Adjusted Y:', y);
         }
 
         const finalPos = { x, y };
-        console.log('[CellContextMenu] [LAYOUT] Setting final adjustedPos:', finalPos);
         setAdjustedPos(finalPos);
-      } else {
-        console.log('[CellContextMenu] [LAYOUT] Menu position OK, no adjustment needed');
       }
     }, [isOpen, adjustedPos, position]);
 
@@ -158,7 +137,6 @@ export const CellContextMenu = React.forwardRef<HTMLDivElement, CellContextMenuP
     }, [isOpen, onClose]);
 
     if (!visiblePortal || !adjustedPos) {
-      console.log('[CellContextMenu] Not rendering portal - visiblePortal:', visiblePortal, 'adjustedPos:', adjustedPos);
       return null;
     }
 
@@ -166,14 +144,11 @@ export const CellContextMenu = React.forwardRef<HTMLDivElement, CellContextMenuP
     const bgClass = isDarkMode ? 'bg-neutral-900/95 backdrop-blur-sm' : 'bg-white/95 backdrop-blur-sm';
     const borderClass = isDarkMode ? 'border-gray-400/30' : 'border-gray-200/50';
     const shadowClass = isDarkMode ? 'shadow-lg' : 'shadow-sm';
-    console.log('[CellContextMenu] Rendering portal with className:', classNameStr, 'isDarkMode:', isDarkMode, 'position:', adjustedPos, 'children:', !!children);
 
     return createPortal(
       <div
         ref={(node) => {
-          console.log('[CellContextMenu] Ref callback - node created:', !!node, 'className will be:', classNameStr);
           if (node) {
-            console.log('[CellContextMenu] Ref callback - computed styles:', window.getComputedStyle(node).display);
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (menuRef as any).current = node;
           }

@@ -236,7 +236,6 @@ export default function useAppMainBuilder() {
           newEditor.setCurrentProjectPath(currentProjectPath);
         }
 
-        try { newEditor.clearLocalStorageBackup?.(); } catch (err) { void err; }
         newEditor.setMapSize((pending as EditorProjectData).width ?? 20, (pending as EditorProjectData).height ?? 15);
 
         try {
@@ -392,7 +391,13 @@ export default function useAppMainBuilder() {
 
   const { handleNpcDragStart, handleNpcDragEnd } = useNpcDrag({ editor, setDraggingNpcId: appState.setDraggingNpcId });
 
-  const objectEditing = useObjectEditing({ editor: null, syncMapObjects, createTabFor, switchToTab, currentProjectPath });
+  const objectEditing = useObjectEditing({ 
+    editor: undefined, 
+    syncMapObjects, 
+    createTabFor, 
+    switchToTab, 
+    currentProjectPath 
+  });
 
   useEffect(() => {
   }, [appState.activeLayerId]);
@@ -685,8 +690,6 @@ export default function useAppMainBuilder() {
     try {
       const result = await window.electronAPI?.deleteMap?.(currentProjectPath, mapConfig.mapName);
       if (result?.success) {
-        // Clear autosave backup so crash-recovery doesn't restore a deleted map
-        editor?.clearLocalStorageBackup?.();
         // Clear spawn.txt reference if this was the starting map
         if (mapConfig.isStartingMap) {
           mapConfig.updateStartingMap(false);
@@ -699,7 +702,7 @@ export default function useAppMainBuilder() {
       console.warn('handleDeleteMap failed', e);
       return false;
     }
-  }, [currentProjectPath, mapConfig, activeTabId, closeEditorTab, editor]);
+  }, [currentProjectPath, mapConfig, activeTabId, closeEditorTab]);
 
   function buildAppMainCtxFromSidebar(assembledSidebar: AssembledSidebar): Record<string, unknown> {
     const sb = (assembledSidebar ?? {}) as Record<string, unknown>;
@@ -1017,8 +1020,33 @@ export default function useAppMainBuilder() {
         stampsState: { stamps: toolbarState.stamps, selectedStamp: toolbarState.selectedStamp, stampMode: toolbarState.stampMode, newStampName: toolbarState.newStampName }
       },
       enemyPanelProps: {},
-      dialogsCtx: {
-        ...(dialogsCtx as Record<string, unknown>),
+      dialogsCtx: (() => {
+        const dialogCtx = {
+          ...(dialogsCtx as Record<string, unknown>),
+          // Actor dialog state and handlers
+          actorDialogState: objectEditing.actorDialogState,
+          setActorDialogState: objectEditing.setActorDialogState,
+          actorDialogError: objectEditing.actorDialogError,
+          setActorDialogError: objectEditing.setActorDialogError,
+          handleOpenActorDialog: objectEditing.handleOpenActorDialog,
+          handleCloseActorDialog: objectEditing.handleCloseActorDialog,
+          handleActorFieldChange: objectEditing.handleActorFieldChange,
+          handleActorRoleToggle: objectEditing.handleActorRoleToggle,
+          handleActorTilesetBrowse: objectEditing.handleActorTilesetBrowse,
+          handleActorPortraitBrowse: objectEditing.handleActorPortraitBrowse,
+          handleActorSubmit: objectEditing.handleActorSubmit,
+          // Item dialog state and handlers
+          itemDialogState: itemsHook.itemDialogState,
+          setItemDialogState: itemsHook.setItemDialogState,
+          itemDialogError: itemsHook.itemDialogError,
+          setItemDialogError: itemsHook.setItemDialogError,
+          pendingDuplicateItem: itemsHook.pendingDuplicateItem,
+          setPendingDuplicateItem: itemsHook.setPendingDuplicateItem,
+          handleCloseItemDialog: itemsHook.handleCloseItemDialog,
+          handleItemFieldChange: itemsHook.handleItemFieldChange,
+          handleItemSubmit: itemsHook.handleItemSubmit,
+          handleConfirmDuplicateItem: itemsHook.handleConfirmDuplicateItem,
+          clearPendingDuplicate: () => itemsHook.setPendingDuplicateItem(null),
         // Phase 3: Import Review Modal
         showImportReview,
         setShowImportReview,
@@ -1221,7 +1249,33 @@ export default function useAppMainBuilder() {
           setImportReviewTileHeight(64);
           setImportReviewOriginPreset('bottom-center');
         }
-      } as Record<string, unknown>,
+        } as Record<string, unknown>;
+        return dialogCtx;
+      })(),
+      // Flatten dialog properties to top level for dialog containers
+      actorDialogState: objectEditing.actorDialogState,
+      setActorDialogState: objectEditing.setActorDialogState,
+      actorDialogError: objectEditing.actorDialogError,
+      setActorDialogError: objectEditing.setActorDialogError,
+      handleOpenActorDialog: objectEditing.handleOpenActorDialog,
+      handleCloseActorDialog: objectEditing.handleCloseActorDialog,
+      handleActorFieldChange: objectEditing.handleActorFieldChange,
+      handleActorRoleToggle: objectEditing.handleActorRoleToggle,
+      handleActorTilesetBrowse: objectEditing.handleActorTilesetBrowse,
+      handleActorPortraitBrowse: objectEditing.handleActorPortraitBrowse,
+      handleActorSubmit: objectEditing.handleActorSubmit,
+      canUseTilesetDialog: typeof window !== 'undefined' && !!window.electronAPI?.selectTilesetFile,
+      itemDialogState: itemsHook.itemDialogState,
+      setItemDialogState: itemsHook.setItemDialogState,
+      itemDialogError: itemsHook.itemDialogError,
+      setItemDialogError: itemsHook.setItemDialogError,
+      pendingDuplicateItem: itemsHook.pendingDuplicateItem,
+      setPendingDuplicateItem: itemsHook.setPendingDuplicateItem,
+      handleCloseItemDialog: itemsHook.handleCloseItemDialog,
+      handleItemFieldChange: itemsHook.handleItemFieldChange,
+      handleItemSubmit: itemsHook.handleItemSubmit,
+      handleConfirmDuplicateItem: itemsHook.handleConfirmDuplicateItem,
+      clearPendingDuplicate: () => itemsHook.setPendingDuplicateItem(null),
       tooltip: null
     } as Record<string, unknown>;
   }

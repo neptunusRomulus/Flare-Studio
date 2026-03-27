@@ -12,8 +12,11 @@ export default function useMapHandlers(args: {
 
   const syncMapObjects = useCallback(() => {
     if (editor) {
-      setMapObjects(editor.getMapObjects());
+      const objects = editor.getMapObjects();
+      console.log('[DEBUG-SyncMapObjects] Got objects from editor:', objects?.length || 0);
+      setMapObjects(objects);
     } else {
+      console.log('[DEBUG-SyncMapObjects] No editor available, clearing map objects');
       setMapObjects([]);
     }
   }, [editor, setMapObjects]);

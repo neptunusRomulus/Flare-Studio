@@ -133,11 +133,14 @@ export default function useItems({ currentProjectPath, toast, normalizeItemsForS
         const payload = { name: itemDialogState.name.trim(), id: itemId, category: selectedCategory };
         const result = await window.electronAPI.createItemFile(currentProjectPath, payload as unknown as { name: string; id: number; category?: string });
         if (result.success) {
+          console.log('[DEBUG-ItemSubmit] Item file created:', itemDialogState.name, 'ID:', itemId);
           toast({ title: 'Item Created', description: `${itemDialogState.name} (ID: ${itemId}) has been created.` });
           if (window.electronAPI?.listItems) {
             const itemsResult = await window.electronAPI.listItems(currentProjectPath);
             if (itemsResult.success && itemsResult.items) {
+              console.log('[DEBUG-ItemSubmit] Refreshed items list, count:', itemsResult.items.length);
               setItemsList(normalizeItemsForState(itemsResult.items));
+              console.log('[DEBUG-ItemSubmit] itemsList state updated');
             }
           }
           handleCloseItemDialog();

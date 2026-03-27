@@ -118,6 +118,7 @@ const SidebarItemsPanel = ({
           onClick={(event) => {
             event.stopPropagation();
             event.preventDefault();
+            console.log('[UI] Add Item button clicked');
             onAddItem();
           }}
         >

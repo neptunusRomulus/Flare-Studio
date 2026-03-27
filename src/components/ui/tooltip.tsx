@@ -114,11 +114,9 @@ const Tooltip: React.FC<TooltipProps> = ({ content, side = 'top', className = ''
   // recompute when the tooltip becomes visible via hover/focus. We attach handlers
   // on the wrapper to trigger measurement.
   const onTriggerEnter = () => {
-    console.log('[Tooltip] onTriggerEnter triggered');
     clearTimer();
     // measure on next frame so layout is stable
     requestAnimationFrame(() => {
-      console.log('[Tooltip] computeOffset called');
       computeOffset();
     });
     setHovered(true);
@@ -127,31 +125,20 @@ const Tooltip: React.FC<TooltipProps> = ({ content, side = 'top', className = ''
   };
 
   const onTriggerLeave = () => {
-    console.log('[Tooltip] onTriggerLeave triggered');
     // Don't immediately close - mouse might be moving to portal
     // Only set hovered to false if mouse also leaves portal
   };
 
   const onPortalEnter = () => {
-    console.log('[Tooltip] onPortalEnter triggered');
     clearTimer();
     setHovered(true);
   };
 
   const onPortalLeave = () => {
-    console.log('[Tooltip] onPortalLeave triggered');
     // Close tooltip when actually leaving the portal area
     setHovered(false);
     window.setTimeout(() => setVisiblePortal(false), 220);
   };
-
-  React.useEffect(() => {
-    console.log('[Tooltip] Component rendered - wrapperRef:', !!wrapperRef.current);
-    if (wrapperRef.current) {
-      console.log('[Tooltip] Wrapper element:', wrapperRef.current.tagName, wrapperRef.current.className);
-      console.log('[Tooltip] Wrapper pointer-events:', window.getComputedStyle(wrapperRef.current).pointerEvents);
-    }
-  }, []);
 
   React.useEffect(() => {
     return () => clearTimer();
@@ -159,7 +146,6 @@ const Tooltip: React.FC<TooltipProps> = ({ content, side = 'top', className = ''
 
   // after portal tooltip renders, measure and clamp its position
   React.useEffect(() => {
-    console.log('[Tooltip] Positioning effect - running with hovered:', hovered, 'pos:', pos, 'portalRef:', !!portalRef.current, 'wrapperRef:', !!wrapperRef.current);
     if (!hovered || !portalRef.current || !wrapperRef.current) return;
     const portalRect = portalRef.current.getBoundingClientRect();
     const trig = wrapperRef.current.getBoundingClientRect();
@@ -202,15 +188,9 @@ const Tooltip: React.FC<TooltipProps> = ({ content, side = 'top', className = ''
     <>
       <span
         ref={wrapperRef}
-        onMouseEnter={(e) => {
-          console.log('[Tooltip] Mouse ENTER detected on wrapper', e);
-          onTriggerEnter();
-        }}
-        onMouseLeave={(e) => {
-          console.log('[Tooltip] Mouse LEAVE detected on wrapper', e);
-          onTriggerLeave();
-        }}
+        onMouseEnter={onTriggerEnter}
         onFocus={onTriggerEnter}
+        onMouseLeave={onTriggerLeave}
         onBlur={onTriggerLeave}
         className={`relative inline-flex cursor-help ${className}`}
         style={{ pointerEvents: 'auto' }}
@@ -219,7 +199,6 @@ const Tooltip: React.FC<TooltipProps> = ({ content, side = 'top', className = ''
       </span>
       {(() => {
         const shouldRender = typeof document !== 'undefined' && pos && visiblePortal;
-        console.log('[Tooltip] Render portal check - document:', typeof document !== 'undefined', 'pos:', !!pos, 'visiblePortal:', visiblePortal, 'shouldRender:', shouldRender);
         return shouldRender && createPortal(
         <div
           ref={portalRef}

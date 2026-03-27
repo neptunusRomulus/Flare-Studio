@@ -51,7 +51,7 @@ type EventDialogProps = {
 
 const ACTIVATION_OPTIONS: EventActivation[] = ['Trigger', 'Interact', 'Load', 'Leave', 'MapExit', 'MapClear', 'Loop'];
 
-const ACTIVATION_CONFIG: Record<EventActivation, { icon: React.ComponentType<any>; tooltip: string; label: string }> = {
+const ACTIVATION_CONFIG: Record<EventActivation, { icon: React.ComponentType<{ className?: string }>; tooltip: string; label: string }> = {
   Trigger: {
     icon: MapPinPlus,
     tooltip: 'Activated when the player stands in the event area or interacts with a defined hotspot',

@@ -200,11 +200,19 @@ const Tooltip: React.FC<TooltipProps> = ({ content, side = 'top', className = ''
           onMouseLeave={onPortalLeave}
           className={`custom-tooltip transition-all duration-200 ${hovered ? 'opacity-100' : 'opacity-0'}`}
           style={(() => {
-            const base = side === 'right' || side === 'left' 
-              ? { left: pos.left, top: pos.top, transform: 'translateY(-50%)' } 
-              : { left: pos.left, top: pos.top, transform: 'translateX(-50%)' };
+            const base: React.CSSProperties = {
+              position: 'fixed',
+              left: pos.left,
+              top: pos.top,
+            };
             
-            return base as React.CSSProperties;
+            if (side === 'right' || side === 'left') {
+              base.transform = 'translateY(-50%)';
+            } else {
+              base.transform = 'translateX(-50%)';
+            }
+            
+            return base;
           })()}
         >
           <span

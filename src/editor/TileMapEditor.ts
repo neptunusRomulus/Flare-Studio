@@ -1036,6 +1036,15 @@ export class TileMapEditor {
   }
 
   private getLayerTilesetOrFallback(layerType: string): LayerTilesetEntry | null {
+    // Collision layer NEVER uses tabs - always use built-in tileset
+    if (layerType === COLLISION_LAYER_TYPE) {
+      const existing = this.layerTilesets.get(layerType);
+      if (existing && existing.image) {
+        return existing;
+      }
+      return null;
+    }
+    
     // PREFER the active tab's tileset for this layer (per-map scoping)
     const activeTabId = this.layerActiveTabId.get(layerType);
     if (activeTabId) {
@@ -7272,6 +7281,11 @@ export class TileMapEditor {
 
   // Tab management API
   public createLayerTab(layerType: string, name?: string): number {
+  // Collision layer should never have tabs - only use built-in tileset
+  if (layerType === COLLISION_LAYER_TYPE) {
+    console.error('[TileMapEditor] ERROR: Cannot create tab for collision layer - collision layer uses only built-in tileset');
+    return -1;
+  }
   const tabs = this.layerTabs.get(layerType) || [];
   const id = this.nextLayerTabId++;
   // Initialize new tab with empty tileset/brush/detectedTiles to avoid inheriting previous tab data
@@ -9406,9 +9420,12 @@ export class TileMapEditor {
     };
 
     // Serialize per-layer tabs (tab names, per-tab painting data, tab-specific tileset metadata, detected tiles)
+    // NOTE: Collision layer is NOT saved - it uses only the built-in collision tileset
     try {
       const tabsObj: Record<string, Array<{ id: number; name?: string; data?: number[]; tileset?: SavedTilesetEntry; detectedTiles?: SerializedDetectedTile[] }>> = {};
       for (const [layerType, tabs] of this.layerTabs.entries()) {
+        // Skip collision layer - it should never have tabs
+        if (layerType === COLLISION_LAYER_TYPE) continue;
         tabsObj[layerType] = tabs.map(t => {
           const ser: { id: number; name?: string; data?: number[]; tileset?: SavedTilesetEntry; detectedTiles?: SerializedDetectedTile[] } = { id: t.id, name: t.name };
           
@@ -9466,9 +9483,11 @@ export class TileMapEditor {
         projectData.layerTabs = tabsObj;
       } else { void 0; }
 
-      // Save active tab ids
+      // Save active tab ids (skip collision layer - it should never have tabs)
       const activeObj: Record<string, number> = {};
       for (const [k, v] of this.layerActiveTabId.entries()) {
+        // Skip collision layer - it should never have tabs
+        if (k === COLLISION_LAYER_TYPE) continue;
         activeObj[k] = v;
       }
       if (Object.keys(activeObj).length > 0) {
@@ -10786,9 +10805,11 @@ export class TileMapEditor {
             }
             this.layerTabs.set(layerType, arr);
           }
-          // restore active tab mapping
+          // restore active tab mapping (skip collision layer - it should never have tabs)
           if (projectData.layerActiveTabId && typeof projectData.layerActiveTabId === 'object') {
             for (const [lt, id] of Object.entries(projectData.layerActiveTabId)) {
+              // Skip collision layer - it should never have tabs
+              if (lt === COLLISION_LAYER_TYPE) continue;
               if (typeof id === 'number') this.layerActiveTabId.set(lt, id);
             }
           }

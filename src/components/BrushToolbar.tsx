@@ -71,7 +71,6 @@ const BrushToolbar = ({
 }: BrushToolbarProps) => {
   
   // Initialize refs with current prop values IMMEDIATELY
-  console.log('[BrushToolbar] Rendered with props:', { editor: !!editor, activeLayer: !!activeLayer, layerType: activeLayer?.type });
   const editorRef = React.useRef<TileMapEditor | null>(editor);
   const activeLayerRef = React.useRef<TileLayer | null>(activeLayer);
   

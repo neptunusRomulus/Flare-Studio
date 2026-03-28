@@ -104,18 +104,34 @@ const TilesetPalette = ({
   // Refresh tileset palette from editor
   useEffect(() => {
     
-    if (!editor) return;
+    if (!editor) {
+      console.log('[TilesetPalette] DEBUG: No editor available');
+      return;
+    }
     
     // Get tileset image from editor and set up listeners for when it loads
     const fetchTilesetImage = () => {
       try {
         const layerType = activeLayer?.type;
-        if (!layerType) return;
+        if (!layerType) {
+          console.log('[TilesetPalette] DEBUG: No active layer type');
+          return;
+        }
+        
+        console.log('[TilesetPalette] DEBUG: Fetching tileset for layer type:', { layerType, tabTick });
         
         // Try to get image from active tab
         const tabs = editor.getLayerTabs ? editor.getLayerTabs(layerType) : [];
         const activeTabId = editor.getActiveLayerTabId ? editor.getActiveLayerTabId(layerType) : null;
         const tab = tabs.find((t: { id: number }) => t.id === activeTabId);
+        
+        console.log('[TilesetPalette] DEBUG: Tab lookup result:', {
+          tabCount: tabs.length,
+          activeTabId,
+          foundTab: !!tab,
+          tabHasTileset: !!(tab as { tileset?: { image?: HTMLImageElement } }).tileset,
+          tabHasImage: !!(tab as { tileset?: { image?: HTMLImageElement } }).tileset?.image
+        });
         
         if (tab && (tab as { tileset?: { image?: HTMLImageElement } }).tileset?.image) {
           const img = (tab as { tileset: { image: HTMLImageElement } }).tileset.image;
@@ -129,16 +145,21 @@ const TilesetPalette = ({
 
             if (tabDetected && typeof tabDetected.entries === 'function' && tabDetected.size > 0) {
               detectedSource = tabDetected;
+              console.log('[TilesetPalette] DEBUG: Found detectedTiles on tab:', { count: tabDetected.size });
             } else if (typeof (editor as unknown as { getDetectedTilesForLayer?: (lt: string) => Array<[number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }]> }).getDetectedTilesForLayer === 'function') {
               const fallbackEntries = (editor as unknown as { getDetectedTilesForLayer: (lt: string) => Array<[number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }]> }).getDetectedTilesForLayer(layerType);
+              console.log('[TilesetPalette] DEBUG: Fallback getDetectedTilesForLayer returned:', { count: fallbackEntries?.length || 0 });
               if (Array.isArray(fallbackEntries) && fallbackEntries.length > 0) {
                 detectedSource = new Map(fallbackEntries);
                 // Keep tab-level data in sync so subsequent refreshes remain in asset mode.
                 (tab as { detectedTiles?: DetectedMap }).detectedTiles = detectedSource;
               }
+            } else {
+              console.log('[TilesetPalette] DEBUG: No detected tiles source available (no fallback method)');
             }
 
             if (detectedSource && detectedSource.size > 0) {
+              console.log('[TilesetPalette] DEBUG: Setting detected tiles:', detectedSource.size);
               const entries: DetectedTileRect[] = Array.from(detectedSource.entries()).map(([gid, data]) => ({
                 gid,
                 sourceX: data.sourceX,
@@ -149,12 +170,16 @@ const TilesetPalette = ({
               setDetectedTiles(entries);
               setSelectedDetectedGids([]);
             } else {
-              setDetectedTiles([]);
-              setSelectedDetectedGids([]);
+              console.log('[TilesetPalette] DEBUG: No detected source or empty size');
             }
           } catch (_e) { void _e; setDetectedTiles([]); setSelectedDetectedGids([]); }
           
           // Set the image immediately
+          console.log('[TilesetPalette] DEBUG: Setting tileset image:', {
+            imageWidth: img.naturalWidth,
+            imageHeight: img.naturalHeight,
+            src: img.src.substring(0, 50) + '...'
+          });
           setTilesetImage(img);
           // If the tab's tileset provides explicit tile sizes, use them for palette math
           try {
@@ -162,24 +187,30 @@ const TilesetPalette = ({
             const tw = tabTileset?.tileWidth;
             const th = tabTileset?.tileHeight;
             if (typeof tw === 'number' && tw > 0 && typeof th === 'number' && th > 0) {
+              console.log('[TilesetPalette] DEBUG: Using tab tileset sizes:', { width: tw, height: th });
               setTileSize({ width: tw, height: th });
             } else {
+              console.log('[TilesetPalette] DEBUG: Using default tile sizes:', { width: DEFAULT_TILE_WIDTH, height: DEFAULT_TILE_HEIGHT });
               setTileSize({ width: DEFAULT_TILE_WIDTH, height: DEFAULT_TILE_HEIGHT });
             }
-          } catch (_e) { void _e; }
+          } catch (_e) { console.error('[TilesetPalette] ERROR parsing tile sizes:', _e); void _e; }
           
           // Only set size if image is complete and has dimensions
           // Otherwise, let the image load listener handle the size update
           if (img.complete && img.naturalWidth > 0 && img.naturalHeight > 0) {
+            console.log('[TilesetPalette] DEBUG: Image complete, setting image size:', { width: img.naturalWidth, height: img.naturalHeight });
             setImageSize({ width: img.naturalWidth, height: img.naturalHeight });
           } else {
             // Don't set imageSize here - let the load listener handle it
             // This prevents the canvas from being shown with 0 size
+            console.log('[TilesetPalette] DEBUG: Image not complete yet, waiting for load listener');
           }
         } else {
           // Fallback: for layers without tabs (like collision), get the tileset from editor's global tilesetImage
+          console.log('[TilesetPalette] DEBUG: No tab tileset found, trying editor fallback');
           const editorTilesetImage = (editor as unknown as { tilesetImage?: HTMLImageElement | null }).tilesetImage;
           if (editorTilesetImage) {
+            console.log('[TilesetPalette] DEBUG: Using editor global tileset image');
             setTilesetImage(editorTilesetImage);
             setTileSize({ width: DEFAULT_TILE_WIDTH, height: DEFAULT_TILE_HEIGHT });
             if (editorTilesetImage.complete && editorTilesetImage.naturalWidth > 0 && editorTilesetImage.naturalHeight > 0) {
@@ -188,6 +219,7 @@ const TilesetPalette = ({
             setDetectedTiles([]);
             setSelectedDetectedGids([]);
           } else {
+            console.log('[TilesetPalette] DEBUG: No tileset image found anywhere');
             setTilesetImage(null);
             setImageSize({ width: 0, height: 0 });
             setDetectedTiles([]);

@@ -1561,8 +1561,6 @@ export class TileMapEditor {
       return;
     }
 
-    console.log('[TileMapEditor] handleMouseDown - button:', event.button, 'tool:', this.tool);
-
     const rect = this.mapCanvas.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
@@ -1578,7 +1576,6 @@ export class TileMapEditor {
       this.isMouseDown = true;
       const tileCoords = this.screenToTile(x, y);
       if (tileCoords) {
-        console.log('[TileMapEditor] Tile coords:', tileCoords, 'button:', event.button);
         // Check if clicking on hero position
         if (this.isHeroAtPosition(tileCoords.x, tileCoords.y)) {
           this.handleHeroClick(tileCoords.x, tileCoords.y, event);
@@ -1589,7 +1586,6 @@ export class TileMapEditor {
         if (actorAtPosition) {
           // Right-click on NPC/actor - show delete confirmation
           if (event.button === 2 && actorAtPosition.type === 'npc' && this.npcRightClickCallback) {
-            console.log('[TileMapEditor] Right-click on NPC:', actorAtPosition.id);
             this.isMouseDown = false;
             // Get screen position of the actor for popup placement
             const actorScreenPos = this.mapToScreen(actorAtPosition.x, actorAtPosition.y);
@@ -1610,10 +1606,8 @@ export class TileMapEditor {
         }
 
         if (this.tool === 'tiles') {
-          console.log('[TileMapEditor] Tool is tiles, button:', event.button, 'callback exists:', !!this.cellRightClickCallback);
           if (event.button === 2 && this.cellRightClickCallback) {
             // Right-click on tile cell - show context menu
-            console.log('[TileMapEditor] Triggering context menu for tiles tool at', tileCoords);
             this.isMouseDown = false;
             const screenX = event.clientX;
             const screenY = event.clientY;
@@ -1622,10 +1616,8 @@ export class TileMapEditor {
           }
           this.handleTileClick(tileCoords.x, tileCoords.y, event.button === 2);
         } else if (this.tool === 'selection') {
-          console.log('[TileMapEditor] Tool is selection, button:', event.button, 'callback exists:', !!this.cellRightClickCallback);
           if (event.button === 2 && this.cellRightClickCallback) {
             // Right-click on tile cell - show context menu
-            console.log('[TileMapEditor] Triggering context menu for selection tool at', tileCoords);
             this.isMouseDown = false;
             const screenX = event.clientX;
             const screenY = event.clientY;
@@ -1634,10 +1626,8 @@ export class TileMapEditor {
           }
           this.handleSelectionStart(tileCoords.x, tileCoords.y, event.button === 2);
         } else if (this.tool === 'shape') {
-          console.log('[TileMapEditor] Tool is shape, button:', event.button, 'callback exists:', !!this.cellRightClickCallback);
           if (event.button === 2 && this.cellRightClickCallback) {
             // Right-click on tile cell - show context menu
-            console.log('[TileMapEditor] Triggering context menu for shape tool at', tileCoords);
             this.isMouseDown = false;
             const screenX = event.clientX;
             const screenY = event.clientY;
@@ -2045,10 +2035,6 @@ export class TileMapEditor {
             this.removeSpriteObjectAt(layer.type, x, y);
             
             layer.data[index] = newValue;
-            if (newValue > 0) {
-              const totalPainted = layer.data.filter(v => v > 0).length;
-              console.log(`[PAINTED] tile(${x},${y})=GID${newValue} layer="${layer.type}" total=${totalPainted} activeTab=${this.layerActiveTabId.get(layer.type)}`);
-            }
             // Record which tileset (tab) this painted cell came from so tabs don't collide
             try {
               const layerType = layer.type;
@@ -7508,14 +7494,26 @@ export class TileMapEditor {
     manualTileHeight?: number,
     forceGridSlicing?: boolean
   ): Promise<void> {
+    console.log('[TileMapEditor] DEBUG: importBrushImageToLayerTab called with:', {
+      layerType,
+      tabId,
+      fileName: file.name,
+      manualTileWidth,
+      manualTileHeight,
+      forceGridSlicing
+    });
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = (e) => {
         const img = new Image();
         img.onload = () => {
+          console.log('[TileMapEditor] DEBUG: Image loaded:', { width: img.width, height: img.height });
           const tabs = this.layerTabs.get(layerType) || [];
           const tab = tabs.find(t => t.id === tabId);
-          if (!tab) return reject(new Error('Tab not found'));
+          if (!tab) {
+            console.error('[TileMapEditor] ERROR: Tab not found for import:', { layerType, tabId });
+            return reject(new Error('Tab not found'));
+          }
           if (!tab.brushes) tab.brushes = [];
           tab.brushes.push({ image: img as HTMLImageElement, fileName: file.name, width: img.width, height: img.height });
           const effectiveTileWidth = typeof manualTileWidth === 'number' && manualTileWidth > 0 ? manualTileWidth : this.tileSizeX;
@@ -7612,11 +7610,17 @@ export class TileMapEditor {
           }
 
           tab.detectedTiles = importedDetectedTiles;
+          console.log('[TileMapEditor] DEBUG: Set tab.detectedTiles:', {
+            count: importedDetectedTiles.size,
+            tabId,
+            layerType
+          });
           this.layerTileData.set(layerType, new Map(importedDetectedTiles));
 
           // If this is currently the active layer, keep global detected map in sync too.
           const activeLayer = this.tileLayers.find(l => l.id === this.activeLayerId);
           if (activeLayer?.type === layerType) {
+            console.log('[TileMapEditor] DEBUG: Updating global detectedTileData for active layer');
             this.detectedTileData.clear();
             for (const [gid, data] of importedDetectedTiles.entries()) {
               this.detectedTileData.set(gid, data);
@@ -7626,6 +7630,7 @@ export class TileMapEditor {
           // If this tab is active for the layer, update current tileset/palette
           const activeTabId = this.layerActiveTabId.get(layerType);
           if (activeTabId === tabId) {
+            console.log('[TileMapEditor] DEBUG: Tab is active, updating active layer tab');
             this.setActiveLayerTab(layerType, tabId);
           }
           
@@ -7634,13 +7639,15 @@ export class TileMapEditor {
           // Try provided path first, then fallback to stored currentProjectPath
           const pathToUse = projectPath || this.currentProjectPath;
           if (pathToUse) {
+            console.log('[TileMapEditor] DEBUG: Auto-saving tileset after import to:', pathToUse);
             this.saveTilesetToMapFile(pathToUse).catch((err: unknown) => {
-              console.warn('[TileMapEditor] Warning: Failed to auto-save tileset after import:', err);
+              console.warn('[TileMapEditor] ERROR: Failed to auto-save tileset after import:', err);
             });
           } else {
-            console.warn('[TileMapEditor] Warning: currentProjectPath not set, tileset will not be auto-saved. Will be saved on next manual save.');
+            console.warn('[TileMapEditor] WARNING: currentProjectPath not set, tileset will not be auto-saved.');
           }
           
+          console.log('[TileMapEditor] DEBUG: Import complete, resolving promise');
           resolve();
         };
         img.onerror = (_err) => {

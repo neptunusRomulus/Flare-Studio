@@ -106,7 +106,7 @@
     overflow: auto;
     /* Modern minimal scrollbar */
     scrollbar-width: thin;
-    scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.5) transparent;
 }
 
 /* Webkit scrollbar styling for modern browsers */

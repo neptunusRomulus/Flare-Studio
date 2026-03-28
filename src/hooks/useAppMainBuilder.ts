@@ -419,10 +419,6 @@ export default function useAppMainBuilder() {
   });
 
   useEffect(() => {
-    console.log('[DEBUG-AppState] mapObjects updated:', appState.mapObjects.length, 'objects');
-    if (appState.mapObjects.length > 0) {
-      console.log('[DEBUG-AppState] mapObjects:', appState.mapObjects.map(o => ({ id: o.id, name: o.name, type: o.type })));
-    }
   }, [appState.mapObjects]);
 
   useEffect(() => {
@@ -590,10 +586,6 @@ export default function useAppMainBuilder() {
             : isEnemyLayer
             ? appState.mapObjects.filter((obj) => obj.type === 'enemy')
             : [];
-          console.log('[DEBUG-SidebarDeps] isNpcLayer:', isNpcLayer, 'isEnemyLayer:', isEnemyLayer, 'allMapObjects:', appState.mapObjects.length, 'filtered actorEntries:', filtered.length);
-          if (filtered.length > 0) {
-            console.log('[DEBUG-SidebarDeps] Filtered entries:', filtered.map(a => ({ id: a.id, name: a.name, type: a.type })));
-          }
           return filtered;
         })(),
         draggingNpcId: appState.draggingNpcId,
@@ -656,7 +648,25 @@ export default function useAppMainBuilder() {
           stampMode: toolbarState.stampMode
         },
         currentProjectPath,
-        onShowImportReview: undefined,
+        onShowImportReview: (data: unknown) => {
+          const parsedData = data as ImportReviewData;
+          const defaultWidth = parsedData?._meta?.manualTileWidth ?? 64;
+          const defaultHeight = parsedData?._meta?.manualTileHeight ?? 64;
+          console.log('[useAppMainBuilder] DEBUG: onShowImportReview called with:', {
+            tilesetFileName: parsedData?.tilesetFileName,
+            detectedAssetCount: parsedData?.detectedAssets?.length,
+            defaultWidth,
+            defaultHeight,
+            layerType: parsedData?._meta?.layerType,
+            tabId: parsedData?._meta?.tabId
+          });
+          setImportReviewTileWidth(defaultWidth);
+          setImportReviewTileHeight(defaultHeight);
+          setImportReviewOriginPreset('bottom-center');
+          setImportReviewData(parsedData);
+          setShowImportReview(true);
+          console.log('[useAppMainBuilder] DEBUG: Import review modal state set to true');
+        },
         isExporting: isExportingValue,
         exportProgress: exportProgressValue,
         mapsButtonRef,
@@ -745,7 +755,12 @@ export default function useAppMainBuilder() {
     objectEditing,
     handleOpenItemEdit,
     handleOpenItemDialog,
-    projectManagerRecord
+    projectManagerRecord,
+    setShowImportReview,
+    setImportReviewData,
+    setImportReviewTileWidth,
+    setImportReviewTileHeight,
+    setImportReviewOriginPreset
   ]);
   const handleCloseSettings = useCallback(() => setShowSettings(false), []);
   const handleCloseMapSettings = useCallback(() => setShowMapSettingsOnly(false), []);
@@ -1204,13 +1219,15 @@ export default function useAppMainBuilder() {
               effectiveTileHeight,
               true
             ).then(() => {
+              console.log('[useAppMainBuilder] DEBUG: Re-import succeeded, refreshing tab state');
               // Keep the same tab active and force React palette refresh.
               try {
                 if (typeof editor.setActiveLayerTab === 'function') {
                   editor.setActiveLayerTab(meta.layerType, meta.tabId);
+                  console.log('[useAppMainBuilder] DEBUG: Set active layer tab to', { layerType: meta.layerType, tabId: meta.tabId });
                 }
-              } catch (e) { void e; }
-              try { appState.setTabTick((t: number) => (t || 0) + 1); } catch (e) { void e; }
+              } catch (e) { console.error('[useAppMainBuilder] ERROR setting active tab:', e); void e; }
+              try { appState.setTabTick((t: number) => (t || 0) + 1); console.log('[useAppMainBuilder] DEBUG: Incremented tabTick'); } catch (e) { void e; }
 
               // Pull fresh detected assets from the just re-imported tab.
               let refreshedDetectedAssets: Array<{ gid: number; sourceX: number; sourceY: number; width: number; height: number; confidence?: number }> = [];
@@ -1281,14 +1298,22 @@ export default function useAppMainBuilder() {
               // Save profile to project
               if (window.electronAPI?.saveTilesetProfiles) {
                 const profilesToSave = { [profile.id]: profileToSave };
+                console.log('[useAppMainBuilder] DEBUG: Saving tileset profile after re-import:', {
+                  profileId: profile.id,
+                  tilesetFileName: importReviewData?.tilesetFileName,
+                  assetCount: profileToSave.assets?.length,
+                  projectPath: currentProjectPath
+                });
                 window.electronAPI.saveTilesetProfiles(currentProjectPath || '', profilesToSave).then(result => {
                   if (result.success) {
+                    console.log('[useAppMainBuilder] DEBUG: Tileset profile saved successfully');
                     toast({
                       title: 'Profile Saved',
                       description: `Asset definitions for ${importReviewData?.tilesetFileName} have been saved.`
                     });
                     resetImportReviewState();
                   } else {
+                    console.error('[useAppMainBuilder] ERROR: Failed to save tileset profile:', result.error);
                     toast({
                       title: 'Save Failed',
                       description: result.error || 'Failed to save tileset profile',
@@ -1305,17 +1330,26 @@ export default function useAppMainBuilder() {
               });
             });
           } else {
+            console.log('[useAppMainBuilder] DEBUG: No tile size change, saving profile in default flow');
             // Save profile to project (default flow)
             if (editor && window.electronAPI?.saveTilesetProfiles) {
               const profilesToSave = { [profile.id]: profile };
+              console.log('[useAppMainBuilder] DEBUG: Saving tileset profile (default flow):', {
+                profileId: profile.id,
+                tilesetFileName: importReviewData?.tilesetFileName,
+                assetCount: profile.assets?.length,
+                projectPath: currentProjectPath
+              });
               window.electronAPI.saveTilesetProfiles(currentProjectPath || '', profilesToSave).then(result => {
                 if (result.success) {
+                  console.log('[useAppMainBuilder] DEBUG: Tileset profile saved successfully (default flow)');
                   toast({
                     title: 'Profile Saved',
                     description: `Asset definitions for ${importReviewData?.tilesetFileName} have been saved.`
                   });
                   resetImportReviewState();
                 } else {
+                  console.error('[useAppMainBuilder] ERROR: Failed to save tileset profile (default flow):', result.error);
                   toast({
                     title: 'Save Failed',
                     description: result.error || 'Failed to save tileset profile',

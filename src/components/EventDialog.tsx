@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -49,47 +49,60 @@ type EventDialogProps = {
   eventLocation: { x: number; y: number } | null;
 };
 
-const ACTIVATION_OPTIONS: EventActivation[] = ['Trigger', 'Interact', 'Load', 'Leave', 'MapExit', 'MapClear', 'Loop'];
+const ACTIVATION_OPTIONS: EventActivation[] = ['Interact', 'Trigger', 'Leave', 'Load', 'MapExit', 'MapClear', 'Loop'];
 
 const ACTIVATION_CONFIG: Record<EventActivation, { icon: React.ComponentType<any>; tooltip: string; label: string }> = {
-  Trigger: {
-    icon: MapPinPlus,
-    tooltip: 'Activated when the player stands in the event area or interacts with a defined hotspot',
-    label: 'Trigger',
-  },
   Interact: {
     icon: MousePointerClick,
-    tooltip: 'Activated specifically when the player interacts with the hotspot',
+    tooltip: '**Interact** - Activated specifically when the player interacts with the hotspot',
     label: 'Interact',
   },
-  Load: {
-    icon: LogIn,
-    tooltip: 'Activated as the player enters a map',
-    label: 'Load',
+  Trigger: {
+    icon: MapPinPlus,
+    tooltip: '**Trigger** - Activated when the player stands in the event area or interacts with a defined hotspot',
+    label: 'Trigger',
   },
   Leave: {
     icon: MapPinMinus,
-    tooltip: 'Activated as the player leaves a event spot they were previously inside',
+    tooltip: '**Leave** - Activated as the player leaves an event spot they were previously inside',
     label: 'Leave',
+  },
+  Load: {
+    icon: LogIn,
+    tooltip: '**Load** - Activated as the player enters a map',
+    label: 'Load',
   },
   MapExit: {
     icon: LogOut,
-    tooltip: 'Activated as the player leaves the map',
+    tooltip: '**Map Exit** - Activated as the player leaves the map',
     label: 'Map Exit',
   },
   MapClear: {
     icon: SquareCheckBig,
-    tooltip: 'Activated when all enemies on a map have been defeated',
+    tooltip: '**Map Clear** - Activated when all enemies on a map have been defeated',
     label: 'Map Clear',
   },
   Loop: {
     icon: Repeat2,
-    tooltip: 'Activated constantly, every frame',
+    tooltip: '**Loop** - Activated constantly, every frame',
     label: 'Loop',
   },
 };
 
 const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLocation }) => {
+  useEffect(() => {
+    if (!open) return;
+    
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onOpenChange(false);
+      }
+    };
+    
+    document.addEventListener('keydown', handleEsc);
+    return () => document.removeEventListener('keydown', handleEsc);
+  }, [open, onOpenChange]);
+
   const [eventData, setEventData] = useState<EventData>({
     positioning: {
       mapName: '',
@@ -166,15 +179,13 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
     }));
   };
 
-  const titleCoords = eventLocation ? `${eventLocation.x},${eventLocation.y}` : '0,0';
-
   if (!open) return null;
 
   const dialogContent = (
     <div className="fixed inset-0 flex items-center justify-center z-50">
-      <div className="bg-background border border-border/70 rounded-lg w-[45vw] h-[45vh] max-w-3xl flex flex-col">
+      <div className="bg-background border border-border/70 rounded-lg w-[45vw] h-[80vh] max-w-3xl flex flex-col">
         <div className="sticky top-0 z-10 border-b border-border/50 bg-background px-6 py-3 flex items-center justify-between">
-          <h3 className="text-lg font-semibold">Event at {titleCoords}</h3>
+          <h3 className="text-lg font-semibold">Add Event</h3>
           <Button
             size="icon"
             variant="ghost"
@@ -185,7 +196,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
           </Button>
         </div>
 
-        <div className="flex-1 overflow-y-auto space-y-6 px-6 py-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-muted/70 [&::-webkit-scrollbar-thumb]:rounded-full">
+        <div className="flex-1 overflow-y-auto space-y-6 px-6 py-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/15 [&::-webkit-scrollbar-thumb]:rounded-full">
           {/* Positioning and Timing Section */}
           <div className="space-y-4 border-b border-border/50 pb-4">
             <h3 className="text-sm font-semibold text-foreground">Positioning and Timing</h3>

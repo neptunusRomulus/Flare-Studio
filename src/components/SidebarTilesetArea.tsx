@@ -60,7 +60,15 @@ const SidebarTilesetArea: React.FC<Props> = ({
 
   return (
     <>
-      <TilesetPalette editor={editor} activeLayer={activeLayer} tabTick={tabTick} setTabTick={setTabTick} brushTool={brushTool} stampsState={stampsState} />
+      <TilesetPalette 
+        editor={editor} 
+        activeLayer={activeLayer} 
+        tabTick={tabTick} 
+        setTabTick={setTabTick} 
+        brushTool={brushTool} 
+        stampsState={stampsState} 
+      />
+      {console.log('[SidebarTilesetArea] Rendering with editor:', !!editor, 'activeLayer:', !!activeLayer)}
 
       <BrushToolbar
         editor={editor}

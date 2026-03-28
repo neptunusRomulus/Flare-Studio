@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -29,7 +29,21 @@ const ActorDialog = ({
   onTilesetBrowse,
   onPortraitBrowse,
   onSubmit
-}: ActorDialogProps) => (
+}: ActorDialogProps) => {
+  useEffect(() => {
+    if (!actorDialogState) return;
+    
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    
+    document.addEventListener('keydown', handleEsc);
+    return () => document.removeEventListener('keydown', handleEsc);
+  }, [actorDialogState, onClose]);
+
+  return (
   <Dialog open={actorDialogState !== null} onOpenChange={(open) => (open ? void 0 : onClose())}>
     <DialogContent className="max-w-md">
       <DialogHeader className="relative">
@@ -183,6 +197,7 @@ const ActorDialog = ({
       </DialogFooter>
     </DialogContent>
   </Dialog>
-);
+  );
+};
 
 export default ActorDialog;

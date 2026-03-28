@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -38,7 +38,21 @@ const ItemDialog = ({
   onSubmit,
   onConfirmDuplicate,
   onClearDuplicate
-}: ItemDialogProps) => (
+}: ItemDialogProps) => {
+  useEffect(() => {
+    if (!itemDialogState) return;
+    
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    
+    document.addEventListener('keydown', handleEsc);
+    return () => document.removeEventListener('keydown', handleEsc);
+  }, [itemDialogState, onClose]);
+
+  return (
   <Dialog
     open={!!itemDialogState}
     onOpenChange={(open) => {
@@ -183,6 +197,7 @@ const ItemDialog = ({
       </DialogFooter>
     </DialogContent>
   </Dialog>
-);
+  );
+};
 
 export default ItemDialog;

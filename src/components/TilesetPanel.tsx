@@ -55,10 +55,17 @@ const TilesetPanel: React.FC<Props> = ({
   currentProjectPath,
   onShowImportReview
 }) => {
+  console.log('[TilesetPanel] Rendered with:', {
+    editorExists: !!editor,
+    activeLayerType: activeLayer?.type || 'none',
+    brushTool,
+    onShowImportReview: !!onShowImportReview
+  });
   const tileset = useTileset(editor, activeLayer, setTabTick);
 
   const handleFileUpload = propHandleFileUpload ?? tileset.handleFileUpload;
   const handleDeleteActiveTab = propHandleDeleteActiveTab ?? (() => { void tileset.deleteActiveTab(); });
+  console.log('[TilesetPanel] Will pass to BrushToolbar - editor:', !!editor, 'activeLayer:', !!activeLayer);
 
   return (
     <>

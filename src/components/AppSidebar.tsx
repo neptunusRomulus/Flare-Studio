@@ -169,6 +169,7 @@ export default function AppSidebar(p: SidebarProps) {
         )}
 
         {!p.actors.isNpcLayer && !p.actors.isEnemyLayer && !p.events.isEventLayer && !p.items.isItemsLayer && !p.rules.isRulesLayer && (
+          <>  
           <TilesetPanel
             editor={p.tileset.editor}
             activeLayer={p.tileset.activeLayer}
@@ -186,6 +187,7 @@ export default function AppSidebar(p: SidebarProps) {
             currentProjectPath={p.tileset.currentProjectPath}
             onShowImportReview={p.tileset.onShowImportReview}
           />
+          </>
         )}
       </section>
 

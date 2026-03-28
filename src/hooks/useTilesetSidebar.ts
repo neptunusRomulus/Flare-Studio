@@ -28,7 +28,7 @@ const noopToggleBrush = (_tool: BrushTool) => {};
 const noopDeleteTab = () => {};
 const noopToast: typeof import('@/hooks/use-toast').toast = (_props?: any) => ({ id: '', dismiss: () => {}, update: () => {} });
 
-export default function useTilesetSidebar(params?: Partial<TilesetSidebarParams>) {
+export default function useTilesetSidebar(params?: Partial<TilesetSidebarParams> | Record<string, unknown>) {
   const defaultParams: TilesetSidebarParams = {
     editor: null,
     activeLayer: null,
@@ -43,7 +43,9 @@ export default function useTilesetSidebar(params?: Partial<TilesetSidebarParams>
     handleOpenActorDialogForTileset: undefined,
     stampsState: null
   };
-  const p: TilesetSidebarParams = { ...defaultParams, ...(params ?? {}) };
+  // Extract tileset from nested structure if it exists, otherwise use params directly
+  const tilesetData = (params as any)?.tileset ?? params ?? {};
+  const p: TilesetSidebarParams = { ...defaultParams, ...tilesetData };
 
   const tileset = {
     editor: p.editor,

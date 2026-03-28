@@ -9,41 +9,10 @@ Comprehensive debug logging has been added throughout the tileset import flow to
 When you click the import button in the brush toolbar:
 
 ```javascript
-// Logs when import is triggered
-console.log('[BrushToolbar] DEBUG: File selected for import');
-
-// Logs when detected tiles are extracted from imported image
-console.log('[BrushToolbar] DEBUG: Extracted detected tiles from activeTab', {
-  count: detectedTilesArray.length,
-  tabId: targetTabId,
-  layerType,
-  tiles: detectedTilesArray.slice(0, 3)  // First 3 tiles shown
-});
-
-// Logs when onShowImportReview is called
-console.log('[BrushToolbar] DEBUG: Calling onShowImportReview with:', {
-  tilesetFileName: file.name,
-  detectedAssetCount: detectedTilesArray.length,
-  layerType,
-  tabId: targetTabId
-});
-
-// Logs errors during import
-console.error('[BrushToolbar] CRITICAL ERROR: Import flow failed', err);
-console.error('[BrushToolbar] ERROR DETAILS:', {
-  message: String(err),
-  stack: err instanceof Error ? err.stack : 'no stack',
-  targetTabId,
-  layerType,
-  manualTileWidth,
-  manualTileHeight
-});
+// (BrushToolbar debug logs removed)
 ```
 
-**Look for:**
-- Whether detected tiles are being extracted
-- If onShowImportReview is being called with data
-- Any error details if import fails
+**Note:** BrushToolbar debug logs have been removed for cleaner console output.
 
 ---
 

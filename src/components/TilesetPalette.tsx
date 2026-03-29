@@ -117,6 +117,22 @@ const TilesetPalette = ({
           console.log('[TilesetPalette] DEBUG: No active layer type');
           return;
         }
+
+        // --- BUG FIX: Early return for collision layer to prevent state bleed and crashing tab lookup
+        if (layerType === 'collision') {
+          console.log('[TilesetPalette] DEBUG: Handling collision layer directly');
+          const collisionImage = (editor as unknown as { getLayerTilesetImage?: (lt: string) => HTMLImageElement | null }).getLayerTilesetImage?.(layerType);
+          if (collisionImage) {
+            setTilesetImage(collisionImage);
+            setTileSize({ width: DEFAULT_TILE_WIDTH, height: DEFAULT_TILE_HEIGHT });
+            if (collisionImage.complete && collisionImage.naturalWidth > 0 && collisionImage.naturalHeight > 0) {
+              setImageSize({ width: collisionImage.naturalWidth, height: collisionImage.naturalHeight });
+            }
+          }
+          setDetectedTiles([]);
+          setSelectedDetectedGids([]);
+          return;
+        }
         
         console.log('[TilesetPalette] DEBUG: Fetching tileset for layer type:', { layerType, tabTick });
         
@@ -129,8 +145,8 @@ const TilesetPalette = ({
           tabCount: tabs.length,
           activeTabId,
           foundTab: !!tab,
-          tabHasTileset: !!(tab as { tileset?: { image?: HTMLImageElement } }).tileset,
-          tabHasImage: !!(tab as { tileset?: { image?: HTMLImageElement } }).tileset?.image
+          tabHasTileset: !!tab && !!(tab as { tileset?: { image?: HTMLImageElement } }).tileset,
+          tabHasImage: !!tab && !!(tab as { tileset?: { image?: HTMLImageElement } }).tileset?.image
         });
         
         if (tab && (tab as { tileset?: { image?: HTMLImageElement } }).tileset?.image) {
@@ -206,25 +222,41 @@ const TilesetPalette = ({
             console.log('[TilesetPalette] DEBUG: Image not complete yet, waiting for load listener');
           }
         } else {
-          // Fallback: for layers without tabs (like collision), get the tileset from editor's global tilesetImage
-          console.log('[TilesetPalette] DEBUG: No tab tileset found, trying editor fallback');
-          const editorTilesetImage = (editor as unknown as { tilesetImage?: HTMLImageElement | null }).tilesetImage;
-          if (editorTilesetImage) {
-            console.log('[TilesetPalette] DEBUG: Using editor global tileset image');
-            setTilesetImage(editorTilesetImage);
+          // Fallback: for collision, use built-in layer tileset image (never object/background tile import)
+          const collisionTilesetImage = (editor as unknown as { getLayerTilesetImage?: (lt: string) => HTMLImageElement | null }).getLayerTilesetImage?.(layerType);
+          if (collisionTilesetImage) {
+            console.log('[TilesetPalette] DEBUG: Using editor layer-specific tileset image');
+            setTilesetImage(collisionTilesetImage);
             setTileSize({ width: DEFAULT_TILE_WIDTH, height: DEFAULT_TILE_HEIGHT });
-            if (editorTilesetImage.complete && editorTilesetImage.naturalWidth > 0 && editorTilesetImage.naturalHeight > 0) {
-              setImageSize({ width: editorTilesetImage.naturalWidth, height: editorTilesetImage.naturalHeight });
+            if (collisionTilesetImage.complete && collisionTilesetImage.naturalWidth > 0 && collisionTilesetImage.naturalHeight > 0) {
+              setImageSize({ width: collisionTilesetImage.naturalWidth, height: collisionTilesetImage.naturalHeight });
             }
             setDetectedTiles([]);
             setSelectedDetectedGids([]);
-          } else {
-            console.log('[TilesetPalette] DEBUG: No tileset image found anywhere');
-            setTilesetImage(null);
-            setImageSize({ width: 0, height: 0 });
-            setDetectedTiles([]);
-            setSelectedDetectedGids([]);
+            return;
           }
+
+          // Keep existing legacy fallback for non-collision layers only
+          if (layerType !== 'collision') {
+            const editorTilesetImage = (editor as unknown as { tilesetImage?: HTMLImageElement | null }).tilesetImage;
+            if (editorTilesetImage) {
+              console.log('[TilesetPalette] DEBUG: Using editor global tileset image');
+              setTilesetImage(editorTilesetImage);
+              setTileSize({ width: DEFAULT_TILE_WIDTH, height: DEFAULT_TILE_HEIGHT });
+              if (editorTilesetImage.complete && editorTilesetImage.naturalWidth > 0 && editorTilesetImage.naturalHeight > 0) {
+                setImageSize({ width: editorTilesetImage.naturalWidth, height: editorTilesetImage.naturalHeight });
+              }
+              setDetectedTiles([]);
+              setSelectedDetectedGids([]);
+              return;
+            }
+          }
+
+          console.log('[TilesetPalette] DEBUG: No tileset image found anywhere');
+          setTilesetImage(null);
+          setImageSize({ width: 0, height: 0 });
+          setDetectedTiles([]);
+          setSelectedDetectedGids([]);
         }
       } catch (_err) { void _err; }
     };

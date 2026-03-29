@@ -124,9 +124,9 @@ export interface EditorProjectData {
   paintMode?: PaintMode;  // Current paint mode (ground/object)
 }
 
-const INTERNAL_TILESET_FILENAMES = new Set<string>(['collision_tileset.png']);
+const INTERNAL_TILESET_FILENAMES = new Set<string>(['collision-tile.png', 'collision_tileset.png']);
 const COLLISION_LAYER_TYPE = 'collision';
-const INTERNAL_COLLISION_TILESET = 'collision_tileset.png';
+const INTERNAL_COLLISION_TILESET = 'collision-tile.png';
 
 export class TileMapEditor {
   public isStartingMap: boolean = false;
@@ -1503,47 +1503,65 @@ export class TileMapEditor {
   }
 
   private loadDefaultCollisionTileset(): void {
-    const resolvedPath = this.resolveInternalAssetPath(INTERNAL_COLLISION_TILESET);
-    if (!resolvedPath) {
+    const candidates = Array.from(INTERNAL_TILESET_FILENAMES);
+    if (candidates.length === 0) {
       return;
     }
 
     const image = new Image();
-    image.onload = () => {
-      const columns = Math.max(1, Math.floor(image.width / this.tileSizeX));
-      const rows = Math.max(1, Math.floor(image.height / this.tileSizeY));
-      const count = Math.max(1, columns * rows);
 
-      this.layerTilesets.set(COLLISION_LAYER_TYPE, {
-        image,
-        fileName: INTERNAL_COLLISION_TILESET,
-        columns,
-        rows,
-        count,
-        tileWidth: this.tileSizeX,
-        tileHeight: this.tileSizeY,
-        spacing: 0,
-        margin: 0,
-        sourcePath: resolvedPath
-      });
-
-      this.collisionTilesetLoading = false;
-
-      // If collision layer is currently active, refresh the palette
-      if (this.getCurrentLayerType() === COLLISION_LAYER_TYPE) {
-        this.updateCurrentTileset(COLLISION_LAYER_TYPE);
-        this.refreshTilePalette(true);
-        this.draw();
+    const loadCandidate = (index: number): void => {
+      if (index >= candidates.length) {
+        this.collisionTilesetLoading = false;
+        console.warn('[TileMapEditor] Collision tileset not found in internal assets:', candidates);
+        return;
       }
+
+      const candidateFile = candidates[index];
+      const resolvedPath = this.resolveInternalAssetPath(candidateFile);
+      if (!resolvedPath) {
+        loadCandidate(index + 1);
+        return;
+      }
+
+      image.onload = () => {
+        const columns = Math.max(1, Math.floor(image.width / this.tileSizeX));
+        const rows = Math.max(1, Math.floor(image.height / this.tileSizeY));
+        const count = Math.max(1, columns * rows);
+
+        this.layerTilesets.set(COLLISION_LAYER_TYPE, {
+          image,
+          fileName: candidateFile,
+          columns,
+          rows,
+          count,
+          tileWidth: this.tileSizeX,
+          tileHeight: this.tileSizeY,
+          spacing: 0,
+          margin: 0,
+          sourcePath: resolvedPath
+        });
+
+        this.collisionTilesetLoading = false;
+
+        // If collision layer is currently active, refresh the palette
+        if (this.getCurrentLayerType() === COLLISION_LAYER_TYPE) {
+          this.updateCurrentTileset(COLLISION_LAYER_TYPE);
+          this.refreshTilePalette(true);
+          this.draw();
+        }
+      };
+
+      image.onerror = (_error) => {
+        void _error;
+        loadCandidate(index + 1);
+      };
+
+      this.collisionTilesetLoading = true;
+      image.src = resolvedPath;
     };
 
-    image.onerror = (_error) => {
-      void _error;
-      this.collisionTilesetLoading = false;
-    };
-
-    this.collisionTilesetLoading = true;
-    image.src = resolvedPath;
+    loadCandidate(0);
   }
 
   private getDraggableActorAt(x: number, y: number): MapObject | null {
@@ -3822,6 +3840,9 @@ export class TileMapEditor {
 
   // Public methods for React to interact with
   public handleFileUpload(file: File, type: 'tileset' | 'layerTileset', options?: { skipAutoSlice?: boolean }): void {
+    const activeLayer = this.tileLayers.find(l => l.id === this.activeLayerId);
+    if (activeLayer && activeLayer.type === COLLISION_LAYER_TYPE) return;
+    
     if (type === 'tileset') {
       // Treat uploads as layer-specific by default: assign to active layer's tileset
       const reader = new FileReader();
@@ -7210,6 +7231,7 @@ export class TileMapEditor {
 
   // Layer-specific tileset management - now scoped per active tab
   public setLayerTileset(layerType: string, file: File, options?: { skipApply?: boolean }): void {
+    if (layerType === COLLISION_LAYER_TYPE) return;
     console.log('setLayerTileset called', { layerType, fileName: file.name, options });
     const gidSnapshotBefore = this.snapshotLayerGids();
     const image = new Image();
@@ -7277,6 +7299,11 @@ export class TileMapEditor {
 
   public hasLayerTileset(layerType: string): boolean {
     return this.layerTilesets.has(layerType);
+  }
+
+  public getLayerTilesetImage(layerType: string): HTMLImageElement | null {
+    const tileset = this.getLayerTilesetOrFallback(layerType);
+    return tileset?.image ?? null;
   }
 
   // Tab management API

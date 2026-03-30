@@ -39,6 +39,7 @@ const EngineSettingsDialog = ({
   undoStorageSizeKB
 }: EngineSettingsDialogProps) => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
+  const [, setForceRender] = useState(0);
 
   if (!open) return null; 
 
@@ -119,6 +120,7 @@ const EngineSettingsDialog = ({
                     onClick={() => {
                       if (editor) {
                         editor.toggleDebugMode();
+                        setForceRender(prev => prev + 1);
                       }
                     }}
                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
@@ -139,6 +141,35 @@ const EngineSettingsDialog = ({
                 </div>
                 <p className="text-xs text-gray-500 mt-1">
                   Shows tile boundaries and coordinates for debugging
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Minimap View Mode</label>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">Bird's-eye (Orthogonal)</span>
+                  <button
+                    onClick={() => {
+                      if (editor) {
+                        editor.toggleMinimapMode();
+                        setForceRender(prev => prev + 1);
+                      }
+                    }}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      editor?.getMinimapMode() === 'isometric' ? 'bg-orange-600' : 'bg-gray-200'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        editor?.getMinimapMode() === 'isometric' ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                    <span className="sr-only">Toggle Minimap View Mode</span>
+                  </button>
+                  <span className="text-sm">Isometric (Grid)</span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Switches the minimap between orthogonal top-down and isometric views.
                 </p>
               </div>
             </div>

@@ -97,6 +97,7 @@ export interface EditorProjectData {
   // Persist active layer selection for tab switching
   activeLayerId?: number | null;
   minimap?: string | null;
+  minimapMode?: 'orthogonal' | 'isometric';
   version?: string;
   tileContentThreshold?: number;
   objectSeparationSensitivity?: number;
@@ -680,6 +681,7 @@ export class TileMapEditor {
   private ctx!: CanvasRenderingContext2D;
   private mapCanvas: HTMLCanvasElement;
   private showMinimap: boolean = true;
+  private minimapMode: 'orthogonal' | 'isometric' = 'orthogonal';
   private isDarkMode: boolean = false;
   private debugMode: boolean = false;
 
@@ -2719,6 +2721,22 @@ export class TileMapEditor {
     this.draw();
   }
 
+  public toggleMinimapMode(): void {
+    this.minimapMode = this.minimapMode === 'orthogonal' ? 'isometric' : 'orthogonal';
+    this.draw();
+  }
+
+  public getMinimapMode(): 'orthogonal' | 'isometric' {
+    return this.minimapMode;
+  }
+
+  public setMinimapMode(mode: 'orthogonal' | 'isometric'): void {
+    if (this.minimapMode !== mode) {
+      this.minimapMode = mode;
+      this.draw();
+    }
+  }
+
   public toggleMinimap(): void {
     this.showMinimap = !this.showMinimap;
     this.draw();
@@ -3771,20 +3789,40 @@ export class TileMapEditor {
 
     // Calculate crisp integer tile pixel size to ensure squares (disable fractional scaling)
     // We choose the largest integer tile size that fits both directions.
-    const maxTileWidth = Math.floor(minimapWidth / this.mapWidth) || 1;
-    const maxTileHeight = Math.floor(minimapHeight / this.mapHeight) || 1;
-    const tilePixel = Math.max(1, Math.min(maxTileWidth, maxTileHeight));
+    let tilePixel: number;
+    let mapPixelWidth: number;
+    let mapPixelHeight: number;
+    let offsetX: number;
+    let offsetY: number;
 
-    // Recompute centered offsets using integer math so tiles align to pixel grid
-    const mapPixelWidth = this.mapWidth * tilePixel;
-    const mapPixelHeight = this.mapHeight * tilePixel;
-    const offsetX = x + Math.floor((minimapWidth - mapPixelWidth) / 2);
-    const offsetY = y + Math.floor((minimapHeight - mapPixelHeight) / 2);
+    if (this.minimapMode === 'isometric') {
+      const maxTileWidth = Math.floor(minimapWidth * 2 / (this.mapWidth + this.mapHeight)) || 1;
+      const maxTileHeight = Math.floor(minimapHeight * 4 / (this.mapWidth + this.mapHeight)) || 1;
+      tilePixel = Math.max(1, Math.min(maxTileWidth, maxTileHeight));
+      
+      // Enforce even number to avoid sub-pixel rendering gaps in isometric mode if possible
+      if (tilePixel > 2) tilePixel = Math.floor(tilePixel / 2) * 2;
+
+      mapPixelWidth = (this.mapWidth + this.mapHeight) * (tilePixel / 2);
+      mapPixelHeight = (this.mapWidth + this.mapHeight) * (tilePixel / 4);
+      
+      offsetX = x + minimapWidth / 2 - (this.mapWidth - this.mapHeight) * (tilePixel / 4);
+      offsetY = y + minimapHeight / 2 - (this.mapWidth + this.mapHeight) * (tilePixel / 8);
+    } else {
+      const maxTileWidth = Math.floor(minimapWidth / this.mapWidth) || 1;
+      const maxTileHeight = Math.floor(minimapHeight / this.mapHeight) || 1;
+      tilePixel = Math.max(1, Math.min(maxTileWidth, maxTileHeight));
+
+      mapPixelWidth = this.mapWidth * tilePixel;
+      mapPixelHeight = this.mapHeight * tilePixel;
+      offsetX = x + Math.floor((minimapWidth - mapPixelWidth) / 2);
+      offsetY = y + Math.floor((minimapHeight - mapPixelHeight) / 2);
+    }
 
   // Disable smoothing for pixel-perfect minimap (modern engines)
   this.ctx.imageSmoothingEnabled = false;
 
-    // Draw tiles in orthogonal (top-down) view using square pixels
+    // Draw tiles in selected view (top-down or isometric)
     for (let layerIndex = 0; layerIndex < this.tileLayers.length; layerIndex++) {
       const layer = this.tileLayers[layerIndex];
       if (!layer.visible) continue;
@@ -3795,13 +3833,78 @@ export class TileMapEditor {
           const gid = layer.data[index];
 
           if (gid > 0) {
-            const pixelX = offsetX + tileX * tilePixel;
-            const pixelY = offsetY + tileY * tilePixel;
+            let pixelX: number;
+            let pixelY: number;
 
-            // Use a stable color mapping per GID but slightly desaturated for minimap clarity
-            const hue = (gid * 137.5) % 360;
-            this.ctx.fillStyle = `hsl(${hue}, 55%, ${layerIndex === 0 ? '45%' : '60%'})`;
-            this.ctx.fillRect(pixelX, pixelY, tilePixel, tilePixel);
+            if (this.minimapMode === 'isometric') {
+              pixelX = offsetX + (tileX - tileY) * (tilePixel / 2);
+              pixelY = offsetY + (tileX + tileY) * (tilePixel / 4);
+            } else {
+              pixelX = offsetX + tileX * tilePixel;
+              pixelY = offsetY + tileY * tilePixel;
+            }
+
+            let fillColor = '';
+            let strokeColor = '';
+            let drawThisTile = true;
+            let isDashed = false;
+
+            if (layer.type === 'background') {
+              fillColor = `rgba(34, 139, 34, 0.8)`; // Green
+              strokeColor = `rgba(34, 139, 34, 1)`;
+            } else if (layer.type === 'object') {
+              fillColor = `rgba(30, 144, 255, 0.8)`; // Blue
+              strokeColor = `rgba(30, 144, 255, 1)`;
+            } else if (layer.type === 'collision') {
+              if (gid === 1) {
+                fillColor = `rgba(255, 255, 255, 0.9)`;
+                strokeColor = `rgba(255, 255, 255, 1)`;
+              } else if (gid === 2) {
+                fillColor = `rgba(255, 255, 255, 0.2)`;
+                strokeColor = `rgba(255, 255, 255, 0.8)`;
+                isDashed = true;
+              } else {
+                // 3 and 4 are not shown
+                drawThisTile = false;
+              }
+            } else {
+              const hue = (gid * 137.5) % 360;
+              fillColor = `hsl(${hue}, 55%, ${layerIndex === 0 ? '45%' : '60%'})`;
+              strokeColor = `hsl(${hue}, 55%, ${layerIndex === 0 ? '35%' : '50%'})`;
+            }
+
+            if (drawThisTile) {
+              this.ctx.fillStyle = fillColor;
+
+              if (isDashed) {
+                this.ctx.setLineDash([2, 2]);
+              } else {
+                this.ctx.setLineDash([]);
+              }
+
+              if (this.minimapMode === 'isometric') {
+                this.ctx.beginPath();
+                this.ctx.moveTo(pixelX, pixelY); // top
+                this.ctx.lineTo(pixelX + tilePixel / 2, pixelY + tilePixel / 4); // right
+                this.ctx.lineTo(pixelX, pixelY + tilePixel / 2); // bottom
+                this.ctx.lineTo(pixelX - tilePixel / 2, pixelY + tilePixel / 4); // left
+                this.ctx.fill();
+                
+                // Draw subtle stroke for clarity
+                this.ctx.strokeStyle = strokeColor;
+                this.ctx.lineWidth = 0.5;
+                this.ctx.stroke();
+              } else {
+                this.ctx.fillRect(pixelX, pixelY, tilePixel, tilePixel);
+                if (isDashed || layer.type === 'collision') {
+                  this.ctx.strokeStyle = strokeColor;
+                  this.ctx.lineWidth = 0.5;
+                  this.ctx.strokeRect(pixelX, pixelY, tilePixel, tilePixel);
+                }
+              }
+
+              this.ctx.setLineDash([]);
+            }
           }
         }
       }
@@ -3810,13 +3913,37 @@ export class TileMapEditor {
       const spriteObjects = this.placedSpriteObjects.get(layer.type);
       if (spriteObjects && spriteObjects.length > 0) {
         for (const spriteObj of spriteObjects) {
-          const pixelX = offsetX + spriteObj.anchorX * tilePixel;
-          const pixelY = offsetY + spriteObj.anchorY * tilePixel;
+          let pixelX: number;
+          let pixelY: number;
+
+          if (this.minimapMode === 'isometric') {
+            pixelX = offsetX + (spriteObj.anchorX - spriteObj.anchorY) * (tilePixel / 2);
+            pixelY = offsetY + (spriteObj.anchorX + spriteObj.anchorY) * (tilePixel / 4);
+          } else {
+            pixelX = offsetX + spriteObj.anchorX * tilePixel;
+            pixelY = offsetY + spriteObj.anchorY * tilePixel;
+          }
           
-          // Use a slightly brighter color for sprite objects
-          const hue = (spriteObj.gid * 137.5) % 360;
-          this.ctx.fillStyle = `hsl(${hue}, 70%, ${layerIndex === 0 ? '50%' : '65%'})`;
-          this.ctx.fillRect(pixelX, pixelY, tilePixel, tilePixel);
+          // Use a slightly brighter color for sprite objects based on layer type
+          if (layer.type === 'background') {
+            this.ctx.fillStyle = `rgba(50, 205, 50, 0.9)`; // Lighter green
+          } else if (layer.type === 'object') {
+            this.ctx.fillStyle = `rgba(65, 105, 225, 0.9)`; // Royal blue
+          } else {
+            const hue = (spriteObj.gid * 137.5) % 360;
+            this.ctx.fillStyle = `hsl(${hue}, 70%, ${layerIndex === 0 ? '50%' : '65%'})`;
+          }
+          
+          if (this.minimapMode === 'isometric') {
+            this.ctx.beginPath();
+            this.ctx.moveTo(pixelX, pixelY);
+            this.ctx.lineTo(pixelX + tilePixel / 2, pixelY + tilePixel / 4);
+            this.ctx.lineTo(pixelX, pixelY + tilePixel / 2);
+            this.ctx.lineTo(pixelX - tilePixel / 2, pixelY + tilePixel / 4);
+            this.ctx.fill();
+          } else {
+            this.ctx.fillRect(pixelX, pixelY, tilePixel, tilePixel);
+          }
         }
       }
     }
@@ -3827,9 +3954,20 @@ export class TileMapEditor {
       this.ctx.lineWidth = 0.5;
       for (let ty = 0; ty < this.mapHeight; ty++) {
         for (let tx = 0; tx < this.mapWidth; tx++) {
-          const gx = offsetX + tx * tilePixel + 0.25;
-          const gy = offsetY + ty * tilePixel + 0.25;
-          this.ctx.strokeRect(gx, gy, tilePixel - 0.5, tilePixel - 0.5);
+          if (this.minimapMode === 'isometric') {
+            const gx = offsetX + (tx - ty) * (tilePixel / 2);
+            const gy = offsetY + (tx + ty) * (tilePixel / 4);
+            this.ctx.beginPath();
+            this.ctx.moveTo(gx, gy);
+            this.ctx.lineTo(gx + tilePixel / 2, gy + tilePixel / 4);
+            this.ctx.lineTo(gx, gy + tilePixel / 2);
+            this.ctx.lineTo(gx - tilePixel / 2, gy + tilePixel / 4);
+            this.ctx.stroke();
+          } else {
+            const gx = offsetX + tx * tilePixel + 0.25;
+            const gy = offsetY + ty * tilePixel + 0.25;
+            this.ctx.strokeRect(gx, gy, tilePixel - 0.5, tilePixel - 0.5);
+          }
         }
       }
     }
@@ -9437,6 +9575,7 @@ export class TileMapEditor {
       tilesets: tilesets.length > 0 ? tilesets : undefined,
       tilesetImages: Object.keys(tilesetImages).length > 0 ? tilesetImages : undefined,
       minimap: this.generateMinimapDataUrl?.() ?? undefined,
+      minimapMode: this.minimapMode,
       version: '1.0',
       detectedTileData: this.detectedTileData.size > 0 ? Array.from(this.detectedTileData.entries()) : undefined,
       isStartingMap: this.isStartingMap,
@@ -10561,6 +10700,11 @@ export class TileMapEditor {
       this.objectInstanceCellIndex.clear();
       this.objectInstanceIndexCells.clear();
       this.paintMode = 'ground'; // Reset to default paint mode
+
+      if (projectData.minimapMode) {
+        this.minimapMode = projectData.minimapMode;
+      }
+      
       this.selection = {
         active: false,
         startX: -1,

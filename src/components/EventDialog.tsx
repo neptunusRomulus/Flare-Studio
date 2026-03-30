@@ -226,6 +226,9 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
     }));
   };
 
+  const isLocEnabled = ['Trigger', 'Leave'].includes(eventData.timing.activeActivation || '');
+  const isHotspotEnabled = ['Interact', 'Trigger'].includes(eventData.timing.activeActivation || '');
+
   if (!open) return null;
 
   const dialogContent = (
@@ -294,9 +297,20 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                 })}
               </div>
             </div>
+          </div>
 
+          <div className="relative space-y-6">
+            {!eventData.timing.activeActivation && (
+              <div className="absolute -inset-4 z-50 bg-black/50 backdrop-blur-[1px] rounded-lg flex items-start justify-center pt-20 pointer-events-auto">
+                <div className="bg-background border border-border/50 shadow-lg px-6 py-3 rounded-xl flex items-center justify-center">
+                  <span className="text-sm font-medium text-foreground">Select an activation type</span>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-4 border-b border-border/50 pb-4">
             {/* Location and Size */}
-            <div className="space-y-2">
+            <div className={`space-y-2 transition-opacity ${!isLocEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
               <div className="flex items-center gap-2">
                 <label className="text-xs font-medium text-foreground/80">Location and Size</label>
                 <Tooltip content="Defines the physical area of the event">
@@ -420,7 +434,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
             </div>
 
             {/* Hotspot */}
-            <div className="space-y-2">
+            <div className={`space-y-2 transition-opacity ${!isHotspotEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
               <div className="flex items-center gap-2">
                 <label className="text-xs font-medium text-foreground/80">Hotspot</label>
                 <Tooltip content="Property determines the specific clickable area for an interaction">
@@ -891,6 +905,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                 className="h-7 text-xs"
               />
             </div>
+          </div>
           </div>
         </div>
 

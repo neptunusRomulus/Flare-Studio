@@ -108,21 +108,58 @@ export default function EditorCanvas(props: Props) {
   const [minimapHoverCoords, setMinimapHoverCoords] = React.useState<{x: number, y: number} | null>(null);
   const [minimapTooltipFadeOut, setMinimapTooltipFadeOut] = React.useState(false);
   const minimapFadeTimeoutRef = React.useRef<number | null>(null);
+  const [isSpaceHeld, setIsSpaceHeld] = React.useState(false);
+  const [isMinimapPanning, setIsMinimapPanning] = React.useState(false);
+  const minimapPanStartRef = React.useRef<{ x: number; y: number } | null>(null);
+  const isSpaceHeldRef = React.useRef(false); // Track current Space state in ref to avoid stale closures
+  const isMouseDownRef = React.useRef(false); // Track if left mouse button is currently pressed
+  const lastCursorPosRef = React.useRef<{ x: number; y: number }>({ x: 0, y: 0 }); // Track last cursor position
+  const editorRef = React.useRef<TileMapEditor | null>(null); // Keep editor ref for key handlers
+
+  React.useEffect(() => {
+    editorRef.current = editor;
+  }, [editor]);
 
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey) {
-        console.log('[EditorCanvas] Ctrl/Meta key down detected');
         setIsCtrlHeld(true);
+      }
+      if (e.code === 'Space') {
+        console.log('[KEY DOWN] Space detected - mouse is down?', isMouseDownRef.current, 'editor:', !!editorRef.current);
+        e.preventDefault();
+        setIsSpaceHeld(true);
+        isSpaceHeldRef.current = true;
+        
+        // If mouse is already being held down, start panning
+        if (isMouseDownRef.current && editorRef.current && canvasRef.current) {
+          console.log('[KEY DOWN] Starting panning (mouse already down)');
+          setIsMinimapPanning(true);
+          minimapPanStartRef.current = lastCursorPosRef.current;
+        }
       }
     };
     const handleKeyUp = (e: KeyboardEvent) => {
+      console.log('[KEY UP]', e.code);
       if (e.code === 'ControlLeft' || e.code === 'ControlRight' || e.code === 'MetaLeft' || e.code === 'MetaRight') {
-        console.log('[EditorCanvas] Ctrl/Meta key up detected');
+        console.log('[KEY UP] Ctrl/Meta released - setting isCtrlHeld = false');
         setIsCtrlHeld(false);
       }
+      if (e.code === 'Space') {
+        console.log('[KEY UP] Space released - setting isSpaceHeld = false, isMinimapPanning = false, updating ref');
+        e.preventDefault();
+        setIsSpaceHeld(false);
+        isSpaceHeldRef.current = false;
+        setIsMinimapPanning(false);
+        minimapPanStartRef.current = null;
+      }
     };
-    const handleBlur = () => setIsCtrlHeld(false);
+    const handleBlur = () => {
+      setIsCtrlHeld(false);
+      setIsSpaceHeld(false);
+      setIsMinimapPanning(false);
+      minimapPanStartRef.current = null;
+    };
 
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
@@ -143,17 +180,26 @@ export default function EditorCanvas(props: Props) {
     };
   }, []);
 
+  // Debug state changes
+  React.useEffect(() => {
+    if (isMinimapPanning) {
+      console.log('[STATE CHANGE] Panning started - isSpaceHeld:', isSpaceHeld);
+    } else if (isSpaceHeld) {
+      console.log('[STATE CHANGE] isSpaceHeld:', isSpaceHeld, 'isMinimapPanning:', isMinimapPanning);
+    }
+  }, [isSpaceHeld, isMinimapPanning]);
+
   // Context menu state
   const contextMenu = useContextMenu();
 
   // Ensure the editor is bound to the current canvas element. React may replace the canvas
-  // node during re-renders; call `editor.updateCanvas` when the DOM node is present so the
+  // node during re-renders; call `editorRef.current.updateCanvas` when the DOM node is present so the
   // editor rebinds its mouse events to the live canvas.
   React.useEffect(() => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    if (!editor || !canvasRef?.current) return;
+    if (!editorRef.current || !canvasRef?.current) return;
     try {
-      editor.updateCanvas(canvasRef.current);
+      editorRef.current.updateCanvas(canvasRef.current);
     } catch (e) {
       console.warn('EditorCanvas: failed to update editor canvas reference', e);
     }
@@ -161,7 +207,7 @@ export default function EditorCanvas(props: Props) {
 
   // Set up cell right-click context menu callback
   React.useEffect(() => {
-    if (!editor) {
+    if (!editorRef.current) {
       return;
     }
 
@@ -170,12 +216,12 @@ export default function EditorCanvas(props: Props) {
       contextMenu.openAtPosition(screenX, screenY);
     };
 
-    editor.setCellRightClickCallback(handleCellRightClick);
+    editorRef.current.setCellRightClickCallback(handleCellRightClick);
 
     return () => {
-      editor.setCellRightClickCallback(null);
+      editorRef.current.setCellRightClickCallback(null);
     };
-  }, [editor, contextMenu]);
+  }, [editorRef, contextMenu]);
 
   return (
     <div
@@ -183,21 +229,19 @@ export default function EditorCanvas(props: Props) {
       className={`bg-gray-100 flex-1 min-h-0 flex overflow-hidden relative ${draggingNpcId || draggingEventId ? 'ring-2 ring-orange-500 ring-inset' : ''}`}
       onMouseMove={(e) => {
         setCursorScreenPos({ x: e.clientX, y: e.clientY });
+        lastCursorPosRef.current = { x: e.clientX, y: e.clientY };
         
         // Compute tile coordinates from cursor position
-        if (editor && canvasRef.current) {
+        if (editorRef.current && canvasRef.current) {
           const rect = canvasRef.current.getBoundingClientRect();
           const canvasX = e.clientX - rect.left;
           const canvasY = e.clientY - rect.top;
-          const tileCoords = editor.screenToTile(canvasX, canvasY);
-          if (tileCoords) {
-            setCtrlCursorTileCoords(tileCoords);
-          } else {
-            setCtrlCursorTileCoords(null);
-          }
+          
+          let minimapCellX = -1;
+          let minimapCellY = -1;
           
           // Check if mouse is over minimap and compute hover coordinates
-          const minimapBounds = editor.getLastMiniMapBounds();
+          const minimapBounds = editorRef.current.getLastMiniMapBounds();
           if (minimapBounds) {
             if (canvasX >= minimapBounds.x && canvasX <= minimapBounds.x + minimapBounds.w &&
                 canvasY >= minimapBounds.y && canvasY <= minimapBounds.y + minimapBounds.h) {
@@ -205,9 +249,12 @@ export default function EditorCanvas(props: Props) {
               const relX = canvasX - minimapBounds.x;
               const relY = canvasY - minimapBounds.y;
               
-              // Get minimap zoom and mode from editor
-              const minimapZoom = editor.getMinimapZoom();
-              const minimapMode = editor.getMinimapMode();
+              // Get minimap zoom, mode, and pan from editor
+              const minimapZoom = editorRef.current.getMinimapZoom();
+              const minimapMode = editorRef.current.getMinimapMode();
+              const minimapPan = typeof editorRef.current.getMinimapPan === 'function' 
+                ? editorRef.current.getMinimapPan() 
+                : { x: 0, y: 0 };
               
               // Calculate tile pixel size and offsets same as minimap rendering
               let tilePixel = 1;
@@ -223,8 +270,8 @@ export default function EditorCanvas(props: Props) {
                 
                 mapPixelWidth = (mapWidth + mapHeight) * (tilePixel / 2);
                 mapPixelHeight = (mapWidth + mapHeight) * (tilePixel / 4);
-                offsetX = minimapBounds.w / 2 - (mapWidth - mapHeight) * (tilePixel / 4);
-                offsetY = minimapBounds.h / 2 - (mapWidth + mapHeight) * (tilePixel / 8);
+                offsetX = minimapBounds.w / 2 - (mapWidth - mapHeight) * (tilePixel / 4) + minimapPan.x;
+                offsetY = minimapBounds.h / 2 - (mapWidth + mapHeight) * (tilePixel / 8) + minimapPan.y;
               } else {
                 const maxTileWidth = Math.floor(minimapBounds.w / mapWidth) || 1;
                 const maxTileHeight = Math.floor(minimapBounds.h / mapHeight) || 1;
@@ -232,8 +279,8 @@ export default function EditorCanvas(props: Props) {
                 
                 mapPixelWidth = mapWidth * tilePixel;
                 mapPixelHeight = mapHeight * tilePixel;
-                offsetX = Math.floor((minimapBounds.w - mapPixelWidth) / 2);
-                offsetY = Math.floor((minimapBounds.h - mapPixelHeight) / 2);
+                offsetX = Math.floor((minimapBounds.w - mapPixelWidth) / 2) + minimapPan.x;
+                offsetY = Math.floor((minimapBounds.h - mapPixelHeight) / 2) + minimapPan.y;
               }
               
               // Subtract offset to get position within rendered content
@@ -241,36 +288,105 @@ export default function EditorCanvas(props: Props) {
               const contentY = relY - offsetY;
               
               // Calculate cell based on mode
-              let cellX = 0, cellY = 0;
               if (minimapMode === 'isometric') {
                 // For isometric, convert from screen coordinates to tile coordinates
-                cellX = Math.floor((contentX / (tilePixel / 2) + contentY / (tilePixel / 4)) / 2);
-                cellY = Math.floor((contentY / (tilePixel / 4) - contentX / (tilePixel / 2)) / 2);
+                minimapCellX = Math.floor((contentX / (tilePixel / 2) + contentY / (tilePixel / 4)) / 2);
+                minimapCellY = Math.floor((contentY / (tilePixel / 4) - contentX / (tilePixel / 2)) / 2);
               } else {
                 // For orthogonal, simple division
-                cellX = Math.floor(contentX / tilePixel);
-                cellY = Math.floor(contentY / tilePixel);
+                minimapCellX = Math.floor(contentX / tilePixel);
+                minimapCellY = Math.floor(contentY / tilePixel);
+              }
+            }
+          }
+
+          // Handle minimap panning when Left Click drag over minimap
+          if (isMinimapPanning && !isSpaceHeldRef.current && editorRef.current && minimapCellX !== -1 && minimapCellY !== -1) {
+             // Clamping just to be sure
+             const safeX = Math.max(0, Math.min(mapWidth - 1, minimapCellX));
+             const safeY = Math.max(0, Math.min(mapHeight - 1, minimapCellY));
+             editorRef.current.panToTile(safeX, safeY);
+             return; // Skip other calculations when panning using minimap
+          }
+          
+          const tileCoords = editorRef.current.screenToTile(canvasX, canvasY);
+          if (tileCoords) {
+            setCtrlCursorTileCoords(tileCoords);
+          } else {
+            setCtrlCursorTileCoords(null);
+          }
+          
+          // Skip minimap hover updates when Space is held (panning mode)
+          if (isSpaceHeldRef.current) {
+            setMinimapHoverCoords(null);
+            if (editorRef.current) {
+              editorRef.current.setMinimapHoverCoords(null);
+            }
+            return;
+          }
+          
+          if (minimapCellX >= 0 && minimapCellX < mapWidth && minimapCellY >= 0 && minimapCellY < mapHeight) {
+            const newCoords = { x: minimapCellX, y: minimapCellY };
+            setMinimapHoverCoords(newCoords);
+            setMinimapTooltipFadeOut(false);
+            editorRef.current.setMinimapHoverCoords(newCoords);
+            
+            // Clear any existing fade timeout
+            if (minimapFadeTimeoutRef.current !== null) {
+              window.clearTimeout(minimapFadeTimeoutRef.current);
+              minimapFadeTimeoutRef.current = null;
+            }
+          } else {
+            setMinimapHoverCoords(null);
+            editorRef.current.setMinimapHoverCoords(null);
+          }
+        }
+      }}
+      onMouseDown={(e) => {
+        if (e.button === 0) {
+          isMouseDownRef.current = true;
+          lastCursorPosRef.current = { x: e.clientX, y: e.clientY };
+          
+          // Try to start panning if clicking on minimap
+          if (editorRef.current && canvasRef.current) {
+            const rect = canvasRef.current.getBoundingClientRect();
+            const canvasX = e.clientX - rect.left;
+            const canvasY = e.clientY - rect.top;
+            const minimapBounds = editorRef.current.getLastMiniMapBounds();
+            
+            if (minimapBounds && 
+                canvasX >= minimapBounds.x && canvasX <= minimapBounds.x + minimapBounds.w &&
+                canvasY >= minimapBounds.y && canvasY <= minimapBounds.y + minimapBounds.h) {
+              if (isSpaceHeldRef.current) {
+                // If space is held, let TileMapEditor handle the minimap internals panning
+                return;
+              }
+              console.log('[MOUSE DOWN] Starting panning (minimap clicked)');
+              setIsMinimapPanning(true);
+              minimapPanStartRef.current = { x: e.clientX, y: e.clientY };
+              
+              // We also want to PAN immediately to where the user clicked!
+              // Since minimapHoverCoords are kept up to date by onMouseMove before click, 
+              // we can just use the currently hovered cell to pan there immediately.
+              const hoverCoords = editorRef.current.getMinimapHoverCoords();
+              if (hoverCoords) {
+                editorRef.current.panToTile(hoverCoords.x, hoverCoords.y);
               }
               
-              if (cellX >= 0 && cellX < mapWidth && cellY >= 0 && cellY < mapHeight) {
-                const newCoords = { x: cellX, y: cellY };
-                setMinimapHoverCoords(newCoords);
-                setMinimapTooltipFadeOut(false);
-                editor.setMinimapHoverCoords(newCoords);
-                
-                // Clear any existing fade timeout
-                if (minimapFadeTimeoutRef.current !== null) {
-                  window.clearTimeout(minimapFadeTimeoutRef.current);
-                  minimapFadeTimeoutRef.current = null;
-                }
-              } else {
-                setMinimapHoverCoords(null);
-                editor.setMinimapHoverCoords(null);
-              }
-            } else {
-              setMinimapHoverCoords(null);
-              editor.setMinimapHoverCoords(null);
+              e.preventDefault();
+              e.stopPropagation();
             }
+          }
+        }
+      }}
+      onMouseUp={(e) => {
+        if (e.button === 0) {
+          isMouseDownRef.current = false;
+          console.log('[MOUSE UP] Left button released - isMinimapPanning:', isMinimapPanning);
+          if (isMinimapPanning) {
+            console.log('[MOUSE UP] Stopping minimap panning');
+            setIsMinimapPanning(false);
+            minimapPanStartRef.current = null;
           }
         }
       }}
@@ -283,11 +399,11 @@ export default function EditorCanvas(props: Props) {
           if (draggingNpcId) {
             e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
-            editor.setNpcDragHover(canvasX, canvasY);
+            editorRef.current.setNpcDragHover(canvasX, canvasY);
           } else if (draggingEventId) {
             e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
-            editor.setEventDragHover(canvasX, canvasY);
+            editorRef.current.setEventDragHover(canvasX, canvasY);
           }
         }
       }}
@@ -302,8 +418,8 @@ export default function EditorCanvas(props: Props) {
         }
         minimapFadeTimeoutRef.current = window.setTimeout(() => {
           setMinimapHoverCoords(null);
-          if (editor) {
-            editor.setMinimapHoverCoords(null);
+          if (editorRef.current) {
+            editorRef.current.setMinimapHoverCoords(null);
           }
           setMinimapTooltipFadeOut(false);
           minimapFadeTimeoutRef.current = null;
@@ -312,13 +428,13 @@ export default function EditorCanvas(props: Props) {
       onDragLeave={() => {
         setCursorScreenPos(null);
         setCtrlCursorTileCoords(null);
-        if (draggingNpcId && editor) editor.clearNpcDragHover();
-        if (draggingEventId && editor) editor.clearEventDragHover();
+        if (draggingNpcId && editorRef.current) editorRef.current.clearNpcDragHover();
+        if (draggingEventId && editorRef.current) editorRef.current.clearEventDragHover();
       }}
       onDrop={(e) => {
         e.preventDefault();
         const canvas = canvasRef.current;
-        if (!canvas || !editor) return;
+        if (!canvas || !editorRef.current) return;
 
         // Handle NPC drop
         const npcIdStr = e.dataTransfer.getData('npc-id');
@@ -328,12 +444,12 @@ export default function EditorCanvas(props: Props) {
             const rect = canvas.getBoundingClientRect();
             const canvasX = e.clientX - rect.left;
             const canvasY = e.clientY - rect.top;
-            const mapCoords = editor.screenToTile(canvasX, canvasY);
+            const mapCoords = editorRef.current.screenToTile(canvasX, canvasY);
             if (mapCoords && mapCoords.x >= 0 && mapCoords.x < mapWidth && mapCoords.y >= 0 && mapCoords.y < mapHeight) {
               handlePlaceActorOnMap(npcId, mapCoords.x, mapCoords.y);
             }
           }
-          editor.clearNpcDragHover();
+          editorRef.current.clearNpcDragHover();
           setDraggingNpcId(null);
           return;
         }
@@ -344,11 +460,11 @@ export default function EditorCanvas(props: Props) {
           const rect = canvas.getBoundingClientRect();
           const canvasX = e.clientX - rect.left;
           const canvasY = e.clientY - rect.top;
-          const mapCoords = editor.screenToTile(canvasX, canvasY);
+          const mapCoords = editorRef.current.screenToTile(canvasX, canvasY);
           if (mapCoords && mapCoords.x >= 0 && mapCoords.x < mapWidth && mapCoords.y >= 0 && mapCoords.y < mapHeight) {
             handlePlaceEventOnMap(eventIdStr, mapCoords.x, mapCoords.y);
           }
-          editor.clearEventDragHover();
+          editorRef.current.clearEventDragHover();
           setDraggingEventId(null);
         }
       }}

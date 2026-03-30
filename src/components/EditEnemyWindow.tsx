@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import Tooltip from '@/components/ui/tooltip';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
@@ -10,6 +10,7 @@ import type { MapObject } from '@/types';
 import type { LucideIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Slider } from '@/components/ui/slider';
+import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 
 type TabKey = 'identity' | 'visual' | 'audio' | 'stats' | 'behavior' | 'attack' | 'loot' | 'quest' | 'combat' | 'flags' | 'actions';
 
@@ -40,6 +41,15 @@ interface EditEnemyWindowProps {
 
 export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, projectPath = '', inline = false, showCloseConfirm = false, onCloseDecision }: EditEnemyWindowProps) {
   const { toast } = useToast();
+  
+  const {
+    position,
+    size,
+    dialogRef,
+    handleHeaderMouseDown,
+    handleResizeMouseDown,
+  } = useDraggableResizable({ id: 'edit_enemy', initialWidth: 820, initialHeight: 680, minWidth: 600, minHeight: 500 });
+
   const [activeTab, setActiveTab] = useState<TabKey>('identity');
   const [name, setName] = useState(() => enemy?.name || '');
   const [level, setLevel] = useState<number>(() => enemy?.level ?? 1);
@@ -475,11 +485,13 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
     { id: 'passive', label: 'Passive' },
   ];
 
+  if (!open && !inline) return null;
+
   const panel = (
     <>
-        <DialogHeader className="px-6 py-3 flex flex-row items-center justify-between border-b relative">
+        <div className="px-6 py-3 flex flex-row items-center justify-between border-b relative">
           <div className="flex items-center gap-6">
-            <DialogTitle className="whitespace-nowrap">Edit Enemy</DialogTitle>
+            <h2 className="text-lg font-semibold whitespace-nowrap">Edit Enemy</h2>
             <div className="flex items-center gap-1.5 bg-muted/20 p-1 rounded-md border border-border/50">
               {TAB_CONFIG.map((tab) => {
                 const Icon = tab.icon;
@@ -533,7 +545,7 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
               </button>
             </div>
           )}
-        </DialogHeader>
+        </div>
 
         <div className="flex-1 overflow-hidden flex flex-col">
           <div className="flex-1 p-6 min-w-0 overflow-y-auto minimal-scroll">
@@ -1437,19 +1449,49 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
 
   }
 
+  const dialogContent = (
+    <div 
+      ref={dialogRef}
+      className="bg-background border border-border/70 rounded-lg flex flex-col shadow-xl"
+      style={{
+        position: 'fixed',
+        left: `${position.x}px`,
+        top: `${position.y}px`,
+        width: `${size.width}px`,
+        height: `${size.height}px`,
+        zIndex: 50,
+        pointerEvents: 'auto',
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div 
+        className="flex items-center justify-between p-4 border-b border-border cursor-move select-none"
+        onMouseDown={handleHeaderMouseDown}
+      >
+        <h2 className="text-lg font-semibold">Edit Enemy</h2>
+        <button
+          onClick={() => onOpenChange?.(false)}
+          className="text-muted-foreground hover:text-foreground"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
 
-  return (
-
-    <Dialog open={open} onOpenChange={(v) => onOpenChange?.(v)}>
-
-      <DialogContent className="w-[820px] max-w-[90vw] h-[680px] max-h-[90vh] p-0 overflow-hidden flex flex-col">
-
+      <div className="flex-1 overflow-hidden flex flex-col">
         {panel}
+      </div>
 
-      </DialogContent>
-
-    </Dialog>
-
+      {/* Resize handle */}
+      <div
+        onMouseDown={handleResizeMouseDown}
+        className="absolute bottom-0 right-0 w-5 h-5 cursor-se-resize opacity-40 hover:opacity-100 transition-opacity flex items-end justify-end"
+        title="Drag to resize"
+      >
+        <div className="w-1.5 h-1.5 bg-foreground/40 rounded-sm m-1" />
+      </div>
+    </div>
   );
+
+  return createPortal(dialogContent, document.body);
 
 }

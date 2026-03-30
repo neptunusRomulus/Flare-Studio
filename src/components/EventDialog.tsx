@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { HelpCircle, X, Save, MapPinPlus, MousePointerClick, MapPinMinus, LogIn, LogOut, SquareCheckBig, Repeat2 } from 'lucide-react';
 import Tooltip from '@/components/ui/tooltip';
 import { useAppContext } from '@/context/AppContext';
+import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 
 type EventActivation = 'Trigger' | 'Interact' | 'Load' | 'Leave' | 'MapExit' | 'MapClear' | 'Loop';
 
@@ -131,13 +132,13 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
   });
 
   // Dragging and resizing state
-  const [position, setPosition] = useState({ x: 0, y: 0 });
-  const [size, setSize] = useState({ width: 800, height: 600 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [isResizing, setIsResizing] = useState(false);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
-  const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 });
-  const dialogRef = useRef<HTMLDivElement>(null);
+  const {
+    position,
+    size,
+    dialogRef,
+    handleHeaderMouseDown,
+    handleResizeMouseDown,
+  } = useDraggableResizable({ id: 'event_dialog', initialWidth: 800, initialHeight: 600 });
 
   useEffect(() => {
     if (!open) return;
@@ -151,12 +152,6 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
       }));
     }
 
-    // Initialize position to center of screen
-    setPosition({
-      x: (window.innerWidth - 800) / 2,
-      y: (window.innerHeight - 600) / 2,
-    });
-
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         onOpenChange(false);
@@ -166,65 +161,6 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
     document.addEventListener('keydown', handleEsc);
     return () => document.removeEventListener('keydown', handleEsc);
   }, [open, onOpenChange, currentMapName]);
-
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('input')) {
-      return;
-    }
-    
-    setIsDragging(true);
-    setDragOffset({
-      x: e.clientX - position.x,
-      y: e.clientY - position.y,
-    });
-  };
-
-  const handleResizeMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    e.stopPropagation();
-    setIsResizing(true);
-    setResizeStart({
-      x: e.clientX,
-      y: e.clientY,
-      width: size.width,
-      height: size.height,
-    });
-  };
-
-  useEffect(() => {
-    if (!open) return;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (isDragging) {
-        setPosition({
-          x: e.clientX - dragOffset.x,
-          y: e.clientY - dragOffset.y,
-        });
-      } else if (isResizing) {
-        const deltaX = e.clientX - resizeStart.x;
-        const deltaY = e.clientY - resizeStart.y;
-        
-        setSize({
-          width: Math.max(400, resizeStart.width + deltaX),
-          height: Math.max(300, resizeStart.height + deltaY),
-        });
-      }
-    };
-
-    const handleMouseUp = () => {
-      setIsDragging(false);
-      setIsResizing(false);
-    };
-
-    if (isDragging || isResizing) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-    }
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isDragging, isResizing, dragOffset, resizeStart, open]);
 
   const setActivation = (activation: EventActivation) => {
     setEventData(prev => ({
@@ -286,7 +222,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
       >
         <div 
           className="sticky top-0 z-10 border-b border-border/50 bg-background px-6 py-3 flex items-center justify-between cursor-move select-none"
-          onMouseDown={handleMouseDown}
+          onMouseDown={handleHeaderMouseDown}
         >
           <h3 className="text-lg font-semibold flex-1">Add Event</h3>
           <Button

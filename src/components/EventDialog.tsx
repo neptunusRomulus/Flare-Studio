@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -130,6 +130,15 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
     },
   });
 
+  // Dragging and resizing state
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [size, setSize] = useState({ width: 800, height: 600 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [resizeStart, setResizeStart] = useState({ x: 0, y: 0, width: 0, height: 0 });
+  const dialogRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (!open) return;
     
@@ -142,6 +151,12 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
       }));
     }
 
+    // Initialize position to center of screen
+    setPosition({
+      x: (window.innerWidth - 800) / 2,
+      y: (window.innerHeight - 600) / 2,
+    });
+
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         onOpenChange(false);
@@ -151,6 +166,65 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
     document.addEventListener('keydown', handleEsc);
     return () => document.removeEventListener('keydown', handleEsc);
   }, [open, onOpenChange, currentMapName]);
+
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest('button') || (e.target as HTMLElement).closest('input')) {
+      return;
+    }
+    
+    setIsDragging(true);
+    setDragOffset({
+      x: e.clientX - position.x,
+      y: e.clientY - position.y,
+    });
+  };
+
+  const handleResizeMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    setIsResizing(true);
+    setResizeStart({
+      x: e.clientX,
+      y: e.clientY,
+      width: size.width,
+      height: size.height,
+    });
+  };
+
+  useEffect(() => {
+    if (!open) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isDragging) {
+        setPosition({
+          x: e.clientX - dragOffset.x,
+          y: e.clientY - dragOffset.y,
+        });
+      } else if (isResizing) {
+        const deltaX = e.clientX - resizeStart.x;
+        const deltaY = e.clientY - resizeStart.y;
+        
+        setSize({
+          width: Math.max(400, resizeStart.width + deltaX),
+          height: Math.max(300, resizeStart.height + deltaY),
+        });
+      }
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+      setIsResizing(false);
+    };
+
+    if (isDragging || isResizing) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, isResizing, dragOffset, resizeStart, open]);
 
   const setActivation = (activation: EventActivation) => {
     setEventData(prev => ({
@@ -195,10 +269,26 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
   if (!open) return null;
 
   const dialogContent = (
-    <div className="fixed inset-0 flex items-center justify-center z-50">
-      <div className="bg-background border border-border/70 rounded-lg w-[45vw] h-[80vh] max-w-3xl flex flex-col">
-        <div className="sticky top-0 z-10 border-b border-border/50 bg-background px-6 py-3 flex items-center justify-between">
-          <h3 className="text-lg font-semibold">Add Event</h3>
+    <>
+      <div 
+        ref={dialogRef}
+        className="bg-background border border-border/70 rounded-lg flex flex-col shadow-xl"
+        style={{
+          position: 'fixed',
+          left: `${position.x}px`,
+          top: `${position.y}px`,
+          width: `${size.width}px`,
+          height: `${size.height}px`,
+          zIndex: 50,
+          pointerEvents: 'auto',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div 
+          className="sticky top-0 z-10 border-b border-border/50 bg-background px-6 py-3 flex items-center justify-between cursor-move select-none"
+          onMouseDown={handleMouseDown}
+        >
+          <h3 className="text-lg font-semibold flex-1">Add Event</h3>
           <Button
             size="icon"
             variant="ghost"
@@ -825,8 +915,17 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
             </Button>
           </Tooltip>
         </div>
+
+        {/* Resize handle */}
+        <div
+          onMouseDown={handleResizeMouseDown}
+          className="absolute bottom-0 right-0 w-5 h-5 cursor-se-resize opacity-40 hover:opacity-100 transition-opacity flex items-end justify-end"
+          title="Drag to resize"
+        >
+          <div className="w-1.5 h-1.5 bg-foreground/40 rounded-sm m-1" />
+        </div>
       </div>
-    </div>
+    </>
   );
 
   return createPortal(dialogContent, document.body);

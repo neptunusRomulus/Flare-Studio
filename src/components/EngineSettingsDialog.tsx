@@ -4,6 +4,8 @@ import Tooltip from '@/components/ui/tooltip';
 import UndoPersistencePanel from '@/components/UndoPersistencePanel';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 import { useState, type Dispatch, type SetStateAction } from 'react';
+import { createPortal } from 'react-dom';
+import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 
 type SettingsTab = 'general' | 'save' | 'display';
 
@@ -40,6 +42,13 @@ const EngineSettingsDialog = ({
 }: EngineSettingsDialogProps) => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const [, setForceRender] = useState(0);
+  const {
+    position,
+    size,
+    dialogRef,
+    handleHeaderMouseDown,
+    handleResizeMouseDown,
+  } = useDraggableResizable({ id: 'engine_settings', initialWidth: 450, initialHeight: 500, minWidth: 380, minHeight: 400 });
 
   if (!open) return null; 
 
@@ -49,11 +58,27 @@ const EngineSettingsDialog = ({
     { id: 'display', icon: <Eye className="w-4 h-4" />, label: 'Display' },
   ];
 
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-background border border-border rounded-lg w-[420px] max-h-[80vh] flex flex-col">
+  const dialogContent = (
+    <>
+      <div 
+        ref={dialogRef}
+        className="bg-background border border-border/70 rounded-lg flex flex-col shadow-xl"
+        style={{
+          position: 'fixed',
+          left: `${position.x}px`,
+          top: `${position.y}px`,
+          width: `${size.width}px`,
+          height: `${size.height}px`,
+          zIndex: 50,
+          pointerEvents: 'auto',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
-        <div className="flex justify-between items-center p-4 border-b border-border">
+        <div 
+          className="flex justify-between items-center p-4 border-b border-border cursor-move select-none"
+          onMouseDown={handleHeaderMouseDown}
+        >
           <h3 className="text-lg font-semibold">Engine Settings</h3>
           <Button
             variant="ghost"
@@ -270,9 +295,20 @@ const EngineSettingsDialog = ({
             </div>
           )}
         </div>
+
+        {/* Resize handle */}
+        <div
+          onMouseDown={handleResizeMouseDown}
+          className="absolute bottom-0 right-0 w-5 h-5 cursor-se-resize opacity-40 hover:opacity-100 transition-opacity flex items-end justify-end"
+          title="Drag to resize"
+        >
+          <div className="w-1.5 h-1.5 bg-foreground/40 rounded-sm m-1" />
+        </div>
       </div>
-    </div>
+    </>
   );
+
+  return createPortal(dialogContent, document.body);
 };
 
 export default EngineSettingsDialog;

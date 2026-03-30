@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import type { AssetRecord, TilesetProfile } from '@/types';
+import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 
 type AssetOriginPreset =
   | 'top-left'
@@ -53,6 +54,14 @@ export const ImportReviewModal: React.FC<ImportReviewModalProps> = ({
   const [tileWidth, setTileWidth] = React.useState<number>(defaultTileWidth);
   const [tileHeight, setTileHeight] = React.useState<number>(defaultTileHeight);
   const [originPreset, setOriginPreset] = React.useState<AssetOriginPreset>(defaultOriginPreset);
+
+  const {
+    position,
+    size,
+    dialogRef,
+    handleHeaderMouseDown,
+    handleResizeMouseDown,
+  } = useDraggableResizable({ id: 'import_review', initialWidth: 900, initialHeight: 700, minWidth: 600, minHeight: 500 });
 
   const tileSizeOptions = [8, 16, 32, 64, 128, 258, 512];
 
@@ -136,17 +145,32 @@ export const ImportReviewModal: React.FC<ImportReviewModalProps> = ({
   if (!isOpen) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
-      <div className="pointer-events-auto w-full max-w-2xl h-[86vh] max-h-[760px] bg-background border border-border rounded-lg shadow-lg overflow-hidden flex flex-col relative">
+    <div
+      ref={dialogRef}
+      className="bg-background border border-border/70 rounded-lg shadow-lg overflow-hidden flex flex-col relative"
+      style={{
+        position: 'fixed',
+        left: `${position.x}px`,
+        top: `${position.y}px`,
+        width: `${size.width}px`,
+        height: `${size.height}px`,
+        zIndex: 50,
+        pointerEvents: 'auto',
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
       <button
         type="button"
         onClick={onCancel}
         aria-label="Close import review window"
-        className="absolute top-2 right-2 h-7 w-7 text-lg leading-none text-muted-foreground hover:text-foreground"
+        className="absolute top-3 right-3 h-7 w-7 text-lg leading-none text-muted-foreground hover:text-foreground"
       >
         ×
       </button>
-      <div className="pb-3 px-6 pt-6 border-b border-border">
+      <div 
+        className="pb-3 px-6 pt-6 border-b border-border cursor-move select-none"
+        onMouseDown={handleHeaderMouseDown}
+      >
         <div className="flex items-start justify-between gap-3">
           <div>
             <h3 className="text-xl font-semibold leading-none tracking-tight">Review Imported Tileset</h3>
@@ -260,7 +284,7 @@ export const ImportReviewModal: React.FC<ImportReviewModalProps> = ({
           </div>
         </div>
 
-        <div className="flex items-end justify-end gap-3 pt-4 border-t mt-4 px-6 pb-6">
+        <div className="flex items-end justify-end gap-3 pt-4 border-t px-6 pb-4">
           <Button 
             variant="default" 
             onClick={handleConfirm}
@@ -271,8 +295,16 @@ export const ImportReviewModal: React.FC<ImportReviewModalProps> = ({
             ✓
           </Button>
         </div>
-      </div>
-    </div>,
+
+        {/* Resize handle */}
+        <div
+          onMouseDown={handleResizeMouseDown}
+          className="absolute bottom-0 right-0 w-5 h-5 cursor-se-resize opacity-40 hover:opacity-100 transition-opacity flex items-end justify-end"
+          title="Drag to resize"
+        >
+          <div className="w-1.5 h-1.5 bg-foreground/40 rounded-sm m-1" />
+        </div>
+      </div>,
     document.body
   );
 };

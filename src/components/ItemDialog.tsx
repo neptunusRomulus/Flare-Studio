@@ -1,10 +1,11 @@
 import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { AlertTriangle, Check, Sword, X } from 'lucide-react';
 import { ITEM_ROLE_META, ITEM_ROLE_SELECTIONS, RESOURCE_SUBTYPE_META } from '@/editor/itemRoles';
 import type { ItemResourceSubtype, ItemRole } from '@/editor/itemRoles';
+import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 
 type ItemDialogState = {
   name: string;
@@ -39,6 +40,14 @@ const ItemDialog = ({
   onConfirmDuplicate,
   onClearDuplicate
 }: ItemDialogProps) => {
+  const {
+    position,
+    size,
+    dialogRef,
+    handleHeaderMouseDown,
+    handleResizeMouseDown,
+  } = useDraggableResizable({ id: 'item_dialog', initialWidth: 450, initialHeight: 550, minWidth: 380, minHeight: 400 });
+
   useEffect(() => {
     if (!itemDialogState) return;
     
@@ -52,26 +61,43 @@ const ItemDialog = ({
     return () => document.removeEventListener('keydown', handleEsc);
   }, [itemDialogState, onClose]);
 
-  return (
-  <Dialog
-    open={!!itemDialogState}
-    onOpenChange={(open) => {
-      if (!open) {
-        onClose();
-      }
-    }}
-  >
-    <DialogContent className="w-full sm:max-w-sm">
-      <DialogHeader>
-        <DialogTitle className="flex items-center gap-2">
+  if (!itemDialogState) return null;
+
+  const dialogContent = (
+    <div 
+      ref={dialogRef}
+      className="bg-background border border-border/70 rounded-lg flex flex-col shadow-xl"
+      style={{
+        position: 'fixed',
+        left: `${position.x}px`,
+        top: `${position.y}px`,
+        width: `${size.width}px`,
+        height: `${size.height}px`,
+        zIndex: 50,
+        pointerEvents: 'auto',
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div 
+        className="flex items-center justify-between p-4 border-b border-border cursor-move select-none"
+        onMouseDown={handleHeaderMouseDown}
+      >
+        <h3 className="font-semibold flex items-center gap-2">
           <Sword className="w-5 h-5 text-orange-500" />
           Add Item
-        </DialogTitle>
-        <DialogDescription>Create a new item definition.</DialogDescription>
-      </DialogHeader>
-      {itemDialogState && (
-        <div className="space-y-4">
-          <div>
+        </h3>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onClose}
+          className="w-6 h-6 p-0"
+        >
+          <X className="w-4 h-4" />
+        </Button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            <div>
             <label className="block text-sm font-medium mb-1">
               Item Name <span className="text-red-500">*</span>
             </label>
@@ -148,9 +174,9 @@ const ItemDialog = ({
               {itemDialogError}
             </div>
           )}
-        </div>
-      )}
-      <DialogFooter className="relative">
+      </div>
+
+      <div className="flex items-center justify-between gap-2 p-4 border-t border-border relative">
         {pendingDuplicateItem && (
           <div className="absolute -top-24 right-4 w-[280px]">
             <div className="rounded-md border border-amber-500/50 bg-background shadow-lg text-xs p-2.5 flex items-start gap-2">
@@ -188,16 +214,27 @@ const ItemDialog = ({
             </div>
           </div>
         )}
+        <div className="flex-1" />
         <Button variant="outline" onClick={onClose}>
           Cancel
         </Button>
         <Button onClick={onSubmit}>
           Add Item
         </Button>
-      </DialogFooter>
-    </DialogContent>
-  </Dialog>
+      </div>
+
+      {/* Resize handle */}
+      <div
+        onMouseDown={handleResizeMouseDown}
+        className="absolute bottom-0 right-0 w-5 h-5 cursor-se-resize opacity-40 hover:opacity-100 transition-opacity flex items-end justify-end"
+        title="Drag to resize"
+      >
+        <div className="w-1.5 h-1.5 bg-foreground/40 rounded-sm m-1" />
+      </div>
+    </div>
   );
+
+  return createPortal(dialogContent, document.body);
 };
 
 export default ItemDialog;

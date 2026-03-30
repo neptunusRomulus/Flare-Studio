@@ -3,6 +3,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Tooltip from '@/components/ui/tooltip';
 import { HelpCircle, X, Save, Trash2, Check } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 
 type MapSettingsDialogProps = {
   open: boolean;
@@ -34,6 +36,14 @@ const MapSettingsDialog = ({
   handleDeleteMap
 }: MapSettingsDialogProps) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const {
+    position,
+    size,
+    dialogRef,
+    handleHeaderMouseDown,
+    handleResizeMouseDown,
+  } = useDraggableResizable({ id: 'map_settings', initialWidth: 420, initialHeight: 350, minWidth: 380, minHeight: 300 });
+  
   const handleConfirmDelete = async () => {
     const success = await handleDeleteMap();
     if (success) {
@@ -44,22 +54,39 @@ const MapSettingsDialog = ({
 
   if (!open) return null;
 
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-background border border-border rounded-lg p-6 w-96">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold">Map Settings - {mapName}</h3>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={onClose}
-              className="w-8 h-8 p-0"
-              aria-label="Close map settings"
-            >
-              <X className="w-4 h-4" />
-            </Button>
-          </div>
-        <div className="space-y-4">
+  const dialogContent = (
+    <>
+      <div 
+        ref={dialogRef}
+        className="bg-background border border-border/70 rounded-lg flex flex-col shadow-xl"
+        style={{
+          position: 'fixed',
+          left: `${position.x}px`,
+          top: `${position.y}px`,
+          width: `${size.width}px`,
+          height: `${size.height}px`,
+          zIndex: 50,
+          pointerEvents: 'auto',
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div 
+          className="flex justify-between items-center p-4 border-b border-border cursor-move select-none"
+          onMouseDown={handleHeaderMouseDown}
+        >
+          <h3 className="text-lg font-semibold">Map Settings - {mapName}</h3>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            className="w-8 h-8 p-0"
+            aria-label="Close map settings"
+          >
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto space-y-4 p-4">
           <div>
             <label className="block text-sm font-medium mb-2">Map Name</label>
             <Input
@@ -140,6 +167,15 @@ const MapSettingsDialog = ({
             </Tooltip>
           </div>
         </div>
+
+        {/* Resize handle */}
+        <div
+          onMouseDown={handleResizeMouseDown}
+          className="absolute bottom-0 right-0 w-5 h-5 cursor-se-resize opacity-40 hover:opacity-100 transition-opacity flex items-end justify-end"
+          title="Drag to resize"
+        >
+          <div className="w-1.5 h-1.5 bg-foreground/40 rounded-sm m-1" />
+        </div>
       </div>
       {showDeleteConfirm && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50" style={{ zIndex: 60 }}>
@@ -168,8 +204,10 @@ const MapSettingsDialog = ({
           </div>
         </div>
       )}
-    </div>
+    </>
   );
+
+  return createPortal(dialogContent, document.body);
 };
 
 export default MapSettingsDialog;

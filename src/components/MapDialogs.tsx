@@ -1,8 +1,9 @@
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import Tooltip from '@/components/ui/tooltip';
-import { HelpCircle } from 'lucide-react';
+import { HelpCircle, X } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 
 type HeroEditData = {
   currentX: number;
@@ -57,25 +58,58 @@ const MapDialogs = ({
   handleHeroEditCancel,
   handleHeroEditConfirm
 }: MapDialogsProps) => {
+  const {
+    position,
+    size,
+    dialogRef,
+    handleHeaderMouseDown,
+    handleResizeMouseDown,
+  } = useDraggableResizable({ id: 'create_map', initialWidth: 420, initialHeight: 350, minWidth: 350, minHeight: 300 });
+
+  const {
+    position: heroPosition,
+    size: heroSize,
+    dialogRef: heroDialogRef,
+    handleHeaderMouseDown: handleHeroHeaderMouseDown,
+    handleResizeMouseDown: handleHeroResizeMouseDown,
+  } = useDraggableResizable({ id: 'hero_edit', initialWidth: 380, initialHeight: 320, minWidth: 320, minHeight: 280 });
+
   return (
     <>
-      <Dialog
-        open={showCreateMapDialog}
-        onOpenChange={(open) => {
-          setShowCreateMapDialog(open);
-          if (!open) {
-            setCreateMapError(null);
-          }
-        }}
-      >
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Create Map</DialogTitle>
-            <DialogDescription>
-              Set the name, dimensions, and starting status for your new map.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
+      {showCreateMapDialog && createPortal(
+        <div 
+          ref={dialogRef}
+          className="bg-background border border-border/70 rounded-lg flex flex-col shadow-xl"
+          style={{
+            position: 'fixed',
+            left: `${position.x}px`,
+            top: `${position.y}px`,
+            width: `${size.width}px`,
+            height: `${size.height}px`,
+            zIndex: 50,
+            pointerEvents: 'auto',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div 
+            className="flex items-center justify-between p-4 border-b border-border cursor-move select-none"
+            onMouseDown={handleHeaderMouseDown}
+          >
+            <h3 className="font-semibold">Create Map</h3>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => {
+                setShowCreateMapDialog(false);
+                setCreateMapError(null);
+              }}
+              className="w-6 h-6 p-0"
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
             <div>
               <label className="block text-sm font-medium text-muted-foreground mb-1">
                 Map Name
@@ -144,7 +178,8 @@ const MapDialogs = ({
               />
             </div>
           </div>
-          <DialogFooter>
+
+          <div className="flex gap-2 p-4 border-t border-border">
             <Button
               variant="outline"
               onClick={() => {
@@ -168,81 +203,135 @@ const MapDialogs = ({
                 <span>Create</span>
               )}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </div>
 
-      <Dialog open={showHeroEditDialog} onOpenChange={setShowHeroEditDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Edit Hero Position</DialogTitle>
-            <DialogDescription>
+          {/* Resize handle */}
+          <div
+            onMouseDown={handleResizeMouseDown}
+            className="absolute bottom-0 right-0 w-5 h-5 cursor-se-resize opacity-40 hover:opacity-100 transition-opacity flex items-end justify-end"
+            title="Drag to resize"
+          >
+            <div className="w-1.5 h-1.5 bg-foreground/40 rounded-sm m-1" />
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {showHeroEditDialog && createPortal(
+        <div 
+          ref={heroDialogRef}
+          className="bg-background border border-border/70 rounded-lg flex flex-col shadow-xl"
+          style={{
+            position: 'fixed',
+            left: `${heroPosition.x}px`,
+            top: `${heroPosition.y}px`,
+            width: `${heroSize.width}px`,
+            height: `${heroSize.height}px`,
+            zIndex: 50,
+            pointerEvents: 'auto',
+          }}
+        >
+          {/* Header */}
+          <div
+            onMouseDown={handleHeroHeaderMouseDown}
+            className="flex items-center justify-between px-4 py-3 border-b border-border cursor-move select-none bg-muted/30"
+          >
+            <h2 className="text-lg font-semibold">Edit Hero Position</h2>
+            <button
+              onClick={() => {
+                setShowHeroEditDialog(false);
+              }}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Content */}
+          <div className="flex-1 overflow-auto p-4">
+            <p className="text-sm text-muted-foreground mb-4">
               Set the hero spawn position on the map.
-            </DialogDescription>
-          </DialogHeader>
+            </p>
 
-          {heroEditData && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">X Position</label>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={heroEditData.mapWidth - 1}
-                    defaultValue={heroEditData.currentX}
-                    onChange={(e) => {
-                      const newX = parseInt(e.target.value);
-                      if (!Number.isNaN(newX)) {
-                        setHeroEditData({
-                          ...heroEditData,
-                          currentX: newX
-                        });
-                      }
-                    }}
-                  />
-                  <span className="text-xs text-gray-500">
-                    (0 - {heroEditData.mapWidth - 1})
-                  </span>
+            {heroEditData && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">X Position</label>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={heroEditData.mapWidth - 1}
+                      defaultValue={heroEditData.currentX}
+                      onChange={(e) => {
+                        const newX = parseInt(e.target.value);
+                        if (!Number.isNaN(newX)) {
+                          setHeroEditData({
+                            ...heroEditData,
+                            currentX: newX
+                          });
+                        }
+                      }}
+                    />
+                    <span className="text-xs text-gray-500">
+                      (0 - {heroEditData.mapWidth - 1})
+                    </span>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">Y Position</label>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={heroEditData.mapHeight - 1}
+                      defaultValue={heroEditData.currentY}
+                      onChange={(e) => {
+                        const newY = parseInt(e.target.value);
+                        if (!Number.isNaN(newY)) {
+                          setHeroEditData({
+                            ...heroEditData,
+                            currentY: newY
+                          });
+                        }
+                      }}
+                    />
+                    <span className="text-xs text-gray-500">
+                      (0 - {heroEditData.mapHeight - 1})
+                    </span>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Y Position</label>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={heroEditData.mapHeight - 1}
-                    defaultValue={heroEditData.currentY}
-                    onChange={(e) => {
-                      const newY = parseInt(e.target.value);
-                      if (!Number.isNaN(newY)) {
-                        setHeroEditData({
-                          ...heroEditData,
-                          currentY: newY
-                        });
-                      }
-                    }}
-                  />
-                  <span className="text-xs text-gray-500">
-                    (0 - {heroEditData.mapHeight - 1})
-                  </span>
+                <div className="text-sm text-gray-600">
+                  Current position: ({heroEditData.currentX}, {heroEditData.currentY})
                 </div>
               </div>
-              <div className="text-sm text-gray-600">
-                Current position: ({heroEditData.currentX}, {heroEditData.currentY})
-              </div>
-            </div>
-          )}
+            )}
+          </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={handleHeroEditCancel}>
+          {/* Footer */}
+          <div className="flex gap-2 p-4 border-t border-border">
+            <Button 
+              variant="outline" 
+              onClick={handleHeroEditCancel}
+            >
               Cancel
             </Button>
-            <Button onClick={() => heroEditData && handleHeroEditConfirm(heroEditData.currentX, heroEditData.currentY)}>
+            <Button 
+              onClick={() => heroEditData && handleHeroEditConfirm(heroEditData.currentX, heroEditData.currentY)}
+            >
               Confirm
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </div>
+
+          {/* Resize handle */}
+          <div
+            onMouseDown={handleHeroResizeMouseDown}
+            className="absolute bottom-0 right-0 w-5 h-5 cursor-se-resize opacity-40 hover:opacity-100 transition-opacity flex items-end justify-end"
+            title="Drag to resize"
+          >
+            <div className="w-1.5 h-1.5 bg-foreground/40 rounded-sm m-1" />
+          </div>
+        </div>,
+        document.body
+      )}
     </>
   );
 };

@@ -4,12 +4,12 @@ import type { TileMapEditor } from '@/editor/TileMapEditor';
 
 type UseEventDragOptions = {
   editor: TileMapEditor | null;
-  setDraggingEventId: Dispatch<SetStateAction<string | null>>;
+  setDraggingEventId: Dispatch<SetStateAction<number | null>>;
 };
 
 export default function useEventDrag({ editor, setDraggingEventId }: UseEventDragOptions) {
-  const handleEventDragStart = useCallback((e: React.DragEvent, eventId: string) => {
-    e.dataTransfer.setData('event-id', eventId);
+  const handleEventDragStart = useCallback((e: React.DragEvent, eventId: number) => {
+    e.dataTransfer.setData('event-id', eventId.toString());
     e.dataTransfer.effectAllowed = 'move';
     setDraggingEventId(eventId);
   }, [setDraggingEventId]);

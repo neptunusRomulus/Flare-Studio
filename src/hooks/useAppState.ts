@@ -20,7 +20,7 @@ export default function useAppState() {
   const [isOpeningProject, setIsOpeningProject] = useState(false);
 
   const [draggingNpcId, setDraggingNpcId] = useState<number | null>(null);
-  const [draggingEventId, setDraggingEventId] = useState<string | null>(null);
+  const [draggingEventId, setDraggingEventId] = useState<number | null>(null);
   const [eventDialogOpen, setEventDialogOpen] = useState<boolean>(false);
   const [eventDialogLocation, setEventDialogLocation] = useState<{ x: number; y: number } | null>(null);
   const [npcHoverTooltip, setNpcHoverTooltip] = useState<{ x: number; y: number } | null>(null);

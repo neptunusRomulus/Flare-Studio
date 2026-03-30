@@ -21,8 +21,8 @@ type EditorContext = {
   canvasRef: React.RefObject<HTMLCanvasElement>;
   draggingNpcId: number | null;
   setDraggingNpcId: (id: number | null) => void;
-  draggingEventId: string | null;
-  setDraggingEventId: (id: string | null) => void;
+  draggingEventId: number | null;
+  setDraggingEventId: (id: number | null) => void;
   tipsMinimized: boolean;
   setTipsMinimized: (v: boolean) => void;
   setShowHelp: (v: boolean) => void;

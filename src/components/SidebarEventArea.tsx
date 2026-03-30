@@ -1,15 +1,15 @@
 import React from 'react';
 import SidebarEventEntries from '@/components/SidebarEventEntries';
-import type { Event } from '@/EditorCore';
+import type { MapObject } from '@/types';
 
 type Props = {
   isEventLayer: boolean;
-  eventEntries: Event[];
+  eventEntries: MapObject[];
   leftCollapsed: boolean;
-  draggingEventId: string | null;
-  handleEditEvent: (id: string) => void;
+  draggingEventId: number | null;
+  handleEditEvent: (id: number) => void;
   setEventHoverTooltip: (p: { x: number; y: number } | null) => void;
-  handleEventDragStart: (e: React.DragEvent, eventId: string) => void;
+  handleEventDragStart: (e: React.DragEvent, eventId: number) => void;
   handleEventDragEnd: () => void;
   handleOpenEventDialog: () => void;
 };
@@ -42,3 +42,5 @@ const SidebarEventArea: React.FC<Props> = ({
 };
 
 export default SidebarEventArea;
+
+

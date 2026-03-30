@@ -3,17 +3,17 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import Tooltip from '@/components/ui/tooltip';
 import { GripVertical, Plus } from 'lucide-react';
-import type { Event } from '@/EditorCore';
+import type { MapObject } from '@/types';
 
 type EventEntriesPanelProps = {
   isEventLayer: boolean;
-  eventEntries: Event[];
+  eventEntries: MapObject[];
   leftCollapsed: boolean;
-  draggingEventId: string | null;
-  onEditEvent: (eventId: string) => void;
+  draggingEventId: number | null;
+  onEditEvent: (eventId: number) => void;
   onHover: (position: { x: number; y: number }) => void;
   onHoverEnd: () => void;
-  onDragStart: (event: DragEvent<HTMLDivElement>, eventId: string) => void;
+  onDragStart: (event: DragEvent<HTMLDivElement>, eventId: number) => void;
   onDragEnd: () => void;
   onAddEvent: () => void;
 };
@@ -30,9 +30,9 @@ const SidebarEventEntries = ({
   onDragEnd,
   onAddEvent
 }: EventEntriesPanelProps) => {
-  const [clickTimers, setClickTimers] = useState<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const [clickTimers, setClickTimers] = useState<Map<number, ReturnType<typeof setTimeout>>>(new Map());
 
-  const handleEventClick = (eventId: string) => {
+  const handleEventClick = (eventId: number) => {
     const timer = setTimeout(() => {
       // Single click behavior can be added here if needed
       setClickTimers(prev => {
@@ -45,7 +45,7 @@ const SidebarEventEntries = ({
     setClickTimers(prev => new Map(prev).set(eventId, timer));
   };
 
-  const handleEventDoubleClick = (eventId: string) => {
+  const handleEventDoubleClick = (eventId: number) => {
     // Clear the single click timer
     const timer = clickTimers.get(eventId);
     if (timer) clearTimeout(timer);

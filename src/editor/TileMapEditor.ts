@@ -1515,7 +1515,6 @@ export class TileMapEditor {
     const loadCandidate = (index: number): void => {
       if (index >= candidates.length) {
         this.collisionTilesetLoading = false;
-        console.warn('[TileMapEditor] Collision tileset not found in internal assets:', candidates);
         return;
       }
 
@@ -1586,7 +1585,6 @@ export class TileMapEditor {
   private handleMouseDown(event: MouseEvent): void {
     // Prevent editing while save is in progress
     if (this.isSaveLocked) {
-      console.warn('[TileMapEditor] Edit blocked: save in progress');
       return;
     }
 
@@ -1597,7 +1595,17 @@ export class TileMapEditor {
     // Ignore clicks on the minimap
     if (this.showMinimap && this.lastMiniMapBounds) {
       const { x: mapX, y: mapY, w, h } = this.lastMiniMapBounds;
-      if (x >= mapX && x <= mapX + w && y >= mapY && y <= mapY + h) {
+      
+      // Check for minimap resizer click (top-left corner, including outer padding)
+      const resizerSize = 24;
+      if (x >= mapX - 5 && x <= mapX + resizerSize && y >= mapY - 5 && y <= mapY + resizerSize) {
+        this.isResizingMinimap = true;
+        this.lastMinimapResizeX = x;
+        this.lastMinimapResizeY = y;
+        return;
+      }
+      
+      if (x >= mapX - 5 && x <= mapX + w + 5 && y >= mapY - 5 && y <= mapY + h + 5) {
         if (this.spacePressed) {
           this.isMinimapPanning = true;
           this.lastMinimapPanX = x;
@@ -1685,10 +1693,8 @@ export class TileMapEditor {
             this.isMouseDown = false;
           }
         } else if (this.tool === 'stamp') {
-          console.log('[TileMapEditor] Tool is stamp, button:', event.button, 'callback exists:', !!this.cellRightClickCallback);
           if (event.button === 2 && this.cellRightClickCallback) {
             // Right-click on tile cell - show context menu
-            console.log('[TileMapEditor] Triggering context menu for stamp tool at', tileCoords);
             this.isMouseDown = false;
             const screenX = event.clientX;
             const screenY = event.clientY;
@@ -1705,6 +1711,44 @@ export class TileMapEditor {
     const rect = this.mapCanvas.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
+
+    if (this.isResizingMinimap) {
+      this.mapCanvas.style.cursor = 'nwse-resize';
+      // The cursor moving left/up means we are pulling the top-left corner out, increasing the minimap scale
+      // The cursor moving right/down means shrinking the minimap.
+      // Easiest heuristic: drag distance along the diagonal. Or just take X diff.
+      // Actually, standard resize from top-left: dragging left makes it wider. So -deltaX or -deltaY.
+      const deltaX = x - this.lastMinimapResizeX;
+      const deltaY = y - this.lastMinimapResizeY;
+      
+      // Compute scaling based on movement. 150px is baseline width.
+      // -deltaX increases the width.
+      // Minimap width = 150 * scale. 
+      // Diff in scale = -deltaX / 150. Average with -deltaY / 120.
+      const scaleDiff = ((-deltaX / 150) + (-deltaY / 120)) / 2;
+      
+      let newScale = this.minimapWindowScale + scaleDiff;
+      // Clamp between 0.5 and 3.0 like EngineSettingsDialog
+      newScale = Math.max(0.5, Math.min(3.0, newScale));
+      
+      this.setMinimapWindowScale(newScale);
+      
+      this.lastMinimapResizeX = x;
+      this.lastMinimapResizeY = y;
+      
+      return;
+    }
+
+    if (this.showMinimap && this.lastMiniMapBounds) {
+      const { x: mapX, y: mapY } = this.lastMiniMapBounds;
+      const resizerSize = 24;
+      if (x >= mapX - 5 && x <= mapX + resizerSize && y >= mapY - 5 && y <= mapY + resizerSize) {
+        this.mapCanvas.style.cursor = 'nwse-resize';
+        // Hide object tooltip if any
+        this.hideObjectTooltip();
+        return; // Don't do tile hovering logic
+      }
+    }
 
     if (this.isMinimapPanning && this.spacePressed) {
       // Handle minimap panning
@@ -1764,6 +1808,11 @@ export class TileMapEditor {
   }
 
   private handleMouseUp(): void {
+    if (this.isResizingMinimap) {
+      this.isResizingMinimap = false;
+      return;
+    }
+
     if (this.isSelecting) {
       this.handleSelectionEnd();
     } else if (this.isDrawingShape) {
@@ -1794,6 +1843,7 @@ export class TileMapEditor {
     this.isDraggingActor = false;
     this.draggingActorId = null;
     this.isMinimapPanning = false;
+    this.isResizingMinimap = false;
     this.draw();
   }
 
@@ -1896,10 +1946,8 @@ export class TileMapEditor {
           event.preventDefault();
           if (this.manualSaveCallback) {
             this.manualSaveCallback().catch(err => {
-              console.error('[TileMapEditor] Manual save error:', err);
             });
           } else {
-            console.warn('[TileMapEditor] Manual save callback not set');
           }
           break;
         case 'KeyA':
@@ -1968,7 +2016,6 @@ export class TileMapEditor {
   private handleTileClick(x: number, y: number, isRightClick: boolean): void {
     // Prevent editing while save is in progress
     if (this.isSaveLocked) {
-      console.warn('[TileMapEditor] Edit blocked: save in progress');
       return;
     }
 
@@ -1994,7 +2041,6 @@ export class TileMapEditor {
             for (const inst of instancesToRemove) {
               this.removeObjectInstance(inst.id);
             }
-            console.log(`[PAINT-MODE] Object mode eraser: removed ${instancesToRemove.length} instances at (${x}, ${y})`);
             this.saveState();
             this.markAsChanged();
             return; // Don't write to layer.data in object mode
@@ -2096,7 +2142,6 @@ export class TileMapEditor {
                 properties: {}
               };
               this.addObjectInstance(instance);
-              console.log(`[PAINT-MODE] Object mode: placed ObjectInstance at (${x}, ${y})`);
             } else {
               console.warn(`[PAINT-MODE] Object mode: asset not found for GID ${newValue}`);
             }
@@ -2343,7 +2388,6 @@ export class TileMapEditor {
   }
 
   private draw(): void {
-    console.log('[TileMapEditor.draw] Called - panX:', this.panX, 'panY:', this.panY, 'zoom:', this.zoom);
     // Clear canvas
     this.ctx.clearRect(0, 0, this.mapCanvas.width, this.mapCanvas.height);
     
@@ -2793,8 +2837,9 @@ export class TileMapEditor {
   }
 
   public setMinimapWindowScale(scale: number): void {
-    if (this.minimapWindowScale !== scale) {
-      this.minimapWindowScale = scale;
+    const clampedScale = Math.max(0.5, Math.min(3.0, scale));
+    if (this.minimapWindowScale !== clampedScale) {
+      this.minimapWindowScale = clampedScale;
       this.draw();
     }
   }
@@ -2810,8 +2855,15 @@ export class TileMapEditor {
   private isMinimapPanning: boolean = false;
   private lastMinimapPanX: number = 0;
   private lastMinimapPanY: number = 0;
+  private isResizingMinimap: boolean = false;
+  private lastMinimapResizeX: number = 0;
+  private lastMinimapResizeY: number = 0;
   private minimapZoom: number = 1.0;
   private minimapHoverCoords: { x: number; y: number } | null = null;
+
+  public getIsResizingMinimap(): boolean {
+    return this.isResizingMinimap;
+  }
 
   public setSidebarTransitioning(flag: boolean): void {
     this.sidebarTransitioning = !!flag;
@@ -2863,10 +2915,8 @@ export class TileMapEditor {
   }
 
   public setPan(deltaX: number, deltaY: number): void {
-    console.log('[TileMapEditor.setPan] Before - panX:', this.panX, 'panY:', this.panY, 'delta:', deltaX, deltaY);
     this.panX += deltaX;
     this.panY += deltaY;
-    console.log('[TileMapEditor.setPan] After - panX:', this.panX, 'panY:', this.panY);
     this.draw();
   }
 
@@ -3934,17 +3984,52 @@ export class TileMapEditor {
   // Disable smoothing for pixel-perfect minimap (modern engines)
   this.ctx.imageSmoothingEnabled = false;
 
-    // Draw tiles in selected view (top-down or isometric)
-    for (let layerIndex = 0; layerIndex < this.tileLayers.length; layerIndex++) {
-      const layer = this.tileLayers[layerIndex];
-      if (!layer.visible) continue;
+    // Priority order for minimap rendering
+    // Collision will be drawn last to appear on top of everything
+    const layerPriority = (layer: any) => {
+      const type = (layer.type || '').toLowerCase();
+      const name = (layer.name || '').toLowerCase();
+      if (type === 'collision' || name.includes('collision')) return 5; // Highest, drawn last
+      if (type === 'object' || name.includes('object')) return 3;
+      if (type === 'background' || name.includes('background')) return 1;
+      return 2; // Others in between background and foreground
+    };
 
-      for (let tileY = 0; tileY < this.mapHeight; tileY++) {
-        for (let tileX = 0; tileX < this.mapWidth; tileX++) {
-          const index = tileY * this.mapWidth + tileX;
+    // Separate collision layer from other layers
+    const allVisibleLayers = [...this.tileLayers].filter(l => l.visible);
+    const nonCollisionLayers = allVisibleLayers.filter(l => {
+      const type = (l.type || '').toLowerCase();
+      const name = (l.name || '').toLowerCase();
+      return !(type === 'collision' || name.includes('collision'));
+    });
+    const collisionLayers = allVisibleLayers.filter(l => {
+      const type = (l.type || '').toLowerCase();
+      const name = (l.name || '').toLowerCase();
+      return (type === 'collision' || name.includes('collision'));
+    });
+
+    // Sort non-collision layers for back-to-front rendering
+    const renderLayers = nonCollisionLayers.sort((a, b) => layerPriority(a) - layerPriority(b));
+
+    // Draw non-collision tiles in selected view (top-down or isometric)
+    for (let tileY = 0; tileY < this.mapHeight; tileY++) {
+      for (let tileX = 0; tileX < this.mapWidth; tileX++) {
+        const index = tileY * this.mapWidth + tileX;
+
+        // Draw each layer from bottom to top for this cell
+        for (let i = 0; i < renderLayers.length; i++) {
+          const layer = renderLayers[i];
           const gid = layer.data[index];
-
+          
           if (gid > 0) {
+            const lType = (layer.type || '').toLowerCase();
+            const lName = (layer.name || '').toLowerCase();
+
+            // Check collision constraint
+            if ((lType === 'collision' || lName.includes('collision')) && gid !== 1 && gid !== 2) {
+              continue;
+            }
+
             let pixelX: number;
             let pixelY: number;
 
@@ -3958,70 +4043,70 @@ export class TileMapEditor {
 
             let fillColor = '';
             let strokeColor = '';
-            let drawThisTile = true;
             let isDashed = false;
 
-            if (layer.type === 'background') {
+            if (lType === 'background' || lName.includes('background')) {
               fillColor = `rgba(34, 139, 34, 0.8)`; // Green
               strokeColor = `rgba(34, 139, 34, 1)`;
-            } else if (layer.type === 'object') {
+            } else if (lType === 'object' || lName.includes('object')) {
               fillColor = `rgba(30, 144, 255, 0.8)`; // Blue
               strokeColor = `rgba(30, 144, 255, 1)`;
-            } else if (layer.type === 'collision') {
+            } else if (lType === 'collision' || lName.includes('collision')) {
               if (gid === 1) {
-                fillColor = `rgba(255, 255, 255, 0.9)`;
+                fillColor = `rgba(255, 255, 255, 0.8)`; // White overlay
                 strokeColor = `rgba(255, 255, 255, 1)`;
               } else if (gid === 2) {
                 fillColor = `rgba(255, 255, 255, 0.2)`;
                 strokeColor = `rgba(255, 255, 255, 0.8)`;
                 isDashed = true;
-              } else {
-                // 3 and 4 are not shown
-                drawThisTile = false;
               }
             } else {
               const hue = (gid * 137.5) % 360;
+              const layerIndex = this.tileLayers.indexOf(layer);
               fillColor = `hsl(${hue}, 55%, ${layerIndex === 0 ? '45%' : '60%'})`;
               strokeColor = `hsl(${hue}, 55%, ${layerIndex === 0 ? '35%' : '50%'})`;
             }
 
-            if (drawThisTile) {
-              this.ctx.fillStyle = fillColor;
+            this.ctx.fillStyle = fillColor;
 
-              if (isDashed) {
-                this.ctx.setLineDash([2, 2]);
-              } else {
-                this.ctx.setLineDash([]);
-              }
-
-              if (this.minimapMode === 'isometric') {
-                this.ctx.beginPath();
-                this.ctx.moveTo(pixelX, pixelY); // top
-                this.ctx.lineTo(pixelX + tilePixel / 2, pixelY + tilePixel / 4); // right
-                this.ctx.lineTo(pixelX, pixelY + tilePixel / 2); // bottom
-                this.ctx.lineTo(pixelX - tilePixel / 2, pixelY + tilePixel / 4); // left
-                this.ctx.fill();
-                
-                // Draw subtle stroke for clarity
-                this.ctx.strokeStyle = strokeColor;
-                this.ctx.lineWidth = 0.5;
-                this.ctx.stroke();
-              } else {
-                this.ctx.fillRect(pixelX, pixelY, tilePixel, tilePixel);
-                if (isDashed || layer.type === 'collision') {
-                  this.ctx.strokeStyle = strokeColor;
-                  this.ctx.lineWidth = 0.5;
-                  this.ctx.strokeRect(pixelX, pixelY, tilePixel, tilePixel);
-                }
-              }
-
+            if (isDashed) {
+              this.ctx.setLineDash([2, 2]);
+            } else {
               this.ctx.setLineDash([]);
             }
+
+            if (this.minimapMode === 'isometric') {
+              this.ctx.beginPath();
+              this.ctx.moveTo(pixelX, pixelY); // top
+              this.ctx.lineTo(pixelX + tilePixel / 2, pixelY + tilePixel / 4); // right
+              this.ctx.lineTo(pixelX, pixelY + tilePixel / 2); // bottom
+              this.ctx.lineTo(pixelX - tilePixel / 2, pixelY + tilePixel / 4); // left
+              this.ctx.fill();
+              
+              // Draw subtle stroke for clarity
+              this.ctx.strokeStyle = strokeColor;
+              this.ctx.lineWidth = 0.5;
+              this.ctx.stroke();
+            } else {
+              this.ctx.fillRect(pixelX, pixelY, tilePixel, tilePixel);
+              if (isDashed || layer.type === 'collision') {
+                this.ctx.strokeStyle = strokeColor;
+                this.ctx.lineWidth = 0.5;
+                this.ctx.strokeRect(pixelX, pixelY, tilePixel, tilePixel);
+              }
+            }
+
+            this.ctx.setLineDash([]);
           }
         }
       }
-      
-      // Also render sprite objects for this layer on minimap
+    }
+
+    // Also render sprite objects for each visible layer on minimap
+    for (let layerIndex = 0; layerIndex < this.tileLayers.length; layerIndex++) {
+      const layer = this.tileLayers[layerIndex];
+      if (!layer.visible) continue;
+
       const spriteObjects = this.placedSpriteObjects.get(layer.type);
       if (spriteObjects && spriteObjects.length > 0) {
         for (const spriteObj of spriteObjects) {
@@ -4055,6 +4140,113 @@ export class TileMapEditor {
             this.ctx.fill();
           } else {
             this.ctx.fillRect(pixelX, pixelY, tilePixel, tilePixel);
+          }
+        }
+      }
+    }
+
+    // Render ObjectInstances on the minimap
+    if (this.objectInstances && this.objectInstances.size > 0) {
+      for (const instance of this.objectInstances.values()) {
+        // Find the layer this instance belongs to
+        const instanceLayer = this.tileLayers.find(l => l.id.toString() === instance.layerId);
+        if (!instanceLayer || !instanceLayer.visible) continue;
+
+        let pixelX: number;
+        let pixelY: number;
+
+        if (this.minimapMode === 'isometric') {
+          pixelX = offsetX + (instance.gridX - instance.gridY) * (tilePixel / 2);
+          pixelY = offsetY + (instance.gridX + instance.gridY) * (tilePixel / 4);
+        } else {
+          pixelX = offsetX + instance.gridX * tilePixel;
+          pixelY = offsetY + instance.gridY * tilePixel;
+        }
+
+        // Color based on layer type
+        const layerName = (instanceLayer.name || '').toLowerCase();
+        if (layerName.includes('object')) {
+          this.ctx.fillStyle = `rgba(30, 144, 255, 0.8)`; // Blue for objects
+        } else if (layerName.includes('background')) {
+          this.ctx.fillStyle = `rgba(34, 139, 34, 0.8)`; // Green for background
+        } else {
+          this.ctx.fillStyle = `rgba(200, 200, 200, 0.8)`; // Gray for other
+        }
+
+        if (this.minimapMode === 'isometric') {
+          this.ctx.beginPath();
+          this.ctx.moveTo(pixelX, pixelY);
+          this.ctx.lineTo(pixelX + tilePixel / 2, pixelY + tilePixel / 4);
+          this.ctx.lineTo(pixelX, pixelY + tilePixel / 2);
+          this.ctx.lineTo(pixelX - tilePixel / 2, pixelY + tilePixel / 4);
+          this.ctx.fill();
+        } else {
+          this.ctx.fillRect(pixelX, pixelY, tilePixel, tilePixel);
+        }
+      }
+    }
+
+    // Draw collision layer tiles last so they appear on top of everything
+    for (const collisionLayer of collisionLayers) {
+      for (let tileY = 0; tileY < this.mapHeight; tileY++) {
+        for (let tileX = 0; tileX < this.mapWidth; tileX++) {
+          const index = tileY * this.mapWidth + tileX;
+          const gid = collisionLayer.data[index];
+
+          if (gid > 0) {
+            let pixelX: number;
+            let pixelY: number;
+
+            if (this.minimapMode === 'isometric') {
+              pixelX = offsetX + (tileX - tileY) * (tilePixel / 2);
+              pixelY = offsetY + (tileX + tileY) * (tilePixel / 4);
+            } else {
+              pixelX = offsetX + tileX * tilePixel;
+              pixelY = offsetY + tileY * tilePixel;
+            }
+
+            let fillColor = '';
+            let strokeColor = '';
+            let isDashed = false;
+
+            if (gid === 1) {
+              fillColor = `rgba(255, 255, 255, 0.8)`; // White overlay
+              strokeColor = `rgba(255, 255, 255, 1)`;
+            } else if (gid === 2) {
+              fillColor = `rgba(255, 255, 255, 0.2)`;
+              strokeColor = `rgba(255, 255, 255, 0.8)`;
+              isDashed = true;
+            }
+
+            this.ctx.fillStyle = fillColor;
+
+            if (isDashed) {
+              this.ctx.setLineDash([2, 2]);
+            } else {
+              this.ctx.setLineDash([]);
+            }
+
+            if (this.minimapMode === 'isometric') {
+              this.ctx.beginPath();
+              this.ctx.moveTo(pixelX, pixelY);
+              this.ctx.lineTo(pixelX + tilePixel / 2, pixelY + tilePixel / 4);
+              this.ctx.lineTo(pixelX, pixelY + tilePixel / 2);
+              this.ctx.lineTo(pixelX - tilePixel / 2, pixelY + tilePixel / 4);
+              this.ctx.fill();
+              
+              this.ctx.strokeStyle = strokeColor;
+              this.ctx.lineWidth = 0.5;
+              this.ctx.stroke();
+            } else {
+              this.ctx.fillRect(pixelX, pixelY, tilePixel, tilePixel);
+              if (isDashed) {
+                this.ctx.strokeStyle = strokeColor;
+                this.ctx.lineWidth = 0.5;
+                this.ctx.strokeRect(pixelX, pixelY, tilePixel, tilePixel);
+              }
+            }
+
+            this.ctx.setLineDash([]);
           }
         }
       }
@@ -4108,6 +4300,23 @@ export class TileMapEditor {
 
     // End clipping mask for minimap contents
     this.ctx.restore();
+    
+    // Draw minimalistic resize arrow icon at top-left corner
+    this.ctx.strokeStyle = this.isDarkMode ? '#bbb' : '#666';
+    this.ctx.lineWidth = 1.5;
+    this.ctx.beginPath();
+    // Simple diagonal arrow: top-left to bottom-right
+    this.ctx.moveTo(x + 5, y + 5);
+    this.ctx.lineTo(x + 15, y + 15);
+    // Arrowhead on top-left end
+    this.ctx.moveTo(x + 8, y + 5);
+    this.ctx.lineTo(x + 5, y + 5);
+    this.ctx.lineTo(x + 5, y + 8);
+    // Arrowhead on bottom-right end
+    this.ctx.moveTo(x + 15, y + 12);
+    this.ctx.lineTo(x + 15, y + 15);
+    this.ctx.lineTo(x + 12, y + 15);
+    this.ctx.stroke();
 
     // Restore context state
     this.ctx.restore();
@@ -6325,7 +6534,6 @@ export class TileMapEditor {
 
   public setCurrentProjectPath(path: string | null): void {
     this.currentProjectPath = path;
-    console.log('[TileMapEditor] Project path set to:', path);
   }
 
   public getCurrentProjectPath(): string | null {
@@ -7585,7 +7793,6 @@ export class TileMapEditor {
   public createLayerTab(layerType: string, name?: string): number {
   // Collision layer should never have tabs - only use built-in tileset
   if (layerType === COLLISION_LAYER_TYPE) {
-    console.error('[TileMapEditor] ERROR: Cannot create tab for collision layer - collision layer uses only built-in tileset');
     return -1;
   }
   const tabs = this.layerTabs.get(layerType) || [];
@@ -7810,24 +8017,14 @@ export class TileMapEditor {
     manualTileHeight?: number,
     forceGridSlicing?: boolean
   ): Promise<void> {
-    console.log('[TileMapEditor] DEBUG: importBrushImageToLayerTab called with:', {
-      layerType,
-      tabId,
-      fileName: file.name,
-      manualTileWidth,
-      manualTileHeight,
-      forceGridSlicing
-    });
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = (e) => {
         const img = new Image();
         img.onload = () => {
-          console.log('[TileMapEditor] DEBUG: Image loaded:', { width: img.width, height: img.height });
           const tabs = this.layerTabs.get(layerType) || [];
           const tab = tabs.find(t => t.id === tabId);
           if (!tab) {
-            console.error('[TileMapEditor] ERROR: Tab not found for import:', { layerType, tabId });
             return reject(new Error('Tab not found'));
           }
           if (!tab.brushes) tab.brushes = [];
@@ -7926,17 +8123,11 @@ export class TileMapEditor {
           }
 
           tab.detectedTiles = importedDetectedTiles;
-          console.log('[TileMapEditor] DEBUG: Set tab.detectedTiles:', {
-            count: importedDetectedTiles.size,
-            tabId,
-            layerType
-          });
           this.layerTileData.set(layerType, new Map(importedDetectedTiles));
 
           // If this is currently the active layer, keep global detected map in sync too.
           const activeLayer = this.tileLayers.find(l => l.id === this.activeLayerId);
           if (activeLayer?.type === layerType) {
-            console.log('[TileMapEditor] DEBUG: Updating global detectedTileData for active layer');
             this.detectedTileData.clear();
             for (const [gid, data] of importedDetectedTiles.entries()) {
               this.detectedTileData.set(gid, data);
@@ -7946,7 +8137,6 @@ export class TileMapEditor {
           // If this tab is active for the layer, update current tileset/palette
           const activeTabId = this.layerActiveTabId.get(layerType);
           if (activeTabId === tabId) {
-            console.log('[TileMapEditor] DEBUG: Tab is active, updating active layer tab');
             this.setActiveLayerTab(layerType, tabId);
           }
           
@@ -7955,15 +8145,11 @@ export class TileMapEditor {
           // Try provided path first, then fallback to stored currentProjectPath
           const pathToUse = projectPath || this.currentProjectPath;
           if (pathToUse) {
-            console.log('[TileMapEditor] DEBUG: Auto-saving tileset after import to:', pathToUse);
             this.saveTilesetToMapFile(pathToUse).catch((err: unknown) => {
-              console.warn('[TileMapEditor] ERROR: Failed to auto-save tileset after import:', err);
             });
           } else {
-            console.warn('[TileMapEditor] WARNING: currentProjectPath not set, tileset will not be auto-saved.');
           }
           
-          console.log('[TileMapEditor] DEBUG: Import complete, resolving promise');
           resolve();
         };
         img.onerror = (_err) => {
@@ -9455,13 +9641,11 @@ export class TileMapEditor {
   public lockSave(): void {
     this.isSaveLocked = true;
     this.saveLockCallback?.(true);
-    console.log('[TileMapEditor] Save locked - editing disabled');
   }
 
   public unlockSave(): void {
     this.isSaveLocked = false;
     this.saveLockCallback?.(false);
-    console.log('[TileMapEditor] Save unlocked - editing enabled');
   }
 
   public isSaveInProgress(): boolean {
@@ -9471,11 +9655,6 @@ export class TileMapEditor {
   /** Mark the start/end of a tab switch so auto-save knows to stand down. */
   public setTabSwitching(switching: boolean): void {
     this.isTabSwitching = switching;
-    if (switching) {
-      console.log('[TileMapEditor] Tab switch started — auto-save blocked until load completes');
-    } else {
-      console.log('[TileMapEditor] Tab switch ended — auto-save unblocked');
-    }
   }
 
   public getTabSwitching(): boolean {
@@ -9502,7 +9681,6 @@ export class TileMapEditor {
       const targetPath = projectPath || this.currentProjectPath;
       
       if (!targetPath) {
-        console.log('[TileMapEditor] No project path provided, skipping tileset save');
         return;
       }
 
@@ -9517,12 +9695,9 @@ export class TileMapEditor {
       // Save via Electron API (cast to bypass strict type checking)
       if (window.electronAPI?.saveMapProject) {
         await (window.electronAPI.saveMapProject as (path: string, data: unknown) => Promise<boolean>)(targetPath, projectData);
-        console.log('[TileMapEditor] ✓ Tileset saved to map JSON:', targetPath);
       } else {
-        console.warn('[TileMapEditor] saveMapProject API not available');
       }
     } catch (err) {
-      console.error('[TileMapEditor] Failed to save tileset to map file:', err);
       throw err;
     }
   }
@@ -10041,7 +10216,6 @@ export class TileMapEditor {
     }
     this.objectInstances.set(instance.id, instance);
     this.indexObjectInstance(instance);
-    console.log(`[OBJECT] Added object instance: ${instance.id} at (${instance.gridX}, ${instance.gridY})`);
   }
 
   /**
@@ -10075,9 +10249,6 @@ export class TileMapEditor {
   public removeObjectInstance(id: string): boolean {
     this.deindexObjectInstance(id);
     const success = this.objectInstances.delete(id);
-    if (success) {
-      console.log(`[OBJECT] Removed object instance: ${id}`);
-    }
     return success;
   }
 
@@ -11607,6 +11778,5 @@ export class TileMapEditor {
 
     this.history = state.history;
     this.historyIndex = state.historyIndex;
-    console.log(`[TileMapEditor] Restored undo stack: ${state.history.length} states at index ${state.historyIndex}`);
   }
 }

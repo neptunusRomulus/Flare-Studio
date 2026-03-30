@@ -84,7 +84,6 @@ const BrushToolbar = ({
 
   // Keep refs synchronized with props in useEffect
   React.useEffect(() => {
-    console.log('[BrushToolbar] Effect: updating refs with new props - editor:', !!editor, 'activeLayer:', !!activeLayer);
     editorRef.current = editor;
     activeLayerRef.current = activeLayer;
   }, [editor, activeLayer]);
@@ -230,19 +229,14 @@ const BrushToolbar = ({
                         accept="image/png"
                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                         onChange={async (event) => {
-                          console.log('[BrushToolbar] File input change triggered');
                           const file = event.target.files?.[0];
                           if (!file) {
-                            console.log('[BrushToolbar] No file selected from input');
                             return;
                           }
                           if (file.type !== 'image/png') {
-                            console.log('[BrushToolbar] File is not PNG:', file.type);
                             toastInvoke({ title: 'Invalid file', description: 'Please select a PNG image', variant: 'destructive' });
                             return;
                           }
-                          console.log('[BrushToolbar] PNG file selected:', { name: file.name, size: file.size });
-
                           // Keep layers panel visible while importing to avoid hover-collapse
                           try {
                             // Set a global guard so UI mouseleave handlers can opt out
@@ -257,15 +251,6 @@ const BrushToolbar = ({
                           // Refs might not be synchronized yet, so prefer the props passed to this component
                           const currentEditor = editor ?? editorRef.current;
                           const currentActiveLayer = activeLayer ?? activeLayerRef.current;
-                          console.log('[BrushToolbar] Import starting - checking editor/layer:', {
-                            editorFromProps: !!editor,
-                            editorFromRef: !!editorRef.current,
-                            layerFromProps: !!activeLayer,
-                            layerFromRef: !!activeLayerRef.current,
-                            finalEditor: !!currentEditor,
-                            finalLayer: !!currentActiveLayer,
-                            layerType: currentActiveLayer?.type || 'none'
-                          });
                           // appCtx is null to avoid React hook violations, so we can't use it as fallback
                           // Final editor-derived fallback
                           if (!currentActiveLayer && currentEditor) {
@@ -275,10 +260,6 @@ const BrushToolbar = ({
                           }
 
                           if (!currentEditor || !currentActiveLayer) {
-                            console.error('[BrushToolbar] Cannot import - missing editor or layer:', {
-                              editorNull: !currentEditor,
-                              layerNull: !currentActiveLayer
-                            });
                             toastInvoke({ title: 'No editor', description: 'Editor or active layer not available', variant: 'destructive' });
                             return;
                           }
@@ -317,7 +298,6 @@ const BrushToolbar = ({
                                 true
                               );
                             } catch (importErr) {
-                              console.error('[BrushToolbar] Fixed-grid import failed, retrying legacy import', importErr);
                               await currentEditor.importBrushImageToLayerTab(
                                 layerType,
                                 targetTabId,
@@ -378,30 +358,13 @@ const BrushToolbar = ({
                                   height: data.height,
                                   confidence: 0.95 // Default high confidence for auto-detected
                                 }));
-                                console.log('[BrushToolbar] DEBUG: Extracted detected tiles from activeTab:', {
-                                  count: detectedTilesArray.length,
-                                  tabId: targetTabId,
-                                  layerType,
-                                  tiles: detectedTilesArray.slice(0, 3)
-                                });
                               } catch (e) {
-                                console.warn('[BrushToolbar] ERROR: Failed to extract detected tiles:', e);
                               }
                             } else {
-                              console.log('[BrushToolbar] DEBUG: No detectedTiles found on activeTab:', {
-                                hasDetectedTiles: !!activeTab?.detectedTiles,
-                                activeTab: activeTab?.id
-                              });
                             }
                             
                             // Always show the modal after import to allow user to confirm/customize
                             // Notify parent to sync to global context
-                            console.log('[BrushToolbar] DEBUG: Calling onShowImportReview with:', {
-                              tilesetFileName: file.name,
-                              detectedAssetCount: detectedTilesArray.length,
-                              layerType,
-                              tabId: targetTabId
-                            });
                             onShowImportReview?.({
                               tilesetFileName: file.name,
                               detectedAssets: detectedTilesArray,
@@ -422,15 +385,6 @@ const BrushToolbar = ({
                               toastInvoke({ title: 'Review Import', description: 'No assets auto-detected. Confirm or add assets manually.' });
                             }
                           } catch (err) {
-                            console.error('[BrushToolbar] CRITICAL ERROR: Import flow failed', err);
-                            console.error('[BrushToolbar] ERROR DETAILS:', {
-                              message: String(err),
-                              stack: err instanceof Error ? err.stack : 'no stack',
-                              targetTabId,
-                              layerType,
-                              manualTileWidth,
-                              manualTileHeight
-                            });
                             toastInvoke({ title: 'Import failed', description: `Unable to import into editor: ${String(err)}`, variant: 'destructive' });
                           }
                           finally {

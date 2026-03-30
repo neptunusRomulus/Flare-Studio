@@ -105,6 +105,9 @@ export default function EditorCanvas(props: Props) {
   const [cursorScreenPos, setCursorScreenPos] = React.useState<{x: number, y: number} | null>(null);
   const [ctrlCursorTileCoords, setCtrlCursorTileCoords] = React.useState<{x: number, y: number} | null>(null);
   const [isCtrlHeld, setIsCtrlHeld] = React.useState(false);
+  const [minimapHoverCoords, setMinimapHoverCoords] = React.useState<{x: number, y: number} | null>(null);
+  const [minimapTooltipFadeOut, setMinimapTooltipFadeOut] = React.useState(false);
+  const minimapFadeTimeoutRef = React.useRef<number | null>(null);
 
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -128,6 +131,15 @@ export default function EditorCanvas(props: Props) {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('blur', handleBlur);
+    };
+  }, []);
+
+  // Cleanup minimap fade timeout on unmount
+  React.useEffect(() => {
+    return () => {
+      if (minimapFadeTimeoutRef.current !== null) {
+        window.clearTimeout(minimapFadeTimeoutRef.current);
+      }
     };
   }, []);
 
@@ -183,6 +195,83 @@ export default function EditorCanvas(props: Props) {
           } else {
             setCtrlCursorTileCoords(null);
           }
+          
+          // Check if mouse is over minimap and compute hover coordinates
+          const minimapBounds = editor.getLastMiniMapBounds();
+          if (minimapBounds) {
+            if (canvasX >= minimapBounds.x && canvasX <= minimapBounds.x + minimapBounds.w &&
+                canvasY >= minimapBounds.y && canvasY <= minimapBounds.y + minimapBounds.h) {
+              // Mouse is over minimap, compute which cell is hovered
+              const relX = canvasX - minimapBounds.x;
+              const relY = canvasY - minimapBounds.y;
+              
+              // Get minimap zoom and mode from editor
+              const minimapZoom = editor.getMinimapZoom();
+              const minimapMode = editor.getMinimapMode();
+              
+              // Calculate tile pixel size and offsets same as minimap rendering
+              let tilePixel = 1;
+              let offsetX = 0;
+              let offsetY = 0;
+              let mapPixelWidth = 0;
+              let mapPixelHeight = 0;
+              
+              if (minimapMode === 'isometric') {
+                const maxTileWidth = Math.floor(minimapBounds.w * 2 / (mapWidth + mapHeight)) || 1;
+                const maxTileHeight = Math.floor(minimapBounds.h * 4 / (mapWidth + mapHeight)) || 1;
+                tilePixel = Math.max(1, Math.min(maxTileWidth, maxTileHeight)) * minimapZoom;
+                
+                mapPixelWidth = (mapWidth + mapHeight) * (tilePixel / 2);
+                mapPixelHeight = (mapWidth + mapHeight) * (tilePixel / 4);
+                offsetX = minimapBounds.w / 2 - (mapWidth - mapHeight) * (tilePixel / 4);
+                offsetY = minimapBounds.h / 2 - (mapWidth + mapHeight) * (tilePixel / 8);
+              } else {
+                const maxTileWidth = Math.floor(minimapBounds.w / mapWidth) || 1;
+                const maxTileHeight = Math.floor(minimapBounds.h / mapHeight) || 1;
+                tilePixel = Math.max(1, Math.min(maxTileWidth, maxTileHeight)) * minimapZoom;
+                
+                mapPixelWidth = mapWidth * tilePixel;
+                mapPixelHeight = mapHeight * tilePixel;
+                offsetX = Math.floor((minimapBounds.w - mapPixelWidth) / 2);
+                offsetY = Math.floor((minimapBounds.h - mapPixelHeight) / 2);
+              }
+              
+              // Subtract offset to get position within rendered content
+              const contentX = relX - offsetX;
+              const contentY = relY - offsetY;
+              
+              // Calculate cell based on mode
+              let cellX = 0, cellY = 0;
+              if (minimapMode === 'isometric') {
+                // For isometric, convert from screen coordinates to tile coordinates
+                cellX = Math.floor((contentX / (tilePixel / 2) + contentY / (tilePixel / 4)) / 2);
+                cellY = Math.floor((contentY / (tilePixel / 4) - contentX / (tilePixel / 2)) / 2);
+              } else {
+                // For orthogonal, simple division
+                cellX = Math.floor(contentX / tilePixel);
+                cellY = Math.floor(contentY / tilePixel);
+              }
+              
+              if (cellX >= 0 && cellX < mapWidth && cellY >= 0 && cellY < mapHeight) {
+                const newCoords = { x: cellX, y: cellY };
+                setMinimapHoverCoords(newCoords);
+                setMinimapTooltipFadeOut(false);
+                editor.setMinimapHoverCoords(newCoords);
+                
+                // Clear any existing fade timeout
+                if (minimapFadeTimeoutRef.current !== null) {
+                  window.clearTimeout(minimapFadeTimeoutRef.current);
+                  minimapFadeTimeoutRef.current = null;
+                }
+              } else {
+                setMinimapHoverCoords(null);
+                editor.setMinimapHoverCoords(null);
+              }
+            } else {
+              setMinimapHoverCoords(null);
+              editor.setMinimapHoverCoords(null);
+            }
+          }
         }
       }}
       onDragOver={(e) => {
@@ -205,6 +294,20 @@ export default function EditorCanvas(props: Props) {
       onMouseLeave={() => {
         setCursorScreenPos(null);
         setCtrlCursorTileCoords(null);
+        
+        // Fade out minimap tooltip
+        setMinimapTooltipFadeOut(true);
+        if (minimapFadeTimeoutRef.current !== null) {
+          window.clearTimeout(minimapFadeTimeoutRef.current);
+        }
+        minimapFadeTimeoutRef.current = window.setTimeout(() => {
+          setMinimapHoverCoords(null);
+          if (editor) {
+            editor.setMinimapHoverCoords(null);
+          }
+          setMinimapTooltipFadeOut(false);
+          minimapFadeTimeoutRef.current = null;
+        }, 300); // Match fade animation duration
       }}
       onDragLeave={() => {
         setCursorScreenPos(null);
@@ -296,6 +399,18 @@ export default function EditorCanvas(props: Props) {
          >
            <span>{`${ctrlCursorTileCoords.x}, ${ctrlCursorTileCoords.y}`}</span>
          </div>
+      ) : null}
+
+      {minimapHoverCoords ? (
+        <div
+          className={`fixed z-[100] px-2 py-1 bg-black/90 text-white text-xs rounded shadow-lg pointer-events-none flex items-center gap-1.5 transition-opacity duration-300 ${minimapTooltipFadeOut ? 'opacity-0' : 'opacity-100'}`}
+          style={{ 
+            left: (cursorScreenPos?.x ?? 0) + 12, 
+            top: (cursorScreenPos?.y ?? 0) - 30 
+          }}
+        >
+          <span>{`${minimapHoverCoords.x}, ${minimapHoverCoords.y}`}</span>
+        </div>
       ) : null}
 
       <CellContextMenu

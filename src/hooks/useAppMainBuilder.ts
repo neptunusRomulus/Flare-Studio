@@ -597,7 +597,7 @@ export default function useAppMainBuilder() {
       },
       events: {
         isEventLayer: activeLayer?.type === 'event',
-        eventEntries: [],  // TODO: Populate from EditorCore.events once integrated
+        eventEntries: activeLayer?.type === 'event' ? appState.mapObjects.filter((obj) => obj.type === 'event') : [],
         draggingEventId: appState.draggingEventId,
         handleEditEvent: () => {},  // TODO: Wire up to open EventDialog for editing
         setEventHoverTooltip: () => {},  // TODO: Implement event hover tooltip
@@ -962,6 +962,7 @@ export default function useAppMainBuilder() {
       handleCloseSettings,
       setIsDarkMode,
       editor: defaultEditor,
+      syncMapObjectsWrapper: syncMapObjects,
       showActiveGid,
       setShowActiveGid,
       setShowSidebarToggle,
@@ -1411,3 +1412,4 @@ export default function useAppMainBuilder() {
   
   return { sidebarDeps, buildAppMainCtxFromSidebar };
 }
+

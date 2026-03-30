@@ -10,6 +10,7 @@ import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 type EventActivation = 'Trigger' | 'Interact' | 'Load' | 'Leave' | 'MapExit' | 'MapClear' | 'Loop';
 
 type EventData = {
+  name: string;
   positioning: {
     mapName: string;
     coordinates: { x: number; y: number };
@@ -93,7 +94,40 @@ const ACTIVATION_CONFIG: Record<EventActivation, { icon: React.ComponentType<Rea
 
 const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLocation: _eventLocation }) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { mapName: currentMapName, mapWidth, mapHeight } = useAppContext() as any;
+  const { mapName: currentMapName, mapWidth, mapHeight, editor, syncMapObjectsWrapper } = useAppContext() as any;
+
+  const handleSave = () => {
+    if (editor && typeof editor.addMapObject === 'function') {
+      const { coordinates, size, hotspot } = eventData.positioning;
+      
+      const newObject = editor.addMapObject('event', coordinates.x, coordinates.y, size.width, size.height);
+      if (newObject && typeof editor.updateMapObject === 'function') {
+        const uniqueEventId = `ev_${Date.now().toString(36)}_${Math.random().toString(36).substr(2, 5)}`;
+        const props: Record<string, string> = {
+          ...newObject.properties,
+          eventId: uniqueEventId,
+          activation: eventData.timing.activeActivation || ''
+        };
+        
+        if (eventData.timing.activeActivation === 'Interact' || eventData.timing.activeActivation === 'Trigger') {
+            props.hotspot = `${hotspot.x},${hotspot.y},${hotspot.width},${hotspot.height}`;
+        }
+        
+        editor.updateMapObject(newObject.id, {
+          name: eventData.name || 'Event',
+          type: 'event',
+          x: coordinates.x,
+          y: coordinates.y,
+          width: size.width,
+          height: size.height,
+          properties: props
+        });
+      }
+    }
+    
+    // reset selection / close
+    if (typeof syncMapObjectsWrapper === 'function') syncMapObjectsWrapper(); onOpenChange(false);
+  };
 
   const getSafeCoord = (val: number, max: number) => {
     if (isNaN(val)) return 0;
@@ -106,6 +140,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
   };
 
   const [eventData, setEventData] = useState<EventData>({
+    name: '',
     positioning: {
       mapName: '',
       coordinates: { x: 0, y: 0 },
@@ -164,7 +199,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
 
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onOpenChange(false);
+        if (typeof syncMapObjectsWrapper === 'function') syncMapObjectsWrapper(); onOpenChange(false);
       }
     };
     
@@ -263,6 +298,20 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
         </div>
 
         <div className="flex-1 overflow-y-auto space-y-6 px-6 py-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/15 [&::-webkit-scrollbar-thumb]:rounded-full">
+          {/* Event Information Section */}
+          <div className="space-y-4 border-b border-border/50 pb-4">
+            <h3 className="text-sm font-semibold text-foreground">Event Information</h3>
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-foreground/80">Name</label>
+              <Input
+                value={eventData.name}
+                onChange={e => setEventData(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="Event Name (e.g. Teleport to Town, Boss Trigger)"
+                className="h-8 text-sm"
+              />
+            </div>
+          </div>
+
           {/* Positioning and Timing Section */}
           <div className="space-y-4 border-b border-border/50 pb-4">
             <h3 className="text-sm font-semibold text-foreground">Positioning and Timing</h3>
@@ -913,7 +962,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
           <Tooltip content="Save event">
             <Button
               size="icon"
-              onClick={() => onOpenChange(false)}
+              onClick={handleSave}
               className="h-7 w-7 text-foreground/80 hover:text-foreground hover:bg-muted"
             >
               <Save className="h-4 w-4" />
@@ -937,3 +986,5 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
 };
 
 export default EventDialog;
+
+

@@ -11,7 +11,6 @@ import type { MapObject, TileLayer } from '@/types';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 import type { RuleStartType } from '@/editor/ruleOptions';
 import type { ItemRole, ItemResourceSubtype } from '@/editor/itemRoles';
-import type { Event } from '@/EditorCore';
 
 type ItemSummary = {
   id: number;
@@ -39,11 +38,11 @@ type SidebarProps = {
 
   events: {
     isEventLayer: boolean;
-    eventEntries: Event[];
-    draggingEventId: string | null;
-    handleEditEvent: (id: string) => void;
+    eventEntries: MapObject[];
+    draggingEventId: number | null;
+    handleEditEvent: (id: number) => void;
     setEventHoverTooltip: (p: { x: number; y: number } | null) => void;
-    handleEventDragStart: (e: React.DragEvent, eventId: string) => void;
+    handleEventDragStart: (e: React.DragEvent, eventId: number) => void;
     handleEventDragEnd: () => void;
     handleOpenEventDialog: () => void;
   };
@@ -227,3 +226,5 @@ export default function AppSidebar(p: SidebarProps) {
     </SidebarLayout>
   );
 }
+
+

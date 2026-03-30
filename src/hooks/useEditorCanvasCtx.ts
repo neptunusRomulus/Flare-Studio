@@ -20,8 +20,8 @@ type UseEditorCanvasDeps = {
   canvasRef: React.RefObject<HTMLCanvasElement>;
   draggingNpcId: number | null;
   setDraggingNpcId: React.Dispatch<React.SetStateAction<number | null>>;
-  draggingEventId: string | null;
-  setDraggingEventId: React.Dispatch<React.SetStateAction<string | null>>;
+  draggingEventId: number | null;
+  setDraggingEventId: React.Dispatch<React.SetStateAction<number | null>>;
   tipsMinimized: boolean;
   setTipsMinimized: React.Dispatch<React.SetStateAction<boolean>>;
   setShowHelp: (b: boolean) => void;

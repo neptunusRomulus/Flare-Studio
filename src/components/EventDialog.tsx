@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { HelpCircle, X, Save, MapPinPlus, MousePointerClick, MapPinMinus, LogIn, LogOut, SquareCheckBig, Repeat2 } from 'lucide-react';
 import Tooltip from '@/components/ui/tooltip';
+import { useAppContext } from '@/context/AppContext';
 
 type EventActivation = 'Trigger' | 'Interact' | 'Load' | 'Leave' | 'MapExit' | 'MapClear' | 'Loop';
 
@@ -54,54 +55,44 @@ const ACTIVATION_OPTIONS: EventActivation[] = ['Interact', 'Trigger', 'Leave', '
 const ACTIVATION_CONFIG: Record<EventActivation, { icon: React.ComponentType<any>; tooltip: string; label: string }> = {
   Interact: {
     icon: MousePointerClick,
-    tooltip: '**Interact** - Activated specifically when the player interacts with the hotspot',
+    tooltip: 'Interact - Activated specifically when the player interacts with the hotspot',
     label: 'Interact',
   },
   Trigger: {
     icon: MapPinPlus,
-    tooltip: '**Trigger** - Activated when the player stands in the event area or interacts with a defined hotspot',
+    tooltip: 'Trigger - Activated when the player stands in the event area or interacts with a defined hotspot',
     label: 'Trigger',
   },
   Leave: {
     icon: MapPinMinus,
-    tooltip: '**Leave** - Activated as the player leaves an event spot they were previously inside',
+    tooltip: 'Leave - Activated as the player leaves an event spot they were previously inside',
     label: 'Leave',
   },
   Load: {
     icon: LogIn,
-    tooltip: '**Load** - Activated as the player enters a map',
+    tooltip: 'Load - Activated as the player enters a map',
     label: 'Load',
   },
   MapExit: {
     icon: LogOut,
-    tooltip: '**Map Exit** - Activated as the player leaves the map',
+    tooltip: 'Map Exit - Activated as the player leaves the map',
     label: 'Map Exit',
   },
   MapClear: {
     icon: SquareCheckBig,
-    tooltip: '**Map Clear** - Activated when all enemies on a map have been defeated',
+    tooltip: 'Map Clear - Activated when all enemies on a map have been defeated',
     label: 'Map Clear',
   },
   Loop: {
     icon: Repeat2,
-    tooltip: '**Loop** - Activated constantly, every frame',
+    tooltip: 'Loop - Activated constantly, every frame',
     label: 'Loop',
   },
 };
 
-const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLocation }) => {
-  useEffect(() => {
-    if (!open) return;
-    
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onOpenChange(false);
-      }
-    };
-    
-    document.addEventListener('keydown', handleEsc);
-    return () => document.removeEventListener('keydown', handleEsc);
-  }, [open, onOpenChange]);
+const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLocation: _eventLocation }) => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { mapName: currentMapName } = useAppContext() as any;
 
   const [eventData, setEventData] = useState<EventData>({
     positioning: {
@@ -138,6 +129,28 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
       script: '',
     },
   });
+
+  useEffect(() => {
+    if (!open) return;
+    
+    // Auto-fill mapName when opening
+    if (currentMapName) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setEventData(prev => ({
+        ...prev,
+        positioning: { ...prev.positioning, mapName: currentMapName }
+      }));
+    }
+
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onOpenChange(false);
+      }
+    };
+    
+    document.addEventListener('keydown', handleEsc);
+    return () => document.removeEventListener('keydown', handleEsc);
+  }, [open, onOpenChange, currentMapName]);
 
   const setActivation = (activation: EventActivation) => {
     setEventData(prev => ({
@@ -245,14 +258,10 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                   <label className="text-[10px] text-muted-foreground">Map Name</label>
                   <Input
                     value={eventData.positioning.mapName}
-                    onChange={e =>
-                      setEventData(prev => ({
-                        ...prev,
-                        positioning: { ...prev.positioning, mapName: e.target.value },
-                      }))
-                    }
+                    readOnly
+                    disabled
                     placeholder="Map name"
-                    className="h-7 text-xs"
+                    className="h-7 text-xs bg-muted/50 cursor-not-allowed"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-2">

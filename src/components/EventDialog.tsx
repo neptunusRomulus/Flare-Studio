@@ -93,7 +93,17 @@ const ACTIVATION_CONFIG: Record<EventActivation, { icon: React.ComponentType<Rea
 
 const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLocation: _eventLocation }) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { mapName: currentMapName } = useAppContext() as any;
+  const { mapName: currentMapName, mapWidth, mapHeight } = useAppContext() as any;
+
+  const getSafeCoord = (val: number, max: number) => {
+    if (isNaN(val)) return 0;
+    return Math.max(0, Math.min(max - 1, val));
+  };
+  
+  const getSafeSize = (val: number, pos: number, max: number) => {
+    if (isNaN(val)) return 1;
+    return Math.max(1, Math.min(max - pos, val));
+  };
 
   const [eventData, setEventData] = useState<EventData>({
     positioning: {
@@ -161,6 +171,20 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
     document.addEventListener('keydown', handleEsc);
     return () => document.removeEventListener('keydown', handleEsc);
   }, [open, onOpenChange, currentMapName]);
+
+  useEffect(() => {
+    if (!open) {
+      window.dispatchEvent(new CustomEvent('activeEventPreview', { detail: null }));
+      return;
+    }
+    const { x, y } = eventData.positioning.coordinates;
+    const { width, height } = eventData.positioning.size;
+    window.dispatchEvent(new CustomEvent('activeEventPreview', { detail: { x, y, width, height } }));
+    
+    return () => {
+      window.dispatchEvent(new CustomEvent('activeEventPreview', { detail: null }));
+    };
+  }, [open, eventData.positioning.coordinates.x, eventData.positioning.coordinates.y, eventData.positioning.size.width, eventData.positioning.size.height]);
 
   const setActivation = (activation: EventActivation) => {
     setEventData(prev => ({
@@ -295,13 +319,23 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                     <label className="text-[10px] text-muted-foreground">X</label>
                     <Input
                       type="number"
+                      min="0"
+                      max={mapWidth - 1}
                       value={eventData.positioning.coordinates.x}
                       onChange={e =>
                         setEventData(prev => ({
                           ...prev,
                           positioning: {
                             ...prev.positioning,
-                            coordinates: { ...prev.positioning.coordinates, x: parseInt(e.target.value) || 0 },
+                            coordinates: { 
+                              ...prev.positioning.coordinates, 
+                              x: getSafeCoord(parseInt(e.target.value), mapWidth)
+                            },
+                            // Auto-adjust width if x + width exceeds bounds
+                            size: {
+                              ...prev.positioning.size,
+                              width: getSafeSize(prev.positioning.size.width, getSafeCoord(parseInt(e.target.value), mapWidth), mapWidth)
+                            }
                           },
                         }))
                       }
@@ -312,13 +346,23 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                     <label className="text-[10px] text-muted-foreground">Y</label>
                     <Input
                       type="number"
+                      min="0"
+                      max={mapHeight - 1}
                       value={eventData.positioning.coordinates.y}
                       onChange={e =>
                         setEventData(prev => ({
                           ...prev,
                           positioning: {
                             ...prev.positioning,
-                            coordinates: { ...prev.positioning.coordinates, y: parseInt(e.target.value) || 0 },
+                            coordinates: { 
+                              ...prev.positioning.coordinates, 
+                              y: getSafeCoord(parseInt(e.target.value), mapHeight)
+                            },
+                            // Auto-adjust height if y + height exceeds bounds
+                            size: {
+                              ...prev.positioning.size,
+                              height: getSafeSize(prev.positioning.size.height, getSafeCoord(parseInt(e.target.value), mapHeight), mapHeight)
+                            }
                           },
                         }))
                       }
@@ -333,13 +377,17 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                   <Input
                     type="number"
                     min="1"
+                    max={mapWidth - eventData.positioning.coordinates.x}
                     value={eventData.positioning.size.width}
                     onChange={e =>
                       setEventData(prev => ({
                         ...prev,
                         positioning: {
                           ...prev.positioning,
-                          size: { ...prev.positioning.size, width: Math.max(1, parseInt(e.target.value) || 1) },
+                          size: { 
+                            ...prev.positioning.size, 
+                            width: getSafeSize(parseInt(e.target.value), prev.positioning.coordinates.x, mapWidth)
+                          },
                         },
                       }))
                     }
@@ -351,13 +399,17 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                   <Input
                     type="number"
                     min="1"
+                    max={mapHeight - eventData.positioning.coordinates.y}
                     value={eventData.positioning.size.height}
                     onChange={e =>
                       setEventData(prev => ({
                         ...prev,
                         positioning: {
                           ...prev.positioning,
-                          size: { ...prev.positioning.size, height: Math.max(1, parseInt(e.target.value) || 1) },
+                          size: { 
+                            ...prev.positioning.size, 
+                            height: getSafeSize(parseInt(e.target.value), prev.positioning.coordinates.y, mapHeight)
+                          },
                         },
                       }))
                     }
@@ -380,13 +432,14 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                   <label className="text-[10px] text-muted-foreground">X</label>
                   <Input
                     type="number"
+                    min="0"
                     value={eventData.positioning.hotspot.x}
                     onChange={e =>
                       setEventData(prev => ({
                         ...prev,
                         positioning: {
                           ...prev.positioning,
-                          hotspot: { ...prev.positioning.hotspot, x: parseInt(e.target.value) || 0 },
+                          hotspot: { ...prev.positioning.hotspot, x: Math.max(0, parseInt(e.target.value) || 0) },
                         },
                       }))
                     }
@@ -397,13 +450,14 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                   <label className="text-[10px] text-muted-foreground">Y</label>
                   <Input
                     type="number"
+                    min="0"
                     value={eventData.positioning.hotspot.y}
                     onChange={e =>
                       setEventData(prev => ({
                         ...prev,
                         positioning: {
                           ...prev.positioning,
-                          hotspot: { ...prev.positioning.hotspot, y: parseInt(e.target.value) || 0 },
+                          hotspot: { ...prev.positioning.hotspot, y: Math.max(0, parseInt(e.target.value) || 0) },
                         },
                       }))
                     }

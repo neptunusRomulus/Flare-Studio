@@ -121,6 +121,16 @@ export default function EditorCanvas(props: Props) {
   }, [editor]);
 
   React.useEffect(() => {
+    const handleActiveEventPreview = (e: any) => {
+      if (editorRef.current) {
+        editorRef.current.setActiveEventPreview(e.detail);
+      }
+    };
+    window.addEventListener('activeEventPreview', handleActiveEventPreview);
+    return () => window.removeEventListener('activeEventPreview', handleActiveEventPreview);
+  }, []);
+
+  React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey) {
         setIsCtrlHeld(true);

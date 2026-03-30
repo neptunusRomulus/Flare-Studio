@@ -1663,6 +1663,28 @@ export class TileMapEditor {
           return;
         }
 
+        // Check for event object at this position (double-click to edit)
+        const eventAtPosition = this.objects.find(
+          obj => obj.type === 'event' && obj.x >= 0 && obj.y >= 0 &&
+            tileCoords.x >= obj.x && tileCoords.x < obj.x + obj.width &&
+            tileCoords.y >= obj.y && tileCoords.y < obj.y + obj.height
+        );
+        if (eventAtPosition && event.button === 0) {
+          const now = Date.now();
+          if (this.eventLastClickId === eventAtPosition.id && now - this.eventLastClickTime < 300) {
+            // Double-click detected on event - open edit dialog
+            if (this.eventEditCallback) {
+              this.eventEditCallback(eventAtPosition.id);
+            }
+            this.eventLastClickTime = 0;
+            this.eventLastClickId = null;
+            this.isMouseDown = false;
+            return;
+          }
+          this.eventLastClickTime = now;
+          this.eventLastClickId = eventAtPosition.id;
+        }
+
         if (this.tool === 'tiles') {
           if (event.button === 2 && this.cellRightClickCallback) {
             // Right-click on tile cell - show context menu
@@ -6832,6 +6854,9 @@ export class TileMapEditor {
   private stampPreview: { x: number; y: number; width: number; height: number; visible: boolean } = { x: 0, y: 0, width: 0, height: 0, visible: false };
   private stampCallback: ((stamps: import('../types').Stamp[]) => void) | null = null;
   private heroEditCallback: ((currentX: number, currentY: number, mapWidth: number, mapHeight: number, onConfirm: (x: number, y: number) => void) => void) | null = null;
+  private eventEditCallback: ((eventId: number) => void) | null = null;
+  private eventLastClickTime: number = 0;
+  private eventLastClickId: number | null = null;
 
   public setEyedropperCallback(callback: (() => void) | null): void {
     this.eyedropperCallback = callback;
@@ -7036,6 +7061,10 @@ export class TileMapEditor {
 
   public setHeroEditCallback(callback: ((currentX: number, currentY: number, mapWidth: number, mapHeight: number, onConfirm: (x: number, y: number) => void) => void) | null): void {
     this.heroEditCallback = callback;
+  }
+
+  public setEventEditCallback(callback: ((eventId: number) => void) | null): void {
+    this.eventEditCallback = callback;
   }
 
   private placeStamp(gridX: number, gridY: number): void {
@@ -8974,21 +9003,118 @@ export class TileMapEditor {
     const events = this.objects.filter(obj => obj.type === 'event');
     for (const event of events) {
       lines.push(`[event]`);
-      lines.push(`# ${event.name}`);
-      lines.push(`type=event`);
-      lines.push(`location=${event.x},${event.y},${event.width},${event.height}`);
 
-      if (event.activate) lines.push(`activate=${event.activate}`);
-      if (event.hotspot) lines.push(`hotspot=${event.hotspot}`);
-      if (event.intermap) lines.push(`intermap=${event.intermap}`);
-      if (event.loot) lines.push(`loot=${event.loot}`);
-      if (event.soundfx) lines.push(`soundfx=${event.soundfx}`);
-      if (event.mapmod) lines.push(`mapmod=${event.mapmod}`);
-      if (event.repeat !== undefined) lines.push(`repeat=${event.repeat}`);
-      if (event.tooltip) lines.push(`tooltip=${event.tooltip}`);
+      // activate (always first)
+      const activate = event.properties.activate || event.activate || 'on_trigger';
+      lines.push(`activate=${activate}`);
 
-      for (const [key, value] of Object.entries(event.properties)) {
-        lines.push(`${key}=${value}`);
+      // location
+      if (event.properties.location) {
+        lines.push(`location=${event.properties.location}`);
+      } else if (event.x >= 0 && event.y >= 0) {
+        lines.push(`location=${event.x},${event.y},${event.width},${event.height}`);
+      }
+
+      // hotspot
+      if (event.properties.hotspot) {
+        lines.push(`hotspot=${event.properties.hotspot}`);
+      } else if (event.hotspot) {
+        lines.push(`hotspot=${event.hotspot}`);
+      }
+
+      // tooltip (use event name if set)
+      if (event.properties.tooltip) {
+        lines.push(`tooltip=${event.properties.tooltip}`);
+      } else if (event.name && event.name !== 'Event' && !event.name.startsWith('event_')) {
+        lines.push(`tooltip=${event.name}`);
+      } else if (event.tooltip) {
+        lines.push(`tooltip=${event.tooltip}`);
+      }
+
+      // cooldown / delay
+      if (event.properties.cooldown) lines.push(`cooldown=${event.properties.cooldown}`);
+      if (event.properties.delay) lines.push(`delay=${event.properties.delay}`);
+
+      // requirements
+      if (event.properties.requires_status) lines.push(`requires_status=${event.properties.requires_status}`);
+      if (event.properties.requires_not_status) lines.push(`requires_not_status=${event.properties.requires_not_status}`);
+      if (event.properties.requires_level) lines.push(`requires_level=${event.properties.requires_level}`);
+      if (event.properties.requires_item) lines.push(`requires_item=${event.properties.requires_item}`);
+      if (event.properties.requires_currency) lines.push(`requires_currency=${event.properties.requires_currency}`);
+      if (event.properties.requires_not_currency) lines.push(`requires_not_currency=${event.properties.requires_not_currency}`);
+      if (event.properties.requires_class) lines.push(`requires_class=${event.properties.requires_class}`);
+
+      // actions / rewards
+      if (event.properties.msg) lines.push(`msg=${event.properties.msg}`);
+      if (event.properties.reward_xp) lines.push(`reward_xp=${event.properties.reward_xp}`);
+      if (event.properties.reward_currency) lines.push(`reward_currency=${event.properties.reward_currency}`);
+      if (event.properties.reward_item) lines.push(`reward_item=${event.properties.reward_item}`);
+      if (event.properties.reward_loot) lines.push(`reward_loot=${event.properties.reward_loot}`);
+      if (event.properties.reward_loot_count) lines.push(`reward_loot_count=${event.properties.reward_loot_count}`);
+      if (event.properties.spawn) lines.push(`spawn=${event.properties.spawn}`);
+      if (event.properties.set_status) lines.push(`set_status=${event.properties.set_status}`);
+      if (event.properties.unset_status) lines.push(`unset_status=${event.properties.unset_status}`);
+      if (event.properties.remove_item) lines.push(`remove_item=${event.properties.remove_item}`);
+      if (event.properties.remove_currency) lines.push(`remove_currency=${event.properties.remove_currency}`);
+
+      // teleport / map transitions
+      if (event.properties.intermap) {
+        lines.push(`intermap=${event.properties.intermap}`);
+      } else if (event.intermap) {
+        lines.push(`intermap=${event.intermap}`);
+      }
+      if (event.properties.intermap_random) lines.push(`intermap_random=${event.properties.intermap_random}`);
+      if (event.properties.intramap) lines.push(`intramap=${event.properties.intramap}`);
+
+      // sound / music / visual
+      if (event.properties.soundfx) {
+        lines.push(`soundfx=${event.properties.soundfx}`);
+      } else if (event.soundfx) {
+        lines.push(`soundfx=${event.soundfx}`);
+      }
+      if (event.properties.music) lines.push(`music=${event.properties.music}`);
+      if (event.properties.shakycam) lines.push(`shakycam=${event.properties.shakycam}`);
+
+      // map modifications
+      if (event.properties.mapmod) {
+        lines.push(`mapmod=${event.properties.mapmod}`);
+      } else if (event.mapmod) {
+        lines.push(`mapmod=${event.mapmod}`);
+      }
+
+      // npcs / loot
+      if (event.properties.npc) lines.push(`npc=${event.properties.npc}`);
+      if (event.properties.loot) {
+        lines.push(`loot=${event.properties.loot}`);
+      } else if (event.loot) {
+        lines.push(`loot=${event.loot}`);
+      }
+      if (event.properties.loot_count) lines.push(`loot_count=${event.properties.loot_count}`);
+
+      // power
+      if (event.properties.power) lines.push(`power=${event.properties.power}`);
+      if (event.properties.power_damage) lines.push(`power_damage=${event.properties.power_damage}`);
+      if (event.properties.power_path) lines.push(`power_path=${event.properties.power_path}`);
+
+      // engine/utility
+      if (event.properties.chance_exec) lines.push(`chance_exec=${event.properties.chance_exec}`);
+      if (event.properties.save_game) lines.push(`save_game=${event.properties.save_game}`);
+      if (event.properties.script) lines.push(`script=${event.properties.script}`);
+      if (event.properties.respec) lines.push(`respec=${event.properties.respec}`);
+      if (event.properties.stash) lines.push(`stash=${event.properties.stash}`);
+      if (event.properties.book) lines.push(`book=${event.properties.book}`);
+      if (event.properties.restore) lines.push(`restore=${event.properties.restore}`);
+      if (event.properties.cutscene) lines.push(`cutscene=${event.properties.cutscene}`);
+      if (event.properties.parallax_layers) lines.push(`parallax_layers=${event.properties.parallax_layers}`);
+      if (event.properties.random_status) lines.push(`random_status=${event.properties.random_status}`);
+      if (event.properties.show_on_minimap) lines.push(`show_on_minimap=${event.properties.show_on_minimap}`);
+      if (event.properties.reachable_from) lines.push(`reachable_from=${event.properties.reachable_from}`);
+
+      // repeat
+      if (event.properties.repeat !== undefined) {
+        lines.push(`repeat=${event.properties.repeat}`);
+      } else if (event.repeat !== undefined) {
+        lines.push(`repeat=${event.repeat}`);
       }
 
       lines.push('');

@@ -23,6 +23,7 @@ export default function useAppState() {
   const [draggingEventId, setDraggingEventId] = useState<number | null>(null);
   const [eventDialogOpen, setEventDialogOpen] = useState<boolean>(false);
   const [eventDialogLocation, setEventDialogLocation] = useState<{ x: number; y: number } | null>(null);
+  const [editingEventId, setEditingEventId] = useState<number | null>(null);
   const [npcHoverTooltip, setNpcHoverTooltip] = useState<{ x: number; y: number } | null>(null);
   const [npcDeletePopup, setNpcDeletePopup] = useState<{
     npcId: number;
@@ -71,6 +72,8 @@ export default function useAppState() {
     setEventDialogOpen,
     eventDialogLocation,
     setEventDialogLocation,
+    editingEventId,
+    setEditingEventId,
     npcHoverTooltip,
     setNpcHoverTooltip,
     npcDeletePopup,

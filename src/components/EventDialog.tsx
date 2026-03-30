@@ -50,6 +50,7 @@ type EventDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   eventLocation: { x: number; y: number } | null;
+  editingEventId?: number | null;
 };
 
 const ACTIVATION_OPTIONS: EventActivation[] = ['Interact', 'Trigger', 'Leave', 'Load', 'MapExit', 'MapClear', 'Loop'];
@@ -92,30 +93,95 @@ const ACTIVATION_CONFIG: Record<EventActivation, { icon: React.ComponentType<Rea
   },
 };
 
-const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLocation: _eventLocation }) => {
+// Reverse map: Flare activate values -> UI activation names
+const FLARE_TO_ACTIVATION: Record<string, EventActivation> = {
+  on_interact: 'Interact',
+  on_trigger: 'Trigger',
+  on_leave: 'Leave',
+  on_load: 'Load',
+  on_mapexit: 'MapExit',
+  on_clear: 'MapClear',
+  static: 'Loop',
+};
+
+const ACTIVATION_TO_FLARE: Record<string, string> = {
+  Interact: 'on_interact',
+  Trigger: 'on_trigger',
+  Leave: 'on_leave',
+  Load: 'on_load',
+  MapExit: 'on_mapexit',
+  MapClear: 'on_clear',
+  Loop: 'static',
+};
+
+const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLocation: _eventLocation, editingEventId }) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { mapName: currentMapName, mapWidth, mapHeight, editor, syncMapObjectsWrapper } = useAppContext() as any;
 
+  const isEditing = editingEventId != null;
+
+  const buildProps = (): Record<string, string> => {
+    const { coordinates, size, hotspot } = eventData.positioning;
+    const flareActivate = ACTIVATION_TO_FLARE[eventData.timing.activeActivation || ''] || '';
+    const props: Record<string, string> = {};
+
+    if (flareActivate) props.activate = flareActivate;
+    if (['Trigger', 'Leave'].includes(eventData.timing.activeActivation || '')) {
+      props.location = `${coordinates.x},${coordinates.y},${size.width},${size.height}`;
+    }
+    if (['Interact', 'Trigger'].includes(eventData.timing.activeActivation || '')) {
+      props.hotspot = `${hotspot.x},${hotspot.y},${hotspot.width},${hotspot.height}`;
+    }
+    if (eventData.timing.cooldown > 0) props.cooldown = `${eventData.timing.cooldown}ms`;
+    if (eventData.timing.delay > 0) props.delay = `${eventData.timing.delay}ms`;
+    for (const status of eventData.requirements.status) {
+      if (status.trim()) props.requires_status = status.trim();
+    }
+    if (eventData.requirements.minLevel > 0) props.requires_level = String(eventData.requirements.minLevel);
+    if (eventData.requirements.itemId.trim()) {
+      props.requires_item = `${eventData.requirements.itemId.trim()}:${eventData.requirements.itemQuantity}`;
+    }
+    if (eventData.requirements.currency > 0) props.requires_currency = String(eventData.requirements.currency);
+    if (eventData.rewards.message.trim()) props.msg = eventData.rewards.message.trim();
+    if (eventData.rewards.expReward > 0) props.reward_xp = String(eventData.rewards.expReward);
+    if (eventData.rewards.itemReward.trim()) props.reward_item = eventData.rewards.itemReward.trim();
+    if (eventData.rewards.enemySpawn.trim()) props.spawn = eventData.rewards.enemySpawn.trim();
+    if (eventData.rewards.teleportMap.trim()) {
+      props.intermap = `${eventData.rewards.teleportMap.trim()},${eventData.rewards.teleportX},${eventData.rewards.teleportY}`;
+    }
+    if (eventData.rewards.sound.trim()) props.soundfx = eventData.rewards.sound.trim();
+    if (eventData.engine.chance < 100) props.chance_exec = String(eventData.engine.chance);
+    if (eventData.engine.autoSave) props.save_game = 'true';
+    if (eventData.engine.script.trim()) props.script = eventData.engine.script.trim();
+    return props;
+  };
+
   const handleSave = () => {
-    if (editor && typeof editor.addMapObject === 'function') {
-      const { coordinates, size, hotspot } = eventData.positioning;
-      
+    if (!editor) return;
+    const { coordinates, size } = eventData.positioning;
+    const flareActivate = ACTIVATION_TO_FLARE[eventData.timing.activeActivation || ''] || 'on_trigger';
+    const props = buildProps();
+
+    if (isEditing && typeof editor.updateMapObject === 'function') {
+      // Update existing event
+      editor.updateMapObject(editingEventId, {
+        name: eventData.name || 'Event',
+        type: 'event',
+        activate: flareActivate,
+        x: coordinates.x,
+        y: coordinates.y,
+        width: size.width,
+        height: size.height,
+        properties: props
+      });
+    } else if (typeof editor.addMapObject === 'function') {
+      // Create new event
       const newObject = editor.addMapObject('event', coordinates.x, coordinates.y, size.width, size.height);
       if (newObject && typeof editor.updateMapObject === 'function') {
-        const uniqueEventId = `ev_${Date.now().toString(36)}_${Math.random().toString(36).substr(2, 5)}`;
-        const props: Record<string, string> = {
-          ...newObject.properties,
-          eventId: uniqueEventId,
-          activation: eventData.timing.activeActivation || ''
-        };
-        
-        if (eventData.timing.activeActivation === 'Interact' || eventData.timing.activeActivation === 'Trigger') {
-            props.hotspot = `${hotspot.x},${hotspot.y},${hotspot.width},${hotspot.height}`;
-        }
-        
         editor.updateMapObject(newObject.id, {
           name: eventData.name || 'Event',
           type: 'event',
+          activate: flareActivate,
           x: coordinates.x,
           y: coordinates.y,
           width: size.width,
@@ -124,9 +190,10 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
         });
       }
     }
-    
+
     // reset selection / close
-    if (typeof syncMapObjectsWrapper === 'function') syncMapObjectsWrapper(); onOpenChange(false);
+    if (typeof syncMapObjectsWrapper === 'function') syncMapObjectsWrapper();
+    onOpenChange(false);
   };
 
   const getSafeCoord = (val: number, max: number) => {
@@ -197,6 +264,82 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
       }));
     }
 
+    // Load existing event data when editing
+    if (isEditing && editor && typeof editor.getMapObjects === 'function') {
+      const objects = editor.getMapObjects();
+      const obj = objects.find((o: { id: number }) => o.id === editingEventId);
+      if (obj) {
+        const p = obj.properties || {};
+        // Parse hotspot "x,y,w,h"
+        const hotParts = (p.hotspot || '').split(',').map(Number);
+        const hotspot = hotParts.length === 4 && hotParts.every((n: number) => !isNaN(n))
+          ? { x: hotParts[0], y: hotParts[1], width: hotParts[2], height: hotParts[3] }
+          : { x: 0, y: 0, width: 1, height: 1 };
+        // Parse requires_item "id:qty"
+        const reqItemParts = (p.requires_item || '').split(':');
+        // Parse intermap "map,x,y"
+        const intermapParts = (p.intermap || '').split(',');
+        // Parse cooldown/delay (remove "ms" suffix)
+        const parseCooldown = (v: string) => parseInt((v || '0').replace('ms', '')) || 0;
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setEventData({
+          name: obj.name || '',
+          positioning: {
+            mapName: currentMapName || '',
+            coordinates: { x: obj.x ?? 0, y: obj.y ?? 0 },
+            size: { width: obj.width ?? 1, height: obj.height ?? 1 },
+            hotspot,
+          },
+          timing: {
+            activeActivation: FLARE_TO_ACTIVATION[p.activate || obj.activate || ''] || null,
+            cooldown: parseCooldown(p.cooldown),
+            delay: parseCooldown(p.delay),
+          },
+          requirements: {
+            status: p.requires_status ? [p.requires_status] : [],
+            minLevel: parseInt(p.requires_level || '0') || 0,
+            itemId: reqItemParts[0] || '',
+            itemQuantity: parseInt(reqItemParts[1] || '1') || 1,
+            currency: parseInt(p.requires_currency || '0') || 0,
+          },
+          rewards: {
+            message: p.msg || '',
+            expReward: parseInt(p.reward_xp || '0') || 0,
+            itemReward: p.reward_item || '',
+            enemySpawn: p.spawn || '',
+            teleportMap: intermapParts.length >= 3 ? intermapParts[0] : (p.intermap || ''),
+            teleportX: intermapParts.length >= 3 ? parseInt(intermapParts[1]) || 0 : 0,
+            teleportY: intermapParts.length >= 3 ? parseInt(intermapParts[2]) || 0 : 0,
+            sound: p.soundfx || '',
+          },
+          engine: {
+            chance: parseInt(p.chance_exec || '100') || 100,
+            autoSave: p.save_game === 'true',
+            script: p.script || '',
+          },
+        });
+        return; // Skip default reset when editing
+      }
+    }
+
+    // Reset to defaults for new event
+    if (!isEditing) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setEventData({
+        name: '',
+        positioning: {
+          mapName: currentMapName || '',
+          coordinates: { x: 0, y: 0 },
+          size: { width: 1, height: 1 },
+          hotspot: { x: 0, y: 0, width: 1, height: 1 },
+        },
+        timing: { activeActivation: null, cooldown: 0, delay: 0 },
+        requirements: { status: [], minLevel: 0, itemId: '', itemQuantity: 1, currency: 0 },
+        rewards: { message: '', expReward: 0, itemReward: '', enemySpawn: '', teleportMap: '', teleportX: 0, teleportY: 0, sound: '' },
+        engine: { chance: 100, autoSave: false, script: '' },
+      });
+    }
+
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         if (typeof syncMapObjectsWrapper === 'function') syncMapObjectsWrapper(); onOpenChange(false);
@@ -205,7 +348,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
     
     document.addEventListener('keydown', handleEsc);
     return () => document.removeEventListener('keydown', handleEsc);
-  }, [open, onOpenChange, currentMapName]);
+  }, [open, onOpenChange, currentMapName, isEditing, editingEventId, editor]);
 
   useEffect(() => {
     if (!open) {
@@ -286,7 +429,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
           className="sticky top-0 z-10 border-b border-border/50 bg-background px-6 py-3 flex items-center justify-between cursor-move select-none"
           onMouseDown={handleHeaderMouseDown}
         >
-          <h3 className="text-lg font-semibold flex-1">Add Event</h3>
+          <h3 className="text-lg font-semibold flex-1">{isEditing ? 'Edit Event' : 'Add Event'}</h3>
           <Button
             size="icon"
             variant="ghost"

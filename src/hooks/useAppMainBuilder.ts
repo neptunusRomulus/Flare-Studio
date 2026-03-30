@@ -406,9 +406,28 @@ export default function useAppMainBuilder() {
   const { handleEventDragStart, handleEventDragEnd } = useEventDrag({ editor, setDraggingEventId: appState.setDraggingEventId });
 
   const handleOpenEventDialog = useCallback((location?: { x: number; y: number } | null) => {
+    appState.setEditingEventId(null);
     appState.setEventDialogLocation(location ?? null);
     appState.setEventDialogOpen(true);
   }, [appState]);
+
+  const handleEditEvent = useCallback((eventId: number) => {
+    appState.setEditingEventId(eventId);
+    appState.setEventDialogLocation(null);
+    appState.setEventDialogOpen(true);
+  }, [appState]);
+
+  // Wire canvas double-click on events to open the edit dialog
+  useEffect(() => {
+    if (editor && typeof (editor as any).setEventEditCallback === 'function') {
+      (editor as any).setEventEditCallback((eventId: number) => {
+        handleEditEvent(eventId);
+      });
+      return () => {
+        (editor as any).setEventEditCallback(null);
+      };
+    }
+  }, [editor, handleEditEvent]);
 
   const objectEditing = useObjectEditing({ 
     editor: editor ?? undefined, 
@@ -599,7 +618,7 @@ export default function useAppMainBuilder() {
         isEventLayer: activeLayer?.type === 'event',
         eventEntries: activeLayer?.type === 'event' ? appState.mapObjects.filter((obj) => obj.type === 'event') : [],
         draggingEventId: appState.draggingEventId,
-        handleEditEvent: () => {},  // TODO: Wire up to open EventDialog for editing
+        handleEditEvent,
         setEventHoverTooltip: () => {},  // TODO: Implement event hover tooltip
         handleEventDragStart,
         handleEventDragEnd,
@@ -999,6 +1018,8 @@ export default function useAppMainBuilder() {
       setEventDialogOpen: appState.setEventDialogOpen,
       eventDialogLocation: appState.eventDialogLocation,
       setEventDialogLocation: appState.setEventDialogLocation,
+      editingEventId: appState.editingEventId,
+      setEditingEventId: appState.setEditingEventId,
       confirmDialogProps: buildConfirmDialogProps({ confirmAction, setConfirmAction, onCancel, onConfirm }),
       showHelp: helpState.showHelp,
       activeHelpTab: helpState.activeHelpTab,

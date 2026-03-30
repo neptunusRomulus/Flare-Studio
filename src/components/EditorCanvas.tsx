@@ -102,6 +102,35 @@ export default function EditorCanvas(props: Props) {
     leftTransitioning
   } = ctx;
 
+  const [cursorScreenPos, setCursorScreenPos] = React.useState<{x: number, y: number} | null>(null);
+  const [ctrlCursorTileCoords, setCtrlCursorTileCoords] = React.useState<{x: number, y: number} | null>(null);
+  const [isCtrlHeld, setIsCtrlHeld] = React.useState(false);
+
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        console.log('[EditorCanvas] Ctrl/Meta key down detected');
+        setIsCtrlHeld(true);
+      }
+    };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'ControlLeft' || e.code === 'ControlRight' || e.code === 'MetaLeft' || e.code === 'MetaRight') {
+        console.log('[EditorCanvas] Ctrl/Meta key up detected');
+        setIsCtrlHeld(false);
+      }
+    };
+    const handleBlur = () => setIsCtrlHeld(false);
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    window.addEventListener('blur', handleBlur);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+      window.removeEventListener('blur', handleBlur);
+    };
+  }, []);
+
   // Context menu state
   const contextMenu = useContextMenu();
 
@@ -140,6 +169,22 @@ export default function EditorCanvas(props: Props) {
     <div
       ref={canvasAreaRef}
       className={`bg-gray-100 flex-1 min-h-0 flex overflow-hidden relative ${draggingNpcId || draggingEventId ? 'ring-2 ring-orange-500 ring-inset' : ''}`}
+      onMouseMove={(e) => {
+        setCursorScreenPos({ x: e.clientX, y: e.clientY });
+        
+        // Compute tile coordinates from cursor position
+        if (editor && canvasRef.current) {
+          const rect = canvasRef.current.getBoundingClientRect();
+          const canvasX = e.clientX - rect.left;
+          const canvasY = e.clientY - rect.top;
+          const tileCoords = editor.screenToTile(canvasX, canvasY);
+          if (tileCoords) {
+            setCtrlCursorTileCoords(tileCoords);
+          } else {
+            setCtrlCursorTileCoords(null);
+          }
+        }
+      }}
       onDragOver={(e) => {
         if (editor && canvasRef.current) {
           const rect = canvasRef.current.getBoundingClientRect();
@@ -157,7 +202,13 @@ export default function EditorCanvas(props: Props) {
           }
         }
       }}
+      onMouseLeave={() => {
+        setCursorScreenPos(null);
+        setCtrlCursorTileCoords(null);
+      }}
       onDragLeave={() => {
+        setCursorScreenPos(null);
+        setCtrlCursorTileCoords(null);
         if (draggingNpcId && editor) editor.clearNpcDragHover();
         if (draggingEventId && editor) editor.clearEventDragHover();
       }}
@@ -230,6 +281,22 @@ export default function EditorCanvas(props: Props) {
         handleDeleteSelection={handleDeleteSelection}
         handleClearSelection={handleClearSelection}
       />
+
+      {contextMenu.isOpen && contextMenu.cellCoords && contextMenu.position ? (
+        <div
+          className="fixed z-[100] px-2 py-1 bg-black/90 text-white text-xs rounded shadow-lg pointer-events-none flex items-center gap-1.5"
+          style={{ left: contextMenu.position.x + 12, top: contextMenu.position.y - 30 }}
+        >
+          <span>{contextMenu.cellCoords.x}, {contextMenu.cellCoords.y}</span>
+        </div>
+      ) : isCtrlHeld && cursorScreenPos && ctrlCursorTileCoords ? (
+         <div
+           className="fixed z-[100] px-2 py-1 bg-black/90 text-white text-xs rounded shadow-lg pointer-events-none flex items-center gap-1.5"
+           style={{ left: cursorScreenPos.x + 12, top: cursorScreenPos.y - 30 }}
+         >
+           <span>{`${ctrlCursorTileCoords.x}, ${ctrlCursorTileCoords.y}`}</span>
+         </div>
+      ) : null}
 
       <CellContextMenu
         isOpen={contextMenu.isOpen}

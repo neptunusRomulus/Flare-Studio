@@ -1805,7 +1805,24 @@ export class TileMapEditor {
 
   private handleWheel(event: WheelEvent): void {
     event.preventDefault();
+
+    const rect = this.mapCanvas.getBoundingClientRect();
+    const cursorX = event.clientX - rect.left;
+    const cursorY = event.clientY - rect.top;
+
+    // Check if hovering over minimap
+    if (this.showMinimap && this.lastMiniMapBounds) {
+      const { x, y, w, h } = this.lastMiniMapBounds;
+      if (cursorX >= x && cursorX <= x + w && cursorY >= y && cursorY <= y + h) {
+        const zoomFactor = event.deltaY > 0 ? 0.9 : 1.1;
+        // Clamp minimap internal zoom to reasonable values (e.g. 0.25x to 4.0x)
+        this.minimapZoom = Math.max(0.25, Math.min(4.0, this.minimapZoom * zoomFactor));
+        this.draw();
+        return; // Consume wheel event for minimap zoom
+      }
+    }
     
+    // Default: modify main canvas zoom
     const zoomFactor = event.deltaY > 0 ? 0.9 : 1.1;
     this.setZoom(this.zoom * zoomFactor);
   }
@@ -2742,17 +2759,30 @@ export class TileMapEditor {
     this.draw();
   }
 
+  public getMinimapWindowScale(): number {
+    return this.minimapWindowScale;
+  }
+
+  public setMinimapWindowScale(scale: number): void {
+    if (this.minimapWindowScale !== scale) {
+      this.minimapWindowScale = scale;
+      this.draw();
+    }
+  }
+
   // During sidebar open/close animations we can avoid recomputing minimap
   // coordinates to prevent jitter. When this flag is true the drawMiniMap
   // function will reuse the last computed coordinates until transitions end.
   private sidebarTransitioning: boolean = false;
-  private lastMiniMapPos: { x: number; y: number } | null = null;
+  private lastMiniMapBounds: { x: number; y: number; w: number; h: number } | null = null;
+  private minimapWindowScale: number = 1.0;
+  private minimapZoom: number = 1.0;
 
   public setSidebarTransitioning(flag: boolean): void {
     this.sidebarTransitioning = !!flag;
     if (!this.sidebarTransitioning) {
       // Clear cache when transition finishes so next draw computes fresh pos
-      this.lastMiniMapPos = null;
+      this.lastMiniMapBounds = null;
     }
   }
 
@@ -3723,8 +3753,8 @@ export class TileMapEditor {
     if (!this.showMinimap) return;
 
     // Minimap dimensions and position (bottom-right corner)
-    const minimapWidth = 150;
-    const minimapHeight = 120;
+    const minimapWidth = Math.floor(150 * this.minimapWindowScale);
+    const minimapHeight = Math.floor(120 * this.minimapWindowScale);
     const padding = 10;
     // Anchor minimap to the screen's bottom-right corner so it doesn't
     // shift during layout transitions (sidebar open/close). We compute the
@@ -3739,8 +3769,8 @@ export class TileMapEditor {
     // Clamp inside canvas to avoid drawing outside if the canvas is smaller
     x = Math.max(0, Math.min(this.mapCanvas.width - minimapWidth, x));
     y = Math.max(0, Math.min(this.mapCanvas.height - minimapHeight, y));
-    // Update cached pos as well for compatibility with any other logic
-    this.lastMiniMapPos = { x, y };
+    // Update cached bounds for hit testing
+    this.lastMiniMapBounds = { x, y, w: minimapWidth, h: minimapHeight };
 
     // Save current context state
     this.ctx.save();
@@ -3798,11 +3828,10 @@ export class TileMapEditor {
     if (this.minimapMode === 'isometric') {
       const maxTileWidth = Math.floor(minimapWidth * 2 / (this.mapWidth + this.mapHeight)) || 1;
       const maxTileHeight = Math.floor(minimapHeight * 4 / (this.mapWidth + this.mapHeight)) || 1;
-      tilePixel = Math.max(1, Math.min(maxTileWidth, maxTileHeight));
+      tilePixel = Math.max(1, Math.min(maxTileWidth, maxTileHeight)) * this.minimapZoom;
       
-      // Enforce even number to avoid sub-pixel rendering gaps in isometric mode if possible
-      if (tilePixel > 2) tilePixel = Math.floor(tilePixel / 2) * 2;
-
+      // We can allow sub-pixel sizes here for smooth zooming or round it
+      
       mapPixelWidth = (this.mapWidth + this.mapHeight) * (tilePixel / 2);
       mapPixelHeight = (this.mapWidth + this.mapHeight) * (tilePixel / 4);
       
@@ -3811,13 +3840,18 @@ export class TileMapEditor {
     } else {
       const maxTileWidth = Math.floor(minimapWidth / this.mapWidth) || 1;
       const maxTileHeight = Math.floor(minimapHeight / this.mapHeight) || 1;
-      tilePixel = Math.max(1, Math.min(maxTileWidth, maxTileHeight));
+      tilePixel = Math.max(1, Math.min(maxTileWidth, maxTileHeight)) * this.minimapZoom;
 
       mapPixelWidth = this.mapWidth * tilePixel;
       mapPixelHeight = this.mapHeight * tilePixel;
       offsetX = x + Math.floor((minimapWidth - mapPixelWidth) / 2);
       offsetY = y + Math.floor((minimapHeight - mapPixelHeight) / 2);
     }
+
+  // Draw minimap contents within clipping region so zoom doesn't leak out
+  this.ctx.save();
+  roundedRectPath(x, y, minimapWidth, minimapHeight, innerRadius);
+  this.ctx.clip();
 
   // Disable smoothing for pixel-perfect minimap (modern engines)
   this.ctx.imageSmoothingEnabled = false;
@@ -3971,6 +4005,9 @@ export class TileMapEditor {
         }
       }
     }
+
+    // End clipping mask for minimap contents
+    this.ctx.restore();
 
     // Restore context state
     this.ctx.restore();

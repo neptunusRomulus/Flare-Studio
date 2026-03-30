@@ -131,7 +131,14 @@ const INTERNAL_COLLISION_TILESET = 'collision-tile.png';
 
 export class TileMapEditor {
   public isStartingMap: boolean = false;
+  public activeEventPreview: { x: number; y: number; width: number; height: number } | null = null;
   private enemyCategories: string[] = [];
+
+  public setActiveEventPreview(preview: { x: number; y: number; width: number; height: number } | null): void {
+    const changed = JSON.stringify(this.activeEventPreview) !== JSON.stringify(preview);
+    this.activeEventPreview = preview;
+    if (changed) this.draw();
+  }
   /**
    * Creates a settings.txt file in the project root folder for Flare compatibility.
    * Call this after export. Updates description with project name.
@@ -2433,6 +2440,9 @@ export class TileMapEditor {
     // Draw shape preview
     this.drawShapePreview();
 
+    // Draw active event preview if interacting with EventDialog
+    this.drawActiveEventPreview();
+
     // Draw collision overlay last so collision borders are always on top.
     this.drawCollisionOverlay();
     
@@ -3617,6 +3627,59 @@ export class TileMapEditor {
     }
   }
 
+  private drawActiveEventPreview(): void {
+    if (!this.activeEventPreview) return;
+    const { x, y, width, height } = this.activeEventPreview;
+
+    const w = Math.max(1, width);
+    const h = Math.max(1, height);
+
+    const halfTileX = (this.tileSizeX / 2) * this.zoom;
+    const halfTileY = (this.tileSizeY / 2) * this.zoom;
+
+    this.ctx.save();
+    
+    // Draw the full area with lighter transparency
+    if (w > 1 || h > 1) {
+      const c1 = this.mapToScreen(x, y);
+      const c2 = this.mapToScreen(x + w - 1, y);
+      const c3 = this.mapToScreen(x + w - 1, y + h - 1);
+      const c4 = this.mapToScreen(x, y + h - 1);
+
+      this.ctx.beginPath();
+      this.ctx.moveTo(c1.x, c1.y - halfTileY); // Top
+      this.ctx.lineTo(c2.x + halfTileX, c2.y); // Right
+      this.ctx.lineTo(c3.x, c3.y + halfTileY); // Bottom
+      this.ctx.lineTo(c4.x - halfTileX, c4.y); // Left
+      this.ctx.closePath();
+
+      this.ctx.fillStyle = 'rgba(255, 165, 0, 0.2)';
+      this.ctx.fill();
+
+      this.ctx.strokeStyle = 'rgba(255, 140, 0, 0.4)';
+      this.ctx.lineWidth = Math.max(1, 1 * this.zoom);
+      this.ctx.stroke();
+    }
+
+    // Draw the single cell (x,y) with stronger overlay
+    const origin = this.mapToScreen(x, y);
+    this.ctx.beginPath();
+    this.ctx.moveTo(origin.x, origin.y - halfTileY); // Top
+    this.ctx.lineTo(origin.x + halfTileX, origin.y); // Right
+    this.ctx.lineTo(origin.x, origin.y + halfTileY); // Bottom
+    this.ctx.lineTo(origin.x - halfTileX, origin.y); // Left
+    this.ctx.closePath();
+
+    this.ctx.fillStyle = 'rgba(255, 165, 0, 0.6)';
+    this.ctx.fill();
+
+    this.ctx.strokeStyle = 'rgba(255, 140, 0, 0.9)';
+    this.ctx.lineWidth = Math.max(2, 2 * this.zoom);
+    this.ctx.stroke();
+
+    this.ctx.restore();
+  }
+
   private drawShapePreview(): void {
     if (!this.isDrawingShape || this.shapeDrawing.preview.length === 0) return;
 
@@ -4298,6 +4361,49 @@ export class TileMapEditor {
       }
     }
 
+    if (this.activeEventPreview && tilePixel > 0) {
+      const { x: aX, y: aY, width, height } = this.activeEventPreview;
+      const w = Math.max(1, width);
+      const h = Math.max(1, height);
+
+      const drawMinimapShape = (sX: number, sY: number, sW: number, sH: number, fill: string, stroke: string) => {
+        this.ctx.fillStyle = fill;
+        this.ctx.strokeStyle = stroke;
+        this.ctx.lineWidth = 1;
+
+        if (this.minimapMode === 'isometric') {
+          const getMinimapPoint = (mX: number, mY: number) => ({
+            x: offsetX + (mX - mY) * (tilePixel / 2),
+            y: offsetY + (mX + mY) * (tilePixel / 4)
+          });
+
+          const p1 = getMinimapPoint(sX, sY);
+          const p2 = getMinimapPoint(sX + sW - 1, sY);
+          const p3 = getMinimapPoint(sX + sW - 1, sY + sH - 1);
+          const p4 = getMinimapPoint(sX, sY + sH - 1);
+
+          this.ctx.beginPath();
+          this.ctx.moveTo(p1.x, p1.y);
+          this.ctx.lineTo(p2.x + tilePixel / 2, p2.y + tilePixel / 4);
+          this.ctx.lineTo(p3.x, p3.y + tilePixel / 2);
+          this.ctx.lineTo(p4.x - tilePixel / 2, p4.y + tilePixel / 4);
+          this.ctx.closePath();
+
+          this.ctx.fill();
+          this.ctx.stroke();
+        } else {
+          const pixelX = offsetX + sX * tilePixel;
+          const pixelY = offsetY + sY * tilePixel;
+          this.ctx.fillRect(pixelX, pixelY, sW * tilePixel, sH * tilePixel);
+          this.ctx.strokeRect(pixelX, pixelY, sW * tilePixel, sH * tilePixel);
+        }
+      };
+
+      if (w > 1 || h > 1) {
+        drawMinimapShape(aX, aY, w, h, 'rgba(255, 165, 0, 0.2)', 'rgba(255, 140, 0, 0.4)');
+      }
+      drawMinimapShape(aX, aY, 1, 1, 'rgba(255, 165, 0, 0.6)', 'rgba(255, 140, 0, 0.9)');
+    }
     // End clipping mask for minimap contents
     this.ctx.restore();
     

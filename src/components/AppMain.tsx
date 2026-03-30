@@ -63,6 +63,7 @@ export default function AppMain() {
     eventDialogOpen,
     setEventDialogOpen,
     eventDialogLocation,
+    editingEventId,
     confirmDialogProps,
     showHelp,
     activeHelpTab,
@@ -231,7 +232,7 @@ export default function AppMain() {
           handleDeleteMap={handleDeleteMap}
         />
 
-        <EventDialog open={eventDialogOpen} onOpenChange={setEventDialogOpen} eventLocation={eventDialogLocation} />
+        <EventDialog open={eventDialogOpen} onOpenChange={setEventDialogOpen} eventLocation={eventDialogLocation} editingEventId={editingEventId} />
 
         <ClearLayerDialog open={showClearLayerDialog} onClose={handleClearLayerClose} onConfirm={handleClearLayerConfirm} />
 

@@ -172,6 +172,32 @@ const EngineSettingsDialog = ({
                   Switches the minimap between orthogonal top-down and isometric views.
                 </p>
               </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Minimap Window Size</label>
+                <div className="flex items-center gap-3">
+                  <input 
+                    type="range" 
+                    min="0.5" 
+                    max="3.0" 
+                    step="0.1" 
+                    value={editor?.getMinimapWindowScale() || 1.0}
+                    onChange={(e) => {
+                      if (editor) {
+                        editor.setMinimapWindowScale(parseFloat(e.target.value));
+                        setForceRender(prev => prev + 1);
+                      }
+                    }}
+                    className="flex-1 accent-orange-600"
+                  />
+                  <span className="text-xs font-mono w-10 text-right">
+                    {((editor?.getMinimapWindowScale() || 1.0) * 100).toFixed(0)}%
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Changes the dimensions of the minimap UI box.
+                </p>
+              </div>
             </div>
           )}
 

@@ -126,27 +126,22 @@ export default function EditorCanvas(props: Props) {
         setIsCtrlHeld(true);
       }
       if (e.code === 'Space') {
-        console.log('[KEY DOWN] Space detected - mouse is down?', isMouseDownRef.current, 'editor:', !!editorRef.current);
         e.preventDefault();
         setIsSpaceHeld(true);
         isSpaceHeldRef.current = true;
         
         // If mouse is already being held down, start panning
         if (isMouseDownRef.current && editorRef.current && canvasRef.current) {
-          console.log('[KEY DOWN] Starting panning (mouse already down)');
           setIsMinimapPanning(true);
           minimapPanStartRef.current = lastCursorPosRef.current;
         }
       }
     };
     const handleKeyUp = (e: KeyboardEvent) => {
-      console.log('[KEY UP]', e.code);
       if (e.code === 'ControlLeft' || e.code === 'ControlRight' || e.code === 'MetaLeft' || e.code === 'MetaRight') {
-        console.log('[KEY UP] Ctrl/Meta released - setting isCtrlHeld = false');
         setIsCtrlHeld(false);
       }
       if (e.code === 'Space') {
-        console.log('[KEY UP] Space released - setting isSpaceHeld = false, isMinimapPanning = false, updating ref');
         e.preventDefault();
         setIsSpaceHeld(false);
         isSpaceHeldRef.current = false;
@@ -183,9 +178,7 @@ export default function EditorCanvas(props: Props) {
   // Debug state changes
   React.useEffect(() => {
     if (isMinimapPanning) {
-      console.log('[STATE CHANGE] Panning started - isSpaceHeld:', isSpaceHeld);
     } else if (isSpaceHeld) {
-      console.log('[STATE CHANGE] isSpaceHeld:', isSpaceHeld, 'isMinimapPanning:', isMinimapPanning);
     }
   }, [isSpaceHeld, isMinimapPanning]);
 
@@ -361,7 +354,11 @@ export default function EditorCanvas(props: Props) {
                 // If space is held, let TileMapEditor handle the minimap internals panning
                 return;
               }
-              console.log('[MOUSE DOWN] Starting panning (minimap clicked)');
+              // If we clicked on the top-left resize handle, let `TileMapEditor` handle it
+              if (editorRef.current.getIsResizingMinimap && editorRef.current.getIsResizingMinimap()) {
+                return;
+              }
+              
               setIsMinimapPanning(true);
               minimapPanStartRef.current = { x: e.clientX, y: e.clientY };
               
@@ -382,9 +379,7 @@ export default function EditorCanvas(props: Props) {
       onMouseUp={(e) => {
         if (e.button === 0) {
           isMouseDownRef.current = false;
-          console.log('[MOUSE UP] Left button released - isMinimapPanning:', isMinimapPanning);
           if (isMinimapPanning) {
-            console.log('[MOUSE UP] Stopping minimap panning');
             setIsMinimapPanning(false);
             minimapPanStartRef.current = null;
           }

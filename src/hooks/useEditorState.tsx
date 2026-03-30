@@ -79,15 +79,10 @@ export function useEditorState(optsRef: React.RefObject<Partial<UseEditorStateOp
 
   const syncMapObjectsWrapper = useCallback(() => {
     const fn = syncMapObjectsRef.current;
-    console.log('[DEBUG-Wrapper] syncMapObjectsWrapper called, fn exists:', !!fn, 'fn type:', typeof fn);
     if (fn && typeof fn === 'function') {
       // Always call the function if it exists and is a function
       // Don't compare to wrapper to avoid skipping legitimate calls
-      console.log('[DEBUG-Wrapper] Calling syncMapObjectsRef.current');
       fn();
-      console.log('[DEBUG-Wrapper] syncMapObjectsRef.current completed');
-    } else {
-      console.log('[DEBUG-Wrapper] Skipped: fn is not a valid function', fn);
     }
   }, [syncMapObjectsRef]);
 

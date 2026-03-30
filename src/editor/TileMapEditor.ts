@@ -2777,6 +2777,7 @@ export class TileMapEditor {
   private lastMiniMapBounds: { x: number; y: number; w: number; h: number } | null = null;
   private minimapWindowScale: number = 1.0;
   private minimapZoom: number = 1.0;
+  private minimapHoverCoords: { x: number; y: number } | null = null;
 
   public setSidebarTransitioning(flag: boolean): void {
     this.sidebarTransitioning = !!flag;
@@ -2784,6 +2785,22 @@ export class TileMapEditor {
       // Clear cache when transition finishes so next draw computes fresh pos
       this.lastMiniMapBounds = null;
     }
+  }
+
+  public getLastMiniMapBounds(): { x: number; y: number; w: number; h: number } | null {
+    return this.lastMiniMapBounds;
+  }
+
+  public setMinimapHoverCoords(coords: { x: number; y: number } | null): void {
+    this.minimapHoverCoords = coords;
+  }
+
+  public getMinimapHoverCoords(): { x: number; y: number } | null {
+    return this.minimapHoverCoords;
+  }
+
+  public getMinimapZoom(): number {
+    return this.minimapZoom;
   }
 
   public setPan(deltaX: number, deltaY: number): void {
@@ -3984,8 +4001,8 @@ export class TileMapEditor {
 
     // Optional subtle grid for clarity when tiles are large enough
     if (tilePixel >= 3) {
-      this.ctx.strokeStyle = this.isDarkMode ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.05)';
-      this.ctx.lineWidth = 0.5;
+      this.ctx.strokeStyle = this.isDarkMode ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.25)';
+      this.ctx.lineWidth = 1;
       for (let ty = 0; ty < this.mapHeight; ty++) {
         for (let tx = 0; tx < this.mapWidth; tx++) {
           if (this.minimapMode === 'isometric') {
@@ -4003,6 +4020,28 @@ export class TileMapEditor {
             this.ctx.strokeRect(gx, gy, tilePixel - 0.5, tilePixel - 0.5);
           }
         }
+      }
+    }
+
+    // Draw red overlay for hovered cell in minimap
+    if (this.minimapHoverCoords && tilePixel > 0) {
+      const { x: hoverX, y: hoverY } = this.minimapHoverCoords;
+      
+      this.ctx.fillStyle = 'rgba(255, 0, 0, 0.7)';
+      
+      if (this.minimapMode === 'isometric') {
+        const gx = offsetX + (hoverX - hoverY) * (tilePixel / 2);
+        const gy = offsetY + (hoverX + hoverY) * (tilePixel / 4);
+        this.ctx.beginPath();
+        this.ctx.moveTo(gx, gy);
+        this.ctx.lineTo(gx + tilePixel / 2, gy + tilePixel / 4);
+        this.ctx.lineTo(gx, gy + tilePixel / 2);
+        this.ctx.lineTo(gx - tilePixel / 2, gy + tilePixel / 4);
+        this.ctx.fill();
+      } else {
+        const pixelX = offsetX + hoverX * tilePixel;
+        const pixelY = offsetY + hoverY * tilePixel;
+        this.ctx.fillRect(pixelX, pixelY, tilePixel, tilePixel);
       }
     }
 

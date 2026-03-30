@@ -52,7 +52,7 @@ type EventDialogProps = {
 
 const ACTIVATION_OPTIONS: EventActivation[] = ['Interact', 'Trigger', 'Leave', 'Load', 'MapExit', 'MapClear', 'Loop'];
 
-const ACTIVATION_CONFIG: Record<EventActivation, { icon: React.ComponentType<any>; tooltip: string; label: string }> = {
+const ACTIVATION_CONFIG: Record<EventActivation, { icon: React.ComponentType<React.SVGProps<SVGSVGElement>>; tooltip: string; label: string }> = {
   Interact: {
     icon: MousePointerClick,
     tooltip: 'Interact - Activated specifically when the player interacts with the hotspot',

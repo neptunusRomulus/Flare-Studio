@@ -1594,6 +1594,20 @@ export class TileMapEditor {
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
 
+    // Ignore clicks on the minimap
+    if (this.showMinimap && this.lastMiniMapBounds) {
+      const { x: mapX, y: mapY, w, h } = this.lastMiniMapBounds;
+      if (x >= mapX && x <= mapX + w && y >= mapY && y <= mapY + h) {
+        if (this.spacePressed) {
+          this.isMinimapPanning = true;
+          this.lastMinimapPanX = x;
+          this.lastMinimapPanY = y;
+          this.mapCanvas.style.cursor = 'grabbing';
+        }
+        return;
+      }
+    }
+
     if (this.spacePressed) {
       // Start panning
       this.isPanning = true;
@@ -1692,7 +1706,17 @@ export class TileMapEditor {
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
 
-    if (this.isPanning && this.spacePressed) {
+    if (this.isMinimapPanning && this.spacePressed) {
+      // Handle minimap panning
+      const deltaX = x - this.lastMinimapPanX;
+      const deltaY = y - this.lastMinimapPanY;
+      this.minimapPanX += deltaX;
+      this.minimapPanY += deltaY;
+      this.lastMinimapPanX = x;
+      this.lastMinimapPanY = y;
+      this.draw();
+      return;
+    } else if (this.isPanning && this.spacePressed) {
       // Handle panning
       const deltaX = x - this.lastPanX;
       const deltaY = y - this.lastPanY;
@@ -1758,6 +1782,7 @@ export class TileMapEditor {
 
     this.isMouseDown = false;
     this.isPanning = false;
+    this.isMinimapPanning = false;
   }
 
   private handleMouseLeave(): void {
@@ -1768,6 +1793,7 @@ export class TileMapEditor {
     this.hoverY = -1;
     this.isDraggingActor = false;
     this.draggingActorId = null;
+    this.isMinimapPanning = false;
     this.draw();
   }
 
@@ -1908,6 +1934,8 @@ export class TileMapEditor {
     if (event.code === 'Space') {
       event.preventDefault();
       this.spacePressed = false;
+      this.isPanning = false;
+      this.isMinimapPanning = false;
       this.mapCanvas.style.cursor = 'crosshair';
     }
   }
@@ -2315,6 +2343,7 @@ export class TileMapEditor {
   }
 
   private draw(): void {
+    console.log('[TileMapEditor.draw] Called - panX:', this.panX, 'panY:', this.panY, 'zoom:', this.zoom);
     // Clear canvas
     this.ctx.clearRect(0, 0, this.mapCanvas.width, this.mapCanvas.height);
     
@@ -2776,6 +2805,11 @@ export class TileMapEditor {
   private sidebarTransitioning: boolean = false;
   private lastMiniMapBounds: { x: number; y: number; w: number; h: number } | null = null;
   private minimapWindowScale: number = 1.0;
+  private minimapPanX: number = 0;
+  private minimapPanY: number = 0;
+  private isMinimapPanning: boolean = false;
+  private lastMinimapPanX: number = 0;
+  private lastMinimapPanY: number = 0;
   private minimapZoom: number = 1.0;
   private minimapHoverCoords: { x: number; y: number } | null = null;
 
@@ -2799,13 +2833,40 @@ export class TileMapEditor {
     return this.minimapHoverCoords;
   }
 
+  public getMinimapPan(): { x: number, y: number } {
+    return { x: this.minimapPanX, y: this.minimapPanY };
+  }
+
   public getMinimapZoom(): number {
     return this.minimapZoom;
   }
 
+  public panToTile(tileX: number, tileY: number): void {
+    // Determine where the tile is right now in raw screen space without any pan
+    const oldPanX = this.panX;
+    const oldPanY = this.panY;
+    
+    // Reset pan temporarily to calculate absolute offset
+    this.panX = 0;
+    this.panY = 0;
+    const absScreenPos = this.mapToScreen(tileX, tileY);
+    
+    // We want this position to map to the center of the canvas
+    const targetScreenX = this.mapCanvas.width / 2;
+    const targetScreenY = this.mapCanvas.height / 2;
+    
+    // Calculate new pan required
+    this.panX = (targetScreenX - absScreenPos.x) / this.zoom;
+    this.panY = (targetScreenY - absScreenPos.y) / this.zoom;
+    
+    this.draw();
+  }
+
   public setPan(deltaX: number, deltaY: number): void {
+    console.log('[TileMapEditor.setPan] Before - panX:', this.panX, 'panY:', this.panY, 'delta:', deltaX, deltaY);
     this.panX += deltaX;
     this.panY += deltaY;
+    console.log('[TileMapEditor.setPan] After - panX:', this.panX, 'panY:', this.panY);
     this.draw();
   }
 
@@ -3852,8 +3913,8 @@ export class TileMapEditor {
       mapPixelWidth = (this.mapWidth + this.mapHeight) * (tilePixel / 2);
       mapPixelHeight = (this.mapWidth + this.mapHeight) * (tilePixel / 4);
       
-      offsetX = x + minimapWidth / 2 - (this.mapWidth - this.mapHeight) * (tilePixel / 4);
-      offsetY = y + minimapHeight / 2 - (this.mapWidth + this.mapHeight) * (tilePixel / 8);
+      offsetX = x + minimapWidth / 2 - (this.mapWidth - this.mapHeight) * (tilePixel / 4) + this.minimapPanX;
+      offsetY = y + minimapHeight / 2 - (this.mapWidth + this.mapHeight) * (tilePixel / 8) + this.minimapPanY;
     } else {
       const maxTileWidth = Math.floor(minimapWidth / this.mapWidth) || 1;
       const maxTileHeight = Math.floor(minimapHeight / this.mapHeight) || 1;
@@ -3861,8 +3922,8 @@ export class TileMapEditor {
 
       mapPixelWidth = this.mapWidth * tilePixel;
       mapPixelHeight = this.mapHeight * tilePixel;
-      offsetX = x + Math.floor((minimapWidth - mapPixelWidth) / 2);
-      offsetY = y + Math.floor((minimapHeight - mapPixelHeight) / 2);
+      offsetX = x + Math.floor((minimapWidth - mapPixelWidth) / 2) + this.minimapPanX;
+      offsetY = y + Math.floor((minimapHeight - mapPixelHeight) / 2) + this.minimapPanY;
     }
 
   // Draw minimap contents within clipping region so zoom doesn't leak out

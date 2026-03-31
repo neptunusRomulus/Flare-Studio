@@ -132,11 +132,18 @@ const INTERNAL_COLLISION_TILESET = 'collision-tile.png';
 export class TileMapEditor {
   public isStartingMap: boolean = false;
   public activeEventPreview: { x: number; y: number; width: number; height: number } | null = null;
+  public activeHotspotPreview: { x: number; y: number; width: number; height: number } | null = null;
   private enemyCategories: string[] = [];
 
   public setActiveEventPreview(preview: { x: number; y: number; width: number; height: number } | null): void {
     const changed = JSON.stringify(this.activeEventPreview) !== JSON.stringify(preview);
     this.activeEventPreview = preview;
+    if (changed) this.draw();
+  }
+
+  public setActiveHotspotPreview(preview: { x: number; y: number; width: number; height: number } | null): void {
+    const changed = JSON.stringify(this.activeHotspotPreview) !== JSON.stringify(preview);
+    this.activeHotspotPreview = preview;
     if (changed) this.draw();
   }
   /**
@@ -797,8 +804,7 @@ export class TileMapEditor {
   private draggingActorId: number | null = null;
   private isDraggingEvent: boolean = false;
   private draggingEventObjectId: number | null = null;
-
-  // Placed sprite objects on object layers (background layer objects like trees, walls)
+    private hoveredEventIndex: number = 0;
   // These are rendered as single sprites, not per-cell tiles
   // Key: layerType, Value: array of placed objects
   private placedSpriteObjects: Map<string, Array<{
@@ -1694,13 +1700,16 @@ export class TileMapEditor {
           return;
         }
 
-        // Check for event object at this position (double-click to edit, single-click to drag)
-        const eventAtPosition = this.objects.find(
+        // Check for event object at this position (single-click to drag/edit)
+        const eventsAtPosition = this.objects.filter(
           obj => obj.type === 'event' && obj.x >= 0 && obj.y >= 0 &&
             tileCoords.x >= obj.x && tileCoords.x < obj.x + obj.width &&
             tileCoords.y >= obj.y && tileCoords.y < obj.y + obj.height
         );
-        if (eventAtPosition && event.button === 0) {
+        if (eventsAtPosition.length > 0 && event.button === 0) {
+          // Use hoveredEventIndex to pick the correct event when multiple share a cell
+          const idx = eventsAtPosition.length > 1 ? Math.min(this.hoveredEventIndex, eventsAtPosition.length - 1) : 0;
+          const eventAtPosition = eventsAtPosition[idx];
           // Start dragging event - single click edit is now handled in mouseup if not dragged
           this.isDraggingEvent = true;
           this.draggingEventObjectId = eventAtPosition.id;
@@ -1979,6 +1988,24 @@ export class TileMapEditor {
       }
     }
     
+    // Check if hovering over a cell with multiple events – scroll to cycle
+    if (this.hoverX >= 0 && this.hoverY >= 0) {
+      const eventsAtHover = this.objects.filter(
+        obj => obj.type === 'event' && obj.x >= 0 && obj.y >= 0 &&
+          this.hoverX >= obj.x && this.hoverX < obj.x + obj.width &&
+          this.hoverY >= obj.y && this.hoverY < obj.y + obj.height
+      );
+      if (eventsAtHover.length > 1) {
+        if (event.deltaY > 0) {
+          this.hoveredEventIndex = (this.hoveredEventIndex + 1) % eventsAtHover.length;
+        } else {
+          this.hoveredEventIndex = (this.hoveredEventIndex - 1 + eventsAtHover.length) % eventsAtHover.length;
+        }
+        this.showObjectTooltip(eventsAtHover[this.hoveredEventIndex], eventsAtHover.length);
+        return;
+      }
+    }
+
     // Default: modify main canvas zoom
     const zoomFactor = event.deltaY > 0 ? 0.9 : 1.1;
     this.setZoom(this.zoom * zoomFactor);
@@ -2516,6 +2543,9 @@ export class TileMapEditor {
 
     // Draw active event preview if interacting with EventDialog
     this.drawActiveEventPreview();
+
+    // Draw active hotspot preview (pink overlay)
+    this.drawActiveHotspotPreview();
 
     // Draw collision overlay last so collision borders are always on top.
     this.drawCollisionOverlay();
@@ -3659,12 +3689,48 @@ export class TileMapEditor {
     
     // Connect to transparency state of the Event layer panel item
     if (eventLayer && eventLayer.transparency != null) {
-      this.ctx.globalAlpha = 1 - eventLayer.transparency;
+      this.ctx.globalAlpha = eventLayer.transparency;
     }
 
-    for (const event of events) {
-      this.drawEventPlaceholder(event);
-    }
+// Group events by cell to draw badges for stacked events
+      const eventsByCell = new Map<string, MapObject[]>();
+      for (const event of events) {
+        const key = `${event.x},${event.y}`;
+        if (!eventsByCell.has(key)) eventsByCell.set(key, []);
+        eventsByCell.get(key)!.push(event);
+      }
+
+      for (const event of events) {
+        this.drawEventPlaceholder(event);
+      }
+
+      // Draw count badges for cells with multiple events
+      for (const [, cellEvents] of eventsByCell) {
+        if (cellEvents.length > 1) {
+          const first = cellEvents[0];
+          const screenPos = this.mapToScreen(first.x, first.y);
+          const halfTileX = (this.tileSizeX / 2) * this.zoom;
+          const halfTileY = (this.tileSizeY / 2) * this.zoom;
+
+          const badgeR = Math.max(6, Math.min(12, 9 * this.zoom));
+          const bx = screenPos.x + halfTileX - badgeR * 0.3;
+          const by = screenPos.y - halfTileY + badgeR * 0.3;
+
+          this.ctx.save();
+          this.ctx.fillStyle = '#ffffff';
+          this.ctx.beginPath();
+          this.ctx.arc(bx, by, badgeR, 0, Math.PI * 2);
+          this.ctx.fill();
+
+          this.ctx.fillStyle = '#000000';
+          const fontSize = Math.max(8, Math.min(14, 10 * this.zoom));
+          this.ctx.font = `bold ${fontSize}px "Segoe UI", sans-serif`;
+          this.ctx.textAlign = 'center';
+          this.ctx.textBaseline = 'middle';
+          this.ctx.fillText(String(cellEvents.length), bx, by);
+          this.ctx.restore();
+        }
+      }
 
     this.ctx.restore();
   }
@@ -3865,6 +3931,59 @@ export class TileMapEditor {
     this.ctx.fill();
 
     this.ctx.strokeStyle = 'rgba(255, 140, 0, 0.9)';
+    this.ctx.lineWidth = Math.max(2, 2 * this.zoom);
+    this.ctx.stroke();
+
+    this.ctx.restore();
+  }
+
+  private drawActiveHotspotPreview(): void {
+    if (!this.activeHotspotPreview) return;
+    const { x, y, width, height } = this.activeHotspotPreview;
+
+    const w = Math.max(1, width);
+    const h = Math.max(1, height);
+
+    const halfTileX = (this.tileSizeX / 2) * this.zoom;
+    const halfTileY = (this.tileSizeY / 2) * this.zoom;
+
+    this.ctx.save();
+    
+    // Draw the full area with lighter pink transparency
+    if (w > 1 || h > 1) {
+      const c1 = this.mapToScreen(x, y);
+      const c2 = this.mapToScreen(x + w - 1, y);
+      const c3 = this.mapToScreen(x + w - 1, y + h - 1);
+      const c4 = this.mapToScreen(x, y + h - 1);
+
+      this.ctx.beginPath();
+      this.ctx.moveTo(c1.x, c1.y - halfTileY); // Top
+      this.ctx.lineTo(c2.x + halfTileX, c2.y); // Right
+      this.ctx.lineTo(c3.x, c3.y + halfTileY); // Bottom
+      this.ctx.lineTo(c4.x - halfTileX, c4.y); // Left
+      this.ctx.closePath();
+
+      this.ctx.fillStyle = 'rgba(236, 72, 153, 0.2)';
+      this.ctx.fill();
+
+      this.ctx.strokeStyle = 'rgba(219, 39, 119, 0.4)';
+      this.ctx.lineWidth = Math.max(1, 1 * this.zoom);
+      this.ctx.stroke();
+    }
+
+    // Draw the single cell (x,y) with stronger pink overlay
+    const origin = this.mapToScreen(x, y);
+    this.ctx.beginPath();
+    this.ctx.moveTo(origin.x, origin.y - halfTileY); // Top
+    this.ctx.lineTo(origin.x + halfTileX, origin.y); // Right
+    this.ctx.lineTo(origin.x, origin.y + halfTileY); // Bottom
+    this.ctx.lineTo(origin.x - halfTileX, origin.y); // Left
+    this.ctx.closePath();
+
+    this.ctx.fillStyle = 'rgba(236, 72, 153, 0.6)';
+    this.ctx.fill();
+
+    this.ctx.strokeStyle = 'rgba(219, 39, 119, 0.9)';
     this.ctx.lineWidth = Math.max(2, 2 * this.zoom);
     this.ctx.stroke();
 
@@ -4595,6 +4714,51 @@ export class TileMapEditor {
       }
       drawMinimapShape(aX, aY, 1, 1, 'rgba(255, 165, 0, 0.6)', 'rgba(255, 140, 0, 0.9)');
     }
+
+    if (this.activeHotspotPreview && tilePixel > 0) {
+      const { x: hX, y: hY, width: hWidth, height: hHeight } = this.activeHotspotPreview;
+      const hw = Math.max(1, hWidth);
+      const hh = Math.max(1, hHeight);
+
+      const drawMinimapShape2 = (sX: number, sY: number, sW: number, sH: number, fill: string, stroke: string) => {
+        this.ctx.fillStyle = fill;
+        this.ctx.strokeStyle = stroke;
+        this.ctx.lineWidth = 1;
+
+        if (this.minimapMode === 'isometric') {
+          const getMinimapPoint = (mX: number, mY: number) => ({
+            x: offsetX + (mX - mY) * (tilePixel / 2),
+            y: offsetY + (mX + mY) * (tilePixel / 4)
+          });
+
+          const p1 = getMinimapPoint(sX, sY);
+          const p2 = getMinimapPoint(sX + sW - 1, sY);
+          const p3 = getMinimapPoint(sX + sW - 1, sY + sH - 1);
+          const p4 = getMinimapPoint(sX, sY + sH - 1);
+
+          this.ctx.beginPath();
+          this.ctx.moveTo(p1.x, p1.y);
+          this.ctx.lineTo(p2.x + tilePixel / 2, p2.y + tilePixel / 4);
+          this.ctx.lineTo(p3.x, p3.y + tilePixel / 2);
+          this.ctx.lineTo(p4.x - tilePixel / 2, p4.y + tilePixel / 4);
+          this.ctx.closePath();
+
+          this.ctx.fill();
+          this.ctx.stroke();
+        } else {
+          const pixelX = offsetX + sX * tilePixel;
+          const pixelY = offsetY + sY * tilePixel;
+          this.ctx.fillRect(pixelX, pixelY, sW * tilePixel, sH * tilePixel);
+          this.ctx.strokeRect(pixelX, pixelY, sW * tilePixel, sH * tilePixel);
+        }
+      };
+
+      if (hw > 1 || hh > 1) {
+        drawMinimapShape2(hX, hY, hw, hh, 'rgba(236, 72, 153, 0.2)', 'rgba(219, 39, 119, 0.4)');
+      }
+      drawMinimapShape2(hX, hY, 1, 1, 'rgba(236, 72, 153, 0.6)', 'rgba(219, 39, 119, 0.9)');
+    }
+
     // End clipping mask for minimap contents
     this.ctx.restore();
     
@@ -11013,17 +11177,20 @@ export class TileMapEditor {
     }
 
     // Check if we're hovering over an event object
-    const eventAtHover = this.objects.find(
-      obj => obj.type === 'event' && obj.x >= 0 && obj.y >= 0 &&
-        this.hoverX >= obj.x && this.hoverX < obj.x + obj.width &&
-        this.hoverY >= obj.y && this.hoverY < obj.y + obj.height
-    );
-    if (eventAtHover) {
-      this.mapCanvas.style.cursor = 'move';
-      this.showObjectTooltip(eventAtHover);
-      return;
-    }
-
+      const eventsAtHover = this.objects.filter(
+        obj => obj.type === 'event' && obj.x >= 0 && obj.y >= 0 &&
+          this.hoverX >= obj.x && this.hoverX < obj.x + obj.width &&
+          this.hoverY >= obj.y && this.hoverY < obj.y + obj.height
+      );
+      if (eventsAtHover.length > 0) {
+        // Clamp hoveredEventIndex
+        if (this.hoveredEventIndex >= eventsAtHover.length) this.hoveredEventIndex = 0;
+        const eventAtHover = eventsAtHover[this.hoveredEventIndex];
+        this.mapCanvas.style.cursor = 'move';
+        this.showObjectTooltip(eventAtHover, eventsAtHover.length);
+        return;
+      }
+      this.hoveredEventIndex = 0;
     // Check if we're hovering over an object on an interactive layer
     const activeLayer = this.getActiveLayer();
     const interactiveLayers = ['enemy', 'npc', 'object', 'event', 'background'];
@@ -11046,7 +11213,7 @@ export class TileMapEditor {
     this.hideObjectTooltip();
   }
 
-  private showObjectTooltip(object: MapObject): void {
+  private showObjectTooltip(object: MapObject, eventCount: number = 1): void {
     // Create or update tooltip
     let tooltip = document.getElementById('object-tooltip') as HTMLElement;
     if (!tooltip) {
@@ -11081,11 +11248,26 @@ export class TileMapEditor {
       const typeDisplay = object.type === 'enemy' ? object.category || 'enemy' : object.type;
       const title = typeDisplay === 'event' ? `${object.name || 'Unnamed'} (Event)` : (object.name || (typeDisplay.charAt(0).toUpperCase() + typeDisplay.slice(1)));
       
+      // Lucide Mouse SVG (for scroll hint)
+      const scrollIcon = `
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; margin-right: 4px;">
+          <rect x="6" y="3" width="12" height="18" rx="6" />
+          <path d="M12 7v4" />
+        </svg>
+      `;
+
+      const scrollLine = eventCount > 1 ? `
+        <div style="font-size: 11px; display: flex; align-items: center; color: rgba(209, 213, 219, 0.8); margin-top: 2px;">
+          ${scrollIcon}Scroll to switch
+        </div>
+      ` : '';
+
       tooltip.innerHTML = `
         <div style="font-weight: bold; margin-bottom: 4px; color: #ffffff; font-size: 13px;">${title}</div>
         <div style="font-size: 11px; display: flex; align-items: center; color: rgba(209, 213, 219, 0.8);">
           ${mouseIcon}Click to edit
         </div>
+        ${scrollLine}
     `;
 
     // Position tooltip near mouse cursor

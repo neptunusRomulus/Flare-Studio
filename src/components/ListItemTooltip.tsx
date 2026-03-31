@@ -1,16 +1,16 @@
 import React from 'react';
 import Tooltip from '@/components/ui/tooltip';
-import { Mouse } from 'lucide-react';
+import { Mouse, MouseRight } from 'lucide-react';
 
 const tooltipContent = (
   <div className="flex flex-col gap-1 text-xs">
     <div className="flex items-center gap-1.5">
       <Mouse className="w-3 h-3" />
-      <span>Edit</span>
+      <span>to edit</span>
     </div>
     <div className="flex items-center gap-1.5">
-      <Mouse className="w-3 h-3" style={{ transform: 'scaleX(-1)' }} />
-      <span>Menu</span>
+      <MouseRight className="w-3 h-3" />
+      <span>to see Actions</span>
     </div>
   </div>
 );

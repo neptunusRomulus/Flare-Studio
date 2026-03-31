@@ -8488,8 +8488,8 @@ export class TileMapEditor {
     projectPath?: string,
     overrideSensitivity?: number,
     forceIsometric?: boolean,
-    manualTileWidth?: number,
-    manualTileHeight?: number,
+    _manualTileWidth?: number,
+    _manualTileHeight?: number,
     forceGridSlicing?: boolean
   ): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -8504,13 +8504,12 @@ export class TileMapEditor {
           }
           if (!tab.brushes) tab.brushes = [];
           tab.brushes.push({ image: img as HTMLImageElement, fileName: file.name, width: img.width, height: img.height });
-          const effectiveTileWidth = typeof manualTileWidth === 'number' && manualTileWidth > 0 ? manualTileWidth : this.tileSizeX;
-          const effectiveTileHeight = typeof manualTileHeight === 'number' && manualTileHeight > 0 ? manualTileHeight : this.tileSizeY;
-          const columns = Math.max(1, Math.floor(img.width / effectiveTileWidth));
-          const rows = Math.max(1, Math.floor(img.height / effectiveTileHeight));
+          // Fixed isometric tile dimensions — always 64x32
+          const tileWidth = this.tileSizeX;
+          const tileHeight = this.tileSizeY;
+          const columns = Math.max(1, Math.floor(img.width / tileWidth));
+          const rows = Math.max(1, Math.floor(img.height / tileHeight));
           const count = Math.max(1, columns * rows);
-          const tileWidth = effectiveTileWidth;
-          const tileHeight = effectiveTileHeight;
           const sourcePath = this.extractFileSourcePath(file);
           
           // Store just the filename (not full path) for tilesetImages key

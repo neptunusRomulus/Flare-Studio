@@ -278,10 +278,10 @@ const BrushToolbar = ({
                               currentEditor.setActiveLayerTab(layerType, targetTabId);
                             }
 
-                            // Import starts with default fixed-grid slicing (64x64).
-                            // Users can adjust tile width/height in the review window and re-import.
+                            // Fixed isometric tile dimensions (64x32) — not user-configurable.
+                            // Variable-size detection runs first; grid fallback uses these values.
                             const manualTileWidth = 64;
-                            const manualTileHeight = 64;
+                            const manualTileHeight = 32;
 
                             // Import into the editor/tab with fixed-grid slicing.
                             // Fall back to legacy import call if runtime class shape differs.

@@ -1998,6 +1998,23 @@ ipcMainLocal.handle("write-item-file", async (event, filePath, itemData) => {
   }
 });
 
+// Delete item file
+ipcMainLocal.handle("delete-item-file", async (event, filePath) => {
+  try {
+    if (!filePath) {
+      return { success: false, error: "File path is required" };
+    }
+    if (!fs.existsSync(filePath)) {
+      return { success: false, error: "File does not exist" };
+    }
+    fs.unlinkSync(filePath);
+    return { success: true };
+  } catch (error) {
+    console.error("Error deleting item file:", error);
+    return { success: false, error: error.message };
+  }
+});
+
 // Handle app protocol for development
 if (isDev) {
   if (process.platform === "win32") {

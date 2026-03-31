@@ -4,6 +4,8 @@ import Tooltip from '@/components/ui/tooltip';
 import { ChevronsUpDown, Folder, Plus, Sword } from 'lucide-react';
 import { ITEM_ROLE_META, ITEM_ROLE_SELECTIONS } from '@/editor/itemRoles';
 import type { ItemRole, ItemResourceSubtype } from '@/editor/itemRoles';
+import ElementContextMenu from '@/components/ElementContextMenu';
+import ListItemTooltip from '@/components/ListItemTooltip';
 
 type ItemEntry = {
   id: number;
@@ -20,6 +22,8 @@ type SidebarItemsPanelProps = {
   expandedItemCategories: Set<ItemRole>;
   setExpandedItemCategories: React.Dispatch<React.SetStateAction<Set<ItemRole>>>;
   onOpenItemEdit: (item: ItemEntry) => void;
+  onDuplicateItem: (item: ItemEntry) => void;
+  onDeleteItem: (item: ItemEntry) => void;
   onAddItem: () => void;
 };
 
@@ -28,6 +32,8 @@ const SidebarItemsPanel = ({
   expandedItemCategories,
   setExpandedItemCategories,
   onOpenItemEdit,
+  onDuplicateItem,
+  onDeleteItem,
   onAddItem
 }: SidebarItemsPanelProps) => (
   <div className="flex flex-col flex-1">
@@ -83,20 +89,30 @@ const SidebarItemsPanel = ({
                     <div className="overflow-hidden">
                       <div className="flex flex-col gap-1 mt-1">
                         {items.map((item) => (
-                          <div
+                          <ElementContextMenu
                             key={item.id}
-                            className="flex items-center gap-2 p-2 bg-muted/50 hover:bg-muted rounded-md border border-border cursor-pointer transition-colors w-full"
-                            title={`${item.name} (ID: ${item.id}) - Click to edit`}
+                            elementType="item"
+                            onEdit={() => onOpenItemEdit(item)}
+                            onDuplicate={() => onDuplicateItem(item)}
+                            onDelete={() => onDeleteItem(item)}
+                          >
+                          <ListItemTooltip>
+                          <div
+                            className="flex items-center gap-2 p-2 bg-muted/50 hover:bg-muted rounded-md border border-border cursor-pointer transition-colors w-full box-border"
                             onClick={() => onOpenItemEdit(item)}
                           >
-                            <Sword className="w-4 h-4 text-orange-500 flex-shrink-0" />
-                            <div className="flex-1 min-w-0">
-                              <div className="text-sm font-medium truncate">{item.name}</div>
-                              <div className="text-xs text-muted-foreground truncate">
-                                ID: {item.id}
+                            <div className="flex items-center gap-2 w-full">
+                              <Sword className="w-4 h-4 text-orange-500 flex-shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <div className="text-sm font-medium truncate">{item.name}</div>
+                                <div className="text-xs text-muted-foreground truncate">
+                                  ID: {item.id}
+                                </div>
                               </div>
                             </div>
                           </div>
+                          </ListItemTooltip>
+                          </ElementContextMenu>
                         ))}
                       </div>
                     </div>

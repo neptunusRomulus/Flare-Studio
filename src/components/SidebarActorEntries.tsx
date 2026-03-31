@@ -5,6 +5,9 @@ import Tooltip from '@/components/ui/tooltip';
 import { GripVertical, HelpCircle, Plus } from 'lucide-react';
 import type { MapObject } from '@/types';
 import { ENEMY_ROLE_META_LOOKUP } from '@/editor/actorRoles';
+import ElementContextMenu from '@/components/ElementContextMenu';
+import ListItemTooltip from '@/components/ListItemTooltip';
+import useListReorder from '@/hooks/useListReorder';
 
 type ActorEntriesPanelProps = {
   isNpcLayer: boolean;
@@ -13,10 +16,13 @@ type ActorEntriesPanelProps = {
   leftCollapsed: boolean;
   draggingNpcId: number | null;
   onEditObject: (actorId: number) => void;
+  onDuplicateObject: (actorId: number) => void;
+  onDeleteObject: (actorId: number) => void;
   onHover: (position: { x: number; y: number }) => void;
   onHoverEnd: () => void;
   onDragStart: (event: DragEvent<HTMLDivElement>, actorId: number) => void;
   onDragEnd: () => void;
+  onReorderActors: (fromIndex: number, toIndex: number) => void;
   onAddNpc: () => void;
   onAddEnemy: () => void;
 };
@@ -28,13 +34,23 @@ const SidebarActorEntries = ({
   leftCollapsed,
   draggingNpcId,
   onEditObject,
+  onDuplicateObject,
+  onDeleteObject,
   onHover,
   onHoverEnd,
   onDragStart,
   onDragEnd,
+  onReorderActors,
   onAddNpc,
   onAddEnemy
-}: ActorEntriesPanelProps) => (
+}: ActorEntriesPanelProps) => {
+  const { getItemDragProps, reorderClass } = useListReorder(
+    actorEntries,
+    (a) => a.id,
+    onReorderActors,
+  );
+
+  return (
   <>
     {(isNpcLayer || isEnemyLayer) && (
       <div className="flex-1 min-h-0 flex flex-col gap-3">
@@ -43,8 +59,8 @@ const SidebarActorEntries = ({
             {isNpcLayer ? 'No NPCs added yet. Use the Add control to create your first NPC.' : 'No enemies added yet. Use the Add control to place an enemy.'}
           </div>
         ) : (
-          <div className="space-y-2 overflow-y-auto pr-1">
-            {actorEntries.map((actor) => {
+          <div className="flex flex-col gap-2 overflow-y-auto pr-1">
+            {actorEntries.map((actor, index) => {
               const isTalker = actor.properties?.talker === 'true' || actor.properties?.talker === '1';
               const isVendor = actor.properties?.vendor === 'true' || actor.properties?.vendor === '1';
               const isQuestGiver = actor.properties?.questGiver === 'true' || actor.properties?.questGiver === '1';
@@ -63,16 +79,24 @@ const SidebarActorEntries = ({
               const isPlacedOnMap = actor.x >= 0 && actor.y >= 0;
 
               return (
-                <div
+                <ElementContextMenu
                   key={actor.id}
-                  className={`rounded-md px-2 py-2 hover:bg-background transition-colors cursor-pointer border border-dashed border-gray-400 dark:border-gray-600 ${
+                  elementType={isNpcLayer ? 'npc' : 'enemy'}
+                  onEdit={() => onEditObject(actor.id)}
+                  onDuplicate={() => onDuplicateObject(actor.id)}
+                  onDelete={() => onDeleteObject(actor.id)}
+                >
+                <ListItemTooltip>
+                <div
+                  {...getItemDragProps(index)}
+                  className={`w-full box-border rounded-md px-2 py-2 hover:bg-background transition-colors cursor-pointer border border-dashed border-gray-400 dark:border-gray-600 flex ${
                     isPlacedOnMap ? 'bg-background/50' : 'bg-muted/20'
-                  } ${draggingNpcId === actor.id ? 'opacity-50' : ''}`}
+                  } ${draggingNpcId === actor.id ? 'opacity-50' : ''} ${reorderClass(index)}`}
                   onClick={() => onEditObject(actor.id)}
                   onMouseMove={(event) => onHover({ x: event.clientX, y: event.clientY })}
                   onMouseLeave={onHoverEnd}
                 >
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 w-full">
                     <div className={`flex-shrink-0 w-10 h-10 rounded border bg-muted/50 flex items-center justify-center overflow-hidden ${
                       isPlacedOnMap ? 'border-border' : 'border-dashed border-muted-foreground/40'
                     }`}
@@ -91,7 +115,7 @@ const SidebarActorEntries = ({
                       <HelpCircle className={`w-5 h-5 text-muted-foreground ${portraitPath ? 'hidden' : ''}`} />
                     </div>
                     <div className="space-y-1 text-sm flex-1 min-w-0">
-                      <div className="font-medium text-foreground" title={actor.name || `${actor.type === 'npc' ? 'NPC' : 'Enemy'} #${actor.id}`}>
+                      <div className="font-medium text-foreground truncate">
                         <span className={leftCollapsed ? 'sr-only' : ''}>{actor.name || `${actor.type === 'npc' ? 'NPC' : 'Enemy'} #${actor.id}`}</span>
                         {!actor.name && leftCollapsed && <span className="text-xs text-muted-foreground">#{actor.id}</span>}
                       </div>
@@ -179,6 +203,8 @@ const SidebarActorEntries = ({
                     )}
                   </div>
                 </div>
+                </ListItemTooltip>
+                </ElementContextMenu>
               );
             })}
           </div>
@@ -228,6 +254,7 @@ const SidebarActorEntries = ({
       </div>
     )}
   </>
-);
+  );
+};
 
 export default SidebarActorEntries;

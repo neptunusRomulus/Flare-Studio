@@ -80,6 +80,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   readItemFile: (filePath) => ipcRenderer.invoke("read-item-file", filePath),
   writeItemFile: (filePath, itemData) =>
     ipcRenderer.invoke("write-item-file", filePath, itemData),
+  deleteItemFile: (filePath) =>
+    ipcRenderer.invoke("delete-item-file", filePath),
   listEnemies: (projectPath) => ipcRenderer.invoke("list-enemies", projectPath),
   saveEnemyPreset: (projectPath, filename, content) =>
     ipcRenderer.invoke("save-enemy-preset", projectPath, filename, content),

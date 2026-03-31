@@ -91,6 +91,7 @@ declare global {
       listItems: (projectPath: string) => Promise<{ success: boolean; items: Array<{ id: number; name: string; category: string; filePath: string; fileName: string }>; error?: string }>;
       readItemFile: (filePath: string) => Promise<{ success: boolean; data?: Record<string, unknown>; error?: string }>;
       writeItemFile: (filePath: string, itemData: Record<string, unknown>) => Promise<{ success: boolean; error?: string }>;
+      deleteItemFile: (filePath: string) => Promise<{ success: boolean; error?: string }>;
       listEnemies: (projectPath: string) => Promise<string[]>;
       saveEnemyPreset: (projectPath: string, filename: string, content: string) => Promise<boolean>;
       // Generic filesystem helpers for renderer

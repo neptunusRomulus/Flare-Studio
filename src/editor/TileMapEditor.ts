@@ -10972,6 +10972,14 @@ export class TileMapEditor {
     return [...this.objects];
   }
 
+  public reorderMapObjects(fromIndex: number, toIndex: number): void {
+    if (fromIndex < 0 || fromIndex >= this.objects.length || toIndex < 0 || toIndex >= this.objects.length || fromIndex === toIndex) return;
+    const [item] = this.objects.splice(fromIndex, 1);
+    this.objects.splice(toIndex, 0, item);
+    this.saveState();
+    this.notifyObjectsChanged();
+  }
+
   public getObjectsAtPosition(x: number, y: number): MapObject[] {
     return this.objects.filter(obj => obj.x === x && obj.y === y);
   }

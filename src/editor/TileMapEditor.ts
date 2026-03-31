@@ -829,7 +829,9 @@ export class TileMapEditor {
   private heroX: number = 0;
   private heroY: number = 0;
   private isDraggingHero: boolean = false;
-  private heroLastClickTime: number = 0;
+  private clickStartX: number = 0;
+  private clickStartY: number = 0;
+  private hasMovedSinceClick: boolean = false;
 
   // Tool and interaction state
   private tool: Tool = 'tiles';
@@ -1620,6 +1622,10 @@ export class TileMapEditor {
       return;
     }
 
+    this.clickStartX = event.clientX;
+    this.clickStartY = event.clientY;
+    this.hasMovedSinceClick = false;
+
     const rect = this.mapCanvas.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
@@ -1661,7 +1667,7 @@ export class TileMapEditor {
       if (tileCoords) {
         // Check if clicking on hero position
         if (this.isHeroAtPosition(tileCoords.x, tileCoords.y)) {
-          this.handleHeroClick(tileCoords.x, tileCoords.y, event);
+          this.isDraggingHero = true;
           return;
         }
 
@@ -1695,20 +1701,7 @@ export class TileMapEditor {
             tileCoords.y >= obj.y && tileCoords.y < obj.y + obj.height
         );
         if (eventAtPosition && event.button === 0) {
-          const now = Date.now();
-          if (this.eventLastClickId === eventAtPosition.id && now - this.eventLastClickTime < 300) {
-            // Double-click detected on event - open edit dialog
-            if (this.eventEditCallback) {
-              this.eventEditCallback(eventAtPosition.id);
-            }
-            this.eventLastClickTime = 0;
-            this.eventLastClickId = null;
-            this.isMouseDown = false;
-            return;
-          }
-          this.eventLastClickTime = now;
-          this.eventLastClickId = eventAtPosition.id;
-          // Start dragging event
+          // Start dragging event - single click edit is now handled in mouseup if not dragged
           this.isDraggingEvent = true;
           this.draggingEventObjectId = eventAtPosition.id;
           this.selectedObject = eventAtPosition;
@@ -1768,6 +1761,14 @@ export class TileMapEditor {
   }
 
   private handleMouseMove(event: MouseEvent): void {
+    if (this.isMouseDown) {
+      const dx = Math.abs(event.clientX - this.clickStartX);
+      const dy = Math.abs(event.clientY - this.clickStartY);
+      if (dx > 3 || dy > 3) {
+        this.hasMovedSinceClick = true;
+      }
+    }
+
     const rect = this.mapCanvas.getBoundingClientRect();
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
@@ -1870,6 +1871,8 @@ export class TileMapEditor {
   }
 
   private handleMouseUp(): void {
+    const wasClick = !this.hasMovedSinceClick;
+
     if (this.isResizingMinimap) {
       this.isResizingMinimap = false;
       return;
@@ -1884,17 +1887,40 @@ export class TileMapEditor {
     // Stop hero dragging
     if (this.isDraggingHero) {
       this.isDraggingHero = false;
+      if (wasClick) {
+        this.openHeroEditDialog();
+      }
     }
 
     if (this.isDraggingActor) {
+      if (wasClick && this.objectEditCallback && this.draggingActorId !== null) {
+        this.objectEditCallback(this.draggingActorId);
+      }
       this.isDraggingActor = false;
       this.draggingActorId = null;
     }
 
     if (this.isDraggingEvent) {
+      if (wasClick && this.eventEditCallback && this.draggingEventObjectId !== null) {
+        this.eventEditCallback(this.draggingEventObjectId);
+      }
       this.isDraggingEvent = false;
       this.draggingEventObjectId = null;
       this.notifyObjectsChanged();
+    }
+
+    if (wasClick && !this.isDraggingHero && !this.isDraggingActor && !this.isDraggingEvent) {
+      const activeLayer = this.getActiveLayer();
+      const interactiveLayers = ['enemy', 'npc', 'object', 'event', 'background'];
+      
+      if (activeLayer && interactiveLayers.includes(activeLayer.type) && this.hoverX >= 0 && this.hoverY >= 0) {
+        const objectsAtPosition = this.getObjectsAtPosition(this.hoverX, this.hoverY);
+        // Only trigger generic object edit if it isn't an event (events are handled above because they are implicitly dragged)
+        const objectAtMenu = objectsAtPosition.find(obj => obj.x === this.hoverX && obj.y === this.hoverY);
+        if (objectAtMenu && this.objectEditCallback && objectAtMenu.type !== 'event') {
+          this.objectEditCallback(objectAtMenu.id);
+        }
+      }
     }
 
     this.isMouseDown = false;
@@ -1915,21 +1941,6 @@ export class TileMapEditor {
     this.isMinimapPanning = false;
     this.isResizingMinimap = false;
     this.draw();
-  }
-
-  private handleHeroClick(_x: number, _y: number, _event: MouseEvent): void {
-    const currentTime = Date.now();
-    
-    // Check for double-click (within 300ms)
-    if (currentTime - this.heroLastClickTime < 300) {
-      // Double-click detected - open hero edit dialog
-      this.openHeroEditDialog();
-    } else {
-      // Single click - start dragging
-      this.isDraggingHero = true;
-    }
-    
-    this.heroLastClickTime = currentTime;
   }
 
   private openHeroEditDialog(): void {
@@ -3664,29 +3675,6 @@ export class TileMapEditor {
     const halfTileY = (this.tileSizeY / 2) * this.zoom;
 
     this.ctx.save();
-
-    // Always show glow effect for events (orange)
-    {
-      const glowLayers = [
-        { color: 'rgba(249, 115, 22, 0.1)', width: 8 },
-        { color: 'rgba(249, 115, 22, 0.2)', width: 6 },
-        { color: 'rgba(249, 115, 22, 0.3)', width: 4 },
-        { color: 'rgba(249, 115, 22, 0.5)', width: 2 }
-      ];
-      glowLayers.forEach(layer => {
-        this.ctx.strokeStyle = layer.color;
-        this.ctx.lineWidth = Math.max(1, Math.min(layer.width, layer.width / this.zoom));
-        this.ctx.shadowColor = '#f97316';
-        this.ctx.shadowBlur = Math.max(2, Math.min(10, layer.width / this.zoom));
-        this.ctx.beginPath();
-        this.ctx.moveTo(screenPos.x, screenPos.y - halfTileY);
-        this.ctx.lineTo(screenPos.x + halfTileX, screenPos.y);
-        this.ctx.lineTo(screenPos.x, screenPos.y + halfTileY);
-        this.ctx.lineTo(screenPos.x - halfTileX, screenPos.y);
-        this.ctx.closePath();
-        this.ctx.stroke();
-      });
-    }
 
     this.ctx.shadowColor = 'transparent';
     this.ctx.shadowBlur = 0;
@@ -7036,8 +7024,7 @@ export class TileMapEditor {
   private stampCallback: ((stamps: import('../types').Stamp[]) => void) | null = null;
   private heroEditCallback: ((currentX: number, currentY: number, mapWidth: number, mapHeight: number, onConfirm: (x: number, y: number) => void) => void) | null = null;
   private eventEditCallback: ((eventId: number) => void) | null = null;
-  private eventLastClickTime: number = 0;
-  private eventLastClickId: number | null = null;
+  private objectEditCallback: ((objectId: number) => void) | null = null;
 
   public setEyedropperCallback(callback: (() => void) | null): void {
     this.eyedropperCallback = callback;
@@ -7236,6 +7223,10 @@ export class TileMapEditor {
     return false;
   }
 
+  public hasMovedDuringClick(): boolean {
+    return this.hasMovedSinceClick;
+  }
+
   public setStampCallback(callback: ((stamps: import('../types').Stamp[]) => void) | null): void {
     this.stampCallback = callback;
   }
@@ -7246,6 +7237,10 @@ export class TileMapEditor {
 
   public setEventEditCallback(callback: ((eventId: number) => void) | null): void {
     this.eventEditCallback = callback;
+  }
+
+  public setObjectEditCallback(callback: ((objectId: number) => void) | null): void {
+    this.objectEditCallback = callback;
   }
 
   private placeStamp(gridX: number, gridY: number): void {
@@ -11058,37 +11053,39 @@ export class TileMapEditor {
       tooltip = document.createElement('div');
       tooltip.id = 'object-tooltip';
       tooltip.style.position = 'absolute';
-      tooltip.style.background = 'rgba(0, 0, 0, 0.35)'; // 65% transparent (35% opacity)
-      tooltip.style.color = 'white';
-      tooltip.style.padding = '4px 6px'; // Reduced padding
-      tooltip.style.borderRadius = '3px'; // Slightly smaller border radius
-      tooltip.style.fontSize = '11px'; // Smaller font size
-      tooltip.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'; // Editor's font
-      tooltip.style.lineHeight = '1.2'; // Tighter line height
+      tooltip.style.background = '#000000'; // Black background
+      tooltip.style.padding = '6px 8px'; // Slightly adjusted padding
+      tooltip.style.borderRadius = '6px'; // Shadcn style border radius
+      tooltip.style.fontSize = '12px'; // Standard smaller text
+      tooltip.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'; 
+      tooltip.style.lineHeight = '1.4'; // Normal line height
       tooltip.style.pointerEvents = 'none';
       tooltip.style.zIndex = '1000';
-      tooltip.style.border = '1px solid rgba(255, 107, 0, 0.8)'; // Semi-transparent border
-      tooltip.style.boxShadow = '0 1px 4px rgba(0,0,0,0.3)'; // Smaller shadow
-      tooltip.style.backdropFilter = 'blur(2px)'; // Add subtle blur effect
+      tooltip.style.border = '1px solid rgba(156, 163, 175, 0.5)'; // Light gray stroke
+      tooltip.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)'; // Tailwind shadow-md
       document.body.appendChild(tooltip);
     }
 
-    // Mouse icon SVG (from Lucide React) - smaller version
-    const mouseIcon = `
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; margin-right: 4px;">
-        <rect x="5" y="2" width="14" height="20" rx="7"/>
-        <path d="M12 6v4"/>
-      </svg>
-    `;
+// Lucide MousePointerClick SVG
+      const mouseIcon = `
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; margin-right: 4px;">
+          <path d="M14 4.1 12 6" />
+          <path d="m5.1 8-2.9-.8" />
+          <path d="m6 12-1.9 2" />
+          <path d="M7.2 2.2 8 5.1" />
+          <path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z" />
+        </svg>
+      `;
 
-    // Update tooltip content with tighter spacing
-    const typeDisplay = object.type === 'enemy' ? object.category || 'enemy' : object.type;
-    tooltip.innerHTML = `
-      <div style="font-weight: bold; margin-bottom: 2px; color: #ff6b00; font-size: 10px;">
-        ${mouseIcon}Double click to edit
-      </div>
-      <div style="font-weight: bold; margin-bottom: 1px;">${object.name || 'Unnamed'}</div>
-      <div style="font-size: 10px; color: rgba(255,255,255,0.9);">Type: ${typeDisplay}</div>
+      // Update tooltip content - larger bold name at top, smaller action text below
+      const typeDisplay = object.type === 'enemy' ? object.category || 'enemy' : object.type;
+      const title = typeDisplay === 'event' ? `${object.name || 'Unnamed'} (Event)` : (object.name || (typeDisplay.charAt(0).toUpperCase() + typeDisplay.slice(1)));
+      
+      tooltip.innerHTML = `
+        <div style="font-weight: bold; margin-bottom: 4px; color: #ffffff; font-size: 13px;">${title}</div>
+        <div style="font-size: 11px; display: flex; align-items: center; color: rgba(209, 213, 219, 0.8);">
+          ${mouseIcon}Click to edit
+        </div>
     `;
 
     // Position tooltip near mouse cursor
@@ -11106,38 +11103,38 @@ export class TileMapEditor {
       tooltip = document.createElement('div');
       tooltip.id = 'object-tooltip';
       tooltip.style.position = 'absolute';
-      tooltip.style.background = 'rgba(0, 0, 0, 0.35)';
-      tooltip.style.color = 'white';
-      tooltip.style.padding = '4px 6px';
-      tooltip.style.borderRadius = '3px';
-      tooltip.style.fontSize = '11px';
-      tooltip.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
-      tooltip.style.lineHeight = '1.2';
+      tooltip.style.background = '#000000'; // Black background
+      tooltip.style.padding = '6px 8px'; // Slightly adjusted padding
+      tooltip.style.borderRadius = '6px'; // Shadcn style border radius
+      tooltip.style.fontSize = '12px'; // Standard smaller text
+      tooltip.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'; 
+      tooltip.style.lineHeight = '1.4'; // Normal line height
       tooltip.style.pointerEvents = 'none';
       tooltip.style.zIndex = '1000';
-      tooltip.style.border = '1px solid rgba(255, 107, 0, 0.8)';
-      tooltip.style.boxShadow = '0 1px 4px rgba(0,0,0,0.3)';
-      tooltip.style.backdropFilter = 'blur(2px)';
+      tooltip.style.border = '1px solid rgba(156, 163, 175, 0.5)'; // Light gray stroke
+      tooltip.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)'; // Tailwind shadow-md
       document.body.appendChild(tooltip);
     }
 
-    const mouseIcon = `
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; margin-right: 4px;">
-        <rect x="5" y="2" width="14" height="20" rx="7"/>
-        <path d="M12 6v4"/>
-      </svg>
-    `;
-
-    const label = actorType === 'npc' ? 'NPC' : 'Enemy';
-    const name = object.name || label;
-
-    tooltip.innerHTML = `
-      <div style="font-weight: bold; margin-bottom: 2px; color: #ff6b00; font-size: 10px;">
-        ${mouseIcon}Drag to move
-      </div>
-      <div style="font-weight: bold; margin-bottom: 1px;">${name}</div>
-      <div style="font-size: 10px; color: rgba(255,255,255,0.9);">Type: ${label}</div>
-      <div style="font-size: 10px; color: rgba(255,255,255,0.9);">Double click to edit</div>
+// Lucide MousePointerClick SVG
+      const mouseIcon = `
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; margin-right: 4px;">
+          <path d="M14 4.1 12 6" />
+          <path d="m5.1 8-2.9-.8" />
+          <path d="m6 12-1.9 2" />
+          <path d="M7.2 2.2 8 5.1" />
+          <path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z" />
+        </svg>
+      `;
+  
+      const label = actorType === 'npc' ? 'NPC' : 'Enemy';
+      const name = object.name || label;
+  
+      tooltip.innerHTML = `
+        <div style="font-weight: bold; margin-bottom: 4px; color: #ffffff; font-size: 13px;">${name}</div>
+        <div style="font-size: 11px; display: flex; align-items: center; color: rgba(209, 213, 219, 0.8);">
+          ${mouseIcon}Click to edit or drag to move
+        </div>
     `;
 
     const rect = this.mapCanvas.getBoundingClientRect();
@@ -11161,36 +11158,37 @@ export class TileMapEditor {
       tooltip = document.createElement('div');
       tooltip.id = 'object-tooltip';
       tooltip.style.position = 'absolute';
-      tooltip.style.background = 'rgba(0, 0, 0, 0.35)'; // 65% transparent (35% opacity)
-      tooltip.style.color = 'white';
-      tooltip.style.padding = '4px 6px'; // Reduced padding
-      tooltip.style.borderRadius = '3px'; // Slightly smaller border radius
-      tooltip.style.fontSize = '11px'; // Smaller font size
-      tooltip.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'; // Editor's font
-      tooltip.style.lineHeight = '1.2'; // Tighter line height
+      tooltip.style.background = '#000000'; // Black background
+      tooltip.style.padding = '6px 8px'; // Slightly adjusted padding
+      tooltip.style.borderRadius = '6px'; // Shadcn style border radius
+      tooltip.style.fontSize = '12px'; // Standard smaller text
+      tooltip.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'; 
+      tooltip.style.lineHeight = '1.4'; // Normal line height
       tooltip.style.pointerEvents = 'none';
       tooltip.style.zIndex = '1000';
-      tooltip.style.border = '1px solid rgba(255, 107, 0, 0.8)'; // Semi-transparent border
-      tooltip.style.boxShadow = '0 1px 4px rgba(0,0,0,0.3)'; // Smaller shadow
-      tooltip.style.backdropFilter = 'blur(2px)'; // Add subtle blur effect
+      tooltip.style.border = '1px solid rgba(156, 163, 175, 0.5)'; // Light gray stroke
+      tooltip.style.boxShadow = '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)'; // Tailwind shadow-md
       document.body.appendChild(tooltip);
     }
 
-    // Mouse icon SVG (from Lucide React) - smaller version
-    const mouseIcon = `
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; margin-right: 4px;">
-        <rect x="5" y="2" width="14" height="20" rx="7"/>
-        <path d="M12 6v4"/>
-      </svg>
-    `;
-
-    // Update tooltip content with hero-specific information
-    tooltip.innerHTML = `
-      <div style="font-weight: bold; margin-bottom: 2px; color: #ff6b00; font-size: 10px;">
-        ${mouseIcon}Double click to edit or drag to move
-      </div>
-      <div style="font-weight: bold; margin-bottom: 1px;">Hero Position</div>
-      <div style="font-size: 10px; color: rgba(255,255,255,0.9);">Position: (${this.heroX}, ${this.heroY})</div>
+// Lucide MousePointerClick SVG
+      const mouseIcon = `
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#d1d5db" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: middle; margin-right: 4px;">
+          <path d="M14 4.1 12 6" />
+          <path d="m5.1 8-2.9-.8" />
+          <path d="m6 12-1.9 2" />
+          <path d="M7.2 2.2 8 5.1" />
+          <path d="M9.037 9.69a.498.498 0 0 1 .653-.653l11 4.5a.5.5 0 0 1-.074.949l-4.349 1.041a1 1 0 0 0-.74.739l-1.04 4.35a.5.5 0 0 1-.95.074z" />
+        </svg>
+      `;
+  
+      // Update tooltip content with hero-specific information
+      tooltip.innerHTML = `
+        <div style="font-weight: bold; margin-bottom: 4px; color: #ffffff; font-size: 13px;">Hero Position</div>
+        <div style="font-size: 11px; color: rgba(209, 213, 219, 0.8); margin-bottom: 4px;">Position: (${this.heroX}, ${this.heroY})</div>
+        <div style="font-size: 11px; display: flex; align-items: center; color: rgba(209, 213, 219, 0.8);">
+          ${mouseIcon}Click to edit or drag to move
+        </div>
     `;
 
     // Position tooltip near mouse cursor

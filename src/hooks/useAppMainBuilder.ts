@@ -437,6 +437,20 @@ export default function useAppMainBuilder() {
     currentProjectPath 
   });
 
+  // Wire canvas click on objects to open the edit dialog
+  useEffect(() => {
+    if (editor && typeof (editor as any).setObjectEditCallback === 'function') {
+      (editor as any).setObjectEditCallback((objectId: number) => {
+        if (objectEditing && objectEditing.handleEditObject) {
+          objectEditing.handleEditObject(objectId);
+        }
+      });
+      return () => {
+        (editor as any).setObjectEditCallback(null);
+      };
+    }
+  }, [editor, objectEditing]);
+
   useEffect(() => {
   }, [appState.mapObjects]);
 

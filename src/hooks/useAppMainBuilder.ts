@@ -619,7 +619,7 @@ export default function useAppMainBuilder() {
         eventEntries: activeLayer?.type === 'event' ? appState.mapObjects.filter((obj) => obj.type === 'event') : [],
         draggingEventId: appState.draggingEventId,
         handleEditEvent,
-        setEventHoverTooltip: () => {},  // TODO: Implement event hover tooltip
+        setEventHoverTooltip: appState.setNpcHoverTooltip,
         handleEventDragStart,
         handleEventDragEnd,
         handleOpenEventDialog,

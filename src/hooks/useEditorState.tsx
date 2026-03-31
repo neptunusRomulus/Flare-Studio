@@ -117,10 +117,22 @@ export function useEditorState(optsRef: React.RefObject<Partial<UseEditorStateOp
   }, [editor, syncMapObjectsWrapper]);
 
   const handlePlaceEventOnMap = useCallback((eventId: string, x: number, y: number) => {
-    // TODO: Integrate with EditorCore.events to update event position
-    // For now, this is a placeholder that will be enhanced once EditorCore integration is complete
-    console.log('[DEBUG] Event placed on map:', { eventId, x, y });
-  }, []);
+    if (!editor) return;
+    const numId = parseInt(eventId, 10);
+    if (isNaN(numId)) return;
+    const ev = editor.getMapObjects().find((obj: { id: number }) => obj.id === numId);
+    if (!ev) return;
+    // Update position and recalculate location/hotspot in properties
+    const props = { ...(ev.properties || {}) };
+    if (props.location) {
+      props.location = `${x},${y},${ev.width},${ev.height}`;
+    }
+    if (props.hotspot) {
+      props.hotspot = `${x},${y},${ev.width},${ev.height}`;
+    }
+    editor.updateMapObject(numId, { x, y, properties: props });
+    syncMapObjectsWrapper();
+  }, [editor, syncMapObjectsWrapper]);
 
   const handleFillSelection = useCallback(() => {
     if (!editor) return;

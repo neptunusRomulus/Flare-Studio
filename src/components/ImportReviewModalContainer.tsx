@@ -19,12 +19,8 @@ type ImportReviewModalCtx = {
       confidence?: number;
     }>;
   } | null;
-  importReviewTileWidth?: number;
-  importReviewTileHeight?: number;
   importReviewOriginPreset?: AssetOriginPreset;
   setImportReviewData?: (data: any) => void;
-  setImportReviewTileWidth?: (width: number) => void;
-  setImportReviewTileHeight?: (height: number) => void;
   setImportReviewOriginPreset?: (originPreset: AssetOriginPreset) => void;
   handleImportReviewConfirm?: (
     profile: TilesetProfile,
@@ -41,18 +37,12 @@ export default function ImportReviewModalContainer({ ctx }: { ctx: unknown }) {
       isOpen={c.showImportReview ?? false}
       tilesetFileName={c.importReviewData?.tilesetFileName ?? ''}
       detectedAssets={c.importReviewData?.detectedAssets ?? []}
-      defaultTileWidth={c.importReviewTileWidth ?? 64}
-      defaultTileHeight={c.importReviewTileHeight ?? 64}
       defaultOriginPreset={c.importReviewOriginPreset ?? 'bottom-center'}
       onConfirm={(profile: TilesetProfile, options?: { tileWidth: number; tileHeight: number; originPreset: AssetOriginPreset }) => {
         c.handleImportReviewConfirm?.(profile, options);
       }}
       onCancel={() => {
         c.handleImportReviewCancel?.();
-      }}
-      onTileSizeChange={(tileSize: { tileWidth: number; tileHeight: number }) => {
-        c.setImportReviewTileWidth?.(tileSize.tileWidth);
-        c.setImportReviewTileHeight?.(tileSize.tileHeight);
       }}
       onOriginChange={(originPreset: AssetOriginPreset) => {
         c.setImportReviewOriginPreset?.(originPreset);

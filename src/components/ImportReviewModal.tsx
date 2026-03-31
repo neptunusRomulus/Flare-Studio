@@ -28,10 +28,7 @@ export interface ImportReviewModalProps {
   ) => void;
   onCancel: () => void;
   onEditAsset?: (gid: number) => void;
-  onTileSizeChange?: (tileSize: { tileWidth: number; tileHeight: number }) => void;
   onOriginChange?: (originPreset: AssetOriginPreset) => void;
-  defaultTileWidth?: number;
-  defaultTileHeight?: number;
   defaultOriginPreset?: AssetOriginPreset;
 }
 
@@ -39,20 +36,21 @@ export interface ImportReviewModalProps {
  * ImportReviewModal: Shows detected assets from tileset import for user review
  * Allows confirming asset definitions, editing anchors/footprints, or canceling
  */
+// Fixed isometric tile dimensions — not user-configurable
+const TILE_WIDTH = 64;
+const TILE_HEIGHT = 32;
+
 export const ImportReviewModal: React.FC<ImportReviewModalProps> = ({
   isOpen,
   tilesetFileName,
   detectedAssets,
   onConfirm,
   onCancel,
-  onTileSizeChange,
   onOriginChange,
-  defaultTileWidth = 64,
-  defaultTileHeight = 64,
   defaultOriginPreset = 'bottom-center'
 }) => {
-  const [tileWidth, setTileWidth] = React.useState<number>(defaultTileWidth);
-  const [tileHeight, setTileHeight] = React.useState<number>(defaultTileHeight);
+  const tileWidth = TILE_WIDTH;
+  const tileHeight = TILE_HEIGHT;
   const [originPreset, setOriginPreset] = React.useState<AssetOriginPreset>(defaultOriginPreset);
 
   const {
@@ -63,27 +61,13 @@ export const ImportReviewModal: React.FC<ImportReviewModalProps> = ({
     handleResizeMouseDown,
   } = useDraggableResizable({ id: 'import_review', initialWidth: 900, initialHeight: 700, minWidth: 600, minHeight: 500 });
 
-  const tileSizeOptions = [8, 16, 32, 64, 128, 258, 512];
-
   const lowConfidenceAssets = detectedAssets.filter(a => (a.confidence ?? 1) < 0.8);
   const totalAssets = detectedAssets.length;
 
   React.useEffect(() => {
     if (!isOpen) return;
-    setTileWidth(defaultTileWidth);
-    setTileHeight(defaultTileHeight);
     setOriginPreset(defaultOriginPreset);
-  }, [isOpen, defaultTileWidth, defaultTileHeight, defaultOriginPreset]);
-
-  const handleTileWidthChange = (value: number) => {
-    setTileWidth(value);
-    onTileSizeChange?.({ tileWidth: value, tileHeight });
-  };
-
-  const handleTileHeightChange = (value: number) => {
-    setTileHeight(value);
-    onTileSizeChange?.({ tileWidth, tileHeight: value });
-  };
+  }, [isOpen, defaultOriginPreset]);
 
   const resolveOrigin = (
     asset: { sourceX: number; sourceY: number; width: number; height: number },
@@ -194,8 +178,8 @@ export const ImportReviewModal: React.FC<ImportReviewModalProps> = ({
       </div>
 
         <div className="flex-1 overflow-y-auto space-y-4 px-6 py-4">
-          {/* Tile size selector */}
-          <div className="bg-muted/30 p-3 rounded-md border border-border space-y-2">
+          {/* Fixed tile size info */}
+          <div className="bg-muted/30 p-3 rounded-md border border-border">
             <div className="flex items-center justify-between gap-2">
               <label className="text-xs font-semibold uppercase tracking-wide text-foreground">
                 Tile Size
@@ -204,45 +188,9 @@ export const ImportReviewModal: React.FC<ImportReviewModalProps> = ({
                 {tileWidth}x{tileHeight}
               </span>
             </div>
-            <div className="space-y-2">
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground font-medium">Width (X)</p>
-                <div className="flex flex-wrap gap-1">
-                  {tileSizeOptions.map((size) => (
-                    <button
-                      key={`tile-width-${size}`}
-                      type="button"
-                      onClick={() => handleTileWidthChange(size)}
-                      className={`h-7 min-w-9 px-2 rounded-md border text-xs transition-colors ${tileWidth === size
-                        ? 'border-foreground bg-accent text-foreground'
-                        : 'border-border hover:bg-accent text-muted-foreground'
-                      }`}
-                    >
-                      {size}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <p className="text-xs text-muted-foreground font-medium">Height (Y)</p>
-                <div className="flex flex-wrap gap-1">
-                  {tileSizeOptions.map((size) => (
-                    <button
-                      key={`tile-height-${size}`}
-                      type="button"
-                      onClick={() => handleTileHeightChange(size)}
-                      className={`h-7 min-w-9 px-2 rounded-md border text-xs transition-colors ${tileHeight === size
-                        ? 'border-foreground bg-accent text-foreground'
-                        : 'border-border hover:bg-accent text-muted-foreground'
-                      }`}
-                    >
-                      {size}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Fixed isometric grid. Use merge/separate tools to adjust tile boundaries after import.
+            </p>
           </div>
 
           <div className="space-y-3">
@@ -278,7 +226,7 @@ export const ImportReviewModal: React.FC<ImportReviewModalProps> = ({
 
             <div className="bg-muted/20 p-3 rounded-md border border-border">
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Confirm to save this import profile. If tile boundaries look wrong, adjust width/height above and confirm to re-slice with the selected fixed grid. Each asset will occupy one map grid cell.
+                Confirm to save this import profile. If tile boundaries look wrong, use the merge/separate tools to adjust them after import.
               </p>
             </div>
           </div>

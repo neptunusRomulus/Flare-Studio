@@ -65,10 +65,8 @@ const SidebarActorEntries = ({
               return (
                 <div
                   key={actor.id}
-                  className={`rounded-md px-2 py-2 hover:bg-background transition-colors cursor-pointer ${
-                    isPlacedOnMap
-                      ? 'border-2 border-orange-500 bg-background/50'
-                      : 'border border-dashed border-gray-400 dark:border-gray-600 bg-muted/20'
+                  className={`rounded-md px-2 py-2 hover:bg-background transition-colors cursor-pointer border border-dashed border-gray-400 dark:border-gray-600 ${
+                    isPlacedOnMap ? 'bg-background/50' : 'bg-muted/20'
                   } ${draggingNpcId === actor.id ? 'opacity-50' : ''}`}
                   onClick={() => onEditObject(actor.id)}
                   onMouseMove={(event) => onHover({ x: event.clientX, y: event.clientY })}
@@ -90,10 +88,10 @@ const SidebarActorEntries = ({
                           }}
                         />
                       ) : null}
-                      <HelpCircle className={`w-5 h-5 text-muted-foreground ${portraitPath ? 'hidden' : ''} ${!isPlacedOnMap ? 'opacity-50' : ''}`} />
+                      <HelpCircle className={`w-5 h-5 text-muted-foreground ${portraitPath ? 'hidden' : ''}`} />
                     </div>
                     <div className="space-y-1 text-sm flex-1 min-w-0">
-                      <div className={`font-medium ${isPlacedOnMap ? 'text-foreground' : 'text-muted-foreground'}`} title={actor.name || `${actor.type === 'npc' ? 'NPC' : 'Enemy'} #${actor.id}`}>
+                      <div className="font-medium text-foreground" title={actor.name || `${actor.type === 'npc' ? 'NPC' : 'Enemy'} #${actor.id}`}>
                         <span className={leftCollapsed ? 'sr-only' : ''}>{actor.name || `${actor.type === 'npc' ? 'NPC' : 'Enemy'} #${actor.id}`}</span>
                         {!actor.name && leftCollapsed && <span className="text-xs text-muted-foreground">#{actor.id}</span>}
                       </div>

@@ -795,6 +795,8 @@ export class TileMapEditor {
   private selectedObjectId: number | null = null;
   private isDraggingActor: boolean = false;
   private draggingActorId: number | null = null;
+  private isDraggingEvent: boolean = false;
+  private draggingEventObjectId: number | null = null;
 
   // Placed sprite objects on object layers (background layer objects like trees, walls)
   // These are rendered as single sprites, not per-cell tiles
@@ -1589,6 +1591,29 @@ export class TileMapEditor {
     this.draw();
   }
 
+  private handleEventDrag(x: number, y: number): void {
+    if (!this.isDraggingEvent || this.draggingEventObjectId === null) return;
+    if (x < 0 || y < 0 || x >= this.mapWidth || y >= this.mapHeight) return;
+
+    const ev = this.objects.find(obj => obj.id === this.draggingEventObjectId);
+    if (!ev) return;
+    if (ev.x === x && ev.y === y) return;
+
+    // Update position and recalculate location property
+    const updates: Partial<MapObject> = { x, y };
+    const props = { ...ev.properties };
+    if (props.location) {
+      props.location = `${x},${y},${ev.width},${ev.height}`;
+    }
+    if (props.hotspot) {
+      // Keep hotspot relative: reset to event origin
+      props.hotspot = `${x},${y},${ev.width},${ev.height}`;
+    }
+    updates.properties = props;
+    this.updateMapObject(ev.id, updates);
+    this.draw();
+  }
+
   private handleMouseDown(event: MouseEvent): void {
     // Prevent editing while save is in progress
     if (this.isSaveLocked) {
@@ -1663,7 +1688,7 @@ export class TileMapEditor {
           return;
         }
 
-        // Check for event object at this position (double-click to edit)
+        // Check for event object at this position (double-click to edit, single-click to drag)
         const eventAtPosition = this.objects.find(
           obj => obj.type === 'event' && obj.x >= 0 && obj.y >= 0 &&
             tileCoords.x >= obj.x && tileCoords.x < obj.x + obj.width &&
@@ -1683,6 +1708,12 @@ export class TileMapEditor {
           }
           this.eventLastClickTime = now;
           this.eventLastClickId = eventAtPosition.id;
+          // Start dragging event
+          this.isDraggingEvent = true;
+          this.draggingEventObjectId = eventAtPosition.id;
+          this.selectedObject = eventAtPosition;
+          this.selectedObjectId = eventAtPosition.id;
+          return;
         }
 
         if (this.tool === 'tiles') {
@@ -1819,6 +1850,8 @@ export class TileMapEditor {
             this.setHeroPosition(tileCoords.x, tileCoords.y);
           } else if (this.isDraggingActor) {
             this.handleActorDrag(tileCoords.x, tileCoords.y);
+          } else if (this.isDraggingEvent) {
+            this.handleEventDrag(tileCoords.x, tileCoords.y);
           } else if (this.tool === 'tiles') {
             this.handleTileClick(tileCoords.x, tileCoords.y, false);
           } else if (this.tool === 'stamp' && this.currentStampMode === 'place' && this.activeStamp) {
@@ -1858,6 +1891,12 @@ export class TileMapEditor {
       this.draggingActorId = null;
     }
 
+    if (this.isDraggingEvent) {
+      this.isDraggingEvent = false;
+      this.draggingEventObjectId = null;
+      this.notifyObjectsChanged();
+    }
+
     this.isMouseDown = false;
     this.isPanning = false;
     this.isMinimapPanning = false;
@@ -1871,6 +1910,8 @@ export class TileMapEditor {
     this.hoverY = -1;
     this.isDraggingActor = false;
     this.draggingActorId = null;
+    this.isDraggingEvent = false;
+    this.draggingEventObjectId = null;
     this.isMinimapPanning = false;
     this.isResizingMinimap = false;
     this.draw();
@@ -3540,24 +3581,164 @@ export class TileMapEditor {
     const screenPos = this.mapToScreen(this.eventDragHoverX, this.eventDragHoverY);
     const halfTileX = (this.tileSizeX / 2) * this.zoom;
     const halfTileY = (this.tileSizeY / 2) * this.zoom;
-    
-    // Blue hover outline - same as NPC hover (for consistency)
-    this.ctx.strokeStyle = '#007acc';
-    this.ctx.lineWidth = Math.max(1, Math.min(3, 2 / this.zoom));
-    
+
+    this.ctx.save();
+
+    // Orange filled diamond
+    this.ctx.fillStyle = 'rgba(249, 115, 22, 0.7)';
     this.ctx.beginPath();
-    this.ctx.moveTo(screenPos.x, screenPos.y - halfTileY); // Top
-    this.ctx.lineTo(screenPos.x + halfTileX, screenPos.y); // Right
-    this.ctx.lineTo(screenPos.x, screenPos.y + halfTileY); // Bottom
-    this.ctx.lineTo(screenPos.x - halfTileX, screenPos.y); // Left
+    this.ctx.moveTo(screenPos.x, screenPos.y - halfTileY);
+    this.ctx.lineTo(screenPos.x + halfTileX, screenPos.y);
+    this.ctx.lineTo(screenPos.x, screenPos.y + halfTileY);
+    this.ctx.lineTo(screenPos.x - halfTileX, screenPos.y);
+    this.ctx.closePath();
+    this.ctx.fill();
+
+    // Orange border
+    this.ctx.strokeStyle = '#ea580c';
+    this.ctx.lineWidth = Math.max(1, Math.min(2, 2 / this.zoom));
+    this.ctx.beginPath();
+    this.ctx.moveTo(screenPos.x, screenPos.y - halfTileY);
+    this.ctx.lineTo(screenPos.x + halfTileX, screenPos.y);
+    this.ctx.lineTo(screenPos.x, screenPos.y + halfTileY);
+    this.ctx.lineTo(screenPos.x - halfTileX, screenPos.y);
     this.ctx.closePath();
     this.ctx.stroke();
+
+    // White clock icon at center
+    const iconSize = Math.max(8, Math.min(16, 12 * this.zoom));
+    const cx = screenPos.x;
+    const cy = screenPos.y;
+    const r = iconSize / 2;
+
+    this.ctx.strokeStyle = '#ffffff';
+    this.ctx.lineWidth = Math.max(1, Math.min(2, 1.5 * this.zoom));
+    this.ctx.lineCap = 'round';
+
+    // Clock circle
+    this.ctx.beginPath();
+    this.ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    this.ctx.stroke();
+
+    // Hour hand (12 o'clock)
+    this.ctx.beginPath();
+    this.ctx.moveTo(cx, cy);
+    this.ctx.lineTo(cx, cy - r * 0.6);
+    this.ctx.stroke();
+
+    // Minute hand (3 o'clock)
+    this.ctx.beginPath();
+    this.ctx.moveTo(cx, cy);
+    this.ctx.lineTo(cx + r * 0.5, cy);
+    this.ctx.stroke();
+
+    this.ctx.restore();
   }
 
   private drawEvents(): void {
-    // Draw event placeholders from EditorCore events repository
-    // This will be integrated once EditorCore is connected to the TileMapEditor
-    // For now, this is a placeholder method that will be populated in the integration phase
+    // Check if there is an "event" tile layer to get its visibility and opacity.
+    // If it doesn't exist, we default to visible and opaque.
+    const eventLayer = this.tileLayers.find(l => l.type === 'event');
+    if (eventLayer && !eventLayer.visible) return; // Hide/Unhide functional tie-in
+
+    const events = this.objects.filter(obj => obj.type === 'event' && obj.x >= 0 && obj.y >= 0);
+    if (events.length === 0) return;
+
+    this.ctx.save();
+    
+    // Connect to transparency state of the Event layer panel item
+    if (eventLayer && eventLayer.transparency != null) {
+      this.ctx.globalAlpha = 1 - eventLayer.transparency;
+    }
+
+    for (const event of events) {
+      this.drawEventPlaceholder(event);
+    }
+
+    this.ctx.restore();
+  }
+
+  private drawEventPlaceholder(event: MapObject): void {
+    const screenPos = this.mapToScreen(event.x, event.y);
+    const halfTileX = (this.tileSizeX / 2) * this.zoom;
+    const halfTileY = (this.tileSizeY / 2) * this.zoom;
+
+    this.ctx.save();
+
+    // Always show glow effect for events (orange)
+    {
+      const glowLayers = [
+        { color: 'rgba(249, 115, 22, 0.1)', width: 8 },
+        { color: 'rgba(249, 115, 22, 0.2)', width: 6 },
+        { color: 'rgba(249, 115, 22, 0.3)', width: 4 },
+        { color: 'rgba(249, 115, 22, 0.5)', width: 2 }
+      ];
+      glowLayers.forEach(layer => {
+        this.ctx.strokeStyle = layer.color;
+        this.ctx.lineWidth = Math.max(1, Math.min(layer.width, layer.width / this.zoom));
+        this.ctx.shadowColor = '#f97316';
+        this.ctx.shadowBlur = Math.max(2, Math.min(10, layer.width / this.zoom));
+        this.ctx.beginPath();
+        this.ctx.moveTo(screenPos.x, screenPos.y - halfTileY);
+        this.ctx.lineTo(screenPos.x + halfTileX, screenPos.y);
+        this.ctx.lineTo(screenPos.x, screenPos.y + halfTileY);
+        this.ctx.lineTo(screenPos.x - halfTileX, screenPos.y);
+        this.ctx.closePath();
+        this.ctx.stroke();
+      });
+    }
+
+    this.ctx.shadowColor = 'transparent';
+    this.ctx.shadowBlur = 0;
+
+    // Filled orange diamond
+    this.ctx.fillStyle = '#f97316';
+    this.ctx.beginPath();
+    this.ctx.moveTo(screenPos.x, screenPos.y - halfTileY);
+    this.ctx.lineTo(screenPos.x + halfTileX, screenPos.y);
+    this.ctx.lineTo(screenPos.x, screenPos.y + halfTileY);
+    this.ctx.lineTo(screenPos.x - halfTileX, screenPos.y);
+    this.ctx.closePath();
+    this.ctx.fill();
+
+    // Orange border
+    this.ctx.strokeStyle = '#ea580c';
+    this.ctx.lineWidth = Math.max(1, Math.min(2, 2 / this.zoom));
+    this.ctx.beginPath();
+    this.ctx.moveTo(screenPos.x, screenPos.y - halfTileY);
+    this.ctx.lineTo(screenPos.x + halfTileX, screenPos.y);
+    this.ctx.lineTo(screenPos.x, screenPos.y + halfTileY);
+    this.ctx.lineTo(screenPos.x - halfTileX, screenPos.y);
+    this.ctx.closePath();
+    this.ctx.stroke();
+
+    // White clock icon at center
+    const iconSize = Math.max(8, Math.min(16, 12 * this.zoom));
+    const cx = screenPos.x;
+    const cy = screenPos.y;
+    const r = iconSize / 2;
+
+    // Clock circle
+    this.ctx.strokeStyle = '#ffffff';
+    this.ctx.lineWidth = Math.max(1, Math.min(2, 1.5 * this.zoom));
+    this.ctx.beginPath();
+    this.ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    this.ctx.stroke();
+
+    // Clock hands (hour hand pointing to 12, minute hand pointing to 3)
+    this.ctx.lineCap = 'round';
+    // Hour hand (12 o'clock)
+    this.ctx.beginPath();
+    this.ctx.moveTo(cx, cy);
+    this.ctx.lineTo(cx, cy - r * 0.6);
+    this.ctx.stroke();
+    // Minute hand (3 o'clock)
+    this.ctx.beginPath();
+    this.ctx.moveTo(cx, cy);
+    this.ctx.lineTo(cx + r * 0.5, cy);
+    this.ctx.stroke();
+
+    this.ctx.restore();
   }
 
   private drawSelection(): void {
@@ -10826,6 +11007,18 @@ export class TileMapEditor {
         this.showActorTooltip(actorPlaceholder, actorLayerType);
         return;
       }
+    }
+
+    // Check if we're hovering over an event object
+    const eventAtHover = this.objects.find(
+      obj => obj.type === 'event' && obj.x >= 0 && obj.y >= 0 &&
+        this.hoverX >= obj.x && this.hoverX < obj.x + obj.width &&
+        this.hoverY >= obj.y && this.hoverY < obj.y + obj.height
+    );
+    if (eventAtHover) {
+      this.mapCanvas.style.cursor = 'move';
+      this.showObjectTooltip(eventAtHover);
+      return;
     }
 
     // Check if we're hovering over an object on an interactive layer

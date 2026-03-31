@@ -81,14 +81,13 @@ const SidebarEventEntries = ({
               const activationLabel = event.activate ? FLARE_TO_ACTIVATION[event.activate] || event.activate : null;
 
               return (
+                <ListItemTooltip key={event.id}>
                 <ElementContextMenu
-                  key={event.id}
                   elementType="event"
                   onEdit={() => onEditEvent(event.id)}
                   onDuplicate={() => onDuplicateEvent(event.id)}
                   onDelete={() => onDeleteEvent(event.id)}
                 >
-                <ListItemTooltip>
                 <div
                   {...getItemDragProps(index)}
                   className={`w-full box-border rounded-md px-2 py-2 hover:bg-background transition-colors cursor-pointer border border-dashed border-gray-400 dark:border-gray-600 flex ${
@@ -142,8 +141,8 @@ const SidebarEventEntries = ({
                     </Tooltip>
                   </div>
                 </div>
-                </ListItemTooltip>
                 </ElementContextMenu>
+                </ListItemTooltip>
               );
             })}
           </div>

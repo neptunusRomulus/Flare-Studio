@@ -148,7 +148,10 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
     if (eventData.rewards.itemReward.trim()) props.reward_item = eventData.rewards.itemReward.trim();
     if (eventData.rewards.enemySpawn.trim()) props.spawn = eventData.rewards.enemySpawn.trim();
     if (eventData.rewards.teleportMap.trim()) {
-      props.intermap = `${eventData.rewards.teleportMap.trim()},${eventData.rewards.teleportX},${eventData.rewards.teleportY}`;
+      let mapFile = eventData.rewards.teleportMap.trim();
+      if (!mapFile.startsWith('maps/')) mapFile = `maps/${mapFile}`;
+      if (!mapFile.endsWith('.txt')) mapFile = `${mapFile}.txt`;
+      props.intermap = `${mapFile},${eventData.rewards.teleportX},${eventData.rewards.teleportY}`;
     }
     if (eventData.rewards.sound.trim()) props.soundfx = eventData.rewards.sound.trim();
     if (eventData.engine.chance < 100) props.chance_exec = String(eventData.engine.chance);
@@ -308,7 +311,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
             expReward: parseInt(p.reward_xp || '0') || 0,
             itemReward: p.reward_item || '',
             enemySpawn: p.spawn || '',
-            teleportMap: intermapParts.length >= 3 ? intermapParts[0] : (p.intermap || ''),
+            teleportMap: intermapParts.length >= 3 ? intermapParts[0].replace(/^\/?(maps\/)/i, '').replace(/\.txt$/i, '') : (p.intermap || '').replace(/^\/?(maps\/)/i, '').replace(/\.txt$/i, ''),
             teleportX: intermapParts.length >= 3 ? parseInt(intermapParts[1]) || 0 : 0,
             teleportY: intermapParts.length >= 3 ? parseInt(intermapParts[2]) || 0 : 0,
             sound: p.soundfx || '',

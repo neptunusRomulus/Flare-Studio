@@ -352,7 +352,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
     
     document.addEventListener('keydown', handleEsc);
     return () => document.removeEventListener('keydown', handleEsc);
-  }, [open, onOpenChange, currentMapName, isEditing, editingEventId, editor]);
+  }, [open, onOpenChange, currentMapName, isEditing, editingEventId, editor, syncMapObjectsWrapper]);
 
   useEffect(() => {
     if (!open) {
@@ -366,7 +366,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
     return () => {
       window.dispatchEvent(new CustomEvent('activeEventPreview', { detail: null }));
     };
-  }, [open, eventData.positioning.coordinates.x, eventData.positioning.coordinates.y, eventData.positioning.size.width, eventData.positioning.size.height]);
+  }, [open, eventData.positioning.coordinates, eventData.positioning.size]);
 
   // Dispatch hotspot preview (pink overlay on canvas)
   useEffect(() => {
@@ -381,7 +381,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
     return () => {
       window.dispatchEvent(new CustomEvent('activeHotspotPreview', { detail: null }));
     };
-  }, [open, eventData.timing.activeActivation, eventData.positioning.hotspot.x, eventData.positioning.hotspot.y, eventData.positioning.hotspot.width, eventData.positioning.hotspot.height]);
+  }, [open, eventData.timing.activeActivation, eventData.positioning.hotspot]);
 
   const setActivation = (activation: EventActivation) => {
     setEventData(prev => ({

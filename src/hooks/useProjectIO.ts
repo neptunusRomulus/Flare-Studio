@@ -1,7 +1,7 @@
 import { useCallback, useState, useRef, useEffect } from 'react';
 import type { MapObject } from '@/types';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
-import { buildSpawnContent, STARTING_MAP_INVALID_NAMES } from '@/editor/mapSpawnUtils';
+import { buildSpawnContent, computeIntermapTarget, STARTING_MAP_INVALID_NAMES } from '@/editor/mapSpawnUtils';
 
 type ProjectIOOptions = {
   editor: TileMapEditor | null;
@@ -90,7 +90,24 @@ const useProjectIO = ({
       setExportProgress(0);
     }
 
-    const spawnContent = buildSpawnContent(startingMapIntermap);
+    // Build spawn.txt content with hero coordinates.
+    // If the currently loaded map IS the starting map, use its live hero position.
+    // Otherwise, read the existing spawn.txt (which was written with correct coords
+    // by writeSpawnFile) to preserve the hero position.
+    let spawnContent: string;
+    const currentIntermapTarget = computeIntermapTarget(true, mapName);
+    const isCurrentMapStarting = Boolean(
+      currentIntermapTarget && startingMapIntermap && currentIntermapTarget === startingMapIntermap
+    );
+    if (isCurrentMapStarting && editor) {
+      const heroPos = (editor as unknown as { getHeroPosition?: () => { x: number; y: number } }).getHeroPosition?.();
+      spawnContent = buildSpawnContent(startingMapIntermap, heroPos);
+    } else if (currentProjectPath && window.electronAPI?.readSpawnFile) {
+      const existingSpawn = await window.electronAPI.readSpawnFile(currentProjectPath);
+      spawnContent = existingSpawn ?? buildSpawnContent(startingMapIntermap);
+    } else {
+      spawnContent = buildSpawnContent(startingMapIntermap);
+    }
 
     const tilesetExportInfo = editor.getTilesetExportInfo();
     let pathOverrides: Record<string, string> | undefined;

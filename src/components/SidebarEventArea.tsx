@@ -8,9 +8,12 @@ type Props = {
   leftCollapsed: boolean;
   draggingEventId: number | null;
   handleEditEvent: (id: number) => void;
+  handleDuplicateEvent: (id: number) => void;
+  handleDeleteEvent: (id: number) => void;
   setEventHoverTooltip: (p: { x: number; y: number } | null) => void;
   handleEventDragStart: (e: React.DragEvent, eventId: number) => void;
   handleEventDragEnd: () => void;
+  handleReorderEvents: (fromIndex: number, toIndex: number) => void;
   handleOpenEventDialog: () => void;
 };
 
@@ -20,9 +23,12 @@ const SidebarEventArea: React.FC<Props> = ({
   leftCollapsed,
   draggingEventId,
   handleEditEvent,
+  handleDuplicateEvent,
+  handleDeleteEvent,
   setEventHoverTooltip,
   handleEventDragStart,
   handleEventDragEnd,
+  handleReorderEvents,
   handleOpenEventDialog
 }) => {
   return (
@@ -32,10 +38,13 @@ const SidebarEventArea: React.FC<Props> = ({
       leftCollapsed={leftCollapsed}
       draggingEventId={draggingEventId}
       onEditEvent={handleEditEvent}
+      onDuplicateEvent={handleDuplicateEvent}
+      onDeleteEvent={handleDeleteEvent}
       onHover={(pos) => setEventHoverTooltip(pos)}
       onHoverEnd={() => setEventHoverTooltip(null)}
       onDragStart={handleEventDragStart}
       onDragEnd={handleEventDragEnd}
+      onReorderEvents={handleReorderEvents}
       onAddEvent={handleOpenEventDialog}
     />
   );

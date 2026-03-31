@@ -30,9 +30,12 @@ type SidebarProps = {
     actorEntries: MapObject[];
     draggingNpcId: number | null;
     handleEditObject: (id: number) => void;
+    handleDuplicateObject: (id: number) => void;
+    handleDeleteObject: (id: number) => void;
     setNpcHoverTooltip: (p: { x: number; y: number } | null) => void;
     handleNpcDragStart: (e: React.DragEvent, actorId: number) => void;
     handleNpcDragEnd: () => void;
+    handleReorderActors: (fromIndex: number, toIndex: number) => void;
     handleOpenActorDialog: (type: 'npc' | 'enemy') => void;
   };
 
@@ -41,9 +44,12 @@ type SidebarProps = {
     eventEntries: MapObject[];
     draggingEventId: number | null;
     handleEditEvent: (id: number) => void;
+    handleDuplicateEvent: (id: number) => void;
+    handleDeleteEvent: (id: number) => void;
     setEventHoverTooltip: (p: { x: number; y: number } | null) => void;
     handleEventDragStart: (e: React.DragEvent, eventId: number) => void;
     handleEventDragEnd: () => void;
+    handleReorderEvents: (fromIndex: number, toIndex: number) => void;
     handleOpenEventDialog: () => void;
   };
 
@@ -59,6 +65,8 @@ type SidebarProps = {
     expandedItemCategories: Set<ItemRole>;
     setExpandedItemCategories: React.Dispatch<React.SetStateAction<Set<ItemRole>>>;
     handleOpenItemEdit: (item: ItemSummary) => void;
+    handleDuplicateItem: (item: ItemSummary) => void;
+    handleDeleteItem: (item: ItemSummary) => void;
     handleOpenItemDialog: () => void;
   };
 
@@ -132,9 +140,12 @@ export default function AppSidebar(p: SidebarProps) {
             leftCollapsed={p.leftCollapsed}
             draggingNpcId={p.actors.draggingNpcId}
             handleEditObject={p.actors.handleEditObject}
+            handleDuplicateObject={p.actors.handleDuplicateObject}
+            handleDeleteObject={p.actors.handleDeleteObject}
             setNpcHoverTooltip={p.actors.setNpcHoverTooltip}
             handleNpcDragStart={p.actors.handleNpcDragStart}
             handleNpcDragEnd={p.actors.handleNpcDragEnd}
+            handleReorderActors={p.actors.handleReorderActors}
             handleOpenActorDialog={p.actors.handleOpenActorDialog}
           />
         )}
@@ -146,9 +157,12 @@ export default function AppSidebar(p: SidebarProps) {
             leftCollapsed={p.leftCollapsed}
             draggingEventId={p.events.draggingEventId}
             handleEditEvent={p.events.handleEditEvent}
+            handleDuplicateEvent={p.events.handleDuplicateEvent}
+            handleDeleteEvent={p.events.handleDeleteEvent}
             setEventHoverTooltip={p.events.setEventHoverTooltip}
             handleEventDragStart={p.events.handleEventDragStart}
             handleEventDragEnd={p.events.handleEventDragEnd}
+            handleReorderEvents={p.events.handleReorderEvents}
             handleOpenEventDialog={p.events.handleOpenEventDialog}
           />
         )}
@@ -163,6 +177,8 @@ export default function AppSidebar(p: SidebarProps) {
             expandedItemCategories={p.items.expandedItemCategories}
             setExpandedItemCategories={p.items.setExpandedItemCategories}
             handleOpenItemEdit={p.items.handleOpenItemEdit}
+            handleDuplicateItem={p.items.handleDuplicateItem}
+            handleDeleteItem={p.items.handleDeleteItem}
             handleOpenItemDialog={p.items.handleOpenItemDialog}
           />
         )}

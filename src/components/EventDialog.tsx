@@ -6,6 +6,7 @@ import { HelpCircle, X, Save, MapPinPlus, MousePointerClick, MapPinMinus, LogIn,
 import Tooltip from '@/components/ui/tooltip';
 import { useAppContext } from '@/context/AppContext';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
+import { ACTIVATION_COLORS } from '@/editor/eventActivationColors';
 
 type EventActivation = 'Trigger' | 'Interact' | 'Load' | 'Leave' | 'MapExit' | 'MapClear' | 'Loop';
 
@@ -478,7 +479,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                         onClick={() => setActivation(activation)}
                         className={`rounded-md border p-2 transition-colors ${
                           isActive
-                            ? 'border-orange-500/50 bg-orange-500/10 text-orange-600'
+                            ? (ACTIVATION_COLORS[activation]?.active ?? 'border-orange-500/50 bg-orange-500/10 text-orange-600')
                             : 'border-border/50 bg-muted/30 text-foreground/60 hover:bg-muted/50'
                         }`}
                       >

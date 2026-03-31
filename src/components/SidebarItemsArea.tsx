@@ -17,6 +17,8 @@ type Props = {
   expandedItemCategories: Set<ItemRole>;
   setExpandedItemCategories: React.Dispatch<React.SetStateAction<Set<ItemRole>>>;
   handleOpenItemEdit: (item: ItemSummary) => void;
+  handleDuplicateItem: (item: ItemSummary) => void;
+  handleDeleteItem: (item: ItemSummary) => void;
   handleOpenItemDialog: () => void;
 };
 
@@ -25,6 +27,8 @@ const SidebarItemsArea: React.FC<Props> = ({
   expandedItemCategories,
   setExpandedItemCategories,
   handleOpenItemEdit,
+  handleDuplicateItem,
+  handleDeleteItem,
   handleOpenItemDialog
 }) => {
   return (
@@ -33,6 +37,8 @@ const SidebarItemsArea: React.FC<Props> = ({
       expandedItemCategories={expandedItemCategories}
       setExpandedItemCategories={setExpandedItemCategories}
       onOpenItemEdit={handleOpenItemEdit}
+      onDuplicateItem={handleDuplicateItem}
+      onDeleteItem={handleDeleteItem}
       onAddItem={handleOpenItemDialog}
     />
   );

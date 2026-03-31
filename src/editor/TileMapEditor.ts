@@ -127,7 +127,6 @@ export interface EditorProjectData {
 
 const INTERNAL_TILESET_FILENAMES = new Set<string>(['collision-tile.png', 'collision_tileset.png']);
 const COLLISION_LAYER_TYPE = 'collision';
-const INTERNAL_COLLISION_TILESET = 'collision-tile.png';
 
 export class TileMapEditor {
   public isStartingMap: boolean = false;
@@ -2053,9 +2052,9 @@ export class TileMapEditor {
           // Ctrl+S = Manual Save
           event.preventDefault();
           if (this.manualSaveCallback) {
-            this.manualSaveCallback().catch(err => {
+            this.manualSaveCallback().catch(_err => {
+              // save error handled elsewhere
             });
-          } else {
           }
           break;
         case 'KeyA':
@@ -3009,9 +3008,6 @@ export class TileMapEditor {
 
   public panToTile(tileX: number, tileY: number): void {
     // Determine where the tile is right now in raw screen space without any pan
-    const oldPanX = this.panX;
-    const oldPanY = this.panY;
-    
     // Reset pan temporarily to calculate absolute offset
     this.panX = 0;
     this.panY = 0;
@@ -4359,7 +4355,7 @@ export class TileMapEditor {
 
     // Priority order for minimap rendering
     // Collision will be drawn last to appear on top of everything
-    const layerPriority = (layer: any) => {
+    const layerPriority = (layer: TileLayer) => {
       const type = (layer.type || '').toLowerCase();
       const name = (layer.name || '').toLowerCase();
       if (type === 'collision' || name.includes('collision')) return 5; // Highest, drawn last
@@ -8619,9 +8615,9 @@ export class TileMapEditor {
           // Try provided path first, then fallback to stored currentProjectPath
           const pathToUse = projectPath || this.currentProjectPath;
           if (pathToUse) {
-            this.saveTilesetToMapFile(pathToUse).catch((err: unknown) => {
+            this.saveTilesetToMapFile(pathToUse).catch((_err: unknown) => {
+              // tileset save error handled elsewhere
             });
-          } else {
           }
           
           resolve();
@@ -10247,29 +10243,24 @@ export class TileMapEditor {
    * Does NOT save other map properties - ONLY tilesets
    */
   public async saveTilesetToMapFile(projectPath?: string): Promise<void> {
-    try {
-      // Use provided path, fall back to currentProjectPath, then mapName
-      const targetPath = projectPath || this.currentProjectPath;
-      
-      if (!targetPath) {
-        return;
-      }
+    // Use provided path, fall back to currentProjectPath, then mapName
+    const targetPath = projectPath || this.currentProjectPath;
+    
+    if (!targetPath) {
+      return;
+    }
 
-      // Get current project data (includes all tilesets)
-      const projectData = this.getProjectData();
-      
-      // Ensure name is always a string
-      if (!projectData.name) {
-        projectData.name = this.mapName || 'Untitled Map';
-      }
-      
-      // Save via Electron API (cast to bypass strict type checking)
-      if (window.electronAPI?.saveMapProject) {
-        await (window.electronAPI.saveMapProject as (path: string, data: unknown) => Promise<boolean>)(targetPath, projectData);
-      } else {
-      }
-    } catch (err) {
-      throw err;
+    // Get current project data (includes all tilesets)
+    const projectData = this.getProjectData();
+    
+    // Ensure name is always a string
+    if (!projectData.name) {
+      projectData.name = this.mapName || 'Untitled Map';
+    }
+    
+    // Save via Electron API (cast to bypass strict type checking)
+    if (window.electronAPI?.saveMapProject) {
+      await (window.electronAPI.saveMapProject as (path: string, data: unknown) => Promise<boolean>)(targetPath, projectData);
     }
   }
 

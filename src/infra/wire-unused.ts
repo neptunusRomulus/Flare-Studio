@@ -17,7 +17,6 @@ import '@/hooks/useBeforeCreateMap';
 import '@/hooks/useBeforeUnload';
 import '@/hooks/useBrushActionListener';
 import '@/hooks/useBrushToolDomSync';
-import '@/hooks/useCanvasDoubleClick';
 import '@/hooks/useClearLayerHandler';
 import '@/hooks/useClickOutsideDropdown';
 import '@/hooks/useConfirmActionHandlers';

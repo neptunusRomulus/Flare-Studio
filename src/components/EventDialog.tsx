@@ -365,6 +365,21 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
     };
   }, [open, eventData.positioning.coordinates.x, eventData.positioning.coordinates.y, eventData.positioning.size.width, eventData.positioning.size.height]);
 
+  // Dispatch hotspot preview (pink overlay on canvas)
+  useEffect(() => {
+    const isHotspotActive = ['Interact', 'Trigger'].includes(eventData.timing.activeActivation || '');
+    if (!open || !isHotspotActive) {
+      window.dispatchEvent(new CustomEvent('activeHotspotPreview', { detail: null }));
+      return;
+    }
+    const { x, y, width, height } = eventData.positioning.hotspot;
+    window.dispatchEvent(new CustomEvent('activeHotspotPreview', { detail: { x, y, width, height } }));
+    
+    return () => {
+      window.dispatchEvent(new CustomEvent('activeHotspotPreview', { detail: null }));
+    };
+  }, [open, eventData.timing.activeActivation, eventData.positioning.hotspot.x, eventData.positioning.hotspot.y, eventData.positioning.hotspot.width, eventData.positioning.hotspot.height]);
+
   const setActivation = (activation: EventActivation) => {
     setEventData(prev => ({
       ...prev,

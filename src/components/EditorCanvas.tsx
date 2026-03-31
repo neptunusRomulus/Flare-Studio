@@ -131,6 +131,16 @@ export default function EditorCanvas(props: Props) {
   }, []);
 
   React.useEffect(() => {
+    const handleActiveHotspotPreview = (e: any) => {
+      if (editorRef.current) {
+        editorRef.current.setActiveHotspotPreview(e.detail);
+      }
+    };
+    window.addEventListener('activeHotspotPreview', handleActiveHotspotPreview);
+    return () => window.removeEventListener('activeHotspotPreview', handleActiveHotspotPreview);
+  }, []);
+
+  React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey) {
         setIsCtrlHeld(true);

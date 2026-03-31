@@ -40,8 +40,8 @@ const SidebarEventArea: React.FC<Props> = ({
       onEditEvent={handleEditEvent}
       onDuplicateEvent={handleDuplicateEvent}
       onDeleteEvent={handleDeleteEvent}
-      onHover={(pos) => setEventHoverTooltip(pos)}
-      onHoverEnd={() => setEventHoverTooltip(null)}
+      onHover={() => {}}
+      onHoverEnd={() => {}}
       onDragStart={handleEventDragStart}
       onDragEnd={handleEventDragEnd}
       onReorderEvents={handleReorderEvents}

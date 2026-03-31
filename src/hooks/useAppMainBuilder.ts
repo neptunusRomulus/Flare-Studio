@@ -616,16 +616,23 @@ export default function useAppMainBuilder() {
     const objects = typeof editor.getMapObjects === 'function' ? editor.getMapObjects() : [];
     const source = objects.find((o: MapObject) => o.id === eventId);
     if (!source) return;
-    const newObj = editor.addMapObject('event', -1, -1, source.width ?? 1, source.height ?? 1);
+    const srcX = source.x ?? -1;
+    const srcY = source.y ?? -1;
+    const newObj = editor.addMapObject('event', srcX, srcY, source.width ?? 1, source.height ?? 1);
     if (newObj && typeof editor.updateMapObject === 'function') {
       editor.updateMapObject(newObj.id, {
         name: `${source.name || 'Event'} (copy)`,
         activate: source.activate,
         hotspot: source.hotspot,
         tooltip: source.tooltip,
+        intermap: source.intermap,
+        loot: source.loot,
+        soundfx: source.soundfx,
+        mapmod: source.mapmod,
+        repeat: source.repeat,
         properties: { ...(source.properties || {}) },
-        x: -1,
-        y: -1,
+        x: srcX,
+        y: srcY,
       });
     }
     if (typeof realSyncMapObjects === 'function') realSyncMapObjects();

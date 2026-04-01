@@ -9337,6 +9337,13 @@ export class TileMapEditor {
 
     const events = this.objects.filter(obj => obj.type === 'event');
     for (const event of events) {
+      // Write comment line with event name and optional description
+      const eName = event.name || '';
+      const eDesc = event.description || event.properties?._description || '';
+      if (eName) {
+        const commentLine = eDesc ? `#${eName} - ${eDesc}` : `#${eName}`;
+        lines.push(commentLine);
+      }
       lines.push(`[event]`);
 
       // activate (always first)

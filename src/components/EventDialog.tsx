@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { HelpCircle, X, Save, MapPinPlus, MousePointerClick, MapPinMinus, LogIn, LogOut, SquareCheckBig, Repeat2 } from 'lucide-react';
 import Tooltip from '@/components/ui/tooltip';
 import { useAppContext } from '@/context/AppContext';
@@ -12,6 +13,7 @@ type EventActivation = 'Trigger' | 'Interact' | 'Load' | 'Leave' | 'MapExit' | '
 
 type EventData = {
   name: string;
+  description: string;
   positioning: {
     mapName: string;
     coordinates: { x: number; y: number };
@@ -117,7 +119,10 @@ const ACTIVATION_TO_FLARE: Record<string, string> = {
 
 const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLocation: _eventLocation, editingEventId }) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { mapName: currentMapName, mapWidth, mapHeight, editor, syncMapObjectsWrapper } = useAppContext() as any;
+  const { mapName: currentMapName, mapWidth, mapHeight, editor, syncMapObjectsWrapper, controls } = useAppContext() as any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const currentProjectPath: string | null = (controls as any)?.currentProjectPath ?? null;
+  const [projectMaps, setProjectMaps] = useState<string[]>([]);
 
   const isEditing = editingEventId != null;
 
@@ -157,6 +162,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
     if (eventData.engine.chance < 100) props.chance_exec = String(eventData.engine.chance);
     if (eventData.engine.autoSave) props.save_game = 'true';
     if (eventData.engine.script.trim()) props.script = eventData.engine.script.trim();
+    if (eventData.description.trim()) props._description = eventData.description.trim();
     return props;
   };
 
@@ -170,6 +176,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
       // Update existing event
       editor.updateMapObject(editingEventId, {
         name: eventData.name || 'Event',
+        description: eventData.description || '',
         type: 'event',
         activate: flareActivate,
         x: coordinates.x,
@@ -184,6 +191,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
       if (newObject && typeof editor.updateMapObject === 'function') {
         editor.updateMapObject(newObject.id, {
           name: eventData.name || 'Event',
+          description: eventData.description || '',
           type: 'event',
           activate: flareActivate,
           x: coordinates.x,
@@ -212,6 +220,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
 
   const [eventData, setEventData] = useState<EventData>({
     name: '',
+    description: '',
     positioning: {
       mapName: '',
       coordinates: { x: 0, y: 0 },
@@ -288,6 +297,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
         // eslint-disable-next-line react-hooks/set-state-in-effect
         setEventData({
           name: obj.name || '',
+          description: obj.description || p._description || '',
           positioning: {
             mapName: currentMapName || '',
             coordinates: { x: obj.x ?? 0, y: obj.y ?? 0 },
@@ -331,6 +341,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setEventData({
         name: '',
+        description: '',
         positioning: {
           mapName: currentMapName || '',
           coordinates: { x: 0, y: 0 },
@@ -353,6 +364,22 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
     document.addEventListener('keydown', handleEsc);
     return () => document.removeEventListener('keydown', handleEsc);
   }, [open, onOpenChange, currentMapName, isEditing, editingEventId, editor, syncMapObjectsWrapper]);
+
+  // Fetch project maps when dialog opens
+  useEffect(() => {
+    if (!open || !currentProjectPath) return;
+    let cancelled = false;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const electronAPI = (window as any).electronAPI;
+    if (electronAPI?.listMaps) {
+      electronAPI.listMaps(currentProjectPath).then((maps: string[]) => {
+        if (!cancelled) setProjectMaps(maps ?? []);
+      }).catch(() => {
+        if (!cancelled) setProjectMaps([]);
+      });
+    }
+    return () => { cancelled = true; };
+  }, [open, currentProjectPath]);
 
   useEffect(() => {
     if (!open) {
@@ -472,6 +499,15 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                 className="h-8 text-sm"
               />
             </div>
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-foreground/80">Description</label>
+              <Input
+                value={eventData.description}
+                onChange={e => setEventData(prev => ({ ...prev, description: e.target.value }))}
+                placeholder="Brief description of this event"
+                className="h-8 text-sm"
+              />
+            </div>
           </div>
 
           {/* Positioning and Timing Section */}
@@ -492,7 +528,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                   const IconComponent = config.icon;
                   const isActive = eventData.timing.activeActivation === activation;
                   return (
-                    <Tooltip key={activation} content={config.tooltip}>
+                    <Tooltip key={activation} content={config.tooltip} side="right">
                       <button
                         onClick={() => setActivation(activation)}
                         className={`rounded-md border p-2 transition-colors ${
@@ -528,75 +564,59 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                   <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
                 </Tooltip>
               </div>
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid grid-cols-4 gap-2">
                 <div>
-                  <label className="text-[10px] text-muted-foreground">Map Name</label>
+                  <label className="text-[10px] text-muted-foreground">X</label>
                   <Input
-                    value={eventData.positioning.mapName}
-                    readOnly
-                    disabled
-                    placeholder="Map name"
-                    className="h-7 text-xs bg-muted/50 cursor-not-allowed"
+                    type="number"
+                    min="0"
+                    max={mapWidth - 1}
+                    value={eventData.positioning.coordinates.x}
+                    onChange={e =>
+                      setEventData(prev => ({
+                        ...prev,
+                        positioning: {
+                          ...prev.positioning,
+                          coordinates: { 
+                            ...prev.positioning.coordinates, 
+                            x: getSafeCoord(parseInt(e.target.value), mapWidth)
+                          },
+                          size: {
+                            ...prev.positioning.size,
+                            width: getSafeSize(prev.positioning.size.width, getSafeCoord(parseInt(e.target.value), mapWidth), mapWidth)
+                          }
+                        },
+                      }))
+                    }
+                    className="h-7 text-xs w-full"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-[10px] text-muted-foreground">X</label>
-                    <Input
-                      type="number"
-                      min="0"
-                      max={mapWidth - 1}
-                      value={eventData.positioning.coordinates.x}
-                      onChange={e =>
-                        setEventData(prev => ({
-                          ...prev,
-                          positioning: {
-                            ...prev.positioning,
-                            coordinates: { 
-                              ...prev.positioning.coordinates, 
-                              x: getSafeCoord(parseInt(e.target.value), mapWidth)
-                            },
-                            // Auto-adjust width if x + width exceeds bounds
-                            size: {
-                              ...prev.positioning.size,
-                              width: getSafeSize(prev.positioning.size.width, getSafeCoord(parseInt(e.target.value), mapWidth), mapWidth)
-                            }
+                <div>
+                  <label className="text-[10px] text-muted-foreground">Y</label>
+                  <Input
+                    type="number"
+                    min="0"
+                    max={mapHeight - 1}
+                    value={eventData.positioning.coordinates.y}
+                    onChange={e =>
+                      setEventData(prev => ({
+                        ...prev,
+                        positioning: {
+                          ...prev.positioning,
+                          coordinates: { 
+                            ...prev.positioning.coordinates, 
+                            y: getSafeCoord(parseInt(e.target.value), mapHeight)
                           },
-                        }))
-                      }
-                      className="h-7 text-xs"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-muted-foreground">Y</label>
-                    <Input
-                      type="number"
-                      min="0"
-                      max={mapHeight - 1}
-                      value={eventData.positioning.coordinates.y}
-                      onChange={e =>
-                        setEventData(prev => ({
-                          ...prev,
-                          positioning: {
-                            ...prev.positioning,
-                            coordinates: { 
-                              ...prev.positioning.coordinates, 
-                              y: getSafeCoord(parseInt(e.target.value), mapHeight)
-                            },
-                            // Auto-adjust height if y + height exceeds bounds
-                            size: {
-                              ...prev.positioning.size,
-                              height: getSafeSize(prev.positioning.size.height, getSafeCoord(parseInt(e.target.value), mapHeight), mapHeight)
-                            }
-                          },
-                        }))
-                      }
-                      className="h-7 text-xs"
-                    />
-                  </div>
+                          size: {
+                            ...prev.positioning.size,
+                            height: getSafeSize(prev.positioning.size.height, getSafeCoord(parseInt(e.target.value), mapHeight), mapHeight)
+                          }
+                        },
+                      }))
+                    }
+                    className="h-7 text-xs w-full"
+                  />
                 </div>
-              </div>
-              <div className="grid gap-2 sm:grid-cols-2">
                 <div>
                   <label className="text-[10px] text-muted-foreground">Width</label>
                   <Input
@@ -616,7 +636,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                         },
                       }))
                     }
-                    className="h-7 text-xs"
+                    className="h-7 text-xs w-full"
                   />
                 </div>
                 <div>
@@ -638,7 +658,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                         },
                       }))
                     }
-                    className="h-7 text-xs"
+                    className="h-7 text-xs w-full"
                   />
                 </div>
               </div>
@@ -737,21 +757,41 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                 </Tooltip>
               </div>
               <div className="flex items-center gap-3">
+                <div className="flex-1 relative">
+                  <Input
+                    type="range"
+                    min="0"
+                    max="10000"
+                    step="500"
+                    list="cooldown-ticks"
+                    value={Math.min(eventData.timing.cooldown, 10000)}
+                    onChange={e =>
+                      setEventData(prev => ({
+                        ...prev,
+                        timing: { ...prev.timing, cooldown: parseInt(e.target.value) },
+                      }))
+                    }
+                    className="w-full"
+                  />
+                  <datalist id="cooldown-ticks">
+                    {[0, 500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 6500, 7000, 7500, 8000, 8500, 9000, 9500, 10000].map(v => (
+                      <option key={v} value={v} />
+                    ))}
+                  </datalist>
+                </div>
                 <Input
-                  type="range"
+                  type="number"
                   min="0"
-                  max="9999000"
-                  step="100"
                   value={eventData.timing.cooldown}
                   onChange={e =>
                     setEventData(prev => ({
                       ...prev,
-                      timing: { ...prev.timing, cooldown: parseInt(e.target.value) },
+                      timing: { ...prev.timing, cooldown: Math.max(0, parseInt(e.target.value) || 0) },
                     }))
                   }
-                  className="flex-1"
+                  className="h-7 text-xs font-mono w-20"
                 />
-                <span className="text-xs font-mono text-muted-foreground w-16">{eventData.timing.cooldown}ms</span>
+                <span className="text-[10px] text-muted-foreground">ms</span>
               </div>
             </div>
 
@@ -764,21 +804,41 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                 </Tooltip>
               </div>
               <div className="flex items-center gap-3">
+                <div className="flex-1 relative">
+                  <Input
+                    type="range"
+                    min="0"
+                    max="10000"
+                    step="500"
+                    list="delay-ticks"
+                    value={Math.min(eventData.timing.delay, 10000)}
+                    onChange={e =>
+                      setEventData(prev => ({
+                        ...prev,
+                        timing: { ...prev.timing, delay: parseInt(e.target.value) },
+                      }))
+                    }
+                    className="w-full"
+                  />
+                  <datalist id="delay-ticks">
+                    {[0, 500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 6500, 7000, 7500, 8000, 8500, 9000, 9500, 10000].map(v => (
+                      <option key={v} value={v} />
+                    ))}
+                  </datalist>
+                </div>
                 <Input
-                  type="range"
+                  type="number"
                   min="0"
-                  max="9999000"
-                  step="100"
                   value={eventData.timing.delay}
                   onChange={e =>
                     setEventData(prev => ({
                       ...prev,
-                      timing: { ...prev.timing, delay: parseInt(e.target.value) },
+                      timing: { ...prev.timing, delay: Math.max(0, parseInt(e.target.value) || 0) },
                     }))
                   }
-                  className="flex-1"
+                  className="h-7 text-xs font-mono w-20"
                 />
-                <span className="text-xs font-mono text-muted-foreground w-16">{eventData.timing.delay}ms</span>
+                <span className="text-[10px] text-muted-foreground">ms</span>
               </div>
             </div>
           </div>
@@ -849,7 +909,18 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                   }
                   className="flex-1"
                 />
-                <span className="text-xs font-mono text-muted-foreground w-12">{eventData.requirements.minLevel}</span>
+                <Input
+                  type="number"
+                  min="0"
+                  value={eventData.requirements.minLevel}
+                  onChange={e =>
+                    setEventData(prev => ({
+                      ...prev,
+                      requirements: { ...prev.requirements, minLevel: Math.max(0, parseInt(e.target.value) || 0) },
+                    }))
+                  }
+                  className="h-7 text-xs font-mono w-16"
+                />
               </div>
             </div>
 
@@ -988,42 +1059,62 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
             {/* Teleport */}
             <div className="space-y-2">
               <label className="text-xs font-medium text-foreground/80">Teleport</label>
-              <div className="grid gap-2 sm:grid-cols-3">
-                <Input
+              <div className="flex items-center gap-2">
+                <Select
                   value={eventData.rewards.teleportMap}
-                  onChange={e =>
+                  onValueChange={val =>
                     setEventData(prev => ({
                       ...prev,
-                      rewards: { ...prev.rewards, teleportMap: e.target.value },
+                      rewards: { ...prev.rewards, teleportMap: val === '__none__' ? '' : val },
                     }))
                   }
-                  placeholder="Map name"
-                  className="h-7 text-xs"
-                />
-                <Input
-                  type="number"
-                  value={eventData.rewards.teleportX}
-                  onChange={e =>
-                    setEventData(prev => ({
-                      ...prev,
-                      rewards: { ...prev.rewards, teleportX: parseInt(e.target.value) || 0 },
-                    }))
-                  }
-                  placeholder="X"
-                  className="h-7 text-xs"
-                />
-                <Input
-                  type="number"
-                  value={eventData.rewards.teleportY}
-                  onChange={e =>
-                    setEventData(prev => ({
-                      ...prev,
-                      rewards: { ...prev.rewards, teleportY: parseInt(e.target.value) || 0 },
-                    }))
-                  }
-                  placeholder="Y"
-                  className="h-7 text-xs"
-                />
+                >
+                  <SelectTrigger className="h-7 text-xs flex-1">
+                    <SelectValue placeholder="Select map" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__" className="text-xs">None</SelectItem>
+                    {projectMaps.map((mapFile: string) => {
+                      const mapLabel = mapFile.replace(/\.(txt|json)$/i, '');
+                      const isCurrent = mapLabel === currentMapName;
+                      return (
+                        <SelectItem key={mapFile} value={mapLabel} className={`text-xs ${isCurrent ? 'text-orange-400' : ''}`}>
+                          {mapLabel}{isCurrent ? ' (current)' : ''}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+                <div>
+                  <label className="text-[10px] text-muted-foreground">X</label>
+                  <Input
+                    type="number"
+                    value={eventData.rewards.teleportX}
+                    onChange={e =>
+                      setEventData(prev => ({
+                        ...prev,
+                        rewards: { ...prev.rewards, teleportX: parseInt(e.target.value) || 0 },
+                      }))
+                    }
+                    placeholder="Coordinate X"
+                    className="h-7 text-xs w-24"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] text-muted-foreground">Y</label>
+                  <Input
+                    type="number"
+                    value={eventData.rewards.teleportY}
+                    onChange={e =>
+                      setEventData(prev => ({
+                        ...prev,
+                        rewards: { ...prev.rewards, teleportY: parseInt(e.target.value) || 0 },
+                      }))
+                    }
+                    placeholder="Coordinate Y"
+                    className="h-7 text-xs w-24"
+                  />
+                </div>
               </div>
             </div>
 
@@ -1070,7 +1161,20 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                   }
                   className="flex-1"
                 />
-                <span className="text-xs font-mono text-muted-foreground w-12">{eventData.engine.chance}%</span>
+                <Input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={eventData.engine.chance}
+                  onChange={e =>
+                    setEventData(prev => ({
+                      ...prev,
+                      engine: { ...prev.engine, chance: Math.max(0, Math.min(100, parseInt(e.target.value) || 0)) },
+                    }))
+                  }
+                  className="h-7 text-xs font-mono w-16"
+                />
+                <span className="text-[10px] text-muted-foreground">%</span>
               </div>
             </div>
 

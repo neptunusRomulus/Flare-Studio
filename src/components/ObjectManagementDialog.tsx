@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import Tooltip from '@/components/ui/tooltip';
-import { Check, Gift, HelpCircle, Image, MessageSquare, Package, Save, Sparkles, Trash2, User, X } from 'lucide-react';
+import { ArrowUp, ArrowUpRight, ArrowRight, ArrowDownRight, ArrowDown, ArrowDownLeft, ArrowLeft, ArrowUpLeft, Check, Gift, HelpCircle, Image, MessageSquare, Package, Plus, Save, Sparkles, Trash2, User, X } from 'lucide-react';
+import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 import type { DialogueTree, MapObject } from '@/types';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 
@@ -34,6 +35,30 @@ type ObjectManagementDialogProps = {
   setShowDeleteEnemyConfirm: (v: boolean) => void;
 };
 
+/**
+ * Overlay wrapper for spawn requirement fields.
+ * When inactive (no value set), shows a dark tint with "+ Add" text.
+ * Clicking activates the field for editing.
+ */
+const SpawnFieldOverlay = ({ active, onActivate, children }: { active: boolean; onActivate: () => void; children: React.ReactNode }) => (
+  <div className="relative">
+    <div className={active ? '' : 'pointer-events-none'}>
+      {children}
+    </div>
+    {!active && (
+      <div
+        className="absolute top-5 left-0 right-0 bottom-0 rounded-md bg-black/50 flex items-center justify-center cursor-pointer z-10 transition-opacity hover:bg-black/40"
+        onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); onActivate(); }}
+      >
+        <span className="flex items-center gap-1 text-xs font-medium text-white/90">
+          <Plus className="w-3 h-3" />
+          Add
+        </span>
+      </div>
+    )}
+  </div>
+);
+
 const ObjectManagementDialog = ({
   showObjectDialog,
   editingObject,
@@ -59,52 +84,90 @@ const ObjectManagementDialog = ({
   setShowDeleteNpcConfirm,
   showDeleteEnemyConfirm,
   setShowDeleteEnemyConfirm
-}: ObjectManagementDialogProps) => (
-<Dialog
-  open={showObjectDialog && editingObject?.type !== 'enemy'}
-  onOpenChange={(open) => {
-    if (!open) {
-      handleObjectDialogClose();
-    }
-  }}
->
-  <DialogContent className="max-w-5xl w-full h-[90vh] flex flex-col">
-    <DialogHeader className="mb-4">
-      <DialogTitle className="flex items-center gap-2">
-        {editingObject?.type === 'enemy' ? (
-          'Edit Enemy'
-        ) : (
-          <>
-            {editingObject?.type === 'npc' && (
-              <User className="w-5 h-5 text-orange-500" />
-            )}
-            {editingObject?.type === 'enemy' && (
-              <div className="flex items-center gap-2">
-                <span>{editingObject ? `Edit ${editingObject.type.toUpperCase()}` : 'Add Object'}</span>
-                <Tooltip
-                  content={
-                    <div
-                      className="max-w-lg whitespace-normal break-words text-sm text-foreground leading-snug p-2"
-                      style={{ whiteSpace: 'normal', overflow: 'visible', textOverflow: 'clip' }}
-                    >
-                      Enemy stats normally scale with level. Overriding a stat disables scaling for that stat.
-                    </div>
-                  }
-                  side="right"
-                >
-                  <span className="inline-flex items-center text-orange-500 font-semibold">
-                    <HelpCircle className="w-4 h-4" strokeWidth={2.4} />
-                  </span>
-                </Tooltip>
-              </div>
-            )}
-            {editingObject?.type !== 'enemy' && (editingObject ? `Edit ${editingObject.type.toUpperCase()}` : 'Add Object')}
-          </>
-        )}
-      </DialogTitle>
-    </DialogHeader>
+}: ObjectManagementDialogProps) => {
+  const isOpen = showObjectDialog && editingObject?.type !== 'enemy';
+
+  const {
+    position,
+    size,
+    dialogRef,
+    handleHeaderMouseDown,
+    handleResizeMouseDown,
+  } = useDraggableResizable({ id: 'object_management_dialog', initialWidth: 1024, initialHeight: 600 });
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') handleObjectDialogClose();
+    };
+    document.addEventListener('keydown', handleEsc);
+    return () => document.removeEventListener('keydown', handleEsc);
+  }, [isOpen, handleObjectDialogClose]);
+
+  if (!isOpen) return null;
+
+  const dialogContent = (
+    <div
+      ref={dialogRef}
+      className="bg-background border border-border/70 rounded-lg flex flex-col shadow-xl"
+      style={{
+        position: 'fixed',
+        left: `${position.x}px`,
+        top: `${position.y}px`,
+        width: `${size.width}px`,
+        height: `${size.height}px`,
+        zIndex: 50,
+        pointerEvents: 'auto',
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div
+        className="sticky top-0 z-10 border-b border-border/50 bg-background px-6 py-3 flex items-center justify-between cursor-move select-none rounded-t-lg"
+        onMouseDown={handleHeaderMouseDown}
+      >
+        <div className="flex items-center gap-2">
+          {editingObject?.type === 'enemy' ? (
+            'Edit Enemy'
+          ) : (
+            <>
+              {editingObject?.type === 'npc' && (
+                <User className="w-5 h-5 text-orange-500" />
+              )}
+              {editingObject?.type === 'enemy' && (
+                <div className="flex items-center gap-2">
+                  <span>{editingObject ? `Edit ${editingObject.type.toUpperCase()}` : 'Add Object'}</span>
+                  <Tooltip
+                    content={
+                      <div
+                        className="max-w-lg whitespace-normal break-words text-sm text-foreground leading-snug p-2"
+                        style={{ whiteSpace: 'normal', overflow: 'visible', textOverflow: 'clip' }}
+                      >
+                        Enemy stats normally scale with level. Overriding a stat disables scaling for that stat.
+                      </div>
+                    }
+                    side="right"
+                  >
+                    <span className="inline-flex items-center text-orange-500 font-semibold">
+                      <HelpCircle className="w-4 h-4" strokeWidth={2.4} />
+                    </span>
+                  </Tooltip>
+                </div>
+              )}
+              {editingObject?.type !== 'enemy' && (editingObject ? `Edit ${editingObject.type.toUpperCase()}` : 'Add Object')}
+            </>
+          )}
+        </div>
+        <Button
+          size="icon"
+          variant="ghost"
+          onClick={handleObjectDialogClose}
+          className="h-6 w-6 text-foreground/60 hover:text-foreground"
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
     {objectValidationErrors.length > 0 && (
-          <div className="mb-3 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+          <div className="mx-6 mt-3 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
             <p className="font-semibold mb-1">Please fix the following:</p>
             <ul className="ml-4 list-disc space-y-1">
               {objectValidationErrors.map((error, index) => (
@@ -114,148 +177,403 @@ const ObjectManagementDialog = ({
           </div>
         )}
 
-        <div className="flex-1 overflow-y-auto pr-2 minimal-scroll">
+        <div className="flex-1 overflow-y-auto px-6 py-4 minimal-scroll [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/15 [&::-webkit-scrollbar-thumb]:rounded-full">
           {editingObject && (
             <div className="space-y-3 pb-4">
-        {/* Basic Info Row */}
-        <div className="flex gap-3 items-end">
-          <div className="flex-1">
-            <label className="text-xs text-muted-foreground">Name</label>
-            <Input
-              value={editingObject.name || ''}
-              onChange={(e) => setEditingObject({...editingObject, name: e.target.value})}
-              placeholder="Object name"
-              className="h-8"
-            />
-          </div>
-          <div className="w-24">
-            <label className="text-xs text-muted-foreground">Position</label>
-            <div className="flex items-center gap-1">
+        {editingObject.type === 'enemy' ? (
+          <>
+          {/* Basic Info Row for enemies */}
+          <div className="flex gap-3 items-end">
+            <div className="flex-1">
+              <label className="text-xs text-muted-foreground">Name</label>
               <Input
-                type="number"
-                value={editingObject.x}
-                onChange={(e) => setEditingObject({...editingObject, x: Number(e.target.value)})}
-                disabled={editingObject.type === 'npc' || editingObject.type === 'enemy'}
-                className={`h-8 w-11 px-1 text-center ${(editingObject.type === 'npc' || editingObject.type === 'enemy') ? 'opacity-50' : ''}`}
-              />
-              <span className="text-muted-foreground text-xs">,</span>
-              <Input
-                type="number"
-                value={editingObject.y}
-                onChange={(e) => setEditingObject({...editingObject, y: Number(e.target.value)})}
-                disabled={editingObject.type === 'npc' || editingObject.type === 'enemy'}
-                className={`h-8 w-11 px-1 text-center ${(editingObject.type === 'npc' || editingObject.type === 'enemy') ? 'opacity-50' : ''}`}
+                value={editingObject.name || ''}
+                onChange={(e) => setEditingObject({...editingObject, name: e.target.value})}
+                placeholder="Object name"
+                className="h-8"
               />
             </div>
+            <div className="w-24">
+              <label className="text-xs text-muted-foreground">Position</label>
+              <div className="flex items-center gap-1">
+                <Input type="number" value={editingObject.x} disabled className="h-8 w-11 px-1 text-center opacity-50" />
+                <span className="text-muted-foreground text-xs">,</span>
+                <Input type="number" value={editingObject.y} disabled className="h-8 w-11 px-1 text-center opacity-50" />
+              </div>
+            </div>
           </div>
-        </div>
-
-        {editingObject.type === 'enemy' ? (
-          <div className="rounded-md border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
-            Enemy details are edited in the enemy tab.
-          </div>
-        ) : (
-          <>
-
-        {/* NPC Roles */}
-        {editingObject.type === 'npc' && (
-          <div className="flex gap-1.5">
-            {[
-              { key: 'talker', label: 'Talker', color: 'blue' },
-              { key: 'vendor', label: 'Vendor', color: 'emerald' },
-              { key: 'questGiver', label: 'Quest', color: 'amber' }
-            ].map(role => (
-              <button
-                key={role.key}
-                type="button"
-                onClick={() => {
-                  const newProps = { ...editingObject.properties };
-                  if (newProps[role.key] === 'true') {
-                    delete newProps[role.key];
-                  } else {
-                    newProps[role.key] = 'true';
-                  }
-                  setEditingObject({ ...editingObject, properties: newProps });
-                }}
-                className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
-                  editingObject.properties?.[role.key] === 'true'
-                    ? role.color === 'blue' ? 'bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/50'
-                    : role.color === 'emerald' ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/50'
-                    : 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/50'
-                    : 'bg-muted/50 text-muted-foreground border border-transparent hover:bg-muted'
-                }`}
-              >
-                {role.label}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Tileset & Portrait for NPC/Enemy */}
-        {(editingObject.type === 'npc' || editingObject.type === 'enemy') && (
-          <div className="space-y-2">
-            <div className="flex gap-2">
+          {/* Tileset for Enemy */}
+          <div className="flex gap-2">
             <Input
               className="h-8 flex-1 text-xs"
               value={getEditingObjectProperty('tilesetPath', '')}
               onChange={(e) => updateEditingObjectProperty('tilesetPath', e.target.value)}
               placeholder="Tileset path..."
-                readOnly={canUseTilesetDialog}
-                onClick={canUseTilesetDialog ? () => { void handleEditingTilesetBrowse(); } : undefined}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-8 px-2 gap-2"
-                onClick={() => { void handleEditingTilesetBrowse(); }}
-                disabled={!canUseTilesetDialog}
-              >
-                <Image className="w-4 h-4" />
-                <span className="text-xs">Tileset</span>
-              </Button>
+              readOnly={canUseTilesetDialog}
+              onClick={canUseTilesetDialog ? () => { void handleEditingTilesetBrowse(); } : undefined}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-8 px-2 gap-2"
+              onClick={() => { void handleEditingTilesetBrowse(); }}
+              disabled={!canUseTilesetDialog}
+            >
+              <Image className="w-4 h-4" />
+              <span className="text-xs">Tileset</span>
+            </Button>
+          </div>
+          <div className="rounded-md border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
+            Enemy details are edited in the enemy tab.
+          </div>
+          </>
+        ) : (
+          <>
+
+        {/* NPC Appearance Section */}
+        {editingObject.type === 'npc' && (
+          <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
+            <div>
+              <h4 className="text-sm font-semibold">Appearance</h4>
+              <p className="text-xs text-muted-foreground">Visual and positioning settings for this NPC.</p>
             </div>
-            {editingObject.type === 'npc' && (
-              <div className="flex gap-2">
+
+            {/* Name & Position */}
+            <div className="flex gap-3 items-end">
+              <div className="flex-1">
+                <label className="text-xs text-muted-foreground">Name</label>
                 <Input
-                  className="h-8 flex-1 text-xs"
-                  value={getEditingObjectProperty('portraitPath', '')}
-                  onChange={(e) => updateEditingObjectProperty('portraitPath', e.target.value)}
-                  placeholder="Portrait path..."
-                  readOnly={canUseTilesetDialog}
-                  onClick={canUseTilesetDialog ? () => { void handleEditingPortraitBrowse(); } : undefined}
+                  value={editingObject.name || ''}
+                  onChange={(e) => setEditingObject({...editingObject, name: e.target.value})}
+                  placeholder="NPC name"
+                  className="h-7 text-xs"
                 />
+              </div>
+              <div className="w-24">
+                <label className="text-xs text-muted-foreground">Position</label>
+                <div className="flex items-center gap-1">
+                  <Input
+                    type="number"
+                    value={editingObject.x}
+                    onChange={(e) => {
+                      const newX = Number(e.target.value);
+                      if (editor) {
+                        const allObjects = editor.getMapObjects();
+                        const conflict = allObjects.find(o => o.type === 'npc' && o.id !== editingObject.id && o.x === newX && o.y === editingObject.y);
+                        if (conflict) return;
+                      }
+                      setEditingObject({...editingObject, x: newX});
+                    }}
+                    className="h-7 w-11 px-1 text-center text-xs"
+                  />
+                  <span className="text-muted-foreground text-xs">,</span>
+                  <Input
+                    type="number"
+                    value={editingObject.y}
+                    onChange={(e) => {
+                      const newY = Number(e.target.value);
+                      if (editor) {
+                        const allObjects = editor.getMapObjects();
+                        const conflict = allObjects.find(o => o.type === 'npc' && o.id !== editingObject.id && o.x === editingObject.x && o.y === newY);
+                        if (conflict) return;
+                      }
+                      setEditingObject({...editingObject, y: newY});
+                    }}
+                    className="h-7 w-11 px-1 text-center text-xs"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Tileset & Portrait - button only with green badge */}
+            <div className="flex gap-2">
+              <div className="relative">
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
-                  className="h-8 px-2 gap-2"
+                  className="h-7 px-2 gap-1.5"
+                  onClick={() => { void handleEditingTilesetBrowse(); }}
+                  disabled={!canUseTilesetDialog}
+                >
+                  <Image className="w-3.5 h-3.5" />
+                  <span className="text-xs">Tileset</span>
+                </Button>
+                {getEditingObjectProperty('tilesetPath', '') && (
+                  <span className="absolute -top-1 -right-1 flex items-center justify-center w-3.5 h-3.5 rounded-full bg-green-500">
+                    <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
+                  </span>
+                )}
+              </div>
+              <div className="relative">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2 gap-1.5"
                   onClick={() => { void handleEditingPortraitBrowse(); }}
                   disabled={!canUseTilesetDialog}
                 >
-                  <User className="w-4 h-4" />
+                  <User className="w-3.5 h-3.5" />
                   <span className="text-xs">Portrait</span>
                 </Button>
+                {getEditingObjectProperty('portraitPath', '') && (
+                  <span className="absolute -top-1 -right-1 flex items-center justify-center w-3.5 h-3.5 rounded-full bg-green-500">
+                    <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
+                  </span>
+                )}
               </div>
-            )}
+            </div>
+
+            {/* Direction */}
+            <div>
+              <div className="flex items-center gap-1 mb-1">
+                <label className="text-xs text-muted-foreground">Direction</label>
+                <Tooltip content="The direction to use for this NPC's stance animation">
+                  <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                </Tooltip>
+              </div>
+              <div className="flex gap-1 flex-wrap">
+                {([
+                  { value: '0', label: 'N', icon: ArrowUp },
+                  { value: '1', label: 'NE', icon: ArrowUpRight },
+                  { value: '2', label: 'E', icon: ArrowRight },
+                  { value: '3', label: 'SE', icon: ArrowDownRight },
+                  { value: '4', label: 'S', icon: ArrowDown },
+                  { value: '5', label: 'SW', icon: ArrowDownLeft },
+                  { value: '6', label: 'W', icon: ArrowLeft },
+                  { value: '7', label: 'NW', icon: ArrowUpLeft },
+                ] as const).map(dir => {
+                  const Icon = dir.icon;
+                  const isSelected = getEditingObjectProperty('direction', '') === dir.value;
+                  return (
+                    <button
+                      key={dir.value}
+                      type="button"
+                      onClick={() => updateEditingObjectProperty('direction', isSelected ? null : dir.value)}
+                      className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium transition-colors ${
+                        isSelected
+                          ? 'bg-orange-500/20 text-orange-600 dark:text-orange-400 border border-orange-500/50'
+                          : 'bg-muted/50 text-muted-foreground border border-transparent hover:bg-muted'
+                      }`}
+                    >
+                      <Icon className="w-3 h-3" />
+                      {dir.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Show on Minimap */}
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                className="w-4 h-4"
+                checked={getEditingObjectProperty('show_on_minimap', 'true') === 'true'}
+                onChange={(e) => updateEditingObjectBoolean('show_on_minimap', e.target.checked)}
+              />
+              <div className="flex items-center gap-1">
+                <label className="text-xs text-muted-foreground">Show on Minimap</label>
+                <Tooltip content="If true, this NPC will be shown on the minimap. The default is true.">
+                  <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                </Tooltip>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Non-NPC basic info (events etc.) */}
+        {editingObject.type !== 'npc' && (
+          <div className="flex gap-3 items-end">
+            <div className="flex-1">
+              <label className="text-xs text-muted-foreground">Name</label>
+              <Input
+                value={editingObject.name || ''}
+                onChange={(e) => setEditingObject({...editingObject, name: e.target.value})}
+                placeholder="Object name"
+                className="h-8"
+              />
+            </div>
+            <div className="w-24">
+              <label className="text-xs text-muted-foreground">Position</label>
+              <div className="flex items-center gap-1">
+                <Input
+                  type="number"
+                  value={editingObject.x}
+                  onChange={(e) => setEditingObject({...editingObject, x: Number(e.target.value)})}
+                  className="h-8 w-11 px-1 text-center"
+                />
+                <span className="text-muted-foreground text-xs">,</span>
+                <Input
+                  type="number"
+                  value={editingObject.y}
+                  onChange={(e) => setEditingObject({...editingObject, y: Number(e.target.value)})}
+                  className="h-8 w-11 px-1 text-center"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* NPC Roles */}
+        {editingObject.type === 'npc' && (
+          <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
+            <div>
+              <h4 className="text-sm font-semibold">Roles</h4>
+              <p className="text-xs text-muted-foreground">Select the special roles for this NPC.</p>
+            </div>
+            <div className="flex gap-1.5">
+              <Tooltip content="Allows this NPC to be talked to.">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newProps = { ...editingObject.properties };
+                    if (newProps.talker === 'true') delete newProps.talker;
+                    else newProps.talker = 'true';
+                    setEditingObject({ ...editingObject, properties: newProps });
+                  }}
+                  className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
+                    editingObject.properties?.talker === 'true'
+                      ? 'bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/50'
+                      : 'bg-muted/50 text-muted-foreground border border-transparent hover:bg-muted'
+                  }`}
+                >
+                  Talker
+                </button>
+              </Tooltip>
+
+              <Tooltip content="Allows this NPC to buy/sell items.">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newProps = { ...editingObject.properties };
+                    if (newProps.vendor === 'true') delete newProps.vendor;
+                    else newProps.vendor = 'true';
+                    setEditingObject({ ...editingObject, properties: newProps });
+                  }}
+                  className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
+                    editingObject.properties?.vendor === 'true'
+                      ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/50'
+                      : 'bg-muted/50 text-muted-foreground border border-transparent hover:bg-muted'
+                  }`}
+                >
+                  Vendor
+                </button>
+              </Tooltip>
+
+              <Tooltip content="Allows this NPC to give quests.">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newProps = { ...editingObject.properties };
+                    if (newProps.questGiver === 'true') delete newProps.questGiver;
+                    else newProps.questGiver = 'true';
+                    setEditingObject({ ...editingObject, properties: newProps });
+                  }}
+                  className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
+                    editingObject.properties?.questGiver === 'true'
+                      ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/50'
+                      : 'bg-muted/50 text-muted-foreground border border-transparent hover:bg-muted'
+                  }`}
+                >
+                  Quest
+                </button>
+              </Tooltip>
+            </div>
           </div>
         )}
 
         {/* Role-specific compact options */}
         {editingObject.type === 'npc' && editingObject.properties?.talker === 'true' && (
-          <div className="pl-2 border-l-2 border-blue-500/50">
+          <div className="pl-3 border-l-[3px] border-blue-500/80 space-y-3 py-1">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <div className="flex items-center gap-1 mb-1">
+                  <label className="text-xs text-blue-700/80 dark:text-blue-400/80 font-medium">Unique Id</label>
+                  <Tooltip content="A unique identifer used to reference this dialog.">
+                    <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                  </Tooltip>
+                </div>
+                <Input
+                  className="h-7 text-xs border-blue-500/30 bg-blue-500/5"
+                  value={getEditingObjectProperty('unique_id', '')}
+                  onChange={(e) => updateEditingObjectProperty('unique_id', e.target.value)}
+                  placeholder="e.g. intro_dialog"
+                />
+              </div>
+              <div>
+                <div className="flex items-center gap-1 mb-1">
+                  <label className="text-xs text-blue-700/80 dark:text-blue-400/80 font-medium">Topic</label>
+                  <Tooltip content="The name of this dialog topic. Displayed when picking a dialog tree.">
+                    <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                  </Tooltip>
+                </div>
+                <Input
+                  className="h-7 text-xs border-blue-500/30 bg-blue-500/5"
+                  value={getEditingObjectProperty('topic', '')}
+                  onChange={(e) => updateEditingObjectProperty('topic', e.target.value)}
+                  placeholder="e.g. Greetings"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <div className="flex items-center gap-1 mb-1">
+                  <label className="text-[10px] text-blue-700/80 dark:text-blue-400/80 font-medium truncate">Group</label>
+                  <Tooltip content="Dialog group.">
+                    <HelpCircle className="w-3 h-3 text-muted-foreground shrink-0" />
+                  </Tooltip>
+                </div>
+                <Input
+                  className="h-7 text-xs border-blue-500/30 bg-blue-500/5"
+                  value={getEditingObjectProperty('group', '')}
+                  onChange={(e) => updateEditingObjectProperty('group', e.target.value)}
+                  placeholder="Group"
+                />
+              </div>
+              <div>
+                <div className="flex items-center gap-1 mb-1">
+                  <label className="text-[10px] text-blue-700/80 dark:text-blue-400/80 font-medium truncate">Movement Lock</label>
+                  <Tooltip content="Restrict the player's movement during dialog.">
+                    <HelpCircle className="w-3 h-3 text-muted-foreground shrink-0" />
+                  </Tooltip>
+                </div>
+                <Input
+                  className="h-7 text-xs border-blue-500/30 bg-blue-500/5"
+                  value={getEditingObjectProperty('movement_lock', '')}
+                  onChange={(e) => updateEditingObjectProperty('movement_lock', e.target.value)}
+                  placeholder="e.g. true"
+                />
+              </div>
+              <div>
+                <div className="flex items-center gap-1 mb-1">
+                  <label className="text-[10px] text-blue-700/80 dark:text-blue-400/80 font-medium truncate">Party</label>
+                  <Tooltip content="Start/stop taking a party with player.">
+                    <HelpCircle className="w-3 h-3 text-muted-foreground shrink-0" />
+                  </Tooltip>
+                </div>
+                <Input
+                  className="h-7 text-xs border-blue-500/30 bg-blue-500/5"
+                  value={getEditingObjectProperty('party', '')}
+                  onChange={(e) => updateEditingObjectProperty('party', e.target.value)}
+                  placeholder="Party action"
+                />
+              </div>
+            </div>
+
             <Button
               type="button"
               variant="outline"
               size="sm"
-              className="h-8 w-full text-xs gap-2"
+              className="h-8 w-full text-xs gap-2 border-blue-500/30 bg-blue-500/5 text-blue-700 hover:bg-blue-500/10"
               onClick={() => {
-                // Load existing dialogue trees from properties if any
                 const existingTrees = editingObject.properties?.dialogueTrees;
                 if (existingTrees) {
                   try {
                     const parsed = JSON.parse(existingTrees as string);
-                    // Ensure rewards and worldEffects exist for backward compatibility
                     const normalized = parsed.map((t: DialogueTree) => ({
                       ...t,
                       rewards: t.rewards || [],
@@ -279,49 +597,185 @@ const ObjectManagementDialog = ({
         )}
 
         {editingObject.type === 'npc' && editingObject.properties?.vendor === 'true' && (
-          <div className="pl-2 border-l-2 border-emerald-500/50">
-            <div className="space-y-1.5 flex flex-col">
-              <div className="w-full">
-                <Tooltip content="Items that are always in this vendor's shop.">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-8 w-full text-xs gap-2 justify-start"
-                    onClick={handleOpenVendorStockDialog}
-                  >
-                    <Package className="w-3.5 h-3.5" />
-                    Edit Always Available Items
-                  </Button>
+          <div className="pl-3 border-l-[3px] border-emerald-500/80 space-y-3 py-1">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <div className="flex items-center gap-1 mb-1">
+                  <label className="text-xs text-emerald-700/80 dark:text-emerald-400/80 font-medium">Vendor Requires Status</label>
+                  <Tooltip content="The player must have these statuses in order to use this NPC as a vendor.">
+                    <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                  </Tooltip>
+                </div>
+                <Input
+                  className="h-7 text-xs border-emerald-500/30 bg-emerald-500/5"
+                  value={getEditingObjectProperty('vendor_requires_status', '')}
+                  onChange={(e) => updateEditingObjectProperty('vendor_requires_status', e.target.value)}
+                  placeholder="e.g. hero_status"
+                />
+              </div>
+              <div>
+                <div className="flex items-center gap-1 mb-1">
+                  <label className="text-xs text-emerald-700/80 dark:text-emerald-400/80 font-medium">Vendor Requires Not Status</label>
+                  <Tooltip content="The player must not have these statuses in order to use this NPC as a vendor.">
+                    <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                  </Tooltip>
+                </div>
+                <Input
+                  className="h-7 text-xs border-emerald-500/30 bg-emerald-500/5"
+                  value={getEditingObjectProperty('vendor_requires_not_status', '')}
+                  onChange={(e) => updateEditingObjectProperty('vendor_requires_not_status', e.target.value)}
+                  placeholder="e.g. thief_status"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <div className="flex items-center gap-1 mb-1">
+                  <label className="text-xs text-emerald-700/80 dark:text-emerald-400/80 font-medium">Constant Stock</label>
+                  <Tooltip content="A list of items this vendor has for sale.">
+                    <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                  </Tooltip>
+                </div>
+                <div className="flex gap-1">
+                  <Input
+                    className="h-7 text-xs flex-1 border-emerald-500/30 bg-emerald-500/5"
+                    value={getEditingObjectProperty('constant_stock', '')}
+                    onChange={(e) => updateEditingObjectProperty('constant_stock', e.target.value)}
+                    placeholder="item_id"
+                  />
+                  <Input
+                    type="number"
+                    className="h-7 text-xs w-14 border-emerald-500/30 bg-emerald-500/5"
+                    value={getEditingObjectProperty('constant_stock_quantity', '')}
+                    onChange={(e) => updateEditingObjectProperty('constant_stock_quantity', e.target.value)}
+                    placeholder="Qty"
+                    min="1"
+                  />
+                </div>
+              </div>
+              <div>
+                <div className="flex items-center gap-1 mb-1">
+                  <label className="text-xs text-emerald-700/80 dark:text-emerald-400/80 font-medium">Status Stock</label>
+                  <Tooltip content="A list of items this vendor will have for sale if the required status is met.">
+                    <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                  </Tooltip>
+                </div>
+                <div className="flex gap-1">
+                  <Input
+                    className="h-7 text-xs flex-1 border-emerald-500/30 bg-emerald-500/5"
+                    value={getEditingObjectProperty('status_stock', '')}
+                    onChange={(e) => updateEditingObjectProperty('status_stock', e.target.value)}
+                    placeholder="item_id"
+                  />
+                  <Input
+                    type="number"
+                    className="h-7 text-xs w-14 border-emerald-500/30 bg-emerald-500/5"
+                    value={getEditingObjectProperty('status_stock_quantity', '')}
+                    onChange={(e) => updateEditingObjectProperty('status_stock_quantity', e.target.value)}
+                    placeholder="Qty"
+                    min="1"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center gap-1 mb-1">
+                <label className="text-xs text-emerald-700/80 dark:text-emerald-400/80 font-medium">Random Stock</label>
+                <Tooltip content="Use a loot table to add random items to the stock; either a filename or an inline definition.">
+                  <HelpCircle className="w-3 h-3 text-muted-foreground" />
                 </Tooltip>
               </div>
-              <div className="w-full">
-                <Tooltip content="Extra items that appear after certain quests or story steps.">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-8 w-full text-xs gap-2 justify-start"
-                    onClick={handleOpenVendorUnlockDialog}
-                  >
-                    <Gift className="w-3.5 h-3.5" />
-                    Edit Unlockable Items
-                  </Button>
+              <Input
+                className="h-7 text-xs border-emerald-500/30 bg-emerald-500/5"
+                value={getEditingObjectProperty('random_stock', '')}
+                onChange={(e) => updateEditingObjectProperty('random_stock', e.target.value)}
+                placeholder="loot table definition"
+              />
+            </div>
+
+            <div>
+              <div className="flex items-center gap-1 mb-1">
+                <label className="text-xs text-emerald-700/80 dark:text-emerald-400/80 font-medium">Random Stock Count</label>
+                <Tooltip content="Sets the minimum (and optionally, the maximum) amount of random items this npc can have.">
+                  <HelpCircle className="w-3 h-3 text-muted-foreground" />
                 </Tooltip>
               </div>
-              <div className="w-full">
-                <Tooltip content="Extra items randomly picked from a loot table each time.">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-8 w-full text-xs gap-2 justify-start"
-                    onClick={handleOpenVendorRandomDialog}
-                  >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    Edit Random Offers
-                  </Button>
-                </Tooltip>
+              <div className="flex gap-2">
+                <div className="flex items-center gap-1 flex-1">
+                  <span className="text-xs text-muted-foreground">Min</span>
+                  <Input
+                    type="number"
+                    className="h-7 text-xs border-emerald-500/30 bg-emerald-500/5"
+                    value={getEditingObjectProperty('random_stock_count_min', '')}
+                    onChange={(e) => updateEditingObjectProperty('random_stock_count_min', e.target.value)}
+                    placeholder="Min"
+                    min="0"
+                  />
+                </div>
+                <div className="flex items-center gap-1 flex-1">
+                  <span className="text-xs text-muted-foreground">Max</span>
+                  <Input
+                    type="number"
+                    className="h-7 text-xs border-emerald-500/30 bg-emerald-500/5"
+                    value={getEditingObjectProperty('random_stock_count_max', '')}
+                    onChange={(e) => updateEditingObjectProperty('random_stock_count_max', e.target.value)}
+                    placeholder="Max"
+                    min="0"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <div className="flex items-center gap-1 mb-1">
+                  <label className="text-[10px] text-emerald-700/80 dark:text-emerald-400/80 font-medium truncate">Ratio Buy</label>
+                  <Tooltip content="NPC-specific version of vendor_ratio_buy from engine/loot.txt. Uses the global setting when set to 0.">
+                    <HelpCircle className="w-3 h-3 text-muted-foreground shrink-0" />
+                  </Tooltip>
+                </div>
+                <Input
+                  type="number"
+                  step="0.01"
+                  className="h-7 text-xs border-emerald-500/30 bg-emerald-500/5"
+                  value={getEditingObjectProperty('vendor_ratio_buy', '')}
+                  onChange={(e) => updateEditingObjectProperty('vendor_ratio_buy', e.target.value)}
+                  placeholder="0"
+                />
+              </div>
+              <div>
+                <div className="flex items-center gap-1 mb-1">
+                  <label className="text-[10px] text-emerald-700/80 dark:text-emerald-400/80 font-medium truncate">Ratio Sell</label>
+                  <Tooltip content="NPC-specific version of vendor_ratio_sell from engine/loot.txt. Uses the global setting when set to 0.">
+                    <HelpCircle className="w-3 h-3 text-muted-foreground shrink-0" />
+                  </Tooltip>
+                </div>
+                <Input
+                  type="number"
+                  step="0.01"
+                  className="h-7 text-xs border-emerald-500/30 bg-emerald-500/5"
+                  value={getEditingObjectProperty('vendor_ratio_sell', '')}
+                  onChange={(e) => updateEditingObjectProperty('vendor_ratio_sell', e.target.value)}
+                  placeholder="0"
+                />
+              </div>
+              <div>
+                <div className="flex items-center gap-1 mb-1">
+                  <label className="text-[10px] text-emerald-700/80 dark:text-emerald-400/80 font-medium truncate">Ratio Sell Old</label>
+                  <Tooltip content="NPC-specific version of vendor_ratio_sell_old from engine/loot.txt. Uses the global setting when set to 0.">
+                    <HelpCircle className="w-3 h-3 text-muted-foreground shrink-0" />
+                  </Tooltip>
+                </div>
+                <Input
+                  type="number"
+                  step="0.01"
+                  className="h-7 text-xs border-emerald-500/30 bg-emerald-500/5"
+                  value={getEditingObjectProperty('vendor_ratio_sell_old', '')}
+                  onChange={(e) => updateEditingObjectProperty('vendor_ratio_sell_old', e.target.value)}
+                  placeholder="0"
+                />
               </div>
             </div>
           </div>
@@ -341,6 +795,364 @@ const ObjectManagementDialog = ({
               onChange={(e) => updateEditingObjectProperty('questSetStatus', e.target.value)}
               placeholder="Set status on accept..."
             />
+          </div>
+        )}
+
+        {/* NPC Spawn Requirements & Behavior */}
+        {editingObject.type === 'npc' && (
+          <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
+            <div>
+              <h4 className="text-sm font-semibold">Spawn Requirements</h4>
+              <p className="text-xs text-muted-foreground">Conditions for this NPC to appear on the map.</p>
+            </div>
+
+            {/* Status requirements */}
+            {/* Status requirements */}
+            <div className="grid grid-cols-2 gap-3">
+              <SpawnFieldOverlay
+                active={'requires_status' in (editingObject.properties || {})}
+                onActivate={() => { updateEditingObjectProperty('requires_status', ''); }}
+              >
+              <div>
+                <div className="flex items-center gap-1 mb-1">
+                  <label className="text-xs text-muted-foreground">Have Status</label>
+                  <Tooltip content="The NPC will only appear if the listed statuses are currently active">
+                    <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                  </Tooltip>
+                </div>
+                <Input
+                  className="h-7 text-xs"
+                  value={getEditingObjectProperty('requires_status', '')}
+                  onChange={(e) => updateEditingObjectProperty('requires_status', e.target.value)}
+                  placeholder="e.g. quest_started"
+                />
+              </div>
+              </SpawnFieldOverlay>
+              <SpawnFieldOverlay
+                active={'requires_not_status' in (editingObject.properties || {})}
+                onActivate={() => { updateEditingObjectProperty('requires_not_status', ''); }}
+              >
+              <div>
+                <div className="flex items-center gap-1 mb-1">
+                  <label className="text-xs text-muted-foreground">Have Not Status</label>
+                  <Tooltip content="The NPC will only appear if the listed statuses are not active">
+                    <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                  </Tooltip>
+                </div>
+                <Input
+                  className="h-7 text-xs"
+                  value={getEditingObjectProperty('requires_not_status', '')}
+                  onChange={(e) => updateEditingObjectProperty('requires_not_status', e.target.value)}
+                  placeholder="e.g. quest_complete"
+                />
+              </div>
+              </SpawnFieldOverlay>
+            </div>
+
+            {/* Level requirements */}
+            <div className="grid grid-cols-2 gap-3">
+              <SpawnFieldOverlay
+                active={'requires_level' in (editingObject.properties || {})}
+                onActivate={() => { updateEditingObjectProperty('requires_level', ''); }}
+              >
+              <div>
+                <div className="flex items-center gap-1 mb-1">
+                  <label className="text-xs text-muted-foreground">Required Min Level</label>
+                  <Tooltip content="Player level must be equal or greater to load NPC">
+                    <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                  </Tooltip>
+                </div>
+                <Input
+                  type="number"
+                  className="h-7 text-xs"
+                  value={getEditingObjectProperty('requires_level', '')}
+                  onChange={(e) => updateEditingObjectProperty('requires_level', e.target.value)}
+                  min="0"
+                />
+              </div>
+              </SpawnFieldOverlay>
+              <SpawnFieldOverlay
+                active={'requires_not_level' in (editingObject.properties || {})}
+                onActivate={() => { updateEditingObjectProperty('requires_not_level', ''); }}
+              >
+              <div>
+                <div className="flex items-center gap-1 mb-1">
+                  <label className="text-xs text-muted-foreground">Required Max Level</label>
+                  <Tooltip content="Player level must be lesser to load NPC">
+                    <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                  </Tooltip>
+                </div>
+                <Input
+                  type="number"
+                  className="h-7 text-xs"
+                  value={getEditingObjectProperty('requires_not_level', '')}
+                  onChange={(e) => updateEditingObjectProperty('requires_not_level', e.target.value)}
+                  min="0"
+                />
+              </div>
+              </SpawnFieldOverlay>
+            </div>
+
+            {/* Currency requirements */}
+            <div className="grid grid-cols-2 gap-3">
+              <SpawnFieldOverlay
+                active={'requires_currency' in (editingObject.properties || {})}
+                onActivate={() => { updateEditingObjectProperty('requires_currency', ''); }}
+              >
+              <div>
+                <div className="flex items-center gap-1 mb-1">
+                  <label className="text-xs text-muted-foreground">Required Min Currency</label>
+                  <Tooltip content="Player currency must be equal or greater to load NPC">
+                    <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                  </Tooltip>
+                </div>
+                <Input
+                  type="number"
+                  className="h-7 text-xs"
+                  value={getEditingObjectProperty('requires_currency', '')}
+                  onChange={(e) => updateEditingObjectProperty('requires_currency', e.target.value)}
+                  min="0"
+                />
+              </div>
+              </SpawnFieldOverlay>
+              <SpawnFieldOverlay
+                active={'requires_not_currency' in (editingObject.properties || {})}
+                onActivate={() => { updateEditingObjectProperty('requires_not_currency', ''); }}
+              >
+              <div>
+                <div className="flex items-center gap-1 mb-1">
+                  <label className="text-xs text-muted-foreground">Required Max Currency</label>
+                  <Tooltip content="Player currency must be lesser to load NPC">
+                    <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                  </Tooltip>
+                </div>
+                <Input
+                  type="number"
+                  className="h-7 text-xs"
+                  value={getEditingObjectProperty('requires_not_currency', '')}
+                  onChange={(e) => updateEditingObjectProperty('requires_not_currency', e.target.value)}
+                  min="0"
+                />
+              </div>
+              </SpawnFieldOverlay>
+            </div>
+
+            {/* Item requirements */}
+            <div className="grid grid-cols-2 gap-3">
+              <SpawnFieldOverlay
+                active={'requires_item' in (editingObject.properties || {})}
+                onActivate={() => { updateEditingObjectProperty('requires_item', ''); }}
+              >
+              <div>
+                <div className="flex items-center gap-1 mb-1">
+                  <label className="text-xs text-muted-foreground">Required Have Item</label>
+                  <Tooltip content="Item required to exist in player inventory to load NPC">
+                    <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                  </Tooltip>
+                </div>
+                <div className="flex gap-1">
+                  <Input
+                    className="h-7 text-xs flex-1"
+                    value={getEditingObjectProperty('requires_item', '')}
+                    onChange={(e) => updateEditingObjectProperty('requires_item', e.target.value)}
+                    placeholder="item_id"
+                  />
+                  <Input
+                    type="number"
+                    className="h-7 text-xs w-14"
+                    value={getEditingObjectProperty('requires_item_quantity', '')}
+                    onChange={(e) => updateEditingObjectProperty('requires_item_quantity', e.target.value)}
+                    placeholder="Qty"
+                    min="1"
+                  />
+                </div>
+              </div>
+              </SpawnFieldOverlay>
+              <SpawnFieldOverlay
+                active={'requires_not_item' in (editingObject.properties || {})}
+                onActivate={() => { updateEditingObjectProperty('requires_not_item', ''); }}
+              >
+              <div>
+                <div className="flex items-center gap-1 mb-1">
+                  <label className="text-xs text-muted-foreground">Required Have Not Item</label>
+                  <Tooltip content="Item required to not exist in player inventory to load NPC">
+                    <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                  </Tooltip>
+                </div>
+                <div className="flex gap-1">
+                  <Input
+                    className="h-7 text-xs flex-1"
+                    value={getEditingObjectProperty('requires_not_item', '')}
+                    onChange={(e) => updateEditingObjectProperty('requires_not_item', e.target.value)}
+                    placeholder="item_id"
+                  />
+                  <Input
+                    type="number"
+                    className="h-7 text-xs w-14"
+                    value={getEditingObjectProperty('requires_not_item_quantity', '')}
+                    onChange={(e) => updateEditingObjectProperty('requires_not_item_quantity', e.target.value)}
+                    placeholder="Qty"
+                    min="1"
+                  />
+                </div>
+              </div>
+              </SpawnFieldOverlay>
+            </div>
+
+            {/* Class requirements */}
+            <div className="grid grid-cols-2 gap-3">
+              <SpawnFieldOverlay
+                active={'requires_class' in (editingObject.properties || {})}
+                onActivate={() => { updateEditingObjectProperty('requires_class', ''); }}
+              >
+              <div>
+                <div className="flex items-center gap-1 mb-1">
+                  <label className="text-xs text-muted-foreground">Required Have Class</label>
+                  <Tooltip content="Player base class required to load NPC">
+                    <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                  </Tooltip>
+                </div>
+                <Input
+                  className="h-7 text-xs"
+                  value={getEditingObjectProperty('requires_class', '')}
+                  onChange={(e) => updateEditingObjectProperty('requires_class', e.target.value)}
+                  placeholder="e.g. warrior"
+                />
+              </div>
+              </SpawnFieldOverlay>
+              <SpawnFieldOverlay
+                active={'requires_not_class' in (editingObject.properties || {})}
+                onActivate={() => { updateEditingObjectProperty('requires_not_class', ''); }}
+              >
+              <div>
+                <div className="flex items-center gap-1 mb-1">
+                  <label className="text-xs text-muted-foreground">Required Have Not Class</label>
+                  <Tooltip content="Player base class not required to load NPC">
+                    <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                  </Tooltip>
+                </div>
+                <Input
+                  className="h-7 text-xs"
+                  value={getEditingObjectProperty('requires_not_class', '')}
+                  onChange={(e) => updateEditingObjectProperty('requires_not_class', e.target.value)}
+                  placeholder="e.g. mage"
+                />
+              </div>
+              </SpawnFieldOverlay>
+            </div>
+
+            {/* Direction */}
+            <SpawnFieldOverlay
+              active={'spawn_direction' in (editingObject.properties || {})}
+              onActivate={() => { updateEditingObjectProperty('spawn_direction', '0'); }}
+            >
+            <div>
+              <div className="flex items-center gap-1 mb-1">
+                <label className="text-xs text-muted-foreground">Direction</label>
+                <Tooltip content="Direction that NPC will initially face">
+                  <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                </Tooltip>
+              </div>
+              <div className="flex gap-1 flex-wrap">
+                {([
+                  { value: '0', label: 'N', icon: ArrowUp },
+                  { value: '1', label: 'NE', icon: ArrowUpRight },
+                  { value: '2', label: 'E', icon: ArrowRight },
+                  { value: '3', label: 'SE', icon: ArrowDownRight },
+                  { value: '4', label: 'S', icon: ArrowDown },
+                  { value: '5', label: 'SW', icon: ArrowDownLeft },
+                  { value: '6', label: 'W', icon: ArrowLeft },
+                  { value: '7', label: 'NW', icon: ArrowUpLeft },
+                ] as const).map(dir => {
+                  const Icon = dir.icon;
+                  const isSelected = getEditingObjectProperty('spawn_direction', '') === dir.value;
+                  return (
+                    <button
+                      key={dir.value}
+                      type="button"
+                      onClick={() => updateEditingObjectProperty('spawn_direction', isSelected ? null : dir.value)}
+                      className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium transition-colors ${
+                        isSelected
+                          ? 'bg-orange-500/20 text-orange-600 dark:text-orange-400 border border-orange-500/50'
+                          : 'bg-muted/50 text-muted-foreground border border-transparent hover:bg-muted'
+                      }`}
+                    >
+                      <Icon className="w-3 h-3" />
+                      {dir.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            </SpawnFieldOverlay>
+
+            {/* Waypoints & Wander Radius */}
+            <div className="grid grid-cols-2 gap-3">
+              <SpawnFieldOverlay
+                active={'waypoints' in (editingObject.properties || {})}
+                onActivate={() => { updateEditingObjectProperty('waypoints', ''); }}
+              >
+              <div>
+                <div className="flex items-center gap-1 mb-1">
+                  <label className="text-xs text-muted-foreground">Waypoints</label>
+                  <Tooltip content="NPC waypoints; negates wander_radius">
+                    <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                  </Tooltip>
+                </div>
+                <Input
+                  className="h-7 text-xs"
+                  value={getEditingObjectProperty('waypoints', '')}
+                  onChange={(e) => updateEditingObjectProperty('waypoints', e.target.value)}
+                  placeholder="Will be implemented later"
+                />
+              </div>
+              </SpawnFieldOverlay>
+              <SpawnFieldOverlay
+                active={'wander_radius' in (editingObject.properties || {})}
+                onActivate={() => { updateEditingObjectProperty('wander_radius', ''); }}
+              >
+              <div>
+                <div className="flex items-center gap-1 mb-1">
+                  <label className="text-xs text-muted-foreground">Wander Radius</label>
+                  <Tooltip content="The radius (in tiles) that an NPC will wander around randomly; negates waypoints">
+                    <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                  </Tooltip>
+                </div>
+                <Input
+                  type="number"
+                  className="h-7 text-xs"
+                  value={getEditingObjectProperty('wander_radius', '')}
+                  onChange={(e) => updateEditingObjectProperty('wander_radius', e.target.value)}
+                  placeholder="Will be implemented later"
+                  min="0"
+                />
+              </div>
+              </SpawnFieldOverlay>
+            </div>
+          </div>
+        )}
+
+        {/* NPC Audio */}
+        {editingObject.type === 'npc' && (
+          <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
+            <div>
+              <h4 className="text-sm font-semibold">Audio</h4>
+              <p className="text-xs text-muted-foreground">Sound effects for this NPC.</p>
+            </div>
+            <div>
+              <div className="flex items-center gap-1 mb-1">
+                <label className="text-xs text-muted-foreground">Intro Vox (vox_intro)</label>
+                <Tooltip content="Filename of a sound file to play when initially interacting with the NPC.">
+                  <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                </Tooltip>
+              </div>
+              <Input
+                className="h-7 text-xs"
+                value={getEditingObjectProperty('vox_intro', '')}
+                onChange={(e) => updateEditingObjectProperty('vox_intro', e.target.value)}
+                placeholder="sound_file.ogg"
+              />
+            </div>
           </div>
         )}
 
@@ -703,7 +1515,7 @@ const ObjectManagementDialog = ({
     )}
     </div>
 
-    <DialogFooter className="mt-4 flex-shrink-0">
+    <div className="sticky bottom-0 border-t border-border/50 bg-background px-6 py-3 flex-shrink-0">
       <div className="flex w-full justify-between items-center">
         {/* Delete buttons */}
         <div className="flex items-center gap-2">
@@ -794,18 +1606,25 @@ const ObjectManagementDialog = ({
         </div>
         
         <div className="flex gap-2">
-          <Button variant="outline" size="icon" onClick={handleObjectDialogClose} aria-label="Cancel edit">
-            <X className="w-4 h-4" />
-          </Button>
           <Button size="icon" onClick={handleObjectDialogSave} aria-label="Save">
             <Save className="w-4 h-4" />
           </Button>
         </div>
       </div>
-    </DialogFooter>
-  </DialogContent>
-</Dialog>
+    </div>
 
-);
+    {/* Resize handle */}
+    <div
+      onMouseDown={handleResizeMouseDown}
+      className="absolute bottom-0 right-0 w-5 h-5 cursor-se-resize opacity-40 hover:opacity-100 transition-opacity flex items-end justify-end"
+      title="Drag to resize"
+    >
+      <div className="w-1.5 h-1.5 bg-foreground/40 rounded-sm m-1" />
+    </div>
+  </div>
+  );
+
+  return createPortal(dialogContent, document.body);
+};
 
 export default ObjectManagementDialog;

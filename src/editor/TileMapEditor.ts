@@ -1594,6 +1594,12 @@ export class TileMapEditor {
     if (!actor) return;
     if (actor.x === x && actor.y === y) return;
 
+    // NPC pawns cannot occupy the same cell as another NPC
+    if (actor.type === 'npc') {
+      const conflict = this.objects.find(obj => obj.type === 'npc' && obj.id !== actor.id && obj.x === x && obj.y === y);
+      if (conflict) return;
+    }
+
     this.updateMapObject(actor.id, { x, y });
     this.draw();
   }
@@ -4209,16 +4215,47 @@ export class TileMapEditor {
   }
 
   private drawActorIcon(centerX: number, centerY: number, actorType: 'npc' | 'enemy'): void {
-    const fontSize = Math.max(10, Math.min(18, 14 * this.zoom));
-    const label = actorType === 'npc' ? 'N' : 'E';
+    if (actorType === 'npc') {
+      // Draw lucide circle-user-round icon
+      const iconSize = Math.max(5, Math.min(10, 8 * this.zoom));
+      const s = iconSize / 12; // scale factor (icon drawn in 24x24, we use half)
+      const cx = centerX;
+      const cy = centerY;
 
-    this.ctx.save();
-    this.ctx.fillStyle = '#ffffff';
-    this.ctx.font = `bold ${fontSize}px "Segoe UI", sans-serif`;
-    this.ctx.textAlign = 'center';
-    this.ctx.textBaseline = 'middle';
-    this.ctx.fillText(label, centerX, centerY);
-    this.ctx.restore();
+      this.ctx.save();
+      this.ctx.strokeStyle = '#ffffff';
+      this.ctx.lineWidth = Math.max(1, Math.min(2, 1.5 * this.zoom));
+      this.ctx.lineCap = 'round';
+      this.ctx.lineJoin = 'round';
+
+      // Outer circle (circle cx=12 cy=12 r=10 scaled)
+      this.ctx.beginPath();
+      this.ctx.arc(cx, cy, 10 * s, 0, Math.PI * 2);
+      this.ctx.stroke();
+
+      // Head circle (circle cx=12 cy=10 r=4 scaled)
+      this.ctx.beginPath();
+      this.ctx.arc(cx, cy - 2 * s, 4 * s, 0, Math.PI * 2);
+      this.ctx.stroke();
+
+      // Body arc (path d="M18 20a6 6 0 0 0-12 0" scaled)
+      // This is an arc from (18,20) to (6,20) with radius 6, sweep clockwise
+      // Center of this arc is (12, 20), radius 6
+      this.ctx.beginPath();
+      this.ctx.arc(cx, cy + 8 * s, 6 * s, Math.PI, 0, false);
+      this.ctx.stroke();
+
+      this.ctx.restore();
+    } else {
+      const fontSize = Math.max(10, Math.min(18, 14 * this.zoom));
+      this.ctx.save();
+      this.ctx.fillStyle = '#ffffff';
+      this.ctx.font = `bold ${fontSize}px "Segoe UI", sans-serif`;
+      this.ctx.textAlign = 'center';
+      this.ctx.textBaseline = 'middle';
+      this.ctx.fillText('E', centerX, centerY);
+      this.ctx.restore();
+    }
   }
 
   private drawStampPreview(): void {
@@ -11311,11 +11348,12 @@ export class TileMapEditor {
   
       const label = actorType === 'npc' ? 'NPC' : 'Enemy';
       const name = object.name || label;
+      const title = actorType === 'npc' ? `${name}  (NPC)` : name;
   
       tooltip.innerHTML = `
-        <div style="font-weight: bold; margin-bottom: 4px; color: #ffffff; font-size: 13px;">${name}</div>
+        <div style="font-weight: bold; margin-bottom: 4px; color: #ffffff; font-size: 13px;">${title}</div>
         <div style="font-size: 11px; display: flex; align-items: center; color: rgba(209, 213, 219, 0.8);">
-          ${mouseIcon}Click to edit or drag to move
+          ${mouseIcon}Click to edit
         </div>
     `;
 

@@ -76,7 +76,7 @@ export default function useObjectDialogHandlers({ editingObject, setEditingObjec
     setEditingObject((prev) => {
       if (!prev) return prev;
       const properties = { ...(prev.properties || {}) } as Record<string, string>;
-      if (value === null || value === '') {
+      if (value === null) {
         delete properties[key];
       } else {
         properties[key] = value;

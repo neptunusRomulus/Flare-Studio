@@ -461,7 +461,12 @@ export default function EditorCanvas(props: Props) {
             const canvasY = e.clientY - rect.top;
             const mapCoords = editorRef.current.screenToTile(canvasX, canvasY);
             if (mapCoords && mapCoords.x >= 0 && mapCoords.x < mapWidth && mapCoords.y >= 0 && mapCoords.y < mapHeight) {
-              handlePlaceActorOnMap(npcId, mapCoords.x, mapCoords.y);
+              // NPC pawns cannot occupy the same cell as another NPC
+              const allObjects = editorRef.current.getMapObjects();
+              const conflict = allObjects.find(o => o.type === 'npc' && o.id !== npcId && o.x === mapCoords.x && o.y === mapCoords.y);
+              if (!conflict) {
+                handlePlaceActorOnMap(npcId, mapCoords.x, mapCoords.y);
+              }
             }
           }
           editorRef.current.clearNpcDragHover();

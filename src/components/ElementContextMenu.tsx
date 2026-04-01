@@ -38,16 +38,16 @@ export default function ElementContextMenu({
     <ContextMenu>
       <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
       <ContextMenuContent className="min-w-[120px] p-0.5">
-        <ContextMenuItem onClick={onEdit} className="gap-1.5 text-xs px-2 py-1 h-6">
+        <ContextMenuItem onSelect={onEdit} className="gap-1.5 text-xs px-2 py-1 h-6">
           <Pencil className="w-3 h-3" />
           Edit
         </ContextMenuItem>
-        <ContextMenuItem onClick={onDuplicate} className="gap-1.5 text-xs px-2 py-1 h-6">
+        <ContextMenuItem onSelect={onDuplicate} className="gap-1.5 text-xs px-2 py-1 h-6">
           <Copy className="w-3 h-3" />
           Duplicate
         </ContextMenuItem>
         <ContextMenuSeparator className="my-0.5" />
-        <ContextMenuItem onClick={onDelete} className="gap-1.5 text-xs px-2 py-1 h-6 text-destructive focus:text-destructive">
+        <ContextMenuItem onSelect={onDelete} className="gap-1.5 text-xs px-2 py-1 h-6 text-destructive focus:text-destructive">
           <Trash2 className="w-3 h-3" />
           Delete
         </ContextMenuItem>

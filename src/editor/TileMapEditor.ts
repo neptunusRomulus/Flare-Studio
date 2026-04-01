@@ -11069,7 +11069,7 @@ export class TileMapEditor {
     });
   }
 
-  public addMapObject(type: 'event' | 'enemy', x: number, y: number, width: number = 1, height: number = 1): MapObject {
+  public addMapObject(type: 'event' | 'enemy' | 'npc', x: number, y: number, width: number = 1, height: number = 1): MapObject {
     const object: MapObject = {
       id: this.nextObjectId++,
       name: `${type}_${this.nextObjectId - 1}`,
@@ -11091,6 +11091,9 @@ export class TileMapEditor {
       object.level = 1;
       object.number = 1;
       object.wander_radius = 4;
+    } else if (type === 'npc') {
+      object.category = 'npc';
+      object.wander_radius = 0;
     }
 
     this.objects.push(object);
@@ -11396,11 +11399,13 @@ export class TileMapEditor {
     }
 
     // Create new object based on layer type
-    let objectType: 'event' | 'enemy';
+    let objectType: 'event' | 'enemy' | 'npc';
     if (layerType === 'event') {
       objectType = 'event';
-    } else if (layerType === 'enemy' || layerType === 'npc' || layerType === 'object') {
-      objectType = 'enemy'; // NPCs and objects are treated as enemies in Flare
+    } else if (layerType === 'npc') {
+      objectType = 'npc';
+    } else if (layerType === 'enemy' || layerType === 'object') {
+      objectType = 'enemy';
     } else {
       console.log(`Unsupported layer type: ${layerType}`);
       return; // Unsupported layer type

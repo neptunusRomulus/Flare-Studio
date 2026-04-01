@@ -260,7 +260,7 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
     setEditingObject((prev) => {
       if (!prev) return prev;
       const properties = { ...(prev.properties || {}) };
-      if (value === null || value === '') delete properties[key];
+      if (value === null) delete properties[key];
       else properties[key] = value;
       return { ...prev, properties };
     });

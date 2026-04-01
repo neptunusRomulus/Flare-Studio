@@ -146,11 +146,24 @@ export default function useActorManagement({
     const unplacedX = -1;
     const unplacedY = -1;
 
-    const newObject: MapObject = editor.addMapObject('enemy', unplacedX, unplacedY, 1, 1);
+    // For NPCs, auto-place at 0,0 (or next free diagonal cell)
+    let spawnX = unplacedX;
+    let spawnY = unplacedY;
+    if (actorDialogState.type === 'npc') {
+      const existingObjects = editor.getMapObjects();
+      let candidate = 0;
+      while (existingObjects.some(o => o.type === 'npc' && o.x === candidate && o.y === candidate)) {
+        candidate++;
+      }
+      spawnX = candidate;
+      spawnY = candidate;
+    }
+
+    const newObject: MapObject = editor.addMapObject('enemy', spawnX, spawnY, 1, 1);
     editor.updateMapObject(newObject.id, {
       name,
-      x: unplacedX,
-      y: unplacedY,
+      x: spawnX,
+      y: spawnY,
       type: actorDialogState.type,
       category: actorDialogState.type === 'npc' ? 'npc' : '',
       wander_radius: 0,

@@ -134,6 +134,11 @@ const validateAndSanitizeObject = (
     }
   }
 
+  // Remove empty-string properties (activated but never filled in)
+  for (const key of Object.keys(sanitized)) {
+    if (sanitized[key] === '') delete sanitized[key];
+  }
+
   return { errors, sanitized };
 };
 

@@ -21,6 +21,7 @@ export interface TilesetInfo {
 export interface MapObject {
   id: number;
   name: string;
+  description?: string;
   type: string;
   x: number;
   y: number;

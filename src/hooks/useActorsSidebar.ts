@@ -10,6 +10,9 @@ export type ActorsSidebarParams = {
   actorEntries: MapObject[];
   draggingNpcId: number | null;
   handleEditObject: (id: number) => void;
+  handleDuplicateObject: (id: number) => void;
+  handleDeleteObject: (id: number) => void;
+  handleReorderActors: (fromIndex: number, toIndex: number) => void;
   setNpcHoverTooltip: (p: { x: number; y: number } | null) => void;
   handleNpcDragStart: (e: React.DragEvent, actorId: number) => void;
   handleNpcDragEnd: () => void;
@@ -65,6 +68,9 @@ export default function useActorsSidebar(params?: Partial<ActorsSidebarParams>) 
     actorEntries: [],
     draggingNpcId: null,
     handleEditObject: noopHandleNumber,
+    handleDuplicateObject: noopHandleNumber,
+    handleDeleteObject: noopHandleNumber,
+    handleReorderActors: noopTwoArgs,
     setNpcHoverTooltip: noopHoverTooltip,
     handleNpcDragStart: noopDrag,
     handleNpcDragEnd: noopNode,
@@ -100,6 +106,9 @@ export default function useActorsSidebar(params?: Partial<ActorsSidebarParams>) 
     actorEntries: p.actorEntries,
     draggingNpcId: p.draggingNpcId,
     handleEditObject: p.handleEditObject,
+    handleDuplicateObject: p.handleDuplicateObject,
+    handleDeleteObject: p.handleDeleteObject,
+    handleReorderActors: p.handleReorderActors,
     handleNpcDragStart: p.handleNpcDragStart,
     handleNpcDragEnd: p.handleNpcDragEnd,
     handleOpenActorDialog: p.handleOpenActorDialog

@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import Tooltip from '@/components/ui/tooltip';
 import { ArrowUp, ArrowUpRight, ArrowRight, ArrowDownRight, ArrowDown, ArrowDownLeft, ArrowLeft, ArrowUpLeft, Check, Gift, HelpCircle, Image, MessageSquare, Package, Plus, Save, Sparkles, Trash2, User, X } from 'lucide-react';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
+import { DialogueNodeEditor } from '@/components/DialogueNodeEditor';
 import type { DialogueTree, MapObject } from '@/types';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 
@@ -564,35 +565,10 @@ const ObjectManagementDialog = ({
               </div>
             </div>
 
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-8 w-full text-xs gap-2 border-blue-500/30 bg-blue-500/5 text-blue-700 hover:bg-blue-500/10"
-              onClick={() => {
-                const existingTrees = editingObject.properties?.dialogueTrees;
-                if (existingTrees) {
-                  try {
-                    const parsed = JSON.parse(existingTrees as string);
-                    const normalized = parsed.map((t: DialogueTree) => ({
-                      ...t,
-                      rewards: t.rewards || [],
-                      worldEffects: t.worldEffects || []
-                    }));
-                    setDialogueTrees(normalized);
-                  } catch {
-                    setDialogueTrees([{ id: '1', topic: '', requirements: [], dialogues: [], rewards: [], worldEffects: [] }]);
-                  }
-                } else {
-                  setDialogueTrees([{ id: '1', topic: '', requirements: [], dialogues: [], rewards: [], worldEffects: [] }]);
-                }
-                setActiveDialogueTab(0);
-                setShowDialogueTreeDialog(true);
-              }}
-            >
-              <MessageSquare className="w-3.5 h-3.5" />
-              Edit Dialogue Trees
-            </Button>
+            <DialogueNodeEditor
+              dialogNodesStr={getEditingObjectProperty('dialog_nodes', '')}
+              onChange={(newStr) => updateEditingObjectProperty('dialog_nodes', newStr)}
+            />
           </div>
         )}
 

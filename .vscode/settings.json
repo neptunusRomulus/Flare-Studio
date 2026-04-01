@@ -18,5 +18,6 @@
     "css": "css"
   },
   "tailwindCSS.emmetCompletions": true,
-  "chatgpt.openOnStartup": false
+  "chatgpt.openOnStartup": false,
+  "terminal.integrated.defaultProfile.linux": "bash"
 }

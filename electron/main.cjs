@@ -77,11 +77,14 @@ ipcMainLocal.handle("file-exists", async (_event, filePath) => {
 let mainWindow;
 
 function createWindow() {
+  const { screen } = require("electron");
+  const { width: screenW, height: screenH } = screen.getPrimaryDisplay().workAreaSize;
+
   mainWindow = new BrowserWindow({
-    width: 1400,
-    height: 900,
-    minWidth: 1200,
-    minHeight: 800,
+    width: Math.min(1400, screenW),
+    height: Math.min(900, screenH),
+    minWidth: Math.min(1200, screenW),
+    minHeight: Math.min(800, screenH),
     frame: false, // Remove the default window frame
     titleBarStyle: "hidden", // Hide the title bar
     webPreferences: {

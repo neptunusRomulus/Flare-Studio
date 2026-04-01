@@ -100,7 +100,6 @@ export default function useActorsSidebar(params?: Partial<ActorsSidebarParams>) 
     actorEntries: p.actorEntries,
     draggingNpcId: p.draggingNpcId,
     handleEditObject: p.handleEditObject,
-    setNpcHoverTooltip: p.setNpcHoverTooltip,
     handleNpcDragStart: p.handleNpcDragStart,
     handleNpcDragEnd: p.handleNpcDragEnd,
     handleOpenActorDialog: p.handleOpenActorDialog

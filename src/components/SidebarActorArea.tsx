@@ -11,7 +11,6 @@ type Props = {
   handleEditObject: (id: number) => void;
   handleDuplicateObject: (id: number) => void;
   handleDeleteObject: (id: number) => void;
-  setNpcHoverTooltip: (p: { x: number; y: number } | null) => void;
   handleNpcDragStart: (e: React.DragEvent, actorId: number) => void;
   handleNpcDragEnd: () => void;
   handleReorderActors: (fromIndex: number, toIndex: number) => void;
@@ -27,7 +26,6 @@ const SidebarActorArea: React.FC<Props> = ({
   handleEditObject,
   handleDuplicateObject,
   handleDeleteObject,
-  setNpcHoverTooltip,
   handleNpcDragStart,
   handleNpcDragEnd,
   handleReorderActors,
@@ -43,8 +41,6 @@ const SidebarActorArea: React.FC<Props> = ({
       onEditObject={handleEditObject}
       onDuplicateObject={handleDuplicateObject}
       onDeleteObject={handleDeleteObject}
-      onHover={(pos) => setNpcHoverTooltip(pos)}
-      onHoverEnd={() => setNpcHoverTooltip(null)}
       onDragStart={handleNpcDragStart}
       onDragEnd={handleNpcDragEnd}
       onReorderActors={handleReorderActors}

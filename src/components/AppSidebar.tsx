@@ -32,7 +32,6 @@ type SidebarProps = {
     handleEditObject: (id: number) => void;
     handleDuplicateObject: (id: number) => void;
     handleDeleteObject: (id: number) => void;
-    setNpcHoverTooltip: (p: { x: number; y: number } | null) => void;
     handleNpcDragStart: (e: React.DragEvent, actorId: number) => void;
     handleNpcDragEnd: () => void;
     handleReorderActors: (fromIndex: number, toIndex: number) => void;
@@ -142,7 +141,6 @@ export default function AppSidebar(p: SidebarProps) {
             handleEditObject={p.actors.handleEditObject}
             handleDuplicateObject={p.actors.handleDuplicateObject}
             handleDeleteObject={p.actors.handleDeleteObject}
-            setNpcHoverTooltip={p.actors.setNpcHoverTooltip}
             handleNpcDragStart={p.actors.handleNpcDragStart}
             handleNpcDragEnd={p.actors.handleNpcDragEnd}
             handleReorderActors={p.actors.handleReorderActors}

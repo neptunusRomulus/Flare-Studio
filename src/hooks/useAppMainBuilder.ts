@@ -592,7 +592,7 @@ export default function useAppMainBuilder() {
     const objects = typeof editor.getMapObjects === 'function' ? editor.getMapObjects() : [];
     const source = objects.find((o: MapObject) => o.id === objectId);
     if (!source) return;
-    const newObj = editor.addMapObject(source.type === 'npc' ? 'enemy' : (source.type as 'event' | 'enemy'), -1, -1, source.width ?? 1, source.height ?? 1);
+    const newObj = editor.addMapObject(source.type as 'npc' | 'enemy', -1, -1, source.width ?? 1, source.height ?? 1);
     if (newObj && typeof editor.updateMapObject === 'function') {
       editor.updateMapObject(newObj.id, {
         name: `${source.name || source.type} (copy)`,
@@ -1436,6 +1436,27 @@ export default function useAppMainBuilder() {
       handleActorPortraitBrowse: objectEditing.handleActorPortraitBrowse,
       handleActorSubmit: objectEditing.handleActorSubmit,
       canUseTilesetDialog: typeof window !== 'undefined' && !!window.electronAPI?.selectTilesetFile,
+      // Object management dialog (NPC edit on click)
+      showObjectDialog: objectEditing.showObjectDialog,
+      editingObject: objectEditing.editingObject,
+      objectValidationErrors: objectEditing.objectValidationErrors,
+      setEditingObject: objectEditing.setEditingObject,
+      handleObjectDialogClose: objectEditing.handleObjectDialogClose,
+      handleObjectDialogSave: objectEditing.handleObjectDialogSave,
+      updateEditingObjectProperty: objectEditing.updateEditingObjectProperty,
+      updateEditingObjectBoolean: objectEditing.updateEditingObjectBoolean,
+      getEditingObjectProperty: objectEditing.getEditingObjectProperty,
+      handleEditingTilesetBrowse: objectEditing.handleEditingTilesetBrowse,
+      handleEditingPortraitBrowse: objectEditing.handleEditingPortraitBrowse,
+      showDeleteNpcConfirm: objectEditing.showDeleteNpcConfirm,
+      setShowDeleteNpcConfirm: objectEditing.setShowDeleteNpcConfirm,
+      showDeleteEnemyConfirm: objectEditing.showDeleteEnemyConfirm,
+      setShowDeleteEnemyConfirm: objectEditing.setShowDeleteEnemyConfirm,
+      setDialogueTrees: objectEditing.setDialogueTrees,
+      setActiveDialogueTab: objectEditing.setActiveDialogueTab,
+      setShowDialogueTreeDialog: objectEditing.setShowDialogueTreeDialog,
+      editor: editor ?? null,
+      syncMapObjects: realSyncMapObjects,
       itemDialogState: itemsHook.itemDialogState,
       setItemDialogState: itemsHook.setItemDialogState,
       itemDialogError: itemsHook.itemDialogError,

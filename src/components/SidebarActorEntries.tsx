@@ -18,8 +18,6 @@ type ActorEntriesPanelProps = {
   onEditObject: (actorId: number) => void;
   onDuplicateObject: (actorId: number) => void;
   onDeleteObject: (actorId: number) => void;
-  onHover: (position: { x: number; y: number }) => void;
-  onHoverEnd: () => void;
   onDragStart: (event: DragEvent<HTMLDivElement>, actorId: number) => void;
   onDragEnd: () => void;
   onReorderActors: (fromIndex: number, toIndex: number) => void;
@@ -36,8 +34,6 @@ const SidebarActorEntries = ({
   onEditObject,
   onDuplicateObject,
   onDeleteObject,
-  onHover,
-  onHoverEnd,
   onDragStart,
   onDragEnd,
   onReorderActors,
@@ -79,22 +75,19 @@ const SidebarActorEntries = ({
               const isPlacedOnMap = actor.x >= 0 && actor.y >= 0;
 
               return (
+                <ListItemTooltip key={actor.id}>
                 <ElementContextMenu
-                  key={actor.id}
                   elementType={isNpcLayer ? 'npc' : 'enemy'}
                   onEdit={() => onEditObject(actor.id)}
                   onDuplicate={() => onDuplicateObject(actor.id)}
                   onDelete={() => onDeleteObject(actor.id)}
                 >
-                <ListItemTooltip>
                 <div
                   {...getItemDragProps(index)}
                   className={`w-full box-border rounded-md px-2 py-2 hover:bg-background transition-colors cursor-pointer border border-dashed border-gray-400 dark:border-gray-600 flex ${
                     isPlacedOnMap ? 'bg-background/50' : 'bg-muted/20'
                   } ${draggingNpcId === actor.id ? 'opacity-50' : ''} ${reorderClass(index)}`}
                   onClick={() => onEditObject(actor.id)}
-                  onMouseMove={(event) => onHover({ x: event.clientX, y: event.clientY })}
-                  onMouseLeave={onHoverEnd}
                 >
                   <div className="flex items-center gap-2 w-full">
                     <div className={`flex-shrink-0 w-10 h-10 rounded border bg-muted/50 flex items-center justify-center overflow-hidden ${
@@ -203,8 +196,8 @@ const SidebarActorEntries = ({
                     )}
                   </div>
                 </div>
-                </ListItemTooltip>
                 </ElementContextMenu>
+                </ListItemTooltip>
               );
             })}
           </div>

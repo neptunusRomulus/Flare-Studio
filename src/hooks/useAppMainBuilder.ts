@@ -1100,7 +1100,7 @@ export default function useAppMainBuilder() {
         onClose: () => {
           try { window?.electronAPI?.close?.(); } catch (e) { console.warn('Close failed', e); }
         },
-        flareIconUrl: ''
+        flareIconUrl: `${import.meta.env.BASE_URL}flare-studio-ico.png`
       },
       showSidebarToggle,
       leftCollapsed: appState.leftCollapsed,

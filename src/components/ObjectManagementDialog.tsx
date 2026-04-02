@@ -1,9 +1,9 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Tooltip from '@/components/ui/tooltip';
-import { ArrowUp, ArrowUpRight, ArrowRight, ArrowDownRight, ArrowDown, ArrowDownLeft, ArrowLeft, ArrowUpLeft, Check, Gift, HelpCircle, Image, MessageSquare, Package, Plus, Save, Sparkles, Trash2, User, X } from 'lucide-react';
+import { ArrowUp, ArrowUpRight, ArrowRight, ArrowDownRight, ArrowDown, ArrowDownLeft, ArrowLeft, ArrowUpLeft, Check, ChevronDown, ChevronUp, Gift, HelpCircle, Image, MessagesSquare, Package, Plus, Save, Sparkles, Trash2, User, X } from 'lucide-react';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 import type { DialogueTree, MapObject } from '@/types';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
@@ -85,6 +85,10 @@ const ObjectManagementDialog = ({
   showDeleteEnemyConfirm,
   setShowDeleteEnemyConfirm
 }: ObjectManagementDialogProps) => {
+  const [appearanceExpanded, setAppearanceExpanded] = useState(false);
+  const [spawnReqExpanded, setSpawnReqExpanded] = useState(false);
+  const [audioExpanded, setAudioExpanded] = useState(false);
+
   const isOpen = showObjectDialog && editingObject?.type !== 'enemy';
 
   const {
@@ -233,11 +237,19 @@ const ObjectManagementDialog = ({
 
         {/* NPC Appearance Section */}
         {editingObject.type === 'npc' && (
-          <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
-            <div>
-              <h4 className="text-sm font-semibold">Appearance</h4>
-              <p className="text-xs text-muted-foreground">Visual and positioning settings for this NPC.</p>
-            </div>
+          <div className="border border-border rounded-md bg-muted/20">
+            <button
+              type="button"
+              onClick={() => setAppearanceExpanded(!appearanceExpanded)}
+              className="w-full px-3 py-2 flex items-center gap-2 text-sm font-semibold hover:bg-muted/50 rounded-t-md text-left"
+            >
+              {appearanceExpanded ? <ChevronUp className="w-4 h-4 shrink-0" /> : <ChevronDown className="w-4 h-4 shrink-0" />}
+              <div>
+                <span>Appearance</span>
+                <p className="text-xs text-muted-foreground font-normal">Visual and positioning settings for this NPC.</p>
+              </div>
+            </button>
+            {appearanceExpanded && <div className="space-y-3 px-3 pb-3">
 
             {/* Name & Position */}
             <div className="flex gap-3 items-end">
@@ -390,6 +402,7 @@ const ObjectManagementDialog = ({
                 </Tooltip>
               </div>
             </div>
+            </div>}
           </div>
         )}
 
@@ -497,15 +510,14 @@ const ObjectManagementDialog = ({
         {/* Role-specific compact options */}
         {editingObject.type === 'npc' && editingObject.properties?.talker === 'true' && (
           <div className="pl-3 border-l-[3px] border-blue-500/80 py-1">
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full gap-1.5 border-blue-500/30 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10"
+            <button
+              type="button"
               onClick={() => setShowDialogueTreeDialog(true)}
+              className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 hover:opacity-80"
             >
-              <MessageSquare className="w-3.5 h-3.5" />
-              Open Dialogue Tree Editor
-            </Button>
+              <MessagesSquare className="w-3 h-3" />
+              Dialogue Trees
+            </button>
           </div>
         )}
 
@@ -713,11 +725,19 @@ const ObjectManagementDialog = ({
 
         {/* NPC Spawn Requirements & Behavior */}
         {editingObject.type === 'npc' && (
-          <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
-            <div>
-              <h4 className="text-sm font-semibold">Spawn Requirements</h4>
-              <p className="text-xs text-muted-foreground">Conditions for this NPC to appear on the map.</p>
-            </div>
+          <div className="border border-border rounded-md bg-muted/20">
+            <button
+              type="button"
+              onClick={() => setSpawnReqExpanded(!spawnReqExpanded)}
+              className="w-full px-3 py-2 flex items-center gap-2 text-sm font-semibold hover:bg-muted/50 rounded-t-md text-left"
+            >
+              {spawnReqExpanded ? <ChevronUp className="w-4 h-4 shrink-0" /> : <ChevronDown className="w-4 h-4 shrink-0" />}
+              <div>
+                <span>Spawn Requirements</span>
+                <p className="text-xs text-muted-foreground font-normal">Conditions for this NPC to appear on the map.</p>
+              </div>
+            </button>
+            {spawnReqExpanded && <div className="space-y-3 px-3 pb-3">
 
             {/* Status requirements */}
             {/* Status requirements */}
@@ -1051,16 +1071,25 @@ const ObjectManagementDialog = ({
               </div>
               </SpawnFieldOverlay>
             </div>
+            </div>}
           </div>
         )}
 
         {/* NPC Audio */}
         {editingObject.type === 'npc' && (
-          <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
-            <div>
-              <h4 className="text-sm font-semibold">Audio</h4>
-              <p className="text-xs text-muted-foreground">Sound effects for this NPC.</p>
-            </div>
+          <div className="border border-border rounded-md bg-muted/20">
+            <button
+              type="button"
+              onClick={() => setAudioExpanded(!audioExpanded)}
+              className="w-full px-3 py-2 flex items-center gap-2 text-sm font-semibold hover:bg-muted/50 rounded-t-md text-left"
+            >
+              {audioExpanded ? <ChevronUp className="w-4 h-4 shrink-0" /> : <ChevronDown className="w-4 h-4 shrink-0" />}
+              <div>
+                <span>Audio</span>
+                <p className="text-xs text-muted-foreground font-normal">Sound effects for this NPC.</p>
+              </div>
+            </button>
+            {audioExpanded && <div className="space-y-3 px-3 pb-3">
             <div>
               <div className="flex items-center gap-1 mb-1">
                 <label className="text-xs text-muted-foreground">Intro Vox (vox_intro)</label>
@@ -1075,6 +1104,7 @@ const ObjectManagementDialog = ({
                 placeholder="sound_file.ogg"
               />
             </div>
+            </div>}
           </div>
         )}
 

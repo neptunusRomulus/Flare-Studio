@@ -1,10 +1,11 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { AlignLeft, ArrowLeft, ArrowRight, Check, ChevronDown, ChevronUp, Coins, Eye, EyeOff, Fingerprint, Gift, HelpCircle, Image, Link2, MessageSquare, Package, Plus, Save, Shield, Tag, User, Volume2, X, Zap } from 'lucide-react';
 import Tooltip from '@/components/ui/tooltip';
+import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 import type { DialogueLine, DialogueRequirement, DialogueReward, DialogueWorldEffect, DialogueTree, MapObject } from '@/types';
 
 /** Generate a short unique dialogue ID like "dlg_a3f9" */
@@ -138,6 +139,27 @@ const DialogueTreeDialog = ({
   const [pendingIdValue, setPendingIdValue] = useState('');
   const [idConfirmShown, setIdConfirmShown] = useState(false);
 
+  const {
+    position,
+    size,
+    dialogRef,
+    handleHeaderMouseDown,
+    handleResizeMouseDown,
+  } = useDraggableResizable({ id: 'dialogue_tree_dialog', initialWidth: 900, initialHeight: 620, minWidth: 700, minHeight: 450 });
+
+  // Escape to close
+  useEffect(() => {
+    if (!showDialogueTreeDialog) return;
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setEditingIdIndex(null);
+        onClose();
+      }
+    };
+    document.addEventListener('keydown', handleEsc);
+    return () => document.removeEventListener('keydown', handleEsc);
+  }, [showDialogueTreeDialog, onClose]);
+
   // Helper to update a tree at the active tab
   const updateTree = useCallback((index: number, updates: Partial<DialogueTree>) => {
     const newTrees = [...dialogueTrees];
@@ -155,24 +177,41 @@ const DialogueTreeDialog = ({
   }, [dialogueTrees]);
 
   return (
-<Dialog
-  open={showDialogueTreeDialog}
-  onOpenChange={(open) => {
-    if (!open) {
-      setEditingIdIndex(null);
-      onClose();
-    }
-  }}
->
-  <DialogContent className="max-w-4xl w-full h-[80vh] flex flex-col">
-    <DialogHeader className="mb-4">
-      <DialogTitle className="flex items-center gap-2">
-        <MessageSquare className="w-5 h-5 text-blue-500" />
-        Dialogue Trees
-      </DialogTitle>
-    </DialogHeader>
+<>
+  {!showDialogueTreeDialog ? null : createPortal(
+    <div
+      ref={dialogRef}
+      className="bg-background border border-border/70 rounded-lg flex flex-col shadow-xl"
+      style={{
+        position: 'fixed',
+        left: `${position.x}px`,
+        top: `${position.y}px`,
+        width: `${size.width}px`,
+        height: `${size.height}px`,
+        zIndex: 50,
+        pointerEvents: 'auto',
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div
+        className="flex items-center justify-between px-4 py-3 border-b border-border cursor-move select-none"
+        onMouseDown={handleHeaderMouseDown}
+      >
+        <div className="flex items-center gap-2">
+          <MessageSquare className="w-5 h-5 text-blue-500" />
+          <h3 className="font-semibold">Dialogue Trees</h3>
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="w-6 h-6 p-0 hover:bg-transparent"
+          onClick={() => { setEditingIdIndex(null); onClose(); }}
+        >
+          <X className="w-4 h-4 text-muted-foreground" />
+        </Button>
+      </div>
     
-    <div className="flex-1 flex gap-4 overflow-hidden">
+    <div className="flex-1 flex gap-4 overflow-hidden p-4">
       {/* Tab sidebar */}
       <div className="w-52 flex flex-col border-r pr-4">
         <div className="flex-1 space-y-1 overflow-y-auto minimal-scroll">
@@ -970,10 +1009,7 @@ const DialogueTreeDialog = ({
       </div>
     </div>
     
-    <DialogFooter className="mt-4">
-      <Button variant="outline" size="icon" className="h-9 w-9" onClick={onClose}>
-        <ArrowLeft className="w-4 h-4" />
-      </Button>
+    <div className="flex justify-end gap-2 px-4 py-3 border-t border-border">
       <Button 
         size="icon" 
         className="h-9 w-9" 
@@ -1019,9 +1055,20 @@ const DialogueTreeDialog = ({
       >
         <Save className="w-4 h-4" />
       </Button>
-    </DialogFooter>
-  </DialogContent>
-</Dialog>
+    </div>
+
+    {/* Resize handle */}
+    <div
+      onMouseDown={handleResizeMouseDown}
+      className="absolute bottom-0 right-0 w-5 h-5 cursor-se-resize opacity-40 hover:opacity-100 transition-opacity flex items-end justify-end"
+      title="Drag to resize"
+    >
+      <div className="w-1.5 h-1.5 bg-foreground/40 rounded-sm m-1" />
+    </div>
+  </div>,
+  document.body
+  )}
+</>
   );
 };
 

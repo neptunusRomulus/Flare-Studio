@@ -47,21 +47,10 @@ const resolveRuntimePath = (packagedSegments, devSegments) => {
 };
 
 const getPlatformIcon = () => {
-  if (process.platform === "win32") {
-    return resolveRuntimePath(
-      ["icons", "flare.ico"],
-      ["build", "icons", "flare.ico"]
-    );
-  }
-  if (process.platform === "darwin") {
-    return resolveRuntimePath(
-      ["icons", "flare.icns"],
-      ["build", "icons", "flare.icns"]
-    );
-  }
+  // PNG works for taskbar/window icon on both Windows and Linux
   return resolveRuntimePath(
-    ["icons", "flare.png"],
-    ["build", "icons", "flare.png"]
+    ["public", "flare-studio-ico.png"],
+    ["public", "flare-studio-ico.png"]
   );
 };
 

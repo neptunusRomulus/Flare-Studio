@@ -88,8 +88,6 @@ export default function useAppHandlers(params: UseAppHandlersParams) {
   const {
     handleActorFieldChange,
     handleActorRoleToggle,
-    handleActorTilesetBrowse,
-    handleActorPortraitBrowse,
     handleActorSubmit
   } = useActorManagement(actorManagementParams as any);
 
@@ -199,8 +197,6 @@ export default function useAppHandlers(params: UseAppHandlersParams) {
     handleBrushReorder,
     handleActorFieldChange,
     handleActorRoleToggle,
-    handleActorTilesetBrowse,
-    handleActorPortraitBrowse,
     handleActorSubmit,
     handleAddRule,
     handleSaveRule,

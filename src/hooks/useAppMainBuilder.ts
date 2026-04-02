@@ -1322,8 +1322,6 @@ export default function useAppMainBuilder() {
           handleCloseActorDialog: objectEditing.handleCloseActorDialog,
           handleActorFieldChange: objectEditing.handleActorFieldChange,
           handleActorRoleToggle: objectEditing.handleActorRoleToggle,
-          handleActorTilesetBrowse: objectEditing.handleActorTilesetBrowse,
-          handleActorPortraitBrowse: objectEditing.handleActorPortraitBrowse,
           handleActorSubmit: objectEditing.handleActorSubmit,
           // Item dialog state and handlers
           itemDialogState: itemsHook.itemDialogState,

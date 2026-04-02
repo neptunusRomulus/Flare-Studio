@@ -25,9 +25,12 @@ export default function useActorManagement({
   handleEditObject,
   syncMapObjects
 }: Params) {
-  const handleActorFieldChange = useCallback((field: 'name' | 'tilesetPath' | 'portraitPath', value: string) => {
+  const handleActorFieldChange = useCallback((field: 'name' | 'tilesetPath' | 'portraitPath' | 'locationX' | 'locationY', value: string) => {
     setActorDialogState((prev) => {
       if (!prev) return prev;
+      if (field === 'locationX' || field === 'locationY') {
+        return { ...prev, [field]: parseInt(value, 10) || 0 } as CanonActorDialogState;
+      }
       return { ...prev, [field]: value } as CanonActorDialogState;
     });
     setActorDialogError(null);
@@ -42,45 +45,6 @@ export default function useActorManagement({
       return { ...prev, [role]: !curr } as CanonActorDialogState;
     });
   }, [setActorDialogState]);
-
-  const handleActorTilesetBrowse = useCallback(async () => {
-    if (typeof window === 'undefined' || !window.electronAPI?.selectTilesetFile) {
-      return;
-    }
-
-    try {
-      const selected = await window.electronAPI.selectTilesetFile();
-      if (selected) {
-        handleActorFieldChange('tilesetPath', selected);
-      }
-    } catch (error) {
-      console.error('Failed to select tileset file for actor:', error);
-    }
-  }, [handleActorFieldChange]);
-
-  const handleActorPortraitBrowse = useCallback(async () => {
-    if (typeof window === 'undefined' || !window.electronAPI?.selectTilesetFile) {
-      return;
-    }
-
-    try {
-      const selected = await window.electronAPI.selectTilesetFile();
-      if (selected) {
-        if (window.electronAPI.readFileAsDataURL) {
-          const dataUrl = await window.electronAPI.readFileAsDataURL(selected);
-          if (dataUrl) {
-            handleActorFieldChange('portraitPath', dataUrl);
-          } else {
-            handleActorFieldChange('portraitPath', selected);
-          }
-        } else {
-          handleActorFieldChange('portraitPath', selected);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to select portrait file for actor:', error);
-    }
-  }, [handleActorFieldChange]);
 
   const handleActorSubmit = useCallback(async (editAfter = false) => {
     if (!editor || !actorDialogState) {
@@ -143,12 +107,13 @@ export default function useActorManagement({
       if (isStationary) roleProperties.stationary = 'true';
     }
 
-    const unplacedX = -1;
-    const unplacedY = -1;
+    // Use location from dialog state
+    const actorX = actorDialogState.locationX ?? 0;
+    const actorY = actorDialogState.locationY ?? 0;
 
-    // For NPCs, auto-place at 0,0 (or next free diagonal cell)
-    let spawnX = unplacedX;
-    let spawnY = unplacedY;
+    // For NPCs, auto-place at next free diagonal cell if coordinates are 0,0
+    let spawnX = actorX;
+    let spawnY = actorY;
     if (actorDialogState.type === 'npc') {
       const existingObjects = editor.getMapObjects();
       let candidate = 0;
@@ -192,8 +157,6 @@ export default function useActorManagement({
   return {
     handleActorFieldChange,
     handleActorRoleToggle,
-    handleActorTilesetBrowse,
-    handleActorPortraitBrowse,
     handleActorSubmit
   };
 }

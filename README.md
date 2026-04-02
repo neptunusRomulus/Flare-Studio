@@ -57,8 +57,8 @@ Coming Soon...
 ---
 #### ⚡ **Beta Version** 
 - [x] 0- Multi-tileset use with "Tabs"
-- [ ] 1- Objects (In progress)
-- [ ] 2- Events 
+- [x] 1- Objects
+- [x] 2- Events (Partly finished) 
 - [ ] 3- NPCs (In progress)
 - [ ] 4- Enemies
 - [ ] 5- Dialogue (In progress)
@@ -76,8 +76,16 @@ Coming Soon...
 - [ ] 13- Shaders (with injection method)
 - [ ] 14- Translations/localization editor
 - [ ] 15- Particles
+- [ ] 16- Player Settings
+- [ ] 15- Gameworld Settings
+- [ ] 15- Engine Settings
+- [x] 15- Linux, MacOS support. (Partly tested on Archlinux, works decent.)
 - [ ] 16- **You name it. I will check on it. Promise.**
 
+---
+### Testing
+
+I need people for testings the Flare Studio for Windows, MacOS and Linux. If you have can spare some time to do please reach me out in [**Flare Official Discord.**](https://discord.gg/6UmaA8HA55) - if discord link is broken please visit [Flare Engine webpage](https://flarerpg.org/get-involved/). My name is Isemlorer (ismlorer - 173499916004360192) in discord.
 
 
 ## Development
@@ -108,4 +116,4 @@ This will:
 - Start Vite dev server
 - Launch Electron app automatically
 
-Enjoy exploring Flare Studio, the editor is evolving, feedbacks are always welcome. **Go make games!**
+Enjoy exploring Flare Studio, feedbacks are welcome. **Go make games!**

@@ -157,17 +157,19 @@ export interface DialogueLine {
   id: string;
   speaker: 'npc' | 'player';
   text: string;
+  voice?: string;
+  portrait?: string;
 }
 
 export interface DialogueRequirement {
   id: string;
-  type: 'status' | 'not_status' | 'item' | 'level' | 'class';
+  type: 'status' | 'not_status' | 'item' | 'not_item' | 'level' | 'not_level' | 'currency' | 'not_currency' | 'class' | 'not_class';
   value: string;
 }
 
 export interface DialogueReward {
   id: string;
-  type: 'xp' | 'gold' | 'item' | 'remove_gold' | 'remove_item' | 'restore';
+  type: 'xp' | 'gold' | 'item' | 'remove_gold' | 'remove_item' | 'restore' | 'msg';
   value: string;
   quantity?: number;
 }
@@ -180,7 +182,11 @@ export interface DialogueWorldEffect {
 
 export interface DialogueTree {
   id: string;
+  dialogueId: string; // Flare dialog.id — unique identifier for response linking
   topic: string;
+  group?: string; // Flare dialog.group — random selection within same group
+  responseOnly: boolean; // Flare dialog.response_only — hidden from topic list, reachable only via response
+  responses: string[]; // Flare dialog.response — array of dialogueId strings this node links to
   requirements: DialogueRequirement[];
   dialogues: DialogueLine[];
   rewards: DialogueReward[];

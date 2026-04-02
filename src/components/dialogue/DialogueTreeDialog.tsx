@@ -1,9 +1,115 @@
-import React from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { AlignLeft, ArrowLeft, Check, ChevronDown, ChevronUp, Eye, Gift, MessageSquare, Package, Plus, Save, Tag, User, X, Zap } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { AlignLeft, ArrowLeft, ArrowRight, Check, ChevronDown, ChevronUp, Coins, Eye, EyeOff, Fingerprint, Gift, HelpCircle, Image, Link2, MessageSquare, Package, Plus, Save, Shield, Tag, User, Volume2, X, Zap } from 'lucide-react';
+import Tooltip from '@/components/ui/tooltip';
 import type { DialogueLine, DialogueRequirement, DialogueReward, DialogueWorldEffect, DialogueTree, MapObject } from '@/types';
+
+/** Generate a short unique dialogue ID like "dlg_a3f9" */
+function generateDialogueId(): string {
+  return 'dlg_' + Math.random().toString(36).substring(2, 6);
+}
+
+/** Requirement type config for labels/placeholders */
+const REQ_CONFIG: Record<DialogueRequirement['type'], { label: string; placeholder: string }> = {
+  status: { label: 'Has Status', placeholder: 'e.g. quest_started' },
+  not_status: { label: 'Missing Status', placeholder: 'e.g. quest_completed' },
+  item: { label: 'Has Item', placeholder: 'Item ID:qty (e.g. 1002:1)' },
+  not_item: { label: 'Has Not Item', placeholder: 'Item ID:qty (e.g. 1002:1)' },
+  level: { label: 'Min Level', placeholder: 'e.g. 5' },
+  not_level: { label: 'Max Level', placeholder: 'e.g. 10' },
+  currency: { label: 'Min Currency', placeholder: 'e.g. 100' },
+  not_currency: { label: 'Max Currency', placeholder: 'e.g. 500' },
+  class: { label: 'Has Class', placeholder: 'e.g. warrior' },
+  not_class: { label: 'Has Not Class', placeholder: 'e.g. ranger' },
+};
+
+/** Visual branching panel: shows arrow connections between nodes */
+const BranchingPanel: React.FC<{
+  trees: DialogueTree[];
+  activeTab: number;
+  onNavigate: (index: number) => void;
+}> = ({ trees, activeTab, onNavigate }) => {
+  // Build links: for each tree that has responses, find target trees
+  const links = useMemo(() => {
+    const result: { fromIdx: number; fromTopic: string; toIdx: number; toTopic: string; toDialogueId: string }[] = [];
+    for (let i = 0; i < trees.length; i++) {
+      const responses = trees[i].responses || [];
+      for (const respId of responses) {
+        if (!respId) continue;
+        const targetIdx = trees.findIndex(t => t.dialogueId === respId);
+        if (targetIdx !== -1) {
+          result.push({
+            fromIdx: i,
+            fromTopic: trees[i].topic || `Dialogue ${i + 1}`,
+            toIdx: targetIdx,
+            toTopic: trees[targetIdx].topic || `Dialogue ${targetIdx + 1}`,
+            toDialogueId: respId,
+          });
+        }
+      }
+    }
+    return result;
+  }, [trees]);
+
+  // Also find which trees reference the active tab as a response target
+  const incomingLinks = useMemo(() => {
+    const activeDialogueId = trees[activeTab]?.dialogueId;
+    if (!activeDialogueId) return [];
+    return links.filter(l => l.toDialogueId === activeDialogueId);
+  }, [links, trees, activeTab]);
+
+  const outgoingLinks = useMemo(() => {
+    return links.filter(l => l.fromIdx === activeTab);
+  }, [links, activeTab]);
+
+  if (links.length === 0) return null;
+
+  return (
+    <div className="border rounded-md bg-muted/20 p-2 space-y-1.5">
+      <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+        <Link2 className="w-3 h-3" />
+        Response Links
+      </div>
+      {incomingLinks.length > 0 && (
+        <div className="space-y-1">
+          {incomingLinks.map((link, i) => (
+            <button
+              key={`in-${i}`}
+              type="button"
+              onClick={() => onNavigate(link.fromIdx)}
+              className="w-full flex items-center gap-1.5 text-[11px] px-2 py-1 rounded hover:bg-muted/50 transition-colors"
+            >
+              <ArrowLeft className="w-3 h-3 text-blue-400 shrink-0" />
+              <span className="text-blue-500 font-medium truncate">{link.fromTopic}</span>
+              <ArrowRight className="w-2.5 h-2.5 text-muted-foreground shrink-0" />
+              <span className="text-muted-foreground truncate">this</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {outgoingLinks.length > 0 && (
+        <div className="space-y-1">
+          {outgoingLinks.map((link, i) => (
+            <button
+              key={`out-${i}`}
+              type="button"
+              onClick={() => onNavigate(link.toIdx)}
+              className="w-full flex items-center gap-1.5 text-[11px] px-2 py-1 rounded hover:bg-muted/50 transition-colors"
+            >
+              <span className="text-muted-foreground truncate">this</span>
+              <ArrowRight className="w-2.5 h-2.5 text-emerald-400 shrink-0" />
+              <span className="text-emerald-500 font-medium truncate">{link.toTopic}</span>
+              <span className="text-muted-foreground/60 ml-auto text-[10px] shrink-0">{link.toDialogueId}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const DialogueTreeDialog = ({
   showDialogueTreeDialog,
@@ -27,11 +133,33 @@ const DialogueTreeDialog = ({
   onClose: () => void;
   editingObject: MapObject | null;
   updateEditingObjectProperty: (key: string, value: string | null) => void;
-}) => (
+}) => {
+  const [editingIdIndex, setEditingIdIndex] = useState<number | null>(null);
+  const [pendingIdValue, setPendingIdValue] = useState('');
+  const [idConfirmShown, setIdConfirmShown] = useState(false);
+
+  // Helper to update a tree at the active tab
+  const updateTree = useCallback((index: number, updates: Partial<DialogueTree>) => {
+    const newTrees = [...dialogueTrees];
+    newTrees[index] = { ...newTrees[index], ...updates };
+    setDialogueTrees(newTrees);
+  }, [dialogueTrees, setDialogueTrees]);
+
+  const activeTree = dialogueTrees[activeDialogueTab];
+
+  // Collect all dialogueIds for response dropdown
+  const allDialogueIds = useMemo(() => {
+    return dialogueTrees
+      .map((t, i) => ({ dialogueId: t.dialogueId, topic: t.topic, index: i }))
+      .filter(t => t.dialogueId);
+  }, [dialogueTrees]);
+
+  return (
 <Dialog
   open={showDialogueTreeDialog}
   onOpenChange={(open) => {
     if (!open) {
+      setEditingIdIndex(null);
       onClose();
     }
   }}
@@ -46,9 +174,13 @@ const DialogueTreeDialog = ({
     
     <div className="flex-1 flex gap-4 overflow-hidden">
       {/* Tab sidebar */}
-      <div className="w-48 flex flex-col border-r pr-4">
+      <div className="w-52 flex flex-col border-r pr-4">
         <div className="flex-1 space-y-1 overflow-y-auto minimal-scroll">
-          {dialogueTrees.map((tree, index) => (
+          {dialogueTrees.map((tree, index) => {
+            const hasResponses = (tree.responses || []).length > 0;
+            const isResponseOnly = tree.responseOnly;
+            const isResponseTarget = dialogueTrees.some(t => (t.responses || []).includes(tree.dialogueId));
+            return (
             <button
               key={tree.id}
               type="button"
@@ -63,6 +195,7 @@ const DialogueTreeDialog = ({
                   setDialogueTabToDelete(null);
                 } else {
                   setActiveDialogueTab(index);
+                  setEditingIdIndex(null);
                 }
               }}
               className={`w-full px-3 py-2 text-left text-sm rounded-md transition-colors ${
@@ -82,7 +215,11 @@ const DialogueTreeDialog = ({
                       className="p-0.5 rounded hover:bg-red-500/30"
                       onClick={(e) => {
                         e.stopPropagation();
-                        const newTrees = dialogueTrees.filter((_, i) => i !== index);
+                        const deletedId = dialogueTrees[index].dialogueId;
+                        const newTrees = dialogueTrees.filter((_, i) => i !== index).map(t => ({
+                          ...t,
+                          responses: (t.responses || []).filter(r => r !== deletedId)
+                        }));
                         setDialogueTrees(newTrees);
                         setDialogueTabToDelete(null);
                         if (activeDialogueTab >= newTrees.length) {
@@ -105,10 +242,24 @@ const DialogueTreeDialog = ({
                   </div>
                 </div>
               ) : (
-                <span>Dialogue {index + 1}</span>
+                <div className="flex flex-col gap-0.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate">{tree.topic || `Dialogue ${index + 1}`}</span>
+                    {isResponseOnly && <EyeOff className="w-3 h-3 text-amber-500 shrink-0" />}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {tree.dialogueId && (
+                      <span className="text-[9px] text-muted-foreground/70 font-mono truncate">{tree.dialogueId}</span>
+                    )}
+                    {(hasResponses || isResponseTarget) && (
+                      <Link2 className="w-2.5 h-2.5 text-blue-400 shrink-0 ml-auto" />
+                    )}
+                  </div>
+                </div>
               )}
             </button>
-          ))}
+            );
+          })}
           <Button
             variant="outline"
             size="sm"
@@ -116,7 +267,11 @@ const DialogueTreeDialog = ({
             onClick={() => {
               const newTree: DialogueTree = {
                 id: String(Date.now()),
+                dialogueId: generateDialogueId(),
                 topic: '',
+                group: undefined,
+                responseOnly: false,
+                responses: [],
                 requirements: [],
                 dialogues: [],
                 rewards: [],
@@ -134,60 +289,224 @@ const DialogueTreeDialog = ({
       
       {/* Tab content */}
       <div className="flex-1 overflow-y-auto minimal-scroll pr-2">
-        {dialogueTrees[activeDialogueTab] && (
+        {activeTree && (
           <div className="space-y-4">
-            {/* Topic */}
-            <div>
-              <label className="text-xs text-muted-foreground font-medium">Topic</label>
-              <Input
-                value={dialogueTrees[activeDialogueTab].topic}
-                onChange={(e) => {
-                  const newTrees = [...dialogueTrees];
-                  newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], topic: e.target.value };
-                  setDialogueTrees(newTrees);
-                }}
-                placeholder="Enter dialogue topic..."
-                className="h-8"
-              />
+            {/* ID & Topic row */}
+            <div className="flex gap-3">
+              <div className="flex-1">
+                <div className="flex items-center gap-1">
+                  <label className="text-xs text-muted-foreground font-medium">Topic</label>
+                  <Tooltip content="The name of this dialog topic. Displayed to the player when picking a dialog tree.">
+                    <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                  </Tooltip>
+                </div>
+                <Input
+                  value={activeTree.topic}
+                  onChange={(e) => updateTree(activeDialogueTab, { topic: e.target.value })}
+                  placeholder="Enter dialogue topic..."
+                  className="h-8"
+                />
+              </div>
+              <div className="w-20">
+                <div className="flex items-center gap-1">
+                  <label className="text-xs text-muted-foreground font-medium">Group</label>
+                  <Tooltip content="Dialog group. Dialogs in the same group are selected randomly (only one is shown). Leave empty for no grouping.">
+                    <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                  </Tooltip>
+                </div>
+                <Input
+                  value={activeTree.group || ''}
+                  onChange={(e) => updateTree(activeDialogueTab, { group: e.target.value || undefined })}
+                  placeholder="—"
+                  className="h-8 text-xs"
+                />
+              </div>
+              <div className="w-36">
+                <div className="flex items-center gap-1">
+                  <label className="text-xs text-muted-foreground font-medium flex items-center gap-1">
+                    <Fingerprint className="w-3 h-3" /> ID
+                  </label>
+                  <Tooltip content="A unique identifier used to reference this dialog node. Other nodes can link to it via response connections.">
+                    <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                  </Tooltip>
+                </div>
+                {editingIdIndex === activeDialogueTab ? (
+                  <div className="space-y-1">
+                    {idConfirmShown && (
+                      <div className="text-[10px] text-amber-500 bg-amber-500/10 border border-amber-500/30 rounded px-1.5 py-0.5">
+                        Changing ID will break existing response links. Are you sure?
+                        <div className="flex gap-1 mt-0.5">
+                          <button
+                            type="button"
+                            className="text-[10px] text-emerald-500 hover:underline"
+                            onClick={() => {
+                              const oldId = activeTree.dialogueId;
+                              // Update all trees that reference the old ID
+                              const newTrees = dialogueTrees.map((t, i) => {
+                                if (i === activeDialogueTab) {
+                                  return { ...t, dialogueId: pendingIdValue };
+                                }
+                                return {
+                                  ...t,
+                                  responses: (t.responses || []).map(r => r === oldId ? pendingIdValue : r)
+                                };
+                              });
+                              setDialogueTrees(newTrees);
+                              setEditingIdIndex(null);
+                              setIdConfirmShown(false);
+                            }}
+                          >Yes, update</button>
+                          <button
+                            type="button"
+                            className="text-[10px] text-muted-foreground hover:underline"
+                            onClick={() => { setEditingIdIndex(null); setIdConfirmShown(false); }}
+                          >Cancel</button>
+                        </div>
+                      </div>
+                    )}
+                    <Input
+                      value={pendingIdValue}
+                      onChange={(e) => setPendingIdValue(e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && pendingIdValue.trim()) {
+                          setIdConfirmShown(true);
+                        } else if (e.key === 'Escape') {
+                          setEditingIdIndex(null);
+                          setIdConfirmShown(false);
+                        }
+                      }}
+                      className="h-8 text-xs font-mono"
+                      autoFocus
+                    />
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingIdIndex(activeDialogueTab);
+                      setPendingIdValue(activeTree.dialogueId || '');
+                      setIdConfirmShown(false);
+                    }}
+                    className="h-8 w-full px-2 text-xs font-mono text-left border rounded-md bg-background hover:bg-muted/50 truncate"
+                    title={activeTree.dialogueId || 'No ID'}
+                  >
+                    {activeTree.dialogueId || '—'}
+                  </button>
+                )}
+              </div>
             </div>
+
+            {/* Response Only toggle */}
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={activeTree.responseOnly || false}
+                onCheckedChange={(checked) => updateTree(activeDialogueTab, { responseOnly: checked })}
+                className="scale-75"
+              />
+              <span className="text-xs text-muted-foreground">
+                Response Only
+              </span>
+              <span className="text-[10px] text-muted-foreground/60">
+                — hidden from topic list, only reachable via response link
+              </span>
+            </div>
+
+            {/* Response Links (outgoing) */}
+            <div className="border rounded-md">
+              <button
+                type="button"
+                onClick={() => updateTree(activeDialogueTab, { _respExpanded: !((activeTree as any)._respExpanded) } as any)}
+                className="w-full px-3 py-2 flex items-center gap-2 text-sm font-medium hover:bg-muted/50 rounded-t-md"
+              >
+                <div className="flex items-center gap-2">
+                  <Link2 className="w-4 h-4 text-blue-400" />
+                  <span>Player Responses ({(activeTree.responses || []).filter(Boolean).length})</span>
+                </div>
+                {(activeTree as any)._respExpanded
+                  ? <ChevronUp className="w-4 h-4" />
+                  : <ChevronDown className="w-4 h-4" />}
+              </button>
+              {(activeTree as any)._respExpanded && (
+                <div className="px-3 pb-3 space-y-2">
+                  <p className="text-xs text-muted-foreground">After this dialog text, show these as clickable player choices:</p>
+                  {(activeTree.responses || []).map((respId, respIndex) => (
+                    <div key={respIndex} className="flex gap-2 items-center bg-blue-500/5 border-l-2 border-l-blue-500/50 rounded-md p-2">
+                      <ArrowRight className="w-3 h-3 text-blue-400 shrink-0" />
+                      <select
+                        value={respId}
+                        onChange={(e) => {
+                          const newResponses = [...(activeTree.responses || [])];
+                          newResponses[respIndex] = e.target.value;
+                          updateTree(activeDialogueTab, { responses: newResponses });
+                        }}
+                        className="h-7 px-2 rounded border text-[11px] bg-background cursor-pointer flex-1"
+                      >
+                        <option value="">Select target...</option>
+                        {allDialogueIds
+                          .filter(t => t.index !== activeDialogueTab)
+                          .map(t => (
+                            <option key={t.dialogueId} value={t.dialogueId}>
+                              {t.topic || `Dialogue ${t.index + 1}`} ({t.dialogueId})
+                            </option>
+                          ))}
+                      </select>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0"
+                        onClick={() => {
+                          const newResponses = (activeTree.responses || []).filter((_, i) => i !== respIndex);
+                          updateTree(activeDialogueTab, { responses: newResponses });
+                        }}
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  ))}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 text-xs gap-1"
+                    onClick={() => {
+                      updateTree(activeDialogueTab, { responses: [...(activeTree.responses || []), ''] });
+                    }}
+                  >
+                    <Plus className="w-3 h-3" />
+                    Add Response Link
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            {/* Visual branching arrows */}
+            <BranchingPanel
+              trees={dialogueTrees}
+              activeTab={activeDialogueTab}
+              onNavigate={(idx) => { setActiveDialogueTab(idx); setEditingIdIndex(null); }}
+            />
             
             {/* Requirements - Expandable */}
             <div className="border rounded-md">
               <button
                 type="button"
-                onClick={() => {
-                  const tree = dialogueTrees[activeDialogueTab];
-                  const newTrees = [...dialogueTrees];
-                  newTrees[activeDialogueTab] = {
-                    ...tree,
-                    _reqExpanded: !tree._reqExpanded
-                  };
-                  setDialogueTrees(newTrees);
-                }}
+                onClick={() => updateTree(activeDialogueTab, { _reqExpanded: !activeTree._reqExpanded })}
                 className="w-full px-3 py-2 flex items-center gap-2 text-sm font-medium hover:bg-muted/50 rounded-t-md"
               >
                 <div className="flex items-center gap-2">
                   <Eye className="w-4 h-4 text-blue-400" />
-                  <span>Dialogue is visible when player has ({dialogueTrees[activeDialogueTab].requirements.length})</span>
+                  <span>Visibility Conditions ({activeTree.requirements.length})</span>
                 </div>
-                {dialogueTrees[activeDialogueTab]._reqExpanded 
+                {activeTree._reqExpanded 
                   ? <ChevronUp className="w-4 h-4" /> 
                   : <ChevronDown className="w-4 h-4" />}
               </button>
-              {dialogueTrees[activeDialogueTab]._reqExpanded && (
+              {activeTree._reqExpanded && (
                 <div className="px-3 pb-3 space-y-2">
-                  {dialogueTrees[activeDialogueTab].requirements.length === 0 && (
+                  {activeTree.requirements.length === 0 && (
                     <p className="text-xs text-muted-foreground py-1">Everyone can see this dialogue. Add conditions to restrict it.</p>
                   )}
-                  {dialogueTrees[activeDialogueTab].requirements.map((req, reqIndex) => {
-                    const reqConfig: Record<DialogueRequirement['type'], { icon: React.ReactNode; label: string; placeholder: string; color: string }> = {
-                      status: { icon: <Tag className="w-3.5 h-3.5" />, label: 'Status', placeholder: 'e.g. quest_started', color: 'text-green-400' },
-                      not_status: { icon: <Tag className="w-3.5 h-3.5" />, label: 'Missing Status', placeholder: 'e.g. quest_completed', color: 'text-red-400' },
-                      item: { icon: <Package className="w-3.5 h-3.5" />, label: 'Item', placeholder: 'Item ID (e.g. 1)', color: 'text-yellow-400' },
-                      level: { icon: <Zap className="w-3.5 h-3.5" />, label: 'Min Level', placeholder: 'e.g. 5', color: 'text-cyan-400' },
-                      class: { icon: <User className="w-3.5 h-3.5" />, label: 'Class', placeholder: 'e.g. warrior', color: 'text-purple-400' }
-                    };
-                    const config = reqConfig[req.type];
+                  {activeTree.requirements.map((req, reqIndex) => {
+                    const config = REQ_CONFIG[req.type] || REQ_CONFIG.status;
                     return (
                       <div key={req.id} className="flex gap-2 items-center bg-muted/30 rounded-md p-2">
                         <select
@@ -201,11 +520,26 @@ const DialogueTreeDialog = ({
                           }}
                           className="h-8 px-2 py-1 rounded border text-[11px] bg-background cursor-pointer hover:border-primary/50 transition-colors min-w-[130px]"
                         >
-                          <option value="status">Status</option>
-                          <option value="not_status">Missing Status</option>
-                          <option value="item">Item</option>
-                          <option value="level">Min Level</option>
-                          <option value="class">Class</option>
+                          <optgroup label="Status">
+                            <option value="status">Has Status</option>
+                            <option value="not_status">Missing Status</option>
+                          </optgroup>
+                          <optgroup label="Items">
+                            <option value="item">Has Item</option>
+                            <option value="not_item">Has Not Item</option>
+                          </optgroup>
+                          <optgroup label="Level">
+                            <option value="level">Min Level</option>
+                            <option value="not_level">Max Level</option>
+                          </optgroup>
+                          <optgroup label="Currency">
+                            <option value="currency">Min Currency</option>
+                            <option value="not_currency">Max Currency</option>
+                          </optgroup>
+                          <optgroup label="Class">
+                            <option value="class">Has Class</option>
+                            <option value="not_class">Has Not Class</option>
+                          </optgroup>
                         </select>
                         <Input
                           value={req.value}
@@ -260,71 +594,128 @@ const DialogueTreeDialog = ({
             <div className="border rounded-md">
               <button
                 type="button"
-                onClick={() => {
-                  const tree = dialogueTrees[activeDialogueTab];
-                  const newTrees = [...dialogueTrees];
-                  newTrees[activeDialogueTab] = {
-                    ...tree,
-                    _dlgExpanded: !tree._dlgExpanded
-                  };
-                  setDialogueTrees(newTrees);
-                }}
+                onClick={() => updateTree(activeDialogueTab, { _dlgExpanded: !activeTree._dlgExpanded })}
                 className="w-full px-3 py-2 flex items-center gap-2 text-sm font-medium hover:bg-muted/50 rounded-t-md"
               >
                 <div className="flex items-center gap-2">
                   <AlignLeft className="w-4 h-4 text-blue-400" />
-                  <span>Dialogues ({dialogueTrees[activeDialogueTab].dialogues.length})</span>
+                  <span>Dialogues ({activeTree.dialogues.length})</span>
                 </div>
-                {dialogueTrees[activeDialogueTab]._dlgExpanded 
+                {activeTree._dlgExpanded 
                   ? <ChevronUp className="w-4 h-4" /> 
                   : <ChevronDown className="w-4 h-4" />}
               </button>
-              {dialogueTrees[activeDialogueTab]._dlgExpanded && (
+              {activeTree._dlgExpanded && (
                 <div className="px-3 pb-3 space-y-2">
-                  {dialogueTrees[activeDialogueTab].dialogues.map((dlg, dlgIndex) => (
-                    <div key={dlg.id} className="flex gap-2 items-start">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const newTrees = [...dialogueTrees];
-                          const newDlgs = [...newTrees[activeDialogueTab].dialogues];
-                          newDlgs[dlgIndex] = { ...newDlgs[dlgIndex], speaker: dlg.speaker === 'npc' ? 'player' : 'npc' };
-                          newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], dialogues: newDlgs };
-                          setDialogueTrees(newTrees);
-                        }}
-                        className={`px-2 py-1 rounded text-xs font-medium shrink-0 ${
-                          dlg.speaker === 'npc'
-                            ? 'bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/50'
-                            : 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/50'
-                        }`}
-                      >
-                        {dlg.speaker === 'npc' ? 'NPC' : 'Player'}
-                      </button>
-                      <Input
-                        value={dlg.text}
-                        onChange={(e) => {
-                          const newTrees = [...dialogueTrees];
-                          const newDlgs = [...newTrees[activeDialogueTab].dialogues];
-                          newDlgs[dlgIndex] = { ...newDlgs[dlgIndex], text: e.target.value };
-                          newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], dialogues: newDlgs };
-                          setDialogueTrees(newTrees);
-                        }}
-                        placeholder={dlg.speaker === 'npc' ? 'NPC says...' : 'Player says...'}
-                        className="h-7 text-xs flex-1"
-                      />
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 w-7 p-0 shrink-0"
-                        onClick={() => {
-                          const newTrees = [...dialogueTrees];
-                          const newDlgs = dialogueTrees[activeDialogueTab].dialogues.filter((_, i) => i !== dlgIndex);
-                          newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], dialogues: newDlgs };
-                          setDialogueTrees(newTrees);
-                        }}
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </Button>
+                  {activeTree.dialogues.map((dlg, dlgIndex) => (
+                    <div key={dlg.id} className="space-y-1">
+                      <div className="flex gap-2 items-start">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newTrees = [...dialogueTrees];
+                            const newDlgs = [...newTrees[activeDialogueTab].dialogues];
+                            newDlgs[dlgIndex] = { ...newDlgs[dlgIndex], speaker: dlg.speaker === 'npc' ? 'player' : 'npc' };
+                            newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], dialogues: newDlgs };
+                            setDialogueTrees(newTrees);
+                          }}
+                          className={`px-2 py-1 rounded text-xs font-medium shrink-0 ${
+                            dlg.speaker === 'npc'
+                              ? 'bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/50'
+                              : 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/50'
+                          }`}
+                        >
+                          {dlg.speaker === 'npc' ? 'NPC' : 'Player'}
+                        </button>
+                        <Input
+                          value={dlg.text}
+                          onChange={(e) => {
+                            const newTrees = [...dialogueTrees];
+                            const newDlgs = [...newTrees[activeDialogueTab].dialogues];
+                            newDlgs[dlgIndex] = { ...newDlgs[dlgIndex], text: e.target.value };
+                            newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], dialogues: newDlgs };
+                            setDialogueTrees(newTrees);
+                          }}
+                          placeholder={dlg.speaker === 'npc' ? 'NPC says...' : 'Player says...'}
+                          className="h-7 text-xs flex-1"
+                        />
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 shrink-0"
+                          onClick={() => {
+                            const newTrees = [...dialogueTrees];
+                            const newDlgs = dialogueTrees[activeDialogueTab].dialogues.filter((_, i) => i !== dlgIndex);
+                            newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], dialogues: newDlgs };
+                            setDialogueTrees(newTrees);
+                          }}
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
+                      {/* Optional voice/portrait for this line */}
+                      {(dlg.voice || dlg.portrait) ? (
+                        <div className="flex gap-2 ml-14">
+                          <div className="flex items-center gap-1 flex-1">
+                            <Volume2 className="w-3 h-3 text-muted-foreground shrink-0" />
+                            <Input
+                              value={dlg.voice || ''}
+                              onChange={(e) => {
+                                const newTrees = [...dialogueTrees];
+                                const newDlgs = [...newTrees[activeDialogueTab].dialogues];
+                                newDlgs[dlgIndex] = { ...newDlgs[dlgIndex], voice: e.target.value || undefined };
+                                newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], dialogues: newDlgs };
+                                setDialogueTrees(newTrees);
+                              }}
+                              placeholder="Voice file (e.g. intro.ogg)"
+                              className="h-6 text-[10px] flex-1"
+                            />
+                          </div>
+                          <div className="flex items-center gap-1 flex-1">
+                            <Image className="w-3 h-3 text-muted-foreground shrink-0" />
+                            <Input
+                              value={dlg.portrait || ''}
+                              onChange={(e) => {
+                                const newTrees = [...dialogueTrees];
+                                const newDlgs = [...newTrees[activeDialogueTab].dialogues];
+                                newDlgs[dlgIndex] = { ...newDlgs[dlgIndex], portrait: e.target.value || undefined };
+                                newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], dialogues: newDlgs };
+                                setDialogueTrees(newTrees);
+                              }}
+                              placeholder="Portrait override"
+                              className="h-6 text-[10px] flex-1"
+                            />
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0 shrink-0 text-muted-foreground"
+                            onClick={() => {
+                              const newTrees = [...dialogueTrees];
+                              const newDlgs = [...newTrees[activeDialogueTab].dialogues];
+                              newDlgs[dlgIndex] = { ...newDlgs[dlgIndex], voice: undefined, portrait: undefined };
+                              newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], dialogues: newDlgs };
+                              setDialogueTrees(newTrees);
+                            }}
+                          >
+                            <X className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          className="ml-14 text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+                          onClick={() => {
+                            const newTrees = [...dialogueTrees];
+                            const newDlgs = [...newTrees[activeDialogueTab].dialogues];
+                            newDlgs[dlgIndex] = { ...newDlgs[dlgIndex], voice: '', portrait: '' };
+                            newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], dialogues: newDlgs };
+                            setDialogueTrees(newTrees);
+                          }}
+                        >
+                          + voice / portrait
+                        </button>
+                      )}
                     </div>
                   ))}
                   <div className="flex gap-2">
@@ -371,30 +762,23 @@ const DialogueTreeDialog = ({
             <div className="border rounded-md">
               <button
                 type="button"
-                onClick={() => {
-                  const tree = dialogueTrees[activeDialogueTab];
-                  const newTrees = [...dialogueTrees];
-                  newTrees[activeDialogueTab] = {
-                    ...tree,
-                    _rewExpanded: !tree._rewExpanded
-                  };
-                  setDialogueTrees(newTrees);
-                }}
+                onClick={() => updateTree(activeDialogueTab, { _rewExpanded: !activeTree._rewExpanded })}
                 className="w-full px-3 py-2 flex items-center gap-2 text-sm font-medium hover:bg-muted/50 rounded-t-md"
               >
                 <div className="flex items-center gap-2">
                   <Gift className="w-4 h-4 text-emerald-500" />
-                  <span>Rewards ({dialogueTrees[activeDialogueTab].rewards?.length || 0})</span>
+                  <span>Rewards ({activeTree.rewards?.length || 0})</span>
                 </div>
-                {dialogueTrees[activeDialogueTab]._rewExpanded 
+                {activeTree._rewExpanded 
                   ? <ChevronUp className="w-4 h-4" /> 
                   : <ChevronDown className="w-4 h-4" />}
               </button>
-              {dialogueTrees[activeDialogueTab]._rewExpanded && (
+              {activeTree._rewExpanded && (
                 <div className="px-3 pb-3 space-y-2">
                   <p className="text-xs text-muted-foreground">What does the player gain or lose?</p>
-                  {(dialogueTrees[activeDialogueTab].rewards || []).map((rew, rewIndex) => (
+                  {(activeTree.rewards || []).map((rew, rewIndex) => (
                     <div key={rew.id} className={`flex gap-2 items-center p-2 rounded-md ${
+                      rew.type === 'msg' ? 'bg-sky-500/10 border-l-2 border-l-sky-500/50' :
                       rew.type.includes('remove') ? 'bg-red-500/10 border-l-2 border-l-red-500/50' : 'bg-emerald-500/10 border-l-2 border-l-emerald-500/50'
                     }`}>
                       <select
@@ -414,6 +798,7 @@ const DialogueTreeDialog = ({
                         <option value="remove_gold">Take Gold</option>
                         <option value="remove_item">Take Item</option>
                         <option value="restore">Restore HP/MP</option>
+                        <option value="msg">Notification</option>
                       </select>
                       <Input
                         value={rew.value}
@@ -424,7 +809,12 @@ const DialogueTreeDialog = ({
                           newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], rewards: newRews };
                           setDialogueTrees(newTrees);
                         }}
-                        placeholder={rew.type === 'item' || rew.type === 'remove_item' ? 'Item ID...' : rew.type === 'restore' ? 'hp/mp/all' : 'Amount...'}
+                        placeholder={
+                          rew.type === 'item' || rew.type === 'remove_item' ? 'Item ID...' :
+                          rew.type === 'restore' ? 'hp/mp/all' :
+                          rew.type === 'msg' ? 'e.g. Quest added.' :
+                          'Amount...'
+                        }
                         className="h-7 text-xs flex-1"
                       />
                       {(rew.type === 'item' || rew.type === 'remove_item') && (
@@ -435,12 +825,12 @@ const DialogueTreeDialog = ({
                             min={1}
                             value={rew.quantity || 1}
                             onChange={(e) => {
-                          const newTrees = [...dialogueTrees];
-                          const newRews = [...(newTrees[activeDialogueTab].rewards || [])];
-                          newRews[rewIndex] = { ...newRews[rewIndex], quantity: parseInt(e.target.value, 10) || 1 };
-                          newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], rewards: newRews };
-                          setDialogueTrees(newTrees);
-                        }}
+                              const newTrees = [...dialogueTrees];
+                              const newRews = [...(newTrees[activeDialogueTab].rewards || [])];
+                              newRews[rewIndex] = { ...newRews[rewIndex], quantity: parseInt(e.target.value, 10) || 1 };
+                              newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], rewards: newRews };
+                              setDialogueTrees(newTrees);
+                            }}
                             className="h-7 w-14 text-xs"
                           />
                         </>
@@ -485,30 +875,22 @@ const DialogueTreeDialog = ({
             <div className="border rounded-md">
               <button
                 type="button"
-                onClick={() => {
-                  const tree = dialogueTrees[activeDialogueTab];
-                  const newTrees = [...dialogueTrees];
-                  newTrees[activeDialogueTab] = {
-                    ...tree,
-                    _wfExpanded: !tree._wfExpanded
-                  };
-                  setDialogueTrees(newTrees);
-                }}
+                onClick={() => updateTree(activeDialogueTab, { _wfExpanded: !activeTree._wfExpanded })}
                 className="w-full px-3 py-2 flex items-center gap-2 text-sm font-medium hover:bg-muted/50 rounded-t-md"
               >
                 <div className="flex items-center gap-2">
                   <Zap className="w-4 h-4 text-purple-500" />
-                  <span>World Effects ({dialogueTrees[activeDialogueTab].worldEffects?.length || 0})</span>
+                  <span>World Effects ({activeTree.worldEffects?.length || 0})</span>
                   <span className="text-xs text-muted-foreground">(Advanced)</span>
                 </div>
-                {dialogueTrees[activeDialogueTab]._wfExpanded 
+                {activeTree._wfExpanded 
                   ? <ChevronUp className="w-4 h-4" /> 
                   : <ChevronDown className="w-4 h-4" />}
               </button>
-              {dialogueTrees[activeDialogueTab]._wfExpanded && (
+              {activeTree._wfExpanded && (
                 <div className="px-3 pb-3 space-y-2">
                   <p className="text-xs text-muted-foreground">What happens in the world after this?</p>
-                  {(dialogueTrees[activeDialogueTab].worldEffects || []).map((wf, wfIndex) => (
+                  {(activeTree.worldEffects || []).map((wf, wfIndex) => (
                     <div key={wf.id} className="flex gap-2 items-center p-2 rounded-md bg-purple-500/10 border-l-2 border-l-purple-500/50">
                       <select
                         value={wf.type}
@@ -614,11 +996,21 @@ const DialogueTreeDialog = ({
             // Clean up expanded state before saving, only save valid trees
             const cleanTrees = validTrees.map(tree => ({
               id: tree.id,
+              dialogueId: tree.dialogueId || '',
               topic: tree.topic,
-              requirements: tree.requirements.filter(r => r.value.trim()), // Only save requirements with values
-              dialogues: tree.dialogues.filter(d => d.text.trim()), // Only save dialogues with text
-              rewards: (tree.rewards || []).filter(r => r.value.trim()), // Only save rewards with values
-              worldEffects: (tree.worldEffects || []).filter(w => w.value.trim()) // Only save effects with values
+              group: tree.group || undefined,
+              responseOnly: tree.responseOnly || false,
+              responses: (tree.responses || []).filter(Boolean),
+              requirements: tree.requirements.filter(r => r.value.trim()),
+              dialogues: tree.dialogues.filter(d => d.text.trim()).map(d => ({
+                id: d.id,
+                speaker: d.speaker,
+                text: d.text,
+                ...(d.voice ? { voice: d.voice } : {}),
+                ...(d.portrait ? { portrait: d.portrait } : {}),
+              })),
+              rewards: (tree.rewards || []).filter(r => r.value.trim()),
+              worldEffects: (tree.worldEffects || []).filter(w => w.value.trim())
             }));
             updateEditingObjectProperty('dialogueTrees', JSON.stringify(cleanTrees));
           }
@@ -630,7 +1022,7 @@ const DialogueTreeDialog = ({
     </DialogFooter>
   </DialogContent>
 </Dialog>
-
-);
+  );
+};
 
 export default DialogueTreeDialog;

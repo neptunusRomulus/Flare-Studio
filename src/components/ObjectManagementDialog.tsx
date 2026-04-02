@@ -5,7 +5,6 @@ import { Input } from '@/components/ui/input';
 import Tooltip from '@/components/ui/tooltip';
 import { ArrowUp, ArrowUpRight, ArrowRight, ArrowDownRight, ArrowDown, ArrowDownLeft, ArrowLeft, ArrowUpLeft, Check, Gift, HelpCircle, Image, MessageSquare, Package, Plus, Save, Sparkles, Trash2, User, X } from 'lucide-react';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
-import { DialogueNodeEditor } from '@/components/DialogueNodeEditor';
 import type { DialogueTree, MapObject } from '@/types';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 
@@ -335,32 +334,41 @@ const ObjectManagementDialog = ({
                   <HelpCircle className="w-3 h-3 text-muted-foreground" />
                 </Tooltip>
               </div>
-              <div className="flex gap-1 flex-wrap">
+              <div className="grid grid-cols-3 gap-1 w-[fit-content]">
                 {([
+                  { value: '7', label: 'NW', icon: ArrowUpLeft },
                   { value: '0', label: 'N', icon: ArrowUp },
                   { value: '1', label: 'NE', icon: ArrowUpRight },
-                  { value: '2', label: 'E', icon: ArrowRight },
-                  { value: '3', label: 'SE', icon: ArrowDownRight },
-                  { value: '4', label: 'S', icon: ArrowDown },
-                  { value: '5', label: 'SW', icon: ArrowDownLeft },
                   { value: '6', label: 'W', icon: ArrowLeft },
-                  { value: '7', label: 'NW', icon: ArrowUpLeft },
+                  { value: 'center', label: '', icon: null },
+                  { value: '2', label: 'E', icon: ArrowRight },
+                  { value: '5', label: 'SW', icon: ArrowDownLeft },
+                  { value: '4', label: 'S', icon: ArrowDown },
+                  { value: '3', label: 'SE', icon: ArrowDownRight },
                 ] as const).map(dir => {
-                  const Icon = dir.icon;
+                  if (dir.value === 'center') {
+                    return (
+                      <div key="center" className="flex items-center justify-center w-9 h-9">
+                        <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30" />
+                      </div>
+                    );
+                  }
+                  const Icon = dir.icon!;
                   const isSelected = getEditingObjectProperty('direction', '') === dir.value;
                   return (
                     <button
                       key={dir.value}
                       type="button"
                       onClick={() => updateEditingObjectProperty('direction', isSelected ? null : dir.value)}
-                      className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium transition-colors ${
+                      className={`flex flex-col items-center justify-center w-9 h-9 gap-0.5 rounded text-[9px] font-medium transition-colors ${
                         isSelected
                           ? 'bg-orange-500/20 text-orange-600 dark:text-orange-400 border border-orange-500/50'
                           : 'bg-muted/50 text-muted-foreground border border-transparent hover:bg-muted'
                       }`}
+                      title={dir.label}
                     >
-                      <Icon className="w-3 h-3" />
-                      {dir.label}
+                      <Icon className="w-3.5 h-3.5" />
+                      <span>{dir.label}</span>
                     </button>
                   );
                 })}
@@ -488,87 +496,16 @@ const ObjectManagementDialog = ({
 
         {/* Role-specific compact options */}
         {editingObject.type === 'npc' && editingObject.properties?.talker === 'true' && (
-          <div className="pl-3 border-l-[3px] border-blue-500/80 space-y-3 py-1">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <div className="flex items-center gap-1 mb-1">
-                  <label className="text-xs text-blue-700/80 dark:text-blue-400/80 font-medium">Unique Id</label>
-                  <Tooltip content="A unique identifer used to reference this dialog.">
-                    <HelpCircle className="w-3 h-3 text-muted-foreground" />
-                  </Tooltip>
-                </div>
-                <Input
-                  className="h-7 text-xs border-blue-500/30 bg-blue-500/5"
-                  value={getEditingObjectProperty('unique_id', '')}
-                  onChange={(e) => updateEditingObjectProperty('unique_id', e.target.value)}
-                  placeholder="e.g. intro_dialog"
-                />
-              </div>
-              <div>
-                <div className="flex items-center gap-1 mb-1">
-                  <label className="text-xs text-blue-700/80 dark:text-blue-400/80 font-medium">Topic</label>
-                  <Tooltip content="The name of this dialog topic. Displayed when picking a dialog tree.">
-                    <HelpCircle className="w-3 h-3 text-muted-foreground" />
-                  </Tooltip>
-                </div>
-                <Input
-                  className="h-7 text-xs border-blue-500/30 bg-blue-500/5"
-                  value={getEditingObjectProperty('topic', '')}
-                  onChange={(e) => updateEditingObjectProperty('topic', e.target.value)}
-                  placeholder="e.g. Greetings"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2">
-              <div>
-                <div className="flex items-center gap-1 mb-1">
-                  <label className="text-[10px] text-blue-700/80 dark:text-blue-400/80 font-medium truncate">Group</label>
-                  <Tooltip content="Dialog group.">
-                    <HelpCircle className="w-3 h-3 text-muted-foreground shrink-0" />
-                  </Tooltip>
-                </div>
-                <Input
-                  className="h-7 text-xs border-blue-500/30 bg-blue-500/5"
-                  value={getEditingObjectProperty('group', '')}
-                  onChange={(e) => updateEditingObjectProperty('group', e.target.value)}
-                  placeholder="Group"
-                />
-              </div>
-              <div>
-                <div className="flex items-center gap-1 mb-1">
-                  <label className="text-[10px] text-blue-700/80 dark:text-blue-400/80 font-medium truncate">Movement Lock</label>
-                  <Tooltip content="Restrict the player's movement during dialog.">
-                    <HelpCircle className="w-3 h-3 text-muted-foreground shrink-0" />
-                  </Tooltip>
-                </div>
-                <Input
-                  className="h-7 text-xs border-blue-500/30 bg-blue-500/5"
-                  value={getEditingObjectProperty('movement_lock', '')}
-                  onChange={(e) => updateEditingObjectProperty('movement_lock', e.target.value)}
-                  placeholder="e.g. true"
-                />
-              </div>
-              <div>
-                <div className="flex items-center gap-1 mb-1">
-                  <label className="text-[10px] text-blue-700/80 dark:text-blue-400/80 font-medium truncate">Party</label>
-                  <Tooltip content="Start/stop taking a party with player.">
-                    <HelpCircle className="w-3 h-3 text-muted-foreground shrink-0" />
-                  </Tooltip>
-                </div>
-                <Input
-                  className="h-7 text-xs border-blue-500/30 bg-blue-500/5"
-                  value={getEditingObjectProperty('party', '')}
-                  onChange={(e) => updateEditingObjectProperty('party', e.target.value)}
-                  placeholder="Party action"
-                />
-              </div>
-            </div>
-
-            <DialogueNodeEditor
-              dialogNodesStr={getEditingObjectProperty('dialog_nodes', '')}
-              onChange={(newStr) => updateEditingObjectProperty('dialog_nodes', newStr)}
-            />
+          <div className="pl-3 border-l-[3px] border-blue-500/80 py-1">
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full gap-1.5 border-blue-500/30 text-blue-600 dark:text-blue-400 hover:bg-blue-500/10"
+              onClick={() => setShowDialogueTreeDialog(true)}
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              Open Dialogue Tree Editor
+            </Button>
           </div>
         )}
 
@@ -1029,32 +966,41 @@ const ObjectManagementDialog = ({
                   <HelpCircle className="w-3 h-3 text-muted-foreground" />
                 </Tooltip>
               </div>
-              <div className="flex gap-1 flex-wrap">
+              <div className="grid grid-cols-3 gap-1 w-[fit-content]">
                 {([
+                  { value: '7', label: 'NW', icon: ArrowUpLeft },
                   { value: '0', label: 'N', icon: ArrowUp },
                   { value: '1', label: 'NE', icon: ArrowUpRight },
-                  { value: '2', label: 'E', icon: ArrowRight },
-                  { value: '3', label: 'SE', icon: ArrowDownRight },
-                  { value: '4', label: 'S', icon: ArrowDown },
-                  { value: '5', label: 'SW', icon: ArrowDownLeft },
                   { value: '6', label: 'W', icon: ArrowLeft },
-                  { value: '7', label: 'NW', icon: ArrowUpLeft },
+                  { value: 'center', label: '', icon: null },
+                  { value: '2', label: 'E', icon: ArrowRight },
+                  { value: '5', label: 'SW', icon: ArrowDownLeft },
+                  { value: '4', label: 'S', icon: ArrowDown },
+                  { value: '3', label: 'SE', icon: ArrowDownRight },
                 ] as const).map(dir => {
-                  const Icon = dir.icon;
+                  if (dir.value === 'center') {
+                    return (
+                      <div key="center" className="flex items-center justify-center w-9 h-9">
+                        <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30" />
+                      </div>
+                    );
+                  }
+                  const Icon = dir.icon!;
                   const isSelected = getEditingObjectProperty('spawn_direction', '') === dir.value;
                   return (
                     <button
                       key={dir.value}
                       type="button"
                       onClick={() => updateEditingObjectProperty('spawn_direction', isSelected ? null : dir.value)}
-                      className={`flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium transition-colors ${
+                      className={`flex flex-col items-center justify-center w-9 h-9 gap-0.5 rounded text-[9px] font-medium transition-colors ${
                         isSelected
                           ? 'bg-orange-500/20 text-orange-600 dark:text-orange-400 border border-orange-500/50'
                           : 'bg-muted/50 text-muted-foreground border border-transparent hover:bg-muted'
                       }`}
+                      title={dir.label}
                     >
-                      <Icon className="w-3 h-3" />
-                      {dir.label}
+                      <Icon className="w-3.5 h-3.5" />
+                      <span>{dir.label}</span>
                     </button>
                   );
                 })}

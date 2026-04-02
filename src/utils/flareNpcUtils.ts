@@ -249,9 +249,24 @@ function serializeDialogueTrees(trees: DialogueTree[]): string {
     
     const dialogBlock: string[] = ['[dialog]'];
     
+    // Dialog ID (for response linking)
+    if (tree.dialogueId) {
+      dialogBlock.push(`id=${tree.dialogueId}`);
+    }
+    
+    // Response only flag
+    if (tree.responseOnly) {
+      dialogBlock.push(`response_only=true`);
+    }
+    
     // Topic
     if (tree.topic) {
       dialogBlock.push(`topic=${tree.topic}`);
+    }
+    
+    // Group
+    if (tree.group) {
+      dialogBlock.push(`group=${tree.group}`);
     }
     
     // Requirements
@@ -268,18 +283,46 @@ function serializeDialogueTrees(trees: DialogueTree[]): string {
           // Format: item_id:quantity veya sadece item_id
           dialogBlock.push(`requires_item=${req.value}`);
           break;
+        case 'not_item':
+          dialogBlock.push(`requires_not_item=${req.value}`);
+          break;
         case 'level':
           dialogBlock.push(`requires_level=${req.value}`);
+          break;
+        case 'not_level':
+          dialogBlock.push(`requires_not_level=${req.value}`);
+          break;
+        case 'currency':
+          dialogBlock.push(`requires_currency=${req.value}`);
+          break;
+        case 'not_currency':
+          dialogBlock.push(`requires_not_currency=${req.value}`);
           break;
         case 'class':
           dialogBlock.push(`requires_class=${req.value}`);
           break;
+        case 'not_class':
+          dialogBlock.push(`requires_not_class=${req.value}`);
+          break;
       }
     }
     
-    // Dialogues (him/her/you)
+    // Response links (must precede dialog text per Flare engine)
+    for (const responseId of (tree.responses || [])) {
+      if (responseId) {
+        dialogBlock.push(`response=${responseId}`);
+      }
+    }
+    
+    // Dialogues (him/her/you) with optional voice/portrait
     for (const dlg of tree.dialogues) {
       if (!dlg.text) continue;
+      if (dlg.voice) {
+        dialogBlock.push(`voice=${dlg.voice}`);
+      }
+      if (dlg.portrait) {
+        dialogBlock.push(`portrait=${dlg.portrait}`);
+      }
       if (dlg.speaker === 'npc') {
         // Flare'de him veya her kullanılabilir, varsayılan him
         dialogBlock.push(`him=${dlg.text}`);
@@ -342,6 +385,9 @@ function serializeDialogueTrees(trees: DialogueTree[]): string {
           break;
         case 'restore':
           dialogBlock.push(`restore=${rew.value || 'all'}`);
+          break;
+        case 'msg':
+          dialogBlock.push(`msg=${rew.value}`);
           break;
       }
     }

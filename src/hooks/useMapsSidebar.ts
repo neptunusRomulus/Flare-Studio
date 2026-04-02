@@ -5,23 +5,20 @@ export default function useMapsSidebar(params: any) {
   const exportStatus = { isExporting: p.isExporting, exportProgress: p.exportProgress, isSaving: p.isManuallySaving, saveProgress: p.saveProgress };
 
   const controls = {
-    mapsButtonRef: p.mapsButtonRef,
-    mapsDropdownOpen: p.mapsDropdownOpen,
-    mapsDropdownPos: p.mapsDropdownPos,
-    mapsPortalRef: p.mapsPortalRef,
-    mapsSubOpen: p.mapsSubOpen,
     currentProjectPath: p.currentProjectPath,
-    projectMaps: p.projectMaps,
-    setMapsSubOpen: p.setMapsSubOpen,
-    setMapsDropdownOpen: p.setMapsDropdownOpen,
-    handleOpenCreateMapDialog: p.handleOpenCreateMapDialog,
-    handleOpenMapFromMapsFolder: p.handleOpenMapFromMapsFolder,
+    onSaveAndQuit: p.onSaveAndQuit,
+    onQuit: p.onQuit,
+    onShowProjectFolder: p.onShowProjectFolder,
+    onShowHelp: p.onShowHelp,
+    onSaveAsCopy: p.onSaveAsCopy,
+    onRestart: p.onRestart,
+    onExport: p.onExport,
+    onCheckUpdates: p.onCheckUpdates,
     handleManualSave: p.handleManualSave,
     isManuallySaving: p.isManuallySaving,
     isPreparingNewMap: p.isPreparingNewMap,
     hasUnsavedChanges: p.hasUnsavedChanges,
     setShowSettings: p.setShowSettings,
-    refreshProjectMaps: p.refreshProjectMaps,
     uiHelpers: p.uiHelpers,
     toast: p.toast
   };

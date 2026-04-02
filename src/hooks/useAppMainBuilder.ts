@@ -846,22 +846,41 @@ export default function useAppMainBuilder() {
         },
         isExporting: isExportingValue,
         exportProgress: exportProgressValue,
-        mapsButtonRef,
-        mapsDropdownOpen,
-        mapsDropdownPos,
-        mapsPortalRef,
-        mapsSubOpen,
-        projectMaps: projectMapsList,
-        setMapsSubOpen,
-        setMapsDropdownOpen,
-        setMapsDropdownPos,
-        handleOpenCreateMapDialog: mapConfig.handleOpenCreateMapDialog,
-        handleOpenMapFromMapsFolder: handleOpenMapFromMapsFolderFn,
+        onSaveAndQuit: async () => {
+          if (handleManualSaveFn) await handleManualSaveFn();
+          appState.setShowWelcome(true);
+        },
+        onQuit: () => { appState.setShowWelcome(true); },
+        onShowProjectFolder: () => {
+          if (currentProjectPath) {
+            try { (window as unknown as { electronAPI?: { showItemInFolder?: (p: string) => Promise<boolean> } }).electronAPI?.showItemInFolder?.(currentProjectPath); } catch (e) { console.warn(e); }
+          }
+        },
+        onShowHelp: () => { if (typeof helpState.setShowHelp === 'function') helpState.setShowHelp(true); },
+        onSaveAsCopy: async () => {
+          try {
+            const api = (window as unknown as { electronAPI?: { selectDirectory?: () => Promise<string | null>; copyProject?: (src: string, dest: string) => Promise<{ success: boolean; error?: string }> } }).electronAPI;
+            if (!api?.selectDirectory || !api?.copyProject || !currentProjectPath) return;
+            if (handleManualSaveFn) await handleManualSaveFn();
+            const destPath = await api.selectDirectory();
+            if (!destPath) return;
+            const result = await api.copyProject(currentProjectPath, destPath);
+            if (result.success) {
+              toast({ title: 'Copy complete', description: `Project copied to ${destPath}` });
+            } else {
+              toast({ title: 'Copy failed', description: result.error || 'Unknown error', variant: 'destructive' });
+            }
+          } catch (e) { console.warn('Save as copy failed', e); toast({ title: 'Copy failed', description: String(e), variant: 'destructive' }); }
+        },
+        onRestart: () => {
+          try { (window as unknown as { electronAPI?: { restartApp?: () => void } }).electronAPI?.restartApp?.(); } catch (e) { console.warn(e); }
+        },
+        onExport: () => { toast({ title: 'Export', description: 'Export is not yet available.' }); },
+        onCheckUpdates: () => { toast({ title: 'Updates', description: 'Update checking is not yet available.' }); },
         handleManualSave: handleManualSaveFn,
         isManuallySaving: isManuallySavingValue,
         saveProgress: saveProgressValue,
         isPreparingNewMap: mapConfig.isPreparingNewMap,
-        refreshProjectMaps: refreshProjectMapsFn
       },
       layers: {
         layers: appState.layers,
@@ -1055,24 +1074,24 @@ export default function useAppMainBuilder() {
     const pmForDefaults = projectManager as ProjectManagerView;
     
     const defaultControls = {
-      mapsButtonRef: { current: null } as React.RefObject<HTMLButtonElement>,
-      mapsDropdownOpen: false,
-      mapsDropdownPos: null,
-      mapsPortalRef: { current: null } as React.RefObject<HTMLDivElement>,
-      mapsSubOpen: false,
       currentProjectPath: currentProjectPath,
-      projectMaps: (projectManager as ProjectManagerView)?.projectMaps ?? [] as string[],
-      setMapsSubOpen: setMapsSubOpen,
-      setMapsDropdownOpen: setMapsDropdownOpen,
-      setMapsDropdownPos: setMapsDropdownPos,
-      handleOpenCreateMapDialog: () => { if (typeof mapConfig.setShowCreateMapDialog === 'function') mapConfig.setShowCreateMapDialog(true); },
-      handleOpenMapFromMapsFolder: async (filename?: string) => { try { if (pmForDefaults?.handleOpenMapFromMapsFolder && currentProjectPath && filename) await pmForDefaults.handleOpenMapFromMapsFolder(filename); } catch (e) { console.warn(e); } },
+      onSaveAndQuit: async () => { if (pmForDefaults?.handleManualSave) await pmForDefaults.handleManualSave(); appState.setShowWelcome(true); },
+      onQuit: () => { appState.setShowWelcome(true); },
+      onShowProjectFolder: () => {
+        if (currentProjectPath) {
+          try { (window as unknown as { electronAPI?: { showItemInFolder?: (p: string) => Promise<boolean> } }).electronAPI?.showItemInFolder?.(currentProjectPath); } catch (e) { console.warn(e); }
+        }
+      },
+      onShowHelp: () => { if (typeof helpState.setShowHelp === 'function') helpState.setShowHelp(true); },
+      onSaveAsCopy: async () => {},
+      onRestart: () => { try { (window as unknown as { electronAPI?: { restartApp?: () => void } }).electronAPI?.restartApp?.(); } catch (e) { console.warn(e); } },
+      onExport: () => {},
+      onCheckUpdates: () => {},
       handleManualSave: async () => { if (pmForDefaults?.handleManualSave) await pmForDefaults.handleManualSave(); },
       isManuallySaving: false,
       isPreparingNewMap: false,
       hasUnsavedChanges: false,
       setShowSettings: setShowSettings,
-      refreshProjectMaps: async () => { if (pmForDefaults?.refreshProjectMaps) await pmForDefaults.refreshProjectMaps(); },
       uiHelpers: undefined,
       toast: undefined
     } as unknown as Record<string, unknown>;

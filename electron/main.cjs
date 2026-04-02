@@ -3,6 +3,7 @@
   BrowserWindow,
   Menu,
   dialog,
+  shell,
   ipcMain: ipcMainLocal,
 } = require("electron");
 const path = require("path");
@@ -1192,6 +1193,53 @@ ipcMainLocal.handle("check-project-exists", async (event, projectPath) => {
   } catch (e) {
     console.warn("check-project-exists failed for", projectPath, e);
     return false;
+  }
+});
+
+// Show a folder in the system file explorer
+ipcMainLocal.handle("show-item-in-folder", async (_event, folderPath) => {
+  try {
+    if (!folderPath) return false;
+    if (!fs.existsSync(folderPath)) return false;
+    shell.openPath(folderPath);
+    return true;
+  } catch (e) {
+    console.warn("show-item-in-folder failed:", e);
+    return false;
+  }
+});
+
+// Restart the application
+ipcMainLocal.on("restart-app", () => {
+  app.relaunch();
+  app.exit(0);
+});
+
+// Copy entire project folder to a new location
+ipcMainLocal.handle("copy-project", async (_event, sourcePath, destPath) => {
+  try {
+    if (!sourcePath || !destPath) return { success: false, error: "Invalid paths" };
+    if (!fs.existsSync(sourcePath)) return { success: false, error: "Source project not found" };
+
+    const copyDirRecursive = (src, dest) => {
+      fs.mkdirSync(dest, { recursive: true });
+      const entries = fs.readdirSync(src, { withFileTypes: true });
+      for (const entry of entries) {
+        const srcPath = path.join(src, entry.name);
+        const destEntryPath = path.join(dest, entry.name);
+        if (entry.isDirectory()) {
+          copyDirRecursive(srcPath, destEntryPath);
+        } else {
+          fs.copyFileSync(srcPath, destEntryPath);
+        }
+      }
+    };
+
+    copyDirRecursive(sourcePath, destPath);
+    return { success: true };
+  } catch (e) {
+    console.warn("copy-project failed:", e);
+    return { success: false, error: String(e.message || e) };
   }
 });
 

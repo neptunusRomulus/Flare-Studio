@@ -201,6 +201,15 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
       } else {
         setEditingObject(obj);
         setShowObjectDialog(true);
+        // New NPC has no dialogue trees yet
+        try {
+          const stored = obj.properties?.dialogueTrees;
+          setDialogueTrees(stored ? JSON.parse(stored) : []);
+        } catch {
+          setDialogueTrees([]);
+        }
+        setActiveDialogueTab(0);
+        setDialogueTabToDelete(null);
       }
     }
 
@@ -230,6 +239,15 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
 
     setEditingObject(obj);
     setShowObjectDialog(true);
+    // Load dialogue trees from the object's properties
+    try {
+      const stored = obj.properties?.dialogueTrees;
+      setDialogueTrees(stored ? JSON.parse(stored) : []);
+    } catch {
+      setDialogueTrees([]);
+    }
+    setActiveDialogueTab(0);
+    setDialogueTabToDelete(null);
   }, [createTabFor, editor, mapObjects, switchToTab]);
 
   const handleUpdateObject = useCallback((updatedObject: MapObject) => {
@@ -259,6 +277,11 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
     setObjectValidationErrors([]);
     setShowDeleteNpcConfirm(false);
     setShowDeleteEnemyConfirm(false);
+    // Reset dialogue tree state so it doesn't leak to the next NPC
+    setDialogueTrees([]);
+    setActiveDialogueTab(0);
+    setDialogueTabToDelete(null);
+    setShowDialogueTreeDialog(false);
   }, []);
 
   const handleObjectDialogSave = useCallback(async () => {

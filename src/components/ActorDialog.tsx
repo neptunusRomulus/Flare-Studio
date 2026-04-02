@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Tooltip from '@/components/ui/tooltip';
-import { Edit2, Image, Save, User, X } from 'lucide-react';
+import { Edit2, MapPin, Save, X } from 'lucide-react';
 import { ENEMY_ROLE_OPTIONS, NPC_ROLE_OPTIONS } from '@/editor/actorRoles';
 import type { ActorDialogState, ActorRoleKey } from '@/editor/actorRoles';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
@@ -11,24 +11,18 @@ import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 type ActorDialogProps = {
   actorDialogState: ActorDialogState | null;
   actorDialogError: string | null;
-  canUseTilesetDialog: boolean;
   onClose: () => void;
-  onFieldChange: (key: 'name' | 'tilesetPath' | 'portraitPath', value: string) => void;
+  onFieldChange: (key: 'name' | 'tilesetPath' | 'portraitPath' | 'locationX' | 'locationY', value: string) => void;
   onRoleToggle: (role: ActorRoleKey) => void;
-  onTilesetBrowse: () => void;
-  onPortraitBrowse: () => void;
   onSubmit: (openEditor: boolean) => void;
 };
 
 const ActorDialog = ({
   actorDialogState,
   actorDialogError,
-  canUseTilesetDialog,
   onClose,
   onFieldChange,
   onRoleToggle,
-  onTilesetBrowse,
-  onPortraitBrowse,
   onSubmit
 }: ActorDialogProps) => {
   const {
@@ -142,53 +136,30 @@ const ActorDialog = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">Tileset Location</label>
+            <label className="flex items-center gap-1 text-sm font-medium mb-1">
+              <MapPin className="w-3.5 h-3.5" /> Location Coordinates
+            </label>
             <div className="flex gap-2">
-              <Input
-                className="flex-1"
-                value={actorDialogState.tilesetPath}
-                onChange={(event) => onFieldChange('tilesetPath', event.target.value)}
-                placeholder="npcs/merchant.png (optional)"
-                readOnly={canUseTilesetDialog}
-                onClick={canUseTilesetDialog ? onTilesetBrowse : undefined}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-10 px-3 gap-2"
-                onClick={onTilesetBrowse}
-                disabled={!canUseTilesetDialog}
-              >
-                <Image className="w-4 h-4" />
-                <span>Browse</span>
-              </Button>
+              <div className="flex-1">
+                <label className="block text-xs text-muted-foreground mb-0.5">X</label>
+                <Input
+                  type="number"
+                  value={actorDialogState.locationX}
+                  onChange={(event) => onFieldChange('locationX', event.target.value)}
+                  placeholder="0"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="block text-xs text-muted-foreground mb-0.5">Y</label>
+                <Input
+                  type="number"
+                  value={actorDialogState.locationY}
+                  onChange={(event) => onFieldChange('locationY', event.target.value)}
+                  placeholder="0"
+                />
+              </div>
             </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Portrait Location</label>
-            <div className="flex gap-2">
-              <Input
-                className="flex-1"
-                value={actorDialogState.portraitPath}
-                onChange={(event) => onFieldChange('portraitPath', event.target.value)}
-                placeholder="portraits/merchant.png (optional)"
-                readOnly={canUseTilesetDialog}
-                onClick={canUseTilesetDialog ? onPortraitBrowse : undefined}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-10 px-3 gap-2"
-                onClick={onPortraitBrowse}
-                disabled={!canUseTilesetDialog}
-              >
-                <User className="w-4 h-4" />
-                <span>Browse</span>
-              </Button>
-            </div>
+            <p className="text-xs text-muted-foreground mt-1">Map tile coordinates where the actor will be placed.</p>
           </div>
 
           {actorDialogError && (

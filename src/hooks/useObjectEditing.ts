@@ -21,7 +21,7 @@ type UseObjectEditingOptions = {
 };
 
 const useObjectEditing = (opts?: UseObjectEditingOptions) => {
-  const { editor = null, syncMapObjects, createTabFor, switchToTab, handleEditObject: externalHandleEditObject } = opts || {};
+  const { editor = null, syncMapObjects, createTabFor, switchToTab } = opts || {};
 
   const [showObjectDialog, setShowObjectDialog] = useState(false);
   const [editingObject, setEditingObject] = useState<MapObject | null>(null);
@@ -42,6 +42,8 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
       name: '',
       tilesetPath: '',
       portraitPath: '',
+      locationX: 0,
+      locationY: 0,
       ...EMPTY_ACTOR_ROLES,
       ...(type === 'npc'
         ? { isTalker: true }
@@ -55,8 +57,14 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
     setActorDialogError(null);
   }, []);
 
-  const handleActorFieldChange = useCallback((field: 'name' | 'tilesetPath' | 'portraitPath', value: string) => {
-    setActorDialogState((prev) => (prev ? { ...prev, [field]: value } : prev));
+  const handleActorFieldChange = useCallback((field: 'name' | 'tilesetPath' | 'portraitPath' | 'locationX' | 'locationY', value: string) => {
+    setActorDialogState((prev) => {
+      if (!prev) return prev;
+      if (field === 'locationX' || field === 'locationY') {
+        return { ...prev, [field]: parseInt(value, 10) || 0 };
+      }
+      return { ...prev, [field]: value };
+    });
     setActorDialogError(null);
   }, []);
 
@@ -118,19 +126,19 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
       }
     }
 
-    // Create a new unplaced object
-    const unplacedX = -1;
-    const unplacedY = -1;
+    // Use location from dialog state
+    const actorX = actorDialogState.locationX ?? 0;
+    const actorY = actorDialogState.locationY ?? 0;
 
     let newObject: MapObject | null = null;
     try {
       if (editor && typeof editor.addMapObject === 'function') {
-        newObject = editor.addMapObject('enemy', unplacedX, unplacedY, 1, 1);
+        newObject = editor.addMapObject('enemy', actorX, actorY, 1, 1);
         if (newObject && typeof editor.updateMapObject === 'function') {
           editor.updateMapObject(newObject.id, {
             name,
-            x: unplacedX,
-            y: unplacedY,
+            x: actorX,
+            y: actorY,
             type: actorDialogState.type,
             category: actorDialogState.type === 'npc' ? 'npc' : '',
             wander_radius: 0,
@@ -149,8 +157,8 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
           id,
           name,
           type: actorDialogState.type,
-          x: unplacedX,
-          y: unplacedY,
+          x: actorX,
+          y: actorY,
           width: 1,
           height: 1,
           properties: {
@@ -180,8 +188,19 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
 
     handleCloseActorDialog();
     if (editAfter && newObject) {
-      if (typeof externalHandleEditObject === 'function') {
-        externalHandleEditObject(newObject.id);
+      // Open the edit dialog for the newly created actor
+      const objects = editor && typeof editor.getMapObjects === 'function' ? editor.getMapObjects() : [...mapObjects, newObject];
+      const obj = objects?.find(o => o.id === newObject.id) || newObject;
+      if (obj.type === 'enemy' && typeof createTabFor === 'function') {
+        try {
+          const tab = createTabFor(obj.name || 'Enemy', null, { enemy: obj });
+          if (tab && typeof switchToTab === 'function') void switchToTab(tab.id);
+        } catch (err) {
+          console.warn('Failed to create tab for enemy edit:', err);
+        }
+      } else {
+        setEditingObject(obj);
+        setShowObjectDialog(true);
       }
     }
 
@@ -190,7 +209,7 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
     } catch (e) {
       console.warn('triggerAutoSave failed', e);
     }
-  }, [actorDialogState, editor, syncMapObjects, externalHandleEditObject, handleCloseActorDialog]);
+  }, [actorDialogState, editor, syncMapObjects, createTabFor, switchToTab, mapObjects, handleCloseActorDialog]);
 
   const handleEditObject = useCallback((objectId: number) => {
     // If an editor instance is available use it to find the object

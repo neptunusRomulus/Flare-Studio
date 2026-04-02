@@ -7,6 +7,8 @@ type ActorDialogState = {
   name: string;
   tilesetPath: string;
   portraitPath: string;
+  locationX: number;
+  locationY: number;
 } & Record<ActorRoleKey, boolean>;
 
 const NPC_ROLE_OPTIONS: Array<{ key: NpcRoleKey; label: string; badgeClass: string; description: string }> = [

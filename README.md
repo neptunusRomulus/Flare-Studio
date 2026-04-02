@@ -29,7 +29,17 @@ Flare studio is a graphical user interface for Flare Engine which aims to improv
 
 ## Screenshots;
 
-**Coming Soon**...
+<img width="1420" height="914" alt="image" src="https://github.com/user-attachments/assets/6d12e8ef-6094-44cf-8db7-32012daf4ddd" />
+<img width="639" height="791" alt="image" src="https://github.com/user-attachments/assets/f8554f7d-0e1c-44ed-9b7d-3b55826fc87c" />
+<img width="1068" height="396" alt="image" src="https://github.com/user-attachments/assets/ccbeb7ff-5b8f-4be3-b617-ffffa323bf8c" />
+<img width="249" height="557" alt="image" src="https://github.com/user-attachments/assets/8265f49d-19dc-4d65-b9f4-cdee421ae463" />
+<img width="231" height="275" alt="image" src="https://github.com/user-attachments/assets/28f6a285-897a-4941-954a-c8c0716290c1" />
+<img width="846" height="652" alt="image" src="https://github.com/user-attachments/assets/ecf955ff-73d7-442e-a5f8-8aa07dd80e13" />
+<img width="639" height="791" alt="image" src="https://github.com/user-attachments/assets/26be3878-0255-4d37-bc6d-fcd57ebb3ec6" />
+<img width="419" height="530" alt="image" src="https://github.com/user-attachments/assets/37ae2498-f7da-4125-8987-316b6eb5d2c5" />
+<img width="342" height="472" alt="image" src="https://github.com/user-attachments/assets/b5327990-006e-4b4d-a6e0-194fa77149fd" />
+<img width="457" height="409" alt="image" src="https://github.com/user-attachments/assets/3304c7ae-3793-4c32-9ff1-d13f0f663dd9" />
+
 
 ## Video
 
@@ -67,11 +77,12 @@ Coming Soon...
 - [ ] 14- Translations/localization editor
 - [ ] 15- Particles
 - [ ] 16- **You name it. I will check on it. Promise.**
-  
+
 
 
 ## Development
-
+ [**Development Logs** ](https://github.com/neptunusRomulus/Flare-Studio/discussions).
+ 
 Warning! This software developed by a non-programmer person with AI assistants. So, because of that the codebase is probably like hell... However, If you still want to work on it; 
 Run this single commands to start development after cloning the repo;
 

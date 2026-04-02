@@ -1,29 +1,25 @@
-import React from 'react';
+import React, { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import Tooltip from '@/components/ui/tooltip';
-import MapsDropdown from '@/components/MapsDropdown';
+import MainMenuDialog from '@/components/MainMenuDialog';
 import { Menu, Save, Settings } from 'lucide-react';
 
 type Props = {
-  mapsButtonRef: React.RefObject<HTMLButtonElement>;
-  mapsDropdownOpen: boolean;
-  mapsDropdownPos: { left: number; top: number } | null;
-  mapsPortalRef: React.RefObject<HTMLDivElement>;
-  mapsSubOpen: boolean;
   currentProjectPath: string | null;
-  projectMaps: string[];
-  setMapsSubOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  setMapsDropdownOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  setMapsDropdownPos: React.Dispatch<React.SetStateAction<{ left: number; top: number } | null>>;
-  handleOpenCreateMapDialog: () => void;
-  handleOpenMap: (path: string) => Promise<void>;
+  onSaveAndQuit: () => Promise<void>;
+  onQuit: () => void;
+  onShowProjectFolder: () => void;
+  onShowHelp: () => void;
+  onSaveAsCopy: () => Promise<void>;
+  onRestart: () => void;
+  onExport: () => void;
+  onCheckUpdates: () => void;
   toast: typeof import('@/hooks/use-toast').toast;
   handleManualSave: () => void;
   isManuallySaving: boolean;
   isPreparingNewMap: boolean;
   hasUnsavedChanges: boolean;
   setShowSettings: (v: boolean) => void;
-  refreshProjectMaps: () => Promise<void>;
   uiHelpers?: {
     showTooltipWithDelay: (text: React.ReactNode, target: HTMLElement) => void;
     hideTooltip: () => void;
@@ -31,72 +27,60 @@ type Props = {
 };
 
 const AppControls: React.FC<Props> = ({
-  mapsButtonRef,
-  mapsDropdownOpen,
-  mapsDropdownPos,
-  mapsPortalRef,
-  mapsSubOpen,
   currentProjectPath,
-  projectMaps,
-  setMapsSubOpen,
-  setMapsDropdownOpen,
-  setMapsDropdownPos,
-  handleOpenCreateMapDialog,
-  handleOpenMap,
-  toast,
+  onSaveAndQuit,
+  onQuit,
+  onShowProjectFolder,
+  onShowHelp,
+  onSaveAsCopy,
+  onRestart,
+  onExport,
+  onCheckUpdates,
   handleManualSave,
   isManuallySaving,
   isPreparingNewMap,
   hasUnsavedChanges,
   setShowSettings,
-  refreshProjectMaps
-  ,
   uiHelpers: _uiHelpers
 }) => {
   void _uiHelpers;
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState<{ left: number; top: number } | null>(null);
+
   return (
     <div className="flex items-center gap-2">
       <div>
         <Button
-          ref={mapsButtonRef}
+          ref={btnRef}
           size="sm"
           className="w-7 h-7 p-0 shadow-sm"
-          onClick={async () => {
-            if (!mapsDropdownOpen) await refreshProjectMaps();
-            try {
-              const btn = mapsButtonRef?.current;
-              if (!btn) {
-                setMapsDropdownOpen((s) => !s);
-                return;
-              }
+          onClick={() => {
+            const btn = btnRef.current;
+            if (btn) {
               const rect = btn.getBoundingClientRect();
-              // set position above the button
-              setMapsDropdownPos({ left: rect.left, top: rect.top - 8 });
-            } catch (e) {
-              console.warn('Failed to compute maps dropdown position', e);
+              setMenuPos({ left: rect.left, top: rect.top - 8 });
             }
-            setMapsDropdownOpen((s) => !s);
+            setMenuOpen((s) => !s);
           }}
-          disabled={false}
         >
           <Menu className="w-3 h-3" />
         </Button>
 
-        {mapsDropdownOpen && mapsDropdownPos && (
-          <MapsDropdown
-            mapsDropdownOpen={mapsDropdownOpen}
-            mapsDropdownPos={mapsDropdownPos}
-            mapsPortalRef={mapsPortalRef}
-            mapsSubOpen={mapsSubOpen}
-            currentProjectPath={currentProjectPath}
-            projectMaps={projectMaps}
-            setMapsSubOpen={setMapsSubOpen}
-            setMapsDropdownOpen={setMapsDropdownOpen}
-            handleOpenCreateMapDialog={handleOpenCreateMapDialog}
-            handleOpenMap={handleOpenMap}
-            toast={toast}
-          />
-        )}
+        <MainMenuDialog
+          open={menuOpen}
+          anchorPos={menuPos}
+          onClose={() => setMenuOpen(false)}
+          currentProjectPath={currentProjectPath}
+          onSaveAndQuit={async () => { await onSaveAndQuit(); setMenuOpen(false); }}
+          onQuit={() => { onQuit(); setMenuOpen(false); }}
+          onShowProjectFolder={() => { onShowProjectFolder(); setMenuOpen(false); }}
+          onShowHelp={() => { onShowHelp(); setMenuOpen(false); }}
+          onSaveAsCopy={async () => { await onSaveAsCopy(); setMenuOpen(false); }}
+          onRestart={onRestart}
+          onExport={() => { onExport(); setMenuOpen(false); }}
+          onCheckUpdates={() => { onCheckUpdates(); setMenuOpen(false); }}
+        />
       </div>
 
       <Tooltip content={hasUnsavedChanges ? 'Unsaved changes — click to save (Ctrl+S)' : 'All changes saved'}>

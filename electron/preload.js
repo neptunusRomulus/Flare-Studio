@@ -96,6 +96,14 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on("menu-undo", (_e) => callback && callback()),
   onMenuRedo: (callback) =>
     ipcRenderer.on("menu-redo", (_e) => callback && callback()),
+  // Show folder in system file explorer
+  showItemInFolder: (folderPath) =>
+    ipcRenderer.invoke("show-item-in-folder", folderPath),
+  // Restart the application
+  restartApp: () => ipcRenderer.send("restart-app"),
+  // Copy project to a new folder
+  copyProject: (sourcePath, destPath) =>
+    ipcRenderer.invoke("copy-project", sourcePath, destPath),
   // Graceful shutdown handlers
   onAppBeforeQuit: (callback) =>
     ipcRenderer.on("app-before-quit", () => callback && callback()),

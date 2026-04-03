@@ -2096,16 +2096,263 @@ ipcMainLocal.handle("delete-item-file", async (event, filePath) => {
 });
 
 // Launch Flare engine with optional arguments
-const { spawn: spawnProcess } = require("child_process");
-
-// Default Flare engine path — can be overridden via settings
-const DEFAULT_FLARE_EXE = "D:\\Flare\\flare.exe";
-const DEFAULT_FLARE_DIR = "D:\\Flare";
+const { spawn: spawnProcess, execSync: execSyncProcess } = require("child_process");
 
 let activeFlareProcess = null;
+// Track junctions we created so we can clean them up on exit
+const createdJunctions = new Set();
+
+// --- Select flare.exe via native file dialog ---
+ipcMainLocal.handle("select-flare-exe", async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: "Locate flare.exe",
+    properties: ["openFile"],
+    filters: [
+      { name: "Flare Engine", extensions: ["exe"] },
+      { name: "All Files", extensions: ["*"] },
+    ],
+  });
+  if (!result.canceled && result.filePaths.length > 0) {
+    return result.filePaths[0];
+  }
+  return null;
+});
+
+// --- Ensure project is accessible as a Flare mod (junction if needed) ---
+ipcMainLocal.handle("ensure-flare-mod-link", async (_event, { flarePath, projectPath }) => {
+  try {
+    const flareDir = path.dirname(flarePath);
+    const modsDir = path.join(flareDir, "mods");
+    const projectName = path.basename(projectPath);
+    const linkPath = path.join(modsDir, projectName);
+
+    // Normalise for comparison
+    const normalProjectPath = path.resolve(projectPath).toLowerCase();
+    const normalModsDir = path.resolve(modsDir).toLowerCase();
+
+    // If the project is already inside the mods folder, no junction needed
+    if (normalProjectPath.startsWith(normalModsDir + path.sep) || normalProjectPath === normalModsDir) {
+      console.log("[FlareEngine] Project is already inside mods folder, no junction needed");
+      return { success: true, modName: projectName, junctionCreated: false };
+    }
+
+    // Ensure the mods directory exists
+    if (!fs.existsSync(modsDir)) {
+      fs.mkdirSync(modsDir, { recursive: true });
+    }
+
+    // Check if the link already exists and points to the right place
+    if (fs.existsSync(linkPath)) {
+      try {
+        const existingTarget = fs.realpathSync(linkPath);
+        if (path.resolve(existingTarget).toLowerCase() === normalProjectPath) {
+          console.log("[FlareEngine] Junction already exists and points to correct project");
+          return { success: true, modName: projectName, junctionCreated: false };
+        }
+      } catch {
+        // If realpathSync fails, the link might be broken — remove and recreate
+      }
+      // Remove stale link/dir so we can recreate
+      try {
+        fs.rmSync(linkPath, { recursive: true, force: true });
+      } catch (rmErr) {
+        return { success: false, error: `Cannot remove stale link at ${linkPath}: ${rmErr.message}` };
+      }
+    }
+
+    // Create a directory junction (no admin privileges needed on Windows)
+    try {
+      // Use mklink /J on Windows for a directory junction (no elevation required)
+      if (process.platform === "win32") {
+        execSyncProcess(`mklink /J "${linkPath}" "${path.resolve(projectPath)}"`, { stdio: "ignore" });
+      } else {
+        fs.symlinkSync(path.resolve(projectPath), linkPath, "dir");
+      }
+      createdJunctions.add(linkPath);
+      console.log(`[FlareEngine] Created junction: ${linkPath} -> ${projectPath}`);
+      return { success: true, modName: projectName, junctionCreated: true };
+    } catch (linkErr) {
+      console.error("[FlareEngine] Failed to create junction:", linkErr);
+      return { success: false, error: `Failed to create mod link: ${linkErr.message}` };
+    }
+  } catch (err) {
+    console.error("[FlareEngine] ensure-flare-mod-link error:", err);
+    return { success: false, error: err.message };
+  }
+});
+
+// --- Prepare quick-launch files (spawn.txt, gameplay.txt, save slot) ---
+ipcMainLocal.handle("prepare-flare-quick-launch", async (_event, { flarePath, projectPath, mapName, mode }) => {
+  try {
+    const projectName = path.basename(projectPath);
+    const mapsDir = path.join(projectPath, "maps");
+    const engineDir = path.join(projectPath, "engine");
+
+    // 1. Ensure engine/gameplay.txt has enable_playgame=1
+    if (!fs.existsSync(engineDir)) {
+      fs.mkdirSync(engineDir, { recursive: true });
+    }
+    const gameplayPath = path.join(engineDir, "gameplay.txt");
+    fs.writeFileSync(gameplayPath, "enable_playgame=1\n", "utf8");
+    console.log("[FlareEngine] Wrote engine/gameplay.txt");
+
+    // 2. Read the project's existing spawn.txt to get hero_pos
+    let heroX = 2;
+    let heroY = 2;
+    const existingSpawnPath = path.join(mapsDir, "spawn.txt");
+    if (fs.existsSync(existingSpawnPath)) {
+      try {
+        const spawnContent = fs.readFileSync(existingSpawnPath, "utf8");
+        // Parse hero_pos=X,Y from the existing spawn.txt
+        const heroPosMatch = spawnContent.match(/hero_pos\s*=\s*(\d+)\s*,\s*(\d+)/);
+        if (heroPosMatch) {
+          heroX = parseInt(heroPosMatch[1], 10);
+          heroY = parseInt(heroPosMatch[2], 10);
+          console.log(`[FlareEngine] Found hero_pos from spawn.txt: ${heroX},${heroY}`);
+        }
+        // Also try to get the intermap destination coords if hero_pos is 0,0
+        if (heroX === 0 && heroY === 0) {
+          const intermapMatch = spawnContent.match(/intermap\s*=\s*[^,]+\s*,\s*(\d+)\s*,\s*(\d+)/);
+          if (intermapMatch) {
+            heroX = parseInt(intermapMatch[1], 10);
+            heroY = parseInt(intermapMatch[2], 10);
+            console.log(`[FlareEngine] Using intermap coords as hero_pos: ${heroX},${heroY}`);
+          }
+        }
+      } catch (e) {
+        console.warn("[FlareEngine] Could not parse existing spawn.txt:", e);
+      }
+    }
+
+    // Determine the target map file path for each mode
+    let targetMap;
+    if (mode === "current-map" && mapName) {
+      targetMap = `maps/${mapName}.txt`;
+    } else {
+      // new-game: try to find the original intermap target from spawn.txt
+      targetMap = null;
+      if (fs.existsSync(existingSpawnPath)) {
+        try {
+          const spawnContent = fs.readFileSync(existingSpawnPath, "utf8");
+          const intermapMatch = spawnContent.match(/intermap\s*=\s*([^,\s]+)/);
+          if (intermapMatch) {
+            targetMap = intermapMatch[1].trim();
+          }
+        } catch { /* ignore */ }
+      }
+      if (!targetMap && mapName) {
+        targetMap = `maps/${mapName}.txt`;
+      }
+    }
+
+    if (!targetMap) {
+      return { success: false, error: "No map available to launch" };
+    }
+
+    // 3. Write a temporary spawn.txt that teleports directly to the target map
+    //    This is the Flare "dummy map" format — 1x1 tile map with on_load intermap event
+    if (!fs.existsSync(mapsDir)) {
+      fs.mkdirSync(mapsDir, { recursive: true });
+    }
+    const spawnTxt = [
+      "# Auto-generated by Flare Studio for quick play testing",
+      "",
+      "[header]",
+      "width=1",
+      "height=1",
+      "hero_pos=0,0",
+      "",
+      "[event]",
+      "type=event",
+      "location=0,0,1,1",
+      "activate=on_load",
+      `intermap=${targetMap},${heroX},${heroY}`,
+      "",
+    ].join("\n");
+
+    // Back up the original spawn.txt if it exists and wasn't already backed up
+    const spawnBackupPath = path.join(mapsDir, "spawn.txt.bak");
+    if (fs.existsSync(existingSpawnPath) && !fs.existsSync(spawnBackupPath)) {
+      fs.copyFileSync(existingSpawnPath, spawnBackupPath);
+      console.log("[FlareEngine] Backed up original spawn.txt");
+    }
+    fs.writeFileSync(existingSpawnPath, spawnTxt, "utf8");
+    console.log(`[FlareEngine] Wrote quick-launch spawn.txt -> ${targetMap},${heroX},${heroY}`);
+
+    // 4. Create a minimal save slot in Flare's user config directory
+    //    Save location: %APPDATA%/flare/userdata/saves/{modName}/{slotNum}/avatar.txt
+    const flareConfigDir = path.join(process.env.APPDATA || "", "flare");
+    const savesBaseDir = path.join(flareConfigDir, "userdata", "saves", projectName);
+
+    // Find first empty slot (start at 1, increment until we find an empty one)
+    let slotNum = 1;
+    const MAX_SLOT = 100;
+    while (slotNum <= MAX_SLOT) {
+      const slotDir = path.join(savesBaseDir, String(slotNum));
+      const avatarFile = path.join(slotDir, "avatar.txt");
+      if (!fs.existsSync(avatarFile)) {
+        break; // empty slot found
+      }
+      // Check if this is our own quick-launch save (marked with a comment)
+      try {
+        const content = fs.readFileSync(avatarFile, "utf8");
+        if (content.includes("# flare-studio-quick-launch")) {
+          break; // reuse our own slot
+        }
+      } catch { /* ignore */ }
+      slotNum++;
+    }
+    if (slotNum > MAX_SLOT) {
+      return { success: false, error: "No empty save slot available (checked 1-100)" };
+    }
+
+    const slotDir = path.join(savesBaseDir, String(slotNum));
+    if (!fs.existsSync(slotDir)) {
+      fs.mkdirSync(slotDir, { recursive: true });
+    }
+
+    const avatarTxt = [
+      "## flare-engine save file ##",
+      "# flare-studio-quick-launch",
+      "name=Hero",
+      `spawn=${targetMap},${heroX},${heroY}`,
+      "",
+    ].join("\n");
+
+    fs.writeFileSync(path.join(slotDir, "avatar.txt"), avatarTxt, "utf8");
+    console.log(`[FlareEngine] Wrote quick-launch save to slot ${slotNum}`);
+
+    return { success: true, slotNum };
+  } catch (err) {
+    console.error("[FlareEngine] prepare-flare-quick-launch error:", err);
+    return { success: false, error: err.message };
+  }
+});
+
+// --- Restore original spawn.txt after Flare exits ---
+ipcMainLocal.handle("restore-spawn-backup", async (_event, { projectPath }) => {
+  try {
+    const mapsDir = path.join(projectPath, "maps");
+    const spawnPath = path.join(mapsDir, "spawn.txt");
+    const backupPath = path.join(mapsDir, "spawn.txt.bak");
+    if (fs.existsSync(backupPath)) {
+      fs.copyFileSync(backupPath, spawnPath);
+      fs.unlinkSync(backupPath);
+      console.log("[FlareEngine] Restored original spawn.txt from backup");
+      return true;
+    }
+    return false;
+  } catch (err) {
+    console.error("[FlareEngine] restore-spawn-backup error:", err);
+    return false;
+  }
+});
 
 ipcMainLocal.handle("launch-flare-engine", async (_event, options) => {
-  const flarePath = options.flarePath || DEFAULT_FLARE_EXE;
+  const flarePath = options.flarePath;
+  if (!flarePath) {
+    return { success: false, error: "Flare engine path not configured. Please set the path to flare.exe first." };
+  }
   const flareDir = path.dirname(flarePath);
 
   // Validate the exe path exists

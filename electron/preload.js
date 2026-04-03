@@ -110,6 +110,14 @@ contextBridge.exposeInMainWorld("electronAPI", {
   appShutdownComplete: () =>
     ipcRenderer.send("app-shutdown-complete"),
   // Flare engine launcher
+  selectFlareExe: () =>
+    ipcRenderer.invoke("select-flare-exe"),
+  ensureFlareModLink: (options) =>
+    ipcRenderer.invoke("ensure-flare-mod-link", options),
+  prepareFlareQuickLaunch: (options) =>
+    ipcRenderer.invoke("prepare-flare-quick-launch", options),
+  restoreSpawnBackup: (options) =>
+    ipcRenderer.invoke("restore-spawn-backup", options),
   launchFlareEngine: (options) =>
     ipcRenderer.invoke("launch-flare-engine", options),
   isFlareRunning: () =>

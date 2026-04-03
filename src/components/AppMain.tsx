@@ -185,9 +185,11 @@ export default function AppMain() {
       lastError: flareEngine.lastError,
       hasProject: !!controls?.currentProjectPath,
       hasMap,
+      flarePath: flareEngine.flarePath,
       onLaunch: flareEngine.launch,
+      onConfigurePath: flareEngine.configureFlarePath,
     },
-  }), [titleBarProps, flareEngine.isRunning, flareEngine.lastError, flareEngine.launch, controls?.currentProjectPath, hasMap]);
+  }), [titleBarProps, flareEngine.isRunning, flareEngine.lastError, flareEngine.launch, flareEngine.flarePath, flareEngine.configureFlarePath, controls?.currentProjectPath, hasMap]);
 
   if (showWelcome) {
     return (

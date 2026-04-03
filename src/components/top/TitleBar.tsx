@@ -30,7 +30,9 @@ type TitleBarProps = {
     lastError: string | null;
     hasProject: boolean;
     hasMap: boolean;
+    flarePath: string | null;
     onLaunch: (mode: FlareLaunchMode) => void;
+    onConfigurePath: () => void;
   };
 };
 
@@ -101,7 +103,9 @@ const TitleBar = ({
           lastError={flareEngine.lastError}
           hasProject={flareEngine.hasProject}
           hasMap={flareEngine.hasMap}
+          flarePath={flareEngine.flarePath}
           onLaunch={flareEngine.onLaunch}
+          onConfigurePath={flareEngine.onConfigurePath}
         />
       )}
       <WindowControls onMinimize={onMinimize} onMaximize={onMaximize} onClose={onClose} />

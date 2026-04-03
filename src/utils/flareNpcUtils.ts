@@ -103,7 +103,7 @@ function serializeMapSpawnBlock(npc: FlareNPC): string {
  * vendor=true
  * constant_stock=1,2,3,4
  */
-function serializeNpcFile(npc: FlareNPC): string {
+export function serializeNpcFile(npc: FlareNPC): string {
   const lines: string[] = [];
   
   // Temel bilgiler
@@ -442,6 +442,7 @@ export function parseNpcFile(
         npc.name = value;
         break;
       case 'gfx':
+      case 'animations':
         npc.gfx = value;
         break;
       case 'portrait':

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type React from 'react';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
+import type { FlareNPC } from '@/types';
+import { serializeNpcFile } from '@/utils/flareNpcUtils';
 import { useSaveQueue } from '@/context/SaveQueueContext';
 import { useRetryStrategy } from '@/context/RetryStrategyContext';
 import { useConflictResolution } from '@/context/ConflictResolutionContext';
@@ -8,6 +10,84 @@ import useAtomicSave from './useAtomicSave';
 import useSaveSequencing from './useSaveSequencing';
 import useSaveErrorNotification from './useSaveErrorNotification';
 import useFileConflictDetection from './useFileConflictDetection';
+
+// Helper to safely get file stats from Electron
+const getFileStatsSafe = async (path: string) => {
+  const api = (window as any)?.electronAPI;
+  if (api && typeof api.getFileStats === 'function') {
+    try {
+      return await api.getFileStats(path);
+    } catch (err) {
+      console.warn('[ManualSave] Failed to get file stats:', err);
+    }
+  }
+  return null;
+};
+
+/**
+ * Load an image from an absolute file path via Electron and return its dimensions.
+ * Returns { width, height } or null if the image could not be loaded.
+ */
+const getImageDimensions = (sourcePath: string): Promise<{ width: number; height: number } | null> => {
+  const api = (window as any)?.electronAPI;
+  if (!api || typeof api.readFileAsDataURL !== 'function') return Promise.resolve(null);
+  return api.readFileAsDataURL(sourcePath).then((dataUrl: string | null) => {
+    if (!dataUrl) return null;
+    return new Promise<{ width: number; height: number } | null>((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+      img.onerror = () => resolve(null);
+      img.src = dataUrl;
+    });
+  }).catch(() => null);
+};
+
+/**
+ * Build Flare animation definition file content with a proper [stance] section.
+ * If dimensions are available, computes render_size / render_offset and frame data.
+ */
+const buildAnimationFileContent = (
+  imageRelativePath: string,
+  dims: { width: number; height: number } | null
+): string => {
+  const lines: string[] = [`image=${imageRelativePath}`];
+  lines.push('');
+
+  if (dims && dims.width > 0 && dims.height > 0) {
+    const w = dims.width;
+    const h = dims.height;
+    // Heuristic: if the width is a multiple of the height, treat it as a horizontal sprite strip
+    const frameW = h > 0 && w > h && w % h === 0 ? h : w;
+    const frameH = h;
+    const frameCount = Math.max(1, Math.floor(w / frameW));
+    const offsetX = Math.floor(frameW / 2);
+    const offsetY = frameH - 2; // anchor near the feet
+
+    lines.push(`render_size=${frameW},${frameH}`);
+    lines.push(`render_offset=${offsetX},${offsetY}`);
+    lines.push('');
+    lines.push('[stance]');
+    lines.push(`frames=${frameCount}`);
+    lines.push('position=0');
+    lines.push(`duration=${frameCount > 1 ? '1200ms' : '1s'}`);
+    lines.push('type=looped');
+
+    // If we have 1 frame, emit explicit frame= line; for multi-frame strips Flare
+    // auto-slices when render_size is present, so no per-frame lines are needed.
+    if (frameCount === 1) {
+      lines.push(`frame=0,0,0,0,${frameW},${frameH},${offsetX},${offsetY}`);
+    }
+  } else {
+    // Fallback: minimal [stance] so the NPC is not invisible
+    lines.push('[stance]');
+    lines.push('frames=1');
+    lines.push('duration=1s');
+    lines.push('type=looped');
+  }
+
+  lines.push('');
+  return lines.join('\n');
+};
 
 export default function useManualSave(args: {
   editor?: TileMapEditor | null;
@@ -244,9 +324,176 @@ export default function useManualSave(args: {
               } catch (err) {
                 console.warn('[ManualSave][TXT] Failed to collect tileset images:', err);
               }
+              // Collect NPC files
+              const npcFiles: Array<{ filename: string; content: string }> = [];
+              const portraitFiles: Array<{ sourcePath: string; destFilename: string }> = [];
+              const npcTilesetImages: Array<{ sourcePath: string; destFilename: string }> = [];
+              const npcAnimationFiles: Array<{ filename: string; content: string }> = [];
+              try {
+                const allObjects = editor.getMapObjects();
+                const npcObjects = allObjects.filter(obj => obj.type === 'npc');
+                for (const npc of npcObjects) {
+                  const npcName = npc.name || `npc_${npc.id}`;
+                  const sanitizedName = npcName
+                    .toLowerCase()
+                    .replace(/[<>:"/\\|?*]/g, '_')
+                    .trim()
+                    .replace(/\s+/g, '_')
+                    .replace(/_{2,}/g, '_') || 'unnamed_npc';
+
+                  // Resolve portrait: if we have the original source path, compute the
+                  // relative Flare path and queue the file for copying into the project.
+                  let portraitRelative: string | undefined;
+                  const portraitSource = npc.properties?.portraitSourcePath || '';
+                  if (portraitSource) {
+                    // Extract just the filename from the absolute path
+                    const portraitFilename = portraitSource.replace(/\\/g, '/').split('/').pop() || '';
+                    if (portraitFilename) {
+                      portraitRelative = `images/portraits/${portraitFilename}`;
+                      // Check if the original source still exists; if not, fall back to the
+                      // already-exported copy inside the project folder.
+                      let resolvedPortraitSource = portraitSource;
+                      try {
+                        const api = (window as unknown as { electronAPI?: { fileExists?: (p: string) => Promise<boolean> } }).electronAPI;
+                        if (api?.fileExists && currentProjectPath) {
+                          const sourceExists = await api.fileExists(portraitSource);
+                          if (!sourceExists) {
+                            const projectCopy = `${currentProjectPath.replace(/\\/g, '/')}/images/portraits/${portraitFilename}`;
+                            const copyExists = await api.fileExists(projectCopy);
+                            if (copyExists) {
+                              resolvedPortraitSource = projectCopy;
+                              console.log(`[ManualSave][TXT] Portrait source gone, using project copy: ${projectCopy}`);
+                            } else {
+                              console.warn(`[ManualSave][TXT] Portrait source not found: ${portraitSource} (project copy also missing)`);
+                            }
+                          }
+                        }
+                      } catch { /* ignore */ }
+                      portraitFiles.push({ sourcePath: resolvedPortraitSource, destFilename: portraitFilename });
+                    }
+                  }
+                  // Fallback: if portrait was already a relative path (not a data URL), keep it
+                  if (!portraitRelative && npc.properties?.portraitPath) {
+                    const pp = npc.properties.portraitPath;
+                    if (!pp.startsWith('data:')) {
+                      portraitRelative = pp;
+                    }
+                  }
+
+                  // Resolve tileset/animation: if we have the original source path,
+                  // copy the image to images/npcs/ and create an animation definition
+                  // file at animations/npcs/<npcname>.txt that references it.
+                  let gfxRelative: string | undefined;
+                  const tilesetSource = npc.properties?.tilesetSourcePath || '';
+                  if (tilesetSource) {
+                    const tilesetFilename = tilesetSource.replace(/\\/g, '/').split('/').pop() || '';
+                    if (tilesetFilename) {
+                      // The NPC .txt will point to the animation definition file
+                      gfxRelative = `animations/npcs/${sanitizedName}.txt`;
+
+                      // Check if the original source still exists; if not, fall back to the
+                      // already-exported copy inside the project folder (Fix #4 / #5).
+                      let resolvedTilesetSource = tilesetSource;
+                      try {
+                        const api = (window as unknown as { electronAPI?: { fileExists?: (p: string) => Promise<boolean> } }).electronAPI;
+                        if (api?.fileExists && currentProjectPath) {
+                          const sourceExists = await api.fileExists(tilesetSource);
+                          if (!sourceExists) {
+                            const projectCopy = `${currentProjectPath.replace(/\\/g, '/')}/images/npcs/${tilesetFilename}`;
+                            const copyExists = await api.fileExists(projectCopy);
+                            if (copyExists) {
+                              resolvedTilesetSource = projectCopy;
+                              console.log(`[ManualSave][TXT] Tileset source gone, using project copy: ${projectCopy}`);
+                            } else {
+                              console.warn(`[ManualSave][TXT] ⚠ NPC "${npcName}" sprite source not found: ${tilesetSource} (project copy also missing). NPC may be invisible in-game.`);
+                            }
+                          }
+                        }
+                      } catch { /* ignore */ }
+
+                      // Queue the image to be copied into images/npcs/
+                      npcTilesetImages.push({ sourcePath: resolvedTilesetSource, destFilename: tilesetFilename });
+                      // Get image dimensions to build a proper [stance] animation file
+                      let dims: { width: number; height: number } | null = null;
+                      try {
+                        dims = await getImageDimensions(resolvedTilesetSource);
+                      } catch (e) {
+                        console.warn('[ManualSave][TXT] Failed to get NPC sprite dimensions:', e);
+                      }
+                      // Create the animation definition file content with [stance]
+                      npcAnimationFiles.push({
+                        filename: `${sanitizedName}.txt`,
+                        content: buildAnimationFileContent(`images/npcs/${tilesetFilename}`, dims)
+                      });
+                    }
+                  }
+                  // Fallback: if gfx was already a relative path, keep it.
+                  // Also accept absolute paths if the file was already exported to images/npcs/
+                  if (!gfxRelative && npc.properties?.tilesetPath) {
+                    const tp = npc.properties.tilesetPath;
+                    if (!tp.startsWith('data:') && !tp.includes(':')) {
+                      gfxRelative = tp;
+                    } else if (tp.includes(':') && !tp.startsWith('data:') && currentProjectPath) {
+                      // Absolute path left from a previous session — extract filename and
+                      // build the Flare-relative animation path if a project copy exists.
+                      const fn = tp.replace(/\\/g, '/').split('/').pop() || '';
+                      if (fn) {
+                        gfxRelative = `animations/npcs/${sanitizedName}.txt`;
+                        console.warn(`[ManualSave][TXT] ⚠ NPC "${npcName}" tileset was an absolute path (${tp}). Using relative fallback: ${gfxRelative}`);
+                      }
+                    }
+                  }
+
+                  const flareNpc: FlareNPC = {
+                    id: npc.id,
+                    x: npc.x,
+                    y: npc.y,
+                    filename: npc.properties?.npcFilename || `npcs/${sanitizedName}.txt`,
+                    name: npcName,
+                    talker: npc.properties?.talker === 'true' || npc.properties?.vendor === 'true' || npc.properties?.questGiver === 'true',
+                    vendor: npc.properties?.vendor === 'true',
+                    gfx: gfxRelative || undefined,
+                    portrait: portraitRelative || undefined,
+                    constant_stock: npc.properties?.constant_stock || undefined,
+                    random_stock: npc.properties?.random_stock || undefined,
+                    random_stock_count: npc.properties?.random_stock_count ? parseInt(npc.properties.random_stock_count, 10) : undefined,
+                    vendor_requires_status: npc.properties?.vendor_requires_status || undefined,
+                    vendor_requires_not_status: npc.properties?.vendor_requires_not_status || undefined,
+                    direction: npc.properties?.direction ? parseInt(npc.properties.direction, 10) as FlareNPC['direction'] : undefined,
+                    waypoints: npc.properties?.waypoints || undefined,
+                    wander_radius: npc.properties?.wander_radius ? parseInt(npc.properties.wander_radius, 10) : undefined,
+                    customProperties: {
+                      ...(npc.properties?.dialogueTrees ? { dialogueTrees: npc.properties.dialogueTrees } : {}),
+                      ...(npc.properties?.status_stock_entries ? { status_stock_entries: npc.properties.status_stock_entries } : {}),
+                    },
+                  };
+
+                  npcFiles.push({ filename: `${sanitizedName}.txt`, content: serializeNpcFile(flareNpc) });
+
+                  // Warn when an NPC has no sprite — it will be invisible in Flare
+                  if (!flareNpc.gfx) {
+                    console.warn(`[ManualSave][TXT] ⚠ NPC "${npcName}" has no sprite/animation assigned — it will be invisible in the Flare engine. Assign a tileset image in the NPC edit dialog.`);
+                  }
+                }
+                if (npcFiles.length > 0) {
+                  console.log(`[ManualSave][TXT] Collected ${npcFiles.length} NPC files for export`);
+                }
+                if (portraitFiles.length > 0) {
+                  console.log(`[ManualSave][TXT] Collected ${portraitFiles.length} portrait files for copying`);
+                }
+                if (npcTilesetImages.length > 0) {
+                  console.log(`[ManualSave][TXT] Collected ${npcTilesetImages.length} NPC tileset images for copying`);
+                }
+                if (npcAnimationFiles.length > 0) {
+                  console.log(`[ManualSave][TXT] Collected ${npcAnimationFiles.length} NPC animation definition files`);
+                }
+              } catch (npcErr) {
+                console.warn('[ManualSave][TXT] Failed to collect NPC files:', npcErr);
+              }
+
               console.log('[ManualSave][TXT] Generated mapTxt length:', mapTxt.length, '| tilesetDef length:', tilesetDef.length);
               console.log('[ManualSave][TXT] Calling saveExportFiles — path:', projectPath, '| mapName:', mapName);
-              const ok = await electronAPI.saveExportFiles(projectPath, mapName, mapTxt, tilesetDef, { tilesetImages });
+              const ok = await electronAPI.saveExportFiles(projectPath, mapName, mapTxt, tilesetDef, { tilesetImages, npcFiles, portraitFiles, npcTilesetImages, npcAnimationFiles });
               if (ok) {
                 console.log('[ManualSave][TXT] ✓ Flare .txt saved to', projectPath + '/maps/' + mapName + '.txt');
               } else {

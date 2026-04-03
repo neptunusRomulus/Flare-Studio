@@ -11,6 +11,8 @@ export default function useEditingBrowseHandlers(args: { updateEditingObjectProp
     try {
       const selected = await window.electronAPI.selectTilesetFile();
       if (selected) {
+        // Store the original absolute path so we can copy the image on save
+        updateEditingObjectProperty('tilesetSourcePath', selected);
         updateEditingObjectProperty('tilesetPath', selected);
       }
     } catch (error) {
@@ -27,6 +29,8 @@ export default function useEditingBrowseHandlers(args: { updateEditingObjectProp
     try {
       const selected = await window.electronAPI.selectTilesetFile();
       if (selected) {
+        // Store the original absolute path so we can copy the file on save
+        updateEditingObjectProperty('portraitSourcePath', selected);
         if (window.electronAPI.readFileAsDataURL) {
           const dataUrl = await window.electronAPI.readFileAsDataURL(selected);
           if (dataUrl) {

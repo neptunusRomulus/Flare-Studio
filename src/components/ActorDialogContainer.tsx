@@ -6,7 +6,7 @@ type ActorDialogCtx = {
   actorDialogState: ActorDialogState | null;
   actorDialogError?: string | null;
   handleCloseActorDialog: () => void;
-  handleActorFieldChange: (field: 'name' | 'tilesetPath' | 'portraitPath' | 'locationX' | 'locationY', value: string) => void;
+  handleActorFieldChange: (field: 'name' | 'tilesetPath' | 'tilesetSourcePath' | 'portraitPath' | 'portraitSourcePath' | 'locationX' | 'locationY', value: string) => void;
   handleActorRoleToggle: (role: ActorRoleKey) => void;
   handleActorSubmit: (editAfter?: boolean) => Promise<void> | void;
 };

@@ -694,7 +694,7 @@ export class TileMapEditor {
   private ctx!: CanvasRenderingContext2D;
   private mapCanvas: HTMLCanvasElement;
   private showMinimap: boolean = true;
-  private minimapMode: 'orthogonal' | 'isometric' = 'orthogonal';
+  private minimapMode: 'orthogonal' | 'isometric' = 'isometric';
   private isDarkMode: boolean = false;
   private debugMode: boolean = false;
 
@@ -9512,6 +9512,41 @@ export class TileMapEditor {
 
       for (const [key, value] of Object.entries(enemy.properties)) {
         lines.push(`${key}=${value}`);
+      }
+
+      lines.push('');
+    }
+
+    const npcs = this.objects.filter(obj => obj.type === 'npc');
+    for (const npc of npcs) {
+      lines.push(`[npc]`);
+      lines.push(`type=npc`);
+      lines.push(`location=${npc.x},${npc.y},${npc.width},${npc.height}`);
+
+      const npcFilename = npc.properties?.npcFilename;
+      if (npcFilename) {
+        lines.push(`filename=${npcFilename}`);
+      } else {
+        const sanitized = (npc.name || `npc_${npc.id}`)
+          .toLowerCase()
+          .replace(/[<>:"/\\|?*]/g, '_')
+          .trim()
+          .replace(/\s+/g, '_')
+          .replace(/_{2,}/g, '_') || 'unnamed_npc';
+        lines.push(`filename=npcs/${sanitized}.txt`);
+      }
+
+      const conditionKeys = [
+        'requires_status', 'requires_not_status',
+        'requires_level', 'requires_not_level',
+        'requires_currency', 'requires_not_currency',
+        'requires_item', 'requires_not_item',
+        'requires_class', 'requires_not_class',
+      ];
+      for (const key of conditionKeys) {
+        if (npc.properties?.[key]) {
+          lines.push(`${key}=${npc.properties[key]}`);
+        }
       }
 
       lines.push('');

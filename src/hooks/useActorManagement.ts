@@ -25,7 +25,7 @@ export default function useActorManagement({
   handleEditObject,
   syncMapObjects
 }: Params) {
-  const handleActorFieldChange = useCallback((field: 'name' | 'tilesetPath' | 'portraitPath' | 'locationX' | 'locationY', value: string) => {
+  const handleActorFieldChange = useCallback((field: 'name' | 'tilesetPath' | 'tilesetSourcePath' | 'portraitPath' | 'portraitSourcePath' | 'locationX' | 'locationY', value: string) => {
     setActorDialogState((prev) => {
       if (!prev) return prev;
       if (field === 'locationX' || field === 'locationY') {
@@ -58,7 +58,9 @@ export default function useActorManagement({
 
     const name = actorDialogState.name.trim();
     const tilesetPath = actorDialogState.tilesetPath.trim();
+    const tilesetSourcePath = actorDialogState.tilesetSourcePath?.trim() || '';
     const portraitPath = actorDialogState.portraitPath.trim();
+    const portraitSourcePath = actorDialogState.portraitSourcePath?.trim() || '';
     const {
       isTalker,
       isVendor,
@@ -124,7 +126,7 @@ export default function useActorManagement({
       spawnY = candidate;
     }
 
-    const newObject: MapObject = editor.addMapObject('enemy', spawnX, spawnY, 1, 1);
+    const newObject: MapObject = editor.addMapObject(actorDialogState.type as 'npc' | 'enemy', spawnX, spawnY, 1, 1);
     editor.updateMapObject(newObject.id, {
       name,
       x: spawnX,
@@ -136,7 +138,9 @@ export default function useActorManagement({
         ...(newObject.properties || {}),
         ...roleProperties,
         ...(tilesetPath ? { tilesetPath } : {}),
+        ...(tilesetSourcePath ? { tilesetSourcePath } : {}),
         ...(portraitPath ? { portraitPath } : {}),
+        ...(portraitSourcePath ? { portraitSourcePath } : {}),
         ...(npcFilename ? { npcFilename: `npcs/${npcFilename}` } : {}),
       }
     });

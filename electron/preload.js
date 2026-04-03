@@ -109,4 +109,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on("app-before-quit", () => callback && callback()),
   appShutdownComplete: () =>
     ipcRenderer.send("app-shutdown-complete"),
+  // Flare engine launcher
+  launchFlareEngine: (options) =>
+    ipcRenderer.invoke("launch-flare-engine", options),
+  isFlareRunning: () =>
+    ipcRenderer.invoke("is-flare-running"),
+  onFlareEngineExited: (callback) =>
+    ipcRenderer.on("flare-engine-exited", () => callback && callback()),
 });

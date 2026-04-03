@@ -108,6 +108,16 @@ declare global {
       // Graceful shutdown handlers
       onAppBeforeQuit: (callback: () => void) => void;
       appShutdownComplete: () => void;
+      // Flare engine launcher
+      launchFlareEngine: (options: {
+        flarePath?: string;
+        dataPath?: string;
+        mods?: string[];
+        loadSlot?: string;
+        loadScript?: string;
+      }) => Promise<{ success: boolean; pid?: number; error?: string }>;
+      isFlareRunning: () => Promise<boolean>;
+      onFlareEngineExited: (callback: () => void) => void;
     };
   }
 }

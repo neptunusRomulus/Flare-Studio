@@ -16,6 +16,7 @@ import DialogsContainer from '@/components/DialogsContainer';
 import SessionRecoveryDialog from '@/components/SessionRecoveryDialog';
 import useCrashRecovery from '@/hooks/useCrashRecovery';
 import useManualSaveSetup from '@/hooks/useManualSaveSetup';
+import useFlareEngine from '@/hooks/useFlareEngine';
 
 export default function AppMain() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -168,6 +169,26 @@ export default function AppMain() {
 
   const hasMap = canvasCtx.mapInitialized;
 
+  // Flare engine launcher
+  const flareEngineSave = useCallback(async () => { await handleManualSave(); }, [handleManualSave]);
+  const flareEngine = useFlareEngine({
+    currentProjectPath: controls?.currentProjectPath ?? null,
+    mapName: mapName ?? null,
+    onBeforeLaunch: flareEngineSave,
+  });
+
+  // Merge flare engine state into titleBarProps
+  const enhancedTitleBarProps = useMemo(() => ({
+    ...titleBarProps,
+    flareEngine: {
+      isRunning: flareEngine.isRunning,
+      lastError: flareEngine.lastError,
+      hasProject: !!controls?.currentProjectPath,
+      hasMap,
+      onLaunch: flareEngine.launch,
+    },
+  }), [titleBarProps, flareEngine.isRunning, flareEngine.lastError, flareEngine.launch, controls?.currentProjectPath, hasMap]);
+
   if (showWelcome) {
     return (
       <WelcomeScreen
@@ -181,7 +202,7 @@ export default function AppMain() {
   return (
     <div className="h-screen bg-background text-foreground flex flex-col overflow-hidden">
       <AppShell
-        titleBarProps={titleBarProps}
+        titleBarProps={enhancedTitleBarProps}
         sidebarToggleProps={{ show: showSidebarToggle && hasMap, leftCollapsed, onToggle: handleSidebarToggle }}
       />
 

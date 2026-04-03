@@ -2,6 +2,8 @@ import React from 'react';
 // removed unused Button import
 import EditorTabs from '@/components/EditorTabs';
 import WindowControls from '@/components/WindowControls';
+import PlayButton from '@/components/PlayButton';
+import type { FlareLaunchMode } from '@/hooks/useFlareEngine';
 
 type TabEntry = {
   id: string;
@@ -22,6 +24,14 @@ type TitleBarProps = {
   onMaximize: () => void;
   onClose: () => void;
   flareIconUrl?: string | null;
+  // Flare engine play button
+  flareEngine?: {
+    isRunning: boolean;
+    lastError: string | null;
+    hasProject: boolean;
+    hasMap: boolean;
+    onLaunch: (mode: FlareLaunchMode) => void;
+  };
 };
 
 const TitleBar = ({
@@ -36,7 +46,8 @@ const TitleBar = ({
   onMinimize,
   onMaximize,
   onClose,
-  flareIconUrl
+  flareIconUrl,
+  flareEngine
 }: TitleBarProps) => (
   <div className="bg-gray-100 dark:bg-neutral-900 text-orange-600 dark:text-orange-400 flex justify-between items-center px-4 py-1 select-none drag-region border-b border-gray-200 dark:border-neutral-700 min-h-0">
     <div className="flex items-center gap-3 min-w-0 flex-shrink-0">
@@ -83,7 +94,18 @@ const TitleBar = ({
         />
       </div>
     </div>
-    <WindowControls onMinimize={onMinimize} onMaximize={onMaximize} onClose={onClose} />
+    <div className="flex items-center gap-2">
+      {flareEngine && (
+        <PlayButton
+          isRunning={flareEngine.isRunning}
+          lastError={flareEngine.lastError}
+          hasProject={flareEngine.hasProject}
+          hasMap={flareEngine.hasMap}
+          onLaunch={flareEngine.onLaunch}
+        />
+      )}
+      <WindowControls onMinimize={onMinimize} onMaximize={onMaximize} onClose={onClose} />
+    </div>
   </div>
 );
 

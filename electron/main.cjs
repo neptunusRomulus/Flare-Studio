@@ -2095,6 +2095,89 @@ ipcMainLocal.handle("delete-item-file", async (event, filePath) => {
   }
 });
 
+// Launch Flare engine with optional arguments
+const { spawn: spawnProcess } = require("child_process");
+
+// Default Flare engine path — can be overridden via settings
+const DEFAULT_FLARE_EXE = "D:\\Flare\\flare.exe";
+const DEFAULT_FLARE_DIR = "D:\\Flare";
+
+let activeFlareProcess = null;
+
+ipcMainLocal.handle("launch-flare-engine", async (_event, options) => {
+  const flarePath = options.flarePath || DEFAULT_FLARE_EXE;
+  const flareDir = path.dirname(flarePath);
+
+  // Validate the exe path exists
+  if (!fs.existsSync(flarePath)) {
+    return { success: false, error: `Flare executable not found: ${flarePath}` };
+  }
+
+  // If a Flare instance is already running, report it
+  if (activeFlareProcess && !activeFlareProcess.killed) {
+    try {
+      process.kill(activeFlareProcess.pid, 0); // check if alive
+      return { success: false, error: "Flare engine is already running. Close it first." };
+    } catch {
+      activeFlareProcess = null; // process already exited
+    }
+  }
+
+  const args = [];
+
+  if (options.dataPath) {
+    args.push("--data-path=" + options.dataPath);
+  }
+  if (options.mods && options.mods.length > 0) {
+    args.push("--mods=" + options.mods.join(","));
+  }
+  if (options.loadSlot) {
+    args.push("--load-slot=" + options.loadSlot);
+  }
+  if (options.loadScript) {
+    args.push("--load-script=" + options.loadScript);
+  }
+
+  try {
+    console.log("[FlareEngine] Launching:", flarePath, args.join(" "), "cwd:", flareDir);
+    const child = spawnProcess(flarePath, args, {
+      cwd: flareDir,
+      detached: true,
+      stdio: "ignore",
+    });
+    child.unref();
+    activeFlareProcess = child;
+
+    child.on("exit", () => {
+      activeFlareProcess = null;
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send("flare-engine-exited");
+      }
+    });
+
+    child.on("error", (err) => {
+      console.error("[FlareEngine] Process error:", err);
+      activeFlareProcess = null;
+    });
+
+    return { success: true, pid: child.pid };
+  } catch (err) {
+    console.error("[FlareEngine] Failed to launch:", err);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMainLocal.handle("is-flare-running", async () => {
+  if (!activeFlareProcess) return false;
+  try {
+    process.kill(activeFlareProcess.pid, 0);
+    return true;
+  } catch {
+    activeFlareProcess = null;
+    return false;
+  }
+});
+
 // Handle app protocol for development
 if (isDev) {
   if (process.platform === "win32") {

@@ -6,10 +6,12 @@ interface PlayButtonProps {
   lastError: string | null;
   hasProject: boolean;
   hasMap: boolean;
+  flarePath: string | null;
   onLaunch: (mode: FlareLaunchMode) => void;
+  onConfigurePath: () => void;
 }
 
-const PlayButton: React.FC<PlayButtonProps> = ({ isRunning, lastError, hasProject, hasMap, onLaunch }) => {
+const PlayButton: React.FC<PlayButtonProps> = ({ isRunning, lastError, hasProject, hasMap, flarePath, onLaunch, onConfigurePath }) => {
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -127,6 +129,29 @@ const PlayButton: React.FC<PlayButtonProps> = ({ isRunning, lastError, hasProjec
               <div className="px-3 py-1.5 text-xs text-red-500">{lastError}</div>
             </>
           )}
+
+          <div className="border-t border-gray-200 dark:border-neutral-600 my-1" />
+
+          <button
+            onClick={() => { setOpen(false); onConfigurePath(); }}
+            className="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-neutral-700 flex items-center gap-2"
+          >
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-gray-500 flex-shrink-0">
+              <path d="M10.5 6.5v3a1 1 0 01-1 1h-7a1 1 0 01-1-1v-7a1 1 0 011-1h3" />
+              <path d="M8 1.5h2.5V4" />
+              <path d="M5.5 6.5L10.5 1.5" />
+            </svg>
+            <div>
+              <div className="font-medium text-gray-800 dark:text-gray-200">
+                {flarePath ? 'Change Flare Location...' : 'Set Flare Location...'}
+              </div>
+              {flarePath ? (
+                <div className="text-xs text-gray-400 dark:text-gray-500 truncate max-w-[220px]" title={flarePath}>{flarePath}</div>
+              ) : (
+                <div className="text-xs text-amber-500">Select flare.exe to enable play</div>
+              )}
+            </div>
+          </button>
         </div>
       )}
     </div>

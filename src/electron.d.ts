@@ -109,8 +109,22 @@ declare global {
       onAppBeforeQuit: (callback: () => void) => void;
       appShutdownComplete: () => void;
       // Flare engine launcher
+      selectFlareExe: () => Promise<string | null>;
+      ensureFlareModLink: (options: {
+        flarePath: string;
+        projectPath: string;
+      }) => Promise<{ success: boolean; modName?: string; junctionCreated?: boolean; error?: string }>;
+      prepareFlareQuickLaunch: (options: {
+        flarePath: string;
+        projectPath: string;
+        mapName: string;
+        mode: 'current-map' | 'new-game';
+      }) => Promise<{ success: boolean; slotNum?: number; error?: string }>;
+      restoreSpawnBackup: (options: {
+        projectPath: string;
+      }) => Promise<boolean>;
       launchFlareEngine: (options: {
-        flarePath?: string;
+        flarePath: string;
         dataPath?: string;
         mods?: string[];
         loadSlot?: string;

@@ -53,7 +53,7 @@ declare global {
       saveTilesetProfiles: (projectPath: string, profiles: Record<string, any>) => Promise<{ success: boolean; path?: string; error?: string }>;
       loadTilesetProfiles: (projectPath: string) => Promise<Record<string, any> | null>;
       deleteMap: (projectPath: string, mapName: string) => Promise<{ success: boolean; message?: string }>;
-      saveExportFiles: (projectPath: string, mapName: string, mapTxt: string, tilesetDef: string, options?: { spawn?: { enabled: boolean; content: string; filename?: string }; tilesetImages?: Record<string, string>; npcFiles?: Array<{ filename: string; content: string }> }) => Promise<boolean>;
+      saveExportFiles: (projectPath: string, mapName: string, mapTxt: string, tilesetDef: string, options?: { spawn?: { enabled: boolean; content: string; filename?: string }; tilesetImages?: Record<string, string>; npcFiles?: Array<{ filename: string; content: string }>; portraitFiles?: Array<{ sourcePath: string; destFilename: string }>; npcTilesetImages?: Array<{ sourcePath: string; destFilename: string }>; npcAnimationFiles?: Array<{ filename: string; content: string }> }) => Promise<boolean>;
       discoverTilesetImages: (projectPath: string) => Promise<{ tilesetImages: { [key: string]: string }; tilesets: { name: string; fileName: string }[] }>;
       fileExists: (filePath: string) => Promise<boolean>;
       listMaps: (projectPath: string) => Promise<string[]>;

@@ -6,7 +6,9 @@ type ActorDialogState = {
   type: 'npc' | 'enemy';
   name: string;
   tilesetPath: string;
+  tilesetSourcePath: string;
   portraitPath: string;
+  portraitSourcePath: string;
   locationX: number;
   locationY: number;
 } & Record<ActorRoleKey, boolean>;

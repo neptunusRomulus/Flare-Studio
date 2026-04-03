@@ -1,7 +1,8 @@
 import { useCallback, useState, useRef, useEffect } from 'react';
-import type { MapObject } from '@/types';
+import type { MapObject, FlareNPC } from '@/types';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 import { buildSpawnContent, computeIntermapTarget, STARTING_MAP_INVALID_NAMES } from '@/editor/mapSpawnUtils';
+import { serializeNpcFile } from '@/utils/flareNpcUtils';
 
 type ProjectIOOptions = {
   editor: TileMapEditor | null;
@@ -222,84 +223,33 @@ const useProjectIO = ({
               .replace(/_{2,}/g, '_') || 'unnamed_npc';
 
             const filename = `${sanitizedName}.txt`;
-            const lines: string[] = [];
 
-            lines.push(`name=${npcName}`);
-            lines.push('');
+            const flareNpc: FlareNPC = {
+              id: npc.id,
+              x: npc.x,
+              y: npc.y,
+              filename: npc.properties?.npcFilename || `npcs/${sanitizedName}.txt`,
+              name: npcName,
+              talker: npc.properties?.talker === 'true' || npc.properties?.vendor === 'true' || npc.properties?.questGiver === 'true',
+              vendor: npc.properties?.vendor === 'true',
+              gfx: npc.properties?.tilesetPath || undefined,
+              portrait: npc.properties?.portraitPath || undefined,
+              constant_stock: npc.properties?.constant_stock || undefined,
+              random_stock: npc.properties?.random_stock || undefined,
+              random_stock_count: npc.properties?.random_stock_count ? parseInt(npc.properties.random_stock_count, 10) : undefined,
+              vendor_requires_status: npc.properties?.vendor_requires_status || undefined,
+              vendor_requires_not_status: npc.properties?.vendor_requires_not_status || undefined,
+              direction: npc.properties?.direction ? parseInt(npc.properties.direction, 10) as FlareNPC['direction'] : undefined,
+              waypoints: npc.properties?.waypoints || undefined,
+              wander_radius: npc.properties?.wander_radius ? parseInt(npc.properties.wander_radius, 10) : undefined,
+              customProperties: {
+                ...(npc.properties?.dialogueTrees ? { dialogueTrees: npc.properties.dialogueTrees } : {}),
+                ...(npc.properties?.status_stock_entries ? { status_stock_entries: npc.properties.status_stock_entries } : {}),
+              },
+            };
 
-            if (npc.properties?.portraitPath) {
-              lines.push(`portrait=${npc.properties.portraitPath}`);
-              lines.push('');
-            }
-
-            const isTalker = npc.properties?.talker === 'true';
-            const isVendor = npc.properties?.vendor === 'true';
-            const isQuestGiver = npc.properties?.questGiver === 'true';
-
-            if (isVendor) {
-              lines.push(`# shop info`);
-              lines.push(`vendor=true`);
-              if (npc.properties?.constant_stock) {
-                lines.push(`constant_stock=${npc.properties.constant_stock}`);
-              }
-              if (npc.properties?.status_stock_entries) {
-                try {
-                  const entries = JSON.parse(npc.properties.status_stock_entries as string);
-                  if (Array.isArray(entries)) {
-                    for (const entry of entries) {
-                      if (!entry?.requirement || !entry.items) continue;
-                      const stockStr = buildConstantStockString(entry.items);
-                      if (stockStr) {
-                        lines.push(`status_stock=${entry.requirement},${stockStr}`);
-                      }
-                    }
-                  }
-                } catch (err) {
-                  console.warn('Failed to parse status_stock_entries for export', err);
-                }
-              }
-              if (npc.properties?.random_stock) {
-                lines.push(`random_stock=${npc.properties.random_stock}`);
-              }
-              if (npc.properties?.random_stock_count) {
-                lines.push(`random_stock_count=${npc.properties.random_stock_count}`);
-              }
-              lines.push(`# TODO: Add stock items`);
-              lines.push(`# constant_stock=item_id:count,item_id:count`);
-              lines.push('');
-            }
-
-            if (npc.properties?.tilesetPath) {
-              lines.push(`# animation info`);
-              lines.push(`animations=${npc.properties.tilesetPath}`);
-              lines.push('');
-            }
-
-            if (isTalker || isVendor || isQuestGiver) {
-              lines.push(`talker=true`);
-              lines.push('');
-            }
-
-            if (isQuestGiver) {
-              lines.push(`# This NPC is marked as a Quest Giver in the editor.`);
-              lines.push(`# Quest assignments are defined in quests/*.txt files with giver=npcs/${sanitizedName}.txt`);
-              lines.push('');
-            }
-
-            if (!isTalker && !isVendor && !isQuestGiver) {
-              lines.push(`# This NPC is decorative and has no interaction.`);
-              lines.push('');
-            }
-
-            if (isTalker || isVendor || isQuestGiver) {
-              lines.push(`# Dialog sections`);
-              lines.push(`# [dialog]`);
-              lines.push(`# topic=Talk`);
-              lines.push(`# him=Hello, traveler!`);
-              lines.push('');
-            }
-
-            npcFiles.push({ filename, content: lines.join('\n') });
+            const content = serializeNpcFile(flareNpc);
+            npcFiles.push({ filename, content });
           }
         } catch (npcErr) {
           console.warn('Failed to collect NPC files for export:', npcErr);

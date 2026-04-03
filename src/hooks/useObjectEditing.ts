@@ -41,7 +41,9 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
       type,
       name: '',
       tilesetPath: '',
+      tilesetSourcePath: '',
       portraitPath: '',
+      portraitSourcePath: '',
       locationX: 0,
       locationY: 0,
       ...EMPTY_ACTOR_ROLES,
@@ -57,7 +59,7 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
     setActorDialogError(null);
   }, []);
 
-  const handleActorFieldChange = useCallback((field: 'name' | 'tilesetPath' | 'portraitPath' | 'locationX' | 'locationY', value: string) => {
+  const handleActorFieldChange = useCallback((field: 'name' | 'tilesetPath' | 'tilesetSourcePath' | 'portraitPath' | 'portraitSourcePath' | 'locationX' | 'locationY', value: string) => {
     setActorDialogState((prev) => {
       if (!prev) return prev;
       if (field === 'locationX' || field === 'locationY') {
@@ -76,7 +78,11 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
     if (typeof window === 'undefined' || !window.electronAPI?.selectTilesetFile) return;
     try {
       const selected = await window.electronAPI.selectTilesetFile();
-      if (selected) handleActorFieldChange('tilesetPath', selected);
+      if (selected) {
+        // Store the original absolute path so we can copy the image on save
+        handleActorFieldChange('tilesetSourcePath', selected);
+        handleActorFieldChange('tilesetPath', selected);
+      }
     } catch (err) {
       console.error('Failed to select tileset file for actor:', err);
     }
@@ -87,6 +93,8 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
     try {
       const selected = await window.electronAPI.selectTilesetFile();
       if (!selected) return;
+      // Store the original absolute path so we can copy the file on save
+      handleActorFieldChange('portraitSourcePath', selected);
       if (window.electronAPI.readFileAsDataURL) {
         try {
           const dataUrl = await window.electronAPI.readFileAsDataURL(selected);
@@ -111,7 +119,9 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
 
     const name = actorDialogState.name.trim();
     const tilesetPath = actorDialogState.tilesetPath?.trim() || '';
+    const tilesetSourcePath = actorDialogState.tilesetSourcePath?.trim() || '';
     const portraitPath = actorDialogState.portraitPath?.trim() || '';
+    const portraitSourcePath = actorDialogState.portraitSourcePath?.trim() || '';
 
     const roleProperties: Record<string, string> = {};
     if (actorDialogState.type === 'npc') {
@@ -133,7 +143,7 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
     let newObject: MapObject | null = null;
     try {
       if (editor && typeof editor.addMapObject === 'function') {
-        newObject = editor.addMapObject('enemy', actorX, actorY, 1, 1);
+        newObject = editor.addMapObject(actorDialogState.type as 'npc' | 'enemy', actorX, actorY, 1, 1);
         if (newObject && typeof editor.updateMapObject === 'function') {
           editor.updateMapObject(newObject.id, {
             name,
@@ -146,7 +156,9 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
               ...(newObject.properties || {}),
               ...roleProperties,
               ...(tilesetPath ? { tilesetPath } : {}),
-              ...(portraitPath ? { portraitPath } : {})
+              ...(tilesetSourcePath ? { tilesetSourcePath } : {}),
+              ...(portraitPath ? { portraitPath } : {}),
+              ...(portraitSourcePath ? { portraitSourcePath } : {})
             }
           });
         }
@@ -164,7 +176,9 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
           properties: {
             ...roleProperties,
             ...(tilesetPath ? { tilesetPath } : {}),
-            ...(portraitPath ? { portraitPath } : {})
+            ...(tilesetSourcePath ? { tilesetSourcePath } : {}),
+            ...(portraitPath ? { portraitPath } : {}),
+            ...(portraitSourcePath ? { portraitSourcePath } : {})
           }
         } as MapObject;
         setMapObjects(prev => [...prev, newObject as MapObject]);
@@ -326,7 +340,11 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
     if (typeof window === 'undefined' || !window.electronAPI?.selectTilesetFile) return;
     try {
       const selected = await window.electronAPI.selectTilesetFile();
-      if (selected) updateEditingObjectProperty('tilesetPath', selected);
+      if (selected) {
+        // Store the original absolute path so we can copy the image on save
+        updateEditingObjectProperty('tilesetSourcePath', selected);
+        updateEditingObjectProperty('tilesetPath', selected);
+      }
     } catch (err) {
       console.error('Failed to select tileset for editing object:', err);
     }
@@ -337,6 +355,8 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
     try {
       const selected = await window.electronAPI.selectTilesetFile();
       if (!selected) return;
+      // Store the original absolute path so we can copy the file on save
+      updateEditingObjectProperty('portraitSourcePath', selected);
       if (window.electronAPI.readFileAsDataURL) {
         try {
           const dataUrl = await window.electronAPI.readFileAsDataURL(selected);

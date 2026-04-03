@@ -1099,6 +1099,104 @@ ipcMainLocal.handle(
         console.warn("Failed to save NPC files:", npcErr);
       }
 
+      // If exporter provided portrait files, copy them to images/portraits/
+      try {
+        if (
+          options.portraitFiles &&
+          Array.isArray(options.portraitFiles) &&
+          options.portraitFiles.length > 0
+        ) {
+          const imagesDir = path.join(projectPath, "images");
+          const portraitsDir = path.join(imagesDir, "portraits");
+          if (!fs.existsSync(imagesDir)) {
+            fs.mkdirSync(imagesDir, { recursive: true });
+            console.log("Created images directory:", imagesDir);
+          }
+          if (!fs.existsSync(portraitsDir)) {
+            fs.mkdirSync(portraitsDir, { recursive: true });
+            console.log("Created portraits directory:", portraitsDir);
+          }
+
+          for (const portrait of options.portraitFiles) {
+            if (portrait && portrait.sourcePath && portrait.destFilename) {
+              const destPath = path.join(portraitsDir, portrait.destFilename);
+              if (fs.existsSync(portrait.sourcePath)) {
+                fs.copyFileSync(portrait.sourcePath, destPath);
+                console.log("Export: copied portrait", portrait.sourcePath, "->", destPath);
+              } else {
+                console.warn("Export: portrait source not found:", portrait.sourcePath);
+              }
+            }
+          }
+        }
+      } catch (portraitErr) {
+        console.warn("Failed to copy portrait files:", portraitErr);
+      }
+
+      // If exporter provided NPC tileset images, copy them to images/npcs/
+      try {
+        if (
+          options.npcTilesetImages &&
+          Array.isArray(options.npcTilesetImages) &&
+          options.npcTilesetImages.length > 0
+        ) {
+          const imagesDir = path.join(projectPath, "images");
+          const npcsImgDir = path.join(imagesDir, "npcs");
+          if (!fs.existsSync(imagesDir)) {
+            fs.mkdirSync(imagesDir, { recursive: true });
+            console.log("Created images directory:", imagesDir);
+          }
+          if (!fs.existsSync(npcsImgDir)) {
+            fs.mkdirSync(npcsImgDir, { recursive: true });
+            console.log("Created images/npcs directory:", npcsImgDir);
+          }
+
+          for (const img of options.npcTilesetImages) {
+            if (img && img.sourcePath && img.destFilename) {
+              const destPath = path.join(npcsImgDir, img.destFilename);
+              if (fs.existsSync(img.sourcePath)) {
+                fs.copyFileSync(img.sourcePath, destPath);
+                console.log("Export: copied NPC tileset image", img.sourcePath, "->", destPath);
+              } else {
+                console.warn("Export: NPC tileset image source not found:", img.sourcePath);
+              }
+            }
+          }
+        }
+      } catch (npcImgErr) {
+        console.warn("Failed to copy NPC tileset images:", npcImgErr);
+      }
+
+      // If exporter provided NPC animation definition files, save them to animations/npcs/
+      try {
+        if (
+          options.npcAnimationFiles &&
+          Array.isArray(options.npcAnimationFiles) &&
+          options.npcAnimationFiles.length > 0
+        ) {
+          const animationsDir = path.join(projectPath, "animations");
+          const npcsAnimDir = path.join(animationsDir, "npcs");
+          if (!fs.existsSync(animationsDir)) {
+            fs.mkdirSync(animationsDir, { recursive: true });
+            console.log("Created animations directory:", animationsDir);
+          }
+          if (!fs.existsSync(npcsAnimDir)) {
+            fs.mkdirSync(npcsAnimDir, { recursive: true });
+            console.log("Created animations/npcs directory:", npcsAnimDir);
+          }
+
+          for (const animFile of options.npcAnimationFiles) {
+            if (animFile && animFile.filename && animFile.content) {
+              const animFilePath = path.join(npcsAnimDir, animFile.filename);
+              fs.writeFileSync(animFilePath, animFile.content, "utf8");
+              console.log("Export: saved NPC animation file to", animFilePath);
+            }
+          }
+        }
+      } catch (animErr) {
+        console.warn("Failed to save NPC animation files:", animErr);
+      }
+
       console.log("Export files saved successfully:");
       console.log("- Map:", mapFilePath);
       console.log("- Tileset:", tilesetFilePath);
@@ -1458,75 +1556,17 @@ ipcMainLocal.handle("create-npc-file", async (event, projectPath, npcData) => {
     };
 
     const sanitizedName = sanitize(npcData.name);
-    const npcFilePath = path.join(npcsDir, `${sanitizedName}.txt`);
 
-    // Build NPC file content in Flare format
-    const lines = [];
+    // Only generate the sanitized filename here — the actual NPC .txt content
+    // is written by the save-export flow (saveExportFiles) which produces the
+    // authoritative file with dialogues, vendor settings, and proper relative
+    // paths.  Writing a skeleton here would be immediately overwritten on save,
+    // and if save never runs the skeleton could have stale/incorrect data.
 
-    // Name
-    lines.push(`name=${npcData.name}`);
-    lines.push("");
-
-    // Portrait (if provided)
-    if (npcData.portraitPath) {
-      lines.push(`portrait=${npcData.portraitPath}`);
-      lines.push("");
-    }
-
-    // Role-based attributes
-    const role = npcData.role || "static";
-
-    if (role === "vendor") {
-      lines.push(`# shop info`);
-      lines.push(`vendor=true`);
-      lines.push(`# TODO: Add stock items`);
-      lines.push(`# constant_stock=item_id:count,item_id:count`);
-      lines.push("");
-    }
-
-    // Animation/Tileset (if provided)
-    if (npcData.tilesetPath) {
-      lines.push(`# animation info`);
-      lines.push(`animations=${npcData.tilesetPath}`);
-      lines.push("");
-    }
-
-    if (role === "talker" || role === "vendor" || role === "quest") {
-      lines.push(`talker=true`);
-      lines.push("");
-    }
-
-    // Quest giver note (editor-only, as comment)
-    if (role === "quest") {
-      lines.push(`# This NPC is marked as a Quest Giver in the editor.`);
-      lines.push(
-        `# Quest assignments are defined in quests/*.txt files with giver=npcs/${sanitizedName}.txt`
-      );
-      lines.push("");
-    }
-
-    // Static NPC note
-    if (role === "static") {
-      lines.push(`# This NPC is decorative and has no interaction.`);
-      lines.push("");
-    }
-
-    // Placeholder for dialog (if talker)
-    if (role === "talker" || role === "vendor" || role === "quest") {
-      lines.push(`# Dialog sections`);
-      lines.push(`# [dialog]`);
-      lines.push(`# topic=Talk`);
-      lines.push(`# him=Hello, traveler!`);
-      lines.push("");
-    }
-
-    const npcContent = lines.join("\n");
-    fs.writeFileSync(npcFilePath, npcContent, "utf8");
-
-    console.log("NPC file created:", npcFilePath);
+    console.log("NPC filename generated:", `${sanitizedName}.txt`);
     return {
       success: true,
-      filePath: npcFilePath,
+      filePath: path.join(npcsDir, `${sanitizedName}.txt`),
       filename: `${sanitizedName}.txt`,
     };
   } catch (error) {

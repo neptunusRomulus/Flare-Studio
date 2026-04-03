@@ -12,7 +12,7 @@ type ActorDialogProps = {
   actorDialogState: ActorDialogState | null;
   actorDialogError: string | null;
   onClose: () => void;
-  onFieldChange: (key: 'name' | 'tilesetPath' | 'portraitPath' | 'locationX' | 'locationY', value: string) => void;
+  onFieldChange: (key: 'name' | 'tilesetPath' | 'tilesetSourcePath' | 'portraitPath' | 'portraitSourcePath' | 'locationX' | 'locationY', value: string) => void;
   onRoleToggle: (role: ActorRoleKey) => void;
   onSubmit: (openEditor: boolean) => void;
 };

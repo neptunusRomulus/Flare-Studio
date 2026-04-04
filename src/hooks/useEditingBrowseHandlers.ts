@@ -26,11 +26,28 @@ export function computeAnimDefaults(
   imgH: number,
   existing: Record<string, string>
 ): Record<string, string> {
-  const frameW = imgH > 0 && imgW > imgH && imgW % imgH === 0 ? imgH : imgW;
-  const frameH = imgH;
+  let frameH = imgH;
+  let frameW = imgW;
+
+  // Flare NPC/Enemy standard: 8 directions (rows)
+  // Most Flare sprites are powers of 2 (64, 128, etc) or multiples of 32.
+  // If height is divisible by 8 and >= 64, it's very likely an 8-direction sheet.
+  if (imgH >= 64 && imgH % 8 === 0) {
+    const fh = imgH / 8;
+    // If width is also a multiple of this candidate frame height, assume square frames
+    if (imgW % fh === 0) {
+      frameH = fh;
+      frameW = fh;
+    }
+  } else if (imgH > 0 && imgW >= imgH && imgW % imgH === 0) {
+    // Single row animation with square frames
+    frameW = imgH;
+    frameH = imgH;
+  }
+
   const frameCount = Math.max(1, Math.floor(imgW / frameW));
   const offsetX = Math.floor(frameW / 2);
-  const offsetY = frameH - 2;
+  const offsetY = Math.floor(frameH * 0.9); // Common default for NPC feet position
 
   const defaults: Record<string, string> = {
     anim_image_width: String(imgW),
@@ -40,7 +57,7 @@ export function computeAnimDefaults(
     anim_render_offset_x: String(offsetX),
     anim_render_offset_y: String(offsetY),
     anim_frames: String(frameCount),
-    anim_duration: frameCount > 1 ? '1200ms' : '1s',
+    anim_duration: frameCount > 1 ? `${frameCount * 100}ms` : '1000ms',
     anim_type: 'looped',
     anim_blend_mode: 'normal',
     anim_alpha_mod: '255',
@@ -131,5 +148,24 @@ export default function useEditingBrowseHandlers(args: {
     }
   }, [updateEditingObjectProperty]);
 
-  return { handleEditingTilesetBrowse, handleEditingPortraitBrowse };
+  const handleAutoDetectAnim = useCallback(async () => {
+    const tilesetPath = getEditingObjectProperty?.('tilesetPath', '');
+    if (!tilesetPath) return;
+
+    try {
+      const dims = await loadImageDimensions(tilesetPath);
+      if (dims) {
+        // Reset everything to defaults for the new dimensions
+        const defaults = computeAnimDefaults(dims.width, dims.height, {});
+        for (const [key, value] of Object.entries(defaults)) {
+          updateEditingObjectProperty(key, value);
+        }
+      }
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to auto-detect animation properties:', error);
+    }
+  }, [getEditingObjectProperty, updateEditingObjectProperty]);
+
+  return { handleEditingTilesetBrowse, handleEditingPortraitBrowse, handleAutoDetectAnim };
 }

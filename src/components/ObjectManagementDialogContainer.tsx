@@ -19,6 +19,7 @@ type ObjMgmtCtx = {
   canUseTilesetDialog?: boolean;
   handleEditingTilesetBrowse?: () => Promise<void> | void;
   handleEditingPortraitBrowse?: () => Promise<void> | void;
+  handleAutoDetectAnim?: () => Promise<void> | void;
   handleOpenVendorStockDialog?: () => void;
   handleOpenVendorUnlockDialog?: () => void;
   handleOpenVendorRandomDialog?: () => void;
@@ -49,6 +50,7 @@ export default function ObjectManagementDialogContainer({ ctx }: { ctx: unknown 
       canUseTilesetDialog={!!c.canUseTilesetDialog}
       handleEditingTilesetBrowse={c.handleEditingTilesetBrowse ?? (() => {})}
       handleEditingPortraitBrowse={c.handleEditingPortraitBrowse ?? (() => {})}
+      handleAutoDetectAnim={c.handleAutoDetectAnim ?? (() => {})}
       handleOpenVendorStockDialog={c.handleOpenVendorStockDialog ?? (() => {})}
       handleOpenVendorUnlockDialog={c.handleOpenVendorUnlockDialog ?? (() => {})}
       handleOpenVendorRandomDialog={c.handleOpenVendorRandomDialog ?? (() => {})}

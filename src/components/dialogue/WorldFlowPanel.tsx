@@ -29,6 +29,9 @@ import {
   Map,
   Sparkles
 } from 'lucide-react';
+import { useAppContext } from '../../context/AppContext';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../ui/select';
+
 
 interface WorldFlowPanelProps {
   config: WorldFlowConfig;
@@ -44,6 +47,27 @@ export const WorldFlowPanel: React.FC<WorldFlowPanelProps> = ({
   onToggleExpand
 }) => {
   const [expandedSections, setExpandedSections] = React.useState<Record<string, boolean>>({});
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { controls, mapName: currentMapName } = useAppContext() as any;
+  const currentProjectPath = controls?.currentProjectPath ?? null;
+  const [projectMaps, setProjectMaps] = React.useState<string[]>([]);
+
+  React.useEffect(() => {
+    if (!expanded || !currentProjectPath) return;
+    let cancelled = false;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const electronAPI = (window as any).electronAPI;
+    if (electronAPI?.listMaps) {
+      electronAPI.listMaps(currentProjectPath).then((maps: string[]) => {
+        if (!cancelled) setProjectMaps(maps ?? []);
+      }).catch(() => {
+        if (!cancelled) setProjectMaps([]);
+      });
+    }
+    return () => { cancelled = true; };
+  }, [expanded, currentProjectPath]);
+
 
   const toggleSection = (section: string) => {
     setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
@@ -209,12 +233,26 @@ export const WorldFlowPanel: React.FC<WorldFlowPanelProps> = ({
               )}
               {config.teleport.mode === 'intermap' && (
                 <>
-                  <Input
-                    value={config.teleport.mapFile ?? ''}
-                    onChange={(e) => updateTeleport({ mapFile: e.target.value })}
-                    placeholder="Map file (e.g., maps/town.txt)"
-                    className="h-7 text-xs"
-                  />
+                  <Select
+                    value={config.teleport.mapFile || '__none__'}
+                    onValueChange={(val) => updateTeleport({ mapFile: val === '__none__' ? undefined : val })}
+                  >
+                    <SelectTrigger className="h-7 text-xs flex-1">
+                      <SelectValue placeholder="Select map" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__" className="text-xs">None</SelectItem>
+                      {projectMaps.map((mapFile: string) => {
+                        const mapLabel = mapFile.replace(/\.(txt|json)$/i, '');
+                        const isCurrent = mapLabel === currentMapName;
+                        return (
+                          <SelectItem key={mapFile} value={mapLabel} className={`text-xs ${isCurrent ? 'text-orange-400' : ''}`}>
+                            {mapLabel}{isCurrent ? ' (current)' : ''}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
                   <div className="flex gap-2 items-center">
                     <span className="text-xs text-muted-foreground">X:</span>
                     <Input

@@ -1439,14 +1439,15 @@ export default function useAppMainBuilder() {
         }
         } as Record<string, unknown>;
         // Inject projectMaps into dialogCtx for DialogsContainer
-        console.log('[useAppMainBuilder] sb["projectMaps"]:', sb['projectMaps']);
-        const maps = sb['projectMaps'] ?? [];
+        const controls = (sb['controls'] as Record<string, unknown> | undefined) ?? {};
+        const maps = (controls.projectMaps as string[] | undefined) ?? [];
+        console.log('[useAppMainBuilder] sidebar controls projectMaps:', maps);
         if (Array.isArray(maps)) {
           dialogCtx.projectMaps = maps;
           console.log('[useAppMainBuilder] Injected projectMaps into dialogCtx:', maps);
         } else {
           dialogCtx.projectMaps = [];
-          console.warn('[useAppMainBuilder] No projectMaps found, injecting empty array.');
+          console.warn('[useAppMainBuilder] No projectMaps found in sidebar controls, injecting empty array.');
         }
         return dialogCtx;
       })(),

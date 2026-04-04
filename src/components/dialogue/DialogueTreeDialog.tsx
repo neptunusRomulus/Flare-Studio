@@ -2,10 +2,12 @@ import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { AlignLeft, ArrowLeft, ArrowRight, Check, ChevronDown, ChevronUp, Coins, Eye, EyeOff, Fingerprint, Gift, HelpCircle, Image, Link2, MessageSquare, Package, Plus, Save, Shield, Tag, User, Volume2, X, Zap } from 'lucide-react';
 import Tooltip from '@/components/ui/tooltip';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
+import { useAppContext } from '@/context/AppContext';
 import type { DialogueLine, DialogueRequirement, DialogueReward, DialogueWorldEffect, DialogueTree, MapObject } from '@/types';
 
 /** Generate a short unique dialogue ID like "dlg_a3f9" */
@@ -112,6 +114,22 @@ const BranchingPanel: React.FC<{
   );
 };
 
+const parseTeleportValue = (value: string) => {
+  const parts = value.split(',');
+  const mapFile = parts[0] || '';
+  return {
+    map: mapFile.replace(/^\/?(maps\/)/i, '').replace(/\.txt$/i, ''),
+    x: parseInt(parts[1] || '0', 10) || 0,
+    y: parseInt(parts[2] || '0', 10) || 0,
+  };
+};
+
+const buildTeleportValue = (map: string, x: number, y: number) => {
+  const normalizedMap = map.replace(/^\/?(maps\/)/i, '').replace(/\.txt$/i, '');
+  if (!normalizedMap) return '';
+  return `maps/${normalizedMap}.txt,${x},${y}`;
+};
+
 const DialogueTreeDialog = ({
   showDialogueTreeDialog,
   dialogueTrees = [],
@@ -122,7 +140,8 @@ const DialogueTreeDialog = ({
   setDialogueTabToDelete,
   onClose,
   editingObject,
-  updateEditingObjectProperty
+  updateEditingObjectProperty,
+  projectMaps = [],
 }: {
   showDialogueTreeDialog: boolean;
   dialogueTrees?: DialogueTree[];
@@ -134,10 +153,42 @@ const DialogueTreeDialog = ({
   onClose: () => void;
   editingObject: MapObject | null;
   updateEditingObjectProperty: (key: string, value: string | null) => void;
+  projectMaps?: string[];
 }) => {
   const [editingIdIndex, setEditingIdIndex] = useState<number | null>(null);
   const [pendingIdValue, setPendingIdValue] = useState('');
   const [idConfirmShown, setIdConfirmShown] = useState(false);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { controls } = useAppContext() as any;
+  const currentProjectPath = controls?.currentProjectPath ?? null;
+
+  // Fetch project maps locally
+  const [localMaps, setLocalMaps] = useState<string[]>([]);
+  useEffect(() => {
+    if (!showDialogueTreeDialog) return;
+    
+    if (projectMaps.length > 0) {
+      setLocalMaps(projectMaps);
+      return;
+    }
+
+    if (!currentProjectPath) return;
+
+    let cancelled = false;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const electronAPI = (window as any).electronAPI;
+    if (electronAPI?.listMaps) {
+      electronAPI.listMaps(currentProjectPath).then((maps: string[]) => {
+        if (!cancelled) setLocalMaps(maps ?? []);
+      }).catch(() => {
+        if (!cancelled) setLocalMaps([]);
+      });
+    }
+
+    return () => { cancelled = true; };
+  }, [showDialogueTreeDialog, projectMaps, currentProjectPath]);
+
 
   const {
     position,
@@ -950,25 +1001,93 @@ const DialogueTreeDialog = ({
                         <option value="sound">Play Sound</option>
                         <option value="npc">NPC Dialog</option>
                       </select>
-                      <Input
-                        value={wf.value}
-                        onChange={(e) => {
-                          const newTrees = [...dialogueTrees];
-                          const newWfs = [...(newTrees[activeDialogueTab].worldEffects || [])];
-                          newWfs[wfIndex] = { ...newWfs[wfIndex], value: e.target.value };
-                          newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], worldEffects: newWfs };
-                          setDialogueTrees(newTrees);
-                        }}
-                        placeholder={
-                          wf.type === 'set_status' || wf.type === 'unset_status' ? 'Status tag...' :
-                          wf.type === 'teleport' ? 'map.txt,x,y' :
-                          wf.type === 'spawn' ? 'Enemy category' :
-                          wf.type === 'cutscene' ? 'Cutscene file...' :
-                          wf.type === 'sound' ? 'Sound file...' :
-                          wf.type === 'npc' ? 'NPC file...' : 'Value...'
-                        }
-                        className="h-7 text-xs flex-1"
-                      />
+                      {wf.type === 'teleport' ? (
+                        <div className="flex gap-2 flex-1 items-center">
+                          <Select
+                            value={parseTeleportValue(wf.value).map || '__none__'}
+                            onValueChange={(selectedMap) => {
+                              const current = parseTeleportValue(wf.value);
+                              const mapValue = selectedMap === '__none__' ? '' : selectedMap;
+                              const newValue = buildTeleportValue(mapValue, current.x, current.y);
+                              const newTrees = [...dialogueTrees];
+                              const newWfs = [...(newTrees[activeDialogueTab].worldEffects || [])];
+                              newWfs[wfIndex] = { ...newWfs[wfIndex], value: newValue };
+                              newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], worldEffects: newWfs };
+                              setDialogueTrees(newTrees);
+                            }}
+                          >
+                            <SelectTrigger className="h-8 text-xs min-w-[170px]">
+                              <SelectValue placeholder="Select map" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__none__" className="text-xs">None</SelectItem>
+                              {localMaps?.map((mapFile) => {
+                                const mapLabel = mapFile.replace(/\.(txt|json)$/i, '');
+                                return (
+                                  <SelectItem key={mapFile} value={mapLabel} className="text-xs">
+                                    {mapLabel}
+                                  </SelectItem>
+                                );
+                              })}
+                            </SelectContent>
+                          </Select>
+                          <div className="flex gap-2 items-center">
+                            <div>
+                              <label className="text-[10px] text-muted-foreground">X</label>
+                              <Input
+                                type="number"
+                                value={parseTeleportValue(wf.value).x}
+                                onChange={(e) => {
+                                  const current = parseTeleportValue(wf.value);
+                                  const newValue = buildTeleportValue(current.map, parseInt(e.target.value, 10) || 0, current.y);
+                                  const newTrees = [...dialogueTrees];
+                                  const newWfs = [...(newTrees[activeDialogueTab].worldEffects || [])];
+                                  newWfs[wfIndex] = { ...newWfs[wfIndex], value: newValue };
+                                  newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], worldEffects: newWfs };
+                                  setDialogueTrees(newTrees);
+                                }}
+                                className="h-7 w-20 text-xs"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] text-muted-foreground">Y</label>
+                              <Input
+                                type="number"
+                                value={parseTeleportValue(wf.value).y}
+                                onChange={(e) => {
+                                  const current = parseTeleportValue(wf.value);
+                                  const newValue = buildTeleportValue(current.map, current.x, parseInt(e.target.value, 10) || 0);
+                                  const newTrees = [...dialogueTrees];
+                                  const newWfs = [...(newTrees[activeDialogueTab].worldEffects || [])];
+                                  newWfs[wfIndex] = { ...newWfs[wfIndex], value: newValue };
+                                  newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], worldEffects: newWfs };
+                                  setDialogueTrees(newTrees);
+                                }}
+                                className="h-7 w-20 text-xs"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <Input
+                          value={wf.value}
+                          onChange={(e) => {
+                            const newTrees = [...dialogueTrees];
+                            const newWfs = [...(newTrees[activeDialogueTab].worldEffects || [])];
+                            newWfs[wfIndex] = { ...newWfs[wfIndex], value: e.target.value };
+                            newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], worldEffects: newWfs };
+                            setDialogueTrees(newTrees);
+                          }}
+                          placeholder={
+                            wf.type === 'set_status' || wf.type === 'unset_status' ? 'Status tag...' :
+                            wf.type === 'spawn' ? 'Enemy category' :
+                            wf.type === 'cutscene' ? 'Cutscene file...' :
+                            wf.type === 'sound' ? 'Sound file...' :
+                            wf.type === 'npc' ? 'NPC file...' : 'Value...'
+                          }
+                          className="h-7 text-xs flex-1"
+                        />
+                      )}
                       <Button
                         variant="ghost"
                         size="sm"

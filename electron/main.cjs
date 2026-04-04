@@ -2188,7 +2188,7 @@ ipcMainLocal.handle("prepare-flare-quick-launch", async (_event, { flarePath, pr
     const mapsDir = path.join(projectPath, "maps");
     const engineDir = path.join(projectPath, "engine");
 
-    // 1. Ensure engine/gameplay.txt has enable_playgame=1
+    // 1. Ensure engine/ dir exists and write required config files
     if (!fs.existsSync(engineDir)) {
       fs.mkdirSync(engineDir, { recursive: true });
     }
@@ -2196,33 +2196,22 @@ ipcMainLocal.handle("prepare-flare-quick-launch", async (_event, { flarePath, pr
     fs.writeFileSync(gameplayPath, "enable_playgame=1\n", "utf8");
     console.log("[FlareEngine] Wrote engine/gameplay.txt");
 
-    // 2. Read the project's existing spawn.txt to get hero_pos
-    let heroX = 2;
-    let heroY = 2;
-    const existingSpawnPath = path.join(mapsDir, "spawn.txt");
-    if (fs.existsSync(existingSpawnPath)) {
-      try {
-        const spawnContent = fs.readFileSync(existingSpawnPath, "utf8");
-        // Parse hero_pos=X,Y from the existing spawn.txt
-        const heroPosMatch = spawnContent.match(/hero_pos\s*=\s*(\d+)\s*,\s*(\d+)/);
-        if (heroPosMatch) {
-          heroX = parseInt(heroPosMatch[1], 10);
-          heroY = parseInt(heroPosMatch[2], 10);
-          console.log(`[FlareEngine] Found hero_pos from spawn.txt: ${heroX},${heroY}`);
-        }
-        // Also try to get the intermap destination coords if hero_pos is 0,0
-        if (heroX === 0 && heroY === 0) {
-          const intermapMatch = spawnContent.match(/intermap\s*=\s*[^,]+\s*,\s*(\d+)\s*,\s*(\d+)/);
-          if (intermapMatch) {
-            heroX = parseInt(intermapMatch[1], 10);
-            heroY = parseInt(intermapMatch[2], 10);
-            console.log(`[FlareEngine] Using intermap coords as hero_pos: ${heroX},${heroY}`);
-          }
-        }
-      } catch (e) {
-        console.warn("[FlareEngine] Could not parse existing spawn.txt:", e);
-      }
+    // Ensure engine/misc.txt has save_prefix={projectName} so Flare's save
+    // directory matches where we write the quick-launch save slot.
+    // Without this, Flare defaults save_prefix to "default" and never finds
+    // our save file, falling back to an existing (wrong) save or a new game.
+    const miscPath = path.join(engineDir, "misc.txt");
+    let miscContent = "";
+    if (fs.existsSync(miscPath)) {
+      miscContent = fs.readFileSync(miscPath, "utf8");
     }
+    if (/^save_prefix\s*=/m.test(miscContent)) {
+      miscContent = miscContent.replace(/^save_prefix\s*=.*$/m, `save_prefix=${projectName}`);
+    } else {
+      miscContent = (miscContent ? miscContent.trimEnd() + "\n" : "") + `save_prefix=${projectName}\n`;
+    }
+    fs.writeFileSync(miscPath, miscContent, "utf8");
+    console.log(`[FlareEngine] Ensured save_prefix=${projectName} in engine/misc.txt`);
 
     // Determine the target map file path for each mode
     let targetMap;
@@ -2230,10 +2219,14 @@ ipcMainLocal.handle("prepare-flare-quick-launch", async (_event, { flarePath, pr
       targetMap = `maps/${mapName}.txt`;
     } else {
       // new-game: try to find the original intermap target from spawn.txt
+      const existingSpawnPath = path.join(mapsDir, "spawn.txt");
       targetMap = null;
-      if (fs.existsSync(existingSpawnPath)) {
+      // Check backup first (we may have overwritten spawn.txt in a previous launch)
+      const backupPath = path.join(mapsDir, "spawn.txt.bak");
+      const spawnToRead = fs.existsSync(backupPath) ? backupPath : existingSpawnPath;
+      if (fs.existsSync(spawnToRead)) {
         try {
-          const spawnContent = fs.readFileSync(existingSpawnPath, "utf8");
+          const spawnContent = fs.readFileSync(spawnToRead, "utf8");
           const intermapMatch = spawnContent.match(/intermap\s*=\s*([^,\s]+)/);
           if (intermapMatch) {
             targetMap = intermapMatch[1].trim();
@@ -2249,8 +2242,31 @@ ipcMainLocal.handle("prepare-flare-quick-launch", async (_event, { flarePath, pr
       return { success: false, error: "No map available to launch" };
     }
 
+    // 2. Read hero_pos from the TARGET MAP file (not spawn.txt)
+    let heroX = 2;
+    let heroY = 2;
+    const targetMapPath = path.join(projectPath, targetMap);
+    if (fs.existsSync(targetMapPath)) {
+      try {
+        const mapContent = fs.readFileSync(targetMapPath, "utf8");
+        const heroPosMatch = mapContent.match(/hero_pos\s*=\s*(\d+)\s*,\s*(\d+)/);
+        if (heroPosMatch) {
+          heroX = parseInt(heroPosMatch[1], 10);
+          heroY = parseInt(heroPosMatch[2], 10);
+          console.log(`[FlareEngine] Read hero_pos from ${targetMap}: ${heroX},${heroY}`);
+        }
+      } catch (e) {
+        console.warn("[FlareEngine] Could not parse hero_pos from map file:", e);
+      }
+    }
+    // Fallback: if hero_pos is still 0,0 use a safe default
+    if (heroX === 0 && heroY === 0) {
+      heroX = 2;
+      heroY = 2;
+      console.log("[FlareEngine] hero_pos was 0,0, using safe default 2,2");
+    }
+
     // 3. Write a temporary spawn.txt that teleports directly to the target map
-    //    This is the Flare "dummy map" format — 1x1 tile map with on_load intermap event
     if (!fs.existsSync(mapsDir)) {
       fs.mkdirSync(mapsDir, { recursive: true });
     }
@@ -2271,6 +2287,7 @@ ipcMainLocal.handle("prepare-flare-quick-launch", async (_event, { flarePath, pr
     ].join("\n");
 
     // Back up the original spawn.txt if it exists and wasn't already backed up
+    const existingSpawnPath = path.join(mapsDir, "spawn.txt");
     const spawnBackupPath = path.join(mapsDir, "spawn.txt.bak");
     if (fs.existsSync(existingSpawnPath) && !fs.existsSync(spawnBackupPath)) {
       fs.copyFileSync(existingSpawnPath, spawnBackupPath);

@@ -248,10 +248,10 @@ const useMapConfig = ({
   const handleOpenCreateMapDialog = useCallback(() => {
     setNewMapWidth(mapWidth > 0 ? mapWidth : 20);
     setNewMapHeight(mapHeight > 0 ? mapHeight : 15);
-    setNewMapStarting(isStartingMap);
+    setNewMapStarting(false);
     setCreateMapError(null);
     setShowCreateMapDialog(true);
-  }, [mapWidth, mapHeight, isStartingMap]);
+  }, [mapWidth, mapHeight]);
 
   const hasOpenedCreateMapDialog = useRef(false);
   useEffect(() => {
@@ -365,7 +365,11 @@ const useMapConfig = ({
       showToolbarTemporarily();
       showBottomToolbarTemporarily();
       setMapName(resolvedName);
-      updateStartingMap(newMapStarting, { mapNameOverride: resolvedName });
+      if (newMapStarting) {
+        updateStartingMap(true, { mapNameOverride: resolvedName });
+      } else {
+        setIsStartingMap(false);
+      }
       setNewMapStarting(newMapStarting);
       setHasSelection(false);
       setSelectionCount(0);

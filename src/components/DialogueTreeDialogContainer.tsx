@@ -17,7 +17,9 @@ type DialogueTreeDialogCtx = {
 };
 
 export default function DialogueTreeDialogContainer({ ctx }: { ctx: unknown }) {
-  const c = ctx as DialogueTreeDialogCtx;
+  const c = ctx as DialogueTreeDialogCtx & { projectMaps?: string[] };
+  // Try to get projectMaps from context if available
+  const projectMaps = (c.projectMaps ?? (window.__ISM_TILE_PROJECT_MAPS__ ?? []));
   return (
     <DialogueTreeDialog
       showDialogueTreeDialog={c.showDialogueTreeDialog ?? false}
@@ -30,6 +32,7 @@ export default function DialogueTreeDialogContainer({ ctx }: { ctx: unknown }) {
       editingObject={c.editingObject ?? null}
       updateEditingObjectProperty={(k, v) => (c.updateEditingObjectProperty ? c.updateEditingObjectProperty(k, v) : undefined)}
       onClose={c.onDialogueClose ?? (() => {})}
+      projectMaps={projectMaps}
     />
   );
 }

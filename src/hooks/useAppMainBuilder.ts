@@ -1438,6 +1438,16 @@ export default function useAppMainBuilder() {
           setImportReviewOriginPreset('bottom-center');
         }
         } as Record<string, unknown>;
+        // Inject projectMaps into dialogCtx for DialogsContainer
+        console.log('[useAppMainBuilder] sb["projectMaps"]:', sb['projectMaps']);
+        const maps = sb['projectMaps'] ?? [];
+        if (Array.isArray(maps)) {
+          dialogCtx.projectMaps = maps;
+          console.log('[useAppMainBuilder] Injected projectMaps into dialogCtx:', maps);
+        } else {
+          dialogCtx.projectMaps = [];
+          console.warn('[useAppMainBuilder] No projectMaps found, injecting empty array.');
+        }
         return dialogCtx;
       })(),
       // Flatten dialog properties to top level for dialog containers

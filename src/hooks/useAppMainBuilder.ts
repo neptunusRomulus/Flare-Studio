@@ -1465,6 +1465,7 @@ export default function useAppMainBuilder() {
       getEditingObjectProperty: objectEditing.getEditingObjectProperty,
       handleEditingTilesetBrowse: objectEditing.handleEditingTilesetBrowse,
       handleEditingPortraitBrowse: objectEditing.handleEditingPortraitBrowse,
+      handleAutoDetectAnim: objectEditing.handleAutoDetectAnim,
       showDeleteNpcConfirm: objectEditing.showDeleteNpcConfirm,
       setShowDeleteNpcConfirm: objectEditing.setShowDeleteNpcConfirm,
       showDeleteEnemyConfirm: objectEditing.showDeleteEnemyConfirm,

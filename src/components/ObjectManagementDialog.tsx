@@ -24,6 +24,7 @@ type ObjectManagementDialogProps = {
   canUseTilesetDialog: boolean;
   handleEditingTilesetBrowse: () => Promise<void> | void;
   handleEditingPortraitBrowse: () => Promise<void> | void;
+  handleAutoDetectAnim: () => Promise<void> | void;
   handleOpenVendorStockDialog: () => void;
   handleOpenVendorUnlockDialog: () => void;
   handleOpenVendorRandomDialog: () => void;
@@ -75,6 +76,7 @@ const ObjectManagementDialog = ({
   canUseTilesetDialog,
   handleEditingTilesetBrowse,
   handleEditingPortraitBrowse,
+  handleAutoDetectAnim,
   handleOpenVendorStockDialog,
   handleOpenVendorUnlockDialog,
   handleOpenVendorRandomDialog,
@@ -1079,7 +1081,8 @@ const ObjectManagementDialog = ({
               {animationExpanded ? <ChevronUp className="w-4 h-4 shrink-0" /> : <ChevronDown className="w-4 h-4 shrink-0" />}
               <span>Animation</span>
             </button>
-            {animationExpanded && <div className="space-y-3 px-3 pb-3">
+            {animationExpanded && (
+              <div className="space-y-3 px-3 pb-3">
 
             {/* Live Animation Preview - always visible */}
             <div className="relative">
@@ -1123,6 +1126,18 @@ const ObjectManagementDialog = ({
                   </span>
                 )}
               </div>
+              {getEditingObjectProperty('tilesetPath', '') && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 gap-1.5 text-orange-500 hover:text-orange-600 hover:bg-orange-500/10"
+                  onClick={() => { void handleAutoDetectAnim(); }}
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span className="text-xs">Auto Detect</span>
+                </Button>
+              )}
               {getEditingObjectProperty('anim_image_width', '') && (
                 <span className="text-[10px] text-muted-foreground">
                   {getEditingObjectProperty('anim_image_width', '?')}×{getEditingObjectProperty('anim_image_height', '?')} &bull; {getEditingObjectProperty('anim_frames', '?')} frame{getEditingObjectProperty('anim_frames', '1') !== '1' ? 's' : ''}
@@ -1234,7 +1249,8 @@ const ObjectManagementDialog = ({
               </div>
             </div>
 
-            </div>}
+              </div>
+            )}
           </div>
         )}
 

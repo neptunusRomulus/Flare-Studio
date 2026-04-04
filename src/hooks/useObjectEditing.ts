@@ -469,16 +469,25 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
 
   const handleAutoDetectAnim = useCallback(async () => {
     const tilesetPath = getEditingObjectProperty?.('tilesetPath', '');
-    if (!tilesetPath) return;
+    console.log('[AutoDetectAnim] tilesetPath:', tilesetPath);
+    if (!tilesetPath) {
+      console.warn('[AutoDetectAnim] No tilesetPath set, aborting.');
+      return;
+    }
 
     try {
       const dims = await loadImageDimensions(tilesetPath);
+      console.log('[AutoDetectAnim] Image dimensions:', dims);
       if (dims) {
         // Reset everything to defaults for the new dimensions
         const defaults = computeAnimDefaults(dims.width, dims.height, {});
+        console.log('[AutoDetectAnim] Computed defaults:', defaults);
         for (const [key, value] of Object.entries(defaults)) {
+          console.log(`[AutoDetectAnim] Updating property ${key} =`, value);
           updateEditingObjectProperty(key, value);
         }
+      } else {
+        console.warn('[AutoDetectAnim] Could not load image dimensions.');
       }
     } catch (error) {
       console.error('Failed to auto-detect animation properties:', error);

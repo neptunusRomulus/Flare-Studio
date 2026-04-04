@@ -329,6 +329,14 @@ const useProjectIO = ({
     }
   }, [currentProjectPath]);
 
+  useEffect(() => {
+    if (!currentProjectPath) {
+      setProjectMaps([]);
+      return;
+    }
+    void refreshProjectMaps();
+  }, [currentProjectPath, refreshProjectMaps]);
+
   // Keep refs to external callbacks so we don't force consumers to create
   // new functions and cause unnecessary callback re-creations.
   const handleManualSaveRef = useRef<typeof handleManualSave | undefined>(undefined);

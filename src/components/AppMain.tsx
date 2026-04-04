@@ -201,6 +201,11 @@ export default function AppMain() {
     );
   }
 
+  // Debug: log dialogsCtx and projectMaps
+  console.log('[AppMain] dialogsCtx:', dialogsCtx);
+  if (dialogsCtx && typeof dialogsCtx === 'object' && 'projectMaps' in dialogsCtx) {
+    console.log('[AppMain] dialogsCtx.projectMaps:', dialogsCtx.projectMaps);
+  }
   return (
     <div className="h-screen bg-background text-foreground flex flex-col overflow-hidden">
       <AppShell

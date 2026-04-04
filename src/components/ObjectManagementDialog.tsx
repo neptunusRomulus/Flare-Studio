@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 import Tooltip from '@/components/ui/tooltip';
 import { ArrowUp, ArrowUpRight, ArrowRight, ArrowDownRight, ArrowDown, ArrowDownLeft, ArrowLeft, ArrowUpLeft, Check, ChevronDown, ChevronUp, Gift, HelpCircle, Image, MessagesSquare, Package, Plus, Save, Sparkles, Trash2, User, X } from 'lucide-react';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
@@ -1205,27 +1206,35 @@ const ObjectManagementDialog = ({
               {/* Type */}
               <div className="flex items-center gap-2">
                 <label className="text-[10px] text-muted-foreground w-16 shrink-0">Type</label>
-                <select
+                <Select
                   value={getEditingObjectProperty('anim_type', 'looped')}
-                  onChange={(e) => updateEditingObjectProperty('anim_type', e.target.value)}
-                  className="h-6 px-1 text-xs rounded border border-border bg-background w-28"
+                  onValueChange={(value) => updateEditingObjectProperty('anim_type', value)}
                 >
-                  <option value="looped">looped</option>
-                  <option value="play_once">play_once</option>
-                  <option value="back_forth">back_forth</option>
-                </select>
+                  <SelectTrigger className="h-6 px-1 text-xs rounded border border-border bg-background w-28">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="looped">looped</SelectItem>
+                    <SelectItem value="play_once">play_once</SelectItem>
+                    <SelectItem value="back_forth">back_forth</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               {/* Blend Mode & Alpha */}
               <div className="flex items-center gap-2">
                 <label className="text-[10px] text-muted-foreground w-16 shrink-0">Blend</label>
-                <select
+                <Select
                   value={getEditingObjectProperty('anim_blend_mode', 'normal')}
-                  onChange={(e) => updateEditingObjectProperty('anim_blend_mode', e.target.value)}
-                  className="h-6 px-1 text-xs rounded border border-border bg-background w-20"
+                  onValueChange={(value) => updateEditingObjectProperty('anim_blend_mode', value)}
                 >
-                  <option value="normal">normal</option>
-                  <option value="add">add</option>
-                </select>
+                  <SelectTrigger className="h-6 px-1 text-xs rounded border border-border bg-background w-20">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="normal">normal</SelectItem>
+                    <SelectItem value="add">add</SelectItem>
+                  </SelectContent>
+                </Select>
                 <label className="text-[10px] text-muted-foreground shrink-0">Alpha</label>
                 <Input
                   type="number"

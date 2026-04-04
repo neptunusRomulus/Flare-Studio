@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import Tooltip from '@/components/ui/tooltip';
 import { ArrowUp, ArrowUpRight, ArrowRight, ArrowDownRight, ArrowDown, ArrowDownLeft, ArrowLeft, ArrowUpLeft, Check, ChevronDown, ChevronUp, Gift, HelpCircle, Image, MessagesSquare, Package, Plus, Save, Sparkles, Trash2, User, X } from 'lucide-react';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
+import AnimationPreview from '@/components/AnimationPreview';
 import type { DialogueTree, MapObject } from '@/types';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 
@@ -86,6 +87,7 @@ const ObjectManagementDialog = ({
   setShowDeleteEnemyConfirm
 }: ObjectManagementDialogProps) => {
   const [appearanceExpanded, setAppearanceExpanded] = useState(false);
+  const [animationExpanded, setAnimationExpanded] = useState(false);
   const [spawnReqExpanded, setSpawnReqExpanded] = useState(false);
   const [audioExpanded, setAudioExpanded] = useState(false);
 
@@ -244,10 +246,7 @@ const ObjectManagementDialog = ({
               className="w-full px-3 py-2 flex items-center gap-2 text-sm font-semibold hover:bg-muted/50 rounded-t-md text-left"
             >
               {appearanceExpanded ? <ChevronUp className="w-4 h-4 shrink-0" /> : <ChevronDown className="w-4 h-4 shrink-0" />}
-              <div>
-                <span>Appearance</span>
-                <p className="text-xs text-muted-foreground font-normal">Visual and positioning settings for this NPC.</p>
-              </div>
+              <span>Identity</span>
             </button>
             {appearanceExpanded && <div className="space-y-3 px-3 pb-3">
 
@@ -298,43 +297,37 @@ const ObjectManagementDialog = ({
               </div>
             </div>
 
-            {/* Tileset & Portrait - button only with green badge */}
-            <div className="flex gap-2">
-              <div className="relative">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-7 px-2 gap-1.5"
-                  onClick={() => { void handleEditingTilesetBrowse(); }}
-                  disabled={!canUseTilesetDialog}
-                >
-                  <Image className="w-3.5 h-3.5" />
-                  <span className="text-xs">Tileset</span>
-                </Button>
-                {getEditingObjectProperty('tilesetPath', '') && (
-                  <span className="absolute -top-1 -right-1 flex items-center justify-center w-3.5 h-3.5 rounded-full bg-green-500">
-                    <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
-                  </span>
-                )}
-              </div>
-              <div className="relative">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-7 px-2 gap-1.5"
-                  onClick={() => { void handleEditingPortraitBrowse(); }}
-                  disabled={!canUseTilesetDialog}
-                >
-                  <User className="w-3.5 h-3.5" />
-                  <span className="text-xs">Portrait</span>
-                </Button>
-                {getEditingObjectProperty('portraitPath', '') && (
-                  <span className="absolute -top-1 -right-1 flex items-center justify-center w-3.5 h-3.5 rounded-full bg-green-500">
-                    <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
-                  </span>
-                )}
+            {/* Portrait - preview and button */}
+            <div className="space-y-2">
+              {getEditingObjectProperty('portraitPath', '') && (
+                <div className="w-20 h-20 border border-border rounded bg-muted/40 flex items-center justify-center overflow-hidden">
+                  <img
+                    src={getEditingObjectProperty('portraitPath', '')}
+                    alt="Portrait"
+                    className="max-w-full max-h-full object-contain"
+                    style={{ imageRendering: 'pixelated' }}
+                  />
+                </div>
+              )}
+              <div className="flex gap-2">
+                <div className="relative">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-7 px-2 gap-1.5"
+                    onClick={() => { void handleEditingPortraitBrowse(); }}
+                    disabled={!canUseTilesetDialog}
+                  >
+                    <User className="w-3.5 h-3.5" />
+                    <span className="text-xs">Portrait</span>
+                  </Button>
+                  {getEditingObjectProperty('portraitPath', '') && (
+                    <span className="absolute -top-1 -right-1 flex items-center justify-center w-3.5 h-3.5 rounded-full bg-green-500">
+                      <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -1071,6 +1064,176 @@ const ObjectManagementDialog = ({
               </div>
               </SpawnFieldOverlay>
             </div>
+            </div>}
+          </div>
+        )}
+
+        {/* NPC Animation */}
+        {editingObject.type === 'npc' && (
+          <div className="border border-border rounded-md bg-muted/20">
+            <button
+              type="button"
+              onClick={() => setAnimationExpanded(!animationExpanded)}
+              className="w-full px-3 py-2 flex items-center gap-2 text-sm font-semibold hover:bg-muted/50 rounded-t-md text-left"
+            >
+              {animationExpanded ? <ChevronUp className="w-4 h-4 shrink-0" /> : <ChevronDown className="w-4 h-4 shrink-0" />}
+              <span>Animation</span>
+            </button>
+            {animationExpanded && <div className="space-y-3 px-3 pb-3">
+
+            {/* Live Animation Preview - always visible */}
+            <div className="relative">
+              <AnimationPreview
+                tilesetPath={getEditingObjectProperty('tilesetPath', '')}
+                direction={parseInt(getEditingObjectProperty('direction', '0'), 10) || 0}
+                properties={{
+                  anim_render_width: getEditingObjectProperty('anim_render_width', ''),
+                  anim_render_height: getEditingObjectProperty('anim_render_height', ''),
+                  anim_render_offset_x: getEditingObjectProperty('anim_render_offset_x', ''),
+                  anim_render_offset_y: getEditingObjectProperty('anim_render_offset_y', ''),
+                  anim_frames: getEditingObjectProperty('anim_frames', ''),
+                  anim_duration: getEditingObjectProperty('anim_duration', ''),
+                  anim_type: getEditingObjectProperty('anim_type', ''),
+                  anim_blend_mode: getEditingObjectProperty('anim_blend_mode', ''),
+                  anim_alpha_mod: getEditingObjectProperty('anim_alpha_mod', ''),
+                  anim_color_mod: getEditingObjectProperty('anim_color_mod', ''),
+                  anim_image_width: getEditingObjectProperty('anim_image_width', ''),
+                  anim_image_height: getEditingObjectProperty('anim_image_height', ''),
+                }}
+              />
+            </div>
+
+            {/* Tileset import button */}
+            <div className="flex gap-2 items-center">
+              <div className="relative">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2 gap-1.5"
+                  onClick={() => { void handleEditingTilesetBrowse(); }}
+                  disabled={!canUseTilesetDialog}
+                >
+                  <Image className="w-3.5 h-3.5" />
+                  <span className="text-xs">Import Tileset</span>
+                </Button>
+                {getEditingObjectProperty('tilesetPath', '') && (
+                  <span className="absolute -top-1 -right-1 flex items-center justify-center w-3.5 h-3.5 rounded-full bg-green-500">
+                    <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
+                  </span>
+                )}
+              </div>
+              {getEditingObjectProperty('anim_image_width', '') && (
+                <span className="text-[10px] text-muted-foreground">
+                  {getEditingObjectProperty('anim_image_width', '?')}×{getEditingObjectProperty('anim_image_height', '?')} &bull; {getEditingObjectProperty('anim_frames', '?')} frame{getEditingObjectProperty('anim_frames', '1') !== '1' ? 's' : ''}
+                </span>
+              )}
+            </div>
+
+            {/* Animation Settings - always visible */}
+            <div className="space-y-2">
+              {/* Frame Size */}
+              <div className="flex items-center gap-2">
+                <label className="text-[10px] text-muted-foreground w-16 shrink-0">Frame Size</label>
+                <Input
+                  type="number"
+                  value={getEditingObjectProperty('anim_render_width', '')}
+                  onChange={(e) => updateEditingObjectProperty('anim_render_width', e.target.value || null)}
+                  className="h-6 w-14 px-1 text-center text-xs"
+                  min={1}
+                />
+                <span className="text-muted-foreground text-xs">×</span>
+                <Input
+                  type="number"
+                  value={getEditingObjectProperty('anim_render_height', '')}
+                  onChange={(e) => updateEditingObjectProperty('anim_render_height', e.target.value || null)}
+                  className="h-6 w-14 px-1 text-center text-xs"
+                  min={1}
+                />
+              </div>
+              {/* Render Offset */}
+              <div className="flex items-center gap-2">
+                <label className="text-[10px] text-muted-foreground w-16 shrink-0">Offset</label>
+                <Input
+                  type="number"
+                  value={getEditingObjectProperty('anim_render_offset_x', '')}
+                  onChange={(e) => updateEditingObjectProperty('anim_render_offset_x', e.target.value || null)}
+                  className="h-6 w-14 px-1 text-center text-xs"
+                />
+                <span className="text-muted-foreground text-xs">,</span>
+                <Input
+                  type="number"
+                  value={getEditingObjectProperty('anim_render_offset_y', '')}
+                  onChange={(e) => updateEditingObjectProperty('anim_render_offset_y', e.target.value || null)}
+                  className="h-6 w-14 px-1 text-center text-xs"
+                />
+              </div>
+              {/* Frames & Duration */}
+              <div className="flex items-center gap-2">
+                <label className="text-[10px] text-muted-foreground w-16 shrink-0">Frames</label>
+                <Input
+                  type="number"
+                  value={getEditingObjectProperty('anim_frames', '')}
+                  onChange={(e) => updateEditingObjectProperty('anim_frames', e.target.value || null)}
+                  className="h-6 w-14 px-1 text-center text-xs"
+                  min={1}
+                />
+                <label className="text-[10px] text-muted-foreground shrink-0">Duration</label>
+                <Input
+                  type="text"
+                  value={getEditingObjectProperty('anim_duration', '')}
+                  onChange={(e) => updateEditingObjectProperty('anim_duration', e.target.value || null)}
+                  className="h-6 w-20 px-1 text-center text-xs"
+                  placeholder="1200ms"
+                />
+              </div>
+              {/* Type */}
+              <div className="flex items-center gap-2">
+                <label className="text-[10px] text-muted-foreground w-16 shrink-0">Type</label>
+                <select
+                  value={getEditingObjectProperty('anim_type', 'looped')}
+                  onChange={(e) => updateEditingObjectProperty('anim_type', e.target.value)}
+                  className="h-6 px-1 text-xs rounded border border-border bg-background w-28"
+                >
+                  <option value="looped">looped</option>
+                  <option value="play_once">play_once</option>
+                  <option value="back_forth">back_forth</option>
+                </select>
+              </div>
+              {/* Blend Mode & Alpha */}
+              <div className="flex items-center gap-2">
+                <label className="text-[10px] text-muted-foreground w-16 shrink-0">Blend</label>
+                <select
+                  value={getEditingObjectProperty('anim_blend_mode', 'normal')}
+                  onChange={(e) => updateEditingObjectProperty('anim_blend_mode', e.target.value)}
+                  className="h-6 px-1 text-xs rounded border border-border bg-background w-20"
+                >
+                  <option value="normal">normal</option>
+                  <option value="add">add</option>
+                </select>
+                <label className="text-[10px] text-muted-foreground shrink-0">Alpha</label>
+                <Input
+                  type="number"
+                  value={getEditingObjectProperty('anim_alpha_mod', '')}
+                  onChange={(e) => updateEditingObjectProperty('anim_alpha_mod', e.target.value || null)}
+                  className="h-6 w-14 px-1 text-center text-xs"
+                  min={0}
+                  max={255}
+                />
+              </div>
+              {/* Color Mod */}
+              <div className="flex items-center gap-2">
+                <label className="text-[10px] text-muted-foreground w-16 shrink-0">Color Mod</label>
+                <Input
+                  type="text"
+                  value={getEditingObjectProperty('anim_color_mod', '')}
+                  onChange={(e) => updateEditingObjectProperty('anim_color_mod', e.target.value || null)}
+                  className="h-6 w-24 px-1 text-center text-xs"
+                  placeholder="255,255,255"
+                />
+              </div>
+            </div>
+
             </div>}
           </div>
         )}

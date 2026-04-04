@@ -131,7 +131,7 @@ export default function useAppHandlers(params: UseAppHandlersParams) {
   };
   const { handleObjectDialogSave, updateEditingObjectProperty, updateEditingObjectBoolean, getEditingObjectProperty } = useObjectDialogHandlers(objectDialogHandlersParams as any);
 
-  const editingBrowseParams: Parameters<typeof useEditingBrowseHandlers>[0] = { updateEditingObjectProperty } as any;
+  const editingBrowseParams: Parameters<typeof useEditingBrowseHandlers>[0] = { updateEditingObjectProperty, getEditingObjectProperty } as any;
   const { handleEditingTilesetBrowse, handleEditingPortraitBrowse } = useEditingBrowseHandlers(editingBrowseParams as any);
 
   const vendorDialogsParams: Parameters<typeof useVendorDialogs>[0] = {

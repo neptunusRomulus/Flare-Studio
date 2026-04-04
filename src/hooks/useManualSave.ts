@@ -44,16 +44,47 @@ const getImageDimensions = (sourcePath: string): Promise<{ width: number; height
 
 /**
  * Build Flare animation definition file content with a proper [stance] section.
- * If dimensions are available, computes render_size / render_offset and frame data.
+ * If animProps (anim_* properties from the UI) are available, use them directly.
+ * Otherwise falls back to auto-computing from image dimensions.
  */
 const buildAnimationFileContent = (
   imageRelativePath: string,
-  dims: { width: number; height: number } | null
+  dims: { width: number; height: number } | null,
+  animProps?: Record<string, string>
 ): string => {
   const lines: string[] = [`image=${imageRelativePath}`];
   lines.push('');
 
-  if (dims && dims.width > 0 && dims.height > 0) {
+  // Try to use stored animation properties from the UI first
+  const rw = animProps?.anim_render_width;
+  const rh = animProps?.anim_render_height;
+  if (rw && rh) {
+    const frameW = parseInt(rw, 10);
+    const frameH = parseInt(rh, 10);
+    const offsetX = parseInt(animProps?.anim_render_offset_x || String(Math.floor(frameW / 2)), 10);
+    const offsetY = parseInt(animProps?.anim_render_offset_y || String(frameH - 2), 10);
+    const frameCount = parseInt(animProps?.anim_frames || '1', 10);
+    const duration = animProps?.anim_duration || (frameCount > 1 ? '1200ms' : '1s');
+    const animType = animProps?.anim_type || 'looped';
+    const blendMode = animProps?.anim_blend_mode || 'normal';
+    const alphaMod = animProps?.anim_alpha_mod || '255';
+    const colorMod = animProps?.anim_color_mod || '255,255,255';
+
+    lines.push(`render_size=${frameW},${frameH}`);
+    lines.push(`render_offset=${offsetX},${offsetY}`);
+    if (blendMode !== 'normal') lines.push(`blend_mode=${blendMode}`);
+    if (alphaMod !== '255') lines.push(`alpha_mod=${alphaMod}`);
+    if (colorMod !== '255,255,255') lines.push(`color_mod=${colorMod}`);
+    lines.push('');
+    lines.push('[stance]');
+    lines.push(`frames=${frameCount}`);
+    lines.push('position=0');
+    lines.push(`duration=${duration}`);
+    lines.push(`type=${animType}`);
+    if (frameCount === 1) {
+      lines.push(`frame=0,0,0,0,${frameW},${frameH},${offsetX},${offsetY}`);
+    }
+  } else if (dims && dims.width > 0 && dims.height > 0) {
     const w = dims.width;
     const h = dims.height;
     // Heuristic: if the width is a multiple of the height, treat it as a horizontal sprite strip
@@ -72,8 +103,6 @@ const buildAnimationFileContent = (
     lines.push(`duration=${frameCount > 1 ? '1200ms' : '1s'}`);
     lines.push('type=looped');
 
-    // If we have 1 frame, emit explicit frame= line; for multi-frame strips Flare
-    // auto-slices when render_size is present, so no per-frame lines are needed.
     if (frameCount === 1) {
       lines.push(`frame=0,0,0,0,${frameW},${frameH},${offsetX},${offsetY}`);
     }
@@ -421,9 +450,11 @@ export default function useManualSave(args: {
                         console.warn('[ManualSave][TXT] Failed to get NPC sprite dimensions:', e);
                       }
                       // Create the animation definition file content with [stance]
+                      // Pass stored anim_* properties from the NPC Edit Dialog UI
+                      const animProps = npc.properties || {};
                       npcAnimationFiles.push({
                         filename: `${sanitizedName}.txt`,
-                        content: buildAnimationFileContent(`images/npcs/${tilesetFilename}`, dims)
+                        content: buildAnimationFileContent(`images/npcs/${tilesetFilename}`, dims, animProps)
                       });
                     }
                   }

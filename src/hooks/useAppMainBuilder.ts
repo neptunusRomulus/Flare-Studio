@@ -1505,6 +1505,11 @@ export default function useAppMainBuilder() {
       handleItemSubmit: itemsHook.handleItemSubmit,
       handleConfirmDuplicateItem: itemsHook.handleConfirmDuplicateItem,
       clearPendingDuplicate: () => itemsHook.setPendingDuplicateItem(null),
+      showItemEditDialog: itemsHook.showItemEditDialog,
+      editingItem: itemsHook.editingItem,
+      updateEditingItemField: itemsHook.updateEditingItemField,
+      handleCloseItemEdit: itemsHook.handleCloseItemEdit,
+      handleSaveItemEdit: itemsHook.handleSaveItemEdit,
       tooltip: null
     } as Record<string, unknown>;
   }

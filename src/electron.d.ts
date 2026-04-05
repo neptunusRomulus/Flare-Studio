@@ -83,6 +83,8 @@ declare global {
         name: string;
         id: number;
         category?: string;
+        role?: string;
+        resourceSubtype?: string;
       }) => Promise<{ success: boolean; filePath?: string; filename?: string; error?: string }>;
       getItemCategories: (projectPath: string) => Promise<{ success: boolean; categories: string[]; error?: string }>;
       createItemCategory: (projectPath: string, categoryName: string) => Promise<{ success: boolean; categoryName?: string; categoryPath?: string; error?: string }>;

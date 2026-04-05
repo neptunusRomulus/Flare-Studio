@@ -130,8 +130,14 @@ export default function useItems({ currentProjectPath, toast, normalizeItemsForS
       }
 
       if (window.electronAPI?.createItemFile) {
-        const payload = { name: itemDialogState.name.trim(), id: itemId, category: selectedCategory };
-        const result = await window.electronAPI.createItemFile(currentProjectPath, payload as unknown as { name: string; id: number; category?: string });
+        const payload = { 
+          name: itemDialogState.name.trim(), 
+          id: itemId, 
+          category: selectedCategory,
+          role: selectedRole,
+          resourceSubtype: itemDialogState.resourceSubtype
+        };
+        const result = await window.electronAPI.createItemFile(currentProjectPath, payload as unknown as { name: string; id: number; category?: string; role?: string; resourceSubtype?: string });
         if (result.success) {
           console.log('[DEBUG-ItemSubmit] Item file created:', itemDialogState.name, 'ID:', itemId);
           toast({ title: 'Item Created', description: `${itemDialogState.name} (ID: ${itemId}) has been created.` });

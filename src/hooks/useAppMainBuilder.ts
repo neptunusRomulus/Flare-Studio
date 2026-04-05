@@ -834,17 +834,9 @@ export default function useAppMainBuilder() {
         currentProjectPath,
         onShowImportReview: (data: unknown) => {
           const parsedData = data as ImportReviewData;
-          console.log('[useAppMainBuilder] DEBUG: onShowImportReview called with:', {
-            tilesetFileName: parsedData?.tilesetFileName,
-            detectedAssetCount: parsedData?.detectedAssets?.length,
-            tileSize: `${FIXED_TILE_WIDTH}x${FIXED_TILE_HEIGHT}`,
-            layerType: parsedData?._meta?.layerType,
-            tabId: parsedData?._meta?.tabId
-          });
           setImportReviewOriginPreset('bottom-center');
           setImportReviewData(parsedData);
           setShowImportReview(true);
-          console.log('[useAppMainBuilder] DEBUG: Import review modal state set to true');
         },
         isExporting: isExportingValue,
         exportProgress: exportProgressValue,
@@ -1398,18 +1390,10 @@ export default function useAppMainBuilder() {
           };
 
           // Tile size is fixed — no re-import needed, just save profile directly
-          console.log('[useAppMainBuilder] DEBUG: Saving profile (fixed tile size %dx%d)', FIXED_TILE_WIDTH, FIXED_TILE_HEIGHT);
           if (editor && window.electronAPI?.saveTilesetProfiles) {
             const profilesToSave = { [profile.id]: profile };
-            console.log('[useAppMainBuilder] DEBUG: Saving tileset profile:', {
-              profileId: profile.id,
-              tilesetFileName: importReviewData?.tilesetFileName,
-              assetCount: (profile as { assets?: unknown[] }).assets?.length,
-              projectPath: currentProjectPath
-            });
             window.electronAPI.saveTilesetProfiles(currentProjectPath || '', profilesToSave).then(result => {
               if (result.success) {
-                console.log('[useAppMainBuilder] DEBUG: Tileset profile saved successfully');
                 toast({
                   title: 'Profile Saved',
                   description: `Asset definitions for ${importReviewData?.tilesetFileName} have been saved.`
@@ -1443,13 +1427,10 @@ export default function useAppMainBuilder() {
         // Inject projectMaps into dialogCtx for DialogsContainer
         const controls = (sb['controls'] as Record<string, unknown> | undefined) ?? {};
         const maps = (controls.projectMaps as string[] | undefined) ?? [];
-        console.log('[useAppMainBuilder] sidebar controls projectMaps:', maps);
         if (Array.isArray(maps)) {
           dialogCtx.projectMaps = maps;
-          console.log('[useAppMainBuilder] Injected projectMaps into dialogCtx:', maps);
         } else {
           dialogCtx.projectMaps = [];
-          console.warn('[useAppMainBuilder] No projectMaps found in sidebar controls, injecting empty array.');
         }
         return dialogCtx;
       })(),

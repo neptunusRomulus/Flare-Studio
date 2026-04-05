@@ -674,7 +674,7 @@ export default function useAppMainBuilder() {
     }
   }, [editor, realSyncMapObjects]);
 
-  const handleDuplicateItem = useCallback(async (item: { id: number; name: string; category: string; filePath: string; fileName: string }) => {
+  const handleDuplicateItem = useCallback(async (item: { id: number; name: string; category: string; filePath: string; fileName: string; role?: string; resourceSubtype?: string }) => {
     if (!currentProjectPath) return;
     try {
       let nextId = item.id + 1;
@@ -693,6 +693,8 @@ export default function useAppMainBuilder() {
           name: `${item.name} (copy)`,
           id: nextId,
           category: item.category,
+          role: item.role,
+          resourceSubtype: item.resourceSubtype
         });
         if (createResult.success && createResult.filePath && window.electronAPI?.writeItemFile) {
           await window.electronAPI.writeItemFile(createResult.filePath, { ...itemData, id: nextId, name: `${item.name} (copy)` });

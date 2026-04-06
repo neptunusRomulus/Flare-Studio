@@ -81,7 +81,7 @@ const SidebarEventEntries = ({
               const activationLabel = event.activate ? FLARE_TO_ACTIVATION[event.activate] || event.activate : null;
 
               return (
-                <ListItemTooltip key={event.id}>
+                <ListItemTooltip key={event.id} item={{ id: event.id, name: event.name || `Event #${event.id}` }}>
                 <ElementContextMenu
                   elementType="event"
                   onEdit={() => onEditEvent(event.id)}

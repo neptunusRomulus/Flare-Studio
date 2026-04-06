@@ -76,7 +76,7 @@ const SidebarItemsPanel = ({
           Click &quot;+ Item&quot; to create a new item definition file.
         </div>
       ) : (
-        <div className="flex flex-col gap-1 p-2">
+        <div className="flex flex-col gap-0.5 px-1">
           {(() => {
             const roleOrder = ITEM_ROLE_SELECTIONS.map(r => r.id).concat('unspecified' as ItemRole);
             const roleMetaLookup = ITEM_ROLE_SELECTIONS.reduce(
@@ -88,7 +88,7 @@ const SidebarItemsPanel = ({
               const items = itemsList.filter((item) => item.role === roleId);
               if (items.length === 0) return null;
               const meta = roleMetaLookup[roleId] || ITEM_ROLE_META.unspecified;
-              const isExpanded = expandedItemCategories.has(roleId) || (roleId === 'equipment' && expandedItemCategories.size === 0);
+              const isExpanded = expandedItemCategories.has(roleId);
               return (
                 <div key={roleId} className="flex flex-col w-full">
                   <Tooltip content="Click to expand" side="right">
@@ -118,7 +118,7 @@ const SidebarItemsPanel = ({
                     className={`grid transition-all duration-200 ease-in-out ${isExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}
                   >
                     <div className="overflow-hidden">
-                      <div className="flex flex-col gap-1 mt-1">
+                      <div className="grid grid-cols-4 gap-1 mt-1 px-0.5">
                         {items.map((item) => (
                           <ElementContextMenu
                             key={item.id}
@@ -127,22 +127,16 @@ const SidebarItemsPanel = ({
                             onDuplicate={() => onDuplicateItem(item)}
                             onDelete={() => onDeleteItem(item)}
                           >
-                          <ListItemTooltip>
-                          <div
-                            className="flex items-center gap-2 p-2 bg-muted/50 hover:bg-muted rounded-md border border-border cursor-pointer transition-colors w-full box-border"
-                            onClick={() => onOpenItemEdit(item)}
-                          >
-                            <div className="flex items-center gap-2 w-full">
-                              <CategoryIcon roleId={roleId} className={`w-4 h-4 flex-shrink-0 ${getCategoryColor(roleId)}`} />
-                              <div className="flex-1 min-w-0">
-                                <div className="text-sm font-medium truncate">{item.name}</div>
-                                <div className="text-xs text-muted-foreground truncate">
-                                  ID: {item.id}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                          </ListItemTooltip>
+                            <ListItemTooltip item={{ id: item.id, name: item.name }}>
+                              <button
+                                className="flex flex-col items-center justify-center rounded-md border border-border bg-transparent hover:bg-muted cursor-pointer transition-colors w-full aspect-square relative group"
+                                onClick={() => onOpenItemEdit(item)}
+                              >
+                                <span className="absolute top-0 left-1 text-[7px] text-muted-foreground/40 select-none leading-none">#{item.id}</span>
+                                <CategoryIcon roleId={roleId} className={`w-5 h-5 ${getCategoryColor(roleId)}`} />
+                                <span className="text-[9px] text-muted-foreground truncate w-full text-center leading-none mt-0.5 px-0.5">{item.name}</span>
+                              </button>
+                            </ListItemTooltip>
                           </ElementContextMenu>
                         ))}
                       </div>

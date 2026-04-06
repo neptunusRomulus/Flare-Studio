@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import Tooltip from '@/components/ui/tooltip';
-import { AlertTriangle, Apple, Book, Box, Check, Coins, Gift, HelpCircle, Key, Layers, Shield, Sparkles, Sword, Tag, Volume2, Zap } from 'lucide-react';
+import { useDraggableResizable } from '@/hooks/useDraggableResizable';
+import { AlertTriangle, Apple, Book, Box, Check, Coins, Gift, HelpCircle, Key, Layers, Shield, Sparkles, Sword, Tag, Volume2, X, Zap } from 'lucide-react';
 import { RESOURCE_SUBTYPE_META } from '@/editor/itemRoles';
 import type { ItemResourceSubtype, ItemRole } from '@/editor/itemRoles';
 
@@ -33,6 +34,7 @@ type EditingItem = {
   price_sell?: string | number;
   max_quantity?: number;
   resourceSubtype?: string;
+  role?: string;
   item_type?: string;
   equip_flags?: string;
   requires_level?: number;
@@ -74,308 +76,346 @@ const ItemEditDialog = ({
   updateEditingItemField,
   handleCloseItemEdit,
   handleSaveItemEdit
-}: ItemEditDialogProps) => (
-  <Dialog open={showItemEditDialog} onOpenChange={(open) => !open && handleCloseItemEdit()}>
-    <DialogContent className="max-w-4xl w-full h-[90vh] flex flex-col">
-      <DialogHeader className="mb-2">
-        <DialogTitle className="flex items-center gap-2">
-          <RoleIcon roleId={(editingItem as any)?.role || 'unspecified'} className="w-5 h-5 text-orange-500" />
-          Edit Item: {editingItem?.name || 'Unknown'}
-        </DialogTitle>
-      </DialogHeader>
-      
-      {editingItem && (
-        <div className="flex-1 overflow-y-auto pr-2 minimal-scroll">
-          {(() => {
-            const role = editingItem.role || 'unspecified';
-            const isUnspecified = role === 'unspecified';
-            const isEquipment = role === 'equipment' || isUnspecified;
-            const isConsumable = role === 'consumable';
-            const isQuest = role === 'quest';
-            const isResource = role === 'resource';
-            const isBook = role === 'book';
-            return (
-          <div className="space-y-4 pb-4">
-          {/* Basic Identifier Properties */}
-          <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
-            <h4 className="text-sm font-semibold flex items-center gap-2">
-              <Tag className="w-4 h-4 text-orange-500" />
-              Basic Identifier Properties
-            </h4>
-                <div className="grid grid-cols-2 gap-3 items-start">
-                  <div className="space-y-2">
-                    <div className="flex flex-col gap-1">
-                      <label className="text-xs text-muted-foreground">ID</label>
-                      <Badge variant="secondary" className="w-fit text-xs px-2 py-1 border border-border bg-muted/60">
-                        {editingItem.id}
-                      </Badge>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-xs text-muted-foreground">Name</label>
-                      <Input
-                        value={editingItem.name}
-                        onChange={(e) => updateEditingItemField('name', e.target.value)}
-                        placeholder="Item name"
-                        className="h-8"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-xs text-muted-foreground">Description</label>
-                      <Input
-                        value={editingItem.flavor}
-                        onChange={(e) => updateEditingItemField('flavor', e.target.value)}
-                        placeholder="Item description shown in tooltips"
-                        className="h-16"
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div>
-                      <label className="text-xs text-muted-foreground">Level</label>
-                      <Input
-                        type="text"
-                        value={editingItem.level}
-                        onChange={(e) => updateEditingItemField('level', parseInt(e.target.value, 10) || 1)}
-                        className="h-8 w-24"
-                      />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-1">
-                        <label className="text-xs text-muted-foreground">Quality (Rarity)</label>
-                        <Tooltip content="Controls rarity color & overlay; does not affect stats." side="right">
-                          <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
-                        </Tooltip>
-                      </div>
-                      {(() => {
-                        const qualityOptions = [
-                          { value: '', label: 'None', swatch: '#d4d4d8' },
-                          { value: 'low', label: 'Low', swatch: 'rgb(127,127,127)' },
-                          { value: 'normal', label: 'Normal', swatch: 'rgb(255,255,255)' },
-                          { value: 'high', label: 'High', swatch: 'rgb(64,255,64)' },
-                          { value: 'epic', label: 'Epic', swatch: 'rgb(64,128,255)' },
-                          { value: 'rare', label: 'Rare', swatch: 'rgb(160,64,255)' },
-                          { value: 'unique', label: 'Unique', swatch: 'rgb(255,192,64)' },
-                          { value: 'one_time_use', label: 'One-time Use', swatch: 'rgb(64,255,255)' },
-                          { value: 'currency', label: 'Currency', swatch: 'rgb(255,232,156)' }
-                        ];
-                        const currentValue = editingItem.quality || '';
-                        return (
-                          <div className="space-y-2">
-                            <div className="flex flex-wrap gap-1.5">
-                              {qualityOptions.map((opt) => {
-                                const isActive = currentValue === opt.value;
-                                return (
-                                  <Button
-                                    key={opt.value ?? 'none'}
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-8 px-2 text-xs flex items-center gap-2 border-border bg-card text-foreground hover:border-muted-foreground/60"
-                                    onClick={() => updateEditingItemField('quality', opt.value)}
-                                    style={isActive ? { borderColor: opt.swatch } : undefined}
-                                  >
-                                    <span
-                                      className="h-3 w-3 rounded-full border border-border"
-                                      style={{ backgroundColor: opt.swatch }}
-                                    ></span>
-                                    <span className="truncate">{opt.label}</span>
-                                  </Button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  </div>
-                </div>
-          </div>
+}: ItemEditDialogProps) => {
+  const {
+    position,
+    size,
+    dialogRef,
+    handleHeaderMouseDown,
+    handleResizeMouseDown,
+  } = useDraggableResizable({ id: 'item_edit_dialog', initialWidth: 900, initialHeight: 700 });
 
-          {/* Trade and Inventory Properties */}
-          <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
-        <h4 className="text-sm font-semibold flex items-center gap-2">
-          <Coins className="w-4 h-4 text-orange-500" />
-          Trade and Inventory Properties
-        </h4>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-start">
-          <div className="md:col-span-1">
-            {(() => {
-              const noStash = editingItem.no_stash || 'ignore';
-              const allowPrivate = !(noStash === 'private' || noStash === 'all');
-              const allowShared = !(noStash === 'shared' || noStash === 'all');
-              const updateStash = (nextAllowPrivate: boolean, nextAllowShared: boolean) => {
-                let next: 'ignore' | 'private' | 'shared' | 'all';
-                if (nextAllowPrivate && nextAllowShared) next = 'ignore';
-                else if (!nextAllowPrivate && nextAllowShared) next = 'private';
-                else if (nextAllowPrivate && !nextAllowShared) next = 'shared';
-                else next = 'all';
-                updateEditingItemField('no_stash', next);
-              };
-              return (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium">Stash</span>
-                    <Tooltip content="Where this can be stored?" side="right">
-                      <HelpCircle className="w-4 h-4 text-muted-foreground" />
-                    </Tooltip>
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="flex items-center gap-2 text-xs text-foreground">
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4"
-                        checked={allowPrivate}
-                        onChange={(e) => updateStash(e.target.checked, allowShared)}
-                      />
-                      <span className="leading-tight">
-                        Private stash
-                        <span className="block text-muted-foreground text-[11px]">Character-only storage</span>
-                      </span>
-                    </label>
-                    <label className="flex items-center gap-2 text-xs text-foreground">
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4"
-                        checked={allowShared}
-                        onChange={(e) => updateStash(allowPrivate, e.target.checked)}
-                      />
-                      <span className="leading-tight">
-                        Shared stash
-                        <span className="block text-muted-foreground text-[11px]">Account-wide storage</span>
-                      </span>
-                    </label>
-                  </div>
-                  {editingItem.quest_item && (
-                    <div className="text-[11px] text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700 rounded px-2 py-1">
-                      Quest items are not stashable by default. Adjust the checkboxes above if you want to allow stashing this quest item.
-                    </div>
-                  )}
+  useEffect(() => {
+    if (!showItemEditDialog) return;
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') handleCloseItemEdit();
+    };
+    document.addEventListener('keydown', handleEsc);
+    return () => document.removeEventListener('keydown', handleEsc);
+  }, [showItemEditDialog, handleCloseItemEdit]);
+
+  if (!showItemEditDialog || !editingItem) return null;
+
+  const role = editingItem.role || 'unspecified';
+  const isUnspecified = role === 'unspecified';
+  const isEquipment = role === 'equipment' || isUnspecified;
+  const isConsumable = role === 'consumable';
+  const isQuest = role === 'quest';
+  const isResource = role === 'resource';
+  const isBook = role === 'book';
+
+  const dialogContent = (
+    <div
+      ref={dialogRef}
+      className="bg-background border border-border/70 rounded-lg flex flex-col shadow-xl"
+      style={{
+        position: 'fixed',
+        left: `${position.x}px`,
+        top: `${position.y}px`,
+        width: `${size.width}px`,
+        height: `${size.height}px`,
+        zIndex: 50,
+        pointerEvents: 'auto',
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div
+        className="sticky top-0 z-10 border-b border-border/50 bg-background px-6 py-3 flex items-center gap-2 cursor-move select-none"
+        onMouseDown={handleHeaderMouseDown}
+      >
+        <RoleIcon roleId={role} className="w-5 h-5 text-orange-500 flex-shrink-0" />
+        <h3 className="text-lg font-semibold flex-1">Edit Item: {editingItem.name || 'Unknown'}</h3>
+        <Button
+          size="icon"
+          variant="ghost"
+          onClick={handleCloseItemEdit}
+          className="h-6 w-6 text-foreground/60 hover:text-foreground"
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto space-y-4 px-6 py-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/15 [&::-webkit-scrollbar-thumb]:rounded-full">
+        {/* Basic Identifier Properties */}
+        <div className="space-y-3 border-b border-border/50 pb-4">
+          <h4 className="text-sm font-semibold flex items-center gap-2">
+            <Tag className="w-4 h-4 text-orange-500" />
+            Basic Identifier Properties
+          </h4>
+          <div className="grid grid-cols-2 gap-3 items-start">
+            <div className="space-y-2">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-muted-foreground">ID</label>
+                <Badge variant="secondary" className="w-fit text-xs px-2 py-1 border border-border bg-muted/60">
+                  {editingItem.id}
+                </Badge>
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-muted-foreground">Name</label>
+                <Input
+                  value={editingItem.name}
+                  onChange={(e) => updateEditingItemField('name', e.target.value)}
+                  placeholder="Item name"
+                  className="h-8"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-muted-foreground">Description</label>
+                <Input
+                  value={editingItem.flavor}
+                  onChange={(e) => updateEditingItemField('flavor', e.target.value)}
+                  placeholder="Item description shown in tooltips"
+                  className="h-8"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <div>
+                <label className="text-xs text-muted-foreground">Level</label>
+                <Input
+                  type="text"
+                  value={editingItem.level}
+                  onChange={(e) => updateEditingItemField('level', parseInt(e.target.value, 10) || 1)}
+                  className="h-8 w-24"
+                />
+              </div>
+              <div>
+                <div className="flex items-center gap-1">
+                  <label className="text-xs text-muted-foreground">Quality (Rarity)</label>
+                  <Tooltip content="Controls rarity color & overlay; does not affect stats." side="right">
+                    <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
+                  </Tooltip>
                 </div>
-              );
-            })()}
-          </div>
-              <div className="md:col-span-2">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <div>
-                      <div className="flex items-center gap-1">
-                        <label className="text-xs text-muted-foreground">Buy Price</label>
-                        <Tooltip content="0 = vendors won’t buy this item (unsellable)." side="right">
-                          <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
-                        </Tooltip>
+                {(() => {
+                  const qualityOptions = [
+                    { value: '', label: 'None', swatch: '#d4d4d8' },
+                    { value: 'low', label: 'Low', swatch: 'rgb(127,127,127)' },
+                    { value: 'normal', label: 'Normal', swatch: 'rgb(255,255,255)' },
+                    { value: 'high', label: 'High', swatch: 'rgb(64,255,64)' },
+                    { value: 'epic', label: 'Epic', swatch: 'rgb(64,128,255)' },
+                    { value: 'rare', label: 'Rare', swatch: 'rgb(160,64,255)' },
+                    { value: 'unique', label: 'Unique', swatch: 'rgb(255,192,64)' },
+                    { value: 'one_time_use', label: 'One-time Use', swatch: 'rgb(64,255,255)' },
+                    { value: 'currency', label: 'Currency', swatch: 'rgb(255,232,156)' }
+                  ];
+                  const currentValue = editingItem.quality || '';
+                  return (
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap gap-1.5">
+                        {qualityOptions.map((opt) => {
+                          const isActive = currentValue === opt.value;
+                          return (
+                            <Button
+                              key={opt.value ?? 'none'}
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-8 px-2 text-xs flex items-center gap-2 border-border bg-card text-foreground hover:border-muted-foreground/60"
+                              onClick={() => updateEditingItemField('quality', opt.value)}
+                              style={isActive ? { borderColor: opt.swatch } : undefined}
+                            >
+                              <span
+                                className="h-3 w-3 rounded-full border border-border"
+                                style={{ backgroundColor: opt.swatch }}
+                              ></span>
+                              <span className="truncate">{opt.label}</span>
+                            </Button>
+                          );
+                        })}
                       </div>
-                      <input
-                        type="text"
-                        value={editingItem.price ?? ''}
-                        onChange={(e) => updateEditingItemField('price', e.target.value)}
-                        placeholder="10"
-                        className="h-8 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                      />
                     </div>
-                    <div>
-                      {(() => {
-                        const autoSell = editingItem.price_sell === '0' || editingItem.price_sell === '' || editingItem.price_sell === undefined;
-                        return (
-                          <>
-                            <div className="flex items-center gap-2">
-                              <div className="flex items-center gap-1">
-                                <label className="text-xs text-muted-foreground">Sell Price</label>
-                                <Tooltip content="0 = use automatic sell price (price * vendor_ratio_sell)." side="right">
-                                  <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
-                                </Tooltip>
-                              </div>
-                              <label className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                                <input
-                                  type="checkbox"
-                                  className="h-3.5 w-3.5"
-                                  checked={autoSell}
-                                  onChange={(e) => {
-                                    if (e.target.checked) {
-                                      updateEditingItemField('price_sell', '0');
-                                    } else {
-                                      const fallbackValue = editingItem.price_sell && editingItem.price_sell !== '0'
-                                        ? editingItem.price_sell
-                                        : (editingItem.price && Number(editingItem.price) > 0 ? Math.max(1, Number(editingItem.price) / 2) : 1);
-                                      updateEditingItemField('price_sell', fallbackValue.toString());
-                                    }
-                                  }}
-                                />
-                                Use automatic sell price
-                              </label>
-                            </div>
-                            <input
-                              type="text"
-                              value={editingItem.price_sell ?? ''}
-                              onChange={(e) => updateEditingItemField('price_sell', e.target.value)}
-                              placeholder="5"
-                              className="h-8 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                              inputMode="numeric"
-                              pattern="[0-9]*"
-                              disabled={autoSell}
-                            />
-                          </>
-                        );
-                      })()}
+                  );
+                })()}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Trade and Inventory Properties */}
+        <div className="space-y-3 border-b border-border/50 pb-4">
+          <h4 className="text-sm font-semibold flex items-center gap-2">
+            <Coins className="w-4 h-4 text-orange-500" />
+            Trade and Inventory Properties
+          </h4>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-start">
+            <div className="md:col-span-1">
+              {(() => {
+                const noStash = editingItem.no_stash || 'ignore';
+                const allowPrivate = !(noStash === 'private' || noStash === 'all');
+                const allowShared = !(noStash === 'shared' || noStash === 'all');
+                const updateStash = (nextAllowPrivate: boolean, nextAllowShared: boolean) => {
+                  let next: 'ignore' | 'private' | 'shared' | 'all';
+                  if (nextAllowPrivate && nextAllowShared) next = 'ignore';
+                  else if (!nextAllowPrivate && nextAllowShared) next = 'private';
+                  else if (nextAllowPrivate && !nextAllowShared) next = 'shared';
+                  else next = 'all';
+                  updateEditingItemField('no_stash', next);
+                };
+                return (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium">Stash</span>
+                      <Tooltip content="Where this can be stored?" side="right">
+                        <HelpCircle className="w-4 h-4 text-muted-foreground" />
+                      </Tooltip>
                     </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="flex items-center gap-2 text-xs text-foreground">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4"
+                          checked={allowPrivate}
+                          onChange={(e) => updateStash(e.target.checked, allowShared)}
+                        />
+                        <span className="leading-tight">
+                          Private stash
+                          <span className="block text-muted-foreground text-[11px]">Character-only storage</span>
+                        </span>
+                      </label>
+                      <label className="flex items-center gap-2 text-xs text-foreground">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4"
+                          checked={allowShared}
+                          onChange={(e) => updateStash(allowPrivate, e.target.checked)}
+                        />
+                        <span className="leading-tight">
+                          Shared stash
+                          <span className="block text-muted-foreground text-[11px]">Account-wide storage</span>
+                        </span>
+                      </label>
+                    </div>
+                    {editingItem.quest_item && (
+                      <div className="text-[11px] text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700 rounded px-2 py-1">
+                        Quest items are not stashable by default. Adjust the checkboxes above if you want to allow stashing this quest item.
+                      </div>
+                    )}
                   </div>
+                );
+              })()}
+            </div>
+            <div className="md:col-span-2">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
                   <div>
                     <div className="flex items-center gap-1">
-                      <label className="text-xs text-muted-foreground">Max stack size</label>
-                      <Tooltip content="Maximum items per stack. 1 = no stacking." side="right">
+                      <label className="text-xs text-muted-foreground">Buy Price</label>
+                      <Tooltip content="0 = vendors won't buy this item (unsellable)." side="right">
                         <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
                       </Tooltip>
                     </div>
                     <input
                       type="text"
-                      value={editingItem.max_quantity}
-                      onChange={(e) => updateEditingItemField('max_quantity', parseInt(e.target.value, 10) || 1)}
+                      value={editingItem.price ?? ''}
+                      onChange={(e) => updateEditingItemField('price', e.target.value)}
+                      placeholder="10"
                       className="h-8 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                       inputMode="numeric"
                       pattern="[0-9]*"
                     />
                   </div>
+                  <div>
+                    {(() => {
+                      const autoSell = editingItem.price_sell === '0' || editingItem.price_sell === '' || editingItem.price_sell === undefined;
+                      return (
+                        <>
+                          <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1">
+                              <label className="text-xs text-muted-foreground">Sell Price</label>
+                              <Tooltip content="0 = use automatic sell price (price * vendor_ratio_sell)." side="right">
+                                <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
+                              </Tooltip>
+                            </div>
+                            <label className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                              <input
+                                type="checkbox"
+                                className="h-3.5 w-3.5"
+                                checked={autoSell}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    updateEditingItemField('price_sell', '0');
+                                  } else {
+                                    const fallbackValue = editingItem.price_sell && editingItem.price_sell !== '0'
+                                      ? editingItem.price_sell
+                                      : (editingItem.price && Number(editingItem.price) > 0 ? Math.max(1, Number(editingItem.price) / 2) : 1);
+                                    updateEditingItemField('price_sell', fallbackValue.toString());
+                                  }
+                                }}
+                              />
+                              Use automatic sell price
+                            </label>
+                          </div>
+                          <input
+                            type="text"
+                            value={editingItem.price_sell ?? ''}
+                            onChange={(e) => updateEditingItemField('price_sell', e.target.value)}
+                            placeholder="5"
+                            className="h-8 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            disabled={autoSell}
+                          />
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
+                <div>
+                  <div className="flex items-center gap-1">
+                    <label className="text-xs text-muted-foreground">Max stack size</label>
+                    <Tooltip content="Maximum items per stack. 1 = no stacking." side="right">
+                      <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
+                    </Tooltip>
+                  </div>
+                  <input
+                    type="text"
+                    value={editingItem.max_quantity}
+                    onChange={(e) => updateEditingItemField('max_quantity', parseInt(e.target.value, 10) || 1)}
+                    className="h-8 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                  />
                 </div>
               </div>
             </div>
           </div>
+        </div>
 
-          {/* Resource-specific */}
-          {isResource && (
-            <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
-              <h4 className="text-sm font-semibold flex items-center gap-2">
-                <Layers className="w-4 h-4 text-orange-500" />
-                Resource
-              </h4>
-              <div className="grid sm:grid-cols-2 gap-2">
-                {(Object.keys(RESOURCE_SUBTYPE_META) as Array<Exclude<ItemResourceSubtype, ''>>).map((key) => {
-                  const meta = RESOURCE_SUBTYPE_META[key];
-                  const isActive = editingItem.resourceSubtype === key;
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      onClick={() => updateEditingItemField('resourceSubtype', key)}
-                      className={`text-left border rounded-md px-3 py-2 transition-colors ${isActive ? 'border-purple-500 bg-purple-500/10 ring-1 ring-purple-500/30' : 'border-border hover:bg-muted/60'}`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${meta.badgeClass}`}>
-                          {meta.label}
-                        </span>
-                        <Check className={`w-4 h-4 transition-opacity ${isActive ? 'opacity-100 text-purple-500' : 'opacity-0'}`} />
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1 leading-snug">{meta.hint}</p>
-                    </button>
-                  );
-                })}
-              </div>
+        {/* Resource-specific */}
+        {isResource && (
+          <div className="space-y-3 border-b border-border/50 pb-4">
+            <h4 className="text-sm font-semibold flex items-center gap-2">
+              <Layers className="w-4 h-4 text-orange-500" />
+              Resource
+            </h4>
+            <div className="grid sm:grid-cols-2 gap-2">
+              {(Object.keys(RESOURCE_SUBTYPE_META) as Array<Exclude<ItemResourceSubtype, ''>>).map((key) => {
+                const meta = RESOURCE_SUBTYPE_META[key];
+                const isActive = editingItem.resourceSubtype === key;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => updateEditingItemField('resourceSubtype', key)}
+                    className={`text-left border rounded-md px-3 py-2 transition-colors ${isActive ? 'border-purple-500 bg-purple-500/10 ring-1 ring-purple-500/30' : 'border-border hover:bg-muted/60'}`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${meta.badgeClass}`}>
+                        {meta.label}
+                      </span>
+                      <Check className={`w-4 h-4 transition-opacity ${isActive ? 'opacity-100 text-purple-500' : 'opacity-0'}`} />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1 leading-snug">{meta.hint}</p>
+                  </button>
+                );
+              })}
             </div>
-          )}
+          </div>
+        )}
 
-          {/* Equipment and Requirement Properties */}
-          {isEquipment && (
-          <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
+        {/* Equipment and Requirements */}
+        {isEquipment && (
+          <div className="space-y-3 border-b border-border/50 pb-4">
             <h4 className="text-sm font-semibold flex items-center gap-2">
               <Shield className="w-4 h-4 text-orange-500" />
               Equipment and Requirements
@@ -451,11 +491,11 @@ const ItemEditDialog = ({
               </div>
             </div>
           </div>
-          )}
+        )}
 
-          {/* Status and Effect Properties (Bonuses) */}
-          {isEquipment && (
-          <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
+        {/* Bonuses and Effects */}
+        {isEquipment && (
+          <div className="space-y-3 border-b border-border/50 pb-4">
             <h4 className="text-sm font-semibold flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-orange-500" />
               Bonuses and Effects
@@ -479,61 +519,60 @@ const ItemEditDialog = ({
               />
             </div>
           </div>
-          )}
+        )}
 
-              {/* Usage and Power Properties */}
-              {(isEquipment || isConsumable) && (
-              <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
+        {/* Usage and Power */}
+        {(isEquipment || isConsumable) && (
+          <div className="space-y-3 border-b border-border/50 pb-4">
             <h4 className="text-sm font-semibold flex items-center gap-2">
               <Zap className="w-4 h-4 text-orange-500" />
-              Usage and Power (TODO IN FUTURE)
+              Usage and Power
             </h4>
             {isEquipment && (
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs text-muted-foreground">Damage (dmg)</label>
-                <Input
-                  value={editingItem.dmg}
-                  onChange={(e) => updateEditingItemField('dmg', e.target.value)}
-                  placeholder="melee,1,10"
-                  className="h-8"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-muted-foreground">Damage (dmg)</label>
+                  <Input
+                    value={editingItem.dmg}
+                    onChange={(e) => updateEditingItemField('dmg', e.target.value)}
+                    placeholder="melee,1,10"
+                    className="h-8"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Absorb (abs)</label>
+                  <Input
+                    value={editingItem.abs}
+                    onChange={(e) => updateEditingItemField('abs', e.target.value)}
+                    placeholder="1,5"
+                    className="h-8"
+                  />
+                </div>
               </div>
-              <div>
-                <label className="text-xs text-muted-foreground">Absorb (abs)</label>
-                <Input
-                  value={editingItem.abs}
-                  onChange={(e) => updateEditingItemField('abs', e.target.value)}
-                  placeholder="1,5"
-                  className="h-8"
-                />
-              </div>
-            </div>
             )}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs text-muted-foreground">Power ID</label>
                 <Input
-                      value={editingItem.power}
-                      onChange={(e) => updateEditingItemField('power', e.target.value)}
-                      placeholder="power_id"
-                      className="h-8"
-                    />
+                  value={editingItem.power}
+                  onChange={(e) => updateEditingItemField('power', e.target.value)}
+                  placeholder="power_id"
+                  className="h-8"
+                />
               </div>
               <div>
                 <label className="text-xs text-muted-foreground">Power Description</label>
                 <Input
                   value={editingItem.power_desc}
                   onChange={(e) => updateEditingItemField('power_desc', e.target.value)}
-                      placeholder="Description text"
-                      className="h-8"
-                    />
-                  </div>
-                </div>
-                {/* TODO: When equipment power presets are finalized, add configuration controls here. */}
-                <div>
-                  <label className="text-xs text-muted-foreground">Replace Power</label>
-                  <Input
+                  placeholder="Description text"
+                  className="h-8"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Replace Power</label>
+              <Input
                 value={editingItem.replace_power}
                 onChange={(e) => updateEditingItemField('replace_power', e.target.value)}
                 placeholder="old_power_id,new_power_id"
@@ -550,107 +589,107 @@ const ItemEditDialog = ({
               />
             </div>
           </div>
-          )}
+        )}
 
-          {/* Quest-only */}
-          {isQuest && (
-            <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
-              <h4 className="text-sm font-semibold flex items-center gap-2">
-                <Key className="w-4 h-4 text-orange-500" />
-                Quest Item Settings
-              </h4>
-              <div className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  id="quest_item_lock"
-                  checked={!!editingItem.quest_item}
-                  disabled
-                  className="h-4 w-4"
-                />
-                <label htmlFor="quest_item_lock" className="text-xs text-muted-foreground">Quest item (always on for this role)</label>
-              </div>
-              <div>
-                <label className="text-xs text-muted-foreground">Pickup Status</label>
-                <Input
-                  value={editingItem.pickup_status}
-                  onChange={(e) => updateEditingItemField('pickup_status', e.target.value)}
-                  placeholder="campaign_status_id"
-                  className="h-8"
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Book / Lore */}
-          {isBook && (
-            <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
-              <h4 className="text-sm font-semibold flex items-center gap-2">
-                <Book className="w-4 h-4 text-orange-500" />
-                Book / Lore
-              </h4>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-muted-foreground">Book File</label>
-                  <Input
-                    value={editingItem.book}
-                    onChange={(e) => updateEditingItemField('book', e.target.value)}
-                    placeholder="books/lore.txt"
-                    className="h-8"
-                  />
-                </div>
-                <label className="flex items-center gap-2 text-xs text-foreground mt-6">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4"
-                    checked={editingItem.book_is_readable}
-                    onChange={(e) => updateEditingItemField('book_is_readable', e.target.checked)}
-                  />
-                  Show &quot;Read&quot; instead of &quot;Use&quot;
-                </label>
-              </div>
-            </div>
-          )}
-
-          {/* Visual and Audio Properties */}
-          <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
+        {/* Quest-only */}
+        {isQuest && (
+          <div className="space-y-3 border-b border-border/50 pb-4">
             <h4 className="text-sm font-semibold flex items-center gap-2">
-              <Volume2 className="w-4 h-4 text-orange-500" />
-              Visual and Audio
+              <Key className="w-4 h-4 text-orange-500" />
+              Quest Item Settings
             </h4>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs text-muted-foreground">Sound FX</label>
-                <Input
-                  value={editingItem.soundfx}
-                  onChange={(e) => updateEditingItemField('soundfx', e.target.value)}
-                  placeholder="sounds/item.ogg"
-                  className="h-8"
-                />
-              </div>
-              <div>
-                <label className="text-xs text-muted-foreground">Step FX (for armor)</label>
-                <Input
-                  value={editingItem.stepfx}
-                  onChange={(e) => updateEditingItemField('stepfx', e.target.value)}
-                  placeholder="step_fx_id"
-                  className="h-8"
-                />
-              </div>
+            <div className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                id="quest_item_lock"
+                checked={!!editingItem.quest_item}
+                disabled
+                className="h-4 w-4"
+              />
+              <label htmlFor="quest_item_lock" className="text-xs text-muted-foreground">Quest item (always on for this role)</label>
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">Loot Animation</label>
+              <label className="text-xs text-muted-foreground">Pickup Status</label>
               <Input
-                value={editingItem.loot_animation}
-                onChange={(e) => updateEditingItemField('loot_animation', e.target.value)}
-                placeholder="loot/animation.txt,min,max"
+                value={editingItem.pickup_status}
+                onChange={(e) => updateEditingItemField('pickup_status', e.target.value)}
+                placeholder="campaign_status_id"
                 className="h-8"
               />
             </div>
           </div>
+        )}
 
-          {/* Randomization and Loot Properties */}
-          {!isQuest && (
-          <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
+        {/* Book / Lore */}
+        {isBook && (
+          <div className="space-y-3 border-b border-border/50 pb-4">
+            <h4 className="text-sm font-semibold flex items-center gap-2">
+              <Book className="w-4 h-4 text-orange-500" />
+              Book / Lore
+            </h4>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-muted-foreground">Book File</label>
+                <Input
+                  value={editingItem.book}
+                  onChange={(e) => updateEditingItemField('book', e.target.value)}
+                  placeholder="books/lore.txt"
+                  className="h-8"
+                />
+              </div>
+              <label className="flex items-center gap-2 text-xs text-foreground mt-6">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={editingItem.book_is_readable}
+                  onChange={(e) => updateEditingItemField('book_is_readable', e.target.checked)}
+                />
+                Show "Read" instead of "Use"
+              </label>
+            </div>
+          </div>
+        )}
+
+        {/* Visual and Audio */}
+        <div className="space-y-3 border-b border-border/50 pb-4">
+          <h4 className="text-sm font-semibold flex items-center gap-2">
+            <Volume2 className="w-4 h-4 text-orange-500" />
+            Visual and Audio
+          </h4>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-muted-foreground">Sound FX</label>
+              <Input
+                value={editingItem.soundfx}
+                onChange={(e) => updateEditingItemField('soundfx', e.target.value)}
+                placeholder="sounds/item.ogg"
+                className="h-8"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Step FX (for armor)</label>
+              <Input
+                value={editingItem.stepfx}
+                onChange={(e) => updateEditingItemField('stepfx', e.target.value)}
+                placeholder="step_fx_id"
+                className="h-8"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground">Loot Animation</label>
+            <Input
+              value={editingItem.loot_animation}
+              onChange={(e) => updateEditingItemField('loot_animation', e.target.value)}
+              placeholder="loot/animation.txt,min,max"
+              className="h-8"
+            />
+          </div>
+        </div>
+
+        {/* Randomization and Loot */}
+        {!isQuest && (
+          <div className="space-y-3 pb-4">
             <h4 className="text-sm font-semibold flex items-center gap-2">
               <Gift className="w-4 h-4 text-orange-500" />
               Randomization and Loot
@@ -677,24 +716,28 @@ const ItemEditDialog = ({
               </div>
             </div>
           </div>
-          )}
+        )}
+      </div>
 
-          </div>
-            );
-          })()}
-        </div>
-      )}
-      
-      <DialogFooter className="pt-2 border-t">
-        <Button variant="outline" onClick={handleCloseItemEdit}>
-          Cancel
-        </Button>
-        <Button onClick={handleSaveItemEdit} className="bg-orange-500 hover:bg-orange-600 text-white">
+      {/* Footer */}
+      <div className="sticky bottom-0 border-t border-border/50 bg-background px-6 py-3 flex justify-end">
+        <Button size="sm" onClick={handleSaveItemEdit} className="h-7 bg-orange-500 hover:bg-orange-600 text-white">
           Save Item
         </Button>
-      </DialogFooter>
-    </DialogContent>
-  </Dialog>
-);
+      </div>
+
+      {/* Resize handle */}
+      <div
+        onMouseDown={handleResizeMouseDown}
+        className="absolute bottom-0 right-0 w-5 h-5 cursor-se-resize opacity-40 hover:opacity-100 transition-opacity flex items-end justify-end"
+        title="Drag to resize"
+      >
+        <div className="w-1.5 h-1.5 bg-foreground/40 rounded-sm m-1" />
+      </div>
+    </div>
+  );
+
+  return createPortal(dialogContent, document.body);
+};
 
 export default ItemEditDialog;

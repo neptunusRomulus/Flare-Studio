@@ -75,7 +75,7 @@ const SidebarActorEntries = ({
               const isPlacedOnMap = actor.x >= 0 && actor.y >= 0;
 
               return (
-                <ListItemTooltip key={actor.id}>
+                <ListItemTooltip key={actor.id} item={{ id: actor.id, name: actor.name || `${actor.type === 'npc' ? 'NPC' : 'Enemy'} #${actor.id}` }}>
                 <ElementContextMenu
                   elementType={isNpcLayer ? 'npc' : 'enemy'}
                   onEdit={() => onEditObject(actor.id)}

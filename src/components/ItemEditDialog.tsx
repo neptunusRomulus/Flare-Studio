@@ -4,9 +4,21 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import Tooltip from '@/components/ui/tooltip';
-import { AlertTriangle, Book, Box, Check, Coins, Gift, HelpCircle, Shield, Sparkles, Sword, Tag, Volume2, Zap } from 'lucide-react';
+import { AlertTriangle, Apple, Book, Box, Check, Coins, Gift, HelpCircle, Key, Layers, Shield, Sparkles, Sword, Tag, Volume2, Zap } from 'lucide-react';
 import { RESOURCE_SUBTYPE_META } from '@/editor/itemRoles';
-import type { ItemResourceSubtype } from '@/editor/itemRoles';
+import type { ItemResourceSubtype, ItemRole } from '@/editor/itemRoles';
+
+const RoleIcon = ({ roleId, className }: { roleId: string; className?: string }) => {
+  switch (roleId) {
+    case 'equipment': return <Sword className={className} />;
+    case 'consumable': return <Apple className={className} />;
+    case 'quest': return <Key className={className} />;
+    case 'resource': return <Layers className={className} />;
+    case 'book': return <Book className={className} />;
+    default: return <Sword className={className} />;
+  }
+};
+
 
 type EditingItem = {
   id?: number;
@@ -67,7 +79,7 @@ const ItemEditDialog = ({
     <DialogContent className="max-w-4xl w-full h-[90vh] flex flex-col">
       <DialogHeader className="mb-2">
         <DialogTitle className="flex items-center gap-2">
-          <Sword className="w-5 h-5 text-orange-500" />
+          <RoleIcon roleId={(editingItem as any)?.role || 'unspecified'} className="w-5 h-5 text-orange-500" />
           Edit Item: {editingItem?.name || 'Unknown'}
         </DialogTitle>
       </DialogHeader>
@@ -333,7 +345,7 @@ const ItemEditDialog = ({
           {isResource && (
             <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
               <h4 className="text-sm font-semibold flex items-center gap-2">
-                <Box className="w-4 h-4 text-orange-500" />
+                <Layers className="w-4 h-4 text-orange-500" />
                 Resource
               </h4>
               <div className="grid sm:grid-cols-2 gap-2">
@@ -544,7 +556,7 @@ const ItemEditDialog = ({
           {isQuest && (
             <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
               <h4 className="text-sm font-semibold flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-orange-500" />
+                <Key className="w-4 h-4 text-orange-500" />
                 Quest Item Settings
               </h4>
               <div className="flex items-center gap-2 text-sm">

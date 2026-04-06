@@ -1575,7 +1575,191 @@ ipcMainLocal.handle("create-npc-file", async (event, projectPath, npcData) => {
   }
 });
 
-// Ensure items and items/categories folders exist
+// ============================================================================
+// Item helpers
+// ============================================================================
+
+/**
+ * Parse a category .txt file into an array of parsed items.
+ * Each item object carries all key=value pairs found inside its [item] block
+ * plus a special `_role` and `_resourceSubtype` field extracted from comment lines.
+ */
+function parseItemsInCategoryFile(filePath) {
+  if (!fs.existsSync(filePath)) return [];
+  try {
+    const content = fs.readFileSync(filePath, "utf8");
+    // Split into blocks: each [item] section
+    const blocks = content.split(/\[item\]/i);
+    const items = [];
+    for (let b = 1; b < blocks.length; b += 1) {
+      const block = blocks[b];
+      const lines = block.split("\n");
+      let item = {};
+      for (const line of lines) {
+        const trimmed = line.trim();
+        // Preserve role/resource info from comment lines that the writer adds above [item]
+        const roleMatch = trimmed.match(/^#\s*role=(.+)$/i);
+        if (roleMatch) { item._role = roleMatch[1].toLowerCase(); continue; }
+        const resMatch = trimmed.match(/^#\s*resource_subtype=(.+)$/i);
+        if (resMatch) { item._resourceSubtype = resMatch[1].toLowerCase(); continue; }
+        if (!trimmed || trimmed.startsWith("#") || trimmed.startsWith("[")) continue;
+        const eqIndex = trimmed.indexOf("=");
+        if (eqIndex > 0) {
+          const key = trimmed.substring(0, eqIndex).trim();
+          const value = trimmed.substring(eqIndex + 1).trim();
+          item[key] = value;
+        }
+      }
+      if (item.id !== undefined) {
+        item.id = parseInt(item.id, 10) || 0;
+        items.push(item);
+      }
+    }
+    return items;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Rebuild a category .txt file from a full list of items (all belonging to this category).
+ * For each item, writes an optional role comment, then the [item] block with all fields.
+ */
+function writeCategoryFile(filePath, items) {
+  const lines = [];
+  for (const item of items) {
+    lines.push("");
+    if (item._role) lines.push(`# role=${item._role}`);
+    if (item._resourceSubtype) lines.push(`# resource_subtype=${item._resourceSubtype}`);
+    lines.push("[item]");
+    lines.push(`id=${item.id}`);
+    if (item.name) lines.push(`name=${item.name}`);
+    if (item.flavor) lines.push(`flavor=${item.flavor}`);
+    if (item.level && parseInt(item.level, 10) > 1) lines.push(`level=${item.level}`);
+    if (item.icon) lines.push(`icon=${item.icon}`);
+    if (item.quality) lines.push(`quality=${item.quality}`);
+    if (item.price) lines.push(`price=${item.price}`);
+    if (item.price_sell) lines.push(`price_sell=${item.price_sell}`);
+    if (item.max_quantity && parseInt(item.max_quantity, 10) > 1) lines.push(`max_quantity=${item.max_quantity}`);
+    if (item.quest_item) lines.push(`quest_item=true`);
+    if (item.no_stash && item.no_stash !== "ignore") lines.push(`no_stash=${item.no_stash}`);
+    if (item.item_type) lines.push(`item_type=${item.item_type}`);
+    if (item.equip_flags) lines.push(`equip_flags=${item.equip_flags}`);
+    if (item.requires_level && parseInt(item.requires_level, 10) > 0) lines.push(`requires_level=${item.requires_level}`);
+    if (item.requires_stat) lines.push(`requires_stat=${item.requires_stat}`);
+    if (item.requires_class) lines.push(`requires_class=${item.requires_class}`);
+    if (item.disable_slots) lines.push(`disable_slots=${item.disable_slots}`);
+    if (item.gfx) lines.push(`gfx=${item.gfx}`);
+    if (item.bonus) lines.push(`bonus=${item.bonus}`);
+    if (item.bonus_power_level) lines.push(`bonus_power_level=${item.bonus_power_level}`);
+    if (item.dmg) lines.push(`dmg=${item.dmg}`);
+    if (item.abs) lines.push(`abs=${item.abs}`);
+    if (item.power) lines.push(`power=${item.power}`);
+    if (item.power_desc) lines.push(`power_desc=${item.power_desc}`);
+    if (item.replace_power) lines.push(`replace_power=${item.replace_power}`);
+    if (item.book) lines.push(`book=${item.book}`);
+    if (item.book_is_readable) lines.push(`book_is_readable=true`);
+    if (item.script) lines.push(`script=${item.script}`);
+    if (item.soundfx) lines.push(`soundfx=${item.soundfx}`);
+    if (item.stepfx) lines.push(`stepfx=${item.stepfx}`);
+    if (item.loot_animation) lines.push(`loot_animation=${item.loot_animation}`);
+    if (item.randomizer_def) lines.push(`randomizer_def=${item.randomizer_def}`);
+    if (item.loot_drops_max && parseInt(item.loot_drops_max, 10) > 1) lines.push(`loot_drops_max=${item.loot_drops_max}`);
+    if (item.pickup_status) lines.push(`pickup_status=${item.pickup_status}`);
+  }
+  lines.push("");
+  fs.writeFileSync(filePath, lines.join("\n"), "utf8");
+}
+
+/**
+ * Rebuild the top-level items/items.txt index file with INCLUDE directives
+ * for each existing category file plus any 'Default' items.
+ */
+function rebuildItemsIndex(projectPath) {
+  const itemsDir = path.join(projectPath, "items");
+  const categoriesDir = path.join(itemsDir, "categories");
+  if (!fs.existsSync(itemsDir)) return;
+
+  const lines = [
+    "####################",
+    "# Item Definitions #",
+    "####################",
+    ""
+  ];
+
+  // Check for 'Default' items embedded in items/items.txt itself
+  const itemsIndexFile = path.join(itemsDir, "items.txt");
+  let defaultItems = [];
+  if (fs.existsSync(itemsIndexFile)) {
+    // Preserve any non-include content that was hand-authored
+    defaultItems = parseItemsInCategoryFile(itemsIndexFile);
+  }
+
+  // If there are default items, embed them directly
+  if (defaultItems.length > 0) {
+    lines.push("# Default items");
+    lines.push("");
+    for (const item of defaultItems) {
+      lines.push("");
+      if (item._role) lines.push(`# role=${item._role}`);
+      if (item._resourceSubtype) lines.push(`# resource_subtype=${item._resourceSubtype}`);
+      lines.push("[item]");
+      lines.push(`id=${item.id}`);
+      if (item.name) lines.push(`name=${item.name}`);
+      if (item.flavor) lines.push(`flavor=${item.flavor}`);
+      if (item.level && parseInt(item.level, 10) > 1) lines.push(`level=${item.level}`);
+      if (item.icon) lines.push(`icon=${item.icon}`);
+      if (item.quality) lines.push(`quality=${item.quality}`);
+      if (item.price) lines.push(`price=${item.price}`);
+      if (item.price_sell) lines.push(`price_sell=${item.price_sell}`);
+      if (item.max_quantity && parseInt(item.max_quantity, 10) > 1) lines.push(`max_quantity=${item.max_quantity}`);
+      if (item.quest_item) lines.push(`quest_item=true`);
+      if (item.no_stash && item.no_stash !== "ignore") lines.push(`no_stash=${item.no_stash}`);
+      if (item.item_type) lines.push(`item_type=${item.item_type}`);
+      if (item.equip_flags) lines.push(`equip_flags=${item.equip_flags}`);
+      if (item.requires_level && parseInt(item.requires_level, 10) > 0) lines.push(`requires_level=${item.requires_level}`);
+      if (item.requires_stat) lines.push(`requires_stat=${item.requires_stat}`);
+      if (item.requires_class) lines.push(`requires_class=${item.requires_class}`);
+      if (item.disable_slots) lines.push(`disable_slots=${item.disable_slots}`);
+      if (item.gfx) lines.push(`gfx=${item.gfx}`);
+      if (item.bonus) lines.push(`bonus=${item.bonus}`);
+      if (item.bonus_power_level) lines.push(`bonus_power_level=${item.bonus_power_level}`);
+      if (item.dmg) lines.push(`dmg=${item.dmg}`);
+      if (item.abs) lines.push(`abs=${item.abs}`);
+      if (item.power) lines.push(`power=${item.power}`);
+      if (item.power_desc) lines.push(`power_desc=${item.power_desc}`);
+      if (item.replace_power) lines.push(`replace_power=${item.replace_power}`);
+      if (item.book) lines.push(`book=${item.book}`);
+      if (item.book_is_readable) lines.push(`book_is_readable=true`);
+      if (item.script) lines.push(`script=${item.script}`);
+      if (item.soundfx) lines.push(`soundfx=${item.soundfx}`);
+      if (item.stepfx) lines.push(`stepfx=${item.stepfx}`);
+      if (item.loot_animation) lines.push(`loot_animation=${item.loot_animation}`);
+      if (item.randomizer_def) lines.push(`randomizer_def=${item.randomizer_def}`);
+      if (item.loot_drops_max && parseInt(item.loot_drops_max, 10) > 1) lines.push(`loot_drops_max=${item.loot_drops_max}`);
+      if (item.pickup_status) lines.push(`pickup_status=${item.pickup_status}`);
+      lines.push("");
+    }
+  }
+
+  // Add INCLUDE directives for each category .txt file
+  if (fs.existsSync(categoriesDir)) {
+    const entries = fs.readdirSync(categoriesDir);
+    const txtFiles = entries.filter(f => f.toLowerCase().endsWith(".txt")).sort();
+    for (const f of txtFiles) {
+      lines.push(`INCLUDE items/categories/${f}`);
+    }
+  }
+
+  lines.push("");
+  fs.writeFileSync(itemsIndexFile, lines.join("\n"), "utf8");
+  console.log("Rebuilt items index:", itemsIndexFile);
+}
+
+/**
+ * Ensure items and items/categories folders/file structure exist.
+ * Category structure: items/categories/<name>.txt (file, not directory).
+ */
 ipcMainLocal.handle("ensure-items-folders", async (event, projectPath) => {
   try {
     if (!projectPath || !fs.existsSync(projectPath)) {
@@ -1593,6 +1777,40 @@ ipcMainLocal.handle("ensure-items-folders", async (event, projectPath) => {
     if (!fs.existsSync(categoriesDir)) {
       fs.mkdirSync(categoriesDir, { recursive: true });
       console.log("Created items/categories directory:", categoriesDir);
+    }
+
+    // Migrate old category directories (items/categories/potions/*.txt) to files
+    // (items/categories/potions.txt) so the structure matches Flare conventions.
+    if (fs.existsSync(categoriesDir)) {
+      const catEntries = fs.readdirSync(categoriesDir, { withFileTypes: true });
+      for (const entry of catEntries) {
+        if (entry.isDirectory()) {
+          const dirPath = path.join(categoriesDir, entry.name);
+          const txtPath = path.join(categoriesDir, entry.name + ".txt");
+          // Skip if the .txt file already exists
+          if (fs.existsSync(txtPath)) {
+            console.log("Category .txt already exists, removing old directory:", dirPath);
+            try { fs.rmSync(dirPath, { recursive: true, force: true }); } catch {}
+            continue;
+          }
+          // Collect all [item] blocks from files inside the directory
+          const items = [];
+          const files = fs.readdirSync(dirPath);
+          for (const f of files) {
+            if (f.toLowerCase().endsWith(".txt")) {
+              const parsed = parseItemsInCategoryFile(path.join(dirPath, f));
+              items.push(...parsed);
+            }
+          }
+          if (items.length > 0) {
+            // Sort by id
+            items.sort((a, b) => (parseInt(a.id, 10) || 0) - (parseInt(b.id, 10) || 0));
+            writeCategoryFile(txtPath, items);
+            console.log("Migrated category directory to file:", entry.name, "->", txtPath);
+          }
+          try { fs.rmSync(dirPath, { recursive: true, force: true }); } catch {}
+        }
+      }
     }
 
     // Create qualities.txt file if it doesn't exist
@@ -1650,6 +1868,9 @@ overlay_icon=1031
       console.log("Created qualities.txt file:", qualitiesFile);
     }
 
+    // Create / rebuild items.txt index
+    rebuildItemsIndex(projectPath);
+
     return { success: true };
   } catch (error) {
     console.error("Error ensuring items folders:", error);
@@ -1657,7 +1878,7 @@ overlay_icon=1031
   }
 });
 
-// Get item categories (subdirectories of items/categories)
+// Get item categories (.txt files in items/categories)
 ipcMainLocal.handle("get-item-categories", async (event, projectPath) => {
   try {
     if (!projectPath || !fs.existsSync(projectPath)) {
@@ -1668,10 +1889,10 @@ ipcMainLocal.handle("get-item-categories", async (event, projectPath) => {
     const categories = ["Default"]; // Default is always first
 
     if (fs.existsSync(categoriesDir)) {
-      const entries = fs.readdirSync(categoriesDir, { withFileTypes: true });
-      for (const entry of entries) {
-        if (entry.isDirectory()) {
-          categories.push(entry.name);
+      const entries = fs.readdirSync(categoriesDir);
+      for (const f of entries) {
+        if (f.toLowerCase().endsWith(".txt")) {
+          categories.push(f.replace(/\.txt$/i, ""));
         }
       }
     }
@@ -1683,7 +1904,7 @@ ipcMainLocal.handle("get-item-categories", async (event, projectPath) => {
   }
 });
 
-// Create a new item category folder
+// Create a new item category file
 ipcMainLocal.handle(
   "create-item-category",
   async (event, projectPath, categoryName) => {
@@ -1707,22 +1928,26 @@ ipcMainLocal.handle(
 
       const sanitizedName = sanitize(categoryName);
       const categoriesDir = path.join(projectPath, "items", "categories");
-      const categoryDir = path.join(categoriesDir, sanitizedName);
 
       // Ensure items/categories exists
       if (!fs.existsSync(categoriesDir)) {
         fs.mkdirSync(categoriesDir, { recursive: true });
       }
 
-      if (!fs.existsSync(categoryDir)) {
-        fs.mkdirSync(categoryDir, { recursive: true });
-        console.log("Created item category:", categoryDir);
+      const categoryFile = path.join(categoriesDir, `${sanitizedName}.txt`);
+
+      if (!fs.existsSync(categoryFile)) {
+        fs.writeFileSync(categoryFile, "", "utf8");
+        console.log("Created item category file:", categoryFile);
       }
+
+      // Rebuild the main items index
+      rebuildItemsIndex(projectPath);
 
       return {
         success: true,
         categoryName: sanitizedName,
-        categoryPath: categoryDir,
+        categoryPath: categoryFile,
       };
     } catch (error) {
       console.error("Error creating item category:", error);
@@ -1741,30 +1966,29 @@ ipcMainLocal.handle("get-next-item-id", async (event, projectPath) => {
     const itemsDir = path.join(projectPath, "items");
     let maxId = 0;
 
-    const scanDir = (dir) => {
-      if (!fs.existsSync(dir)) return;
-      const entries = fs.readdirSync(dir, { withFileTypes: true });
-      for (const entry of entries) {
-        const fullPath = path.join(dir, entry.name);
-        if (entry.isDirectory()) {
-          scanDir(fullPath);
-        } else if (entry.name.endsWith(".txt")) {
-          // Read file and extract id
-          try {
-            const content = fs.readFileSync(fullPath, "utf8");
-            const match = content.match(/^id=(\d+)/m);
-            if (match) {
-              const id = parseInt(match[1], 10);
-              if (id > maxId) maxId = id;
-            }
-          } catch (e) {
-            // Ignore read errors
-          }
-        }
+    const scanFile = (filePath) => {
+      if (!fs.existsSync(filePath)) return;
+      const items = parseItemsInCategoryFile(filePath);
+      for (const item of items) {
+        if (item.id > maxId) maxId = item.id;
       }
     };
 
-    scanDir(itemsDir);
+    // Scan all category files
+    const categoriesDir = path.join(itemsDir, "categories");
+    if (fs.existsSync(categoriesDir)) {
+      const entries = fs.readdirSync(categoriesDir);
+      for (const f of entries) {
+        if (f.toLowerCase().endsWith(".txt")) {
+          scanFile(path.join(categoriesDir, f));
+        }
+      }
+    }
+
+    // Also scan items.txt for any Default items
+    const itemsIndexFile = path.join(itemsDir, "items.txt");
+    scanFile(itemsIndexFile);
+
     return { success: true, nextId: maxId + 1 };
   } catch (error) {
     console.error("Error getting next item ID:", error);
@@ -1772,7 +1996,7 @@ ipcMainLocal.handle("get-next-item-id", async (event, projectPath) => {
   }
 });
 
-// Create item file
+// Create item file — adds a new [item] block to the category .txt file
 ipcMainLocal.handle(
   "create-item-file",
   async (event, projectPath, itemData) => {
@@ -1784,57 +2008,73 @@ ipcMainLocal.handle(
         throw new Error("Item name is required");
       }
 
-      const sanitize = (input) => {
-        return (
-          String(input || "")
-            .toLowerCase()
-            .replace(/[<>:"/\\|?*]/g, "_")
-            .trim()
-            .replace(/\s+/g, "_")
-            .replace(/_{2,}/g, "_") || "unnamed_item"
-        );
-      };
-
-      const sanitizedName = sanitize(itemData.name);
       const category = itemData.category || "Default";
-
-      let targetDir;
-      if (category === "Default") {
-        targetDir = path.join(projectPath, "items");
-      } else {
-        targetDir = path.join(projectPath, "items", "categories", category);
-      }
-
-      // Ensure target directory exists
-      if (!fs.existsSync(targetDir)) {
-        fs.mkdirSync(targetDir, { recursive: true });
-      }
-
-      // Build a unique filename to avoid overwriting items with the same name (e.g., different roles)
-      const baseFilename = `${sanitizedName}_${itemData.id}`;
-      const itemFilePath = path.join(targetDir, `${baseFilename}.txt`);
-
-      // Build item file content
-      const lines = [];
       const role = (itemData.role || "").toLowerCase() || "unspecified";
       const resourceSubtype = (itemData.resourceSubtype || "").toLowerCase();
-      lines.push(`# role=${role}`);
-      if (role === "resource" && resourceSubtype) {
-        lines.push(`# resource_subtype=${resourceSubtype}`);
+
+      let categoryFilePath;
+      if (category === "Default") {
+        // Default items live in items.txt (we'll append to it)
+        categoryFilePath = path.join(projectPath, "items", "items.txt");
+      } else {
+        const categoriesDir = path.join(projectPath, "items", "categories");
+        if (!fs.existsSync(categoriesDir)) {
+          fs.mkdirSync(categoriesDir, { recursive: true });
+        }
+        categoryFilePath = path.join(categoriesDir, `${category}.txt`);
+        if (!fs.existsSync(categoryFilePath)) {
+          fs.writeFileSync(categoryFilePath, "", "utf8");
+        }
       }
-      lines.push("[item]");
-      lines.push(`id=${itemData.id}`);
-      lines.push(`name=${itemData.name}`);
-      lines.push("");
 
-      const itemContent = lines.join("\n");
-      fs.writeFileSync(itemFilePath, itemContent, "utf8");
+      // Read existing items for this category file
+      let existingItems = [];
+      if (category === "Default" && fs.existsSync(categoryFilePath)) {
+        // For items.txt, we only extract Default items — but since items.txt
+        // may have INCLUDE lines, we keep it simple: append-only, no dedup.
+        // The file is rewritten below, so we need to read the block we wrote.
+        // Actually for Default we need to rebuild items.txt.
+        existingItems = parseItemsInCategoryFile(categoryFilePath);
+      } else {
+        existingItems = parseItemsInCategoryFile(categoryFilePath);
+      }
 
-      console.log("Item file created:", itemFilePath);
+      // Check for duplicate (same name + same role)
+      const normalizedName = itemData.name.trim().toLowerCase();
+      const isDup = existingItems.some(
+        (it) =>
+          (it.name || "").toLowerCase() === normalizedName &&
+          (it._role || "unspecified") === role
+      );
+      if (isDup) {
+        console.warn("Duplicate item skipped:", normalizedName, role);
+        return { success: false, error: `Item "${itemData.name}" already exists in category "${category}" with role "${role}".` };
+      }
+
+      // Build the new item object
+      const newItem = { id: itemData.id, name: itemData.name.trim(), _role: role };
+      if (resourceSubtype && role === "resource") {
+        newItem._resourceSubtype = resourceSubtype;
+      }
+
+      // Append and rebuild
+      existingItems.push(newItem);
+
+      if (category === "Default") {
+        rebuildDefaultItems(categoryFilePath, existingItems, projectPath);
+      } else {
+        writeCategoryFile(categoryFilePath, existingItems);
+      }
+
+      // Rebuild the main items index
+      rebuildItemsIndex(projectPath);
+
+      console.log("Item added to category:", itemData.name.trim(), "@", categoryFilePath);
       return {
         success: true,
-        filePath: itemFilePath,
-        filename: `${sanitizedName}.txt`,
+        filePath: `${categoryFilePath}#item_${itemData.id}`,
+        filename: category === "Default" ? "items.txt" : `${category}.txt`,
+        categoryFilePath,
       };
     } catch (error) {
       console.error("Error creating item file:", error);
@@ -1842,6 +2082,75 @@ ipcMainLocal.handle(
     }
   }
 );
+
+/**
+ * Rewrite items/items.txt with Default items embedded and INCLUDE lines for categories.
+ * Receives the projectPath so path derivation remains correct.
+ */
+function rebuildDefaultItems(itemsTxtPath, defaultItems, projectPath) {
+  const itemsDir = path.join(projectPath, "items");
+  if (!fs.existsSync(itemsDir)) return;
+
+  const lines = [];
+  lines.push("####################");
+  lines.push("# Item Definitions #");
+  lines.push("####################");
+  lines.push("");
+
+  for (const item of defaultItems) {
+    if (item._role) lines.push(`# role=${item._role}`);
+    if (item._resourceSubtype) lines.push(`# resource_subtype=${item._resourceSubtype}`);
+    lines.push("[item]");
+    lines.push(`id=${item.id}`);
+    if (item.name) lines.push(`name=${item.name}`);
+    if (item.flavor) lines.push(`flavor=${item.flavor}`);
+    if (item.level && parseInt(item.level, 10) > 1) lines.push(`level=${item.level}`);
+    if (item.icon) lines.push(`icon=${item.icon}`);
+    if (item.quality) lines.push(`quality=${item.quality}`);
+    if (item.price) lines.push(`price=${item.price}`);
+    if (item.price_sell) lines.push(`price_sell=${item.price_sell}`);
+    if (item.max_quantity && parseInt(item.max_quantity, 10) > 1) lines.push(`max_quantity=${item.max_quantity}`);
+    if (item.quest_item) lines.push(`quest_item=true`);
+    if (item.no_stash && item.no_stash !== "ignore") lines.push(`no_stash=${item.no_stash}`);
+    if (item.item_type) lines.push(`item_type=${item.item_type}`);
+    if (item.equip_flags) lines.push(`equip_flags=${item.equip_flags}`);
+    if (item.requires_level && parseInt(item.requires_level, 10) > 0) lines.push(`requires_level=${item.requires_level}`);
+    if (item.requires_stat) lines.push(`requires_stat=${item.requires_stat}`);
+    if (item.requires_class) lines.push(`requires_class=${item.requires_class}`);
+    if (item.disable_slots) lines.push(`disable_slots=${item.disable_slots}`);
+    if (item.gfx) lines.push(`gfx=${item.gfx}`);
+    if (item.bonus) lines.push(`bonus=${item.bonus}`);
+    if (item.bonus_power_level) lines.push(`bonus_power_level=${item.bonus_power_level}`);
+    if (item.dmg) lines.push(`dmg=${item.dmg}`);
+    if (item.abs) lines.push(`abs=${item.abs}`);
+    if (item.power) lines.push(`power=${item.power}`);
+    if (item.power_desc) lines.push(`power_desc=${item.power_desc}`);
+    if (item.replace_power) lines.push(`replace_power=${item.replace_power}`);
+    if (item.book) lines.push(`book=${item.book}`);
+    if (item.book_is_readable) lines.push(`book_is_readable=true`);
+    if (item.script) lines.push(`script=${item.script}`);
+    if (item.soundfx) lines.push(`soundfx=${item.soundfx}`);
+    if (item.stepfx) lines.push(`stepfx=${item.stepfx}`);
+    if (item.loot_animation) lines.push(`loot_animation=${item.loot_animation}`);
+    if (item.randomizer_def) lines.push(`randomizer_def=${item.randomizer_def}`);
+    if (item.loot_drops_max && parseInt(item.loot_drops_max, 10) > 1) lines.push(`loot_drops_max=${item.loot_drops_max}`);
+    if (item.pickup_status) lines.push(`pickup_status=${item.pickup_status}`);
+    lines.push("");
+  }
+
+  // Add INCLUDE lines for category files
+  const categoriesDir = path.join(itemsDir, "categories");
+  if (fs.existsSync(categoriesDir)) {
+    const entries = fs.readdirSync(categoriesDir);
+    const txtFiles = entries.filter(f => f.toLowerCase().endsWith(".txt")).sort();
+    for (const f of txtFiles) {
+      lines.push(`INCLUDE items/categories/${f}`);
+    }
+  }
+
+  lines.push("");
+  fs.writeFileSync(itemsTxtPath, lines.join("\n"), "utf8");
+}
 
 // List all items in the project
 ipcMainLocal.handle("list-items", async (event, projectPath) => {
@@ -1851,74 +2160,50 @@ ipcMainLocal.handle("list-items", async (event, projectPath) => {
     }
 
     const itemsDir = path.join(projectPath, "items");
+    const categoriesDir = path.join(itemsDir, "categories");
     const items = [];
 
-    const parseItemFile = (filePath, category) => {
-      try {
-        // Only treat files with an [item] section as items (skip qualities.txt, etc.)
-        const content = fs.readFileSync(filePath, "utf8");
-        if (!/\[item\]/i.test(content)) {
-          return null;
-        }
-
-        const idMatch = content.match(/^id=(\d+)/m);
-        const nameMatch = content.match(/^name=(.+)$/m);
-        const roleMatch = content.match(
-          /^\s*(?:#\s*)?(?:role|item_role)=([a-zA-Z_]+)/m
-        );
-        const resourceSubtypeMatch = content.match(
-          /^\s*(?:#\s*)?resource_subtype=([a-zA-Z_]+)/m
-        );
-
-        return {
-          id: idMatch ? parseInt(idMatch[1], 10) : 0,
-          name: nameMatch
-            ? nameMatch[1].trim()
-            : path.basename(filePath, ".txt"),
-          category: category,
-          filePath: filePath,
-          fileName: path.basename(filePath),
-          role: roleMatch ? roleMatch[1].toLowerCase() : "unspecified",
-          resourceSubtype: resourceSubtypeMatch
-            ? resourceSubtypeMatch[1].toLowerCase()
-            : "",
-        };
-      } catch (e) {
-        return null;
+    /**
+     * Read a category .txt, extract every [item] block, return normalized summaries.
+     * filePath uses a #item_<id> fragment so the renderer can target the correct item.
+     */
+    const addItemsFromFile = (filePath, category, categoryFilePath) => {
+      const parsed = parseItemsInCategoryFile(filePath);
+      for (const item of parsed) {
+        items.push({
+          id: item.id,
+          name: item.name || path.basename(filePath, ".txt"),
+          category,
+          filePath: `${categoryFilePath}#item_${item.id}`,
+          fileName: path.basename(categoryFilePath),
+          role: item._role || "unspecified",
+          resourceSubtype: item._resourceSubtype || "",
+        });
       }
     };
 
-    const scanDir = (dir, category) => {
-      if (!fs.existsSync(dir)) return;
-      const entries = fs.readdirSync(dir, { withFileTypes: true });
-      for (const entry of entries) {
-        const fullPath = path.join(dir, entry.name);
-        if (entry.isDirectory()) {
-          // Skip the 'categories' folder at root level, scan its subdirs instead
-          if (entry.name === "categories" && dir === itemsDir) {
-            const catEntries = fs.readdirSync(fullPath, {
-              withFileTypes: true,
-            });
-            for (const catEntry of catEntries) {
-              if (catEntry.isDirectory()) {
-                scanDir(path.join(fullPath, catEntry.name), catEntry.name);
-              }
-            }
-          }
-        } else if (entry.name.endsWith(".txt")) {
-          const item = parseItemFile(fullPath, category);
-          if (item) {
-            items.push(item);
-          }
+    // Scan categories/*.txt
+    if (fs.existsSync(categoriesDir)) {
+      const entries = fs.readdirSync(categoriesDir);
+      for (const f of entries) {
+        if (f.toLowerCase().endsWith(".txt")) {
+          const catName = f.replace(/\.txt$/i, "");
+          addItemsFromFile(
+            path.join(categoriesDir, f),
+            catName,
+            `items/categories/${f}`
+          );
         }
       }
-    };
+    }
 
-    scanDir(itemsDir, "Default");
+    // Also scan items.txt for any Default items embedded directly
+    const itemsIndexFile = path.join(itemsDir, "items.txt");
+    if (fs.existsSync(itemsIndexFile)) {
+      addItemsFromFile(itemsIndexFile, "Default", "items/items.txt");
+    }
 
-    // Sort by ID
     items.sort((a, b) => a.id - b.id);
-
     return { success: true, items };
   } catch (error) {
     console.error("Error listing items:", error);
@@ -1927,40 +2212,41 @@ ipcMainLocal.handle("list-items", async (event, projectPath) => {
 });
 
 // Read item file and parse all properties
+// filePath may include a #item_<id> fragment — strip it to find the real file
 ipcMainLocal.handle("read-item-file", async (event, filePath) => {
   try {
-    if (!filePath || !fs.existsSync(filePath)) {
+    const hashIdx = filePath.indexOf("#");
+    const realPath = hashIdx > 0 ? filePath.substring(0, hashIdx) : filePath;
+    if (!realPath || !fs.existsSync(realPath)) {
       return { success: false, error: "Item file not found" };
     }
 
-    const content = fs.readFileSync(filePath, "utf8");
-    const lines = content.split("\n");
-    const data = {};
+    const hashPart = hashIdx > 0 ? filePath.substring(hashIdx + 1) : "";
+    const itemIdMatch = hashPart.match(/^item_(\d+)$/);
+    const targetId = itemIdMatch ? parseInt(itemIdMatch[1], 10) : null;
 
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith("#") || trimmed.startsWith("["))
-        continue;
+    const parsed = parseItemsInCategoryFile(realPath);
 
-      const eqIndex = trimmed.indexOf("=");
-      if (eqIndex > 0) {
-        const key = trimmed.substring(0, eqIndex).trim();
-        const value = trimmed.substring(eqIndex + 1).trim();
-        data[key] = value;
+    if (targetId !== null) {
+      // Find the specific item
+      const item = parsed.find(i => i.id === targetId);
+      if (item) {
+        // Convert numeric fields
+        if (item.level) item.level = parseInt(item.level, 10) || 1;
+        if (item.max_quantity) item.max_quantity = parseInt(item.max_quantity, 10) || 1;
+        if (item.requires_level) item.requires_level = parseInt(item.requires_level, 10) || 0;
+        if (item.loot_drops_max) item.loot_drops_max = parseInt(item.loot_drops_max, 10) || 1;
+        return { success: true, data: item };
       }
+      return { success: false, error: `Item with id=${targetId} not found in file` };
     }
 
-    // Convert numeric fields
-    if (data.id) data.id = parseInt(data.id, 10) || 0;
-    if (data.level) data.level = parseInt(data.level, 10) || 1;
-    if (data.max_quantity)
-      data.max_quantity = parseInt(data.max_quantity, 10) || 1;
-    if (data.requires_level)
-      data.requires_level = parseInt(data.requires_level, 10) || 0;
-    if (data.loot_drops_max)
-      data.loot_drops_max = parseInt(data.loot_drops_max, 10) || 1;
+    // Fallback: return first item if no fragment provided
+    if (parsed.length > 0) {
+      return { success: true, data: parsed[0] };
+    }
 
-    return { success: true, data };
+    return { success: false, error: "No items found in file" };
   } catch (error) {
     console.error("Error reading item file:", error);
     return { success: false, error: error.message };
@@ -1968,109 +2254,113 @@ ipcMainLocal.handle("read-item-file", async (event, filePath) => {
 });
 
 // Write item file with all properties
+// filePath may include #item_<id> — we update that item inside a multi-item category .txt
 ipcMainLocal.handle("write-item-file", async (event, filePath, itemData) => {
   try {
-    if (!filePath) {
-      return { success: false, error: "File path is required" };
+    // Strip the #item_<id> fragment to get the real file path
+    const hashIdx = filePath.indexOf("#");
+    const categoryFilePath = hashIdx > 0 ? filePath.substring(0, hashIdx) : filePath;
+    if (!fs.existsSync(categoryFilePath)) {
+      return { success: false, error: `Category file not found: ${categoryFilePath}` };
     }
 
-    // Preserve role metadata if present, even if edit UI does not expose it yet
-    let role = typeof itemData.role === "string" ? itemData.role : "";
-    let resourceSubtype =
-      typeof itemData.resourceSubtype === "string"
-        ? itemData.resourceSubtype
-        : "";
-    try {
-      if ((!role || !resourceSubtype) && fs.existsSync(filePath)) {
-        const existing = fs.readFileSync(filePath, "utf8");
-        const roleMatch = existing.match(
-          /^\s*(?:#\s*)?(?:role|item_role)=([a-zA-Z_]+)/m
-        );
-        const resourceMatch = existing.match(
-          /^\s*(?:#\s*)?resource_subtype=([a-zA-Z_]+)/m
-        );
-        if (!role && roleMatch) role = roleMatch[1];
-        if (!resourceSubtype && resourceMatch)
-          resourceSubtype = resourceMatch[1];
-      }
-    } catch {
-      // ignore preservation errors
+    const hashPart = hashIdx > 0 ? filePath.substring(hashIdx + 1) : "";
+    const itemIdMatch = hashPart.match(/^item_(\d+)$/);
+    const targetId = itemIdMatch ? parseInt(itemIdMatch[1], 10) : (itemData.id != null ? itemData.id : null);
+
+    // Read existing items
+    const existingItems = parseItemsInCategoryFile(categoryFilePath);
+    const idx = existingItems.findIndex(i => i.id === targetId);
+
+    // Preserve role/resource metadata
+    const normalizedRole = (typeof itemData.role === "string" ? itemData.role : "").toLowerCase() || "unspecified";
+    const normalizedResourceSubtype = (typeof itemData.resourceSubtype === "string" ? itemData.resourceSubtype : "").toLowerCase();
+
+    if (idx >= 0) {
+      // Update existing item — merge all fields
+      const existing = existingItems[idx];
+      existingItems[idx] = {
+        id: itemData.id ?? existing.id,
+        name: itemData.name ?? existing.name,
+        _role: normalizedRole,
+        ...(normalizedResourceSubtype ? { _resourceSubtype: normalizedResourceSubtype } : (existing._resourceSubtype ? { _resourceSubtype: existing._resourceSubtype } : {})),
+        ...(itemData.flavor ? { flavor: itemData.flavor } : (existing.flavor ? { flavor: existing.flavor } : {})),
+        ...(itemData.level != null ? { level: itemData.level } : (existing.level ? { level: existing.level } : {})),
+        ...(itemData.icon ? { icon: itemData.icon } : (existing.icon ? { icon: existing.icon } : {})),
+        ...(itemData.quality ? { quality: itemData.quality } : (existing.quality ? { quality: existing.quality } : {})),
+        ...(itemData.price != null ? { price: itemData.price } : (existing.price ? { price: existing.price } : {})),
+        ...(itemData.price_sell != null ? { price_sell: itemData.price_sell } : (existing.price_sell ? { price_sell: existing.price_sell } : {})),
+        ...(itemData.max_quantity != null ? { max_quantity: itemData.max_quantity } : (existing.max_quantity != null ? { max_quantity: existing.max_quantity } : {})),
+        ...(itemData.quest_item ? { quest_item: "true" } : (existing.quest_item ? { quest_item: existing.quest_item } : {})),
+        ...(itemData.no_stash && itemData.no_stash !== "ignore" ? { no_stash: itemData.no_stash } : (existing.no_stash ? { no_stash: existing.no_stash } : {})),
+        ...(itemData.item_type ? { item_type: itemData.item_type } : (existing.item_type ? { item_type: existing.item_type } : {})),
+        ...(itemData.equip_flags ? { equip_flags: itemData.equip_flags } : (existing.equip_flags ? { equip_flags: existing.equip_flags } : {})),
+        ...(itemData.requires_level != null && itemData.requires_level > 0 ? { requires_level: itemData.requires_level } : (existing.requires_level ? { requires_level: existing.requires_level } : {})),
+        ...(itemData.requires_stat ? { requires_stat: itemData.requires_stat } : (existing.requires_stat ? { requires_stat: existing.requires_stat } : {})),
+        ...(itemData.requires_class ? { requires_class: itemData.requires_class } : (existing.requires_class ? { requires_class: existing.requires_class } : {})),
+        ...(itemData.disable_slots ? { disable_slots: itemData.disable_slots } : (existing.disable_slots ? { disable_slots: existing.disable_slots } : {})),
+        ...(itemData.gfx ? { gfx: itemData.gfx } : (existing.gfx ? { gfx: existing.gfx } : {})),
+        ...(itemData.bonus ? { bonus: itemData.bonus } : (existing.bonus ? { bonus: existing.bonus } : {})),
+        ...(itemData.bonus_power_level ? { bonus_power_level: itemData.bonus_power_level } : (existing.bonus_power_level ? { bonus_power_level: existing.bonus_power_level } : {})),
+        ...(itemData.dmg ? { dmg: itemData.dmg } : (existing.dmg ? { dmg: existing.dmg } : {})),
+        ...(itemData.abs ? { abs: itemData.abs } : (existing.abs ? { abs: existing.abs } : {})),
+        ...(itemData.power ? { power: itemData.power } : (existing.power ? { power: existing.power } : {})),
+        ...(itemData.power_desc ? { power_desc: itemData.power_desc } : (existing.power_desc ? { power_desc: existing.power_desc } : {})),
+        ...(itemData.replace_power ? { replace_power: itemData.replace_power } : (existing.replace_power ? { replace_power: existing.replace_power } : {})),
+        ...(itemData.book ? { book: itemData.book } : (existing.book ? { book: existing.book } : {})),
+        ...(itemData.book_is_readable ? { book_is_readable: "true" } : (existing.book_is_readable ? { book_is_readable: existing.book_is_readable } : {})),
+        ...(itemData.script ? { script: itemData.script } : (existing.script ? { script: existing.script } : {})),
+        ...(itemData.soundfx ? { soundfx: itemData.soundfx } : (existing.soundfx ? { soundfx: existing.soundfx } : {})),
+        ...(itemData.stepfx ? { stepfx: itemData.stepfx } : (existing.stepfx ? { stepfx: existing.stepfx } : {})),
+        ...(itemData.loot_animation ? { loot_animation: itemData.loot_animation } : (existing.loot_animation ? { loot_animation: existing.loot_animation } : {})),
+        ...(itemData.randomizer_def ? { randomizer_def: itemData.randomizer_def } : (existing.randomizer_def ? { randomizer_def: existing.randomizer_def } : {})),
+        ...(itemData.loot_drops_max != null && itemData.loot_drops_max > 1 ? { loot_drops_max: itemData.loot_drops_max } : (existing.loot_drops_max != null && parseInt(existing.loot_drops_max, 10) > 1 ? { loot_drops_max: existing.loot_drops_max } : {})),
+        ...(itemData.pickup_status ? { pickup_status: itemData.pickup_status } : (existing.pickup_status ? { pickup_status: existing.pickup_status } : {})),
+      };
+    } else {
+      // Item not found — create new
+      existingItems.push({
+        id: itemData.id ?? (existingItems.length > 0 ? Math.max(...existingItems.map(i => i.id)) + 1 : 1),
+        name: itemData.name || "Unnamed Item",
+        _role: normalizedRole,
+        ...(normalizedResourceSubtype ? { _resourceSubtype: normalizedResourceSubtype } : {}),
+        ...(itemData.flavor ? { flavor: itemData.flavor } : {}),
+        ...(itemData.level ? { level: itemData.level } : {}),
+        ...(itemData.icon ? { icon: itemData.icon } : {}),
+        ...(itemData.quality ? { quality: itemData.quality } : {}),
+        ...(itemData.price != null ? { price: itemData.price } : {}),
+        ...(itemData.price_sell != null ? { price_sell: itemData.price_sell } : {}),
+        ...(itemData.max_quantity && itemData.max_quantity > 1 ? { max_quantity: itemData.max_quantity } : {}),
+        ...(itemData.quest_item ? { quest_item: "true" } : {}),
+        ...(itemData.no_stash && itemData.no_stash !== "ignore" ? { no_stash: itemData.no_stash } : {}),
+        ...(itemData.item_type ? { item_type: itemData.item_type } : {}),
+        ...(itemData.equip_flags ? { equip_flags: itemData.equip_flags } : {}),
+        ...(itemData.requires_level && itemData.requires_level > 0 ? { requires_level: itemData.requires_level } : {}),
+        ...(itemData.requires_stat ? { requires_stat: itemData.requires_stat } : {}),
+        ...(itemData.requires_class ? { requires_class: itemData.requires_class } : {}),
+        ...(itemData.disable_slots ? { disable_slots: itemData.disable_slots } : {}),
+        ...(itemData.gfx ? { gfx: itemData.gfx } : {}),
+        ...(itemData.bonus ? { bonus: itemData.bonus } : {}),
+        ...(itemData.bonus_power_level ? { bonus_power_level: itemData.bonus_power_level } : {}),
+        ...(itemData.dmg ? { dmg: itemData.dmg } : {}),
+        ...(itemData.abs ? { abs: itemData.abs } : {}),
+        ...(itemData.power ? { power: itemData.power } : {}),
+        ...(itemData.power_desc ? { power_desc: itemData.power_desc } : {}),
+        ...(itemData.replace_power ? { replace_power: itemData.replace_power } : {}),
+        ...(itemData.book ? { book: itemData.book } : {}),
+        ...(itemData.book_is_readable ? { book_is_readable: "true" } : {}),
+        ...(itemData.script ? { script: itemData.script } : {}),
+        ...(itemData.soundfx ? { soundfx: itemData.soundfx } : {}),
+        ...(itemData.stepfx ? { stepfx: itemData.stepfx } : {}),
+        ...(itemData.loot_animation ? { loot_animation: itemData.loot_animation } : {}),
+        ...(itemData.randomizer_def ? { randomizer_def: itemData.randomizer_def } : {}),
+        ...(itemData.loot_drops_max && itemData.loot_drops_max > 1 ? { loot_drops_max: itemData.loot_drops_max } : {}),
+        ...(itemData.pickup_status ? { pickup_status: itemData.pickup_status } : {}),
+      });
     }
 
-    const normalizedRole = (role || "").toLowerCase() || "unspecified";
-    const normalizedResourceSubtype = (resourceSubtype || "").toLowerCase();
-
-    const lines = [];
-    lines.push(`# role=${normalizedRole}`);
-    if (normalizedRole === "resource" && normalizedResourceSubtype) {
-      lines.push(`# resource_subtype=${normalizedResourceSubtype}`);
-    }
-    lines.push("[item]");
-
-    // Basic Identifier Properties
-    if (itemData.id !== undefined) lines.push(`id=${itemData.id}`);
-    if (itemData.name) lines.push(`name=${itemData.name}`);
-    if (itemData.flavor) lines.push(`flavor=${itemData.flavor}`);
-    if (itemData.level && itemData.level > 1)
-      lines.push(`level=${itemData.level}`);
-    if (itemData.icon) lines.push(`icon=${itemData.icon}`);
-    if (itemData.quality) lines.push(`quality=${itemData.quality}`);
-
-    // Trade and Inventory Properties
-    if (itemData.price) lines.push(`price=${itemData.price}`);
-    if (itemData.price_sell) lines.push(`price_sell=${itemData.price_sell}`);
-    if (itemData.max_quantity && itemData.max_quantity > 1)
-      lines.push(`max_quantity=${itemData.max_quantity}`);
-    if (itemData.quest_item) lines.push(`quest_item=true`);
-    if (itemData.no_stash && itemData.no_stash !== "ignore")
-      lines.push(`no_stash=${itemData.no_stash}`);
-
-    // Equipment and Requirement Properties
-    if (itemData.item_type) lines.push(`item_type=${itemData.item_type}`);
-    if (itemData.equip_flags) lines.push(`equip_flags=${itemData.equip_flags}`);
-    if (itemData.requires_level && itemData.requires_level > 0)
-      lines.push(`requires_level=${itemData.requires_level}`);
-    if (itemData.requires_stat)
-      lines.push(`requires_stat=${itemData.requires_stat}`);
-    if (itemData.requires_class)
-      lines.push(`requires_class=${itemData.requires_class}`);
-    if (itemData.disable_slots)
-      lines.push(`disable_slots=${itemData.disable_slots}`);
-    if (itemData.gfx) lines.push(`gfx=${itemData.gfx}`);
-
-    // Status and Effect Properties (Bonuses)
-    if (itemData.bonus) lines.push(`bonus=${itemData.bonus}`);
-    if (itemData.bonus_power_level)
-      lines.push(`bonus_power_level=${itemData.bonus_power_level}`);
-
-    // Usage and Power Properties
-    if (itemData.dmg) lines.push(`dmg=${itemData.dmg}`);
-    if (itemData.abs) lines.push(`abs=${itemData.abs}`);
-    if (itemData.power) lines.push(`power=${itemData.power}`);
-    if (itemData.power_desc) lines.push(`power_desc=${itemData.power_desc}`);
-    if (itemData.replace_power)
-      lines.push(`replace_power=${itemData.replace_power}`);
-    if (itemData.book) lines.push(`book=${itemData.book}`);
-    if (itemData.book_is_readable) lines.push(`book_is_readable=true`);
-    if (itemData.script) lines.push(`script=${itemData.script}`);
-
-    // Visual and Audio Properties
-    if (itemData.soundfx) lines.push(`soundfx=${itemData.soundfx}`);
-    if (itemData.stepfx) lines.push(`stepfx=${itemData.stepfx}`);
-    if (itemData.loot_animation)
-      lines.push(`loot_animation=${itemData.loot_animation}`);
-
-    // Randomization and Loot Properties
-    if (itemData.randomizer_def)
-      lines.push(`randomizer_def=${itemData.randomizer_def}`);
-    if (itemData.loot_drops_max && itemData.loot_drops_max > 1)
-      lines.push(`loot_drops_max=${itemData.loot_drops_max}`);
-    if (itemData.pickup_status)
-      lines.push(`pickup_status=${itemData.pickup_status}`);
-
-    lines.push("");
-
-    fs.writeFileSync(filePath, lines.join("\n"), "utf8");
+    writeCategoryFile(categoryFilePath, existingItems);
+    console.log("Item saved:", targetId, "@", categoryFilePath);
     return { success: true };
   } catch (error) {
     console.error("Error writing item file:", error);
@@ -2078,16 +2368,39 @@ ipcMainLocal.handle("write-item-file", async (event, filePath, itemData) => {
   }
 });
 
-// Delete item file
+// Delete item file — removes the [item] block from the category .txt
 ipcMainLocal.handle("delete-item-file", async (event, filePath) => {
   try {
     if (!filePath) {
       return { success: false, error: "File path is required" };
     }
-    if (!fs.existsSync(filePath)) {
+
+    const hashIdx = filePath.indexOf("#");
+    const categoryFilePath = hashIdx > 0 ? filePath.substring(0, hashIdx) : filePath;
+
+    if (!fs.existsSync(categoryFilePath)) {
       return { success: false, error: "File does not exist" };
     }
-    fs.unlinkSync(filePath);
+
+    const hashPart = hashIdx > 0 ? filePath.substring(hashIdx + 1) : "";
+    const itemIdMatch = hashPart.match(/^item_(\d+)$/);
+    const targetId = itemIdMatch ? parseInt(itemIdMatch[1], 10) : null;
+
+    if (targetId == null) {
+      return { success: false, error: "Cannot delete: no item id in path" };
+    }
+
+    const existingItems = parseItemsInCategoryFile(categoryFilePath);
+    const filtered = existingItems.filter(i => i.id !== targetId);
+
+    if (filtered.length === 0) {
+      // No items left — remove the empty file
+      fs.unlinkSync(categoryFilePath);
+    } else {
+      writeCategoryFile(categoryFilePath, filtered);
+    }
+
+    console.log("Item deleted:", targetId, "@", categoryFilePath);
     return { success: true };
   } catch (error) {
     console.error("Error deleting item file:", error);

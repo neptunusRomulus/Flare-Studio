@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import Tooltip from '@/components/ui/tooltip';
-import { ChevronsUpDown, Folder, Plus, Sword } from 'lucide-react';
+import { Apple, Book, ChevronsUpDown, Folder, Key, Layers, Plus, Sword } from 'lucide-react';
 import { ITEM_ROLE_META, ITEM_ROLE_SELECTIONS } from '@/editor/itemRoles';
 import type { ItemRole, ItemResourceSubtype } from '@/editor/itemRoles';
 import ElementContextMenu from '@/components/ElementContextMenu';
@@ -15,6 +15,39 @@ type ItemEntry = {
   fileName: string;
   role: ItemRole;
   resourceSubtype?: ItemResourceSubtype;
+};
+
+const CategoryIcon = ({ roleId, className }: { roleId: ItemRole; className?: string }) => {
+  switch (roleId) {
+    case 'equipment': return <Sword className={className} />;
+    case 'consumable': return <Apple className={className} />;
+    case 'quest': return <Key className={className} />;
+    case 'resource': return <Layers className={className} />;
+    case 'book': return <Book className={className} />;
+    default: return <Folder className={className} />;
+  }
+};
+
+const getCategoryColor = (roleId: ItemRole) => {
+  switch (roleId) {
+    case 'equipment': return 'text-orange-500';
+    case 'consumable': return 'text-emerald-500 text-emerald-600 dark:text-emerald-400';
+    case 'quest': return 'text-amber-500 text-amber-600 dark:text-amber-400';
+    case 'resource': return 'text-purple-500 text-purple-600 dark:text-purple-400';
+    case 'book': return 'text-blue-500 text-blue-600 dark:text-blue-400';
+    default: return 'text-muted-foreground';
+  }
+};
+
+const getCategoryHeaderStyles = (roleId: ItemRole) => {
+  switch (roleId) {
+    case 'equipment': return 'text-orange-500/80 hover:bg-orange-500/10';
+    case 'consumable': return 'text-emerald-500/80 dark:text-emerald-400/80 hover:bg-emerald-500/10';
+    case 'quest': return 'text-amber-500/80 dark:text-amber-400/80 hover:bg-amber-500/10';
+    case 'resource': return 'text-purple-500/80 dark:text-purple-400/80 hover:bg-purple-500/10';
+    case 'book': return 'text-blue-500/80 dark:text-blue-400/80 hover:bg-blue-500/10';
+    default: return 'text-muted-foreground hover:bg-muted/30';
+  }
 };
 
 type SidebarItemsPanelProps = {
@@ -60,7 +93,7 @@ const SidebarItemsPanel = ({
                 <div key={roleId} className="flex flex-col w-full">
                   <Tooltip content="Click to expand" side="right">
                     <div
-                      className="flex items-center gap-2 p-2 bg-muted/30 hover:bg-muted/50 rounded-md border border-border cursor-pointer transition-colors w-full"
+                      className={`flex items-center gap-1.5 py-1 px-1.5 rounded cursor-pointer transition-colors w-full ${getCategoryHeaderStyles(roleId)}`}
                       onClick={() => {
                         setExpandedItemCategories(prev => {
                           const newSet = new Set(prev);
@@ -73,14 +106,12 @@ const SidebarItemsPanel = ({
                         });
                       }}
                     >
-                      <Folder className="w-4 h-4 text-orange-500 flex-shrink-0" />
-                      <span className="flex items-center gap-2 flex-1 text-sm font-medium truncate">
-                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold border ${meta.badgeClass}`}>
-                          {meta.label}
-                        </span>
+                      <CategoryIcon roleId={roleId} className={`w-3.5 h-3.5 flex-shrink-0 ${getCategoryColor(roleId)}`} />
+                      <span className="flex-1 text-xs font-medium truncate" style={{ opacity: 0.8 }}>
+                        {meta.label}
                       </span>
-                      <span className="text-xs text-muted-foreground">({items.length})</span>
-                      <ChevronsUpDown className={`w-4 h-4 text-muted-foreground flex-shrink-0 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
+                      <span className="text-[10px]" style={{ opacity: 0.5 }}>({items.length})</span>
+                      <ChevronsUpDown className={`w-3 h-3 flex-shrink-0 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} style={{ opacity: 0.4 }} />
                     </div>
                   </Tooltip>
                   <div
@@ -102,7 +133,7 @@ const SidebarItemsPanel = ({
                             onClick={() => onOpenItemEdit(item)}
                           >
                             <div className="flex items-center gap-2 w-full">
-                              <Sword className="w-4 h-4 text-orange-500 flex-shrink-0" />
+                              <CategoryIcon roleId={roleId} className={`w-4 h-4 flex-shrink-0 ${getCategoryColor(roleId)}`} />
                               <div className="flex-1 min-w-0">
                                 <div className="text-sm font-medium truncate">{item.name}</div>
                                 <div className="text-xs text-muted-foreground truncate">
@@ -134,7 +165,6 @@ const SidebarItemsPanel = ({
           onClick={(event) => {
             event.stopPropagation();
             event.preventDefault();
-            console.log('[UI] Add Item button clicked');
             onAddItem();
           }}
         >

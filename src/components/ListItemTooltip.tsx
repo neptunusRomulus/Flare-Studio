@@ -2,7 +2,7 @@ import React from 'react';
 import Tooltip from '@/components/ui/tooltip';
 import { Mouse, MouseRight } from 'lucide-react';
 
-const ListItemTooltip: React.FC<{ children: React.ReactNode; item: { id: number; name: string; description?: string } }> = ({ children, item }) => {
+const ListItemTooltip: React.FC<{ children: React.ReactNode; item: { id: number; name: string; description?: string }; showActions?: boolean }> = ({ children, item, showActions = true }) => {
   const content = (
     <div className="flex flex-col gap-1">
       <div className="text-xs font-medium">{item.name}</div>
@@ -12,10 +12,12 @@ const ListItemTooltip: React.FC<{ children: React.ReactNode; item: { id: number;
         <Mouse className="w-3 h-3" />
         <span className="text-[10px]">to edit</span>
       </div>
+      {showActions && (
       <div className="flex items-center gap-1">
         <MouseRight className="w-3 h-3" />
         <span className="text-[10px]">to see Actions</span>
       </div>
+      )}
     </div>
   );
 

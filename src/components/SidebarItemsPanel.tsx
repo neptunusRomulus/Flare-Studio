@@ -127,7 +127,7 @@ const SidebarItemsPanel = ({
                             onDuplicate={() => onDuplicateItem(item)}
                             onDelete={() => onDeleteItem(item)}
                           >
-                            <ListItemTooltip item={{ id: item.id, name: item.name }}>
+                            <ListItemTooltip item={{ id: item.id, name: item.name }} showActions={false}>
                               <button
                                 className="flex flex-col items-center justify-center rounded-md border border-border bg-transparent hover:bg-muted cursor-pointer transition-colors w-full aspect-square relative group"
                                 onClick={() => onOpenItemEdit(item)}

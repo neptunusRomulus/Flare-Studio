@@ -1,0 +1,5 @@
+# Flare Studio Development Rules
+- Always use `@` to reference Flare Engine source files before suggesting logic changes.
+- Before creating a new UI component, check `FLARE_PROGRESS.md` for existing data structures.
+- All `.txt` outputs must be validated against the samples in `docs/examples/`.
+- Use "Thought" blocks to plan the interaction between Studio Architect and Engine Expert.

@@ -1,4 +1,4 @@
-﻿const {
+const {
   app,
   BrowserWindow,
   Menu,
@@ -1629,9 +1629,9 @@ function writeCategoryFile(filePath, items) {
   const lines = [];
   for (const item of items) {
     lines.push("");
+    lines.push("[item]");
     if (item._role) lines.push(`# role=${item._role}`);
     if (item._resourceSubtype) lines.push(`# resource_subtype=${item._resourceSubtype}`);
-    lines.push("[item]");
     lines.push(`id=${item.id}`);
     if (item.name) lines.push(`name=${item.name}`);
     if (item.flavor) lines.push(`flavor=${item.flavor}`);
@@ -1701,9 +1701,9 @@ function rebuildItemsIndex(projectPath) {
     lines.push("");
     for (const item of defaultItems) {
       lines.push("");
+      lines.push("[item]");
       if (item._role) lines.push(`# role=${item._role}`);
       if (item._resourceSubtype) lines.push(`# resource_subtype=${item._resourceSubtype}`);
-      lines.push("[item]");
       lines.push(`id=${item.id}`);
       if (item.name) lines.push(`name=${item.name}`);
       if (item.flavor) lines.push(`flavor=${item.flavor}`);
@@ -2098,9 +2098,9 @@ function rebuildDefaultItems(itemsTxtPath, defaultItems, projectPath) {
   lines.push("");
 
   for (const item of defaultItems) {
+    lines.push("[item]");
     if (item._role) lines.push(`# role=${item._role}`);
     if (item._resourceSubtype) lines.push(`# resource_subtype=${item._resourceSubtype}`);
-    lines.push("[item]");
     lines.push(`id=${item.id}`);
     if (item.name) lines.push(`name=${item.name}`);
     if (item.flavor) lines.push(`flavor=${item.flavor}`);
@@ -2174,7 +2174,7 @@ ipcMainLocal.handle("list-items", async (event, projectPath) => {
           id: item.id,
           name: item.name || path.basename(filePath, ".txt"),
           category,
-          filePath: `${categoryFilePath}#item_${item.id}`,
+          filePath: `${filePath}#item_${item.id}`,
           fileName: path.basename(categoryFilePath),
           role: item._role || "unspecified",
           resourceSubtype: item._resourceSubtype || "",

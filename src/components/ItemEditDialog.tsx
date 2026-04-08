@@ -5,8 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Tooltip from '@/components/ui/tooltip';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
-import { AlertTriangle, Apple, Book, Box, Check, Coins, Gift, HelpCircle, Key, Layers, Shield, Sparkles, Sword, Tag, Volume2, X, Zap } from 'lucide-react';
-import { RESOURCE_SUBTYPE_META } from '@/editor/itemRoles';
+import { AlertTriangle, Apple, Book, Box, Check, ChevronDown, ChevronRight, Coins, Folder, Gift, HelpCircle, Key, Layers, Save, Shield, Sparkles, Sword, Tag, Trash2, Volume2, X, Zap } from 'lucide-react';
+import { ITEM_ROLE_META, ITEM_ROLE_SELECTIONS, RESOURCE_SUBTYPE_META } from '@/editor/itemRoles';
 import type { ItemResourceSubtype, ItemRole } from '@/editor/itemRoles';
 
 const RoleIcon = ({ roleId, className }: { roleId: string; className?: string }) => {
@@ -16,7 +16,7 @@ const RoleIcon = ({ roleId, className }: { roleId: string; className?: string })
     case 'quest': return <Key className={className} />;
     case 'resource': return <Layers className={className} />;
     case 'book': return <Book className={className} />;
-    default: return <Sword className={className} />;
+    default: return <Folder className={className} />;
   }
 };
 
@@ -68,15 +68,56 @@ type ItemEditDialogProps = {
   updateEditingItemField: (key: string, value: FieldValue) => void;
   handleCloseItemEdit: () => void;
   handleSaveItemEdit: () => void;
+  onDeleteItem?: (item: { id: number; name: string; filePath: string }) => Promise<void>;
 };
 
-const ItemEditDialog = ({
-  showItemEditDialog,
-  editingItem,
-  updateEditingItemField,
-  handleCloseItemEdit,
-  handleSaveItemEdit
-}: ItemEditDialogProps) => {
+const CollapsibleSection = ({
+  title,
+  icon: Icon,
+  children,
+  defaultOpen = true,
+  className = ""
+}: {
+  title: string;
+  icon: any;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+  className?: string;
+}) => {
+  const [isOpen, setIsOpen] = React.useState(defaultOpen);
+
+  return (
+    <div className={`space-y-3 border-b border-border/50 pb-4 ${className}`}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center justify-between group py-1"
+      >
+        <h4 className="text-sm font-semibold flex items-center gap-2">
+          <Icon className="w-4 h-4 text-orange-500" />
+          {title}
+        </h4>
+        {isOpen ? (
+          <ChevronDown className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+        ) : (
+          <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+        )}
+      </button>
+      {isOpen && <div className="animate-in fade-in slide-in-from-top-1 duration-200">{children}</div>}
+    </div>
+  );
+};
+
+const ItemEditDialog = (props: ItemEditDialogProps) => {
+  const {
+    showItemEditDialog,
+    editingItem,
+    updateEditingItemField,
+    handleCloseItemEdit,
+    handleSaveItemEdit,
+    onDeleteItem
+  } = props;
+  const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false);
   const {
     position,
     size,
@@ -136,12 +177,8 @@ const ItemEditDialog = ({
       </div>
 
       <div className="flex-1 overflow-y-auto space-y-4 px-6 py-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/15 [&::-webkit-scrollbar-thumb]:rounded-full">
-        {/* Basic Identifier Properties */}
-        <div className="space-y-3 border-b border-border/50 pb-4">
-          <h4 className="text-sm font-semibold flex items-center gap-2">
-            <Tag className="w-4 h-4 text-orange-500" />
-            Basic Identifier Properties
-          </h4>
+        {/* Identity */}
+        <CollapsibleSection title="Identity" icon={Tag}>
           <div className="grid grid-cols-2 gap-3 items-start">
             <div className="space-y-2">
               <div className="flex flex-col gap-1">
@@ -167,6 +204,39 @@ const ItemEditDialog = ({
                   placeholder="Item description shown in tooltips"
                   className="h-8"
                 />
+              </div>
+              <div className="pt-2">
+                <label className="text-xs text-muted-foreground block mb-2">Category (Role)</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {ITEM_ROLE_SELECTIONS.map((roleOpt) => {
+                    const isActive = (editingItem.role || 'unspecified') === roleOpt.id;
+                    const meta = ITEM_ROLE_META[roleOpt.id];
+                    return (
+                      <Tooltip key={roleOpt.id} content={roleOpt.description} side="bottom">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className={`h-8 px-2 text-[11px] flex items-center gap-1.5 border-border bg-card transition-all ${isActive ? 'ring-1 ring-orange-500 border-orange-500 bg-orange-500/5' : 'hover:border-muted-foreground/60'}`}
+                          onClick={() => updateEditingItemField('role', roleOpt.id)}
+                        >
+                          <RoleIcon roleId={roleOpt.id} className={`w-3.5 h-3.5 ${isActive ? 'text-orange-500' : 'text-muted-foreground'}`} />
+                          <span className={isActive ? 'font-semibold' : ''}>{roleOpt.label}</span>
+                        </Button>
+                      </Tooltip>
+                    );
+                  })}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className={`h-8 px-2 text-[11px] flex items-center gap-1.5 border-border bg-card transition-all ${(editingItem.role === 'unspecified' || !editingItem.role) ? 'ring-1 ring-orange-500 border-orange-500 bg-orange-500/5' : 'hover:border-muted-foreground/60'}`}
+                    onClick={() => updateEditingItemField('role', 'unspecified')}
+                  >
+                    <Folder className={`w-3.5 h-3.5 ${(editingItem.role === 'unspecified' || !editingItem.role) ? 'text-orange-500' : 'text-muted-foreground'}`} />
+                    <span>Unspecified</span>
+                  </Button>
+                </div>
               </div>
             </div>
             <div className="space-y-2">
@@ -229,14 +299,10 @@ const ItemEditDialog = ({
               </div>
             </div>
           </div>
-        </div>
+        </CollapsibleSection>
 
         {/* Trade and Inventory Properties */}
-        <div className="space-y-3 border-b border-border/50 pb-4">
-          <h4 className="text-sm font-semibold flex items-center gap-2">
-            <Coins className="w-4 h-4 text-orange-500" />
-            Trade and Inventory Properties
-          </h4>
+        <CollapsibleSection title="Trade and Inventory Properties" icon={Coins}>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-start">
             <div className="md:col-span-1">
               {(() => {
@@ -379,15 +445,11 @@ const ItemEditDialog = ({
               </div>
             </div>
           </div>
-        </div>
+        </CollapsibleSection>
 
         {/* Resource-specific */}
         {isResource && (
-          <div className="space-y-3 border-b border-border/50 pb-4">
-            <h4 className="text-sm font-semibold flex items-center gap-2">
-              <Layers className="w-4 h-4 text-orange-500" />
-              Resource
-            </h4>
+          <CollapsibleSection title="Resource" icon={Layers}>
             <div className="grid sm:grid-cols-2 gap-2">
               {(Object.keys(RESOURCE_SUBTYPE_META) as Array<Exclude<ItemResourceSubtype, ''>>).map((key) => {
                 const meta = RESOURCE_SUBTYPE_META[key];
@@ -410,16 +472,12 @@ const ItemEditDialog = ({
                 );
               })}
             </div>
-          </div>
+          </CollapsibleSection>
         )}
 
         {/* Equipment and Requirements */}
         {isEquipment && (
-          <div className="space-y-3 border-b border-border/50 pb-4">
-            <h4 className="text-sm font-semibold flex items-center gap-2">
-              <Shield className="w-4 h-4 text-orange-500" />
-              Equipment and Requirements
-            </h4>
+          <CollapsibleSection title="Equipment and Requirements" icon={Shield}>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs text-muted-foreground">Item Type (equipment slot)</label>
@@ -490,16 +548,12 @@ const ItemEditDialog = ({
                 />
               </div>
             </div>
-          </div>
+          </CollapsibleSection>
         )}
 
         {/* Bonuses and Effects */}
         {isEquipment && (
-          <div className="space-y-3 border-b border-border/50 pb-4">
-            <h4 className="text-sm font-semibold flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-orange-500" />
-              Bonuses and Effects
-            </h4>
+          <CollapsibleSection title="Bonuses and Effects" icon={Sparkles}>
             <div>
               <label className="text-xs text-muted-foreground">Bonus (stat bonuses)</label>
               <Input
@@ -518,16 +572,12 @@ const ItemEditDialog = ({
                 className="h-8"
               />
             </div>
-          </div>
+          </CollapsibleSection>
         )}
 
         {/* Usage and Power */}
         {(isEquipment || isConsumable) && (
-          <div className="space-y-3 border-b border-border/50 pb-4">
-            <h4 className="text-sm font-semibold flex items-center gap-2">
-              <Zap className="w-4 h-4 text-orange-500" />
-              Usage and Power
-            </h4>
+          <CollapsibleSection title="Usage and Power" icon={Zap}>
             {isEquipment && (
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -588,16 +638,12 @@ const ItemEditDialog = ({
                 className="h-8"
               />
             </div>
-          </div>
+          </CollapsibleSection>
         )}
 
         {/* Quest-only */}
         {isQuest && (
-          <div className="space-y-3 border-b border-border/50 pb-4">
-            <h4 className="text-sm font-semibold flex items-center gap-2">
-              <Key className="w-4 h-4 text-orange-500" />
-              Quest Item Settings
-            </h4>
+          <CollapsibleSection title="Quest Item Settings" icon={Key}>
             <div className="flex items-center gap-2 text-sm">
               <input
                 type="checkbox"
@@ -617,16 +663,12 @@ const ItemEditDialog = ({
                 className="h-8"
               />
             </div>
-          </div>
+          </CollapsibleSection>
         )}
 
         {/* Book / Lore */}
         {isBook && (
-          <div className="space-y-3 border-b border-border/50 pb-4">
-            <h4 className="text-sm font-semibold flex items-center gap-2">
-              <Book className="w-4 h-4 text-orange-500" />
-              Book / Lore
-            </h4>
+          <CollapsibleSection title="Book / Lore" icon={Book}>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs text-muted-foreground">Book File</label>
@@ -647,15 +689,11 @@ const ItemEditDialog = ({
                 Show "Read" instead of "Use"
               </label>
             </div>
-          </div>
+          </CollapsibleSection>
         )}
 
         {/* Visual and Audio */}
-        <div className="space-y-3 border-b border-border/50 pb-4">
-          <h4 className="text-sm font-semibold flex items-center gap-2">
-            <Volume2 className="w-4 h-4 text-orange-500" />
-            Visual and Audio
-          </h4>
+        <CollapsibleSection title="Visual and Audio" icon={Volume2}>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-muted-foreground">Sound FX</label>
@@ -685,15 +723,11 @@ const ItemEditDialog = ({
               className="h-8"
             />
           </div>
-        </div>
+        </CollapsibleSection>
 
         {/* Randomization and Loot */}
         {!isQuest && (
-          <div className="space-y-3 pb-4">
-            <h4 className="text-sm font-semibold flex items-center gap-2">
-              <Gift className="w-4 h-4 text-orange-500" />
-              Randomization and Loot
-            </h4>
+          <CollapsibleSection title="Randomization and Loot" icon={Gift} className="border-none">
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs text-muted-foreground">Randomizer Definition</label>
@@ -715,15 +749,65 @@ const ItemEditDialog = ({
                 />
               </div>
             </div>
-          </div>
+          </CollapsibleSection>
         )}
       </div>
 
       {/* Footer */}
-      <div className="sticky bottom-0 border-t border-border/50 bg-background px-6 py-3 flex justify-end">
-        <Button size="sm" onClick={handleSaveItemEdit} className="h-7 bg-orange-500 hover:bg-orange-600 text-white">
-          Save Item
-        </Button>
+      <div className="sticky bottom-0 border-t border-border/50 bg-background px-6 py-3 flex justify-between items-center">
+        <div>
+          {!showDeleteConfirm ? (
+            <Tooltip content="Delete Item" side="top">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setShowDeleteConfirm(true)}
+                className="h-9 w-9 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+              >
+                <Trash2 className="h-5 w-5" />
+              </Button>
+            </Tooltip>
+          ) : (
+            <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2 duration-200">
+              <span className="text-xs font-medium text-destructive">Delete this item?</span>
+              <Button
+                size="sm"
+                variant="destructive"
+                className="h-7 px-2 text-[10px]"
+                onClick={async () => {
+                  if (onDeleteItem && editingItem) {
+                    await onDeleteItem({ 
+                      id: editingItem.id as number, 
+                      name: editingItem.name as string, 
+                      filePath: editingItem.filePath as string 
+                    });
+                    handleCloseItemEdit();
+                  }
+                  setShowDeleteConfirm(false);
+                }}
+              >
+                Confirm
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2 text-[10px]"
+                onClick={() => setShowDeleteConfirm(false)}
+              >
+                Cancel
+              </Button>
+            </div>
+          )}
+        </div>
+        <Tooltip content="Save Item" side="top">
+          <Button
+            size="icon"
+            onClick={handleSaveItemEdit}
+            className="h-9 w-9 bg-orange-500 hover:bg-orange-600 text-white rounded-md shadow-lg transition-all hover:scale-105 active:scale-95"
+          >
+            <Save className="h-5 w-5" />
+          </Button>
+        </Tooltip>
       </div>
 
       {/* Resize handle */}

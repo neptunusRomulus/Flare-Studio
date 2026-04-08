@@ -1473,7 +1473,6 @@ export default function useAppMainBuilder() {
       dialogueTabToDelete: objectEditing.dialogueTabToDelete,
       setDialogueTabToDelete: objectEditing.setDialogueTabToDelete,
       onDialogueClose: () => { objectEditing.setShowDialogueTreeDialog(false); objectEditing.setDialogueTabToDelete(null); },
-      editor: editor ?? null,
       syncMapObjects: realSyncMapObjects,
       itemDialogState: itemsHook.itemDialogState,
       setItemDialogState: itemsHook.setItemDialogState,
@@ -1491,6 +1490,7 @@ export default function useAppMainBuilder() {
       updateEditingItemField: itemsHook.updateEditingItemField,
       handleCloseItemEdit: itemsHook.handleCloseItemEdit,
       handleSaveItemEdit: itemsHook.handleSaveItemEdit,
+      onDeleteItem: handleDeleteItem,
       tooltip: null
     } as Record<string, unknown>;
   }

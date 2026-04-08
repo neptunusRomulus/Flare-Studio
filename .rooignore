@@ -24,3 +24,5 @@ public/
 *.zip
 *.exe
 *.msi
+!flare-engine-master/
+!mods/

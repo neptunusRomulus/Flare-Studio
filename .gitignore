@@ -3,6 +3,7 @@
 .cline/
 ai-docs/
 roadmap/
+
 # --- AI & Agent Trash ---
 *.md
 !README.md

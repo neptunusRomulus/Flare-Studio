@@ -10,6 +10,7 @@ export type ActorsSidebarParams = {
   actorEntries: MapObject[];
   draggingNpcId: number | null;
   handleEditObject: (id: number) => void;
+  handleEditEnemyTemplate: (id: number) => void;
   handleDuplicateObject: (id: number) => void;
   handleDeleteObject: (id: number) => void;
   handleReorderActors: (fromIndex: number, toIndex: number) => void;
@@ -68,6 +69,7 @@ export default function useActorsSidebar(params?: Partial<ActorsSidebarParams>) 
     actorEntries: [],
     draggingNpcId: null,
     handleEditObject: noopHandleNumber,
+    handleEditEnemyTemplate: noopHandleNumber,
     handleDuplicateObject: noopHandleNumber,
     handleDeleteObject: noopHandleNumber,
     handleReorderActors: noopTwoArgs,
@@ -106,6 +108,7 @@ export default function useActorsSidebar(params?: Partial<ActorsSidebarParams>) 
     actorEntries: p.actorEntries,
     draggingNpcId: p.draggingNpcId,
     handleEditObject: p.handleEditObject,
+    handleEditEnemyTemplate: p.handleEditEnemyTemplate,
     handleDuplicateObject: p.handleDuplicateObject,
     handleDeleteObject: p.handleDeleteObject,
     handleReorderActors: p.handleReorderActors,

@@ -21,6 +21,7 @@ export default function useAssembledSidebar(params: unknown) {
     actorEntries: actorsData?.['actorEntries'] as any | undefined,
     draggingNpcId: actorsData?.['draggingNpcId'] as number | null | undefined,
     handleEditObject: actorsData?.['handleEditObject'] as any | undefined,
+    handleEditEnemyTemplate: actorsData?.['handleEditEnemyTemplate'] as any | undefined,
     handleDuplicateObject: actorsData?.['handleDuplicateObject'] as any | undefined,
     handleDeleteObject: actorsData?.['handleDeleteObject'] as any | undefined,
     handleReorderActors: actorsData?.['handleReorderActors'] as any | undefined,

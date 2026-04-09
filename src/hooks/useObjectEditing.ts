@@ -109,6 +109,8 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
   const [actorDialogState, setActorDialogState] = useState<ActorDialogState | null>(null);
   const [actorDialogError, setActorDialogError] = useState<string | null>(null);
   const [showDialogueTreeDialog, setShowDialogueTreeDialog] = useState(false);
+  const [showVendorSettingsDialog, setShowVendorSettingsDialog] = useState(false);
+  const [showQuestSettingsDialog, setShowQuestSettingsDialog] = useState(false);
   const [dialogueTrees, setDialogueTrees] = useState<DialogueTree[]>([]);
   const [activeDialogueTab, setActiveDialogueTab] = useState(0);
   const [dialogueTabToDelete, setDialogueTabToDelete] = useState<number | null>(null);
@@ -365,6 +367,24 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
     setActiveDialogueTab(0);
     setDialogueTabToDelete(null);
     setShowDialogueTreeDialog(false);
+    setShowVendorSettingsDialog(false);
+    setShowQuestSettingsDialog(false);
+  }, []);
+
+  const handleOpenVendorSettingsDialog = useCallback(() => {
+    setShowVendorSettingsDialog(true);
+  }, []);
+
+  const handleCloseVendorSettingsDialog = useCallback(() => {
+    setShowVendorSettingsDialog(false);
+  }, []);
+
+  const handleOpenQuestSettingsDialog = useCallback(() => {
+    setShowQuestSettingsDialog(true);
+  }, []);
+
+  const handleCloseQuestSettingsDialog = useCallback(() => {
+    setShowQuestSettingsDialog(false);
   }, []);
 
   const handleObjectDialogSave = useCallback(async () => {
@@ -525,6 +545,12 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
     handleAutoDetectAnim,
     showDialogueTreeDialog,
     setShowDialogueTreeDialog,
+    showVendorSettingsDialog,
+    handleOpenVendorSettingsDialog,
+    handleCloseVendorSettingsDialog,
+    showQuestSettingsDialog,
+    handleOpenQuestSettingsDialog,
+    handleCloseQuestSettingsDialog,
     dialogueTrees,
     setDialogueTrees,
     activeDialogueTab,

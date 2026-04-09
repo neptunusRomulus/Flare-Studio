@@ -8022,8 +8022,21 @@ export class TileMapEditor {
       if (event.properties.delay) lines.push(`delay=${event.properties.delay}`);
 
       // requirements
-      if (event.properties.requires_status) lines.push(`requires_status=${event.properties.requires_status}`);
-      if (event.properties.requires_not_status) lines.push(`requires_not_status=${event.properties.requires_not_status}`);
+      const writeRepeatableEventProperty = (key: string) => {
+        const value = event.properties[key];
+        if (Array.isArray(value)) {
+          for (const item of value) {
+            if (item && String(item).trim()) {
+              lines.push(`${key}=${item}`);
+            }
+          }
+        } else if (value) {
+          lines.push(`${key}=${value}`);
+        }
+      };
+
+      writeRepeatableEventProperty('requires_status');
+      writeRepeatableEventProperty('requires_not_status');
       if (event.properties.requires_level) lines.push(`requires_level=${event.properties.requires_level}`);
       if (event.properties.requires_item) lines.push(`requires_item=${event.properties.requires_item}`);
       if (event.properties.requires_currency) lines.push(`requires_currency=${event.properties.requires_currency}`);

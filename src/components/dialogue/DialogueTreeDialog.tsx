@@ -1164,7 +1164,7 @@ const DialogueTreeDialog = ({
                 ...(d.voice ? { voice: d.voice } : {}),
                 ...(d.portrait ? { portrait: d.portrait } : {}),
               })),
-              rewards: (tree.rewards || []).filter(r => r.value.trim()),
+              rewards: (tree.rewards || []).filter(r => r.value.trim() || r.type === 'restore'),
               worldEffects: (tree.worldEffects || []).filter(w => w.value.trim())
             }));
             updateEditingObjectProperty('dialogueTrees', JSON.stringify(cleanTrees));

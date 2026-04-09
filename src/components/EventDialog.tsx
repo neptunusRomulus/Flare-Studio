@@ -126,10 +126,10 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
 
   const isEditing = editingEventId != null;
 
-  const buildProps = (): Record<string, string> => {
+  const buildProps = (): Record<string, string | string[]> => {
     const { coordinates, size, hotspot } = eventData.positioning;
     const flareActivate = ACTIVATION_TO_FLARE[eventData.timing.activeActivation || ''] || '';
-    const props: Record<string, string> = {};
+    const props: Record<string, string | string[]> = {};
 
     if (flareActivate) props.activate = flareActivate;
     if (['Trigger', 'Leave'].includes(eventData.timing.activeActivation || '')) {
@@ -140,8 +140,13 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
     }
     if (eventData.timing.cooldown > 0) props.cooldown = `${eventData.timing.cooldown}ms`;
     if (eventData.timing.delay > 0) props.delay = `${eventData.timing.delay}ms`;
-    for (const status of eventData.requirements.status) {
-      if (status.trim()) props.requires_status = status.trim();
+    const statusValues = eventData.requirements.status
+      .map(status => status.trim())
+      .filter(Boolean);
+    if (statusValues.length === 1) {
+      props.requires_status = statusValues[0];
+    } else if (statusValues.length > 1) {
+      props.requires_status = statusValues;
     }
     if (eventData.requirements.minLevel > 0) props.requires_level = String(eventData.requirements.minLevel);
     if (eventData.requirements.itemId.trim()) {
@@ -310,7 +315,11 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
             delay: parseCooldown(p.delay),
           },
           requirements: {
-            status: p.requires_status ? [p.requires_status] : [],
+            status: Array.isArray(p.requires_status)
+              ? p.requires_status.map(String).filter(Boolean)
+              : p.requires_status
+                ? [String(p.requires_status).trim()]
+                : [],
             minLevel: parseInt(p.requires_level || '0') || 0,
             itemId: reqItemParts[0] || '',
             itemQuantity: parseInt(reqItemParts[1] || '1') || 1,

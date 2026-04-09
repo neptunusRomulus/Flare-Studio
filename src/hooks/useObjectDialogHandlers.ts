@@ -46,7 +46,7 @@ export default function useObjectDialogHandlers({ editingObject, setEditingObjec
             wander_radius: parsedWander,
             constant_stock: sanitized.constant_stock || undefined,
             random_stock: sanitized.random_stock || undefined,
-            random_stock_count: sanitized.random_stock_count ? parseInt(sanitized.random_stock_count, 10) : undefined,
+            random_stock_count: sanitized.random_stock_count || undefined,
             vendor_requires_status: sanitized.vendor_requires_status || undefined,
             vendor_requires_not_status: sanitized.vendor_requires_not_status || undefined,
             customProperties: {}

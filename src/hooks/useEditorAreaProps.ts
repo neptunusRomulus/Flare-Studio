@@ -164,13 +164,5 @@ export default function useEditorAreaProps(params: any) {
     handleResetZoom: params.handleResetZoom
   };
 
-  const enemyPanelProps = {
-    isEnemyActive: params.isEnemyTabActive,
-    enemy: params.enemy,
-    showCloseConfirm: params.pendingEnemyTabCloseId === params.activeTabId,
-    onCloseDecision: params.handleEnemyTabCloseDecision,
-    onSave: params.handleEnemyTabSave
-  };
-
-  return { topBarProps, canvasCtx: editorCanvasCtx, bottomToolbarProps, enemyPanelProps } as const;
+  return { topBarProps, canvasCtx: editorCanvasCtx, bottomToolbarProps } as const;
 }

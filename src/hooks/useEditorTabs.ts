@@ -43,7 +43,14 @@ const useEditorTabs = ({
   const createTabFor = useCallback((name: string, projectPath?: string | null, config?: EditorProjectData | MapConfig | { enemy: MapObject } | null) => {
     const id = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
     const safeConfig = config ? JSON.parse(JSON.stringify(config)) : null;
-    const tab: EditorTab = { id, name, projectPath: projectPath ?? null, config: safeConfig };
+    const isEnemyTab = safeConfig && typeof safeConfig === 'object' && !Array.isArray(safeConfig) && 'enemy' in safeConfig;
+    const tab: EditorTab = {
+      id,
+      name,
+      projectPath: projectPath ?? null,
+      config: safeConfig,
+      tabType: isEnemyTab ? 'enemy' : undefined
+    };
     setTabs((prev) => [...prev, tab]);
     setActiveTabId(id);
     setCurrentProjectPath(projectPath ?? null);

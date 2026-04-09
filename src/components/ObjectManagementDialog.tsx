@@ -94,7 +94,7 @@ const ObjectManagementDialog = ({
   const [spawnReqExpanded, setSpawnReqExpanded] = useState(false);
   const [audioExpanded, setAudioExpanded] = useState(false);
 
-  const isOpen = showObjectDialog && editingObject?.type !== 'enemy';
+  const isOpen = showObjectDialog && !!editingObject;
 
   const {
     position,

@@ -2,9 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 import Tooltip from '@/components/ui/tooltip';
+import type { ItemSummary } from '@/utils/items';
 import { ArrowUp, ArrowUpRight, ArrowRight, ArrowDownRight, ArrowDown, ArrowDownLeft, ArrowLeft, ArrowUpLeft, Check, ChevronDown, ChevronUp, Gift, HelpCircle, Image, MessagesSquare, Package, Plus, Save, Sparkles, Trash2, User, X } from 'lucide-react';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 import AnimationPreview from '@/components/AnimationPreview';
@@ -29,6 +29,7 @@ type ObjectManagementDialogProps = {
   handleEditingPortraitBrowse: () => Promise<void> | void;
   handleAutoDetectAnim: () => Promise<void> | void;
   handleOpenVendorStockDialog: () => void;
+  itemsList: ItemSummary[];
   handleOpenVendorUnlockDialog: () => void;
   handleOpenVendorRandomDialog: () => void;
   handleOpenVendorSettingsDialog: () => void;
@@ -89,6 +90,7 @@ const ObjectManagementDialog = ({
   handleOpenVendorStockDialog,
   handleOpenVendorUnlockDialog,
   handleOpenVendorRandomDialog,
+  itemsList,
   handleOpenVendorSettingsDialog,
   handleCloseVendorSettingsDialog,
   showVendorSettingsDialog,
@@ -118,6 +120,22 @@ const ObjectManagementDialog = ({
     handleResizeMouseDown,
   } = useDraggableResizable({ id: 'object_management_dialog', initialWidth: 1024, initialHeight: 600 });
 
+  const {
+    position: vendorPosition,
+    size: vendorSize,
+    dialogRef: vendorDialogRef,
+    handleHeaderMouseDown: handleVendorHeaderMouseDown,
+    handleResizeMouseDown: handleVendorResizeMouseDown,
+  } = useDraggableResizable({ id: 'vendor_settings_dialog', initialWidth: 700, initialHeight: 520, minWidth: 560, minHeight: 420 });
+
+  const {
+    position: questPosition,
+    size: questSize,
+    dialogRef: questDialogRef,
+    handleHeaderMouseDown: handleQuestHeaderMouseDown,
+    handleResizeMouseDown: handleQuestResizeMouseDown,
+  } = useDraggableResizable({ id: 'quest_settings_dialog', initialWidth: 700, initialHeight: 520, minWidth: 560, minHeight: 420 });
+
   useEffect(() => {
     if (!isOpen) return;
     const handleEsc = (e: KeyboardEvent) => {
@@ -126,6 +144,24 @@ const ObjectManagementDialog = ({
     document.addEventListener('keydown', handleEsc);
     return () => document.removeEventListener('keydown', handleEsc);
   }, [isOpen, handleObjectDialogClose]);
+
+  useEffect(() => {
+    if (!showVendorSettingsDialog) return;
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') handleCloseVendorSettingsDialog();
+    };
+    document.addEventListener('keydown', handleEsc);
+    return () => document.removeEventListener('keydown', handleEsc);
+  }, [showVendorSettingsDialog, handleCloseVendorSettingsDialog]);
+
+  useEffect(() => {
+    if (!showQuestSettingsDialog) return;
+    const handleEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') handleCloseQuestSettingsDialog();
+    };
+    document.addEventListener('keydown', handleEsc);
+    return () => document.removeEventListener('keydown', handleEsc);
+  }, [showQuestSettingsDialog, handleCloseQuestSettingsDialog]);
 
   if (!isOpen) return null;
 
@@ -1600,221 +1636,341 @@ const ObjectManagementDialog = ({
     </div>
   </div>
 
-    <Dialog open={showVendorSettingsDialog} onOpenChange={handleCloseVendorSettingsDialog} zIndex={80}>
-      <DialogContent className="max-w-3xl w-full z-[9999]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Gift className="w-5 h-5 text-emerald-500" />
-            Vendor Settings
-          </DialogTitle>
-          <DialogDescription>
-            Edit the vendor-specific NPC properties for stocks, requirements, and random offers.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-1">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium mb-1">Vendor Requires Status</label>
-              <Input
-                className="h-10 text-sm"
-                value={getEditingObjectProperty('vendor_requires_status', '')}
-                onChange={(e) => updateEditingObjectProperty('vendor_requires_status', e.target.value || null)}
-                placeholder="e.g. hero_status"
-              />
+        {showVendorSettingsDialog && createPortal(
+          <div
+            ref={vendorDialogRef}
+            className="bg-background border border-border/70 rounded-lg flex flex-col shadow-xl"
+            style={{
+              position: 'fixed',
+              left: `${vendorPosition.x}px`,
+              top: `${vendorPosition.y}px`,
+              width: `${vendorSize.width}px`,
+              height: `${vendorSize.height}px`,
+              zIndex: 60,
+              pointerEvents: 'auto',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              className="flex items-center justify-between px-4 py-3 border-b border-border cursor-move select-none"
+              onMouseDown={handleVendorHeaderMouseDown}
+            >
+              <div className="flex items-center gap-2">
+                <Gift className="w-5 h-5 text-emerald-500" />
+                <h3 className="font-semibold">Vendor Settings</h3>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-6 h-6 p-0 hover:bg-transparent"
+                onClick={handleCloseVendorSettingsDialog}
+              >
+                <X className="w-4 h-4 text-muted-foreground" />
+              </Button>
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Vendor Requires Not Status</label>
-              <Input
-                className="h-10 text-sm"
-                value={getEditingObjectProperty('vendor_requires_not_status', '')}
-                onChange={(e) => updateEditingObjectProperty('vendor_requires_not_status', e.target.value || null)}
-                placeholder="e.g. thief_status"
-              />
-            </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium mb-1">Constant Stock</label>
-              <div className="flex gap-2">
-                <Input
-                  className="h-10 text-sm flex-1"
-                  value={getEditingObjectProperty('constant_stock', '')}
-                  onChange={(e) => updateEditingObjectProperty('constant_stock', e.target.value || null)}
-                  placeholder="item_id"
-                />
-                <Input
-                  type="number"
-                  className="h-10 text-sm w-24"
-                  value={getEditingObjectProperty('constant_stock_quantity', '')}
-                  onChange={(e) => updateEditingObjectProperty('constant_stock_quantity', e.target.value || null)}
-                  placeholder="Qty"
-                  min="1"
-                />
+            <div className="px-4 py-3 border-b border-border bg-muted/50 space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Items created in the Items layer can be added to this vendor using the item-based dialogs below.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" onClick={handleOpenVendorStockDialog}>
+                  Always Available
+                </Button>
+                <Button size="sm" variant="outline" onClick={handleOpenVendorUnlockDialog}>
+                  Unlockable
+                </Button>
+                <Button size="sm" variant="outline" onClick={handleOpenVendorRandomDialog}>
+                  Random Offers
+                </Button>
               </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Status Stock</label>
-              <div className="flex gap-2">
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Vendor Requires Status</label>
+                  <Input
+                    className="h-10 text-sm"
+                    value={getEditingObjectProperty('vendor_requires_status', '')}
+                    onChange={(e) => updateEditingObjectProperty('vendor_requires_status', e.target.value || null)}
+                    placeholder="e.g. hero_status"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Vendor Requires Not Status</label>
+                  <Input
+                    className="h-10 text-sm"
+                    value={getEditingObjectProperty('vendor_requires_not_status', '')}
+                    onChange={(e) => updateEditingObjectProperty('vendor_requires_not_status', e.target.value || null)}
+                    placeholder="e.g. thief_status"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Constant Stock</label>
+                  <div className="flex gap-2">
+                    <Input
+                      className="h-10 text-sm flex-1"
+                      value={getEditingObjectProperty('constant_stock', '')}
+                      onChange={(e) => updateEditingObjectProperty('constant_stock', e.target.value || null)}
+                      placeholder="item_id"
+                    />
+                    <Input
+                      type="number"
+                      className="h-10 text-sm w-24"
+                      value={getEditingObjectProperty('constant_stock_quantity', '')}
+                      onChange={(e) => updateEditingObjectProperty('constant_stock_quantity', e.target.value || null)}
+                      placeholder="Qty"
+                      min="1"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Status Stock</label>
+                  <div className="flex gap-2">
+                    <Input
+                      className="h-10 text-sm flex-1"
+                      value={getEditingObjectProperty('status_stock', '')}
+                      onChange={(e) => updateEditingObjectProperty('status_stock', e.target.value || null)}
+                      placeholder="item_id"
+                    />
+                    <Input
+                      type="number"
+                      className="h-10 text-sm w-24"
+                      value={getEditingObjectProperty('status_stock_quantity', '')}
+                      onChange={(e) => updateEditingObjectProperty('status_stock_quantity', e.target.value || null)}
+                      placeholder="Qty"
+                      min="1"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Random Stock</label>
                 <Input
-                  className="h-10 text-sm flex-1"
-                  value={getEditingObjectProperty('status_stock', '')}
-                  onChange={(e) => updateEditingObjectProperty('status_stock', e.target.value || null)}
-                  placeholder="item_id"
-                />
-                <Input
-                  type="number"
-                  className="h-10 text-sm w-24"
-                  value={getEditingObjectProperty('status_stock_quantity', '')}
-                  onChange={(e) => updateEditingObjectProperty('status_stock_quantity', e.target.value || null)}
-                  placeholder="Qty"
-                  min="1"
+                  className="h-10 text-sm"
+                  value={getEditingObjectProperty('random_stock', '')}
+                  onChange={(e) => updateEditingObjectProperty('random_stock', e.target.value || null)}
+                  placeholder="loot table definition"
                 />
               </div>
-            </div>
-          </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Random Stock</label>
-            <Input
-              className="h-10 text-sm"
-              value={getEditingObjectProperty('random_stock', '')}
-              onChange={(e) => updateEditingObjectProperty('random_stock', e.target.value || null)}
-              placeholder="loot table definition"
-            />
-          </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Random Stock Count Min</label>
+                  <Input
+                    type="number"
+                    className="h-10 text-sm"
+                    value={getEditingObjectProperty('random_stock_count_min', '')}
+                    onChange={(e) => updateEditingObjectProperty('random_stock_count_min', e.target.value || null)}
+                    placeholder="Min"
+                    min="0"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Random Stock Count Max</label>
+                  <Input
+                    type="number"
+                    className="h-10 text-sm"
+                    value={getEditingObjectProperty('random_stock_count_max', '')}
+                    onChange={(e) => updateEditingObjectProperty('random_stock_count_max', e.target.value || null)}
+                    placeholder="Max"
+                    min="0"
+                  />
+                </div>
+              </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium mb-1">Random Stock Count Min</label>
-              <Input
-                type="number"
-                className="h-10 text-sm"
-                value={getEditingObjectProperty('random_stock_count_min', '')}
-                onChange={(e) => updateEditingObjectProperty('random_stock_count_min', e.target.value || null)}
-                placeholder="Min"
-                min="0"
-              />
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Vendor Ratio Buy</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    className="h-10 text-sm"
+                    value={getEditingObjectProperty('vendor_ratio_buy', '')}
+                    onChange={(e) => updateEditingObjectProperty('vendor_ratio_buy', e.target.value || null)}
+                    placeholder="0"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Vendor Ratio Sell</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    className="h-10 text-sm"
+                    value={getEditingObjectProperty('vendor_ratio_sell', '')}
+                    onChange={(e) => updateEditingObjectProperty('vendor_ratio_sell', e.target.value || null)}
+                    placeholder="0"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Vendor Ratio Sell Old</label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    className="h-10 text-sm"
+                    value={getEditingObjectProperty('vendor_ratio_sell_old', '')}
+                    onChange={(e) => updateEditingObjectProperty('vendor_ratio_sell_old', e.target.value || null)}
+                    placeholder="0"
+                  />
+                </div>
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Random Stock Count Max</label>
-              <Input
-                type="number"
-                className="h-10 text-sm"
-                value={getEditingObjectProperty('random_stock_count_max', '')}
-                onChange={(e) => updateEditingObjectProperty('random_stock_count_max', e.target.value || null)}
-                placeholder="Max"
-                min="0"
-              />
-            </div>
-          </div>
 
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <label className="block text-sm font-medium mb-1">Vendor Ratio Buy</label>
-              <Input
-                type="number"
-                step="0.01"
-                className="h-10 text-sm"
-                value={getEditingObjectProperty('vendor_ratio_buy', '')}
-                onChange={(e) => updateEditingObjectProperty('vendor_ratio_buy', e.target.value || null)}
-                placeholder="0"
-              />
+            <div className="flex justify-end border-t border-border p-4">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="w-10 h-10"
+                onClick={handleCloseVendorSettingsDialog}
+                aria-label="Save"
+              >
+                <Save className="w-4 h-4" />
+              </Button>
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Vendor Ratio Sell</label>
-              <Input
-                type="number"
-                step="0.01"
-                className="h-10 text-sm"
-                value={getEditingObjectProperty('vendor_ratio_sell', '')}
-                onChange={(e) => updateEditingObjectProperty('vendor_ratio_sell', e.target.value || null)}
-                placeholder="0"
-              />
+
+            <div
+              onMouseDown={handleVendorResizeMouseDown}
+              className="absolute bottom-0 right-0 w-5 h-5 cursor-se-resize opacity-40 hover:opacity-100 transition-opacity flex items-end justify-end"
+              title="Drag to resize"
+            >
+              <div className="w-1.5 h-1.5 bg-foreground/40 rounded-sm m-1" />
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Vendor Ratio Sell Old</label>
-              <Input
-                type="number"
-                step="0.01"
-                className="h-10 text-sm"
-                value={getEditingObjectProperty('vendor_ratio_sell_old', '')}
-                onChange={(e) => updateEditingObjectProperty('vendor_ratio_sell_old', e.target.value || null)}
-                placeholder="0"
-              />
+          </div>,
+          document.body
+        )}
+
+        {showQuestSettingsDialog && createPortal(
+          <div
+            ref={questDialogRef}
+            className="bg-background border border-border/70 rounded-lg flex flex-col shadow-xl"
+            style={{
+              position: 'fixed',
+              left: `${questPosition.x}px`,
+              top: `${questPosition.y}px`,
+              width: `${questSize.width}px`,
+              height: `${questSize.height}px`,
+              zIndex: 60,
+              pointerEvents: 'auto',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              className="flex items-center justify-between px-4 py-3 border-b border-border cursor-move select-none"
+              onMouseDown={handleQuestHeaderMouseDown}
+            >
+              <div className="flex items-center gap-2">
+                <Check className="w-5 h-5 text-amber-500" />
+                <h3 className="font-semibold">Quest Settings</h3>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-6 h-6 p-0 hover:bg-transparent"
+                onClick={handleCloseQuestSettingsDialog}
+              >
+                <X className="w-4 h-4 text-muted-foreground" />
+              </Button>
             </div>
-          </div>
-        </div>
 
-        <DialogFooter className="gap-2 mt-4">
-          <Button variant="outline" onClick={handleCloseVendorSettingsDialog}>
-            Close
-          </Button>
-          <Button onClick={handleCloseVendorSettingsDialog}>
-            Save
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Requires Status</label>
+                  <Input
+                    className="h-10 text-sm"
+                    value={getEditingObjectProperty('questRequiresStatus', '')}
+                    onChange={(e) => updateEditingObjectProperty('questRequiresStatus', e.target.value || null)}
+                    placeholder="e.g. quest_started"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Set Status On Accept</label>
+                  <Input
+                    className="h-10 text-sm"
+                    value={getEditingObjectProperty('questSetStatus', '')}
+                    onChange={(e) => updateEditingObjectProperty('questSetStatus', e.target.value || null)}
+                    placeholder="e.g. quest_accepted"
+                  />
+                </div>
+              </div>
 
-    <Dialog open={showQuestSettingsDialog} onOpenChange={handleCloseQuestSettingsDialog} zIndex={80}>
-      <DialogContent className="max-w-3xl w-full z-[9999]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Check className="w-5 h-5 text-amber-500" />
-            Quest Settings
-          </DialogTitle>
-          <DialogDescription>
-            Edit the quest-specific NPC properties for quest gating and reward setup.
-          </DialogDescription>
-        </DialogHeader>
+              <div>
+                <label className="block text-sm font-medium mb-1">Quest Loot</label>
+                <Input
+                  className="h-10 text-sm"
+                  value={getEditingObjectProperty('quest_loot', '')}
+                  onChange={(e) => updateEditingObjectProperty('quest_loot', e.target.value || null)}
+                  placeholder="status,not_status,item_id"
+                />
+                <p className="text-xs text-muted-foreground mt-1">Format: status,not_status,item_id (one line per entry).</p>
+              </div>
 
-        <div className="space-y-4 max-h-[65vh] overflow-y-auto pr-1">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium mb-1">Requires Status</label>
-              <Input
-                className="h-10 text-sm"
-                value={getEditingObjectProperty('questRequiresStatus', '')}
-                onChange={(e) => updateEditingObjectProperty('questRequiresStatus', e.target.value || null)}
-                placeholder="e.g. quest_started"
-              />
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">Quest Reward Item</p>
+                    <p className="text-xs text-muted-foreground">Select an item created in the Items layer.</p>
+                  </div>
+                  <div className="text-xs text-muted-foreground">Selected: #{getEditingObjectProperty('quest_loot', '').split(',')[2] || 'none'}</div>
+                </div>
+
+                {itemsList.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No items available. Create items in the Items layer to use them as quest rewards.</p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
+                    {itemsList.map((item) => {
+                      const selected = Number(getEditingObjectProperty('quest_loot', '').split(',')[2]) === item.id;
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => {
+                            const [status = '', notStatus = ''] = getEditingObjectProperty('quest_loot', '').split(',').map((part) => part.trim());
+                            updateEditingObjectProperty('quest_loot', `${status},${notStatus},${item.id}`);
+                          }}
+                          className={`text-left rounded-md border p-3 transition-all ${selected ? 'border-amber-500 bg-amber-50 dark:border-amber-400 dark:bg-amber-950/40' : 'border-border bg-muted/20 hover:bg-muted/50'}`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-medium text-sm truncate">{item.name || `Item ${item.id}`}</span>
+                            <span className="text-[11px] text-muted-foreground">#{item.id}</span>
+                          </div>
+                          <div className="text-xs text-muted-foreground mt-1 truncate">{item.category || 'Unknown'} · {item.role}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Set Status On Accept</label>
-              <Input
-                className="h-10 text-sm"
-                value={getEditingObjectProperty('questSetStatus', '')}
-                onChange={(e) => updateEditingObjectProperty('questSetStatus', e.target.value || null)}
-                placeholder="e.g. quest_accepted"
-              />
+
+            <div className="flex justify-end border-t border-border p-4">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="w-10 h-10"
+                onClick={handleCloseQuestSettingsDialog}
+                aria-label="Save"
+              >
+                <Save className="w-4 h-4" />
+              </Button>
             </div>
-          </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Quest Loot</label>
-            <Input
-              className="h-10 text-sm"
-              value={getEditingObjectProperty('quest_loot', '')}
-              onChange={(e) => updateEditingObjectProperty('quest_loot', e.target.value || null)}
-              placeholder="status,not_status,item_id"
-            />
-            <p className="text-xs text-muted-foreground mt-1">Format: status,not_status,item_id (one line per entry).</p>
-          </div>
-        </div>
-
-        <DialogFooter className="gap-2 mt-4">
-          <Button variant="outline" onClick={handleCloseQuestSettingsDialog}>
-            Close
-          </Button>
-          <Button onClick={handleCloseQuestSettingsDialog}>
-            Save
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  </>
+            <div
+              onMouseDown={handleQuestResizeMouseDown}
+              className="absolute bottom-0 right-0 w-5 h-5 cursor-se-resize opacity-40 hover:opacity-100 transition-opacity flex items-end justify-end"
+              title="Drag to resize"
+            >
+              <div className="w-1.5 h-1.5 bg-foreground/40 rounded-sm m-1" />
+            </div>
+          </div>,
+          document.body
+        )}
+      </>
   );
 
   return createPortal(dialogContent, document.body);

@@ -100,6 +100,7 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
   const { editor = null, syncMapObjects, createTabFor, switchToTab } = opts || {};
 
   const [showObjectDialog, setShowObjectDialog] = useState(false);
+  const [showEnemyEditor, setShowEnemyEditor] = useState(false);
   const [editingObject, setEditingObject] = useState<MapObject | null>(null);
   const [objectValidationErrors, setObjectValidationErrors] = useState<string[]>([]);
   const [mapObjects, setMapObjects] = useState<MapObject[]>([]);
@@ -281,7 +282,11 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
       const objects = editor && typeof editor.getMapObjects === 'function' ? editor.getMapObjects() : [...mapObjects, newObject!];
       const obj = objects?.find(o => o.id === newObject!.id) || newObject;
       setEditingObject(obj);
-      setShowObjectDialog(true);
+      if (obj.type === 'enemy') {
+        setShowEnemyEditor(true);
+      } else {
+        setShowObjectDialog(true);
+      }
       if (obj.type !== 'npc') {
         setShowDeleteNpcConfirm(false);
         setShowDeleteEnemyConfirm(false);
@@ -311,7 +316,11 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
     if (!obj) return;
 
     setEditingObject(obj);
-    setShowObjectDialog(true);
+    if (obj.type === 'enemy') {
+      setShowEnemyEditor(true);
+    } else {
+      setShowObjectDialog(true);
+    }
     if (obj.type === 'npc') {
       try {
         const stored = obj.properties?.dialogueTrees;
@@ -481,6 +490,8 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
   return {
     showObjectDialog,
     setShowObjectDialog,
+    showEnemyEditor,
+    setShowEnemyEditor,
     editingObject,
     setEditingObject,
     objectValidationErrors,

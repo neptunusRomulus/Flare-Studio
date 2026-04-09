@@ -1448,6 +1448,8 @@ export default function useAppMainBuilder() {
       canUseTilesetDialog: typeof window !== 'undefined' && !!window.electronAPI?.selectTilesetFile,
       // Object management dialog (NPC edit on click)
       showObjectDialog: objectEditing.showObjectDialog,
+      showEnemyEditor: objectEditing.showEnemyEditor,
+      setShowEnemyEditor: objectEditing.setShowEnemyEditor,
       editingObject: objectEditing.editingObject,
       objectValidationErrors: objectEditing.objectValidationErrors,
       setEditingObject: objectEditing.setEditingObject,

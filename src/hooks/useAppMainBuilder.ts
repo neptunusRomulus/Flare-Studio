@@ -797,6 +797,7 @@ export default function useAppMainBuilder() {
         })(),
         draggingNpcId: appState.draggingNpcId,
         handleEditObject: objectEditing.handleEditObject,
+        handleEditEnemyTemplate: objectEditing.handleEditEnemyTemplate,
         handleDuplicateObject,
         handleDeleteObject,
         handleReorderActors,

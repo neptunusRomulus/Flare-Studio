@@ -30,6 +30,7 @@ type SidebarProps = {
     actorEntries: MapObject[];
     draggingNpcId: number | null;
     handleEditObject: (id: number) => void;
+    handleEditEnemyTemplate: (id: number) => void;
     handleDuplicateObject: (id: number) => void;
     handleDeleteObject: (id: number) => void;
     handleNpcDragStart: (e: React.DragEvent, actorId: number) => void;
@@ -139,6 +140,7 @@ export default function AppSidebar(p: SidebarProps) {
             leftCollapsed={p.leftCollapsed}
             draggingNpcId={p.actors.draggingNpcId}
             handleEditObject={p.actors.handleEditObject}
+            handleEditEnemyTemplate={p.actors.handleEditEnemyTemplate}
             handleDuplicateObject={p.actors.handleDuplicateObject}
             handleDeleteObject={p.actors.handleDeleteObject}
             handleNpcDragStart={p.actors.handleNpcDragStart}

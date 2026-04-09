@@ -329,6 +329,16 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
     }
   }, [editor, mapObjects]);
 
+  const handleEditEnemyTemplate = useCallback((objectId: number) => {
+    const objects = editor && typeof editor.getMapObjects === 'function' ? editor.getMapObjects() : mapObjects;
+    const obj = objects?.find(o => o.id === objectId) || null;
+    if (!obj || obj.type !== 'enemy') return;
+
+    setEditingObject(obj);
+    setShowObjectDialog(false);
+    setShowEnemyEditor(true);
+  }, [editor, mapObjects]);
+
   const handleUpdateObject = useCallback((updatedObject: MapObject) => {
     try {
       if (editor && typeof editor.updateMapObject === 'function') {
@@ -528,6 +538,7 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
     handleActorPortraitBrowse,
     handleActorSubmit,
     handleEditObject,
+    handleEditEnemyTemplate,
     handleUpdateObject,
     handleObjectDialogClose,
     handleObjectDialogSave,

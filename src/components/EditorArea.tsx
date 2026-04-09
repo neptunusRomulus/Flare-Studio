@@ -1,6 +1,5 @@
 import React from 'react';
 import TopBar from '@/components/TopBar';
-import EnemyTabPanel from '@/components/EnemyTabPanel';
 import EditorCanvas from '@/components/EditorCanvas';
 import type { MapObject } from '@/types';
 
@@ -18,38 +17,14 @@ type TopBarProps = {
   handleResetZoom: () => void;
 };
 
-type EnemyPanelProps = {
-  isEnemyActive: boolean;
-  enemy?: MapObject | null;
-  showCloseConfirm: boolean;
-  onCloseDecision: (decision: string) => void;
-  onSave: (data: MapObject) => void;
-};
-
 type Props = {
   topBarProps: TopBarProps;
   canvasCtx: React.ComponentProps<typeof EditorCanvas>['ctx'];
   bottomToolbarProps: React.ComponentProps<typeof EditorCanvas>['bottomToolbarProps'];
-  enemyPanelProps: EnemyPanelProps;
   isDarkMode: boolean;
 };
 
-const EditorArea: React.FC<Props> = ({ topBarProps, canvasCtx, bottomToolbarProps, enemyPanelProps, isDarkMode }) => {
-  if (enemyPanelProps.isEnemyActive) {
-    return (
-      <section className="flex-1 min-w-0 flex flex-col relative">
-        <div className="p-6 h-full overflow-auto">
-          <EnemyTabPanel
-            enemy={enemyPanelProps.enemy}
-            showCloseConfirm={enemyPanelProps.showCloseConfirm}
-            onCloseDecision={enemyPanelProps.onCloseDecision}
-            onSave={enemyPanelProps.onSave}
-          />
-        </div>
-      </section>
-    );
-  }
-
+const EditorArea: React.FC<Props> = ({ topBarProps, canvasCtx, bottomToolbarProps, isDarkMode }) => {
   return (
     <section className="flex-1 min-w-0 flex flex-col relative">
       <TopBar

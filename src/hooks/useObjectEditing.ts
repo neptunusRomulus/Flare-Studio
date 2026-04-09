@@ -278,20 +278,15 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
 
     handleCloseActorDialog();
     if (editAfter && newObject) {
-      // Open the edit dialog for the newly created actor
       const objects = editor && typeof editor.getMapObjects === 'function' ? editor.getMapObjects() : [...mapObjects, newObject!];
       const obj = objects?.find(o => o.id === newObject!.id) || newObject;
-      if (obj.type === 'enemy' && typeof createTabFor === 'function') {
-        try {
-          const tab = createTabFor(obj.name || 'Enemy', null, { enemy: obj });
-          if (tab && typeof switchToTab === 'function') void switchToTab(tab.id);
-        } catch (err) {
-          console.warn('Failed to create tab for enemy edit:', err);
-        }
-      } else {
-        setEditingObject(obj);
-        setShowObjectDialog(true);
-        // New NPC has no dialogue trees yet
+      setEditingObject(obj);
+      setShowObjectDialog(true);
+      if (obj.type !== 'npc') {
+        setShowDeleteNpcConfirm(false);
+        setShowDeleteEnemyConfirm(false);
+      }
+      if (obj.type === 'npc') {
         try {
           const stored = obj.properties?.dialogueTrees;
           setDialogueTrees(stored ? JSON.parse(stored) : []);
@@ -311,34 +306,23 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
   }, [actorDialogState, editor, syncMapObjects, createTabFor, switchToTab, mapObjects, handleCloseActorDialog]);
 
   const handleEditObject = useCallback((objectId: number) => {
-    // If an editor instance is available use it to find the object
     const objects = editor && typeof editor.getMapObjects === 'function' ? editor.getMapObjects() : mapObjects;
     const obj = objects?.find(o => o.id === objectId) || null;
     if (!obj) return;
 
-    // If enemy and createTabFor provided, open an edit tab
-    if (obj.type === 'enemy' && typeof createTabFor === 'function') {
-      try {
-        const tab = createTabFor(obj.name || 'Enemy', null, { enemy: obj });
-        if (tab && typeof switchToTab === 'function') void switchToTab(tab.id);
-        return;
-      } catch (err) {
-        console.warn('Failed to create tab for enemy edit:', err);
-      }
-    }
-
     setEditingObject(obj);
     setShowObjectDialog(true);
-    // Load dialogue trees from the object's properties
-    try {
-      const stored = obj.properties?.dialogueTrees;
-      setDialogueTrees(stored ? JSON.parse(stored) : []);
-    } catch {
-      setDialogueTrees([]);
+    if (obj.type === 'npc') {
+      try {
+        const stored = obj.properties?.dialogueTrees;
+        setDialogueTrees(stored ? JSON.parse(stored) : []);
+      } catch {
+        setDialogueTrees([]);
+      }
+      setActiveDialogueTab(0);
+      setDialogueTabToDelete(null);
     }
-    setActiveDialogueTab(0);
-    setDialogueTabToDelete(null);
-  }, [createTabFor, editor, mapObjects, switchToTab]);
+  }, [editor, mapObjects]);
 
   const handleUpdateObject = useCallback((updatedObject: MapObject) => {
     try {

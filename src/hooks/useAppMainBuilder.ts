@@ -1322,7 +1322,6 @@ export default function useAppMainBuilder() {
         handleDeleteStamp: () => {},
         stampsState: { stamps: toolbarState.stamps, selectedStamp: toolbarState.selectedStamp, stampMode: toolbarState.stampMode, newStampName: toolbarState.newStampName }
       },
-      enemyPanelProps: {},
       dialogsCtx: (() => {
         const dialogCtx = {
           ...(dialogsCtx as Record<string, unknown>),
@@ -1454,9 +1453,11 @@ export default function useAppMainBuilder() {
       setEditingObject: objectEditing.setEditingObject,
       handleObjectDialogClose: objectEditing.handleObjectDialogClose,
       handleObjectDialogSave: objectEditing.handleObjectDialogSave,
+      handleUpdateObject: objectEditing.handleUpdateObject,
       updateEditingObjectProperty: objectEditing.updateEditingObjectProperty,
       updateEditingObjectBoolean: objectEditing.updateEditingObjectBoolean,
       getEditingObjectProperty: objectEditing.getEditingObjectProperty,
+      currentProjectPath,
       handleEditingTilesetBrowse: objectEditing.handleEditingTilesetBrowse,
       handleEditingPortraitBrowse: objectEditing.handleEditingPortraitBrowse,
       handleAutoDetectAnim: objectEditing.handleAutoDetectAnim,

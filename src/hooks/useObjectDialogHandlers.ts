@@ -2,6 +2,13 @@ import { useCallback } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { validateAndSanitizeObject } from '../editor/objectValidation';
 import { serializeNpcToFlare } from '../utils/flareNpcUtils';
+import {
+  buildAnimationFileContent,
+  buildSafeNpcAnimationFilename,
+  getAnimationProps,
+  isAnimationDefinitionFilePath,
+  isImageFilePath,
+} from '../utils/animationUtils';
 import type { MapObject, FlareNPC } from '../types';
 
 type Params = {
@@ -31,6 +38,35 @@ export default function useObjectDialogHandlers({ editingObject, setEditingObjec
           const parsedDirection = sanitized.direction ? Math.max(0, Math.min(7, parseInt(sanitized.direction, 10))) as FlareNPC['direction'] : undefined;
           const parsedWander = sanitized.wander_radius ? parseInt(sanitized.wander_radius, 10) : undefined;
 
+          const animProps = getAnimationProps(sanitized);
+          let gfxPath = sanitized.tilesetPath || undefined;
+          let animationDefinitionPath: string | undefined;
+          const rawTilesetPath = sanitized.tilesetPath || sanitized.tilesetSourcePath || '';
+          const resolvedTilesetPath = rawTilesetPath.replace(/\\/g, '/');
+
+          if (
+            resolvedTilesetPath &&
+            !isAnimationDefinitionFilePath(resolvedTilesetPath) &&
+            isImageFilePath(resolvedTilesetPath) &&
+            Object.keys(animProps).length > 0 &&
+            window.electronAPI?.createFolderIfNotExists &&
+            window.electronAPI?.writeFile
+          ) {
+            const animationFolder = `${currentProjectPath.replace(/\\/g, '/')}/animations/npcs`;
+            await window.electronAPI.createFolderIfNotExists(animationFolder);
+            const safeBaseName = buildSafeNpcAnimationFilename(sanitized.name || existingFilename.replace(/^npcs\//, '') || `npc_${editingObject.id}`);
+            const animationFileName = `${safeBaseName}.txt`;
+            const animationFilePath = `${animationFolder}/${animationFileName}`;
+            const animationFileContent = buildAnimationFileContent(resolvedTilesetPath, animProps);
+            const animationSaved = await window.electronAPI.writeFile(animationFilePath, animationFileContent);
+            if (animationSaved) {
+              animationDefinitionPath = `animations/npcs/${animationFileName}`;
+              gfxPath = animationDefinitionPath;
+            } else {
+              console.warn('Failed to write NPC animation definition file:', animationFilePath);
+            }
+          }
+
           const npcFull: FlareNPC = {
             id: editingObject.id,
             x: editingObject.x,
@@ -39,7 +75,7 @@ export default function useObjectDialogHandlers({ editingObject, setEditingObjec
             name: sanitized.name || '',
             talker: sanitized.talker === 'true',
             vendor: sanitized.vendor === 'true',
-            gfx: sanitized.tilesetPath || undefined,
+            gfx: gfxPath,
             portrait: sanitized.portraitPath || undefined,
             direction: parsedDirection,
             waypoints: sanitized.waypoints || undefined,
@@ -52,8 +88,28 @@ export default function useObjectDialogHandlers({ editingObject, setEditingObjec
             customProperties: {}
           };
 
+          const excludedKeys = new Set([
+            'npcFilename',
+            'name',
+            'talker',
+            'vendor',
+            'tilesetPath',
+            'tilesetSourcePath',
+            'portraitPath',
+            'portraitSourcePath',
+            'direction',
+            'waypoints',
+            'wander_radius',
+            'constant_stock',
+            'random_stock',
+            'random_stock_count',
+            'vendor_requires_status',
+            'vendor_requires_not_status',
+            ...Object.keys(animProps)
+          ]);
+
           for (const [key, value] of Object.entries(sanitized)) {
-            if (!['npcFilename', 'name', 'talker', 'vendor', 'tilesetPath', 'portraitPath', 'direction', 'waypoints', 'wander_radius', 'constant_stock', 'random_stock', 'random_stock_count', 'vendor_requires_status', 'vendor_requires_not_status'].includes(key)) {
+            if (!excludedKeys.has(key)) {
               npcFull.customProperties![key] = String(value || '');
             }
           }

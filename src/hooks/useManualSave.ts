@@ -487,7 +487,7 @@ export default function useManualSave(args: {
                     portrait: portraitRelative || undefined,
                     constant_stock: npc.properties?.constant_stock || undefined,
                     random_stock: npc.properties?.random_stock || undefined,
-                    random_stock_count: npc.properties?.random_stock_count ? parseInt(npc.properties.random_stock_count, 10) : undefined,
+                    random_stock_count: npc.properties?.random_stock_count || undefined,
                     vendor_requires_status: npc.properties?.vendor_requires_status || undefined,
                     vendor_requires_not_status: npc.properties?.vendor_requires_not_status || undefined,
                     direction: npc.properties?.direction ? parseInt(npc.properties.direction, 10) as FlareNPC['direction'] : undefined,

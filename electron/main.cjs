@@ -1599,19 +1599,36 @@ function parseItemsInCategoryFile(filePath) {
         const trimmed = line.trim();
         // Preserve role/resource info from comment lines that the writer adds above [item]
         const roleMatch = trimmed.match(/^#\s*role=(.+)$/i);
-        if (roleMatch) { item._role = roleMatch[1].toLowerCase(); continue; }
+        if (roleMatch) {
+          item._role = roleMatch[1].toLowerCase();
+          continue;
+        }
         const resMatch = trimmed.match(/^#\s*resource_subtype=(.+)$/i);
-        if (resMatch) { item._resourceSubtype = resMatch[1].toLowerCase(); continue; }
+        if (resMatch) {
+          item._resourceSubtype = resMatch[1].toLowerCase();
+          continue;
+        }
         if (!trimmed || trimmed.startsWith("#") || trimmed.startsWith("[")) continue;
         const eqIndex = trimmed.indexOf("=");
         if (eqIndex > 0) {
           const key = trimmed.substring(0, eqIndex).trim();
           const value = trimmed.substring(eqIndex + 1).trim();
-          item[key] = value;
+          if (key === "id") {
+            item.id = parseInt(value, 10) || 0;
+            continue;
+          }
+          if (Object.prototype.hasOwnProperty.call(item, key)) {
+            if (Array.isArray(item[key])) {
+              item[key].push(value);
+            } else {
+              item[key] = [item[key], value];
+            }
+          } else {
+            item[key] = value;
+          }
         }
       }
       if (item.id !== undefined) {
-        item.id = parseInt(item.id, 10) || 0;
         items.push(item);
       }
     }
@@ -1619,6 +1636,78 @@ function parseItemsInCategoryFile(filePath) {
   } catch {
     return [];
   }
+}
+
+function appendItemProperty(lines, key, value, options = {}) {
+  const { shouldWrite = (v) => v !== undefined && v !== null && v !== "", format = (v) => String(v) } = options;
+  const writeValue = (v) => {
+    if (shouldWrite(v)) {
+      lines.push(`${key}=${format(v)}`);
+    }
+  };
+
+  if (Array.isArray(value)) {
+    for (const itemValue of value) {
+      writeValue(itemValue);
+    }
+    return;
+  }
+
+  writeValue(value);
+}
+
+function appendItemLines(lines, item) {
+  if (item._role) lines.push(`# role=${item._role}`);
+  if (item._resourceSubtype) lines.push(`# resource_subtype=${item._resourceSubtype}`);
+  appendItemProperty(lines, "id", item.id);
+  appendItemProperty(lines, "name", item.name);
+  appendItemProperty(lines, "flavor", item.flavor);
+  appendItemProperty(lines, "level", item.level, { shouldWrite: (v) => parseInt(v, 10) > 1 });
+  appendItemProperty(lines, "icon", item.icon);
+  appendItemProperty(lines, "quality", item.quality);
+  appendItemProperty(lines, "price", item.price);
+  appendItemProperty(lines, "price_per_level", item.price_per_level);
+  appendItemProperty(lines, "price_sell", item.price_sell);
+  appendItemProperty(lines, "type", item.type);
+  appendItemProperty(lines, "speed", item.speed);
+  appendItemProperty(lines, "radius", item.radius);
+  appendItemProperty(lines, "trait_elemental", item.trait_elemental);
+  appendItemProperty(lines, "wall_power", item.wall_power);
+  if (item.use_hazard) appendItemProperty(lines, "use_hazard", item.use_hazard, { format: () => "true", shouldWrite: (v) => !!v });
+  appendItemProperty(lines, "post_power", item.post_power);
+  appendItemProperty(lines, "post_effect", item.post_effect);
+  appendItemProperty(lines, "requires_hpmp_state", item.requires_hpmp_state);
+  appendItemProperty(lines, "requires_item", item.requires_item);
+  appendItemProperty(lines, "new_state", item.new_state);
+  appendItemProperty(lines, "modifier_damage", item.modifier_damage);
+  appendItemProperty(lines, "lifespan", item.lifespan);
+  if (item.face) appendItemProperty(lines, "face", item.face, { format: () => "true", shouldWrite: (v) => !!v });
+  appendItemProperty(lines, "max_quantity", item.max_quantity, { shouldWrite: (v) => parseInt(v, 10) > 1 });
+  if (item.quest_item) appendItemProperty(lines, "quest_item", item.quest_item, { format: () => "true", shouldWrite: (v) => !!v });
+  if (item.no_stash) appendItemProperty(lines, "no_stash", item.no_stash, { shouldWrite: (v) => v !== "ignore" });
+  appendItemProperty(lines, "item_type", item.item_type);
+  appendItemProperty(lines, "equip_flags", item.equip_flags);
+  appendItemProperty(lines, "requires_level", item.requires_level, { shouldWrite: (v) => parseInt(v, 10) > 0 });
+  appendItemProperty(lines, "requires_stat", item.requires_stat);
+  appendItemProperty(lines, "requires_class", item.requires_class);
+  appendItemProperty(lines, "disable_slots", item.disable_slots);
+  appendItemProperty(lines, "gfx", item.gfx);
+  appendItemProperty(lines, "bonus", item.bonus);
+  appendItemProperty(lines, "bonus_power_level", item.bonus_power_level);
+  appendItemProperty(lines, "dmg", item.dmg);
+  appendItemProperty(lines, "abs", item.abs);
+  appendItemProperty(lines, "power", item.power);
+  appendItemProperty(lines, "power_desc", item.power_desc);
+  appendItemProperty(lines, "replace_power", item.replace_power);
+  appendItemProperty(lines, "book", item.book);
+  if (item.book_is_readable) appendItemProperty(lines, "book_is_readable", item.book_is_readable, { format: () => "true", shouldWrite: (v) => !!v });
+  appendItemProperty(lines, "script", item.script);
+  appendItemProperty(lines, "soundfx", item.soundfx);
+  appendItemProperty(lines, "stepfx", item.stepfx);
+  appendItemProperty(lines, "loot_animation", item.loot_animation);
+  appendItemProperty(lines, "randomizer_def", item.randomizer_def);
+  appendItemProperty(lines, "loot_drops_max", item.loot_drops_max, { shouldWrite: (v) => parseInt(v, 10) > 1 });
+  appendItemProperty(lines, "pickup_status", item.pickup_status);
 }
 
 /**
@@ -1630,57 +1719,7 @@ function writeCategoryFile(filePath, items) {
   for (const item of items) {
     lines.push("");
     lines.push("[item]");
-    if (item._role) lines.push(`# role=${item._role}`);
-    if (item._resourceSubtype) lines.push(`# resource_subtype=${item._resourceSubtype}`);
-    lines.push(`id=${item.id}`);
-    if (item.name) lines.push(`name=${item.name}`);
-    if (item.flavor) lines.push(`flavor=${item.flavor}`);
-    if (item.level && parseInt(item.level, 10) > 1) lines.push(`level=${item.level}`);
-    if (item.icon) lines.push(`icon=${item.icon}`);
-    if (item.quality) lines.push(`quality=${item.quality}`);
-    if (item.price) lines.push(`price=${item.price}`);
-    if (item.price_per_level) lines.push(`price_per_level=${item.price_per_level}`);
-    if (item.price_sell) lines.push(`price_sell=${item.price_sell}`);
-    if (item.type) lines.push(`type=${item.type}`);
-    if (item.speed) lines.push(`speed=${item.speed}`);
-    if (item.radius) lines.push(`radius=${item.radius}`);
-    if (item.trait_elemental) lines.push(`trait_elemental=${item.trait_elemental}`);
-    if (item.wall_power) lines.push(`wall_power=${item.wall_power}`);
-    if (item.use_hazard) lines.push(`use_hazard=true`);
-    if (item.post_power) lines.push(`post_power=${item.post_power}`);
-    if (item.post_effect) lines.push(`post_effect=${item.post_effect}`);
-    if (item.requires_hpmp_state) lines.push(`requires_hpmp_state=${item.requires_hpmp_state}`);
-    if (item.requires_item) lines.push(`requires_item=${item.requires_item}`);
-    if (item.new_state) lines.push(`new_state=${item.new_state}`);
-    if (item.modifier_damage) lines.push(`modifier_damage=${item.modifier_damage}`);
-    if (item.lifespan) lines.push(`lifespan=${item.lifespan}`);
-    if (item.face) lines.push(`face=true`);
-    if (item.max_quantity && parseInt(item.max_quantity, 10) > 1) lines.push(`max_quantity=${item.max_quantity}`);
-    if (item.quest_item) lines.push(`quest_item=true`);
-    if (item.no_stash && item.no_stash !== "ignore") lines.push(`no_stash=${item.no_stash}`);
-    if (item.item_type) lines.push(`item_type=${item.item_type}`);
-    if (item.equip_flags) lines.push(`equip_flags=${item.equip_flags}`);
-    if (item.requires_level && parseInt(item.requires_level, 10) > 0) lines.push(`requires_level=${item.requires_level}`);
-    if (item.requires_stat) lines.push(`requires_stat=${item.requires_stat}`);
-    if (item.requires_class) lines.push(`requires_class=${item.requires_class}`);
-    if (item.disable_slots) lines.push(`disable_slots=${item.disable_slots}`);
-    if (item.gfx) lines.push(`gfx=${item.gfx}`);
-    if (item.bonus) lines.push(`bonus=${item.bonus}`);
-    if (item.bonus_power_level) lines.push(`bonus_power_level=${item.bonus_power_level}`);
-    if (item.dmg) lines.push(`dmg=${item.dmg}`);
-    if (item.abs) lines.push(`abs=${item.abs}`);
-    if (item.power) lines.push(`power=${item.power}`);
-    if (item.power_desc) lines.push(`power_desc=${item.power_desc}`);
-    if (item.replace_power) lines.push(`replace_power=${item.replace_power}`);
-    if (item.book) lines.push(`book=${item.book}`);
-    if (item.book_is_readable) lines.push(`book_is_readable=true`);
-    if (item.script) lines.push(`script=${item.script}`);
-    if (item.soundfx) lines.push(`soundfx=${item.soundfx}`);
-    if (item.stepfx) lines.push(`stepfx=${item.stepfx}`);
-    if (item.loot_animation) lines.push(`loot_animation=${item.loot_animation}`);
-    if (item.randomizer_def) lines.push(`randomizer_def=${item.randomizer_def}`);
-    if (item.loot_drops_max && parseInt(item.loot_drops_max, 10) > 1) lines.push(`loot_drops_max=${item.loot_drops_max}`);
-    if (item.pickup_status) lines.push(`pickup_status=${item.pickup_status}`);
+    appendItemLines(lines, item);
   }
   lines.push("");
   fs.writeFileSync(filePath, lines.join("\n"), "utf8");
@@ -1717,57 +1756,7 @@ function rebuildItemsIndex(projectPath) {
     for (const item of defaultItems) {
       lines.push("");
       lines.push("[item]");
-      if (item._role) lines.push(`# role=${item._role}`);
-      if (item._resourceSubtype) lines.push(`# resource_subtype=${item._resourceSubtype}`);
-      lines.push(`id=${item.id}`);
-      if (item.name) lines.push(`name=${item.name}`);
-      if (item.flavor) lines.push(`flavor=${item.flavor}`);
-      if (item.level && parseInt(item.level, 10) > 1) lines.push(`level=${item.level}`);
-      if (item.icon) lines.push(`icon=${item.icon}`);
-      if (item.quality) lines.push(`quality=${item.quality}`);
-      if (item.price) lines.push(`price=${item.price}`);
-      if (item.price_per_level) lines.push(`price_per_level=${item.price_per_level}`);
-      if (item.price_sell) lines.push(`price_sell=${item.price_sell}`);
-      if (item.type) lines.push(`type=${item.type}`);
-      if (item.speed) lines.push(`speed=${item.speed}`);
-      if (item.radius) lines.push(`radius=${item.radius}`);
-      if (item.trait_elemental) lines.push(`trait_elemental=${item.trait_elemental}`);
-      if (item.wall_power) lines.push(`wall_power=${item.wall_power}`);
-      if (item.use_hazard) lines.push(`use_hazard=true`);
-      if (item.post_power) lines.push(`post_power=${item.post_power}`);
-      if (item.post_effect) lines.push(`post_effect=${item.post_effect}`);
-      if (item.requires_hpmp_state) lines.push(`requires_hpmp_state=${item.requires_hpmp_state}`);
-      if (item.requires_item) lines.push(`requires_item=${item.requires_item}`);
-      if (item.new_state) lines.push(`new_state=${item.new_state}`);
-      if (item.modifier_damage) lines.push(`modifier_damage=${item.modifier_damage}`);
-      if (item.lifespan) lines.push(`lifespan=${item.lifespan}`);
-      if (item.face) lines.push(`face=true`);
-      if (item.max_quantity && parseInt(item.max_quantity, 10) > 1) lines.push(`max_quantity=${item.max_quantity}`);
-      if (item.quest_item) lines.push(`quest_item=true`);
-      if (item.no_stash && item.no_stash !== "ignore") lines.push(`no_stash=${item.no_stash}`);
-      if (item.item_type) lines.push(`item_type=${item.item_type}`);
-      if (item.equip_flags) lines.push(`equip_flags=${item.equip_flags}`);
-      if (item.requires_level && parseInt(item.requires_level, 10) > 0) lines.push(`requires_level=${item.requires_level}`);
-      if (item.requires_stat) lines.push(`requires_stat=${item.requires_stat}`);
-      if (item.requires_class) lines.push(`requires_class=${item.requires_class}`);
-      if (item.disable_slots) lines.push(`disable_slots=${item.disable_slots}`);
-      if (item.gfx) lines.push(`gfx=${item.gfx}`);
-      if (item.bonus) lines.push(`bonus=${item.bonus}`);
-      if (item.bonus_power_level) lines.push(`bonus_power_level=${item.bonus_power_level}`);
-      if (item.dmg) lines.push(`dmg=${item.dmg}`);
-      if (item.abs) lines.push(`abs=${item.abs}`);
-      if (item.power) lines.push(`power=${item.power}`);
-      if (item.power_desc) lines.push(`power_desc=${item.power_desc}`);
-      if (item.replace_power) lines.push(`replace_power=${item.replace_power}`);
-      if (item.book) lines.push(`book=${item.book}`);
-      if (item.book_is_readable) lines.push(`book_is_readable=true`);
-      if (item.script) lines.push(`script=${item.script}`);
-      if (item.soundfx) lines.push(`soundfx=${item.soundfx}`);
-      if (item.stepfx) lines.push(`stepfx=${item.stepfx}`);
-      if (item.loot_animation) lines.push(`loot_animation=${item.loot_animation}`);
-      if (item.randomizer_def) lines.push(`randomizer_def=${item.randomizer_def}`);
-      if (item.loot_drops_max && parseInt(item.loot_drops_max, 10) > 1) lines.push(`loot_drops_max=${item.loot_drops_max}`);
-      if (item.pickup_status) lines.push(`pickup_status=${item.pickup_status}`);
+      appendItemLines(lines, item);
       lines.push("");
     }
   }
@@ -2178,42 +2167,7 @@ function rebuildDefaultItems(itemsTxtPath, defaultItems, projectPath) {
 
   for (const item of defaultItems) {
     lines.push("[item]");
-    if (item._role) lines.push(`# role=${item._role}`);
-    if (item._resourceSubtype) lines.push(`# resource_subtype=${item._resourceSubtype}`);
-    lines.push(`id=${item.id}`);
-    if (item.name) lines.push(`name=${item.name}`);
-    if (item.flavor) lines.push(`flavor=${item.flavor}`);
-    if (item.level && parseInt(item.level, 10) > 1) lines.push(`level=${item.level}`);
-    if (item.icon) lines.push(`icon=${item.icon}`);
-    if (item.quality) lines.push(`quality=${item.quality}`);
-    if (item.price) lines.push(`price=${item.price}`);
-    if (item.price_sell) lines.push(`price_sell=${item.price_sell}`);
-    if (item.max_quantity && parseInt(item.max_quantity, 10) > 1) lines.push(`max_quantity=${item.max_quantity}`);
-    if (item.quest_item) lines.push(`quest_item=true`);
-    if (item.no_stash && item.no_stash !== "ignore") lines.push(`no_stash=${item.no_stash}`);
-    if (item.item_type) lines.push(`item_type=${item.item_type}`);
-    if (item.equip_flags) lines.push(`equip_flags=${item.equip_flags}`);
-    if (item.requires_level && parseInt(item.requires_level, 10) > 0) lines.push(`requires_level=${item.requires_level}`);
-    if (item.requires_stat) lines.push(`requires_stat=${item.requires_stat}`);
-    if (item.requires_class) lines.push(`requires_class=${item.requires_class}`);
-    if (item.disable_slots) lines.push(`disable_slots=${item.disable_slots}`);
-    if (item.gfx) lines.push(`gfx=${item.gfx}`);
-    if (item.bonus) lines.push(`bonus=${item.bonus}`);
-    if (item.bonus_power_level) lines.push(`bonus_power_level=${item.bonus_power_level}`);
-    if (item.dmg) lines.push(`dmg=${item.dmg}`);
-    if (item.abs) lines.push(`abs=${item.abs}`);
-    if (item.power) lines.push(`power=${item.power}`);
-    if (item.power_desc) lines.push(`power_desc=${item.power_desc}`);
-    if (item.replace_power) lines.push(`replace_power=${item.replace_power}`);
-    if (item.book) lines.push(`book=${item.book}`);
-    if (item.book_is_readable) lines.push(`book_is_readable=true`);
-    if (item.script) lines.push(`script=${item.script}`);
-    if (item.soundfx) lines.push(`soundfx=${item.soundfx}`);
-    if (item.stepfx) lines.push(`stepfx=${item.stepfx}`);
-    if (item.loot_animation) lines.push(`loot_animation=${item.loot_animation}`);
-    if (item.randomizer_def) lines.push(`randomizer_def=${item.randomizer_def}`);
-    if (item.loot_drops_max && parseInt(item.loot_drops_max, 10) > 1) lines.push(`loot_drops_max=${item.loot_drops_max}`);
-    if (item.pickup_status) lines.push(`pickup_status=${item.pickup_status}`);
+    appendItemLines(lines, item);
     lines.push("");
   }
 

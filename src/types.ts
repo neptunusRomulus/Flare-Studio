@@ -27,7 +27,7 @@ export interface MapObject {
   y: number;
   width: number;
   height: number;
-  properties: Record<string, string>;
+  properties: Record<string, string | string[]>;
   // Flare-specific extensions
   category?: string;      // For enemies: antlion, antlion_hatchling, etc.
   level?: number;         // For enemies: difficulty level
@@ -133,7 +133,7 @@ export interface FlareNPC {
   // Vendor ayarları (vendor=true ise)
   constant_stock?: string; // npc.constant_stock=item_id,item_id,...
   random_stock?: string; // npc.random_stock=item_id,item_id,...
-  random_stock_count?: number; // kaç random item gösterilecek
+  random_stock_count?: number | string; // kaç random item gösterilecek, ya da aralık: min,max
   vendor_requires_status?: string;
   vendor_requires_not_status?: string;
   

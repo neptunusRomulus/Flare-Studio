@@ -1607,13 +1607,7 @@ function parseItemsInCategoryFile(filePath) {
         if (eqIndex > 0) {
           const key = trimmed.substring(0, eqIndex).trim();
           const value = trimmed.substring(eqIndex + 1).trim();
-          if (item[key] === undefined) {
-            item[key] = value;
-          } else if (Array.isArray(item[key])) {
-            item[key].push(value);
-          } else {
-            item[key] = [item[key], value];
-          }
+          item[key] = value;
         }
       }
       if (item.id !== undefined) {
@@ -1667,13 +1661,7 @@ function writeCategoryFile(filePath, items) {
     if (item.item_type) lines.push(`item_type=${item.item_type}`);
     if (item.equip_flags) lines.push(`equip_flags=${item.equip_flags}`);
     if (item.requires_level && parseInt(item.requires_level, 10) > 0) lines.push(`requires_level=${item.requires_level}`);
-    if (Array.isArray(item.requires_stat)) {
-      for (const requiresStat of item.requires_stat) {
-        if (requiresStat) lines.push(`requires_stat=${requiresStat}`);
-      }
-    } else if (item.requires_stat) {
-      lines.push(`requires_stat=${item.requires_stat}`);
-    }
+    if (item.requires_stat) lines.push(`requires_stat=${item.requires_stat}`);
     if (item.requires_class) lines.push(`requires_class=${item.requires_class}`);
     if (item.disable_slots) lines.push(`disable_slots=${item.disable_slots}`);
     if (item.gfx) lines.push(`gfx=${item.gfx}`);
@@ -1689,13 +1677,7 @@ function writeCategoryFile(filePath, items) {
     if (item.script) lines.push(`script=${item.script}`);
     if (item.soundfx) lines.push(`soundfx=${item.soundfx}`);
     if (item.stepfx) lines.push(`stepfx=${item.stepfx}`);
-    if (Array.isArray(item.loot_animation)) {
-      for (const lootAnimation of item.loot_animation) {
-        if (lootAnimation) lines.push(`loot_animation=${lootAnimation}`);
-      }
-    } else if (item.loot_animation) {
-      lines.push(`loot_animation=${item.loot_animation}`);
-    }
+    if (item.loot_animation) lines.push(`loot_animation=${item.loot_animation}`);
     if (item.randomizer_def) lines.push(`randomizer_def=${item.randomizer_def}`);
     if (item.loot_drops_max && parseInt(item.loot_drops_max, 10) > 1) lines.push(`loot_drops_max=${item.loot_drops_max}`);
     if (item.pickup_status) lines.push(`pickup_status=${item.pickup_status}`);
@@ -1782,13 +1764,7 @@ function rebuildItemsIndex(projectPath) {
       if (item.script) lines.push(`script=${item.script}`);
       if (item.soundfx) lines.push(`soundfx=${item.soundfx}`);
       if (item.stepfx) lines.push(`stepfx=${item.stepfx}`);
-      if (Array.isArray(item.loot_animation)) {
-        for (const lootAnimation of item.loot_animation) {
-          if (lootAnimation) lines.push(`loot_animation=${lootAnimation}`);
-        }
-      } else if (item.loot_animation) {
-        lines.push(`loot_animation=${item.loot_animation}`);
-      }
+      if (item.loot_animation) lines.push(`loot_animation=${item.loot_animation}`);
       if (item.randomizer_def) lines.push(`randomizer_def=${item.randomizer_def}`);
       if (item.loot_drops_max && parseInt(item.loot_drops_max, 10) > 1) lines.push(`loot_drops_max=${item.loot_drops_max}`);
       if (item.pickup_status) lines.push(`pickup_status=${item.pickup_status}`);
@@ -2218,13 +2194,7 @@ function rebuildDefaultItems(itemsTxtPath, defaultItems, projectPath) {
     if (item.item_type) lines.push(`item_type=${item.item_type}`);
     if (item.equip_flags) lines.push(`equip_flags=${item.equip_flags}`);
     if (item.requires_level && parseInt(item.requires_level, 10) > 0) lines.push(`requires_level=${item.requires_level}`);
-    if (Array.isArray(item.requires_stat)) {
-      for (const requiresStat of item.requires_stat) {
-        if (requiresStat) lines.push(`requires_stat=${requiresStat}`);
-      }
-    } else if (item.requires_stat) {
-      lines.push(`requires_stat=${item.requires_stat}`);
-    }
+    if (item.requires_stat) lines.push(`requires_stat=${item.requires_stat}`);
     if (item.requires_class) lines.push(`requires_class=${item.requires_class}`);
     if (item.disable_slots) lines.push(`disable_slots=${item.disable_slots}`);
     if (item.gfx) lines.push(`gfx=${item.gfx}`);
@@ -2240,13 +2210,7 @@ function rebuildDefaultItems(itemsTxtPath, defaultItems, projectPath) {
     if (item.script) lines.push(`script=${item.script}`);
     if (item.soundfx) lines.push(`soundfx=${item.soundfx}`);
     if (item.stepfx) lines.push(`stepfx=${item.stepfx}`);
-    if (Array.isArray(item.loot_animation)) {
-      for (const lootAnimation of item.loot_animation) {
-        if (lootAnimation) lines.push(`loot_animation=${lootAnimation}`);
-      }
-    } else if (item.loot_animation) {
-      lines.push(`loot_animation=${item.loot_animation}`);
-    }
+    if (item.loot_animation) lines.push(`loot_animation=${item.loot_animation}`);
     if (item.randomizer_def) lines.push(`randomizer_def=${item.randomizer_def}`);
     if (item.loot_drops_max && parseInt(item.loot_drops_max, 10) > 1) lines.push(`loot_drops_max=${item.loot_drops_max}`);
     if (item.pickup_status) lines.push(`pickup_status=${item.pickup_status}`);

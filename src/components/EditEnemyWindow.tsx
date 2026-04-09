@@ -617,7 +617,7 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
       >
         <div className="flex items-center gap-2">
           <Icon className="w-4 h-4 text-orange-500" />
-          <span className="text-sm font-semibold uppercase tracking-wider">{title}</span>
+          <span className="text-sm font-semibold tracking-wide">{title}</span>
         </div>
         {isExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
       </button>

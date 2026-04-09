@@ -3,6 +3,7 @@ import React from 'react';
 import ObjectManagementDialog from '@/components/ObjectManagementDialog';
 import type { MapObject, DialogueTree } from '@/types';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
+import type { ItemSummary } from '@/utils/items';
 
 type ObjMgmtCtx = {
   showObjectDialog?: boolean;
@@ -16,6 +17,7 @@ type ObjMgmtCtx = {
   getEditingObjectProperty?: (key: string, fallback?: string) => string;
   editor?: TileMapEditor | null;
   syncMapObjects?: () => void;
+  itemsList?: ItemSummary[];
   canUseTilesetDialog?: boolean;
   handleEditingTilesetBrowse?: () => Promise<void> | void;
   handleEditingPortraitBrowse?: () => Promise<void> | void;
@@ -56,6 +58,7 @@ export default function ObjectManagementDialogContainer({ ctx }: { ctx: unknown 
       canUseTilesetDialog={!!c.canUseTilesetDialog}
       handleEditingTilesetBrowse={c.handleEditingTilesetBrowse ?? (() => {})}
       handleEditingPortraitBrowse={c.handleEditingPortraitBrowse ?? (() => {})}
+      itemsList={c.itemsList ?? []}
       handleAutoDetectAnim={c.handleAutoDetectAnim ?? (() => {})}
       handleOpenVendorStockDialog={c.handleOpenVendorStockDialog ?? (() => {})}
       handleOpenVendorUnlockDialog={c.handleOpenVendorUnlockDialog ?? (() => {})}

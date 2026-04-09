@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { TileMapEditor } from '../editor/TileMapEditor';
 import type { TileMapEditor as TileMapEditorType } from '../editor/TileMapEditor';
+import type { MapObject } from '@/types';
 
 export type HeroEditData = {
   currentX: number;
@@ -106,7 +107,25 @@ export function useEditorState(optsRef: React.RefObject<Partial<UseEditorStateOp
     }
     const spawnX = x !== undefined ? x : Math.floor((opts.mapWidth ?? 0) / 2);
     const spawnY = y !== undefined ? y : Math.floor((opts.mapHeight ?? 0) / 2);
-    editor.updateMapObject(objectId, { x: spawnX, y: spawnY });
+    const source = editor.getMapObjects().find((obj: MapObject) => obj.id === objectId);
+    if (!source) return;
+
+    const shouldDuplicate = source.type === 'enemy' && source.x >= 0 && source.y >= 0;
+    if (shouldDuplicate) {
+      const newObject = editor.addMapObject(source.type as 'enemy', spawnX, spawnY, source.width ?? 1, source.height ?? 1);
+      if (newObject) {
+        const { id, x: oldX, y: oldY, ...copyData } = source;
+        editor.updateMapObject(newObject.id, {
+          ...copyData,
+          x: spawnX,
+          y: spawnY,
+          name: source.name ? `${source.name} (copy)` : source.name,
+        });
+      }
+    } else {
+      editor.updateMapObject(objectId, { x: spawnX, y: spawnY });
+    }
+
     syncMapObjectsWrapper();
   }, [editor, syncMapObjectsWrapper, optsRef]);
 

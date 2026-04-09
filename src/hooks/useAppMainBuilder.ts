@@ -514,10 +514,8 @@ export default function useAppMainBuilder() {
   const isRulesLayer = activeLayer?.type === 'rules';
   const isItemsLayer = activeLayer?.type === 'items';
 
-  const hasEnemyObjects = appState.mapObjects.some((obj) => obj.type === 'enemy');
-  const hasNpcObjects = appState.mapObjects.some((obj) => obj.type === 'npc');
-  const showEnemyActorArea = isEnemyLayer || hasEnemyObjects;
-  const showNpcActorArea = isNpcLayer || (!showEnemyActorArea && hasNpcObjects);
+  const showEnemyActorArea = isEnemyLayer;
+  const showNpcActorArea = isNpcLayer;
 
   const handleToggleBrushTool = useCallback((tool: 'move' | 'merge' | 'separate' | 'remove') => {
     toolbarState.setBrushTool((current) => (current === tool ? 'none' : tool));
@@ -786,7 +784,14 @@ export default function useAppMainBuilder() {
             return appState.mapObjects.filter((obj) => obj.type === 'npc');
           }
           if (showEnemyActorArea) {
-            return appState.mapObjects.filter((obj) => obj.type === 'enemy');
+            const seen = new Set<string>();
+            return appState.mapObjects.filter((obj) => {
+              if (obj.type !== 'enemy') return false;
+              const key = `${obj.type}:${obj.category || obj.name || obj.id}`;
+              if (seen.has(key)) return false;
+              seen.add(key);
+              return true;
+            });
           }
           return [];
         })(),

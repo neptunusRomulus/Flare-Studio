@@ -373,28 +373,6 @@ const ObjectManagementDialog = ({
               </div>
             </div>
 
-            <div className="flex gap-2">
-              <Input
-                className="h-8 flex-1 text-xs"
-                value={getEditingObjectProperty('tilesetPath', '')}
-                onChange={(e) => updateEditingObjectProperty('tilesetPath', e.target.value)}
-                placeholder="Tileset path..."
-                readOnly={canUseTilesetDialog}
-                onClick={canUseTilesetDialog ? () => { void handleEditingTilesetBrowse(); } : undefined}
-              />
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="h-8 px-2 gap-2"
-                onClick={() => { void handleEditingTilesetBrowse(); }}
-                disabled={!canUseTilesetDialog}
-              >
-                <Image className="w-4 h-4" />
-                <span className="text-xs">Tileset</span>
-              </Button>
-            </div>
-
             <div className="rounded-md border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
               Enemy template details are edited in the enemy tab. This dialog only adjusts map-instance fields.
             </div>

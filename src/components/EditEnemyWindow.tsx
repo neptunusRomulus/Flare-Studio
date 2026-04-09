@@ -553,7 +553,13 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
     if (dmgRangedMax) newProps.dmg_ranged_max = dmgRangedMax; else delete newProps.dmg_ranged_max;
     if (animations) newProps.animations = animations; else delete newProps.animations;
 
-    if (powers && powers.length > 0) newProps.powers = JSON.stringify(powers); else delete newProps.powers;
+    if (powersList) {
+      newProps.powers = powersList;
+    } else if (powers && powers.length > 0) {
+      newProps.powers = JSON.stringify(powers);
+    } else {
+      delete newProps.powers;
+    }
     if (passivePowers) newProps.passive_powers = passivePowers; else delete newProps.passive_powers;
     if (cooldown) newProps.cooldown = cooldown; else delete newProps.cooldown;
     if (cooldownHit) newProps.cooldown_hit = cooldownHit; else delete newProps.cooldown_hit;
@@ -905,8 +911,18 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
               </div>
         </CollapsibleSection>
 
-        <CollapsibleSection title="Powers & Skills" icon={Zap} id="skills" isExpanded={expandedSections.skills} onToggle={() => toggleSection('skills')}>
+        <CollapsibleSection title="Powers" icon={Zap} id="powers" isExpanded={expandedSections.skills} onToggle={() => toggleSection('skills')}>
               <div className="space-y-4 animate-in fade-in duration-300">
+                <div className="space-y-3">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Powers</label>
+                  <Input
+                    value={powersList}
+                    onChange={(e) => setPowersList(e.target.value)}
+                    placeholder="e.g. fireball, ice_shard, summon_wolf"
+                    className="h-9 text-xs"
+                  />
+                  <p className="text-xs text-muted-foreground">Simple power list for now; a full power layer will come later.</p>
+                </div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Active Powers</label>
                   <Button size="sm" variant="outline" onClick={() => setPowers(prev => [...prev, { state: 'melee', id: '', chance: 100 }])} className="h-7 text-[10px]">

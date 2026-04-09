@@ -23,6 +23,12 @@ type ObjMgmtCtx = {
   handleOpenVendorStockDialog?: () => void;
   handleOpenVendorUnlockDialog?: () => void;
   handleOpenVendorRandomDialog?: () => void;
+  handleOpenVendorSettingsDialog?: () => void;
+  handleCloseVendorSettingsDialog?: () => void;
+  showVendorSettingsDialog?: boolean;
+  handleOpenQuestSettingsDialog?: () => void;
+  handleCloseQuestSettingsDialog?: () => void;
+  showQuestSettingsDialog?: boolean;
   setDialogueTrees?: (t: DialogueTree[]) => void;
   setActiveDialogueTab?: (id: number) => void;
   setShowDialogueTreeDialog?: (v: boolean) => void;
@@ -54,6 +60,12 @@ export default function ObjectManagementDialogContainer({ ctx }: { ctx: unknown 
       handleOpenVendorStockDialog={c.handleOpenVendorStockDialog ?? (() => {})}
       handleOpenVendorUnlockDialog={c.handleOpenVendorUnlockDialog ?? (() => {})}
       handleOpenVendorRandomDialog={c.handleOpenVendorRandomDialog ?? (() => {})}
+      handleOpenVendorSettingsDialog={c.handleOpenVendorSettingsDialog ?? (() => {})}
+      handleCloseVendorSettingsDialog={c.handleCloseVendorSettingsDialog ?? (() => {})}
+      showVendorSettingsDialog={!!c.showVendorSettingsDialog}
+      handleOpenQuestSettingsDialog={c.handleOpenQuestSettingsDialog ?? (() => {})}
+      handleCloseQuestSettingsDialog={c.handleCloseQuestSettingsDialog ?? (() => {})}
+      showQuestSettingsDialog={!!c.showQuestSettingsDialog}
       setDialogueTrees={(trees) => (c.setDialogueTrees ? c.setDialogueTrees(trees) : undefined)}
       setActiveDialogueTab={(idx) => (c.setActiveDialogueTab ? c.setActiveDialogueTab(idx) : undefined)}
       setShowDialogueTreeDialog={(v) => (c.setShowDialogueTreeDialog ? c.setShowDialogueTreeDialog(v) : undefined)}

@@ -1639,7 +1639,22 @@ function writeCategoryFile(filePath, items) {
     if (item.icon) lines.push(`icon=${item.icon}`);
     if (item.quality) lines.push(`quality=${item.quality}`);
     if (item.price) lines.push(`price=${item.price}`);
+    if (item.price_per_level) lines.push(`price_per_level=${item.price_per_level}`);
     if (item.price_sell) lines.push(`price_sell=${item.price_sell}`);
+    if (item.type) lines.push(`type=${item.type}`);
+    if (item.speed) lines.push(`speed=${item.speed}`);
+    if (item.radius) lines.push(`radius=${item.radius}`);
+    if (item.trait_elemental) lines.push(`trait_elemental=${item.trait_elemental}`);
+    if (item.wall_power) lines.push(`wall_power=${item.wall_power}`);
+    if (item.use_hazard) lines.push(`use_hazard=true`);
+    if (item.post_power) lines.push(`post_power=${item.post_power}`);
+    if (item.post_effect) lines.push(`post_effect=${item.post_effect}`);
+    if (item.requires_hpmp_state) lines.push(`requires_hpmp_state=${item.requires_hpmp_state}`);
+    if (item.requires_item) lines.push(`requires_item=${item.requires_item}`);
+    if (item.new_state) lines.push(`new_state=${item.new_state}`);
+    if (item.modifier_damage) lines.push(`modifier_damage=${item.modifier_damage}`);
+    if (item.lifespan) lines.push(`lifespan=${item.lifespan}`);
+    if (item.face) lines.push(`face=true`);
     if (item.max_quantity && parseInt(item.max_quantity, 10) > 1) lines.push(`max_quantity=${item.max_quantity}`);
     if (item.quest_item) lines.push(`quest_item=true`);
     if (item.no_stash && item.no_stash !== "ignore") lines.push(`no_stash=${item.no_stash}`);
@@ -1711,7 +1726,22 @@ function rebuildItemsIndex(projectPath) {
       if (item.icon) lines.push(`icon=${item.icon}`);
       if (item.quality) lines.push(`quality=${item.quality}`);
       if (item.price) lines.push(`price=${item.price}`);
+      if (item.price_per_level) lines.push(`price_per_level=${item.price_per_level}`);
       if (item.price_sell) lines.push(`price_sell=${item.price_sell}`);
+      if (item.type) lines.push(`type=${item.type}`);
+      if (item.speed) lines.push(`speed=${item.speed}`);
+      if (item.radius) lines.push(`radius=${item.radius}`);
+      if (item.trait_elemental) lines.push(`trait_elemental=${item.trait_elemental}`);
+      if (item.wall_power) lines.push(`wall_power=${item.wall_power}`);
+      if (item.use_hazard) lines.push(`use_hazard=true`);
+      if (item.post_power) lines.push(`post_power=${item.post_power}`);
+      if (item.post_effect) lines.push(`post_effect=${item.post_effect}`);
+      if (item.requires_hpmp_state) lines.push(`requires_hpmp_state=${item.requires_hpmp_state}`);
+      if (item.requires_item) lines.push(`requires_item=${item.requires_item}`);
+      if (item.new_state) lines.push(`new_state=${item.new_state}`);
+      if (item.modifier_damage) lines.push(`modifier_damage=${item.modifier_damage}`);
+      if (item.lifespan) lines.push(`lifespan=${item.lifespan}`);
+      if (item.face) lines.push(`face=true`);
       if (item.max_quantity && parseInt(item.max_quantity, 10) > 1) lines.push(`max_quantity=${item.max_quantity}`);
       if (item.quest_item) lines.push(`quest_item=true`);
       if (item.no_stash && item.no_stash !== "ignore") lines.push(`no_stash=${item.no_stash}`);
@@ -2052,10 +2082,59 @@ ipcMainLocal.handle(
       }
 
       // Build the new item object
-      const newItem = { id: itemData.id, name: itemData.name.trim(), _role: role };
-      if (resourceSubtype && role === "resource") {
-        newItem._resourceSubtype = resourceSubtype;
-      }
+      const newItem = {
+        id: itemData.id,
+        name: itemData.name.trim(),
+        _role: role,
+        ...(resourceSubtype && role === "resource" ? { _resourceSubtype: resourceSubtype } : {}),
+        ...(itemData.flavor ? { flavor: itemData.flavor } : {}),
+        ...(itemData.level != null ? { level: itemData.level } : {}),
+        ...(itemData.icon ? { icon: itemData.icon } : {}),
+        ...(itemData.quality ? { quality: itemData.quality } : {}),
+        ...(itemData.price != null ? { price: itemData.price } : {}),
+        ...(itemData.price_per_level != null ? { price_per_level: itemData.price_per_level } : {}),
+        ...(itemData.price_sell != null ? { price_sell: itemData.price_sell } : {}),
+        ...(itemData.type ? { type: itemData.type } : {}),
+        ...(itemData.speed ? { speed: itemData.speed } : {}),
+        ...(itemData.radius ? { radius: itemData.radius } : {}),
+        ...(itemData.trait_elemental ? { trait_elemental: itemData.trait_elemental } : {}),
+        ...(itemData.wall_power ? { wall_power: itemData.wall_power } : {}),
+        ...(itemData.use_hazard ? { use_hazard: "true" } : {}),
+        ...(itemData.post_power ? { post_power: itemData.post_power } : {}),
+        ...(itemData.post_effect ? { post_effect: itemData.post_effect } : {}),
+        ...(itemData.requires_hpmp_state ? { requires_hpmp_state: itemData.requires_hpmp_state } : {}),
+        ...(itemData.requires_item ? { requires_item: itemData.requires_item } : {}),
+        ...(itemData.new_state ? { new_state: itemData.new_state } : {}),
+        ...(itemData.modifier_damage ? { modifier_damage: itemData.modifier_damage } : {}),
+        ...(itemData.lifespan ? { lifespan: itemData.lifespan } : {}),
+        ...(itemData.face ? { face: "true" } : {}),
+        ...(itemData.max_quantity && itemData.max_quantity > 1 ? { max_quantity: itemData.max_quantity } : {}),
+        ...(itemData.quest_item ? { quest_item: "true" } : {}),
+        ...(itemData.no_stash && itemData.no_stash !== "ignore" ? { no_stash: itemData.no_stash } : {}),
+        ...(itemData.item_type ? { item_type: itemData.item_type } : {}),
+        ...(itemData.equip_flags ? { equip_flags: itemData.equip_flags } : {}),
+        ...(itemData.requires_level && itemData.requires_level > 0 ? { requires_level: itemData.requires_level } : {}),
+        ...(itemData.requires_stat ? { requires_stat: itemData.requires_stat } : {}),
+        ...(itemData.requires_class ? { requires_class: itemData.requires_class } : {}),
+        ...(itemData.disable_slots ? { disable_slots: itemData.disable_slots } : {}),
+        ...(itemData.gfx ? { gfx: itemData.gfx } : {}),
+        ...(itemData.bonus ? { bonus: itemData.bonus } : {}),
+        ...(itemData.bonus_power_level ? { bonus_power_level: itemData.bonus_power_level } : {}),
+        ...(itemData.dmg ? { dmg: itemData.dmg } : {}),
+        ...(itemData.abs ? { abs: itemData.abs } : {}),
+        ...(itemData.power ? { power: itemData.power } : {}),
+        ...(itemData.power_desc ? { power_desc: itemData.power_desc } : {}),
+        ...(itemData.replace_power ? { replace_power: itemData.replace_power } : {}),
+        ...(itemData.book ? { book: itemData.book } : {}),
+        ...(itemData.book_is_readable ? { book_is_readable: "true" } : {}),
+        ...(itemData.script ? { script: itemData.script } : {}),
+        ...(itemData.soundfx ? { soundfx: itemData.soundfx } : {}),
+        ...(itemData.stepfx ? { stepfx: itemData.stepfx } : {}),
+        ...(itemData.loot_animation ? { loot_animation: itemData.loot_animation } : {}),
+        ...(itemData.randomizer_def ? { randomizer_def: itemData.randomizer_def } : {}),
+        ...(itemData.loot_drops_max && itemData.loot_drops_max > 1 ? { loot_drops_max: itemData.loot_drops_max } : {}),
+        ...(itemData.pickup_status ? { pickup_status: itemData.pickup_status } : {}),
+      };
 
       // Append and rebuild
       existingItems.push(newItem);
@@ -2277,45 +2356,15 @@ ipcMainLocal.handle("write-item-file", async (event, filePath, itemData) => {
     const normalizedResourceSubtype = (typeof itemData.resourceSubtype === "string" ? itemData.resourceSubtype : "").toLowerCase();
 
     if (idx >= 0) {
-      // Update existing item — merge all fields
+      // Update existing item — merge current editor state, preserving unknown fields
       const existing = existingItems[idx];
       existingItems[idx] = {
+        ...existing,
+        ...itemData,
         id: itemData.id ?? existing.id,
         name: itemData.name ?? existing.name,
         _role: normalizedRole,
-        ...(normalizedResourceSubtype ? { _resourceSubtype: normalizedResourceSubtype } : (existing._resourceSubtype ? { _resourceSubtype: existing._resourceSubtype } : {})),
-        ...(itemData.flavor ? { flavor: itemData.flavor } : (existing.flavor ? { flavor: existing.flavor } : {})),
-        ...(itemData.level != null ? { level: itemData.level } : (existing.level ? { level: existing.level } : {})),
-        ...(itemData.icon ? { icon: itemData.icon } : (existing.icon ? { icon: existing.icon } : {})),
-        ...(itemData.quality ? { quality: itemData.quality } : (existing.quality ? { quality: existing.quality } : {})),
-        ...(itemData.price != null ? { price: itemData.price } : (existing.price ? { price: existing.price } : {})),
-        ...(itemData.price_sell != null ? { price_sell: itemData.price_sell } : (existing.price_sell ? { price_sell: existing.price_sell } : {})),
-        ...(itemData.max_quantity != null ? { max_quantity: itemData.max_quantity } : (existing.max_quantity != null ? { max_quantity: existing.max_quantity } : {})),
-        ...(itemData.quest_item ? { quest_item: "true" } : (existing.quest_item ? { quest_item: existing.quest_item } : {})),
-        ...(itemData.no_stash && itemData.no_stash !== "ignore" ? { no_stash: itemData.no_stash } : (existing.no_stash ? { no_stash: existing.no_stash } : {})),
-        ...(itemData.item_type ? { item_type: itemData.item_type } : (existing.item_type ? { item_type: existing.item_type } : {})),
-        ...(itemData.equip_flags ? { equip_flags: itemData.equip_flags } : (existing.equip_flags ? { equip_flags: existing.equip_flags } : {})),
-        ...(itemData.requires_level != null && itemData.requires_level > 0 ? { requires_level: itemData.requires_level } : (existing.requires_level ? { requires_level: existing.requires_level } : {})),
-        ...(itemData.requires_stat ? { requires_stat: itemData.requires_stat } : (existing.requires_stat ? { requires_stat: existing.requires_stat } : {})),
-        ...(itemData.requires_class ? { requires_class: itemData.requires_class } : (existing.requires_class ? { requires_class: existing.requires_class } : {})),
-        ...(itemData.disable_slots ? { disable_slots: itemData.disable_slots } : (existing.disable_slots ? { disable_slots: existing.disable_slots } : {})),
-        ...(itemData.gfx ? { gfx: itemData.gfx } : (existing.gfx ? { gfx: existing.gfx } : {})),
-        ...(itemData.bonus ? { bonus: itemData.bonus } : (existing.bonus ? { bonus: existing.bonus } : {})),
-        ...(itemData.bonus_power_level ? { bonus_power_level: itemData.bonus_power_level } : (existing.bonus_power_level ? { bonus_power_level: existing.bonus_power_level } : {})),
-        ...(itemData.dmg ? { dmg: itemData.dmg } : (existing.dmg ? { dmg: existing.dmg } : {})),
-        ...(itemData.abs ? { abs: itemData.abs } : (existing.abs ? { abs: existing.abs } : {})),
-        ...(itemData.power ? { power: itemData.power } : (existing.power ? { power: existing.power } : {})),
-        ...(itemData.power_desc ? { power_desc: itemData.power_desc } : (existing.power_desc ? { power_desc: existing.power_desc } : {})),
-        ...(itemData.replace_power ? { replace_power: itemData.replace_power } : (existing.replace_power ? { replace_power: existing.replace_power } : {})),
-        ...(itemData.book ? { book: itemData.book } : (existing.book ? { book: existing.book } : {})),
-        ...(itemData.book_is_readable ? { book_is_readable: "true" } : (existing.book_is_readable ? { book_is_readable: existing.book_is_readable } : {})),
-        ...(itemData.script ? { script: itemData.script } : (existing.script ? { script: existing.script } : {})),
-        ...(itemData.soundfx ? { soundfx: itemData.soundfx } : (existing.soundfx ? { soundfx: existing.soundfx } : {})),
-        ...(itemData.stepfx ? { stepfx: itemData.stepfx } : (existing.stepfx ? { stepfx: existing.stepfx } : {})),
-        ...(itemData.loot_animation ? { loot_animation: itemData.loot_animation } : (existing.loot_animation ? { loot_animation: existing.loot_animation } : {})),
-        ...(itemData.randomizer_def ? { randomizer_def: itemData.randomizer_def } : (existing.randomizer_def ? { randomizer_def: existing.randomizer_def } : {})),
-        ...(itemData.loot_drops_max != null && itemData.loot_drops_max > 1 ? { loot_drops_max: itemData.loot_drops_max } : (existing.loot_drops_max != null && parseInt(existing.loot_drops_max, 10) > 1 ? { loot_drops_max: existing.loot_drops_max } : {})),
-        ...(itemData.pickup_status ? { pickup_status: itemData.pickup_status } : (existing.pickup_status ? { pickup_status: existing.pickup_status } : {})),
+        ...(normalizedResourceSubtype ? { _resourceSubtype: normalizedResourceSubtype } : existing._resourceSubtype ? { _resourceSubtype: existing._resourceSubtype } : {}),
       };
     } else {
       // Item not found — create new
@@ -2354,6 +2403,21 @@ ipcMainLocal.handle("write-item-file", async (event, filePath, itemData) => {
         ...(itemData.stepfx ? { stepfx: itemData.stepfx } : {}),
         ...(itemData.loot_animation ? { loot_animation: itemData.loot_animation } : {}),
         ...(itemData.randomizer_def ? { randomizer_def: itemData.randomizer_def } : {}),
+        ...(itemData.price_per_level != null ? { price_per_level: itemData.price_per_level } : {}),
+        ...(itemData.type ? { type: itemData.type } : {}),
+        ...(itemData.speed ? { speed: itemData.speed } : {}),
+        ...(itemData.radius ? { radius: itemData.radius } : {}),
+        ...(itemData.trait_elemental ? { trait_elemental: itemData.trait_elemental } : {}),
+        ...(itemData.wall_power ? { wall_power: itemData.wall_power } : {}),
+        ...(itemData.use_hazard ? { use_hazard: "true" } : {}),
+        ...(itemData.post_power ? { post_power: itemData.post_power } : {}),
+        ...(itemData.post_effect ? { post_effect: itemData.post_effect } : {}),
+        ...(itemData.requires_hpmp_state ? { requires_hpmp_state: itemData.requires_hpmp_state } : {}),
+        ...(itemData.requires_item ? { requires_item: itemData.requires_item } : {}),
+        ...(itemData.new_state ? { new_state: itemData.new_state } : {}),
+        ...(itemData.modifier_damage ? { modifier_damage: itemData.modifier_damage } : {}),
+        ...(itemData.lifespan ? { lifespan: itemData.lifespan } : {}),
+        ...(itemData.face ? { face: "true" } : {}),
         ...(itemData.loot_drops_max && itemData.loot_drops_max > 1 ? { loot_drops_max: itemData.loot_drops_max } : {}),
         ...(itemData.pickup_status ? { pickup_status: itemData.pickup_status } : {}),
       });

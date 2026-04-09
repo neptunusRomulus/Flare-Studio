@@ -4053,7 +4053,7 @@ export class TileMapEditor {
     this.ctx.shadowColor = 'transparent';
     this.ctx.shadowBlur = 0;
 
-    this.ctx.fillStyle = '#ff6b00';
+    this.ctx.fillStyle = '#ffb3b3';
     this.ctx.beginPath();
     this.ctx.moveTo(screenPos.x, screenPos.y - halfTileY);
     this.ctx.lineTo(screenPos.x + halfTileX, screenPos.y);
@@ -4062,7 +4062,7 @@ export class TileMapEditor {
     this.ctx.closePath();
     this.ctx.fill();
 
-    this.ctx.strokeStyle = '#ff8c00';
+    this.ctx.strokeStyle = '#fb7185';
     this.ctx.lineWidth = Math.max(1, Math.min(2, 2 / this.zoom));
     this.ctx.beginPath();
     this.ctx.moveTo(screenPos.x, screenPos.y - halfTileY);
@@ -4110,13 +4110,63 @@ export class TileMapEditor {
 
       this.ctx.restore();
     } else {
-      const fontSize = Math.max(10, Math.min(18, 14 * this.zoom));
+      const iconSize = Math.max(10, Math.min(18, 14 * this.zoom));
+      const skullRadius = iconSize * 0.42;
+      const eyeRadius = Math.max(1.5, iconSize * 0.12);
+      const eyeOffsetX = iconSize * 0.18;
+      const eyeOffsetY = iconSize * -0.08;
+      const jawHeight = iconSize * 0.16;
+      const jawWidth = iconSize * 0.26;
+      const jawSpacing = iconSize * 0.12;
+      const foreheadWidth = skullRadius * 0.95;
+
       this.ctx.save();
       this.ctx.fillStyle = '#ffffff';
-      this.ctx.font = `bold ${fontSize}px "Segoe UI", sans-serif`;
-      this.ctx.textAlign = 'center';
-      this.ctx.textBaseline = 'middle';
-      this.ctx.fillText('E', centerX, centerY);
+      this.ctx.strokeStyle = '#ffffff';
+      this.ctx.lineWidth = Math.max(1, Math.min(2, 1.5 * this.zoom));
+      this.ctx.lineJoin = 'round';
+      this.ctx.lineCap = 'round';
+
+      // Skull head
+      this.ctx.beginPath();
+      this.ctx.arc(centerX, centerY - iconSize * 0.06, skullRadius, Math.PI * 0.95, Math.PI * 0.05, false);
+      this.ctx.lineTo(centerX + skullRadius * 0.7, centerY + skullRadius * 0.3);
+      this.ctx.quadraticCurveTo(centerX, centerY + skullRadius * 0.6, centerX - skullRadius * 0.7, centerY + skullRadius * 0.3);
+      this.ctx.closePath();
+      this.ctx.fill();
+      this.ctx.stroke();
+
+      // Forehead ridge
+      this.ctx.beginPath();
+      this.ctx.moveTo(centerX - foreheadWidth * 0.5, centerY - iconSize * 0.08);
+      this.ctx.quadraticCurveTo(centerX, centerY - iconSize * 0.25, centerX + foreheadWidth * 0.5, centerY - iconSize * 0.08);
+      this.ctx.stroke();
+
+      // Eye sockets
+      this.ctx.fillStyle = '#000000';
+      this.ctx.beginPath();
+      this.ctx.arc(centerX - eyeOffsetX, centerY + eyeOffsetY, eyeRadius, 0, Math.PI * 2);
+      this.ctx.fill();
+      this.ctx.beginPath();
+      this.ctx.arc(centerX + eyeOffsetX, centerY + eyeOffsetY, eyeRadius, 0, Math.PI * 2);
+      this.ctx.fill();
+
+      // Nose cavity
+      this.ctx.beginPath();
+      this.ctx.moveTo(centerX, centerY + iconSize * 0.02);
+      this.ctx.lineTo(centerX - iconSize * 0.05, centerY + iconSize * 0.12);
+      this.ctx.lineTo(centerX + iconSize * 0.05, centerY + iconSize * 0.12);
+      this.ctx.closePath();
+      this.ctx.fill();
+
+      // Teeth blocks
+      const baseY = centerY + skullRadius * 0.25;
+      const toothCount = 3;
+      for (let i = 0; i < toothCount; i += 1) {
+        const x = centerX + (i - 1) * (jawWidth + jawSpacing);
+        this.ctx.fillRect(x - jawWidth / 2, baseY, jawWidth, jawHeight);
+      }
+
       this.ctx.restore();
     }
   }
@@ -10003,12 +10053,13 @@ export class TileMapEditor {
   
       const label = actorType === 'npc' ? 'NPC' : 'Enemy';
       const name = object.name || label;
-      const title = actorType === 'npc' ? `${name}  (NPC)` : name;
+      const title = actorType === 'npc' ? `${name} (NPC)` : `${name} - Instance ${object.id}`;
+      const actionText = actorType === 'enemy' ? 'Click to edit enemy instance' : 'Click to edit';
   
       tooltip.innerHTML = `
         <div style="font-weight: bold; margin-bottom: 4px; color: #ffffff; font-size: 13px;">${title}</div>
         <div style="font-size: 11px; display: flex; align-items: center; color: rgba(209, 213, 219, 0.8);">
-          ${mouseIcon}Click to edit
+          ${mouseIcon}${actionText}
         </div>
     `;
 

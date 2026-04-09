@@ -284,11 +284,8 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
       const objects = editor && typeof editor.getMapObjects === 'function' ? editor.getMapObjects() : [...mapObjects, newObject!];
       const obj = objects?.find(o => o.id === newObject!.id) || newObject;
       setEditingObject(obj);
-      if (obj.type === 'enemy') {
-        setShowEnemyEditor(true);
-      } else {
-        setShowObjectDialog(true);
-      }
+      setShowEnemyEditor(false);
+      setShowObjectDialog(true);
       if (obj.type !== 'npc') {
         setShowDeleteNpcConfirm(false);
         setShowDeleteEnemyConfirm(false);
@@ -318,11 +315,8 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
     if (!obj) return;
 
     setEditingObject(obj);
-    if (obj.type === 'enemy') {
-      setShowEnemyEditor(true);
-    } else {
-      setShowObjectDialog(true);
-    }
+    setShowEnemyEditor(false);
+    setShowObjectDialog(true);
     if (obj.type === 'npc') {
       try {
         const stored = obj.properties?.dialogueTrees;

@@ -10,7 +10,6 @@ import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 import AnimationPreview from '@/components/AnimationPreview';
 import type { DialogueTree, MapObject } from '@/types';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
-import EditEnemyWindow from '@/components/EditEnemyWindow';
 
 type ObjectManagementDialogProps = {
   showObjectDialog: boolean;
@@ -187,31 +186,11 @@ const ObjectManagementDialog = ({
       >
         <div className="flex items-center gap-2">
           {editingObject?.type === 'enemy' ? (
-            'Edit Enemy'
+            'Edit Enemy Instance'
           ) : (
             <>
               {editingObject?.type === 'npc' && (
                 <User className="w-5 h-5 text-orange-500" />
-              )}
-              {editingObject?.type === 'enemy' && (
-                <div className="flex items-center gap-2">
-                  <span>{editingObject ? `Edit ${editingObject.type.toUpperCase()}` : 'Add Object'}</span>
-                  <Tooltip
-                    content={
-                      <div
-                        className="max-w-lg whitespace-normal break-words text-sm text-foreground leading-snug p-2"
-                        style={{ whiteSpace: 'normal', overflow: 'visible', textOverflow: 'clip' }}
-                      >
-                        Enemy stats normally scale with level. Overriding a stat disables scaling for that stat.
-                      </div>
-                    }
-                    side="right"
-                  >
-                    <span className="inline-flex items-center text-orange-500 font-semibold">
-                      <HelpCircle className="w-4 h-4" strokeWidth={2.4} />
-                    </span>
-                  </Tooltip>
-                </div>
               )}
               {editingObject?.type !== 'enemy' && (editingObject ? `Edit ${editingObject.type.toUpperCase()}` : 'Add Object')}
             </>
@@ -242,51 +221,183 @@ const ObjectManagementDialog = ({
             <div className="space-y-3 pb-4">
         {editingObject.type === 'enemy' ? (
           <>
-          {/* Basic Info Row for enemies */}
-          <div className="flex gap-3 items-end">
-            <div className="flex-1">
-              <label className="text-xs text-muted-foreground">Name</label>
-              <Input
-                value={editingObject.name || ''}
-                onChange={(e) => setEditingObject({...editingObject, name: e.target.value})}
-                placeholder="Object name"
-                className="h-8"
-              />
-            </div>
-            <div className="w-24">
-              <label className="text-xs text-muted-foreground">Position</label>
-              <div className="flex items-center gap-1">
-                <Input type="number" value={editingObject.x} disabled className="h-8 w-11 px-1 text-center opacity-50" />
-                <span className="text-muted-foreground text-xs">,</span>
-                <Input type="number" value={editingObject.y} disabled className="h-8 w-11 px-1 text-center opacity-50" />
+            <div className="space-y-4">
+              <div className="grid grid-cols-3 gap-3 items-end">
+                <div className="col-span-2">
+                  <label className="text-xs text-muted-foreground">Name</label>
+                  <Input
+                    value={editingObject.name || ''}
+                    onChange={(e) => setEditingObject({ ...editingObject, name: e.target.value })}
+                    placeholder="Enemy name"
+                    className="h-8"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Spawn Count</label>
+                  <div className="relative">
+                    <Input
+                      type="number"
+                      value={editingObject.number ?? 1}
+                      min={1}
+                      onChange={(e) => {
+                        const parsed = parseInt(e.target.value, 10);
+                        setEditingObject({ ...editingObject, number: Number.isFinite(parsed) ? parsed : undefined });
+                      }}
+                      className="h-8"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-muted-foreground">Location</label>
+                  <div className="flex items-center gap-1 mt-1">
+                    <Input
+                      type="number"
+                      value={editingObject.x}
+                      onChange={(e) => setEditingObject({ ...editingObject, x: Number(e.target.value) })}
+                      className="h-8 w-20 px-1 text-center"
+                    />
+                    <span className="text-muted-foreground text-xs"> , </span>
+                    <Input
+                      type="number"
+                      value={editingObject.y}
+                      onChange={(e) => setEditingObject({ ...editingObject, y: Number(e.target.value) })}
+                      className="h-8 w-20 px-1 text-center"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Map location coordinates for the enemy spawn.</p>
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Size</label>
+                  <div className="flex items-center gap-1 mt-1">
+                    <Input
+                      type="number"
+                      value={editingObject.width}
+                      min={1}
+                      onChange={(e) => setEditingObject({ ...editingObject, width: Number(e.target.value) })}
+                      className="h-8 w-20 px-1 text-center"
+                    />
+                    <span className="text-muted-foreground text-xs">×</span>
+                    <Input
+                      type="number"
+                      value={editingObject.height}
+                      min={1}
+                      onChange={(e) => setEditingObject({ ...editingObject, height: Number(e.target.value) })}
+                      className="h-8 w-20 px-1 text-center"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Width and height used in the enemy location block.</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-muted-foreground">Wander Radius</label>
+                  <Tooltip content="Radius in tiles this enemy can move from its spawn location.">
+                    <HelpCircle className="w-3 h-3 text-muted-foreground ml-1" />
+                  </Tooltip>
+                  <Input
+                    type="number"
+                    value={editingObject.wander_radius ?? 0}
+                    min={0}
+                    onChange={(e) => {
+                      const parsed = parseInt(e.target.value, 10);
+                      setEditingObject({ ...editingObject, wander_radius: Number.isFinite(parsed) ? parsed : undefined });
+                    }}
+                    className="h-8 mt-1"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">Waypoints</label>
+                  <Tooltip content="Optional patrol path: x1,y1;x2,y2;...">
+                    <HelpCircle className="w-3 h-3 text-muted-foreground ml-1" />
+                  </Tooltip>
+                  <Input
+                    className="h-8 mt-1"
+                    value={getEditingObjectProperty('waypoints', '')}
+                    onChange={(e) => updateEditingObjectProperty('waypoints', e.target.value)}
+                    placeholder="e.g. 5,5;10,5;10,10"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center gap-1 mb-1">
+                  <label className="text-xs text-muted-foreground">Direction</label>
+                  <Tooltip content="The facing direction when this enemy spawns on the map.">
+                    <HelpCircle className="w-3 h-3 text-muted-foreground" />
+                  </Tooltip>
+                </div>
+                <div className="grid grid-cols-3 gap-1 w-[fit-content]">
+                  {([
+                    { value: '7', label: 'NW', icon: ArrowUpLeft },
+                    { value: '0', label: 'N', icon: ArrowUp },
+                    { value: '1', label: 'NE', icon: ArrowUpRight },
+                    { value: '6', label: 'W', icon: ArrowLeft },
+                    { value: 'center', label: '', icon: null },
+                    { value: '2', label: 'E', icon: ArrowRight },
+                    { value: '5', label: 'SW', icon: ArrowDownLeft },
+                    { value: '4', label: 'S', icon: ArrowDown },
+                    { value: '3', label: 'SE', icon: ArrowDownRight },
+                  ] as const).map(dir => {
+                    if (dir.value === 'center') {
+                      return (
+                        <div key="center" className="flex items-center justify-center w-9 h-9">
+                          <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/30" />
+                        </div>
+                      );
+                    }
+                    const Icon = dir.icon!;
+                    const currentDir = getEditingObjectProperty('direction', '');
+                    const isSelected = currentDir === dir.value;
+                    return (
+                      <button
+                        key={dir.value}
+                        type="button"
+                        onClick={() => updateEditingObjectProperty('direction', isSelected ? null : dir.value)}
+                        className={`flex flex-col items-center justify-center w-9 h-9 gap-0.5 rounded text-[9px] font-medium transition-colors ${
+                          isSelected
+                            ? 'bg-orange-500/20 text-orange-600 dark:text-orange-400 border border-orange-500/50'
+                            : 'bg-muted/50 text-muted-foreground border border-transparent hover:bg-muted'
+                        }`}
+                        title={dir.label}
+                      >
+                        <Icon className="w-3.5 h-3.5" />
+                        <span>{dir.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
-          </div>
-          {/* Tileset for Enemy */}
-          <div className="flex gap-2">
-            <Input
-              className="h-8 flex-1 text-xs"
-              value={getEditingObjectProperty('tilesetPath', '')}
-              onChange={(e) => updateEditingObjectProperty('tilesetPath', e.target.value)}
-              placeholder="Tileset path..."
-              readOnly={canUseTilesetDialog}
-              onClick={canUseTilesetDialog ? () => { void handleEditingTilesetBrowse(); } : undefined}
-            />
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-8 px-2 gap-2"
-              onClick={() => { void handleEditingTilesetBrowse(); }}
-              disabled={!canUseTilesetDialog}
-            >
-              <Image className="w-4 h-4" />
-              <span className="text-xs">Tileset</span>
-            </Button>
-          </div>
-          <div className="rounded-md border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
-            Enemy details are edited in the enemy tab.
-          </div>
+
+            <div className="flex gap-2">
+              <Input
+                className="h-8 flex-1 text-xs"
+                value={getEditingObjectProperty('tilesetPath', '')}
+                onChange={(e) => updateEditingObjectProperty('tilesetPath', e.target.value)}
+                placeholder="Tileset path..."
+                readOnly={canUseTilesetDialog}
+                onClick={canUseTilesetDialog ? () => { void handleEditingTilesetBrowse(); } : undefined}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 px-2 gap-2"
+                onClick={() => { void handleEditingTilesetBrowse(); }}
+                disabled={!canUseTilesetDialog}
+              >
+                <Image className="w-4 h-4" />
+                <span className="text-xs">Tileset</span>
+              </Button>
+            </div>
+
+            <div className="rounded-md border border-border bg-muted/30 p-3 text-sm text-muted-foreground">
+              Enemy template details are edited in the enemy tab. This dialog only adjusts map-instance fields.
+            </div>
           </>
         ) : (
           <>

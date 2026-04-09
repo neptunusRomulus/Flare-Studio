@@ -9,6 +9,7 @@ import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 import AnimationPreview from '@/components/AnimationPreview';
 import type { DialogueTree, MapObject } from '@/types';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
+import EditEnemyWindow from '@/components/EditEnemyWindow';
 
 type ObjectManagementDialogProps = {
   showObjectDialog: boolean;

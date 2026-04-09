@@ -13,6 +13,7 @@ import ExportSuccessModalContainer from '@/components/ExportSuccessModalContaine
 import ImportReviewModalContainer from '@/components/ImportReviewModalContainer';
 import SeparateBrushDialog from '@/components/SeparateBrushDialog';
 import SaveErrorNotificationPanel from '@/components/SaveErrorNotificationPanel';
+import EditEnemyWindow from '@/components/EditEnemyWindow';
 
 // The dialog context is a large, aggregated object assembled in App.tsx.
 // It's acceptable to allow a broad shape here; keep the exception narrow.
@@ -61,6 +62,14 @@ export default function DialogsContainer({ ctx }: { ctx: unknown }) {
 
       <OverwriteExportDialogContainer ctx={ctx as any} />
       <ExportSuccessModalContainer ctx={ctx as any} />
+
+      <EditEnemyWindow
+        open={(ctx as any).showEnemyEditor}
+        onOpenChange={(ctx as any).setShowEnemyEditor}
+        enemy={(ctx as any).editingObject}
+        onSave={(ctx as any).handleUpdateObject}
+        projectPath={(ctx as any).currentProjectPath}
+      />
     </>
   );
 }

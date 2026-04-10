@@ -157,7 +157,10 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
           setMapConfig({ ...mapConfig, location: dirHandle.name });
         } else {
           // Fallback - just set a default location
-          const defaultLocation = 'C:\\Users\\' + (navigator.userAgent.includes('Windows') ? process.env.USERNAME || 'User' : 'User') + '\\Documents\\TileMaps';
+          const defaultUsername = typeof process !== 'undefined' && typeof process.env !== 'undefined' && process.env.USERNAME ? process.env.USERNAME : 'Public';
+          const defaultLocation = navigator.userAgent.includes('Windows')
+            ? `C:\\Users\\${defaultUsername}\\Documents\\TileMaps`
+            : '/tmp/TileMaps';
           setMapConfig({ ...mapConfig, location: defaultLocation });
         }
       }
@@ -430,7 +433,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
               <div className="text-center text-gray-500 dark:text-gray-400 py-8">
                 <Grid3X3 className="w-20 h-20 mx-auto mb-3 text-gray-300 dark:text-gray-600" />
                 <p>No recent project</p>
-                <p className="text-sm">Create your first projet to get started</p>
+                <p className="text-sm">Create your first project to get started</p>
               </div>
             )}
           </div>
@@ -455,7 +458,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
                 size="lg"
               >
                 <Plus className="w-5 h-5 mr-2" />
-                Create New Projet
+                Create New Project
               </Button>
 
               <Button 

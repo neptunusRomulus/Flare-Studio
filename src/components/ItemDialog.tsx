@@ -176,7 +176,7 @@ const ItemDialog = ({
           )}
       </div>
 
-      <div className="flex items-center justify-between gap-2 p-4 border-t border-border relative">
+      <div className="flex items-center justify-end gap-2 p-4 border-t border-border relative">
         {pendingDuplicateItem && (
           <div className="absolute -top-24 right-4 w-[280px]">
             <div className="rounded-md border border-amber-500/50 bg-background shadow-lg text-xs p-2.5 flex items-start gap-2">
@@ -214,12 +214,8 @@ const ItemDialog = ({
             </div>
           </div>
         )}
-        <div className="flex-1" />
-        <Button variant="outline" onClick={onClose}>
-          Cancel
-        </Button>
-        <Button onClick={onSubmit}>
-          Add Item
+        <Button size="icon" onClick={onSubmit} aria-label="Save item">
+          <Check className="w-4 h-4" />
         </Button>
       </div>
 

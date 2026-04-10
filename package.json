@@ -5,13 +5,16 @@
   "description": "Tile map editor (Flare Studio fork)",
   "main": "electron/main.cjs",
   "author": "",
-  "license": "MIT",
+  "license": "GPL-3.0-or-later",
   "scripts": {
     "start": "electron .",
     "electron-dev": "concurrently \"vite --port 5173\" \"wait-on http://localhost:5173 && electron .\"",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview --port 5173",
+    "playwright:test": "npx playwright test",
+    "playwright:watch": "npx playwright test --watch",
+    "playwright:electron": "npx playwright test tests/e2e/create-project.spec.ts",
     "electron:build": "electron-builder",
     "lint": "eslint . --ext .ts,.tsx,.js",
     "test": "vitest"

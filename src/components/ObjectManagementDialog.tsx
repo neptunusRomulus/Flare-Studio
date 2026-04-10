@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 import Tooltip from '@/components/ui/tooltip';
 import type { ItemSummary } from '@/utils/items';
-import { ArrowUp, ArrowUpRight, ArrowRight, ArrowDownRight, ArrowDown, ArrowDownLeft, ArrowLeft, ArrowUpLeft, Check, ChevronDown, ChevronUp, Gift, HelpCircle, Image, MessagesSquare, Package, Plus, Save, Sparkles, Trash2, User, X } from 'lucide-react';
+import { ArrowUp, ArrowUpRight, ArrowRight, ArrowDownRight, ArrowDown, ArrowDownLeft, ArrowLeft, ArrowUpLeft, Check, ChevronDown, ChevronUp, Gift, HandCoins, HelpCircle, Image, MessagesSquare, MessageCircleQuestionMark, Package, Plus, Save, Settings, Sparkles, Trash2, User, X } from 'lucide-react';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 import AnimationPreview from '@/components/AnimationPreview';
 import type { DialogueTree, MapObject } from '@/types';
@@ -108,6 +108,9 @@ const ObjectManagementDialog = ({
   const [animationExpanded, setAnimationExpanded] = useState(false);
   const [spawnReqExpanded, setSpawnReqExpanded] = useState(false);
   const [audioExpanded, setAudioExpanded] = useState(false);
+  const [vendorRequirementsExpanded, setVendorRequirementsExpanded] = useState(true);
+  const [vendorStockExpanded, setVendorStockExpanded] = useState(true);
+  const [vendorPricingExpanded, setVendorPricingExpanded] = useState(true);
 
   const isOpen = showObjectDialog && !!editingObject;
 
@@ -163,6 +166,10 @@ const ObjectManagementDialog = ({
   }, [showQuestSettingsDialog, handleCloseQuestSettingsDialog]);
 
   if (!isOpen) return null;
+
+  const isTalker = editingObject?.properties?.talker === 'true';
+  const isVendor = editingObject?.properties?.vendor === 'true';
+  const isQuestGiver = editingObject?.properties?.questGiver === 'true';
 
   const dialogContent = (
     <>
@@ -582,103 +589,113 @@ const ObjectManagementDialog = ({
               <h4 className="text-sm font-semibold">Roles</h4>
               <p className="text-xs text-muted-foreground">Select the special roles for this NPC.</p>
             </div>
-            <div className="flex gap-1.5">
-              <Tooltip content="Allows this NPC to be talked to.">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const newProps = { ...editingObject.properties };
-                    if (newProps.talker === 'true') delete newProps.talker;
-                    else newProps.talker = 'true';
-                    setEditingObject({ ...editingObject, properties: newProps });
-                  }}
-                  className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
-                    editingObject.properties?.talker === 'true'
-                      ? 'bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/50'
-                      : 'bg-muted/50 text-muted-foreground border border-transparent hover:bg-muted'
-                  }`}
-                >
-                  Talker
-                </button>
-              </Tooltip>
+            <div className="flex gap-1.5 items-center">
+              <div className="flex items-center gap-1">
+                <Tooltip content="Allows this NPC to be talked to.">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newProps = { ...editingObject.properties };
+                      if (newProps.talker === 'true') delete newProps.talker;
+                      else newProps.talker = 'true';
+                      setEditingObject({ ...editingObject, properties: newProps });
+                    }}
+                    className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
+                      editingObject.properties?.talker === 'true'
+                        ? 'bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/50'
+                        : 'bg-muted/50 text-muted-foreground border border-transparent hover:bg-muted'
+                    }`}
+                  >
+                    <MessagesSquare className="w-3 h-3 mr-1 inline-block" />
+                    Talker
+                  </button>
+                </Tooltip>
 
-              <Tooltip content="Allows this NPC to buy/sell items.">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const newProps = { ...editingObject.properties };
-                    if (newProps.vendor === 'true') delete newProps.vendor;
-                    else newProps.vendor = 'true';
-                    setEditingObject({ ...editingObject, properties: newProps });
-                  }}
-                  className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
-                    editingObject.properties?.vendor === 'true'
-                      ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/50'
-                      : 'bg-muted/50 text-muted-foreground border border-transparent hover:bg-muted'
-                  }`}
-                >
-                  Vendor
-                </button>
-              </Tooltip>
+                <Tooltip content="Settings">
+                  <button
+                    type="button"
+                    onClick={() => isTalker && setShowDialogueTreeDialog(true)}
+                    aria-label="settings"
+                    disabled={!isTalker}
+                    className={`h-7 w-7 p-0 flex items-center justify-center rounded-md bg-transparent border-0 ${!isTalker ? 'opacity-40 pointer-events-none' : ''}`}
+                  >
+                    <Settings className="w-4 h-4 text-white" />
+                  </button>
+                </Tooltip>
+              </div>
 
-              <Tooltip content="Allows this NPC to give quests.">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const newProps = { ...editingObject.properties };
-                    if (newProps.questGiver === 'true') delete newProps.questGiver;
-                    else newProps.questGiver = 'true';
-                    setEditingObject({ ...editingObject, properties: newProps });
-                  }}
-                  className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
-                    editingObject.properties?.questGiver === 'true'
-                      ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/50'
-                      : 'bg-muted/50 text-muted-foreground border border-transparent hover:bg-muted'
-                  }`}
-                >
-                  Quest
-                </button>
-              </Tooltip>
+              <div className="flex items-center gap-1">
+                <Tooltip content="Allows this NPC to buy/sell items.">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newProps = { ...editingObject.properties };
+                      if (newProps.vendor === 'true') delete newProps.vendor;
+                      else newProps.vendor = 'true';
+                      setEditingObject({ ...editingObject, properties: newProps });
+                    }}
+                    className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
+                      editingObject.properties?.vendor === 'true'
+                        ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/50'
+                        : 'bg-muted/50 text-muted-foreground border border-transparent hover:bg-muted'
+                    }`}
+                  >
+                    <HandCoins className="w-3 h-3 mr-1 inline-block" />
+                    Vendor
+                  </button>
+                </Tooltip>
+
+                <Tooltip content="Settings">
+                  <button
+                    type="button"
+                    onClick={() => isVendor && handleOpenVendorSettingsDialog()}
+                    aria-label="settings"
+                    disabled={!isVendor}
+                    className={`h-7 w-7 p-0 flex items-center justify-center rounded-md bg-transparent border-0 ${!isVendor ? 'opacity-40 pointer-events-none' : ''}`}
+                  >
+                    <Settings className="w-4 h-4 text-white" />
+                  </button>
+                </Tooltip>
+              </div>
+
+              <div className="flex items-center gap-1">
+                <Tooltip content="Allows this NPC to give quests.">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newProps = { ...editingObject.properties };
+                      if (newProps.questGiver === 'true') delete newProps.questGiver;
+                      else newProps.questGiver = 'true';
+                      setEditingObject({ ...editingObject, properties: newProps });
+                    }}
+                    className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
+                      editingObject.properties?.questGiver === 'true'
+                        ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/50'
+                        : 'bg-muted/50 text-muted-foreground border border-transparent hover:bg-muted'
+                    }`}
+                  >
+                    <MessageCircleQuestionMark className="w-3 h-3 mr-1 inline-block" />
+                    Quest
+                  </button>
+                </Tooltip>
+
+                <Tooltip content="Settings">
+                  <button
+                    type="button"
+                    onClick={() => isQuestGiver && handleOpenQuestSettingsDialog()}
+                    aria-label="settings"
+                    disabled={!isQuestGiver}
+                    className={`h-7 w-7 p-0 flex items-center justify-center rounded-md bg-transparent border-0 ${!isQuestGiver ? 'opacity-40 pointer-events-none' : ''}`}
+                  >
+                    <Settings className="w-4 h-4 text-white" />
+                  </button>
+                </Tooltip>
+              </div>
             </div>
           </div>
         )}
 
-        {/* Role-specific compact options */}
-        {editingObject.type === 'npc' && (
-          <div className="pl-3 border-l-[3px] border-blue-500/80 py-1 flex flex-wrap gap-3 items-center">
-            {editingObject.properties?.talker === 'true' && (
-              <button
-                type="button"
-                onClick={() => setShowDialogueTreeDialog(true)}
-                className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 hover:opacity-80"
-              >
-                <MessagesSquare className="w-3 h-3" />
-                Dialogue Trees
-              </button>
-            )}
-
-            {editingObject.properties?.vendor === 'true' && (
-              <button
-                type="button"
-                onClick={() => handleOpenVendorSettingsDialog()}
-                className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 hover:opacity-80"
-              >
-                <Gift className="w-3 h-3" />
-                Vendor Settings
-              </button>
-            )}
-            {editingObject.properties?.questGiver === 'true' && (
-              <button
-                type="button"
-                onClick={() => handleOpenQuestSettingsDialog()}
-                className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 hover:opacity-80"
-              >
-                <Check className="w-3 h-3" />
-                Quest Settings
-              </button>
-            )}
-          </div>
-        )}
+        {/* Role-specific compact options removed — settings are now inline with toggles */}
 
 
         {/* NPC Spawn Requirements & Behavior */}
@@ -1776,137 +1793,238 @@ const ObjectManagementDialog = ({
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Vendor Requires Status</label>
-                  <Input
-                    className="h-10 text-sm"
-                    value={getEditingObjectProperty('vendor_requires_status', '')}
-                    onChange={(e) => updateEditingObjectProperty('vendor_requires_status', e.target.value || null)}
-                    placeholder="e.g. hero_status"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Vendor Requires Not Status</label>
-                  <Input
-                    className="h-10 text-sm"
-                    value={getEditingObjectProperty('vendor_requires_not_status', '')}
-                    onChange={(e) => updateEditingObjectProperty('vendor_requires_not_status', e.target.value || null)}
-                    placeholder="e.g. thief_status"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Constant Stock</label>
-                  <div className="flex gap-2">
-                    <Input
-                      className="h-10 text-sm flex-1"
-                      value={getEditingObjectProperty('constant_stock', '')}
-                      onChange={(e) => updateEditingObjectProperty('constant_stock', e.target.value || null)}
-                      placeholder="item_id"
-                    />
-                    <Input
-                      type="number"
-                      className="h-10 text-sm w-24"
-                      value={getEditingObjectProperty('constant_stock_quantity', '')}
-                      onChange={(e) => updateEditingObjectProperty('constant_stock_quantity', e.target.value || null)}
-                      placeholder="Qty"
-                      min="1"
-                    />
+              <div className="rounded-xl border border-border bg-muted/50 overflow-hidden">
+                <button
+                  type="button"
+                  className="w-full px-3 py-3 flex items-center justify-between gap-3 text-sm font-semibold text-foreground hover:bg-slate-100"
+                  onClick={() => setVendorRequirementsExpanded((prev) => !prev)}
+                >
+                  <span className="flex items-center gap-2">
+                    <HandCoins className="w-4 h-4 text-emerald-500" />
+                    Vendor Requirements
+                  </span>
+                  <ChevronDown className={`w-4 h-4 transition-transform ${vendorRequirementsExpanded ? 'rotate-180' : ''}`} />
+                </button>
+                {vendorRequirementsExpanded && (
+                  <div className="px-3 pb-3 space-y-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="flex items-center gap-2 text-sm font-medium mb-1">
+                          Vendor Requires Status
+                          <Tooltip content="Only show this vendor when the player has this status. Use status IDs like hero_status.">
+                            <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
+                          </Tooltip>
+                        </label>
+                        <Input
+                          className="h-10 text-sm"
+                          value={getEditingObjectProperty('vendor_requires_status', '')}
+                          onChange={(e) => updateEditingObjectProperty('vendor_requires_status', e.target.value || null)}
+                          placeholder="e.g. hero_status"
+                        />
+                      </div>
+                      <div>
+                        <label className="flex items-center gap-2 text-sm font-medium mb-1">
+                          Vendor Requires Not Status
+                          <Tooltip content="Hide this vendor when the player has the given status. Useful for exclusive offers or alternate shops.">
+                            <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
+                          </Tooltip>
+                        </label>
+                        <Input
+                          className="h-10 text-sm"
+                          value={getEditingObjectProperty('vendor_requires_not_status', '')}
+                          onChange={(e) => updateEditingObjectProperty('vendor_requires_not_status', e.target.value || null)}
+                          placeholder="e.g. thief_status"
+                        />
+                      </div>
+                    </div>
                   </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Status Stock</label>
-                  <div className="flex gap-2">
-                    <Input
-                      className="h-10 text-sm flex-1"
-                      value={getEditingObjectProperty('status_stock', '')}
-                      onChange={(e) => updateEditingObjectProperty('status_stock', e.target.value || null)}
-                      placeholder="item_id"
-                    />
-                    <Input
-                      type="number"
-                      className="h-10 text-sm w-24"
-                      value={getEditingObjectProperty('status_stock_quantity', '')}
-                      onChange={(e) => updateEditingObjectProperty('status_stock_quantity', e.target.value || null)}
-                      placeholder="Qty"
-                      min="1"
-                    />
+                )}
+              </div>
+
+              <div className="rounded-xl border border-border bg-muted/50 overflow-hidden">
+                <button
+                  type="button"
+                  className="w-full px-3 py-3 flex items-center justify-between gap-3 text-sm font-semibold text-foreground hover:bg-slate-100"
+                  onClick={() => setVendorStockExpanded((prev) => !prev)}
+                >
+                  <span className="flex items-center gap-2">
+                    <Package className="w-4 h-4 text-cyan-500" />
+                    Vendor Stock
+                  </span>
+                  <ChevronDown className={`w-4 h-4 transition-transform ${vendorStockExpanded ? 'rotate-180' : ''}`} />
+                </button>
+                {vendorStockExpanded && (
+                  <div className="px-3 pb-3 space-y-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="flex items-center gap-2 text-sm font-medium mb-1">
+                          Constant Stock
+                          <Tooltip content="The vendor always sells this item. Enter the item ID and quantity here.">
+                            <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
+                          </Tooltip>
+                        </label>
+                        <div className="flex gap-2">
+                          <Input
+                            className="h-10 text-sm flex-1"
+                            value={getEditingObjectProperty('constant_stock', '')}
+                            onChange={(e) => updateEditingObjectProperty('constant_stock', e.target.value || null)}
+                            placeholder="item_id"
+                          />
+                          <Input
+                            type="number"
+                            className="h-10 text-sm w-24"
+                            value={getEditingObjectProperty('constant_stock_quantity', '')}
+                            onChange={(e) => updateEditingObjectProperty('constant_stock_quantity', e.target.value || null)}
+                            placeholder="Qty"
+                            min="1"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="flex items-center gap-2 text-sm font-medium mb-1">
+                          Status Stock
+                          <Tooltip content="This item appears only when the player has the matching status. Useful for status-based offers.">
+                            <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
+                          </Tooltip>
+                        </label>
+                        <div className="flex gap-2">
+                          <Input
+                            className="h-10 text-sm flex-1"
+                            value={getEditingObjectProperty('status_stock', '')}
+                            onChange={(e) => updateEditingObjectProperty('status_stock', e.target.value || null)}
+                            placeholder="item_id"
+                          />
+                          <Input
+                            type="number"
+                            className="h-10 text-sm w-24"
+                            value={getEditingObjectProperty('status_stock_quantity', '')}
+                            onChange={(e) => updateEditingObjectProperty('status_stock_quantity', e.target.value || null)}
+                            placeholder="Qty"
+                            min="1"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="flex items-center gap-2 text-sm font-medium mb-1">
+                        Random Stock
+                        <Tooltip content="Use a loot table or list here. The vendor picks random offers from this source.">
+                          <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
+                        </Tooltip>
+                      </label>
+                      <Input
+                        className="h-10 text-sm"
+                        value={getEditingObjectProperty('random_stock', '')}
+                        onChange={(e) => updateEditingObjectProperty('random_stock', e.target.value || null)}
+                        placeholder="loot table definition"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="flex items-center gap-2 text-sm font-medium mb-1">
+                          Random Stock Count Min
+                          <Tooltip content="Minimum number of random offers the vendor can show. Helps control shop variety.">
+                            <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
+                          </Tooltip>
+                        </label>
+                        <Input
+                          type="number"
+                          className="h-10 text-sm"
+                          value={getEditingObjectProperty('random_stock_count_min', '')}
+                          onChange={(e) => updateEditingObjectProperty('random_stock_count_min', e.target.value || null)}
+                          placeholder="Min"
+                          min="0"
+                        />
+                      </div>
+                      <div>
+                        <label className="flex items-center gap-2 text-sm font-medium mb-1">
+                          Random Stock Count Max
+                          <Tooltip content="Maximum number of random offers the vendor can show. Keep this greater than or equal to Min.">
+                            <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
+                          </Tooltip>
+                        </label>
+                        <Input
+                          type="number"
+                          className="h-10 text-sm"
+                          value={getEditingObjectProperty('random_stock_count_max', '')}
+                          onChange={(e) => updateEditingObjectProperty('random_stock_count_max', e.target.value || null)}
+                          placeholder="Max"
+                          min="0"
+                        />
+                      </div>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-1">Random Stock</label>
-                <Input
-                  className="h-10 text-sm"
-                  value={getEditingObjectProperty('random_stock', '')}
-                  onChange={(e) => updateEditingObjectProperty('random_stock', e.target.value || null)}
-                  placeholder="loot table definition"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Random Stock Count Min</label>
-                  <Input
-                    type="number"
-                    className="h-10 text-sm"
-                    value={getEditingObjectProperty('random_stock_count_min', '')}
-                    onChange={(e) => updateEditingObjectProperty('random_stock_count_min', e.target.value || null)}
-                    placeholder="Min"
-                    min="0"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Random Stock Count Max</label>
-                  <Input
-                    type="number"
-                    className="h-10 text-sm"
-                    value={getEditingObjectProperty('random_stock_count_max', '')}
-                    onChange={(e) => updateEditingObjectProperty('random_stock_count_max', e.target.value || null)}
-                    placeholder="Max"
-                    min="0"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Vendor Ratio Buy</label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    className="h-10 text-sm"
-                    value={getEditingObjectProperty('vendor_ratio_buy', '')}
-                    onChange={(e) => updateEditingObjectProperty('vendor_ratio_buy', e.target.value || null)}
-                    placeholder="0"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Vendor Ratio Sell</label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    className="h-10 text-sm"
-                    value={getEditingObjectProperty('vendor_ratio_sell', '')}
-                    onChange={(e) => updateEditingObjectProperty('vendor_ratio_sell', e.target.value || null)}
-                    placeholder="0"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Vendor Ratio Sell Old</label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    className="h-10 text-sm"
-                    value={getEditingObjectProperty('vendor_ratio_sell_old', '')}
-                    onChange={(e) => updateEditingObjectProperty('vendor_ratio_sell_old', e.target.value || null)}
-                    placeholder="0"
-                  />
-                </div>
+              <div className="rounded-xl border border-border bg-muted/50 overflow-hidden">
+                <button
+                  type="button"
+                  className="w-full px-3 py-3 flex items-center justify-between gap-3 text-sm font-semibold text-foreground hover:bg-slate-100"
+                  onClick={() => setVendorPricingExpanded((prev) => !prev)}
+                >
+                  <span className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-violet-500" />
+                    Vendor Pricing
+                  </span>
+                  <ChevronDown className={`w-4 h-4 transition-transform ${vendorPricingExpanded ? 'rotate-180' : ''}`} />
+                </button>
+                {vendorPricingExpanded && (
+                  <div className="px-3 pb-3 space-y-4">
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <label className="flex items-center gap-2 text-sm font-medium mb-1">
+                          Vendor Ratio Buy
+                          <Tooltip content="How much the vendor charges the player when buying items. A higher number means more expensive buys.">
+                            <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
+                          </Tooltip>
+                        </label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          className="h-10 text-sm"
+                          value={getEditingObjectProperty('vendor_ratio_buy', '')}
+                          onChange={(e) => updateEditingObjectProperty('vendor_ratio_buy', e.target.value || null)}
+                          placeholder="0"
+                        />
+                      </div>
+                      <div>
+                        <label className="flex items-center gap-2 text-sm font-medium mb-1">
+                          Vendor Ratio Sell
+                          <Tooltip content="How much the vendor pays the player when selling items. Use values below 1 for a loss, above 1 to pay more.">
+                            <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
+                          </Tooltip>
+                        </label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          className="h-10 text-sm"
+                          value={getEditingObjectProperty('vendor_ratio_sell', '')}
+                          onChange={(e) => updateEditingObjectProperty('vendor_ratio_sell', e.target.value || null)}
+                          placeholder="0"
+                        />
+                      </div>
+                      <div>
+                        <label className="flex items-center gap-2 text-sm font-medium mb-1">
+                          Vendor Ratio Sell Old
+                          <Tooltip content="Legacy or alternative sell price factor used by older vendor logic. Leave empty unless your mod uses this specifically.">
+                            <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
+                          </Tooltip>
+                        </label>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          className="h-10 text-sm"
+                          value={getEditingObjectProperty('vendor_ratio_sell_old', '')}
+                          onChange={(e) => updateEditingObjectProperty('vendor_ratio_sell_old', e.target.value || null)}
+                          placeholder="0"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

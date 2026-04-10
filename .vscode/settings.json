@@ -19,5 +19,16 @@
   },
   "tailwindCSS.emmetCompletions": true,
   "chatgpt.openOnStartup": false,
+  "mcp.autoStart": true,
+  "mcp.startOnStartup": true,
+  "mcp.autoStartServers": [
+    "oraios/serena",
+    "io.github.ChromeDevTools/chrome-devtools-mcp",
+    "io.github.github/github-mcp-server",
+    "io.github.upstash/context7",
+    "io.github.wonderwhy-er/desktop-commander",
+    "io.github.brightdata/brightdata-mcp",
+    "microsoft/playwright-mcp"
+  ],
   "terminal.integrated.defaultProfile.linux": "bash"
 }

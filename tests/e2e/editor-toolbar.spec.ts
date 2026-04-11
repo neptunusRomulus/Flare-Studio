@@ -1,10 +1,11 @@
 import fs from 'fs';
 import path from 'path';
-import { test, expect, _electron as electron } from '@playwright/test';
+import { test, expect } from '@playwright/test';
+import { launchElectronApp, stopViteServer } from './electron-utils';
 
 test('map editor canvas loads and toolbar shortcuts work', async () => {
   const projectRoot = path.join('C:', 'Users', 'Public', 'Documents', 'PlaywrightToolbarTest');
-  const projectName = 'Playwright Toolbar Test';
+  const projectName = `Playwright Toolbar Test ${Date.now()}`;
   const projectPath = path.join(projectRoot, projectName);
   const mapFileName = `${projectName}.json`;
 
@@ -37,12 +38,12 @@ test('map editor canvas loads and toolbar shortcuts work', async () => {
   };
   fs.writeFileSync(path.join(projectPath, mapFileName), JSON.stringify(mapData, null, 2), 'utf8');
 
-  const electronApp = await electron.launch({ args: ['.'] });
+  const { app: electronApp, viteProcess } = await launchElectronApp();
 
   try {
-    await electronApp.evaluate(async ({ dialog }) => {
-      dialog.showOpenDialog = async () => ({ canceled: false, filePaths: ['C:\\Users\\Public\\Documents\\PlaywrightToolbarTest\\Playwright Toolbar Test'] });
-    });
+    await electronApp.evaluate(async ({ dialog }, selectedPath) => {
+      dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [selectedPath] });
+    }, projectPath);
 
     const appWindow = async () => {
       const existing = electronApp.windows().find((w) => {
@@ -86,5 +87,6 @@ test('map editor canvas loads and toolbar shortcuts work', async () => {
     await expect(brushButton.locator('svg.lucide-eraser')).toBeVisible();
   } finally {
     await electronApp.close();
+    await stopViteServer(viteProcess);
   }
 });

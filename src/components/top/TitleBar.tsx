@@ -59,7 +59,7 @@ const TitleBar = ({
         ) : null}
         <span className="text-sm font-semibold text-orange-600 dark:text-orange-400 whitespace-nowrap">Flare Studio</span>
       </div>
-      <div className="flex items-center gap-1 text-xs mx-4 min-w-[70px]">
+      <div className="flex items-center gap-2 text-xs mx-4 min-w-[90px]">
         {saveStatus === 'saving' && (
           <>
             <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse flex-shrink-0"></div>
@@ -84,6 +84,26 @@ const TitleBar = ({
             <span className="text-gray-500 whitespace-nowrap">Unsaved</span>
           </>
         )}
+
+        <span
+          className={`whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+            saveStatus === 'saved'
+              ? 'bg-green-100 text-green-700'
+              : saveStatus === 'error'
+              ? 'bg-red-100 text-red-700'
+              : saveStatus === 'saving'
+              ? 'bg-orange-100 text-orange-700'
+              : 'bg-gray-100 text-gray-700'
+          }`}
+        >
+          {saveStatus === 'saved'
+            ? 'Shield OK'
+            : saveStatus === 'error'
+            ? 'Shield Broken'
+            : saveStatus === 'saving'
+            ? 'Shield Checking...'
+            : 'Shield Pending'}
+        </span>
       </div>
       <div className="flex-1 min-w-0">
         <EditorTabs

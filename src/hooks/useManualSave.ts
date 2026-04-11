@@ -524,12 +524,17 @@ export default function useManualSave(args: {
 
               console.log('[ManualSave][TXT] Generated mapTxt length:', mapTxt.length, '| tilesetDef length:', tilesetDef.length);
               console.log('[ManualSave][TXT] Calling saveExportFiles — path:', projectPath, '| mapName:', mapName);
-              const ok = await electronAPI.saveExportFiles(projectPath, mapName, mapTxt, tilesetDef, { tilesetImages, npcFiles, portraitFiles, npcTilesetImages, npcAnimationFiles });
-              if (ok) {
+              const saveResult = await electronAPI.saveExportFiles(projectPath, mapName, mapTxt, tilesetDef, { tilesetImages, npcFiles, portraitFiles, npcTilesetImages, npcAnimationFiles });
+              if (saveResult?.success) {
                 console.log('[ManualSave][TXT] ✓ Flare .txt saved to', projectPath + '/maps/' + mapName + '.txt');
               } else {
-                console.error('[ManualSave][TXT] saveExportFiles returned false for', projectPath + '/maps/' + mapName + '.txt');
-                throw new Error('saveExportFiles returned false for Flare .txt export');
+                const validationDetails = saveResult?.validation?.fileResults
+                  ?.map((r) => `${r.filePath}: ${[...r.errors, ...r.warnings].join('; ')}`)
+                  .filter(Boolean)
+                  .join(' | ');
+                const message = saveResult?.message || validationDetails || 'saveExportFiles failed for Flare .txt export';
+                console.error('[ManualSave][TXT] saveExportFiles validation failed for', projectPath + '/maps/' + mapName + '.txt', message);
+                throw new Error(message);
               }
             },
             rollback: async () => {

@@ -8,7 +8,9 @@ const {
 } = require("electron");
 const path = require("path");
 const fs = require("fs");
+const { validateSerializedFlareData, loadFlareDataSchema } = require("./flareDataValidator.cjs");
 const isDev = !app.isPackaged;
+const validationRoot = path.join(__dirname, "..");
 
 const sanitizeMapNameForFilename = (name) => {
   return (
@@ -1009,6 +1011,52 @@ ipcMainLocal.handle(
         `tileset_${sanitizedMapName}.txt`
       );
 
+      const validationSchema = loadFlareDataSchema(validationRoot);
+      const validationResults = [];
+      const mapTargetPath = path.join("maps", `${sanitizedMapName}.txt`).split(path.sep).join("/");
+      validationResults.push(
+        validateSerializedFlareData(validationRoot, mapTargetPath, mapTxt, validationSchema)
+      );
+
+      if (options.spawn && options.spawn.enabled && typeof options.spawn.content === 'string') {
+        const spawnFile = path.join("maps", options.spawn.filename || "spawn.txt").split(path.sep).join("/");
+        validationResults.push(
+          validateSerializedFlareData(validationRoot, spawnFile, options.spawn.content, validationSchema)
+        );
+      }
+
+      if (Array.isArray(options.npcFiles)) {
+        for (const npcFile of options.npcFiles) {
+          if (npcFile && npcFile.filename && typeof npcFile.content === 'string') {
+            const npcTarget = path.join("npcs", npcFile.filename).split(path.sep).join("/");
+            validationResults.push(
+              validateSerializedFlareData(validationRoot, npcTarget, npcFile.content, validationSchema)
+            );
+          }
+        }
+      }
+
+      const validationIssues = validationResults.flatMap((result) => {
+        const filePrefix = result.filePath ? `${result.filePath}: ` : '';
+        return [...result.errors.map((error) => `${filePrefix}${error}`), ...result.warnings.map((warning) => `${filePrefix}${warning}`)];
+      });
+
+      if (validationIssues.length > 0) {
+        return {
+          success: false,
+          message: `Flare Shield validation failed: ${validationIssues.join(' | ')}`,
+          validation: {
+            success: false,
+            fileResults: validationResults.map((result) => ({
+              filePath: result.filePath,
+              category: result.category,
+              errors: result.errors,
+              warnings: result.warnings,
+            })),
+          },
+        };
+      }
+
       fs.writeFileSync(mapFilePath, mapTxt, "utf8");
       fs.writeFileSync(tilesetFilePath, tilesetDef, "utf8");
 
@@ -1200,10 +1248,13 @@ ipcMainLocal.handle(
       console.log("Export files saved successfully:");
       console.log("- Map:", mapFilePath);
       console.log("- Tileset:", tilesetFilePath);
-      return true;
+      return { success: true };
     } catch (error) {
       console.error("Error saving export files:", error);
-      return false;
+      return {
+        success: false,
+        message: error?.message || "Error saving export files"
+      };
     }
   }
 );

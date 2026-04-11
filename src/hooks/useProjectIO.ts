@@ -255,7 +255,7 @@ const useProjectIO = ({
           console.warn('Failed to collect NPC files for export:', npcErr);
         }
 
-        const success = await window.electronAPI.saveExportFiles(
+        const result = await window.electronAPI.saveExportFiles(
           currentProjectPath,
           mapName,
           mapTxt,
@@ -271,8 +271,12 @@ const useProjectIO = ({
           }
         );
 
-        if (!success) {
-          throw new Error('Failed to save export files');
+        if (!result?.success) {
+          const validationDetails = result?.validation?.fileResults
+            ?.map((r) => `${r.filePath}: ${[...r.errors, ...r.warnings].join('; ')}`)
+            .filter(Boolean)
+            .join(' | ');
+          throw new Error(result?.message || validationDetails || 'Failed to save export files');
         }
 
         if (!silent) {

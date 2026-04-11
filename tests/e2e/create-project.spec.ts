@@ -1,7 +1,8 @@
-import { test, expect, _electron as electron } from '@playwright/test';
+import { test, expect } from '@playwright/test';
+import { launchElectronApp, stopViteServer } from './electron-utils';
 
 test('create new project flow and transition into the editor', async () => {
-  const electronApp = await electron.launch({ args: ['.'] });
+  const { app: electronApp, viteProcess } = await launchElectronApp();
 
   try {
     await electronApp.evaluate(async ({ dialog }) => {
@@ -28,24 +29,34 @@ test('create new project flow and transition into the editor', async () => {
     await window.waitForLoadState('domcontentloaded');
     await window.waitForLoadState('load');
 
+    const projectName = `Playwright Test Project ${Date.now()}`;
+
     await expect(window.getByRole('button', { name: /Create New Project/i })).toBeVisible({ timeout: 15000 });
-  await window.getByRole('button', { name: /Create New Project/i }).click();
+    await window.getByRole('button', { name: /Create New Project/i }).click();
 
-  await expect(window.getByRole('heading', { name: /Create a New Flare Project/i })).toBeVisible();
+    await expect(window.getByRole('heading', { name: /Create a New Flare Project/i })).toBeVisible();
 
-  await window.locator('input[placeholder="Enter map name"]').fill('Playwright Test Project');
+    await window.locator('input[placeholder="Enter map name"]').fill(projectName);
 
-  const folderButton = window.locator('input[placeholder="Select folder for your project"] + button');
-  await expect(folderButton).toHaveCount(1);
-  await folderButton.click({ force: true });
+    await window.evaluate(() => {
+      window.electronAPI = {
+        ...window.electronAPI,
+        selectDirectory: async () => 'C:\\Users\\Public\\Documents\\PlaywrightTest',
+      };
+    });
 
-  await expect(window.locator('input[placeholder="Select folder for your project"]')).toHaveValue(/PlaywrightTest/);
+    const folderButton = window.locator('input[placeholder="Select folder for your project"] + button');
+    await expect(folderButton).toHaveCount(1);
+    await folderButton.click({ force: true });
 
-  await window.getByRole('button', { name: /Confirm/i }).click();
+    await expect(window.locator('input[placeholder="Select folder for your project"]')).toHaveValue(/PlaywrightTest/);
 
-  await expect(window.getByRole('heading', { name: /Create a New Flare Project/i })).toHaveCount(0);
-  await expect(window.getByRole('button', { name: /Confirm/i })).toHaveCount(0);
+    await window.getByRole('button', { name: /Confirm/i }).click();
+
+    await expect(window.getByRole('heading', { name: /Create a New Flare Project/i })).toHaveCount(0);
+    await expect(window.getByRole('button', { name: /Confirm/i })).toHaveCount(0);
   } finally {
     await electronApp.close();
+    await stopViteServer(viteProcess);
   }
 });

@@ -91,6 +91,7 @@ const AppControls: React.FC<Props> = ({
             variant="outline"
             disabled={isManuallySaving || isPreparingNewMap}
             size="sm"
+            aria-label="Save project"
           >
             {isManuallySaving ? (
               <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />

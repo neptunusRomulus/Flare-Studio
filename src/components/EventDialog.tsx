@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,12 +30,23 @@ type EventData = {
     minLevel: number;
     itemId: string;
     itemQuantity: number;
+    notItemId: string;
+    notItemQuantity: number;
     currency: number;
   };
   rewards: {
     message: string;
     expReward: number;
-    itemReward: string;
+    rewardCurrency: number;
+    removeCurrency: number;
+    rewardItemId: string;
+    rewardItemQuantity: number;
+    removeItemId: string;
+    removeItemQuantity: number;
+    lootGroup: string;
+    rewardLootGroup: string;
+    rewardLootCountMin: number;
+    rewardLootCountMax: number;
     enemySpawn: string;
     teleportMap: string;
     teleportX: number;
@@ -119,12 +130,19 @@ const ACTIVATION_TO_FLARE: Record<string, string> = {
 
 const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLocation: _eventLocation, editingEventId }) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { mapName: currentMapName, mapWidth, mapHeight, editor, syncMapObjectsWrapper, controls } = useAppContext() as any;
+  const { mapName: currentMapName, mapWidth, mapHeight, editor, syncMapObjectsWrapper, controls, itemsList = [] } = useAppContext() as any;
+  const itemGroups = useMemo(() => (itemsList as any[]).filter((item) => item.role === 'loot_groups'), [itemsList]);
+  const inventoryItems = useMemo(() => (itemsList as any[]).filter((item) => item.role !== 'loot_groups'), [itemsList]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const currentProjectPath: string | null = (controls as any)?.currentProjectPath ?? null;
   const [projectMaps, setProjectMaps] = useState<string[]>([]);
 
   const isEditing = editingEventId != null;
+
+  const parseItemValue = (value: string) => {
+    const [id, quantity] = value.split(/[: ,]/).map((part) => part.trim());
+    return { id: id || '', quantity: parseInt(quantity || '1', 10) || 1 };
+  };
 
   const buildProps = (): Record<string, string | string[]> => {
     const { coordinates, size, hotspot } = eventData.positioning;
@@ -152,10 +170,27 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
     if (eventData.requirements.itemId.trim()) {
       props.requires_item = `${eventData.requirements.itemId.trim()}:${eventData.requirements.itemQuantity}`;
     }
+    if (eventData.requirements.notItemId.trim()) {
+      props.requires_not_item = `${eventData.requirements.notItemId.trim()}:${eventData.requirements.notItemQuantity}`;
+    }
     if (eventData.requirements.currency > 0) props.requires_currency = String(eventData.requirements.currency);
     if (eventData.rewards.message.trim()) props.msg = eventData.rewards.message.trim();
     if (eventData.rewards.expReward > 0) props.reward_xp = String(eventData.rewards.expReward);
-    if (eventData.rewards.itemReward.trim()) props.reward_item = eventData.rewards.itemReward.trim();
+    if (eventData.rewards.rewardCurrency > 0) props.reward_currency = String(eventData.rewards.rewardCurrency);
+    if (eventData.rewards.removeCurrency > 0) props.remove_currency = String(eventData.rewards.removeCurrency);
+    if (eventData.rewards.rewardItemId.trim()) {
+      props.reward_item = `${eventData.rewards.rewardItemId.trim()}:${eventData.rewards.rewardItemQuantity}`;
+    }
+    if (eventData.rewards.removeItemId.trim()) {
+      props.remove_item = `${eventData.rewards.removeItemId.trim()}:${eventData.rewards.removeItemQuantity}`;
+    }
+    if (eventData.rewards.lootGroup.trim()) {
+      props.loot = eventData.rewards.lootGroup.trim();
+    }
+    if (eventData.rewards.rewardLootGroup.trim()) {
+      props.reward_loot = eventData.rewards.rewardLootGroup.trim();
+      props.reward_loot_count = `${eventData.rewards.rewardLootCountMin},${eventData.rewards.rewardLootCountMax}`;
+    }
     if (eventData.rewards.enemySpawn.trim()) props.spawn = eventData.rewards.enemySpawn.trim();
     if (eventData.rewards.teleportMap.trim()) {
       let mapFile = eventData.rewards.teleportMap.trim();
@@ -242,12 +277,23 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
       minLevel: 0,
       itemId: '',
       itemQuantity: 1,
+      notItemId: '',
+      notItemQuantity: 1,
       currency: 0,
     },
     rewards: {
       message: '',
       expReward: 0,
-      itemReward: '',
+      rewardCurrency: 0,
+      removeCurrency: 0,
+      rewardItemId: '',
+      rewardItemQuantity: 1,
+      removeItemId: '',
+      removeItemQuantity: 1,
+      lootGroup: '',
+      rewardLootGroup: '',
+      rewardLootCountMin: 1,
+      rewardLootCountMax: 1,
       enemySpawn: '',
       teleportMap: '',
       teleportX: 0,
@@ -294,7 +340,11 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
           ? { x: hotParts[0], y: hotParts[1], width: hotParts[2], height: hotParts[3] }
           : { x: 0, y: 0, width: 1, height: 1 };
         // Parse requires_item "id:qty"
-        const reqItemParts = (p.requires_item || '').split(':');
+        const reqItemParts = parseItemValue(p.requires_item || '');
+        const reqNotItemParts = parseItemValue(p.requires_not_item || '');
+        const rewardItemParts = parseItemValue(p.reward_item || '');
+        const removeItemParts = parseItemValue(p.remove_item || '');
+        const rewardLootCountParts = (p.reward_loot_count || '').split(',').map((part: string) => parseInt(part.trim(), 10) || 0);
         // Parse intermap "map,x,y"
         const intermapParts = (p.intermap || '').split(',');
         // Parse cooldown/delay (remove "ms" suffix)
@@ -321,14 +371,25 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                 ? [String(p.requires_status).trim()]
                 : [],
             minLevel: parseInt(p.requires_level || '0') || 0,
-            itemId: reqItemParts[0] || '',
-            itemQuantity: parseInt(reqItemParts[1] || '1') || 1,
+            itemId: reqItemParts.id,
+            itemQuantity: reqItemParts.quantity,
+            notItemId: reqNotItemParts.id,
+            notItemQuantity: reqNotItemParts.quantity,
             currency: parseInt(p.requires_currency || '0') || 0,
           },
           rewards: {
             message: p.msg || '',
             expReward: parseInt(p.reward_xp || '0') || 0,
-            itemReward: p.reward_item || '',
+            rewardCurrency: parseInt(p.reward_currency || '0') || 0,
+            removeCurrency: parseInt(p.remove_currency || '0') || 0,
+            rewardItemId: rewardItemParts.id,
+            rewardItemQuantity: rewardItemParts.quantity,
+            removeItemId: removeItemParts.id,
+            removeItemQuantity: removeItemParts.quantity,
+            lootGroup: p.loot || '',
+            rewardLootGroup: p.reward_loot || '',
+            rewardLootCountMin: rewardLootCountParts[0] || 1,
+            rewardLootCountMax: rewardLootCountParts[1] || (rewardLootCountParts[0] || 1),
             enemySpawn: p.spawn || '',
             teleportMap: intermapParts.length >= 3 ? intermapParts[0].replace(/^\/?(maps\/)/i, '').replace(/\.txt$/i, '') : (p.intermap || '').replace(/^\/?(maps\/)/i, '').replace(/\.txt$/i, ''),
             teleportX: intermapParts.length >= 3 ? parseInt(intermapParts[1]) || 0 : 0,
@@ -358,8 +419,8 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
           hotspot: { x: 0, y: 0, width: 1, height: 1 },
         },
         timing: { activeActivation: null, cooldown: 0, delay: 0 },
-        requirements: { status: [], minLevel: 0, itemId: '', itemQuantity: 1, currency: 0 },
-        rewards: { message: '', expReward: 0, itemReward: '', enemySpawn: '', teleportMap: '', teleportX: 0, teleportY: 0, sound: '' },
+        requirements: { status: [], minLevel: 0, itemId: '', itemQuantity: 1, notItemId: '', notItemQuantity: 1, currency: 0 },
+        rewards: { message: '', expReward: 0, rewardCurrency: 0, removeCurrency: 0, rewardItemId: '', rewardItemQuantity: 1, removeItemId: '', removeItemQuantity: 1, lootGroup: '', rewardLootGroup: '', rewardLootCountMin: 1, rewardLootCountMax: 1, enemySpawn: '', teleportMap: '', teleportX: 0, teleportY: 0, sound: '' },
         engine: { chance: 100, autoSave: false, script: '' },
       });
     }
@@ -933,41 +994,106 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
               </div>
             </div>
 
-            {/* Item */}
+            {/* Item requirements */}
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <label className="text-xs font-medium text-foreground/80">Item Requirement</label>
-                <Tooltip content="Checks for a specific item (and quantity) in the inventory">
+                <label className="text-xs font-medium text-foreground/80">Item Requirements</label>
+                <Tooltip content="Require or forbid a specific inventory item for this event">
                   <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
                 </Tooltip>
               </div>
-              <div className="grid gap-2 sm:grid-cols-2">
-                <Input
-                  value={eventData.requirements.itemId}
-                  onChange={e =>
-                    setEventData(prev => ({
-                      ...prev,
-                      requirements: { ...prev.requirements, itemId: e.target.value },
-                    }))
-                  }
-                  placeholder="Item ID"
-                  className="h-7 text-xs"
-                />
-                <div>
-                  <label className="text-[10px] text-muted-foreground">Quantity</label>
-                  <Input
-                    type="number"
-                    min="1"
-                    value={eventData.requirements.itemQuantity}
-                    onChange={e =>
-                      setEventData(prev => ({
-                        ...prev,
-                        requirements: { ...prev.requirements, itemQuantity: Math.max(1, parseInt(e.target.value) || 1) },
-                      }))
-                    }
-                    className="h-7 text-xs"
-                  />
-                </div>
+              <div className="overflow-hidden rounded-md border border-border">
+                <table className="min-w-full text-left text-xs">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="px-2 py-2">Condition</th>
+                      <th className="px-2 py-2">Item</th>
+                      <th className="px-2 py-2">Qty</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    <tr>
+                      <td className="px-2 py-2">Requires item</td>
+                      <td className="px-2 py-2">
+                        <Select
+                          value={eventData.requirements.itemId}
+                          onValueChange={(value) =>
+                            setEventData(prev => ({
+                              ...prev,
+                              requirements: { ...prev.requirements, itemId: value === '__none__' ? '' : value },
+                            }))
+                          }
+                        >
+                          <SelectTrigger className="h-8 text-xs w-full">
+                            <SelectValue placeholder="Select item" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__" className="text-xs">None</SelectItem>
+                            {inventoryItems.map((item: any) => (
+                              <SelectItem key={item.id} value={String(item.id)} className="text-xs">
+                                {String(item.id)} {item.name || item.fileName || ''}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </td>
+                      <td className="px-2 py-2">
+                        <Input
+                          type="number"
+                          min="1"
+                          value={eventData.requirements.itemQuantity}
+                          onChange={e =>
+                            setEventData(prev => ({
+                              ...prev,
+                              requirements: { ...prev.requirements, itemQuantity: Math.max(1, parseInt(e.target.value) || 1) },
+                            }))
+                          }
+                          className="h-7 text-xs w-full"
+                        />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="px-2 py-2">Requires not item</td>
+                      <td className="px-2 py-2">
+                        <Select
+                          value={eventData.requirements.notItemId}
+                          onValueChange={(value) =>
+                            setEventData(prev => ({
+                              ...prev,
+                              requirements: { ...prev.requirements, notItemId: value === '__none__' ? '' : value },
+                            }))
+                          }
+                        >
+                          <SelectTrigger className="h-8 text-xs w-full">
+                            <SelectValue placeholder="Select item" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__" className="text-xs">None</SelectItem>
+                            {inventoryItems.map((item: any) => (
+                              <SelectItem key={`not-${item.id}`} value={String(item.id)} className="text-xs">
+                                {String(item.id)} {item.name || item.fileName || ''}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </td>
+                      <td className="px-2 py-2">
+                        <Input
+                          type="number"
+                          min="1"
+                          value={eventData.requirements.notItemQuantity}
+                          onChange={e =>
+                            setEventData(prev => ({
+                              ...prev,
+                              requirements: { ...prev.requirements, notItemQuantity: Math.max(1, parseInt(e.target.value) || 1) },
+                            }))
+                          }
+                          className="h-7 text-xs w-full"
+                        />
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             </div>
 
@@ -1033,20 +1159,223 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
               />
             </div>
 
-            {/* Item Reward */}
+            {/* Inventory and Loot Effects */}
             <div className="space-y-2">
-              <label className="text-xs font-medium text-foreground/80">Item Reward</label>
-              <Input
-                value={eventData.rewards.itemReward}
-                onChange={e =>
-                  setEventData(prev => ({
-                    ...prev,
-                    rewards: { ...prev.rewards, itemReward: e.target.value },
-                  }))
-                }
-                placeholder="Item ID"
-                className="h-7 text-xs"
-              />
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-medium text-foreground/80">Inventory & Loot Effects</label>
+                <Tooltip content="Take or give items, currency, or item groups when this event triggers">
+                  <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                </Tooltip>
+              </div>
+              <div className="overflow-hidden rounded-md border border-border">
+                <table className="min-w-full text-left text-xs">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="px-2 py-2">Effect</th>
+                      <th className="px-2 py-2">Item / Group</th>
+                      <th className="px-2 py-2">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    <tr>
+                      <td className="px-2 py-2">Give gold</td>
+                      <td className="px-2 py-2 text-muted-foreground">Currency</td>
+                      <td className="px-2 py-2">
+                        <Input
+                          type="number"
+                          min="0"
+                          value={eventData.rewards.rewardCurrency}
+                          onChange={e =>
+                            setEventData(prev => ({
+                              ...prev,
+                              rewards: { ...prev.rewards, rewardCurrency: Math.max(0, parseInt(e.target.value) || 0) },
+                            }))
+                          }
+                          className="h-7 text-xs w-full"
+                        />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="px-2 py-2">Take gold</td>
+                      <td className="px-2 py-2 text-muted-foreground">Currency</td>
+                      <td className="px-2 py-2">
+                        <Input
+                          type="number"
+                          min="0"
+                          value={eventData.rewards.removeCurrency}
+                          onChange={e =>
+                            setEventData(prev => ({
+                              ...prev,
+                              rewards: { ...prev.rewards, removeCurrency: Math.max(0, parseInt(e.target.value) || 0) },
+                            }))
+                          }
+                          className="h-7 text-xs w-full"
+                        />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="px-2 py-2">Give item</td>
+                      <td className="px-2 py-2">
+                        <Select
+                          value={eventData.rewards.rewardItemId}
+                          onValueChange={(value) =>
+                            setEventData(prev => ({
+                              ...prev,
+                              rewards: { ...prev.rewards, rewardItemId: value === '__none__' ? '' : value },
+                            }))
+                          }
+                        >
+                          <SelectTrigger className="h-8 text-xs w-full">
+                            <SelectValue placeholder="Select item" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__" className="text-xs">None</SelectItem>
+                            {inventoryItems.map((item: any) => (
+                              <SelectItem key={`give-${item.id}`} value={String(item.id)} className="text-xs">
+                                {String(item.id)} {item.name || item.fileName || ''}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </td>
+                      <td className="px-2 py-2">
+                        <Input
+                          type="number"
+                          min="1"
+                          value={eventData.rewards.rewardItemQuantity}
+                          onChange={e =>
+                            setEventData(prev => ({
+                              ...prev,
+                              rewards: { ...prev.rewards, rewardItemQuantity: Math.max(1, parseInt(e.target.value) || 1) },
+                            }))
+                          }
+                          className="h-7 text-xs w-full"
+                        />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="px-2 py-2">Take item</td>
+                      <td className="px-2 py-2">
+                        <Select
+                          value={eventData.rewards.removeItemId}
+                          onValueChange={(value) =>
+                            setEventData(prev => ({
+                              ...prev,
+                              rewards: { ...prev.rewards, removeItemId: value === '__none__' ? '' : value },
+                            }))
+                          }
+                        >
+                          <SelectTrigger className="h-8 text-xs w-full">
+                            <SelectValue placeholder="Select item" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__" className="text-xs">None</SelectItem>
+                            {inventoryItems.map((item: any) => (
+                              <SelectItem key={`take-${item.id}`} value={String(item.id)} className="text-xs">
+                                {String(item.id)} {item.name || item.fileName || ''}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </td>
+                      <td className="px-2 py-2">
+                        <Input
+                          type="number"
+                          min="1"
+                          value={eventData.rewards.removeItemQuantity}
+                          onChange={e =>
+                            setEventData(prev => ({
+                              ...prev,
+                              rewards: { ...prev.rewards, removeItemQuantity: Math.max(1, parseInt(e.target.value) || 1) },
+                            }))
+                          }
+                          className="h-7 text-xs w-full"
+                        />
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="px-2 py-2">Loot table</td>
+                      <td className="px-2 py-2" colSpan={2}>
+                        <Select
+                          value={eventData.rewards.lootGroup}
+                          onValueChange={(value) =>
+                            setEventData(prev => ({
+                              ...prev,
+                              rewards: { ...prev.rewards, lootGroup: value === '__none__' ? '' : value },
+                            }))
+                          }
+                        >
+                          <SelectTrigger className="h-8 text-xs w-full">
+                            <SelectValue placeholder="Select loot group" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__" className="text-xs">None</SelectItem>
+                            {itemGroups.map((group: any) => (
+                              <SelectItem key={`loot-${group.id}`} value={String(group.id)} className="text-xs">
+                                {String(group.id)} {group.name || group.fileName || ''}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td className="px-2 py-2">Random loot reward</td>
+                      <td className="px-2 py-2">
+                        <Select
+                          value={eventData.rewards.rewardLootGroup}
+                          onValueChange={(value) =>
+                            setEventData(prev => ({
+                              ...prev,
+                              rewards: { ...prev.rewards, rewardLootGroup: value === '__none__' ? '' : value },
+                            }))
+                          }
+                        >
+                          <SelectTrigger className="h-8 text-xs w-full">
+                            <SelectValue placeholder="Select loot group" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__none__" className="text-xs">None</SelectItem>
+                            {itemGroups.map((group: any) => (
+                              <SelectItem key={`reward-loot-${group.id}`} value={String(group.id)} className="text-xs">
+                                {String(group.id)} {group.name || group.fileName || ''}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </td>
+                      <td className="px-2 py-2 grid grid-cols-2 gap-1">
+                        <Input
+                          type="number"
+                          min="1"
+                          value={eventData.rewards.rewardLootCountMin}
+                          onChange={e =>
+                            setEventData(prev => ({
+                              ...prev,
+                              rewards: { ...prev.rewards, rewardLootCountMin: Math.max(1, parseInt(e.target.value) || 1) },
+                            }))
+                          }
+                          className="h-7 text-xs w-full"
+                          placeholder="Min"
+                        />
+                        <Input
+                          type="number"
+                          min="1"
+                          value={eventData.rewards.rewardLootCountMax}
+                          onChange={e =>
+                            setEventData(prev => ({
+                              ...prev,
+                              rewards: { ...prev.rewards, rewardLootCountMax: Math.max(1, parseInt(e.target.value) || 1) },
+                            }))
+                          }
+                          className="h-7 text-xs w-full"
+                          placeholder="Max"
+                        />
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             {/* Enemy Spawn */}

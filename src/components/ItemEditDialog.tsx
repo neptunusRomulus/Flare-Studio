@@ -5,9 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Tooltip from '@/components/ui/tooltip';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
-import { AlertTriangle, Apple, Book, Box, Check, ChevronDown, ChevronRight, Coins, Folder, Gift, HelpCircle, Key, Layers, Save, Shield, Sparkles, Sword, Tag, Trash2, Volume2, X, Zap } from 'lucide-react';
+import { Apple, Book, Box, Check, ChevronDown, ChevronRight, Coins, Folder, Gift, HelpCircle, Key, Layers, Save, Shield, Sparkles, Sword, Tag, Trash2, Volume2, X, Zap } from 'lucide-react';
 import { ITEM_ROLE_META, ITEM_ROLE_SELECTIONS, RESOURCE_SUBTYPE_META } from '@/editor/itemRoles';
-import type { ItemResourceSubtype, ItemRole } from '@/editor/itemRoles';
+import type { ItemResourceSubtype } from '@/editor/itemRoles';
 
 const RoleIcon = ({ roleId, className }: { roleId: string; className?: string }) => {
   switch (roleId) {
@@ -95,7 +95,7 @@ const CollapsibleSection = ({
   className = ""
 }: {
   title: string;
-  icon: any;
+  icon: React.ElementType;
   children: React.ReactNode;
   defaultOpen?: boolean;
   className?: string;
@@ -233,9 +233,9 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
               <div className="pt-2">
                 <label className="text-xs text-muted-foreground block mb-2">Category (Role)</label>
                 <div className="flex flex-wrap gap-1.5">
-                  {ITEM_ROLE_SELECTIONS.map((roleOpt) => {
+                  {ITEM_ROLE_SELECTIONS.filter((roleOpt) => roleOpt.id !== 'loot_groups').map((roleOpt) => {
                     const isActive = (editingItem.role || 'unspecified') === roleOpt.id;
-                    const meta = ITEM_ROLE_META[roleOpt.id];
+                    // const meta = ITEM_ROLE_META[roleOpt.id];
                     return (
                       <Tooltip key={roleOpt.id} content={roleOpt.description} side="bottom">
                         <Button

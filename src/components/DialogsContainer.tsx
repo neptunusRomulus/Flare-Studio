@@ -4,6 +4,7 @@ import AbilityDialogContainer from '@/components/AbilityDialogContainer';
 import ActorDialogContainer from '@/components/ActorDialogContainer';
 import ItemDialogContainer from '@/components/ItemDialogContainer';
 import ItemEditDialogContainer from '@/components/ItemEditDialogContainer';
+import LootGroupEditDialogContainer from '@/components/LootGroupEditDialogContainer';
 import VendorDialogsContainer from '@/components/VendorDialogsContainer';
 import ObjectManagementDialogContainer from '@/components/ObjectManagementDialogContainer';
 import DialogueTreeDialogContainer from '@/components/DialogueTreeDialogContainer';
@@ -51,6 +52,7 @@ export default function DialogsContainer({ ctx }: { ctx: unknown }) {
 
       <ItemDialogContainer ctx={ctx as any} />
       <ItemEditDialogContainer ctx={ctx as any} />
+      <LootGroupEditDialogContainer ctx={ctx as any} />
 
       <ObjectManagementDialogContainer ctx={ctx as any} />
 

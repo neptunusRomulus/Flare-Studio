@@ -98,6 +98,7 @@ declare global {
       saveEnemyPreset: (projectPath: string, filename: string, content: string) => Promise<boolean>;
       // Generic filesystem helpers for renderer
       createFolderIfNotExists: (folderPath: string) => Promise<boolean>;
+      readFile: (filePath: string) => Promise<string | null>;
       writeFile: (filePath: string, content: string) => Promise<boolean>;
       readDir: (dirPath: string) => Promise<Array<{ name: string; isDirectory: boolean }>>;
       getProjectFolder: () => Promise<string | null>;

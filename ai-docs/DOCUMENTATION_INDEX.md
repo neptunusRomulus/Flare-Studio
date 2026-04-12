@@ -15,7 +15,14 @@ Complete implementation of a 5-phase save system robustness initiative for the F
 - **Best for**: Project managers, stakeholders, overview seekers
 - **Read time**: 10-15 minutes
 
-### 2. Deployment Guide
+### 2. Test Coverage Catalog
+**[TEST_COVERAGE_SUMMARY.md](TEST_COVERAGE_SUMMARY.md)**
+- Central catalog of current Playwright and Vitest coverage
+- Runner commands, current suite, and coverage gaps
+- **Best for**: QA, testers, developers, and agents verifying test status
+- **Read time**: 5-10 minutes
+
+### 3. Deployment Guide
 **[DEPLOYMENT_CHECKLIST.md](DEPLOYMENT_CHECKLIST.md)**
 - Pre-deployment verification
 - Feature checklist (all 5 phases)

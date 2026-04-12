@@ -2,6 +2,133 @@ import { useCallback, useEffect, useState } from 'react';
 import type { ItemRole, ItemResourceSubtype } from '../editor/itemRoles';
 import type { RawItem, ItemSummary } from '@/utils/items';
 
+const safeString = (value: unknown) => {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  return '';
+};
+
+const slugify = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+
+const normalizePathForJoin = (input: string) => input.replace(/\\/g, '/');
+
+const formatLootStringValue = (value: unknown) => {
+  if (Array.isArray(value)) return value.map(safeString).join(',');
+  return safeString(value);
+};
+
+export const serializeLootGroupText = (data: Record<string, unknown>) => {
+  const lines: string[] = [];
+  const id = safeString(data.id ?? data.name);
+  const name = safeString(data.name);
+  const description = safeString(data.description);
+  const manualLootEntries = Array.isArray(data.loot) ? data.loot as Array<Record<string, unknown>> : data.loot ? [data.loot as Record<string, unknown>] : [];
+  const lootContents = data.loot_contents as Record<string, number> | undefined;
+  const globalChance = safeString(data.loot_chance_value);
+  const globalFixed = data.loot_chance_fixed === true;
+  const globalRequiresStatus = safeString(data.requires_status);
+  const globalRequiresLevel = safeString(data.requires_level);
+  const globalQuantityPerLevel = safeString(data.quantity_per_level);
+
+  if (id) lines.push(`id=${id}`);
+  if (name) lines.push(`name=${name}`);
+  if (description) lines.push(`description=${description}`);
+
+  const appendLootEntry = (entry: Record<string, unknown>) => {
+    const rawStatusLoot = safeString(entry.status_loot);
+    if (rawStatusLoot) {
+      lines.push(`status_loot=${rawStatusLoot}`);
+      lines.push('');
+      return;
+    }
+
+    const lootId = safeString(entry['loot.id']);
+    if (!lootId) return;
+
+    lines.push('[loot]');
+    lines.push(`id=${lootId}`);
+
+    const chance = safeString(entry['loot.chance'] ?? (globalFixed ? 'fixed' : globalChance));
+    if (chance) lines.push(`chance=${chance}`);
+
+    const quantity = formatLootStringValue(entry['loot.quantity']);
+    if (quantity) lines.push(`quantity=${quantity}`);
+
+    const requiresStatus = safeString(entry['loot.requires_status'] ?? globalRequiresStatus);
+    if (requiresStatus) lines.push(`requires_status=${requiresStatus}`);
+
+    const requiresLevel = formatLootStringValue(entry['loot.requires_level'] ?? globalRequiresLevel);
+    if (requiresLevel) lines.push(`requires_level=${requiresLevel}`);
+
+    const quantityPerLevel = formatLootStringValue(entry['loot.quantity_per_level'] ?? globalQuantityPerLevel);
+    if (quantityPerLevel) lines.push(`quantity_per_level=${quantityPerLevel}`);
+
+    lines.push('');
+  };
+
+  manualLootEntries.forEach(appendLootEntry);
+
+  if (lootContents) {
+    for (const [itemId, quantity] of Object.entries(lootContents)) {
+      appendLootEntry({
+        'loot.id': itemId,
+        'loot.quantity': quantity,
+      });
+    }
+  }
+
+  return lines.join('\n').trim() + '\n';
+};
+
+export const parseLootGroupText = (content: string) => {
+  const data: Record<string, unknown> = {};
+  const lootEntries: Array<Record<string, unknown>> = [];
+  let currentEntry: Record<string, unknown> | null = null;
+
+  for (const rawLine of content.split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith('#') || line.startsWith(';')) continue;
+
+    if (line.toLowerCase() === '[loot]') {
+      currentEntry = {};
+      lootEntries.push(currentEntry);
+      continue;
+    }
+
+    const eqIndex = line.indexOf('=');
+    if (eqIndex < 0) continue;
+
+    const key = line.substring(0, eqIndex).trim();
+    const value = line.substring(eqIndex + 1).trim();
+
+    if (!currentEntry) {
+      if (key === 'name') data.name = value;
+      else if (key === 'id') data.id = value;
+      else if (key === 'description') data.description = value;
+      else if (key === 'status_loot') {
+        lootEntries.push({ status_loot: value });
+      }
+      continue;
+    }
+
+    if (key === 'id') currentEntry['loot.id'] = value;
+    else if (key === 'chance') currentEntry['loot.chance'] = value;
+    else if (key === 'quantity') currentEntry['loot.quantity'] = value;
+    else if (key === 'requires_status') currentEntry['loot.requires_status'] = value;
+    else if (key === 'requires_level') currentEntry['loot.requires_level'] = value;
+    else if (key === 'quantity_per_level') currentEntry['loot.quantity_per_level'] = value;
+    else if (key === 'status_loot') currentEntry.status_loot = value;
+  }
+
+  if (lootEntries.length) data.loot = lootEntries;
+  return data;
+};
+
 type PendingDuplicate = {
   name: string;
   targetRole: ItemRole;
@@ -34,6 +161,10 @@ export default function useItems({ currentProjectPath, toast, normalizeItemsForS
   const [showItemEditDialog, setShowItemEditDialog] = useState(false);
   const [editingItem, setEditingItem] = useState<ItemEdit>(null);
 
+  const [showLootGroupEditDialog, setShowLootGroupEditDialog] = useState(false);
+  const [lootGroupEditingItem, setLootGroupEditingItem] = useState<ItemSummary | null>(null);
+  const [lootGroupEditingData, setLootGroupEditingData] = useState<Record<string, unknown> | null>(null);
+
   const handleOpenItemDialog = useCallback(async () => {
     setItemDialogState({ name: '', role: 'equipment', resourceSubtype: 'material' });
     setItemDialogError(null);
@@ -50,6 +181,10 @@ export default function useItems({ currentProjectPath, toast, normalizeItemsForS
       return { ...prev, [field]: value };
     });
     setItemDialogError(null);
+  }, []);
+
+  const updateLootGroupField = useCallback((key: string, value: unknown) => {
+    setLootGroupEditingData((prev) => (prev ? { ...prev, [key]: value } : prev));
   }, []);
 
   const refreshItemsList = useCallback(async (projectPath: string | null) => {
@@ -170,6 +305,48 @@ export default function useItems({ currentProjectPath, toast, normalizeItemsForS
   }, [performCreateItem]);
 
   const handleOpenItemEdit = useCallback(async (item: ItemSummary) => {
+    const itemRole = (typeof item.role === 'string' ? item.role : 'unspecified') as ItemRole;
+    if (itemRole === 'loot_groups') {
+      setLootGroupEditingItem(item);
+      setLootGroupEditingData(null);
+      setShowLootGroupEditDialog(false);
+
+      if (window.electronAPI?.readFile) {
+        try {
+          const content = await window.electronAPI.readFile(item.filePath);
+          if (content) {
+            const parsed = parseLootGroupText(content);
+            setLootGroupEditingData({ ...parsed, name: parsed.name ?? item.name, id: parsed.id ?? item.name });
+          } else {
+            setLootGroupEditingData({ name: item.name });
+          }
+        } catch (err) {
+          console.error('Error reading item group file:', err);
+          toast({ title: 'Error', description: 'Failed to read item group file.', variant: 'destructive' });
+          setLootGroupEditingData({ name: item.name });
+        }
+      } else if (window.electronAPI?.readItemFile) {
+        try {
+          const result = await window.electronAPI.readItemFile(item.filePath);
+          if (result.success && result.data) {
+            const d = result.data as Record<string, unknown>;
+            setLootGroupEditingData({ ...d, name: d.name ?? item.name });
+          } else {
+            setLootGroupEditingData({ name: item.name });
+          }
+        } catch (err) {
+          console.error('Error reading item group file:', err);
+          toast({ title: 'Error', description: 'Failed to read item group file.', variant: 'destructive' });
+          setLootGroupEditingData({ name: item.name });
+        }
+      } else {
+        setLootGroupEditingData({ name: item.name });
+      }
+
+      setShowLootGroupEditDialog(true);
+      return;
+    }
+
     if (window.electronAPI?.readItemFile) {
       try {
         const result = await window.electronAPI.readItemFile(item.filePath);
@@ -315,6 +492,63 @@ export default function useItems({ currentProjectPath, toast, normalizeItemsForS
     setEditingItem(null);
   }, []);
 
+  const handleCloseLootGroupEdit = useCallback(() => {
+    setShowLootGroupEditDialog(false);
+    setLootGroupEditingItem(null);
+    setLootGroupEditingData(null);
+  }, []);
+
+  const handleSaveLootGroupEdit = useCallback(async () => {
+    if (!lootGroupEditingItem || !lootGroupEditingData) return;
+    try {
+      const id = safeString(lootGroupEditingData.id ?? lootGroupEditingData.name);
+      if (!id) {
+        toast({ title: 'Error', description: 'Item group must have an ID or name before saving.', variant: 'destructive' });
+        return;
+      }
+
+      let targetFilePath = safeString(lootGroupEditingItem.filePath);
+      const normalizedProjectPath = currentProjectPath ? normalizePathForJoin(currentProjectPath) : null;
+      const normalizedId = slugify(id);
+
+      if (!targetFilePath.toLowerCase().endsWith('.txt') || !targetFilePath.includes('/loot/')) {
+        if (!normalizedProjectPath || !window.electronAPI?.createFolderIfNotExists || !window.electronAPI?.writeFile) {
+          toast({ title: 'Error', description: 'Unable to save item group: missing project path or file APIs.', variant: 'destructive' });
+          return;
+        }
+        const lootFolder = `${normalizedProjectPath}/mods/default/loot`;
+        const created = await window.electronAPI.createFolderIfNotExists(lootFolder);
+        if (!created) {
+          toast({ title: 'Error', description: 'Unable to create loot folder.', variant: 'destructive' });
+          return;
+        }
+        targetFilePath = `${lootFolder}/${normalizedId}.txt`;
+      }
+
+      const content = serializeLootGroupText({
+        ...lootGroupEditingData,
+        id: normalizedId,
+        name: safeString(lootGroupEditingData.name ?? lootGroupEditingItem.name),
+      });
+
+      if (!window.electronAPI?.writeFile) {
+        toast({ title: 'Error', description: 'Filesystem write API is unavailable.', variant: 'destructive' });
+        return;
+      }
+
+      const saved = await window.electronAPI.writeFile(targetFilePath, content);
+      if (saved) {
+        toast({ title: 'Item Group Saved', description: `${lootGroupEditingItem.name} has been updated.` });
+        handleCloseLootGroupEdit();
+      } else {
+        toast({ title: 'Error', description: 'Failed to save item group file.', variant: 'destructive' });
+      }
+    } catch (err) {
+      console.error('Error saving item group:', err);
+      toast({ title: 'Error', description: 'Failed to save item group file.', variant: 'destructive' });
+    }
+  }, [lootGroupEditingItem, lootGroupEditingData, currentProjectPath, toast, handleCloseLootGroupEdit]);
+
   const handleSaveItemEdit = useCallback(async () => {
     if (!editingItem || !window.electronAPI?.writeItemFile) return;
     const payload = { ...editingItem, item_type: editingItem.role || editingItem.item_type };
@@ -367,6 +601,12 @@ export default function useItems({ currentProjectPath, toast, normalizeItemsForS
     handleOpenItemEdit,
     handleCloseItemEdit,
     handleSaveItemEdit,
-    updateEditingItemField
+    updateEditingItemField,
+    showLootGroupEditDialog,
+    lootGroupEditingItem,
+    lootGroupEditingData,
+    updateLootGroupField,
+    handleCloseLootGroupEdit,
+    handleSaveLootGroupEdit
   };
 }

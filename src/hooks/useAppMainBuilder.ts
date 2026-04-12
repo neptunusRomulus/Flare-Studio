@@ -1566,7 +1566,6 @@ export default function useAppMainBuilder() {
       showLootGroupEditDialog: itemsHook.showLootGroupEditDialog,
       lootGroupEditingItem: itemsHook.lootGroupEditingItem,
       lootGroupEditingData: itemsHook.lootGroupEditingData,
-      itemsList: itemsHook.itemsList,
       updateLootGroupField: itemsHook.updateLootGroupField,
       handleCloseLootGroupEdit: itemsHook.handleCloseLootGroupEdit,
       handleSaveLootGroupEdit: itemsHook.handleSaveLootGroupEdit,

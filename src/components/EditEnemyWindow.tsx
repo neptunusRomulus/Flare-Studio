@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import Tooltip from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,8 @@ import { User, Eye, Sword, Gift, Flag, MapPin, Volume2, HelpCircle, X, Save, Plu
 import type { MapObject } from '@/types';
 import type { LucideIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import useItems from '@/hooks/useItems';
+import { normalizeItemsForState } from '@/utils/items';
 import { Slider } from '@/components/ui/slider';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 
@@ -29,7 +31,11 @@ interface EditEnemyWindowProps {
 
 export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, projectPath = '', inline = false, showCloseConfirm = false, onCloseDecision }: EditEnemyWindowProps) {
   const { toast } = useToast();
-  
+  const itemsHook = useItems({ currentProjectPath: projectPath || null, toast, normalizeItemsForState });
+  const { itemsList = [] } = itemsHook;
+  const itemGroups = useMemo(() => itemsList.filter((item) => item.role === 'loot_groups'), [itemsList]);
+  const lootItems = useMemo(() => itemsList.filter((item) => item.role !== 'loot_groups'), [itemsList]);
+
   const {
     position,
     size,
@@ -171,7 +177,7 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
     // Powers
     // Flare formats power as: power=state,power_id,chance
     if (powers && Array.isArray(powers)) {
-       powers.forEach((p: any) => {
+       powers.forEach((p) => {
          if (p.id) lines.push(`power=${p.state || 'melee'},${p.id},${p.chance || 100}`);
        });
     }
@@ -352,11 +358,90 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
   // Loot
   const [loot, setLoot] = useState<string>(() => enemy?.properties?.loot || '');
   const [lootCount, setLootCount] = useState<string>(() => enemy?.properties?.loot_count || '');
+  const [lootGroup, setLootGroup] = useState<string>(() => '');
+  const [lootSelection, setLootSelection] = useState<Record<number, number>>(() => ({}));
   const [firstDefeatLoot, setFirstDefeatLoot] = useState<string>(() => enemy?.properties?.first_defeat_loot || '');
 
   // Quest
   const [questLoot, setQuestLoot] = useState<string>(() => enemy?.properties?.quest_loot || '');
   const [defeatStatus, setDefeatStatus] = useState<string>(() => enemy?.properties?.defeat_status || '');
+
+  const buildLootString = useCallback((groupId: string, selection: Record<number, number>) => {
+    const parts: string[] = [];
+    if (groupId) {
+      parts.push(groupId);
+    }
+    Object.entries(selection)
+      .filter(([, qty]) => qty > 0)
+      .sort(([a], [b]) => Number(a) - Number(b))
+      .forEach(([id, qty]) => {
+        if (qty > 1) {
+          parts.push(`${id}:${qty}`);
+        } else {
+          parts.push(id);
+        }
+      });
+    return parts.join(',');
+  }, []);
+
+  const handleSelectLootGroup = useCallback((groupId: string) => {
+    const gid = groupId === '__none__' ? '' : groupId;
+    setLootGroup(gid);
+    setLoot(buildLootString(gid, lootSelection));
+  }, [buildLootString, lootSelection]);
+
+  const handleToggleLootItem = useCallback((itemId: number) => {
+    setLootSelection((prev) => {
+      const next = { ...prev };
+      if (next[itemId]) {
+        delete next[itemId];
+      } else {
+        next[itemId] = 1;
+      }
+      setLoot(buildLootString(lootGroup, next));
+      return next;
+    });
+  }, [buildLootString, lootGroup]);
+
+  const handleLootQuantityChange = useCallback((itemId: number, value: string) => {
+    setLootSelection((prev) => {
+      const next = { ...prev };
+      const parsedQty = Math.max(1, Number.parseInt(value, 10) || 1);
+      next[itemId] = parsedQty;
+      setLoot(buildLootString(lootGroup, next));
+      return next;
+    });
+  }, [buildLootString, lootGroup]);
+
+  const handleSelectFirstDefeatLootItem = useCallback((itemId: string) => {
+    setFirstDefeatLoot(itemId);
+  }, []);
+
+  const handleSelectQuestLootItem = useCallback((itemId: string) => {
+    const parts = questLoot.split(',').map((part) => part.trim());
+    const [status = '', notStatus = ''] = parts;
+    setQuestLoot([status, notStatus, itemId].join(','));
+  }, [questLoot]);
+
+  useEffect(() => {
+    if (!open) return;
+    const selection: Record<number, number> = {};
+    let groupId = '';
+    loot.split(',').map((part) => part.trim()).filter(Boolean).forEach((token) => {
+      const group = itemGroups.find((groupItem) => String(groupItem.id) === token || groupItem.name === token);
+      if (group) {
+        groupId = String(group.id);
+        return;
+      }
+      const [idPart, qtyPart] = token.split(':').map((segment) => segment.trim());
+      const idNum = Number.parseInt(idPart, 10);
+      if (!Number.isNaN(idNum)) {
+        selection[idNum] = Math.max(1, Number.parseInt(qtyPart || '1', 10) || 1);
+      }
+    });
+    setLootGroup(groupId);
+    setLootSelection(selection);
+  }, [open, loot, itemGroups]);
 
   // Flags / custom
   const [customPropsRaw, setCustomPropsRaw] = useState<string>(() => {
@@ -612,6 +697,81 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
     { id: 'passive', label: 'Passive' },
   ];
 
+  const enemyPropertyTooltips: Record<string, string> = {
+    name: 'Name',
+    level: 'Level',
+    count: 'Number of enemies spawned together in a group.',
+    include: 'Path to another enemy file to inherit properties from. e.g. enemies/base/goblin.txt',
+    rarity: 'Enemy rarity used for loot and display purposes.',
+    humanoid: 'This creature gives human traits when transformed into, such as the ability to talk with NPCs.',
+    lifeform: 'Determines whether this entity appears as living, such as displaying Dead vs Destroyed when HP reaches 0.',
+    gfx: 'Animation template filename for this enemy.',
+    animations: 'Filename of an animation definition.',
+    tilesetPath: 'Internal tileset source path for enemy rendering.',
+    renderLayers: 'Render layers used by this enemy animation and display.',
+    animationSlots: 'Animation slots assign animations to defined render layers.',
+    sfxAttack: 'Sound effect played when the enemy attacks.',
+    sfxHit: 'Sound effect played when the enemy is hit.',
+    sfxDie: 'Sound effect played when the enemy dies.',
+    sfxCritDie: 'Sound effect played when the enemy dies from a critical hit.',
+    hp: 'Maximum health points for this enemy.',
+    mp: 'Maximum magic points for this enemy.',
+    speed: 'Movement or action speed for this enemy.',
+    accuracy: 'Chance to hit with attacks.',
+    avoidance: 'Chance to dodge incoming attacks.',
+    crit: 'Chance to land a critical hit.',
+    poise: 'Ability to resist stagger or interrupt effects.',
+    absorbMin: 'Minimum absorbed damage on each hit.',
+    absorbMax: 'Maximum absorbed damage on each hit.',
+    stealth: 'Stealth rating, affecting detection and surprise.',
+    reflectChance: 'Chance to reflect a portion of incoming damage.',
+    dmgMeleeMin: 'Minimum melee damage dealt by this enemy.',
+    dmgMeleeMax: 'Maximum melee damage dealt by this enemy.',
+    meleeRange: 'Effective melee attack range.',
+    dmgRangedMin: 'Minimum ranged damage dealt by this enemy.',
+    dmgRangedMax: 'Maximum ranged damage dealt by this enemy.',
+    cooldown: 'Time between attacks or actions.',
+    cooldownHit: 'Delay before the enemy can act again after being hit.',
+    powersList: 'List of powers this enemy can use.',
+    passivePowers: 'A list of passive powers this creature has.',
+    combatStyle: 'How the creature enters combat. Default engages when in range, aggressive always fights, passive waits until attacked.',
+    threatRange: 'The first value is the engage radius; the second optional value is the stop distance, defaulting to double the first.',
+    fleeRange: 'The radius at which the creature begins fleeing. Defaults to half of the threat range.',
+    turnDelay: 'Duration it takes for this creature to turn and face its target in ms or s.',
+    wanderRadius: 'Radius this creature will wander when not in combat.',
+    chancePursue: 'Percentage chance the creature will chase its target.',
+    chanceFlee: 'Percentage chance the creature will run away from its target.',
+    isFacing: 'Creature can turn to face its target.',
+    isFlying: 'Creature can move over gaps and water.',
+    isIntangible: 'Creature can move through walls.',
+    xp: 'XP awarded upon death.',
+    gold: 'Base gold rewarded when this enemy is defeated.',
+    itemFind: 'Chance to find items on this enemy.',
+    currencyFind: 'Chance to find currency on this enemy.',
+    loot: 'Possible loot that can be dropped on death.',
+    lootCount: 'Minimum and optional maximum number of loot drops from this creature.',
+    firstDefeatLoot: 'Item dropped the first time this creature is defeated. Requires defeat status.',
+    defeatStatus: 'Campaign status set when this enemy dies.',
+    questLoot: 'Item dropped when a campaign status condition is met.',
+  };
+
+  interface LabelWithTooltipProps {
+    field: string;
+    children: React.ReactNode;
+    className?: string;
+  }
+
+  const LabelWithTooltip = ({ field, children, className }: LabelWithTooltipProps) => (
+    <label className={`text-xs text-muted-foreground flex items-center gap-1 ${className || ''}`}>
+      {children}
+      {enemyPropertyTooltips[field] ? (
+        <Tooltip content={enemyPropertyTooltips[field]} side="top">
+          <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+        </Tooltip>
+      ) : null}
+    </label>
+  );
+
   if (!open && !inline) return null;
 
   const CollapsibleSection = ({ title, icon: Icon, isExpanded, onToggle, children, id }: { title: string; icon: LucideIcon; isExpanded: boolean; onToggle: () => void; children: React.ReactNode; id: string }) => (
@@ -641,16 +801,16 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
                     <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1.5 block">Name & Identifiers</label>
                     <div className="space-y-3">
                       <div className="space-y-1">
-                        <label className="text-xs text-muted-foreground">Full Name</label>
+                        <LabelWithTooltip field="name">Full Name</LabelWithTooltip>
                         <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Goblin Warrior" className="h-9" />
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1">
-                          <label className="text-xs text-muted-foreground">Level</label>
+                          <LabelWithTooltip field="level">Level</LabelWithTooltip>
                           <Input type="number" value={level} onChange={(e) => setLevel(Number(e.target.value))} className="h-9" />
                         </div>
                         <div className="space-y-1">
-                          <label className="text-xs text-muted-foreground">Spawn Number</label>
+                          <LabelWithTooltip field="count">Spawn Number</LabelWithTooltip>
                           <Input type="number" value={count} onChange={(e) => setCount(Number(e.target.value))} className="h-9" />
                         </div>
                       </div>
@@ -713,8 +873,8 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
                         <Input value={include} onChange={(e) => setInclude(e.target.value)} placeholder="enemies/base/..." className="h-9 font-mono text-xs" />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-xs text-muted-foreground">Rarity</label>
-                        <Select value={rarity} onValueChange={(v: any) => setRarity(v)}>
+                        <LabelWithTooltip field="rarity">Rarity</LabelWithTooltip>
+                        <Select value={rarity} onValueChange={(v: 'common' | 'uncommon' | 'rare' | 'unique') => setRarity(v)}>
                           <SelectTrigger className="h-9">
                             <SelectValue />
                           </SelectTrigger>
@@ -733,10 +893,16 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
                     <label className="flex items-center gap-2 cursor-pointer group">
                       <input type="checkbox" checked={isHumanoid} onChange={(e) => setIsHumanoid(e.target.checked)} className="h-4 w-4 rounded border-border" />
                       <span className="text-sm">Humanoid</span>
+                      <Tooltip content={enemyPropertyTooltips.humanoid} side="top">
+                        <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                      </Tooltip>
                     </label>
                     <label className="flex items-center gap-2 cursor-pointer group">
                       <input type="checkbox" checked={isLifeform} onChange={(e) => setIsLifeform(e.target.checked)} className="h-4 w-4 rounded border-border" />
                       <span className="text-sm">Lifeform</span>
+                      <Tooltip content={enemyPropertyTooltips.lifeform} side="top">
+                        <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
+                      </Tooltip>
                     </label>
                   </div>
                 </div>
@@ -747,15 +913,15 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
               <div className="grid grid-cols-2 gap-6 animate-in fade-in zoom-in-95 duration-300">
                 <div className="space-y-4">
                   <div className="space-y-1">
-                    <label className="text-xs font-semibold">GFX (Animation Template)</label>
+                    <LabelWithTooltip field="gfx">GFX (Animation Template)</LabelWithTooltip>
                     <Input value={gfx} onChange={(e) => setGfx(e.target.value)} placeholder="e.g. gob_war" className="h-9" />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-semibold">Animations Definition File</label>
+                    <LabelWithTooltip field="animations">Animations Definition File</LabelWithTooltip>
                     <Input value={animations} onChange={(e) => setAnimations(e.target.value)} placeholder="animations/enemies/goblin.txt" className="h-9 font-mono text-xs" />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-semibold">Tileset Source (Internal)</label>
+                    <LabelWithTooltip field="tilesetPath">Tileset Source (Internal)</LabelWithTooltip>
                     <div className="flex gap-2">
                       <Input value={tilesetPath} onChange={(e) => setTilesetPath(e.target.value)} className="h-9 text-xs flex-1" />
                     </div>
@@ -763,11 +929,11 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
                 </div>
                 <div className="space-y-4">
                    <div className="space-y-1">
-                    <label className="text-xs font-semibold">Render Layers</label>
+                    <LabelWithTooltip field="renderLayers">Render Layers</LabelWithTooltip>
                     <Input value={renderLayers} onChange={(e) => setRenderLayers(e.target.value)} placeholder="e.g. floor,object" className="h-9" />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-semibold">Animation Slots</label>
+                    <LabelWithTooltip field="animationSlots">Animation Slots</LabelWithTooltip>
                     <Input value={animationSlots} onChange={(e) => setAnimationSlots(e.target.value)} placeholder="e.g. body,weapon" className="h-9" />
                   </div>
                   <div className="p-4 border border-border/50 rounded-lg bg-muted/10 flex flex-col items-center justify-center min-h-[140px]">
@@ -788,19 +954,19 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
               <div className="space-y-4 animate-in fade-in slide-in-from-left-4 duration-300">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="text-xs font-semibold">Attack SFX</label>
+                    <LabelWithTooltip field="sfxAttack">Attack SFX</LabelWithTooltip>
                     <Input value={sfxAttack} onChange={(e) => setSfxAttack(e.target.value)} placeholder="soundfx/enemies/hit.ogg" className="h-9 text-xs" />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-semibold">Hit SFX</label>
+                    <LabelWithTooltip field="sfxHit">Hit SFX</LabelWithTooltip>
                     <Input value={sfxHit} onChange={(e) => setSfxHit(e.target.value)} placeholder="soundfx/enemies/pain.ogg" className="h-9 text-xs" />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-semibold">Death SFX</label>
+                    <LabelWithTooltip field="sfxDie">Death SFX</LabelWithTooltip>
                     <Input value={sfxDie} onChange={(e) => setSfxDie(e.target.value)} placeholder="soundfx/enemies/die.ogg" className="h-9 text-xs" />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-semibold">Crit Death SFX</label>
+                    <LabelWithTooltip field="sfxCritDie">Crit Death SFX</LabelWithTooltip>
                     <Input value={sfxCritDie} onChange={(e) => setSfxCritDie(e.target.value)} placeholder="soundfx/enemies/crit.ogg" className="h-9 text-xs" />
                   </div>
                 </div>
@@ -811,53 +977,53 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
               <div className="space-y-6 animate-in fade-in duration-300">
                 <div className="grid grid-cols-3 gap-4">
                   <div className="p-3 border rounded-lg bg-muted/10">
-                    <label className="text-[10px] font-bold uppercase text-red-500 mb-1 block">Health</label>
+                    <LabelWithTooltip field="hp">Health</LabelWithTooltip>
                     <Input type="number" value={hp} onChange={(e) => setHp(e.target.value)} className="h-8 text-center font-bold" />
                   </div>
                   <div className="p-3 border rounded-lg bg-muted/10">
-                    <label className="text-[10px] font-bold uppercase text-blue-500 mb-1 block">Mana</label>
+                    <LabelWithTooltip field="mp">Mana</LabelWithTooltip>
                     <Input type="number" value={mp} onChange={(e) => setMp(e.target.value)} className="h-8 text-center" />
                   </div>
                   <div className="p-3 border rounded-lg bg-muted/10">
-                    <label className="text-[10px] font-bold uppercase text-green-500 mb-1 block">Speed</label>
+                    <LabelWithTooltip field="speed">Speed</LabelWithTooltip>
                     <Input type="number" value={speed} onChange={(e) => setSpeed(e.target.value)} className="h-8 text-center" step="0.1" />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-3 gap-4">
                    <div className="space-y-1">
-                    <label className="text-xs font-semibold">Accuracy</label>
+                    <LabelWithTooltip field="accuracy">Accuracy</LabelWithTooltip>
                     <Input type="number" value={accuracy} onChange={(e) => setAccuracy(e.target.value)} className="h-8" />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-semibold">Avoidance</label>
+                    <LabelWithTooltip field="avoidance">Avoidance</LabelWithTooltip>
                     <Input type="number" value={avoidance} onChange={(e) => setAvoidance(e.target.value)} className="h-8" />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-semibold">Crit Rate</label>
+                    <LabelWithTooltip field="crit">Crit Rate</LabelWithTooltip>
                     <Input type="number" value={crit} onChange={(e) => setCrit(e.target.value)} className="h-8" />
                   </div>
                    <div className="space-y-1">
-                    <label className="text-xs font-semibold">Poise</label>
+                    <LabelWithTooltip field="poise">Poise</LabelWithTooltip>
                     <Input type="number" value={poise} onChange={(e) => setPoise(e.target.value)} className="h-8" />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-semibold">Absorb Min</label>
+                    <LabelWithTooltip field="absorbMin">Absorb Min</LabelWithTooltip>
                     <Input type="number" value={absorbMin} onChange={(e) => setAbsorbMin(e.target.value)} className="h-8" />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-semibold">Absorb Max</label>
+                    <LabelWithTooltip field="absorbMax">Absorb Max</LabelWithTooltip>
                     <Input type="number" value={absorbMax} onChange={(e) => setAbsorbMax(e.target.value)} className="h-8" />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 border-t pt-4">
                    <div className="space-y-1">
-                    <label className="text-xs font-semibold">Stealth</label>
+                    <LabelWithTooltip field="stealth">Stealth</LabelWithTooltip>
                     <Input type="number" value={stealth} onChange={(e) => setStealth(e.target.value)} className="h-8" />
                   </div>
                    <div className="space-y-1">
-                    <label className="text-xs font-semibold">Reflect Chance %</label>
+                    <LabelWithTooltip field="reflectChance">Reflect Chance %</LabelWithTooltip>
                     <Input type="number" value={reflectChance} onChange={(e) => setReflectChance(e.target.value)} className="h-8" />
                   </div>
                 </div>
@@ -870,15 +1036,15 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
                   <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">Melee Damage</label>
                   <div className="grid grid-cols-3 gap-4">
                     <div className="space-y-1">
-                      <label className="text-xs text-muted-foreground">Min</label>
+                      <LabelWithTooltip field="dmgMeleeMin">Min</LabelWithTooltip>
                       <Input type="number" value={dmgMeleeMin} onChange={(e) => setDmgMeleeMin(e.target.value)} className="h-9" />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs text-muted-foreground">Max</label>
+                      <LabelWithTooltip field="dmgMeleeMax">Max</LabelWithTooltip>
                       <Input type="number" value={dmgMeleeMax} onChange={(e) => setDmgMeleeMax(e.target.value)} className="h-9" />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs text-muted-foreground">Range</label>
+                      <LabelWithTooltip field="meleeRange">Range</LabelWithTooltip>
                       <Input type="number" value={meleeRange} onChange={(e) => setMeleeRange(e.target.value)} step="0.1" className="h-9" />
                     </div>
                   </div>
@@ -888,11 +1054,11 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
                   <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">Ranged Damage</label>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1">
-                      <label className="text-xs text-muted-foreground">Min</label>
+                      <LabelWithTooltip field="dmgRangedMin">Min</LabelWithTooltip>
                       <Input type="number" value={dmgRangedMin} onChange={(e) => setDmgRangedMin(e.target.value)} className="h-9" />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs text-muted-foreground">Max</label>
+                      <LabelWithTooltip field="dmgRangedMax">Max</LabelWithTooltip>
                       <Input type="number" value={dmgRangedMax} onChange={(e) => setDmgRangedMax(e.target.value)} className="h-9" />
                     </div>
                   </div>
@@ -900,11 +1066,11 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
 
                 <div className="grid grid-cols-2 gap-4 border-t pt-4">
                     <div className="space-y-1">
-                      <label className="text-xs font-semibold">Global Cooldown</label>
+                      <LabelWithTooltip field="cooldown">Global Cooldown</LabelWithTooltip>
                       <Input value={cooldown} onChange={(e) => setCooldown(e.target.value)} placeholder="e.g. 1500ms" className="h-9" />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs font-semibold">Cooldown on Hit</label>
+                      <LabelWithTooltip field="cooldownHit">Cooldown on Hit</LabelWithTooltip>
                       <Input value={cooldownHit} onChange={(e) => setCooldownHit(e.target.value)} placeholder="e.g. 500ms" className="h-9" />
                     </div>
                 </div>
@@ -914,7 +1080,7 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
         <CollapsibleSection title="Powers" icon={Zap} id="powers" isExpanded={expandedSections.skills} onToggle={() => toggleSection('skills')}>
               <div className="space-y-4 animate-in fade-in duration-300">
                 <div className="space-y-3">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Powers</label>
+                  <LabelWithTooltip field="powersList" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">Powers</LabelWithTooltip>
                   <Input
                     value={powersList}
                     onChange={(e) => setPowersList(e.target.value)}
@@ -924,7 +1090,7 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
                   <p className="text-xs text-muted-foreground">Simple power list for now; a full power layer will come later.</p>
                 </div>
                 <div className="flex items-center justify-between mb-2">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Active Powers</label>
+                  <LabelWithTooltip field="power" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Active Powers</LabelWithTooltip>
                   <Button size="sm" variant="outline" onClick={() => setPowers(prev => [...prev, { state: 'melee', id: '', chance: 100 }])} className="h-7 text-[10px]">
                     <Plus className="w-3 h-3 mr-1" /> Add Power
                   </Button>
@@ -995,7 +1161,7 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
                 </div>
 
                 <div className="border-t pt-4">
-                    <label className="text-xs font-semibold mb-1.5 block">Passive Powers (comma-separated IDs)</label>
+                    <LabelWithTooltip field="passivePowers" className="text-xs font-semibold mb-1.5 block">Passive Powers (comma-separated IDs)</LabelWithTooltip>
                     <Input value={passivePowers} onChange={(e) => setPassivePowers(e.target.value)} placeholder="e.g. health_regen,armor_bonus" className="h-9 text-xs" />
                 </div>
               </div>
@@ -1005,8 +1171,8 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
               <div className="space-y-6 animate-in fade-in duration-300">
                 <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-4">
-                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">AI Style</label>
-                    <Select value={combatStyle} onValueChange={(v: any) => setCombatStyle(v)}>
+                    <LabelWithTooltip field="combatStyle" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">AI Style</LabelWithTooltip>
+                    <Select value={combatStyle} onValueChange={(v: 'default' | 'aggressive' | 'passive') => setCombatStyle(v)}>
                       <SelectTrigger className="h-9">
                         <SelectValue />
                       </SelectTrigger>
@@ -1025,11 +1191,11 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
                     <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">Ranges</label>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
-                        <label className="text-[10px] text-muted-foreground">Threat (Engage)</label>
+                        <LabelWithTooltip field="threatRange">Threat (Engage)</LabelWithTooltip>
                         <Input value={threatRange} onChange={(e) => setThreatRange(e.target.value)} className="h-8" />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[10px] text-muted-foreground">Flee Range</label>
+                        <LabelWithTooltip field="fleeRange">Flee Range</LabelWithTooltip>
                         <Input value={fleeRange} onChange={(e) => setFleeRange(e.target.value)} className="h-8" />
                       </div>
                     </div>
@@ -1042,14 +1208,14 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
                     <div className="space-y-3">
                       <div className="space-y-1">
                         <div className="flex justify-between text-[11px] mb-1">
-                           <span>Chance Pursue</span>
+                           <LabelWithTooltip field="chancePursue">Chance Pursue</LabelWithTooltip>
                            <span className="font-bold">{chancePursue || 0}%</span>
                         </div>
                         <Slider value={parseInt(chancePursue || '0', 10)} onChange={v => setChancePursue(String(v))} min={0} max={100} step={5} />
                       </div>
                       <div className="space-y-1">
                         <div className="flex justify-between text-[11px] mb-1">
-                           <span>Chance Flee</span>
+                           <LabelWithTooltip field="chanceFlee">Chance Flee</LabelWithTooltip>
                            <span className="font-bold">{chanceFlee || 0}%</span>
                         </div>
                         <Slider value={parseInt(chanceFlee || '0', 10)} onChange={v => setChanceFlee(String(v))} min={0} max={100} step={5} />
@@ -1061,11 +1227,11 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
                     <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">Movement</label>
                     <div className="grid grid-cols-2 gap-3">
                        <div className="space-y-1">
-                          <label className="text-[10px] text-muted-foreground">Turn Delay</label>
+                          <LabelWithTooltip field="turnDelay">Turn Delay</LabelWithTooltip>
                           <Input value={turnDelay} onChange={(e) => setTurnDelay(e.target.value)} placeholder="200ms" className="h-8" />
                        </div>
                        <div className="space-y-1">
-                          <label className="text-[10px] text-muted-foreground">Wander Radius</label>
+                          <LabelWithTooltip field="wanderRadius">Wander Radius</LabelWithTooltip>
                           <Input value={wanderRadius} onChange={(e) => setWanderRadius(e.target.value)} placeholder="0" className="h-8" />
                        </div>
                     </div>
@@ -1095,11 +1261,11 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
                     <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">Rewards</label>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
-                        <label className="text-[10px] text-muted-foreground">Kill XP</label>
+                        <LabelWithTooltip field="xp">Kill XP</LabelWithTooltip>
                         <Input type="number" value={xp} onChange={(e) => setXp(e.target.value)} className="h-9" />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[10px] text-muted-foreground">Base Gold</label>
+                        <LabelWithTooltip field="gold">Base Gold</LabelWithTooltip>
                         <Input type="number" value={gold} onChange={(e) => setGold(e.target.value)} className="h-9" />
                       </div>
                     </div>
@@ -1108,11 +1274,11 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
                     <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">Modifiers</label>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1">
-                        <label className="text-[10px] text-muted-foreground">Item Find %</label>
+                        <LabelWithTooltip field="itemFind">Item Find %</LabelWithTooltip>
                         <Input value={itemFind} onChange={(e) => setItemFind(e.target.value)} className="h-9" />
                       </div>
                       <div className="space-y-1">
-                        <label className="text-[10px] text-muted-foreground">Currency Find %</label>
+                        <LabelWithTooltip field="currencyFind">Currency Find %</LabelWithTooltip>
                         <Input value={currencyFind} onChange={(e) => setCurrencyFind(e.target.value)} className="h-9" />
                       </div>
                     </div>
@@ -1123,19 +1289,119 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
                   <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">Loot Tables</label>
                   <div className="space-y-3">
                     <div className="space-y-1">
-                      <label className="text-xs text-muted-foreground">Standard Loot</label>
-                      <Input value={loot} onChange={(e) => setLoot(e.target.value)} placeholder="loot/level_1.txt" className="h-9 font-mono text-xs" />
+                      <LabelWithTooltip field="loot">Standard Loot</LabelWithTooltip>
+                      <Input value={loot} onChange={(e) => setLoot(e.target.value)} placeholder="loot/level_1.txt or 16,17" className="h-9 font-mono text-xs" />
+                      <p className="text-[10px] text-muted-foreground italic">Select a loot table or pick specific items from the Items layer below. Group and selected items can be combined.</p>
                     </div>
-                     <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <label className="text-xs text-muted-foreground">Loot Count Range</label>
-                          <Input value={lootCount} onChange={(e) => setLootCount(e.target.value)} placeholder="e.g. 1,3" className="h-9" />
+                    <div className="rounded-xl border border-border bg-muted/30 p-3 space-y-4">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                          <span>Loot Table</span>
+                          <Tooltip content="Choose an existing loot group from the Items layer.">
+                            <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
+                          </Tooltip>
                         </div>
-                         <div className="space-y-1">
-                          <label className="text-xs text-muted-foreground">First Defeat Loot</label>
-                          <Input value={firstDefeatLoot} onChange={(e) => setFirstDefeatLoot(e.target.value)} className="h-9 font-mono text-xs" />
+                        {itemGroups.length > 0 ? (
+                          <Select value={lootGroup} onValueChange={handleSelectLootGroup}>
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder="Select loot table group" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__none__">None</SelectItem>
+                              {itemGroups.map((group) => (
+                                <SelectItem key={group.id} value={String(group.id)}>
+                                  {group.name || `Group ${group.id}`}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <div className="rounded-md border border-border/70 bg-muted p-3 text-xs text-muted-foreground">
+                            No loot groups are available in the Items layer.
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-foreground">Custom Loot Items</span>
+                          <Tooltip content="Select item IDs to include in this enemy's loot drop list.">
+                            <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
+                          </Tooltip>
                         </div>
-                     </div>
+                        <div className="overflow-auto rounded border border-border bg-background">
+                          <table className="min-w-full text-left text-sm">
+                            <thead className="border-b border-border/70 bg-muted/30">
+                              <tr>
+                                <th className="p-2 w-10" />
+                                <th className="p-2">ID</th>
+                                <th className="p-2">Name</th>
+                                <th className="p-2">Category</th>
+                                <th className="p-2 w-24">Qty</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {lootItems.map((item) => {
+                                const selected = Boolean(lootSelection[item.id]);
+                                return (
+                                  <tr key={item.id} className={`border-b border-border/50 ${selected ? 'bg-orange-50' : ''}`}>
+                                    <td className="p-2">
+                                      <input
+                                        type="checkbox"
+                                        checked={selected}
+                                        onChange={() => handleToggleLootItem(item.id)}
+                                        className="h-4 w-4 rounded border-border text-orange-500"
+                                      />
+                                    </td>
+                                    <td className="p-2 text-xs font-medium text-slate-700">{item.id}</td>
+                                    <td className="p-2 text-xs text-slate-700">{item.name}</td>
+                                    <td className="p-2 text-xs text-muted-foreground">{item.category || 'Unknown'}</td>
+                                    <td className="p-2">
+                                      <Input
+                                        value={selected ? String(lootSelection[item.id] || 1) : ''}
+                                        onChange={(event) => handleLootQuantityChange(item.id, event.target.value)}
+                                        placeholder="1"
+                                        className="h-9 text-xs"
+                                        disabled={!selected}
+                                      />
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                              {lootItems.length === 0 && (
+                                <tr>
+                                  <td colSpan={5} className="p-4 text-xs text-muted-foreground">
+                                    No items found in the Items layer.
+                                  </td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <LabelWithTooltip field="lootCount">Loot Count Range</LabelWithTooltip>
+                        <Input value={lootCount} onChange={(e) => setLootCount(e.target.value)} placeholder="e.g. 1,3" className="h-9" />
+                      </div>
+                      <div className="space-y-1">
+                        <LabelWithTooltip field="firstDefeatLoot">First Defeat Loot</LabelWithTooltip>
+                        <Input value={firstDefeatLoot} onChange={(e) => setFirstDefeatLoot(e.target.value)} className="h-9 font-mono text-xs" />
+                        <Select value={firstDefeatLoot} onValueChange={handleSelectFirstDefeatLootItem}>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Select item" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {lootItems.map((item) => (
+                              <SelectItem key={item.id} value={String(item.id)}>
+                                {item.name} ({item.id})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1144,14 +1410,29 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
         <CollapsibleSection title="Quest & Status" icon={MapPin} id="quest" isExpanded={expandedSections.quest} onToggle={() => toggleSection('quest')}>
               <div className="space-y-4 animate-in fade-in duration-300">
                 <div className="space-y-1">
-                  <label className="text-xs font-semibold">Defeat Status</label>
+                  <LabelWithTooltip field="defeatStatus">Defeat Status</LabelWithTooltip>
                   <Input value={defeatStatus} onChange={(e) => setDefeatStatus(e.target.value)} placeholder="e.g. boss_defeated" className="h-9 font-mono text-xs" />
                   <p className="text-[10px] text-muted-foreground italic">Campaign status set when this enemy dies.</p>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-semibold">Quest Loot</label>
-                  <Input value={questLoot} onChange={(e) => setQuestLoot(e.target.value)} placeholder="16,100 (item_id, chance)" className="h-9 font-mono text-xs" />
-                   <p className="text-[10px] text-muted-foreground italic">Item dropped only if a quest requires it.</p>
+                  <LabelWithTooltip field="questLoot">Quest Loot</LabelWithTooltip>
+                  <Input value={questLoot} onChange={(e) => setQuestLoot(e.target.value)} placeholder="required_status,required_not_status,item_id" className="h-9 font-mono text-xs" />
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">Quest Item</label>
+                    <Select value={questLoot.split(',').map((p) => p.trim()).slice(2).join(',')} onValueChange={handleSelectQuestLootItem}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select item" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {lootItems.map((item) => (
+                          <SelectItem key={item.id} value={String(item.id)}>
+                            {item.name} ({item.id})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground italic">Item dropped only when the quest status condition is met.</p>
                 </div>
               </div>
         </CollapsibleSection>

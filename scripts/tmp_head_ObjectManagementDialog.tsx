@@ -4,9 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 import Tooltip from '@/components/ui/tooltip';
-import { buildConstantStockString, buildRandomStockString, buildStatusStockEntriesString, parseConstantStock, parseRandomStock, parseStatusStockEntries } from '@/utils/parsers';
 import type { ItemSummary } from '@/utils/items';
-import type { RandomStockEntry } from '@/utils/parsers';
 import { ArrowUp, ArrowUpRight, ArrowRight, ArrowDownRight, ArrowDown, ArrowDownLeft, ArrowLeft, ArrowUpLeft, Check, ChevronDown, ChevronUp, Gift, HandCoins, HelpCircle, Image, MessagesSquare, MessageCircleQuestionMark, Package, Plus, Save, Settings, Sparkles, Trash2, User, X } from 'lucide-react';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 import AnimationPreview from '@/components/AnimationPreview';
@@ -172,135 +170,6 @@ const ObjectManagementDialog = ({
   const isTalker = editingObject?.properties?.talker === 'true';
   const isVendor = editingObject?.properties?.vendor === 'true';
   const isQuestGiver = editingObject?.properties?.questGiver === 'true';
-
-  const constantStockSelection = parseConstantStock(getEditingObjectProperty('constant_stock', ''));
-  const constantStockGroup = getEditingObjectProperty('constant_stock_group', '');
-  const statusStockGroup = getEditingObjectProperty('status_stock_group', '');
-  const statusStockEntries = parseStatusStockEntries(getEditingObjectProperty('status_stock_entries', ''));
-  const randomStockSelection = parseRandomStock(getEditingObjectProperty('random_stock', ''));
-  const randomStockGroup = getEditingObjectProperty('random_stock_group', '');
-  const itemGroups = itemsList.filter((item) => item.role === 'loot_groups');
-
-  const statusStockRows = itemsList
-    .filter((item) => item.role !== 'loot_groups')
-    .map((item) => {
-      const match = statusStockEntries
-        .flatMap((entry) => Object.entries(entry.items).map(([itemId, qty]) => ({
-          itemId: Number(itemId),
-          requirement: entry.requirement,
-          qty: Number(qty)
-        })))
-        .find((row) => row.itemId === item.id);
-      return {
-        item,
-        selected: !!match,
-        requirement: match?.requirement ?? '',
-        qty: match?.qty ?? 1
-      };
-    });
-
-  const randomStockRows = itemsList
-    .filter((item) => item.role !== 'loot_groups')
-    .map((item) => {
-      const entry = randomStockSelection[item.id];
-      return {
-        item,
-        selected: !!entry,
-        chance: entry?.chance ?? 100,
-        min: entry?.min ?? 1,
-        max: entry?.max ?? 1
-      };
-    });
-
-  const updateStatusStockEntries = (rows: Array<{ item: ItemSummary; selected: boolean; requirement: string; qty: number }>) => {
-    const entries = rows
-      .filter((row) => row.selected && row.requirement.trim() !== '' && row.qty > 0)
-      .map((row) => ({
-        id: `status-${row.item.id}`,
-        requirement: row.requirement.trim(),
-        items: { [row.item.id]: row.qty }
-      }));
-    const value = buildStatusStockEntriesString(entries);
-    updateEditingObjectProperty('status_stock_entries', value || null);
-  };
-
-  const handleToggleStatusStockItem = (itemId: number) => {
-    const rows = statusStockRows.map((row) => row.item.id === itemId ? { ...row, selected: !row.selected } : row);
-    updateStatusStockEntries(rows);
-  };
-
-  const handleStatusStockRequirementChange = (itemId: number, requirement: string) => {
-    const rows = statusStockRows.map((row) => row.item.id === itemId ? { ...row, requirement } : row);
-    updateStatusStockEntries(rows);
-  };
-
-  const handleStatusStockQuantityChange = (itemId: number, value: string) => {
-    const qty = Math.max(1, Number.parseInt(value, 10) || 1);
-    const rows = statusStockRows.map((row) => row.item.id === itemId ? { ...row, qty } : row);
-    updateStatusStockEntries(rows);
-  };
-
-  const updateRandomStockSelection = (rows: Array<{ item: ItemSummary; selected: boolean; chance: number; min: number; max: number }>) => {
-    const selection = rows
-      .filter((row) => row.selected && row.min > 0 && row.max > 0 && row.chance > 0)
-      .reduce<Record<number, RandomStockEntry>>((acc, row) => {
-        acc[row.item.id] = { chance: row.chance, min: row.min, max: row.max };
-        return acc;
-      }, {});
-    const stockValue = buildRandomStockString(selection);
-    updateEditingObjectProperty('random_stock', stockValue || null);
-  };
-
-  const handleToggleRandomStockItem = (itemId: number) => {
-    const rows = randomStockRows.map((row) => row.item.id === itemId ? { ...row, selected: !row.selected } : row);
-    updateRandomStockSelection(rows);
-  };
-
-  const handleRandomStockFieldChange = (itemId: number, field: 'chance' | 'min' | 'max', value: string) => {
-    const numberValue = Math.max(1, Number.parseInt(value, 10) || 1);
-    const rows = randomStockRows.map((row) => {
-      if (row.item.id !== itemId) return row;
-      const updated = { ...row, [field]: numberValue };
-      if (field === 'min' && updated.min > updated.max) {
-        updated.max = updated.min;
-      }
-      if (field === 'max' && updated.max < updated.min) {
-        updated.min = updated.max;
-      }
-      return updated;
-    });
-    updateRandomStockSelection(rows);
-  };
-
-  const handleSelectConstantStockGroup = (groupId: string) => {
-    updateEditingObjectProperty('constant_stock_group', groupId || null);
-  };
-
-  const handleSelectStatusStockGroup = (groupId: string) => {
-    updateEditingObjectProperty('status_stock_group', groupId || null);
-  };
-
-  const handleSelectRandomStockGroup = (groupId: string) => {
-    updateEditingObjectProperty('random_stock_group', groupId || null);
-  };
-
-  const handleToggleConstantStockItem = (itemId: number) => {
-    const updated = { ...constantStockSelection };
-    if (updated[itemId] !== undefined) {
-      delete updated[itemId];
-    } else {
-      updated[itemId] = 1;
-    }
-    const stockValue = buildConstantStockString(updated);
-    updateEditingObjectProperty('constant_stock', stockValue || null);
-  };
-
-  const handleConstantStockQuantityChange = (itemId: number, value: string) => {
-    const qty = Math.max(1, Number.parseInt(value, 10) || 1);
-    const updated = { ...constantStockSelection, [itemId]: qty };
-    const stockValue = buildConstantStockString(updated);
-    updateEditingObjectProperty('constant_stock', stockValue || null);
-  };
 
   const dialogContent = (
     <>
@@ -1986,423 +1855,61 @@ const ObjectManagementDialog = ({
                 </button>
                 {vendorStockExpanded && (
                   <div className="px-3 pb-3 space-y-4">
-                    <div className="space-y-4">
-                      <div className="space-y-3 rounded-xl border border-border bg-muted/30 p-3">
-                        <div>
-                          <div className="text-sm font-semibold text-foreground">Constant Stock</div>
-                          <p className="text-xs text-muted-foreground">
-                            Keep these items always available in this vendor's shop. Optional item groups can be combined with custom selected items.
-                          </p>
-                        </div>
-                        <div className="rounded-xl border border-border bg-muted/30 p-3">
-                          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                            <div className="space-y-1">
-                              <div className="text-sm font-medium text-foreground">Use an Item Group?</div>
-                              <p className="text-xs text-muted-foreground">
-                                You can select a predefined item group from the Items layer and still choose extra custom items below.
-                              </p>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                              <Button
-                                type="button"
-                                variant={constantStockGroup ? 'outline' : 'secondary'}
-                                size="sm"
-                                onClick={() => handleSelectConstantStockGroup('')}
-                              >
-                                No
-                              </Button>
-                              <Button
-                                type="button"
-                                variant={constantStockGroup ? 'secondary' : 'outline'}
-                                size="sm"
-                                onClick={() => {
-                                  if (itemGroups.length > 0) {
-                                    handleSelectConstantStockGroup(String(itemGroups[0].id));
-                                  }
-                                }}
-                              >
-                                Yes
-                              </Button>
-                            </div>
-                          </div>
-                          {constantStockGroup && (
-                            <div className="mt-4">
-                              <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
-                                <span>Item Group</span>
-                                <Tooltip content="Select an existing item group to include with this vendor's constant stock.">
-                                  <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
-                                </Tooltip>
-                              </div>
-                              {itemGroups.length > 0 ? (
-                                <Select onValueChange={handleSelectConstantStockGroup} value={constantStockGroup}>
-                                  <SelectTrigger className="w-full">
-                                    <SelectValue placeholder="Select item group" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {itemGroups.map((group) => (
-                                      <SelectItem key={group.id} value={String(group.id)}>
-                                        {group.name || `Group ${group.id}`}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              ) : (
-                                <div className="rounded-md border border-border/70 bg-muted p-3 text-xs text-muted-foreground">
-                                  No item groups are available in the Items layer.
-                                </div>
-                              )}
-                            </div>
-                          )}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="flex items-center gap-2 text-sm font-medium mb-1">
+                          Constant Stock
+                          <Tooltip content="A list of items this vendor has for sale. Quantity can be specified by appending ':Q' to the item_id, where Q is an integer.">
+                            <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
+                          </Tooltip>
+                        </label>
+                        <div className="flex gap-2">
+                          <Input
+                            className="h-10 text-sm flex-1"
+                            value={getEditingObjectProperty('constant_stock', '')}
+                            onChange={(e) => updateEditingObjectProperty('constant_stock', e.target.value || null)}
+                            placeholder="item_id"
+                          />
+                          <Input
+                            type="number"
+                            className="h-10 text-sm w-24"
+                            value={getEditingObjectProperty('constant_stock_quantity', '')}
+                            onChange={(e) => updateEditingObjectProperty('constant_stock_quantity', e.target.value || null)}
+                            placeholder="Qty"
+                            min="1"
+                          />
                         </div>
                       </div>
-
-                      <div className="rounded-xl border border-border bg-muted/50 overflow-hidden">
-                        <div className="overflow-auto rounded border-border bg-background">
-                          <table className="min-w-full text-left text-sm">
-                            <thead className="border-b border-border/70 bg-muted/30">
-                              <tr>
-                                <th className="p-2 w-10" />
-                                <th className="p-2 w-16">Icon</th>
-                                <th className="p-2">ID</th>
-                                <th className="p-2">Name</th>
-                                <th className="p-2">Category</th>
-                                <th className="p-2 w-28">Qty</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {itemsList.filter((item) => item.role !== 'loot_groups').map((item) => {
-                                const selected = constantStockSelection[item.id] !== undefined;
-                                return (
-                                  <tr key={item.id} className={`border-b border-border/50 ${selected ? 'bg-orange-50' : ''}`}>
-                                    <td className="p-2">
-                                      <input
-                                        type="checkbox"
-                                        checked={selected}
-                                        onChange={() => handleToggleConstantStockItem(item.id)}
-                                        className="h-4 w-4 rounded border-border text-orange-500"
-                                      />
-                                    </td>
-                                    <td className="p-2">
-                                      <div className="w-8 h-8 rounded bg-muted/60 flex items-center justify-center text-[10px] uppercase text-muted-foreground">
-                                        {item.name.charAt(0) || '#'}
-                                      </div>
-                                    </td>
-                                    <td className="p-2 text-xs font-medium text-slate-700">{item.id}</td>
-                                    <td className="p-2 text-xs text-slate-700">{item.name}</td>
-                                    <td className="p-2 text-xs text-muted-foreground">{item.category || 'Unknown'}</td>
-                                    <td className="p-2">
-                                      <Input
-                                        value={selected ? String(constantStockSelection[item.id] || 1) : ''}
-                                        onChange={(event) => handleConstantStockQuantityChange(item.id, event.target.value)}
-                                        placeholder="1"
-                                        className="h-9 text-xs"
-                                        disabled={!selected}
-                                      />
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                              {itemsList.filter((item) => item.role !== 'loot_groups').length === 0 && (
-                                <tr>
-                                  <td colSpan={6} className="p-4 text-xs text-muted-foreground">
-                                    No items found.
-                                  </td>
-                                </tr>
-                              )}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-4">
-                      <div className="space-y-3 rounded-xl border border-border bg-muted/30 p-3">
-                        <div>
-                          <div className="text-sm font-semibold text-foreground">Status Stock</div>
-                          <p className="text-xs text-muted-foreground">
-                            Configure items that are available only when a specific player status is met. Optional item groups can be combined with custom status stock selections.
-                          </p>
-                        </div>
-                        <div className="rounded-xl border border-border bg-muted/30 p-3">
-                          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                            <div className="space-y-1">
-                              <div className="text-sm font-medium text-foreground">Use an Item Group?</div>
-                              <p className="text-xs text-muted-foreground">
-                                You can select a predefined item group from the Items layer and still choose extra custom status stock items below.
-                              </p>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                              <Button
-                                type="button"
-                                variant={statusStockGroup ? 'outline' : 'secondary'}
-                                size="sm"
-                                onClick={() => handleSelectStatusStockGroup('')}
-                              >
-                                No
-                              </Button>
-                              <Button
-                                type="button"
-                                variant={statusStockGroup ? 'secondary' : 'outline'}
-                                size="sm"
-                                onClick={() => {
-                                  if (itemGroups.length > 0) {
-                                    handleSelectStatusStockGroup(String(itemGroups[0].id));
-                                  }
-                                }}
-                              >
-                                Yes
-                              </Button>
-                            </div>
-                          </div>
-                          {statusStockGroup && (
-                            <div className="mt-4">
-                              <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
-                                <span>Item Group</span>
-                                <Tooltip content="Select an existing item group to include with this status stock setup.">
-                                  <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
-                                </Tooltip>
-                              </div>
-                              {itemGroups.length > 0 ? (
-                                <Select onValueChange={handleSelectStatusStockGroup} value={statusStockGroup}>
-                                  <SelectTrigger className="w-full">
-                                    <SelectValue placeholder="Select item group" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {itemGroups.map((group) => (
-                                      <SelectItem key={group.id} value={String(group.id)}>
-                                        {group.name || `Group ${group.id}`}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              ) : (
-                                <div className="rounded-md border border-border/70 bg-muted p-3 text-xs text-muted-foreground">
-                                  No item groups are available in the Items layer.
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="rounded-xl border border-border bg-muted/50 overflow-hidden">
-                        <div className="overflow-auto rounded border-border bg-background">
-                          <table className="min-w-full text-left text-sm">
-                            <thead className="border-b border-border/70 bg-muted/30">
-                              <tr>
-                                <th className="p-2 w-10" />
-                                <th className="p-2 w-16">Icon</th>
-                                <th className="p-2">ID</th>
-                                <th className="p-2">Name</th>
-                                <th className="p-2">Category</th>
-                                <th className="p-2">Status</th>
-                                <th className="p-2 w-28">Qty</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {statusStockRows.map((row) => (
-                                <tr key={row.item.id} className={`border-b border-border/50 ${row.selected ? 'bg-orange-50' : ''}`}>
-                                  <td className="p-2">
-                                    <input
-                                      type="checkbox"
-                                      checked={row.selected}
-                                      onChange={() => handleToggleStatusStockItem(row.item.id)}
-                                      className="h-4 w-4 rounded border-border text-orange-500"
-                                    />
-                                  </td>
-                                  <td className="p-2">
-                                    <div className="w-8 h-8 rounded bg-muted/60 flex items-center justify-center text-[10px] uppercase text-muted-foreground">
-                                      {row.item.name.charAt(0) || '#'}
-                                    </div>
-                                  </td>
-                                  <td className="p-2 text-xs font-medium text-slate-700">{row.item.id}</td>
-                                  <td className="p-2 text-xs text-slate-700">{row.item.name}</td>
-                                  <td className="p-2 text-xs text-muted-foreground">{row.item.category || 'Unknown'}</td>
-                                  <td className="p-2">
-                                    <Input
-                                      value={row.requirement}
-                                      onChange={(event) => handleStatusStockRequirementChange(row.item.id, event.target.value)}
-                                      placeholder="status id"
-                                      className="h-9 text-xs"
-                                      disabled={!row.selected}
-                                    />
-                                  </td>
-                                  <td className="p-2">
-                                    <Input
-                                      type="number"
-                                      value={row.selected ? String(row.qty) : ''}
-                                      onChange={(event) => handleStatusStockQuantityChange(row.item.id, event.target.value)}
-                                      placeholder="1"
-                                      className="h-9 text-xs"
-                                      disabled={!row.selected}
-                                    />
-                                  </td>
-                                </tr>
-                              ))}
-                              {statusStockRows.length === 0 && (
-                                <tr>
-                                  <td colSpan={7} className="p-4 text-xs text-muted-foreground">
-                                    No items found.
-                                  </td>
-                                </tr>
-                              )}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-4">
-                      <div className="space-y-3 rounded-xl border border-border bg-muted/30 p-3">
-                        <div>
-                          <div className="text-sm font-semibold text-foreground">Random Stock</div>
-                          <p className="text-xs text-muted-foreground">
-                            Define candidates for the vendor's random offers. You can include an existing loot group and still add custom random items.
-                          </p>
-                        </div>
-                        <div className="rounded-xl border border-border bg-muted/30 p-3">
-                          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                            <div className="space-y-1">
-                              <div className="text-sm font-medium text-foreground">Use an Item Group?</div>
-                              <p className="text-xs text-muted-foreground">
-                                Choose an existing loot group from the Items layer, and still select custom random items below.
-                              </p>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                              <Button
-                                type="button"
-                                variant={randomStockGroup ? 'outline' : 'secondary'}
-                                size="sm"
-                                onClick={() => handleSelectRandomStockGroup('')}
-                              >
-                                No
-                              </Button>
-                              <Button
-                                type="button"
-                                variant={randomStockGroup ? 'secondary' : 'outline'}
-                                size="sm"
-                                onClick={() => {
-                                  if (itemGroups.length > 0) {
-                                    handleSelectRandomStockGroup(String(itemGroups[0].id));
-                                  }
-                                }}
-                              >
-                                Yes
-                              </Button>
-                            </div>
-                          </div>
-                          {randomStockGroup && (
-                            <div className="mt-4">
-                              <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
-                                <span>Item Group</span>
-                                <Tooltip content="Select an existing item group to include with this vendor's random stock.">
-                                  <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
-                                </Tooltip>
-                              </div>
-                              {itemGroups.length > 0 ? (
-                                <Select onValueChange={handleSelectRandomStockGroup} value={randomStockGroup}>
-                                  <SelectTrigger className="w-full">
-                                    <SelectValue placeholder="Select item group" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {itemGroups.map((group) => (
-                                      <SelectItem key={group.id} value={String(group.id)}>
-                                        {group.name || `Group ${group.id}`}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              ) : (
-                                <div className="rounded-md border border-border/70 bg-muted p-3 text-xs text-muted-foreground">
-                                  No item groups are available in the Items layer.
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="rounded-xl border border-border bg-muted/50 overflow-hidden">
-                        <div className="overflow-auto rounded border-border bg-background">
-                          <table className="min-w-full text-left text-sm">
-                            <thead className="border-b border-border/70 bg-muted/30">
-                              <tr>
-                                <th className="p-2 w-10" />
-                                <th className="p-2 w-16">Icon</th>
-                                <th className="p-2">ID</th>
-                                <th className="p-2">Name</th>
-                                <th className="p-2">Category</th>
-                                <th className="p-2 w-24">Chance</th>
-                                <th className="p-2 w-24">Min</th>
-                                <th className="p-2 w-24">Max</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {randomStockRows.map((row) => (
-                                <tr key={row.item.id} className={`border-b border-border/50 ${row.selected ? 'bg-orange-50' : ''}`}>
-                                  <td className="p-2">
-                                    <input
-                                      type="checkbox"
-                                      checked={row.selected}
-                                      onChange={() => handleToggleRandomStockItem(row.item.id)}
-                                      className="h-4 w-4 rounded border-border text-orange-500"
-                                    />
-                                  </td>
-                                  <td className="p-2">
-                                    <div className="w-8 h-8 rounded bg-muted/60 flex items-center justify-center text-[10px] uppercase text-muted-foreground">
-                                      {row.item.name.charAt(0) || '#'}
-                                    </div>
-                                  </td>
-                                  <td className="p-2 text-xs font-medium text-slate-700">{row.item.id}</td>
-                                  <td className="p-2 text-xs text-slate-700">{row.item.name}</td>
-                                  <td className="p-2 text-xs text-muted-foreground">{row.item.category || 'Unknown'}</td>
-                                  <td className="p-2">
-                                    <Input
-                                      value={String(row.chance)}
-                                      onChange={(event) => handleRandomStockFieldChange(row.item.id, 'chance', event.target.value)}
-                                      className="h-9 text-xs"
-                                      disabled={!row.selected}
-                                    />
-                                  </td>
-                                  <td className="p-2">
-                                    <Input
-                                      type="number"
-                                      value={String(row.min)}
-                                      min={1}
-                                      onChange={(event) => handleRandomStockFieldChange(row.item.id, 'min', event.target.value)}
-                                      className="h-9 text-xs"
-                                      disabled={!row.selected}
-                                    />
-                                  </td>
-                                  <td className="p-2">
-                                    <Input
-                                      type="number"
-                                      value={String(row.max)}
-                                      min={1}
-                                      onChange={(event) => handleRandomStockFieldChange(row.item.id, 'max', event.target.value)}
-                                      className="h-9 text-xs"
-                                      disabled={!row.selected}
-                                    />
-                                  </td>
-                                </tr>
-                              ))}
-                              {randomStockRows.length === 0 && (
-                                <tr>
-                                  <td colSpan={8} className="p-4 text-xs text-muted-foreground">
-                                    No items found.
-                                  </td>
-                                </tr>
-                              )}
-                            </tbody>
-                          </table>
+                      <div>
+                        <label className="flex items-center gap-2 text-sm font-medium mb-1">
+                          Status Stock
+                          <Tooltip content="A list of items this vendor will have for sale if the required status is met. Quantity can be specified by appending ':Q' to the item_id, where Q is an integer.">
+                            <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
+                          </Tooltip>
+                        </label>
+                        <div className="flex gap-2">
+                          <Input
+                            className="h-10 text-sm flex-1"
+                            value={getEditingObjectProperty('status_stock', '')}
+                            onChange={(e) => updateEditingObjectProperty('status_stock', e.target.value || null)}
+                            placeholder="item_id"
+                          />
+                          <Input
+                            type="number"
+                            className="h-10 text-sm w-24"
+                            value={getEditingObjectProperty('status_stock_quantity', '')}
+                            onChange={(e) => updateEditingObjectProperty('status_stock_quantity', e.target.value || null)}
+                            placeholder="Qty"
+                            min="1"
+                          />
                         </div>
                       </div>
                     </div>
 
                     <div>
                       <label className="flex items-center gap-2 text-sm font-medium mb-1">
-                        Random Stock Definition
-                        <Tooltip content="Use a loot table filename or inline definition here. The selected items above will update this value.">
+                        Random Stock
+                        <Tooltip content="Use a loot table to add random items to the stock; either a filename or an inline definition.">
                           <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
                         </Tooltip>
                       </label>
@@ -2412,9 +1919,6 @@ const ObjectManagementDialog = ({
                         onChange={(e) => updateEditingObjectProperty('random_stock', e.target.value || null)}
                         placeholder="loot table definition"
                       />
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Selected items are serialized as <code>id,chance,min,max</code> entries in this field.
-                      </p>
                     </div>
 
                     <div className="grid grid-cols-2 gap-3">

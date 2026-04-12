@@ -51,6 +51,22 @@ export function parseStatusStockEntries(value?: string): Array<{ id: string; req
   }
 }
 
+export function buildStatusStockEntriesString(entries: Array<{ id: string; requirement: string; items: Record<number, number> }>): string {
+  const cleaned = entries
+    .map((entry) => ({
+      id: entry.id || 'status',
+      requirement: entry.requirement.trim(),
+      items: Object.fromEntries(
+        Object.entries(entry.items || {})
+          .filter(([, qty]) => qty > 0)
+          .map(([id, qty]) => [String(id), qty])
+      )
+    }))
+    .filter((entry) => entry.requirement && Object.keys(entry.items).length > 0);
+
+  return JSON.stringify(cleaned);
+}
+
 export function parseRandomStock(value?: string): Record<number, RandomStockEntry> {
   if (!value) return {};
   const tokens = value.split(',').map(t => t.trim()).filter(Boolean);

@@ -17,15 +17,15 @@ type ItemEntry = {
   resourceSubtype?: ItemResourceSubtype;
 };
 
-const CategoryIcon = ({ roleId, className }: { roleId: ItemRole; className?: string }) => {
+const CategoryIcon = ({ roleId, className, style }: { roleId: ItemRole; className?: string; style?: React.CSSProperties }) => {
   switch (roleId) {
-    case 'equipment': return <Sword className={className} />;
-    case 'consumable': return <Apple className={className} />;
-    case 'quest': return <Key className={className} />;
-    case 'resource': return <Layers className={className} />;
-    case 'book': return <Book className={className} />;
-    case 'loot_groups': return <Sheet className={className} />;
-    default: return <Folder className={className} />;
+    case 'equipment': return <Sword className={className} style={style} />;
+    case 'consumable': return <Apple className={className} style={style} />;
+    case 'quest': return <Key className={className} style={style} />;
+    case 'resource': return <Layers className={className} style={style} />;
+    case 'book': return <Book className={className} style={style} />;
+    case 'loot_groups': return <Sheet className={className} style={style} />;
+    default: return <Folder className={className} style={style} />;
   }
 };
 
@@ -36,7 +36,7 @@ const getCategoryColor = (roleId: ItemRole) => {
     case 'quest': return 'text-amber-500 text-amber-600 dark:text-amber-400';
     case 'resource': return 'text-purple-500 text-purple-600 dark:text-purple-400';
     case 'book': return 'text-blue-500 text-blue-600 dark:text-blue-400';
-    case 'loot_groups': return 'text-slate-900 dark:text-white';
+    case 'loot_groups': return 'text-white';
     default: return 'text-muted-foreground';
   }
 };
@@ -48,7 +48,7 @@ const getCategoryHeaderStyles = (roleId: ItemRole) => {
     case 'quest': return 'text-amber-500/80 dark:text-amber-400/80 hover:bg-amber-500/10';
     case 'resource': return 'text-purple-500/80 dark:text-purple-400/80 hover:bg-purple-500/10';
     case 'book': return 'text-blue-500/80 dark:text-blue-400/80 hover:bg-blue-500/10';
-    case 'loot_groups': return 'text-slate-900 dark:text-white border border-transparent';
+    case 'loot_groups': return 'text-white bg-slate-900 hover:bg-slate-800';
     default: return 'text-muted-foreground hover:bg-muted/30';
   }
 };
@@ -76,13 +76,15 @@ const SidebarItemsPanel = ({
     <div className="flex-1 min-h-0 border border-dashed border-border rounded-md overflow-y-auto">
       <div className="flex flex-col gap-0.5 px-1">
         {(() => {
-          const roleOrder = ITEM_ROLE_SELECTIONS.map(r => r.id).concat('unspecified' as ItemRole);
           const roleMetaLookup = ITEM_ROLE_SELECTIONS.reduce(
             (acc, r) => ({ ...acc, [r.id]: ITEM_ROLE_META[r.id] }),
             {} as Record<ItemRole, { label: string; badgeClass: string }>
           );
 
-          const orderedRoles: ItemRole[] = [...ITEM_ROLE_SELECTIONS.map(r => r.id), 'unspecified', 'loot_groups'];
+          const orderedRoles: ItemRole[] = [
+            ...ITEM_ROLE_SELECTIONS.map(r => r.id).filter((id) => id !== 'loot_groups'),
+            'loot_groups'
+          ];
           return orderedRoles.map((roleId) => {
             const items = itemsList.filter((item) => item.role === roleId);
             const meta = roleMetaLookup[roleId] || ITEM_ROLE_META.unspecified;
@@ -92,12 +94,6 @@ const SidebarItemsPanel = ({
                 <Tooltip content="Click to expand" side="right">
                   <div
                     className={`flex items-center gap-1.5 py-1 px-1.5 rounded cursor-pointer transition-colors w-full ${getCategoryHeaderStyles(roleId)}`}
-                    style={roleId === 'loot_groups' ? {
-                      borderImage: 'linear-gradient(to right, rgba(251,146,60,1), rgba(16,185,129,1), rgba(56,189,248,1), rgba(239,68,68,1)) 1',
-                      borderImageSlice: 1,
-                      borderWidth: '1px',
-                      backgroundColor: 'rgba(248,250,252,0.95)',
-                    } : undefined}
                     onClick={() => {
                       setExpandedItemCategories(prev => {
                         const newSet = new Set(prev);
@@ -110,8 +106,14 @@ const SidebarItemsPanel = ({
                       });
                     }}
                   >
-                    <CategoryIcon roleId={roleId} className={`w-3.5 h-3.5 flex-shrink-0 ${getCategoryColor(roleId)}`} />
-                    <span className="flex-1 text-xs font-medium truncate" style={{ opacity: 0.8 }}>
+                    <CategoryIcon
+                      roleId={roleId}
+                      className={`w-3.5 h-3.5 flex-shrink-0 ${getCategoryColor(roleId)}`}
+                    />
+                    <span
+                      className="flex-1 text-xs font-medium truncate"
+                      style={{ opacity: 0.8, color: roleId === 'loot_groups' ? '#ffffff' : undefined }}
+                    >
                       {meta.label}
                     </span>
                     <span className="text-[10px]" style={{ opacity: 0.5 }}>({items.length})</span>

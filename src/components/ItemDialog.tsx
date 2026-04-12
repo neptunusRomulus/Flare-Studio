@@ -2,15 +2,15 @@ import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { AlertTriangle, Check, Sword, X } from 'lucide-react';
-import { ITEM_ROLE_META, ITEM_ROLE_SELECTIONS, RESOURCE_SUBTYPE_META } from '@/editor/itemRoles';
-import type { ItemResourceSubtype, ItemRole } from '@/editor/itemRoles';
+import Tooltip from '@/components/ui/tooltip';
+import { AlertTriangle, Apple, Book, Check, Key, Layers, Package, Sheet, Sword, X, Coins } from 'lucide-react';
+import { ITEM_ROLE_META, ITEM_ROLE_SELECTIONS } from '@/editor/itemRoles';
+import type { ItemRole } from '@/editor/itemRoles';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 
 type ItemDialogState = {
   name: string;
   role: ItemRole;
-  resourceSubtype: ItemResourceSubtype;
 };
 
 type PendingDuplicateItem = {
@@ -24,7 +24,7 @@ type ItemDialogProps = {
   itemDialogError: string | null;
   pendingDuplicateItem: PendingDuplicateItem | null;
   onClose: () => void;
-  onFieldChange: (key: keyof ItemDialogState, value: string) => void;
+  onFieldChange: (key: 'name' | 'role', value: string) => void;
   onSubmit: () => void;
   onConfirmDuplicate: () => void;
   onClearDuplicate: () => void;
@@ -62,6 +62,34 @@ const ItemDialog = ({
   }, [itemDialogState, onClose]);
 
   if (!itemDialogState) return null;
+
+  const getRoleIcon = (role: ItemRole) => {
+    switch (role) {
+      case 'equipment': return Sword;
+      case 'consumable': return Apple;
+      case 'quest': return Key;
+      case 'resource': return Layers;
+      case 'book': return Book;
+      case 'loot_groups': return Sheet;
+      default: return Sword;
+    }
+  };
+
+  const getCategoryIconColor = (role: ItemRole, isActive: boolean) => {
+    if (role === 'loot_groups') return 'text-white';
+    switch (role) {
+      case 'equipment': return isActive ? 'text-orange-600' : 'text-orange-500';
+      case 'consumable': return isActive ? 'text-emerald-600' : 'text-emerald-500';
+      case 'quest': return isActive ? 'text-amber-600' : 'text-amber-500';
+      case 'resource': return isActive ? 'text-purple-600' : 'text-purple-500';
+      case 'book': return isActive ? 'text-blue-600' : 'text-blue-500';
+      default: return 'text-muted-foreground';
+    }
+  };
+
+
+
+  const selectedRoleMeta = ITEM_ROLE_META[itemDialogState.role];
 
   const dialogContent = (
     <div 
@@ -104,70 +132,65 @@ const ItemDialog = ({
             <Input
               value={itemDialogState.name}
               onChange={(event) => onFieldChange('name', event.target.value)}
-              placeholder="Health Potion"
+              placeholder="ex. Iron Helmet"
             />
           </div>
 
+
           <div>
-            <label className="block text-sm font-medium mb-1">What is this item for?</label>
-            <div className="grid sm:grid-cols-2 gap-2">
-              {ITEM_ROLE_SELECTIONS.map((roleOption) => {
+            <div className="flex items-center justify-between gap-4 mb-2">
+              <label className="block text-sm font-medium">Category</label>
+              {selectedRoleMeta?.description ? (
+                <span className="text-xs text-muted-foreground">{selectedRoleMeta.description}</span>
+              ) : null}
+            </div>
+            <div className="inline-grid grid-cols-3 gap-2">
+              {ITEM_ROLE_SELECTIONS.filter((roleOption) => roleOption.id !== 'loot_groups').map((roleOption) => {
                 const isActive = itemDialogState.role === roleOption.id;
-                const roleMeta = ITEM_ROLE_META[roleOption.id];
+                const RoleIcon = getRoleIcon(roleOption.id);
                 return (
-                  <button
-                    key={roleOption.id}
-                    type="button"
-                    onClick={() => {
-                      onFieldChange('role', roleOption.id);
-                      if (roleOption.id !== 'resource') {
-                        onFieldChange('resourceSubtype', '');
-                      } else if (!itemDialogState.resourceSubtype) {
-                        onFieldChange('resourceSubtype', 'material');
-                      }
-                    }}
-                    className={`text-left border rounded-md px-3 py-2 transition-colors ${isActive ? 'border-orange-500 bg-orange-500/10 ring-1 ring-orange-500/30' : 'border-border hover:bg-muted/60'}`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${roleMeta.badgeClass}`}>
-                        {roleMeta.label}
-                      </span>
-                      <Check className={`w-4 h-4 transition-opacity ${isActive ? 'opacity-100 text-orange-500' : 'opacity-0'}`} />
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1 leading-snug">{roleOption.description}</p>
-                  </button>
+                  <Tooltip key={roleOption.id} content={roleOption.label} side="top" className="h-9 w-9 inline-flex items-center justify-center">
+                    <button
+                      type="button"
+                      aria-label={roleOption.label}
+                      onClick={() => {
+                        onFieldChange('role', roleOption.id);
+                      }}
+                      className={`flex aspect-square h-9 w-9 items-center justify-center rounded-md border transition-colors ${isActive ? 'border-orange-500 bg-orange-500/10 ring-1 ring-orange-500/30' : 'border-border hover:bg-muted/60'}`}
+                    >
+                      <RoleIcon className={`w-3.5 h-3.5 ${getCategoryIconColor(roleOption.id, isActive)}`} />
+                    </button>
+                  </Tooltip>
                 );
               })}
             </div>
           </div>
 
-          {itemDialogState.role === 'resource' && (
-            <div>
-              <label className="block text-sm font-medium mb-1">Resource subtype</label>
-              <div className="grid grid-cols-2 gap-2">
-                {(Object.keys(RESOURCE_SUBTYPE_META) as Array<Exclude<ItemResourceSubtype, ''>>).map((key) => {
-                  const meta = RESOURCE_SUBTYPE_META[key];
-                  const isActive = itemDialogState.resourceSubtype === key;
-                  return (
+          <div className="mt-6">
+            <div className="block text-sm font-semibold mb-2">Item Groups</div>
+            <div className="inline-grid grid-cols-3 gap-2">
+              {ITEM_ROLE_SELECTIONS.filter((roleOption) => roleOption.id === 'loot_groups').map((roleOption) => {
+                const isActive = itemDialogState.role === roleOption.id;
+                const RoleIcon = getRoleIcon(roleOption.id);
+                return (
+                  <Tooltip key={roleOption.id} content={roleOption.label} side="top" className="h-9 w-9 inline-flex items-center justify-center">
                     <button
-                      key={key}
                       type="button"
-                      onClick={() => onFieldChange('resourceSubtype', key)}
-                      className={`text-left border rounded-md px-3 py-2 transition-colors ${isActive ? 'border-purple-500 bg-purple-500/10 ring-1 ring-purple-500/30' : 'border-border hover:bg-muted/60'}`}
+                      aria-label={roleOption.label}
+                      onClick={() => {
+                        onFieldChange('role', roleOption.id);
+                      }}
+                      className={`flex aspect-square h-9 w-9 items-center justify-center rounded-md border transition-colors ${isActive ? 'border-orange-500 bg-orange-500/10 ring-1 ring-orange-500/30' : 'border-border hover:bg-muted/60'}`}
                     >
-                      <div className="flex items-center gap-2">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${meta.badgeClass}`}>
-                          {meta.label}
-                        </span>
-                        <Check className={`w-4 h-4 transition-opacity ${isActive ? 'opacity-100 text-purple-500' : 'opacity-0'}`} />
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1 leading-snug">{meta.hint}</p>
+                      <RoleIcon className={`w-3.5 h-3.5 ${getCategoryIconColor(roleOption.id, isActive)}`} />
                     </button>
-                  );
-                })}
-              </div>
+                  </Tooltip>
+                );
+              })}
             </div>
-          )}
+          </div>
+
+          {/* Resource subcategory selection removed: selecting 'resource' will not show subtype UI */}
 
           {itemDialogError && (
             <div className="text-sm text-red-500">

@@ -1563,6 +1563,13 @@ export default function useAppMainBuilder() {
       updateEditingItemField: itemsHook.updateEditingItemField,
       handleCloseItemEdit: itemsHook.handleCloseItemEdit,
       handleSaveItemEdit: itemsHook.handleSaveItemEdit,
+      showLootGroupEditDialog: itemsHook.showLootGroupEditDialog,
+      lootGroupEditingItem: itemsHook.lootGroupEditingItem,
+      lootGroupEditingData: itemsHook.lootGroupEditingData,
+      itemsList: itemsHook.itemsList,
+      updateLootGroupField: itemsHook.updateLootGroupField,
+      handleCloseLootGroupEdit: itemsHook.handleCloseLootGroupEdit,
+      handleSaveLootGroupEdit: itemsHook.handleSaveLootGroupEdit,
       onDeleteItem: handleDeleteItem,
       tooltip: null
     } as Record<string, unknown>;

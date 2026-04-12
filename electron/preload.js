@@ -77,11 +77,18 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getNextItemId: (projectPath) =>
     ipcRenderer.invoke("get-next-item-id", projectPath),
   listItems: (projectPath) => ipcRenderer.invoke("list-items", projectPath),
+  readFile: (filePath) => ipcRenderer.invoke("read-file", filePath),
   readItemFile: (filePath) => ipcRenderer.invoke("read-item-file", filePath),
   writeItemFile: (filePath, itemData) =>
     ipcRenderer.invoke("write-item-file", filePath, itemData),
   deleteItemFile: (filePath) =>
     ipcRenderer.invoke("delete-item-file", filePath),
+  createFolderIfNotExists: (folderPath) =>
+    ipcRenderer.invoke("create-folder-if-not-exists", folderPath),
+  writeFile: (filePath, content) =>
+    ipcRenderer.invoke("write-file", filePath, content),
+  readDir: (dirPath) => ipcRenderer.invoke("read-dir", dirPath),
+  getProjectFolder: () => ipcRenderer.invoke("get-project-folder"),
   listEnemies: (projectPath) => ipcRenderer.invoke("list-enemies", projectPath),
   saveEnemyPreset: (projectPath, filename, content) =>
     ipcRenderer.invoke("save-enemy-preset", projectPath, filename, content),

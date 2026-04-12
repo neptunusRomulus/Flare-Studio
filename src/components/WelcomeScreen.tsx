@@ -46,7 +46,20 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
       const savedRecentMaps = localStorage.getItem('recentMaps');
       if (!savedRecentMaps) return;
 
-      let maps: RecentMap[] = JSON.parse(savedRecentMaps);
+      let maps: RecentMap[] = [];
+      try {
+        const parsed = JSON.parse(savedRecentMaps);
+        if (Array.isArray(parsed)) {
+          // Defensive: migrate old or corrupted entries
+          maps = parsed.filter((m) => m && typeof m.name === 'string' && typeof m.path === 'string' && m.id && m.lastModified);
+        } else {
+          // If not an array, clear corrupted data
+          localStorage.removeItem('recentMaps');
+        }
+      } catch (e) {
+        // If JSON is invalid, clear corrupted data
+        localStorage.removeItem('recentMaps');
+      }
 
       const api = window.electronAPI;
       if (api && typeof api.checkProjectExists === 'function') {

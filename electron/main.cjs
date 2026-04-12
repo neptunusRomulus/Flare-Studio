@@ -2438,6 +2438,66 @@ ipcMainLocal.handle("write-item-file", async (event, filePath, itemData) => {
 });
 
 // Delete item file — removes the [item] block from the category .txt
+ipcMainLocal.handle("read-file", async (event, filePath) => {
+  try {
+    if (!filePath || !fs.existsSync(filePath)) {
+      return null;
+    }
+    return fs.readFileSync(filePath, "utf8");
+  } catch (error) {
+    console.error("Error reading file:", error);
+    return null;
+  }
+});
+
+ipcMainLocal.handle("create-folder-if-not-exists", async (_event, folderPath) => {
+  try {
+    if (!folderPath) return false;
+    fs.mkdirSync(folderPath, { recursive: true });
+    return true;
+  } catch (error) {
+    console.error("Error creating folder:", folderPath, error);
+    return false;
+  }
+});
+
+ipcMainLocal.handle("write-file", async (_event, filePath, content) => {
+  try {
+    if (!filePath) return false;
+    const directory = path.dirname(filePath);
+    if (!fs.existsSync(directory)) {
+      fs.mkdirSync(directory, { recursive: true });
+    }
+    fs.writeFileSync(filePath, content, "utf8");
+    return true;
+  } catch (error) {
+    console.error("Error writing file:", filePath, error);
+    return false;
+  }
+});
+
+ipcMainLocal.handle("read-dir", async (_event, dirPath) => {
+  try {
+    if (!dirPath || !fs.existsSync(dirPath)) {
+      return [];
+    }
+    const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+    return entries.map((entry) => ({ name: entry.name, isDirectory: entry.isDirectory() }));
+  } catch (error) {
+    console.error("Error reading directory:", dirPath, error);
+    return [];
+  }
+});
+
+ipcMainLocal.handle("get-project-folder", async () => {
+  try {
+    return app.getPath("documents");
+  } catch (error) {
+    console.error("Error retrieving project folder:", error);
+    return null;
+  }
+});
+
 ipcMainLocal.handle("delete-item-file", async (event, filePath) => {
   try {
     if (!filePath) {

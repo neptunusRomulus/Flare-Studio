@@ -18,6 +18,10 @@
     "electron:build": "electron-builder",
     "lint": "eslint . --ext .ts,.tsx,.js",
     "test": "vitest",
+    "test:watch": "vitest --watch",
+    "dev:watch": "concurrently \"npm run test:watch\" \"vite --port 5173\" \"wait-on http://localhost:5173 && electron .\"",
+    "dw": "npm run dev:watch",
+    "playwright:ui": "npx playwright test --ui",
     "prepare": "husky"
   },
   "dependencies": {

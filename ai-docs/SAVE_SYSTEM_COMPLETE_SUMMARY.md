@@ -186,6 +186,8 @@ useAutosave
 ### Technical Deep Dives
 - [UNSAVED_CHANGES_FIX.md](UNSAVED_CHANGES_FIX.md) - Phase 4 detailed technical docs
 - [CRASH_RECOVERY_SYSTEM.md](CRASH_RECOVERY_SYSTEM.md) - Phase 5 detailed technical docs
+- [LOOT_TABLE_ITEM_GROUP_NOTES.md](LOOT_TABLE_ITEM_GROUP_NOTES.md) - Item group / loot table behavior and feature-level test references
+- [TEST_COVERAGE_SUMMARY.md](TEST_COVERAGE_SUMMARY.md) - Canonical Playwright and Vitest test coverage catalog
 
 ### Quick References
 - [UNSAVED_CHANGES_QUICK_REF.md](UNSAVED_CHANGES_QUICK_REF.md) - Phase 4 quick guide
@@ -198,6 +200,7 @@ useAutosave
 - [ ] Phase 3: Test progress bar 0-100%
 - [ ] Phase 4: Test 4-layer sync system
 - [ ] Phase 5: Test crash detection logic
+- [x] Loot table `.txt` serialization and parser round-trip coverage via `src/lootGroupSerialization.test.ts`
 
 ### Integration Testing
 - [ ] Normal save flow with all phases active
@@ -211,6 +214,7 @@ useAutosave
 - [ ] User edits → force crash → restart → recovery offered
 - [ ] User dismisses recovery → starts fresh
 - [ ] Progress bar visible on large map save
+- [x] Item group creation and loot table `.txt` persistence verified by `tests/e2e/item-group-creation-edit.spec.ts`
 
 ### Edge Cases
 - [ ] localStorage full

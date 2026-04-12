@@ -43,7 +43,12 @@ const CODE_FENCE_REGEX = /^```/;
 export function getFlareCategory(filePath: string): FlareDataCategory | null {
   const normalized = filePath.split(path.sep).join('/');
   for (const [category, segment] of CATEGORY_PATHS) {
-    if (normalized.includes(segment.split(path.sep).join('/'))) {
+    const normalizedSegment = segment.split(path.sep).join('/');
+    if (
+      normalized.includes(normalizedSegment) ||
+      normalized.startsWith(`${category}/`) ||
+      normalized.endsWith(`/${category}`)
+    ) {
       return category;
     }
   }
@@ -291,6 +296,7 @@ export function validateFlareDataFile(root: string, filePath: string, schema: Sc
 
 export async function findFlareDataFiles(root: string): Promise<string[]> {
   const results: string[] = [];
+  const resolvedRoot = path.resolve(root);
 
   async function crawl(directory: string) {
     const entries = await fs.promises.readdir(directory, { withFileTypes: true });
@@ -302,7 +308,7 @@ export async function findFlareDataFiles(root: string): Promise<string[]> {
         }
         await crawl(absolute);
       } else if (entry.isFile() && entry.name.toLowerCase().endsWith('.txt')) {
-        const relative = path.relative(root, absolute).split(path.sep).join('/');
+        const relative = path.relative(resolvedRoot, absolute).split(path.sep).join('/');
         if (getFlareCategory(relative)) {
           results.push(relative);
         }
@@ -310,12 +316,14 @@ export async function findFlareDataFiles(root: string): Promise<string[]> {
     }
   }
 
-  await crawl(path.resolve(root, 'mods'));
+  if (fs.existsSync(resolvedRoot)) {
+    await crawl(resolvedRoot);
+  }
   return results;
 }
 
-export async function validateAllFlareDataFiles(root: string): Promise<FlareDataValidationResult[]> {
-  const schema = loadFlareDataSchema(root);
+export async function validateAllFlareDataFiles(root: string, schemaRoot?: string): Promise<FlareDataValidationResult[]> {
+  const schema = schemaRoot ? loadFlareDataSchema(schemaRoot) : loadFlareDataSchema(root);
   const files = await findFlareDataFiles(root);
   const results: FlareDataValidationResult[] = [];
 

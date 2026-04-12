@@ -1796,7 +1796,7 @@ const ObjectManagementDialog = ({
               <div className="rounded-xl border border-border bg-muted/50 overflow-hidden">
                 <button
                   type="button"
-                  className="w-full px-3 py-3 flex items-center justify-between gap-3 text-sm font-semibold text-foreground hover:bg-slate-100"
+                  className="w-full px-3 py-3 flex items-center justify-between gap-3 text-sm font-semibold text-foreground hover:bg-transparent"
                   onClick={() => setVendorRequirementsExpanded((prev) => !prev)}
                 >
                   <span className="flex items-center gap-2">
@@ -1811,7 +1811,7 @@ const ObjectManagementDialog = ({
                       <div>
                         <label className="flex items-center gap-2 text-sm font-medium mb-1">
                           Vendor Requires Status
-                          <Tooltip content="Only show this vendor when the player has this status. Use status IDs like hero_status.">
+                          <Tooltip content="The player must have these statuses in order to use this NPC as a vendor.">
                             <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
                           </Tooltip>
                         </label>
@@ -1825,7 +1825,7 @@ const ObjectManagementDialog = ({
                       <div>
                         <label className="flex items-center gap-2 text-sm font-medium mb-1">
                           Vendor Requires Not Status
-                          <Tooltip content="Hide this vendor when the player has the given status. Useful for exclusive offers or alternate shops.">
+                          <Tooltip content="The player must not have these statuses in order to use this NPC as a vendor.">
                             <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
                           </Tooltip>
                         </label>
@@ -1844,7 +1844,7 @@ const ObjectManagementDialog = ({
               <div className="rounded-xl border border-border bg-muted/50 overflow-hidden">
                 <button
                   type="button"
-                  className="w-full px-3 py-3 flex items-center justify-between gap-3 text-sm font-semibold text-foreground hover:bg-slate-100"
+                  className="w-full px-3 py-3 flex items-center justify-between gap-3 text-sm font-semibold text-foreground hover:bg-transparent"
                   onClick={() => setVendorStockExpanded((prev) => !prev)}
                 >
                   <span className="flex items-center gap-2">
@@ -1859,7 +1859,7 @@ const ObjectManagementDialog = ({
                       <div>
                         <label className="flex items-center gap-2 text-sm font-medium mb-1">
                           Constant Stock
-                          <Tooltip content="The vendor always sells this item. Enter the item ID and quantity here.">
+                          <Tooltip content="A list of items this vendor has for sale. Quantity can be specified by appending ':Q' to the item_id, where Q is an integer.">
                             <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
                           </Tooltip>
                         </label>
@@ -1883,7 +1883,7 @@ const ObjectManagementDialog = ({
                       <div>
                         <label className="flex items-center gap-2 text-sm font-medium mb-1">
                           Status Stock
-                          <Tooltip content="This item appears only when the player has the matching status. Useful for status-based offers.">
+                          <Tooltip content="A list of items this vendor will have for sale if the required status is met. Quantity can be specified by appending ':Q' to the item_id, where Q is an integer.">
                             <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
                           </Tooltip>
                         </label>
@@ -1909,7 +1909,7 @@ const ObjectManagementDialog = ({
                     <div>
                       <label className="flex items-center gap-2 text-sm font-medium mb-1">
                         Random Stock
-                        <Tooltip content="Use a loot table or list here. The vendor picks random offers from this source.">
+                        <Tooltip content="Use a loot table to add random items to the stock; either a filename or an inline definition.">
                           <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
                         </Tooltip>
                       </label>
@@ -1925,7 +1925,7 @@ const ObjectManagementDialog = ({
                       <div>
                         <label className="flex items-center gap-2 text-sm font-medium mb-1">
                           Random Stock Count Min
-                          <Tooltip content="Minimum number of random offers the vendor can show. Helps control shop variety.">
+                          <Tooltip content="Sets the minimum amount of random items this npc can have.">
                             <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
                           </Tooltip>
                         </label>
@@ -1941,7 +1941,7 @@ const ObjectManagementDialog = ({
                       <div>
                         <label className="flex items-center gap-2 text-sm font-medium mb-1">
                           Random Stock Count Max
-                          <Tooltip content="Maximum number of random offers the vendor can show. Keep this greater than or equal to Min.">
+                          <Tooltip content="Sets the maximum amount of random items this npc can have.">
                             <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
                           </Tooltip>
                         </label>
@@ -1962,7 +1962,7 @@ const ObjectManagementDialog = ({
               <div className="rounded-xl border border-border bg-muted/50 overflow-hidden">
                 <button
                   type="button"
-                  className="w-full px-3 py-3 flex items-center justify-between gap-3 text-sm font-semibold text-foreground hover:bg-slate-100"
+                  className="w-full px-3 py-3 flex items-center justify-between gap-3 text-sm font-semibold text-foreground hover:bg-transparent"
                   onClick={() => setVendorPricingExpanded((prev) => !prev)}
                 >
                   <span className="flex items-center gap-2">
@@ -1977,7 +1977,7 @@ const ObjectManagementDialog = ({
                       <div>
                         <label className="flex items-center gap-2 text-sm font-medium mb-1">
                           Vendor Ratio Buy
-                          <Tooltip content="How much the vendor charges the player when buying items. A higher number means more expensive buys.">
+                          <Tooltip content="NPC-specific version of vendor_ratio_buy from engine/loot.txt. Uses the global setting when set to 0.">
                             <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
                           </Tooltip>
                         </label>
@@ -1993,7 +1993,7 @@ const ObjectManagementDialog = ({
                       <div>
                         <label className="flex items-center gap-2 text-sm font-medium mb-1">
                           Vendor Ratio Sell
-                          <Tooltip content="How much the vendor pays the player when selling items. Use values below 1 for a loss, above 1 to pay more.">
+                          <Tooltip content="NPC-specific version of vendor_ratio_sell from engine/loot.txt. Uses the global setting when set to 0.">
                             <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
                           </Tooltip>
                         </label>
@@ -2009,7 +2009,7 @@ const ObjectManagementDialog = ({
                       <div>
                         <label className="flex items-center gap-2 text-sm font-medium mb-1">
                           Vendor Ratio Sell Old
-                          <Tooltip content="Legacy or alternative sell price factor used by older vendor logic. Leave empty unless your mod uses this specifically.">
+                          <Tooltip content="NPC-specific version of vendor_ratio_sell_old from engine/loot.txt. Uses the global setting when set to 0.">
                             <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
                           </Tooltip>
                         </label>

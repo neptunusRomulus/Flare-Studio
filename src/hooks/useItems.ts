@@ -269,7 +269,7 @@ export default function useItems({ currentProjectPath, toast, normalizeItemsForS
           name: itemDialogState.name.trim(), 
           id: itemId, 
           category: selectedCategory,
-          role: selectedRole,
+          role: selectedRole === 'loot_groups' ? 'loot_groups' : selectedRole,
           resourceSubtype: itemDialogState.resourceSubtype
         };
         const result = await window.electronAPI.createItemFile(currentProjectPath, payload as unknown as { name: string; id: number; category?: string; role?: string; resourceSubtype?: string });

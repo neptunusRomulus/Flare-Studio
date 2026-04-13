@@ -20,15 +20,25 @@ export type ItemSummary = {
   resourceSubtype?: ItemResourceSubtype;
 };
 
+const VALID_ITEM_ROLES: ItemRole[] = ['equipment', 'consumable', 'quest', 'resource', 'book', 'loot_groups', 'unspecified'];
+
+const normalizeRole = (value: string | undefined): ItemRole => {
+  const role = String(value || '').trim().toLowerCase();
+  if (role === 'loot_group') return 'loot_groups';
+  if (VALID_ITEM_ROLES.includes(role as ItemRole)) return role as ItemRole;
+  return 'unspecified';
+};
+
 export function normalizeItemsForState(items: RawItem[]): ItemSummary[] {
   const toResourceSubtype = (value: string | undefined): ItemResourceSubtype => {
-    if (value === 'currency' || value === 'material' || value === '') return value as ItemResourceSubtype;
+    const subtype = String(value || '').trim().toLowerCase();
+    if (subtype === 'currency' || subtype === 'material' || subtype === '') return subtype as ItemResourceSubtype;
     return '' as ItemResourceSubtype;
   };
 
   return items.map((item) => ({
     ...item,
-    role: (item.role as ItemRole) || 'unspecified',
+    role: normalizeRole(item.role),
     resourceSubtype: toResourceSubtype(item.resourceSubtype)
   }));
 }

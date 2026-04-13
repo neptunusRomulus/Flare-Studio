@@ -98,8 +98,6 @@ const ObjectManagementDialog = ({
   handleOpenQuestSettingsDialog,
   handleCloseQuestSettingsDialog,
   showQuestSettingsDialog,
-  setDialogueTrees,
-  setActiveDialogueTab,
   setShowDialogueTreeDialog,
   showDeleteNpcConfirm,
   setShowDeleteNpcConfirm,
@@ -167,18 +165,16 @@ const ObjectManagementDialog = ({
     return () => document.removeEventListener('keydown', handleEsc);
   }, [showQuestSettingsDialog, handleCloseQuestSettingsDialog]);
 
-  if (!isOpen) return null;
-
   const isTalker = editingObject?.properties?.talker === 'true';
   const isVendor = editingObject?.properties?.vendor === 'true';
   const isQuestGiver = editingObject?.properties?.questGiver === 'true';
 
   const constantStockSelection = parseConstantStock(getEditingObjectProperty('constant_stock', ''));
-  const constantStockGroup = getEditingObjectProperty('constant_stock_group', '');
-  const statusStockGroup = getEditingObjectProperty('status_stock_group', '');
+  const constantStockGroup = getEditingObjectProperty('constant_stock_group', '') || 'none';
+  const statusStockGroup = getEditingObjectProperty('status_stock_group', '') || 'none';
   const statusStockEntries = parseStatusStockEntries(getEditingObjectProperty('status_stock_entries', ''));
   const randomStockSelection = parseRandomStock(getEditingObjectProperty('random_stock', ''));
-  const randomStockGroup = getEditingObjectProperty('random_stock_group', '');
+  const randomStockGroup = getEditingObjectProperty('random_stock_group', '') || 'none';
   const itemGroups = itemsList.filter((item) => item.role === 'loot_groups');
 
   const statusStockRows = itemsList
@@ -273,15 +269,15 @@ const ObjectManagementDialog = ({
   };
 
   const handleSelectConstantStockGroup = (groupId: string) => {
-    updateEditingObjectProperty('constant_stock_group', groupId || null);
+    updateEditingObjectProperty('constant_stock_group', groupId === 'none' ? null : groupId);
   };
 
   const handleSelectStatusStockGroup = (groupId: string) => {
-    updateEditingObjectProperty('status_stock_group', groupId || null);
+    updateEditingObjectProperty('status_stock_group', groupId === 'none' ? null : groupId);
   };
 
   const handleSelectRandomStockGroup = (groupId: string) => {
-    updateEditingObjectProperty('random_stock_group', groupId || null);
+    updateEditingObjectProperty('random_stock_group', groupId === 'none' ? null : groupId);
   };
 
   const handleToggleConstantStockItem = (itemId: number) => {
@@ -301,6 +297,8 @@ const ObjectManagementDialog = ({
     const stockValue = buildConstantStockString(updated);
     updateEditingObjectProperty('constant_stock', stockValue || null);
   };
+
+  if (!isOpen) return null;
 
   const dialogContent = (
     <>
@@ -1991,54 +1989,26 @@ const ObjectManagementDialog = ({
                         <div>
                           <div className="text-sm font-semibold text-foreground">Constant Stock</div>
                           <p className="text-xs text-muted-foreground">
-                            Keep these items always available in this vendor's shop. Optional item groups can be combined with custom selected items.
+                            Select an item group to populate this vendor constant stock. Editing the table will save a new vendor-specific loot group if the selected group is modified.
                           </p>
                         </div>
                         <div className="rounded-xl border border-border bg-muted/30 p-3">
                           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <div className="space-y-1">
-                              <div className="text-sm font-medium text-foreground">Use an Item Group?</div>
+                              <div className="text-sm font-medium text-foreground">Item Group</div>
                               <p className="text-xs text-muted-foreground">
-                                You can select a predefined item group from the Items layer and still choose extra custom items below.
+                                Select one of the project loot groups to populate this vendor constant stock.
+                                Editing the table will save a new vendor-specific loot group if the selected group is modified.
                               </p>
                             </div>
-                            <div className="flex flex-wrap gap-2">
-                              <Button
-                                type="button"
-                                variant={constantStockGroup ? 'outline' : 'secondary'}
-                                size="sm"
-                                onClick={() => handleSelectConstantStockGroup('')}
-                              >
-                                No
-                              </Button>
-                              <Button
-                                type="button"
-                                variant={constantStockGroup ? 'secondary' : 'outline'}
-                                size="sm"
-                                onClick={() => {
-                                  if (itemGroups.length > 0) {
-                                    handleSelectConstantStockGroup(String(itemGroups[0].id));
-                                  }
-                                }}
-                              >
-                                Yes
-                              </Button>
-                            </div>
-                          </div>
-                          {constantStockGroup && (
-                            <div className="mt-4">
-                              <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
-                                <span>Item Group</span>
-                                <Tooltip content="Select an existing item group to include with this vendor's constant stock.">
-                                  <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
-                                </Tooltip>
-                              </div>
+                            <div className="w-full sm:w-72">
                               {itemGroups.length > 0 ? (
                                 <Select onValueChange={handleSelectConstantStockGroup} value={constantStockGroup}>
                                   <SelectTrigger className="w-full">
                                     <SelectValue placeholder="Select item group" />
                                   </SelectTrigger>
                                   <SelectContent>
+                                    <SelectItem value="none">None</SelectItem>
                                     {itemGroups.map((group) => (
                                       <SelectItem key={group.id} value={String(group.id)}>
                                         {group.name || `Group ${group.id}`}
@@ -2052,7 +2022,7 @@ const ObjectManagementDialog = ({
                                 </div>
                               )}
                             </div>
-                          )}
+                          </div>
                         </div>
                       </div>
 
@@ -2120,54 +2090,25 @@ const ObjectManagementDialog = ({
                         <div>
                           <div className="text-sm font-semibold text-foreground">Status Stock</div>
                           <p className="text-xs text-muted-foreground">
-                            Configure items that are available only when a specific player status is met. Optional item groups can be combined with custom status stock selections.
+                            Select a loot group to populate the status stock item table. Edits will create a new vendor-specific loot group if the selected group is modified.
                           </p>
                         </div>
                         <div className="rounded-xl border border-border bg-muted/30 p-3">
                           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <div className="space-y-1">
-                              <div className="text-sm font-medium text-foreground">Use an Item Group?</div>
+                              <div className="text-sm font-medium text-foreground">Item Group</div>
                               <p className="text-xs text-muted-foreground">
-                                You can select a predefined item group from the Items layer and still choose extra custom status stock items below.
+                                Select a loot group to populate the status stock item table. Edits will create a new vendor-specific loot group if the selected group is modified.
                               </p>
                             </div>
-                            <div className="flex flex-wrap gap-2">
-                              <Button
-                                type="button"
-                                variant={statusStockGroup ? 'outline' : 'secondary'}
-                                size="sm"
-                                onClick={() => handleSelectStatusStockGroup('')}
-                              >
-                                No
-                              </Button>
-                              <Button
-                                type="button"
-                                variant={statusStockGroup ? 'secondary' : 'outline'}
-                                size="sm"
-                                onClick={() => {
-                                  if (itemGroups.length > 0) {
-                                    handleSelectStatusStockGroup(String(itemGroups[0].id));
-                                  }
-                                }}
-                              >
-                                Yes
-                              </Button>
-                            </div>
-                          </div>
-                          {statusStockGroup && (
-                            <div className="mt-4">
-                              <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
-                                <span>Item Group</span>
-                                <Tooltip content="Select an existing item group to include with this status stock setup.">
-                                  <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
-                                </Tooltip>
-                              </div>
+                            <div className="w-full sm:w-72">
                               {itemGroups.length > 0 ? (
                                 <Select onValueChange={handleSelectStatusStockGroup} value={statusStockGroup}>
                                   <SelectTrigger className="w-full">
                                     <SelectValue placeholder="Select item group" />
                                   </SelectTrigger>
                                   <SelectContent>
+                                    <SelectItem value="none">None</SelectItem>
                                     {itemGroups.map((group) => (
                                       <SelectItem key={group.id} value={String(group.id)}>
                                         {group.name || `Group ${group.id}`}
@@ -2181,7 +2122,7 @@ const ObjectManagementDialog = ({
                                 </div>
                               )}
                             </div>
-                          )}
+                          </div>
                         </div>
                       </div>
 
@@ -2257,54 +2198,25 @@ const ObjectManagementDialog = ({
                         <div>
                           <div className="text-sm font-semibold text-foreground">Random Stock</div>
                           <p className="text-xs text-muted-foreground">
-                            Define candidates for the vendor's random offers. You can include an existing loot group and still add custom random items.
+                            Define candidates for the vendor random offers. You can include an existing loot group and still add custom random items.
                           </p>
                         </div>
                         <div className="rounded-xl border border-border bg-muted/30 p-3">
                           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <div className="space-y-1">
-                              <div className="text-sm font-medium text-foreground">Use an Item Group?</div>
+                              <div className="text-sm font-medium text-foreground">Item Group</div>
                               <p className="text-xs text-muted-foreground">
-                                Choose an existing loot group from the Items layer, and still select custom random items below.
+                                Select a loot group to populate the random stock table. Edited group contents will be saved as a new vendor-specific loot group if modified.
                               </p>
                             </div>
-                            <div className="flex flex-wrap gap-2">
-                              <Button
-                                type="button"
-                                variant={randomStockGroup ? 'outline' : 'secondary'}
-                                size="sm"
-                                onClick={() => handleSelectRandomStockGroup('')}
-                              >
-                                No
-                              </Button>
-                              <Button
-                                type="button"
-                                variant={randomStockGroup ? 'secondary' : 'outline'}
-                                size="sm"
-                                onClick={() => {
-                                  if (itemGroups.length > 0) {
-                                    handleSelectRandomStockGroup(String(itemGroups[0].id));
-                                  }
-                                }}
-                              >
-                                Yes
-                              </Button>
-                            </div>
-                          </div>
-                          {randomStockGroup && (
-                            <div className="mt-4">
-                              <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-2">
-                                <span>Item Group</span>
-                                <Tooltip content="Select an existing item group to include with this vendor's random stock.">
-                                  <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
-                                </Tooltip>
-                              </div>
+                            <div className="w-full sm:w-72">
                               {itemGroups.length > 0 ? (
                                 <Select onValueChange={handleSelectRandomStockGroup} value={randomStockGroup}>
                                   <SelectTrigger className="w-full">
                                     <SelectValue placeholder="Select item group" />
                                   </SelectTrigger>
                                   <SelectContent>
+                                    <SelectItem value="none">None</SelectItem>
                                     {itemGroups.map((group) => (
                                       <SelectItem key={group.id} value={String(group.id)}>
                                         {group.name || `Group ${group.id}`}
@@ -2318,7 +2230,7 @@ const ObjectManagementDialog = ({
                                 </div>
                               )}
                             </div>
-                          )}
+                          </div>
                         </div>
                       </div>
 

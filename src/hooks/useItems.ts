@@ -487,6 +487,69 @@ export default function useItems({ currentProjectPath, toast, normalizeItemsForS
     }
   }, [toast]);
 
+  const handleCreateVendorStockGroup = useCallback(async (
+    stockType: 'constant' | 'status' | 'random',
+    selectedGroupId: string | null,
+    npcName: string,
+  ) => {
+    if (!currentProjectPath) {
+      toast({ title: 'Error', description: 'Unable to create item group: no project path available.', variant: 'destructive' });
+      return null;
+    }
+
+    const groupLabel = stockType === 'constant' ? 'Constant Stock' : stockType === 'status' ? 'Status Stock' : 'Random Stock';
+    const itemName = `${npcName || 'Vendor'} ${groupLabel}`.trim();
+    const selectedGroup = selectedGroupId ? itemsList.find((item) => String(item.id) === selectedGroupId) : undefined;
+    const category = selectedGroup?.category || 'Default';
+
+    let itemId = 1;
+    if (window.electronAPI?.getNextItemId) {
+      const idResult = await window.electronAPI.getNextItemId(currentProjectPath);
+      if (idResult.success) {
+        itemId = idResult.nextId;
+      }
+    }
+
+    try {
+      if (!window.electronAPI?.createItemFile) {
+        toast({ title: 'Error', description: 'Filesystem API is unavailable.', variant: 'destructive' });
+        return null;
+      }
+
+      const payload = {
+        name: itemName,
+        id: itemId,
+        category,
+        role: 'loot_groups',
+        resourceSubtype: ''
+      };
+      const result = await window.electronAPI.createItemFile(currentProjectPath, payload as unknown as { name: string; id: number; category?: string; role?: string; resourceSubtype?: string });
+      if (!result.success) {
+        toast({ title: 'Error', description: result.error || `Failed to create ${groupLabel}.`, variant: 'destructive' });
+        return null;
+      }
+
+      if (window.electronAPI?.listItems) {
+        const itemsResult = await window.electronAPI.listItems(currentProjectPath);
+        if (itemsResult.success && itemsResult.items) {
+          const normalized = normalizeItemsForState(itemsResult.items);
+          setItemsList(normalized);
+          const createdItem = normalized.find((item) => item.id === itemId);
+          if (createdItem) {
+            await handleOpenItemEdit(createdItem);
+            return createdItem;
+          }
+        }
+      }
+
+      return null;
+    } catch (err) {
+      console.error('Error creating vendor stock item group:', err);
+      toast({ title: 'Error', description: `Failed to create ${groupLabel}.`, variant: 'destructive' });
+      return null;
+    }
+  }, [currentProjectPath, itemsList, normalizeItemsForState, toast, handleOpenItemEdit]);
+
   const handleCloseItemEdit = useCallback(() => {
     setShowItemEditDialog(false);
     setEditingItem(null);
@@ -594,6 +657,7 @@ export default function useItems({ currentProjectPath, toast, normalizeItemsForS
     performCreateItem,
     handleItemSubmit,
     handleConfirmDuplicateItem,
+    handleCreateVendorStockGroup,
     showItemEditDialog,
     setShowItemEditDialog,
     editingItem,

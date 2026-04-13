@@ -1534,6 +1534,7 @@ export default function useAppMainBuilder() {
       handleOpenVendorStockDialog: vendorDialogs.handleOpenVendorStockDialog,
       handleOpenVendorUnlockDialog: vendorDialogs.handleOpenVendorUnlockDialog,
       handleOpenVendorRandomDialog: vendorDialogs.handleOpenVendorRandomDialog,
+      handleCreateVendorStockGroup: itemsHook.handleCreateVendorStockGroup,
       showQuestSettingsDialog: objectEditing.showQuestSettingsDialog,
       handleOpenQuestSettingsDialog: objectEditing.handleOpenQuestSettingsDialog,
       handleCloseQuestSettingsDialog: objectEditing.handleCloseQuestSettingsDialog,

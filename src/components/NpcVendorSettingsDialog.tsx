@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
@@ -7,6 +6,8 @@ import Tooltip from '@/components/ui/tooltip';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 import { Gift, HandCoins, HelpCircle, Package, Save, Sparkles, ChevronDown, Table2, X } from 'lucide-react';
 import type { ItemSummary } from '@/utils/items';
+
+// PATCH TEST: verify file sync
 
 type NpcVendorSettingsDialogProps = {
   isOpen: boolean;
@@ -20,6 +21,7 @@ type NpcVendorSettingsDialogProps = {
   updateEditingObjectProperty: (key: string, value: string | null) => void;
 };
 
+// Vendor stock section configuration
 const NpcVendorSettingsDialog = ({
   isOpen,
   onClose,
@@ -72,9 +74,39 @@ const NpcVendorSettingsDialog = ({
     }
   };
 
+  const vendorStockSections = [
+    {
+      title: 'Always Available',
+      value: constantStockGroup,
+      onSelect: handleSelectConstantStockGroup,
+      stockType: 'constant' as const,
+      propertyKey: 'constant_stock_group' as const,
+      tooltip: 'Use an existing item group as Always Available stock.',
+      buttonTooltip: 'Create or update Always Available item group in background and open it for editing.',
+    },
+    {
+      title: 'Unlockable',
+      value: statusStockGroup,
+      onSelect: handleSelectStatusStockGroup,
+      stockType: 'status' as const,
+      propertyKey: 'status_stock_group' as const,
+      tooltip: 'Use an existing item group as Unlockable stock.',
+      buttonTooltip: 'Create or update Unlockable item group in background and open it for editing.',
+    },
+    {
+      title: 'Random',
+      value: randomStockGroup,
+      onSelect: handleSelectRandomStockGroup,
+      stockType: 'random' as const,
+      propertyKey: 'random_stock_group' as const,
+      tooltip: 'Use an existing item group as Random stock.',
+      buttonTooltip: 'Create or update Random item group in background and open it for editing.',
+    },
+  ] as const;
+
   if (!isOpen) return null;
 
-  return createPortal(
+  return (
     <div
       ref={dialogRef}
       className="bg-background border border-border/70 rounded-lg flex flex-col shadow-xl"
@@ -186,290 +218,70 @@ const NpcVendorSettingsDialog = ({
             <ChevronDown className={`w-4 h-4 transition-transform ${vendorStockExpanded ? 'rotate-180' : ''}`} />
           </button>
           {vendorStockExpanded && (
-            <div className="px-3 pb-3 space-y-4">
-              <div className="space-y-4">
-                <div className="space-y-3 rounded-xl border border-border bg-muted/30 p-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                      <span>Constant Stock</span>
-                      <Tooltip content="Select an item group to populate this vendor constant stock. Editing the table will save a new vendor-specific loot group if the selected group is modified.">
-                        <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
-                      </Tooltip>
-                    </div>
-                  </div>
-                  <div className="rounded-xl border border-border bg-muted/30 p-3">
+            <div className="px-3 pb-3 space-y-3">
+              {vendorStockSections.map((section) => (
+                <div key={section.title} className="rounded-xl border border-border bg-muted/30 p-3">
+                  <div className="space-y-4">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="inline-flex items-center gap-2 border-orange-400 bg-orange-500/10 text-orange-700 hover:bg-orange-600/10"
-                        onClick={() => void handleCreateVendorStockItem('constant', constantStockGroup === 'none' ? null : constantStockGroup, 'constant_stock_group')}
-                      >
-                        <Table2 className="w-4 h-4" />
-                        Stock
-                      </Button>
-                      <div className="flex flex-1 min-w-0 items-center gap-2">
-                        {itemGroups.length > 0 ? (
-                          <Select onValueChange={handleSelectConstantStockGroup} value={constantStockGroup}>
-                            <SelectTrigger className="w-full">
-                              <SelectValue placeholder="Select item group">
-                                {constantStockGroup === 'none' ? 'None' : itemGroups.find(g => String(g.id) === constantStockGroup)?.name || `Group ${constantStockGroup}`}
-                              </SelectValue>
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none">None</SelectItem>
-                              {itemGroups.map((group) => {
-                                const groupId = group?.id ? String(group.id) : 'invalid';
-                                return (
-                                  <SelectItem key={groupId} value={groupId}>
-                                    {group?.name || `Group ${group?.id || '?'}`}
-                                  </SelectItem>
-                                );
-                              })}
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <div className="rounded-md border border-border/70 bg-muted p-3 text-xs text-muted-foreground w-full">
-                            No item groups are available in the Items layer. Create items with role &quot;loot_groups&quot; in the Items layer.
-                          </div>
-                        )}
-                        <Tooltip content="Use an existing item group as Constant Stock.">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                        <span>{section.title}</span>
+                        <Tooltip content={section.buttonTooltip}>
                           <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
+                        </Tooltip>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Tooltip content={section.buttonTooltip}>
+                          <Button
+                            size="sm"
+                            className="inline-flex items-center gap-2 bg-orange-500 text-white hover:bg-orange-600"
+                            onClick={() => void handleCreateVendorStockItem(section.stockType, section.value === 'none' ? null : section.value, section.propertyKey)}
+                          >
+                            <Table2 className="w-4 h-4" />
+                            Stock
+                          </Button>
+                        </Tooltip>
+                        <Select value={section.value} onValueChange={section.onSelect}>
+                          <SelectTrigger className="h-9 text-sm min-w-[160px]">
+                            <SelectValue placeholder="Select item group" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none" className="text-xs">None</SelectItem>
+                            {itemGroups.map((item) => (
+                              <SelectItem key={item.id} value={String(item.id)} className="text-xs">
+                                {item.name || item.fileName}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Tooltip content={section.tooltip}>
+                          <HelpCircle className="w-5 h-5 text-muted-foreground cursor-pointer" />
                         </Tooltip>
                       </div>
                     </div>
                   </div>
                 </div>
+              ))}
+            </div>
+          )}
+        </div>
 
-                <div className="space-y-3 rounded-xl border border-border bg-muted/30 p-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                      <span>Status Stock</span>
-                      <Tooltip content="Select a loot group to populate the status stock item table. Edits will create a new vendor-specific loot group if the selected group is modified.">
-                        <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
-                      </Tooltip>
-                    </div>
-                  </div>
-                  <div className="rounded-xl border border-border bg-muted/30 p-3">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="inline-flex items-center gap-2 border-orange-400 bg-orange-500/10 text-orange-700 hover:bg-orange-600/10"
-                        onClick={() => void handleCreateVendorStockItem('status', statusStockGroup === 'none' ? null : statusStockGroup, 'status_stock_group')}
-                      >
-                        <Table2 className="w-4 h-4" />
-                        Stock
-                      </Button>
-                      <div className="flex flex-1 min-w-0 items-center gap-2">
-                        {itemGroups.length > 0 ? (
-                          <Select onValueChange={handleSelectStatusStockGroup} value={statusStockGroup}>
-                            <SelectTrigger className="w-full">
-                              <SelectValue placeholder="Select item group">
-                                {statusStockGroup === 'none' ? 'None' : itemGroups.find(g => String(g.id) === statusStockGroup)?.name || `Group ${statusStockGroup}`}
-                              </SelectValue>
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none">None</SelectItem>
-                              {itemGroups.map((group) => {
-                                const groupId = group?.id ? String(group.id) : 'invalid';
-                                return (
-                                  <SelectItem key={groupId} value={groupId}>
-                                    {group?.name || `Group ${group?.id || '?'}`}
-                                  </SelectItem>
-                                );
-                              })}
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <div className="rounded-md border border-border/70 bg-muted p-3 text-xs text-muted-foreground w-full">
-                            No item groups are available in the Items layer. Create items with role &quot;loot_groups&quot; in the Items layer.
-                          </div>
-                        )}
-                        <Tooltip content="Use an existing item group as Status Stock.">
-                          <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
-                        </Tooltip>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-3 rounded-xl border border-border bg-muted/30 p-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-                      <span>Random Stock</span>
-                      <Tooltip content="Define candidates for the vendor random offers. You can include an existing loot group and still add custom random items.">
-                        <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
-                      </Tooltip>
-                    </div>
-                  </div>
-                  <div className="rounded-xl border border-border bg-muted/30 p-3">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="inline-flex items-center gap-2 border-orange-400 bg-orange-500/10 text-orange-700 hover:bg-orange-600/10"
-                        onClick={() => void handleCreateVendorStockItem('random', randomStockGroup === 'none' ? null : randomStockGroup, 'random_stock_group')}
-                      >
-                        <Table2 className="w-4 h-4" />
-                        Stock
-                      </Button>
-                      <div className="flex flex-1 min-w-0 items-center gap-2">
-                        {itemGroups.length > 0 ? (
-                          <Select onValueChange={handleSelectRandomStockGroup} value={randomStockGroup}>
-                            <SelectTrigger className="w-full">
-                              <SelectValue placeholder="Select item group">
-                                {randomStockGroup === 'none' ? 'None' : itemGroups.find(g => String(g.id) === randomStockGroup)?.name || `Group ${randomStockGroup}`}
-                              </SelectValue>
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="none">None</SelectItem>
-                              {itemGroups.map((group) => {
-                                const groupId = group?.id ? String(group.id) : 'invalid';
-                                return (
-                                  <SelectItem key={groupId} value={groupId}>
-                                    {group?.name || `Group ${group?.id || '?'}`}
-                                  </SelectItem>
-                                );
-                              })}
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <div className="rounded-md border border-border/70 bg-muted p-3 text-xs text-muted-foreground w-full">
-                            No item groups are available in the Items layer. Create items with role &quot;loot_groups&quot; in the Items layer.
-                          </div>
-                        )}
-                        <Tooltip content="Use an existing item group as Random Stock.">
-                          <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
-                        </Tooltip>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="flex items-center gap-2 text-sm font-medium mb-1">
-                    Random Stock Definition
-                    <Tooltip content="Use a loot table filename or inline definition here. The selected items above will update this value.">
-                      <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
-                    </Tooltip>
-                  </label>
-                  <Input
-                    className="h-10 text-sm"
-                    value={getEditingObjectProperty('random_stock', '')}
-                    onChange={(e) => updateEditingObjectProperty('random_stock', e.target.value || null)}
-                    placeholder="loot table definition"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Selected items are serialized as <code>id,chance,min,max</code> entries in this field.
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="flex items-center gap-2 text-sm font-medium mb-1">
-                      Random Stock Count Min
-                      <Tooltip content="Sets the minimum amount of random items this npc can have.">
-                        <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
-                      </Tooltip>
-                    </label>
-                    <Input
-                      type="number"
-                      className="h-10 text-sm"
-                      value={getEditingObjectProperty('random_stock_count_min', '')}
-                      onChange={(e) => updateEditingObjectProperty('random_stock_count_min', e.target.value || null)}
-                      placeholder="Min"
-                      min="0"
-                    />
-                  </div>
-                  <div>
-                    <label className="flex items-center gap-2 text-sm font-medium mb-1">
-                      Random Stock Count Max
-                      <Tooltip content="Sets the maximum amount of random items this npc can have.">
-                        <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
-                      </Tooltip>
-                    </label>
-                    <Input
-                      type="number"
-                      className="h-10 text-sm"
-                      value={getEditingObjectProperty('random_stock_count_max', '')}
-                      onChange={(e) => updateEditingObjectProperty('random_stock_count_max', e.target.value || null)}
-                      placeholder="Max"
-                      min="0"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="rounded-xl border border-border bg-muted/50 overflow-hidden">
-            <button
-              type="button"
-              className="w-full px-3 py-3 flex items-center justify-between gap-3 text-sm font-semibold text-foreground hover:bg-transparent"
-              onClick={() => setVendorPricingExpanded((prev) => !prev)}
-            >
-              <span className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-violet-500" />
-                Vendor Pricing
-              </span>
-              <ChevronDown className={`w-4 h-4 transition-transform ${vendorPricingExpanded ? 'rotate-180' : ''}`} />
-            </button>
-            {vendorPricingExpanded && (
-              <div className="px-3 pb-3 space-y-4">
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <label className="flex items-center gap-2 text-sm font-medium mb-1">
-                      Vendor Ratio Buy
-                      <Tooltip content="NPC-specific version of vendor_ratio_buy from engine/loot.txt. Uses the global setting when set to 0.">
-                        <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
-                      </Tooltip>
-                    </label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      className="h-10 text-sm"
-                      value={getEditingObjectProperty('vendor_ratio_buy', '')}
-                      onChange={(e) => updateEditingObjectProperty('vendor_ratio_buy', e.target.value || null)}
-                      placeholder="0"
-                    />
-                  </div>
-                  <div>
-                    <label className="flex items-center gap-2 text-sm font-medium mb-1">
-                      Vendor Ratio Sell
-                      <Tooltip content="NPC-specific version of vendor_ratio_sell from engine/loot.txt. Uses the global setting when set to 0.">
-                        <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
-                      </Tooltip>
-                    </label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      className="h-10 text-sm"
-                      value={getEditingObjectProperty('vendor_ratio_sell', '')}
-                      onChange={(e) => updateEditingObjectProperty('vendor_ratio_sell', e.target.value || null)}
-                      placeholder="0"
-                    />
-                  </div>
-                  <div>
-                    <label className="flex items-center gap-2 text-sm font-medium mb-1">
-                      Vendor Ratio Sell Old
-                      <Tooltip content="NPC-specific version of vendor_ratio_sell_old from engine/loot.txt. Uses the global setting when set to 0.">
-                        <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
-                      </Tooltip>
-                    </label>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      className="h-10 text-sm"
-                      value={getEditingObjectProperty('vendor_ratio_sell_old', '')}
-                      onChange={(e) => updateEditingObjectProperty('vendor_ratio_sell_old', e.target.value || null)}
-                      placeholder="0"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+        <div className="rounded-xl border border-border bg-muted/50 overflow-hidden">
+          <button
+            type="button"
+            className="w-full px-3 py-3 flex items-center justify-between gap-3 text-sm font-semibold text-foreground hover:bg-transparent"
+            onClick={() => setVendorPricingExpanded((prev) => !prev)}
+          >
+            <span className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-violet-500" />
+              Vendor Pricing
+            </span>
+            <ChevronDown className={`w-4 h-4 transition-transform ${vendorPricingExpanded ? 'rotate-180' : ''}`} />
+          </button>
+          {vendorPricingExpanded && (
+            <div className="px-3 pb-3">
+              <p className="text-sm text-muted-foreground">Vendor pricing placeholder</p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -492,8 +304,7 @@ const NpcVendorSettingsDialog = ({
       >
         <div className="w-1.5 h-1.5 bg-foreground/40 rounded-sm m-1" />
       </div>
-    </div>,
-    document.body,
+    </div>
   );
 };
 

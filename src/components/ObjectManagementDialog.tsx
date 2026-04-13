@@ -33,6 +33,7 @@ type ObjectManagementDialogProps = {
   itemsList: ItemSummary[];
   handleOpenVendorUnlockDialog: () => void;
   handleOpenVendorRandomDialog: () => void;
+  handleCreateVendorStockGroup: (stockType: 'constant' | 'status' | 'random', selectedGroupId: string | null, npcName: string) => Promise<ItemSummary | null>;
   handleOpenVendorSettingsDialog: () => void;
   handleCloseVendorSettingsDialog: () => void;
   showVendorSettingsDialog: boolean;
@@ -72,6 +73,7 @@ const ObjectManagementDialog = ({
   handleOpenVendorStockDialog,
   handleOpenVendorUnlockDialog,
   handleOpenVendorRandomDialog,
+  handleCreateVendorStockGroup,
   itemsList,
   handleOpenVendorSettingsDialog,
   handleCloseVendorSettingsDialog,
@@ -507,6 +509,7 @@ const ObjectManagementDialog = ({
           onOpenStockDialog={handleOpenVendorStockDialog}
           onOpenUnlockDialog={handleOpenVendorUnlockDialog}
           onOpenRandomDialog={handleOpenVendorRandomDialog}
+          onCreateVendorStockGroup={handleCreateVendorStockGroup}
           itemsList={itemsList}
           getEditingObjectProperty={getEditingObjectProperty}
           updateEditingObjectProperty={updateEditingObjectProperty}

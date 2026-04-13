@@ -25,6 +25,7 @@ type ObjMgmtCtx = {
   handleOpenVendorStockDialog?: () => void;
   handleOpenVendorUnlockDialog?: () => void;
   handleOpenVendorRandomDialog?: () => void;
+  handleCreateVendorStockGroup?: (stockType: 'constant' | 'status' | 'random', selectedGroupId: string | null, npcName: string) => Promise<ItemSummary | null>;
   handleOpenVendorSettingsDialog?: () => void;
   handleCloseVendorSettingsDialog?: () => void;
   showVendorSettingsDialog?: boolean;
@@ -63,6 +64,7 @@ export default function ObjectManagementDialogContainer({ ctx }: { ctx: unknown 
       handleOpenVendorStockDialog={c.handleOpenVendorStockDialog ?? (() => {})}
       handleOpenVendorUnlockDialog={c.handleOpenVendorUnlockDialog ?? (() => {})}
       handleOpenVendorRandomDialog={c.handleOpenVendorRandomDialog ?? (() => {})}
+      handleCreateVendorStockGroup={c.handleCreateVendorStockGroup ?? (async () => null)}
       handleOpenVendorSettingsDialog={c.handleOpenVendorSettingsDialog ?? (() => {})}
       handleCloseVendorSettingsDialog={c.handleCloseVendorSettingsDialog ?? (() => {})}
       showVendorSettingsDialog={!!c.showVendorSettingsDialog}

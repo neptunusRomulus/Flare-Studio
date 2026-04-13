@@ -1651,12 +1651,12 @@ function parseItemsInCategoryFile(filePath) {
         // Preserve role/resource info from comment lines that the writer adds above [item]
         const roleMatch = trimmed.match(/^#\s*role=(.+)$/i);
         if (roleMatch) {
-          item._role = roleMatch[1].toLowerCase();
+          item._role = roleMatch[1].trim().toLowerCase();
           continue;
         }
         const resMatch = trimmed.match(/^#\s*resource_subtype=(.+)$/i);
         if (resMatch) {
-          item._resourceSubtype = resMatch[1].toLowerCase();
+          item._resourceSubtype = resMatch[1].trim().toLowerCase();
           continue;
         }
         if (!trimmed || trimmed.startsWith("#") || trimmed.startsWith("[")) continue;
@@ -2079,8 +2079,8 @@ ipcMainLocal.handle(
       }
 
       const category = itemData.category || "Default";
-      const role = (itemData.role || "").toLowerCase() || "unspecified";
-      const resourceSubtype = (itemData.resourceSubtype || "").toLowerCase();
+      const role = String(itemData.role || "").trim().toLowerCase() || "unspecified";
+      const resourceSubtype = String(itemData.resourceSubtype || "").trim().toLowerCase();
 
       let categoryFilePath;
       if (category === "Default") {

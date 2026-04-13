@@ -176,6 +176,22 @@ const ObjectManagementDialog = ({
   const randomStockSelection = parseRandomStock(getEditingObjectProperty('random_stock', ''));
   const randomStockGroup = getEditingObjectProperty('random_stock_group', '') || 'none';
   const itemGroups = itemsList.filter((item) => item.role === 'loot_groups');
+  
+  // Debug: Log item groups information
+  console.log('Debug itemGroups in ObjectManagementDialog:', {
+    totalItems: itemsList.length,
+    itemGroupsCount: itemGroups.length,
+    itemGroups: itemGroups.map(g => ({ id: g.id, name: g.name, role: g.role, category: g.category })),
+    allRoles: [...new Set(itemsList.map(item => item.role))]
+  });
+  
+  // Debug: Log item groups information
+  console.log('Debug itemGroups:', {
+    totalItems: itemsList.length,
+    itemGroupsCount: itemGroups.length,
+    itemGroups: itemGroups.map(g => ({ id: g.id, name: g.name, role: g.role, category: g.category })),
+    allRoles: [...new Set(itemsList.map(item => item.role))]
+  });
 
   const statusStockRows = itemsList
     .filter((item) => item.role !== 'loot_groups')
@@ -2005,20 +2021,28 @@ const ObjectManagementDialog = ({
                               {itemGroups.length > 0 ? (
                                 <Select onValueChange={handleSelectConstantStockGroup} value={constantStockGroup}>
                                   <SelectTrigger className="w-full">
-                                    <SelectValue placeholder="Select item group" />
+                                    <SelectValue placeholder="Select item group">
+                                      {constantStockGroup === 'none' ? 'None' : 
+                                       itemGroups.find(g => String(g.id) === constantStockGroup)?.name || `Group ${constantStockGroup}`}
+                                    </SelectValue>
                                   </SelectTrigger>
                                   <SelectContent>
                                     <SelectItem value="none">None</SelectItem>
-                                    {itemGroups.map((group) => (
-                                      <SelectItem key={group.id} value={String(group.id)}>
-                                        {group.name || `Group ${group.id}`}
-                                      </SelectItem>
-                                    ))}
+                                    {itemGroups.map((group) => {
+                                      // Ensure group.id is valid
+                                      const groupId = group?.id ? String(group.id) : 'invalid';
+                                      return (
+                                        <SelectItem key={groupId} value={groupId}>
+                                          {group?.name || `Group ${group?.id || '?'}`}
+                                        </SelectItem>
+                                      );
+                                    })}
                                   </SelectContent>
                                 </Select>
                               ) : (
                                 <div className="rounded-md border border-border/70 bg-muted p-3 text-xs text-muted-foreground">
-                                  No item groups are available in the Items layer.
+                                  No item groups are available in the Items layer. 
+                                  Create items with role "loot_groups" in the Items layer.
                                 </div>
                               )}
                             </div>
@@ -2105,20 +2129,27 @@ const ObjectManagementDialog = ({
                               {itemGroups.length > 0 ? (
                                 <Select onValueChange={handleSelectStatusStockGroup} value={statusStockGroup}>
                                   <SelectTrigger className="w-full">
-                                    <SelectValue placeholder="Select item group" />
+                                    <SelectValue placeholder="Select item group">
+                                      {statusStockGroup === 'none' ? 'None' : 
+                                       itemGroups.find(g => String(g.id) === statusStockGroup)?.name || `Group ${statusStockGroup}`}
+                                    </SelectValue>
                                   </SelectTrigger>
                                   <SelectContent>
                                     <SelectItem value="none">None</SelectItem>
-                                    {itemGroups.map((group) => (
-                                      <SelectItem key={group.id} value={String(group.id)}>
-                                        {group.name || `Group ${group.id}`}
-                                      </SelectItem>
-                                    ))}
+                                    {itemGroups.map((group) => {
+                                      const groupId = group?.id ? String(group.id) : 'invalid';
+                                      return (
+                                        <SelectItem key={groupId} value={groupId}>
+                                          {group?.name || `Group ${group?.id || '?'}`}
+                                        </SelectItem>
+                                      );
+                                    })}
                                   </SelectContent>
                                 </Select>
                               ) : (
                                 <div className="rounded-md border border-border/70 bg-muted p-3 text-xs text-muted-foreground">
-                                  No item groups are available in the Items layer.
+                                  No item groups are available in the Items layer. 
+                                  Create items with role "loot_groups" in the Items layer.
                                 </div>
                               )}
                             </div>
@@ -2213,20 +2244,27 @@ const ObjectManagementDialog = ({
                               {itemGroups.length > 0 ? (
                                 <Select onValueChange={handleSelectRandomStockGroup} value={randomStockGroup}>
                                   <SelectTrigger className="w-full">
-                                    <SelectValue placeholder="Select item group" />
+                                    <SelectValue placeholder="Select item group">
+                                      {randomStockGroup === 'none' ? 'None' : 
+                                       itemGroups.find(g => String(g.id) === randomStockGroup)?.name || `Group ${randomStockGroup}`}
+                                    </SelectValue>
                                   </SelectTrigger>
                                   <SelectContent>
                                     <SelectItem value="none">None</SelectItem>
-                                    {itemGroups.map((group) => (
-                                      <SelectItem key={group.id} value={String(group.id)}>
-                                        {group.name || `Group ${group.id}`}
-                                      </SelectItem>
-                                    ))}
+                                    {itemGroups.map((group) => {
+                                      const groupId = group?.id ? String(group.id) : 'invalid';
+                                      return (
+                                        <SelectItem key={groupId} value={groupId}>
+                                          {group?.name || `Group ${group?.id || '?'}`}
+                                        </SelectItem>
+                                      );
+                                    })}
                                   </SelectContent>
                                 </Select>
                               ) : (
                                 <div className="rounded-md border border-border/70 bg-muted p-3 text-xs text-muted-foreground">
-                                  No item groups are available in the Items layer.
+                                  No item groups are available in the Items layer. 
+                                  Create items with role "loot_groups" in the Items layer.
                                 </div>
                               )}
                             </div>

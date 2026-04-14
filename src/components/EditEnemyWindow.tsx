@@ -189,7 +189,8 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
 
     // Loot
     if (loot) lines.push(`loot=${loot}`);
-    if (lootCount) lines.push(`loot_count=${lootCount}`);
+    const savedLootCount = buildLootCount();
+    if (savedLootCount) lines.push(`loot_count=${savedLootCount}`);
     if (firstDefeatLoot) lines.push(`first_defeat_loot=${firstDefeatLoot}`);
     if (questLoot) lines.push(`quest_loot=${questLoot}`);
     if (defeatStatus) lines.push(`defeat_status=${defeatStatus}`);
@@ -357,10 +358,26 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
 
   // Loot
   const [loot, setLoot] = useState<string>(() => enemy?.properties?.loot || '');
-  const [lootCount, setLootCount] = useState<string>(() => enemy?.properties?.loot_count || '');
+  const [lootCountMin, setLootCountMin] = useState<string>('');
+  const [lootCountMax, setLootCountMax] = useState<string>('');
   const [lootGroup, setLootGroup] = useState<string>(() => '');
   const [lootSelection, setLootSelection] = useState<Record<number, number>>(() => ({}));
   const [firstDefeatLoot, setFirstDefeatLoot] = useState<string>(() => enemy?.properties?.first_defeat_loot || '');
+
+  const parseLootCount = (value: string | undefined) => {
+    const defaultValue = ['', ''];
+    if (!value) return defaultValue;
+    const parts = String(value).split(',').map((part) => part.trim());
+    if (parts.length === 1) return [parts[0], ''];
+    return [parts[0], parts[1] || ''];
+  };
+
+  const buildLootCount = () => {
+    if (lootCountMin && lootCountMax) return `${lootCountMin},${lootCountMax}`;
+    if (lootCountMin) return lootCountMin;
+    if (lootCountMax) return `1,${lootCountMax}`;
+    return '';
+  };
 
   // Quest
   const [questLoot, setQuestLoot] = useState<string>(() => enemy?.properties?.quest_loot || '');
@@ -389,29 +406,6 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
     setLootGroup(gid);
     setLoot(buildLootString(gid, lootSelection));
   }, [buildLootString, lootSelection]);
-
-  const handleToggleLootItem = useCallback((itemId: number) => {
-    setLootSelection((prev) => {
-      const next = { ...prev };
-      if (next[itemId]) {
-        delete next[itemId];
-      } else {
-        next[itemId] = 1;
-      }
-      setLoot(buildLootString(lootGroup, next));
-      return next;
-    });
-  }, [buildLootString, lootGroup]);
-
-  const handleLootQuantityChange = useCallback((itemId: number, value: string) => {
-    setLootSelection((prev) => {
-      const next = { ...prev };
-      const parsedQty = Math.max(1, Number.parseInt(value, 10) || 1);
-      next[itemId] = parsedQty;
-      setLoot(buildLootString(lootGroup, next));
-      return next;
-    });
-  }, [buildLootString, lootGroup]);
 
   const handleSelectFirstDefeatLootItem = useCallback((itemId: string) => {
     setFirstDefeatLoot(itemId);
@@ -542,7 +536,9 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
       setPowerFilter(enemy?.properties?.power_filter || '');
 
       setLoot(enemy?.properties?.loot || '');
-      setLootCount(enemy?.properties?.loot_count || '');
+      const [minCount, maxCount] = parseLootCount(enemy?.properties?.loot_count);
+      setLootCountMin(minCount);
+      setLootCountMax(maxCount);
       setFirstDefeatLoot(enemy?.properties?.first_defeat_loot || '');
 
       setQuestLoot(enemy?.properties?.quest_loot || '');
@@ -651,7 +647,8 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
     if (powerFilter) newProps.power_filter = powerFilter; else delete newProps.power_filter;
 
     if (loot) newProps.loot = loot; else delete newProps.loot;
-    if (lootCount) newProps.loot_count = lootCount; else delete newProps.loot_count;
+    const resolvedLootCount = buildLootCount();
+    if (resolvedLootCount) newProps.loot_count = resolvedLootCount; else delete newProps.loot_count;
     if (firstDefeatLoot) newProps.first_defeat_loot = firstDefeatLoot; else delete newProps.first_defeat_loot;
 
     if (questLoot) newProps.quest_loot = questLoot; else delete newProps.quest_loot;
@@ -1287,23 +1284,22 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
 
                 <div className="space-y-4 border-t pt-4">
                   <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">Loot Tables</label>
-                  <div className="space-y-3">
+                  <div className="rounded-xl border border-border bg-muted/30 p-3 space-y-4">
                     <div className="space-y-1">
-                      <LabelWithTooltip field="loot">Standard Loot</LabelWithTooltip>
-                      <Input value={loot} onChange={(e) => setLoot(e.target.value)} placeholder="loot/level_1.txt or 16,17" className="h-9 font-mono text-xs" />
-                      <p className="text-[10px] text-muted-foreground italic">Select a loot table or pick specific items from the Items layer below. Group and selected items can be combined.</p>
-                    </div>
-                    <div className="rounded-xl border border-border bg-muted/30 p-3 space-y-4">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                          <span>Loot Table</span>
-                          <Tooltip content="Choose an existing loot group from the Items layer.">
-                            <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
-                          </Tooltip>
-                        </div>
+                      <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                        <span>Loot Table</span>
+                        <Tooltip content="Choose an existing loot group from the Items layer.">
+                          <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
+                        </Tooltip>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-[auto_auto_1fr] items-center">
+                        <Button size="sm" variant="outline" className="h-9 px-3">
+                          + New
+                        </Button>
+                        <span className="text-xs text-muted-foreground">or</span>
                         {itemGroups.length > 0 ? (
                           <Select value={lootGroup} onValueChange={handleSelectLootGroup}>
-                            <SelectTrigger className="w-full">
+                            <SelectTrigger className="w-full min-w-[180px]">
                               <SelectValue placeholder="Select loot table group" />
                             </SelectTrigger>
                             <SelectContent>
@@ -1321,86 +1317,31 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
                           </div>
                         )}
                       </div>
-
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-foreground">Custom Loot Items</span>
-                          <Tooltip content="Select item IDs to include in this enemy's loot drop list.">
-                            <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
-                          </Tooltip>
-                        </div>
-                        <div className="overflow-auto rounded border border-border bg-background">
-                          <table className="min-w-full text-left text-sm">
-                            <thead className="border-b border-border/70 bg-muted/30">
-                              <tr>
-                                <th className="p-2 w-10" />
-                                <th className="p-2">ID</th>
-                                <th className="p-2">Name</th>
-                                <th className="p-2">Category</th>
-                                <th className="p-2 w-24">Qty</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {lootItems.map((item) => {
-                                const selected = Boolean(lootSelection[item.id]);
-                                return (
-                                  <tr key={item.id} className={`border-b border-border/50 ${selected ? 'bg-orange-50' : ''}`}>
-                                    <td className="p-2">
-                                      <input
-                                        type="checkbox"
-                                        checked={selected}
-                                        onChange={() => handleToggleLootItem(item.id)}
-                                        className="h-4 w-4 rounded border-border text-orange-500"
-                                      />
-                                    </td>
-                                    <td className="p-2 text-xs font-medium text-slate-700">{item.id}</td>
-                                    <td className="p-2 text-xs text-slate-700">{item.name}</td>
-                                    <td className="p-2 text-xs text-muted-foreground">{item.category || 'Unknown'}</td>
-                                    <td className="p-2">
-                                      <Input
-                                        value={selected ? String(lootSelection[item.id] || 1) : ''}
-                                        onChange={(event) => handleLootQuantityChange(item.id, event.target.value)}
-                                        placeholder="1"
-                                        className="h-9 text-xs"
-                                        disabled={!selected}
-                                      />
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                              {lootItems.length === 0 && (
-                                <tr>
-                                  <td colSpan={5} className="p-4 text-xs text-muted-foreground">
-                                    No items found in the Items layer.
-                                  </td>
-                                </tr>
-                              )}
-                            </tbody>
-                          </table>
-                        </div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <LabelWithTooltip field="lootCount">Loot Count Range</LabelWithTooltip>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Input value={lootCountMin} onChange={(e) => setLootCountMin(e.target.value)} placeholder="Min" className="h-9" />
+                        <Input value={lootCountMax} onChange={(e) => setLootCountMax(e.target.value)} placeholder="Max" className="h-9" />
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <LabelWithTooltip field="lootCount">Loot Count Range</LabelWithTooltip>
-                        <Input value={lootCount} onChange={(e) => setLootCount(e.target.value)} placeholder="e.g. 1,3" className="h-9" />
-                      </div>
-                      <div className="space-y-1">
-                        <LabelWithTooltip field="firstDefeatLoot">First Defeat Loot</LabelWithTooltip>
-                        <Input value={firstDefeatLoot} onChange={(e) => setFirstDefeatLoot(e.target.value)} className="h-9 font-mono text-xs" />
-                        <Select value={firstDefeatLoot} onValueChange={handleSelectFirstDefeatLootItem}>
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Select item" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {lootItems.map((item) => (
-                              <SelectItem key={item.id} value={String(item.id)}>
-                                {item.name} ({item.id})
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
+                    <div className="space-y-1">
+                      <LabelWithTooltip field="firstDefeatLoot">First Defeat Loot</LabelWithTooltip>
+                      <Input value={firstDefeatLoot} onChange={(e) => setFirstDefeatLoot(e.target.value)} className="h-9 font-mono text-xs" />
+                      <Select value={firstDefeatLoot} onValueChange={handleSelectFirstDefeatLootItem}>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select item" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {lootItems.map((item) => (
+                            <SelectItem key={item.id} value={String(item.id)}>
+                              {item.name} ({item.id})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
                 </div>
@@ -1474,48 +1415,47 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
   if (!open) return null;
 
   return createPortal(
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40" onClick={() => onOpenChange?.(false)}>
+    <div 
+      ref={dialogRef}
+      className="bg-background border border-border/70 rounded-lg flex flex-col shadow-xl"
+      style={{
+        position: 'fixed',
+        left: `${position.x}px`,
+        top: `${position.y}px`,
+        width: `${size.width}px`,
+        height: `${size.height}px`,
+        zIndex: 100,
+        pointerEvents: 'auto',
+      }}
+      onClick={(e) => e.stopPropagation()}
+    >
       <div 
-        ref={dialogRef}
-        className="bg-background border border-border/70 rounded-lg flex flex-col shadow-xl"
-        style={{
-          position: 'fixed',
-          left: `${position.x}px`,
-          top: `${position.y}px`,
-          width: `${size.width}px`,
-          height: `${size.height}px`,
-          pointerEvents: 'auto',
-        }}
-        onClick={(e) => e.stopPropagation()}
+        className="flex items-center justify-between p-4 border-b border-border cursor-move select-none"
+        onMouseDown={handleHeaderMouseDown}
       >
-        <div 
-          className="flex items-center justify-between p-4 border-b border-border cursor-move select-none"
-          onMouseDown={handleHeaderMouseDown}
+        <div className="flex items-center gap-2">
+          <Sword className="w-5 h-5 text-orange-500" />
+          {name && <Badge variant="outline" className="bg-muted/30">{name}</Badge>}
+        </div>
+        <button
+          onClick={() => onOpenChange?.(false)}
+          className="text-muted-foreground hover:text-foreground transition-colors"
         >
-          <div className="flex items-center gap-2">
-            <Sword className="w-5 h-5 text-orange-500" />
-            {name && <Badge variant="outline" className="bg-muted/30">{name}</Badge>}
-          </div>
-          <button
-            onClick={() => onOpenChange?.(false)}
-            className="text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
+          <X className="w-4 h-4" />
+        </button>
+      </div>
 
-        <div className="flex-1 overflow-hidden flex flex-col">
-          {panel}
-        </div>
+      <div className="flex-1 overflow-hidden flex flex-col">
+        {panel}
+      </div>
 
-        {/* Resize handle */}
-        <div
-          onMouseDown={handleResizeMouseDown}
-          className="absolute bottom-0 right-0 w-5 h-5 cursor-se-resize opacity-40 hover:opacity-100 transition-opacity flex items-end justify-end"
-          title="Drag to resize"
-        >
-          <div className="w-1.5 h-1.5 bg-foreground/40 rounded-sm m-1" />
-        </div>
+      {/* Resize handle */}
+      <div
+        onMouseDown={handleResizeMouseDown}
+        className="absolute bottom-0 right-0 w-5 h-5 cursor-se-resize opacity-40 hover:opacity-100 transition-opacity flex items-end justify-end"
+        title="Drag to resize"
+      >
+        <div className="w-1.5 h-1.5 bg-foreground/40 rounded-sm m-1" />
       </div>
     </div>,
     document.body

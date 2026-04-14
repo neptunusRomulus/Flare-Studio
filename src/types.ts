@@ -27,7 +27,7 @@ export interface MapObject {
   y: number;
   width: number;
   height: number;
-  properties: Record<string, string>;
+  properties: Record<string, string | string[]>;
   // Flare-specific extensions
   category?: string;      // For enemies: antlion, antlion_hatchling, etc.
   level?: number;         // For enemies: difficulty level

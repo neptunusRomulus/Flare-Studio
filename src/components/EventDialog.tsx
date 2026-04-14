@@ -3,13 +3,20 @@ import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import { HelpCircle, X, Save, MapPinPlus, MousePointerClick, MapPinMinus, LogIn, LogOut, SquareCheckBig, Repeat2 } from 'lucide-react';
+import { HelpCircle, X, Save, MapPinPlus, MousePointerClick, MapPinMinus, LogIn, LogOut, SquareCheckBig, Repeat2, ChevronDown, ChevronUp } from 'lucide-react';
 import Tooltip from '@/components/ui/tooltip';
 import { useAppContext } from '@/context/AppContext';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 import { ACTIVATION_COLORS } from '@/editor/eventActivationColors';
 
 type EventActivation = 'Trigger' | 'Interact' | 'Load' | 'Leave' | 'MapExit' | 'MapClear' | 'Loop';
+
+type EventItemRequirement = {
+  id: string;
+  type: 'requires_item' | 'requires_not_item';
+  itemId: string;
+  itemQuantity: number;
+};
 
 type EventData = {
   name: string;
@@ -28,10 +35,7 @@ type EventData = {
   requirements: {
     status: string[];
     minLevel: number;
-    itemId: string;
-    itemQuantity: number;
-    notItemId: string;
-    notItemQuantity: number;
+    itemRequirements: EventItemRequirement[];
     currency: number;
   };
   rewards: {
@@ -167,12 +171,20 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
       props.requires_status = statusValues;
     }
     if (eventData.requirements.minLevel > 0) props.requires_level = String(eventData.requirements.minLevel);
-    if (eventData.requirements.itemId.trim()) {
-      props.requires_item = `${eventData.requirements.itemId.trim()}:${eventData.requirements.itemQuantity}`;
-    }
-    if (eventData.requirements.notItemId.trim()) {
-      props.requires_not_item = `${eventData.requirements.notItemId.trim()}:${eventData.requirements.notItemQuantity}`;
-    }
+
+    const requiresItemValues = eventData.requirements.itemRequirements
+      .filter(req => req.type === 'requires_item' && req.itemId.trim())
+      .map(req => `${req.itemId.trim()}:${req.itemQuantity}`);
+    const requiresNotItemValues = eventData.requirements.itemRequirements
+      .filter(req => req.type === 'requires_not_item' && req.itemId.trim())
+      .map(req => `${req.itemId.trim()}:${req.itemQuantity}`);
+
+    if (requiresItemValues.length === 1) props.requires_item = requiresItemValues[0];
+    else if (requiresItemValues.length > 1) props.requires_item = requiresItemValues;
+
+    if (requiresNotItemValues.length === 1) props.requires_not_item = requiresNotItemValues[0];
+    else if (requiresNotItemValues.length > 1) props.requires_not_item = requiresNotItemValues;
+
     if (eventData.requirements.currency > 0) props.requires_currency = String(eventData.requirements.currency);
     if (eventData.rewards.message.trim()) props.msg = eventData.rewards.message.trim();
     if (eventData.rewards.expReward > 0) props.reward_xp = String(eventData.rewards.expReward);
@@ -275,10 +287,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
     requirements: {
       status: [],
       minLevel: 0,
-      itemId: '',
-      itemQuantity: 1,
-      notItemId: '',
-      notItemQuantity: 1,
+      itemRequirements: [],
       currency: 0,
     },
     rewards: {
@@ -339,9 +348,28 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
         const hotspot = hotParts.length === 4 && hotParts.every((n: number) => !isNaN(n))
           ? { x: hotParts[0], y: hotParts[1], width: hotParts[2], height: hotParts[3] }
           : { x: 0, y: 0, width: 1, height: 1 };
-        // Parse requires_item "id:qty"
-        const reqItemParts = parseItemValue(p.requires_item || '');
-        const reqNotItemParts = parseItemValue(p.requires_not_item || '');
+        const itemRequirements: EventItemRequirement[] = [];
+        const requiresItemValues = Array.isArray(p.requires_item)
+          ? p.requires_item
+          : p.requires_item ? [p.requires_item] : [];
+        const requiresNotItemValues = Array.isArray(p.requires_not_item)
+          ? p.requires_not_item
+          : p.requires_not_item ? [p.requires_not_item] : [];
+
+        itemRequirements.push(
+          ...requiresItemValues.map((item: string) => ({
+            id: `item-req-${Math.random().toString(36).slice(2)}`,
+            type: 'requires_item' as const,
+            ...parseItemValue(item),
+          }))
+        );
+        itemRequirements.push(
+          ...requiresNotItemValues.map((item: string) => ({
+            id: `item-req-${Math.random().toString(36).slice(2)}`,
+            type: 'requires_not_item' as const,
+            ...parseItemValue(item),
+          }))
+        );
         const rewardItemParts = parseItemValue(p.reward_item || '');
         const removeItemParts = parseItemValue(p.remove_item || '');
         const rewardLootCountParts = (p.reward_loot_count || '').split(',').map((part: string) => parseInt(part.trim(), 10) || 0);
@@ -371,10 +399,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                 ? [String(p.requires_status).trim()]
                 : [],
             minLevel: parseInt(p.requires_level || '0') || 0,
-            itemId: reqItemParts.id,
-            itemQuantity: reqItemParts.quantity,
-            notItemId: reqNotItemParts.id,
-            notItemQuantity: reqNotItemParts.quantity,
+            itemRequirements,
             currency: parseInt(p.requires_currency || '0') || 0,
           },
           rewards: {
@@ -419,7 +444,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
           hotspot: { x: 0, y: 0, width: 1, height: 1 },
         },
         timing: { activeActivation: null, cooldown: 0, delay: 0 },
-        requirements: { status: [], minLevel: 0, itemId: '', itemQuantity: 1, notItemId: '', notItemQuantity: 1, currency: 0 },
+        requirements: { status: [], minLevel: 0, itemRequirements: [], currency: 0 },
         rewards: { message: '', expReward: 0, rewardCurrency: 0, removeCurrency: 0, rewardItemId: '', rewardItemQuantity: 1, removeItemId: '', removeItemQuantity: 1, lootGroup: '', rewardLootGroup: '', rewardLootCountMin: 1, rewardLootCountMax: 1, enemySpawn: '', teleportMap: '', teleportX: 0, teleportY: 0, sound: '' },
         engine: { chance: 100, autoSave: false, script: '' },
       });
@@ -520,6 +545,75 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
     }));
   };
 
+  const addItemRequirement = () => {
+    setEventData(prev => ({
+      ...prev,
+      requirements: {
+        ...prev.requirements,
+        itemRequirements: [
+          ...prev.requirements.itemRequirements,
+          {
+            id: `item-req-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+            type: 'requires_item',
+            itemId: '',
+            itemQuantity: 1,
+          },
+        ],
+      },
+    }));
+  };
+
+  const updateItemRequirement = (id: string, updates: Partial<Omit<EventItemRequirement, 'id'>>) => {
+    setEventData(prev => ({
+      ...prev,
+      requirements: {
+        ...prev.requirements,
+        itemRequirements: prev.requirements.itemRequirements.map((req) =>
+          req.id === id ? { ...req, ...updates } : req
+        ),
+      },
+    }));
+  };
+
+  const removeItemRequirement = (id: string) => {
+    setEventData(prev => ({
+      ...prev,
+      requirements: {
+        ...prev.requirements,
+        itemRequirements: prev.requirements.itemRequirements.filter((req) => req.id !== id),
+      },
+    }));
+  };
+
+  const [expandedSections, setExpandedSections] = useState({
+    eventInfo: true,
+    positioning: true,
+    requirements: true,
+    rewards: true,
+    engine: true,
+  });
+
+  const toggleSection = (section: keyof typeof expandedSections) => {
+    setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
+
+  const CollapsibleSection = ({ title, icon: Icon, isExpanded, onToggle, children, id }: { title: string; icon: React.ComponentType<React.SVGProps<SVGSVGElement>>; isExpanded: boolean; onToggle: () => void; children: React.ReactNode; id: string }) => (
+    <div className="border border-border/50 rounded-lg overflow-hidden mb-4 shadow-sm" id={`section-${id}`}>
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full flex items-center justify-between p-3 bg-muted/20 hover:bg-muted/30 transition-colors select-none"
+      >
+        <div className="flex items-center gap-2">
+          <Icon className="w-4 h-4 text-orange-500" />
+          <span className="text-sm font-semibold tracking-wide">{title}</span>
+        </div>
+        {isExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
+      </button>
+      {isExpanded && <div className="p-4 bg-background border-t border-border/10 animate-in slide-in-from-top-2 duration-200">{children}</div>}
+    </div>
+  );
+
   const isLocEnabled = ['Trigger', 'Leave'].includes(eventData.timing.activeActivation || '');
   const isHotspotEnabled = ['Interact', 'Trigger'].includes(eventData.timing.activeActivation || '');
 
@@ -558,1008 +652,1022 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
 
         <div className="flex-1 overflow-y-auto space-y-6 px-6 py-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/15 [&::-webkit-scrollbar-thumb]:rounded-full">
           {/* Event Information Section */}
-          <div className="space-y-4 border-b border-border/50 pb-4">
-            <h3 className="text-sm font-semibold text-foreground">Event Information</h3>
-            <div className="space-y-2">
-              <label className="text-xs font-medium text-foreground/80">Name</label>
-              <Input
-                value={eventData.name}
-                onChange={e => setEventData(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="Event Name (e.g. Teleport to Town, Boss Trigger)"
-                className="h-8 text-sm"
-              />
+          <CollapsibleSection
+            title="Event Information"
+            icon={HelpCircle}
+            id="event-information"
+            isExpanded={expandedSections.eventInfo}
+            onToggle={() => toggleSection('eventInfo')}
+          >
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-foreground/80">Name</label>
+                <Input
+                  value={eventData.name}
+                  onChange={e => setEventData(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="Event Name (e.g. Teleport to Town, Boss Trigger)"
+                  className="h-8 text-sm"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-foreground/80">Description</label>
+                <Input
+                  value={eventData.description}
+                  onChange={e => setEventData(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Brief description of this event"
+                  className="h-8 text-sm"
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <label className="text-xs font-medium text-foreground/80">Description</label>
-              <Input
-                value={eventData.description}
-                onChange={e => setEventData(prev => ({ ...prev, description: e.target.value }))}
-                placeholder="Brief description of this event"
-                className="h-8 text-sm"
-              />
-            </div>
-          </div>
+          </CollapsibleSection>
 
           {/* Positioning and Timing Section */}
-          <div className="space-y-4 border-b border-border/50 pb-4">
-            <h3 className="text-sm font-semibold text-foreground">Positioning and Timing</h3>
+          <CollapsibleSection
+            title="Positioning and Timing"
+            icon={MapPinPlus}
+            id="positioning-and-timing"
+            isExpanded={expandedSections.positioning}
+            onToggle={() => toggleSection('positioning')}
+          >
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-foreground">Positioning and Timing</h3>
 
-            {/* Activation */}
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <label className="text-xs font-medium text-foreground/80">Activation</label>
-                <Tooltip content="When this event executes">
-                  <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
-                </Tooltip>
-              </div>
-              <div className="flex flex-wrap gap-1 items-start">
-                {ACTIVATION_OPTIONS.map(activation => {
-                  const config = ACTIVATION_CONFIG[activation];
-                  const IconComponent = config.icon;
-                  const isActive = eventData.timing.activeActivation === activation;
-                  return (
-                    <Tooltip key={activation} content={config.tooltip} side="right">
-                      <button
-                        onClick={() => setActivation(activation)}
-                        className={`rounded-md border p-2 transition-colors ${
-                          isActive
-                            ? (ACTIVATION_COLORS[activation]?.active ?? 'border-orange-500/50 bg-orange-500/10 text-orange-600')
-                            : 'border-border/50 bg-muted/30 text-foreground/60 hover:bg-muted/50'
-                        }`}
-                      >
-                        <IconComponent className="h-5 w-5" />
-                      </button>
-                    </Tooltip>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          <div className="relative space-y-6">
-            {!eventData.timing.activeActivation && (
-              <div className="absolute -inset-4 z-50 bg-black/50 backdrop-blur-[1px] rounded-lg flex items-start justify-center pt-20 pointer-events-auto">
-                <div className="bg-background border border-border/50 shadow-lg px-6 py-3 rounded-xl flex items-center justify-center">
-                  <span className="text-sm font-medium text-foreground">Select an activation type</span>
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-4 border-b border-border/50 pb-4">
-            {/* Location and Size */}
-            <div className={`space-y-2 transition-opacity ${!isLocEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
-              <div className="flex items-center gap-2">
-                <label className="text-xs font-medium text-foreground/80">Location and Size</label>
-                <Tooltip content="Defines the physical area of the event">
-                  <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
-                </Tooltip>
-              </div>
-              <div className="grid grid-cols-4 gap-2">
-                <div>
-                  <label className="text-[10px] text-muted-foreground">X</label>
-                  <Input
-                    type="number"
-                    min="0"
-                    max={mapWidth - 1}
-                    value={eventData.positioning.coordinates.x}
-                    onChange={e =>
-                      setEventData(prev => ({
-                        ...prev,
-                        positioning: {
-                          ...prev.positioning,
-                          coordinates: { 
-                            ...prev.positioning.coordinates, 
-                            x: getSafeCoord(parseInt(e.target.value), mapWidth)
-                          },
-                          size: {
-                            ...prev.positioning.size,
-                            width: getSafeSize(prev.positioning.size.width, getSafeCoord(parseInt(e.target.value), mapWidth), mapWidth)
-                          }
-                        },
-                      }))
-                    }
-                    className="h-7 text-xs w-full"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] text-muted-foreground">Y</label>
-                  <Input
-                    type="number"
-                    min="0"
-                    max={mapHeight - 1}
-                    value={eventData.positioning.coordinates.y}
-                    onChange={e =>
-                      setEventData(prev => ({
-                        ...prev,
-                        positioning: {
-                          ...prev.positioning,
-                          coordinates: { 
-                            ...prev.positioning.coordinates, 
-                            y: getSafeCoord(parseInt(e.target.value), mapHeight)
-                          },
-                          size: {
-                            ...prev.positioning.size,
-                            height: getSafeSize(prev.positioning.size.height, getSafeCoord(parseInt(e.target.value), mapHeight), mapHeight)
-                          }
-                        },
-                      }))
-                    }
-                    className="h-7 text-xs w-full"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] text-muted-foreground">Width</label>
-                  <Input
-                    type="number"
-                    min="1"
-                    max={mapWidth - eventData.positioning.coordinates.x}
-                    value={eventData.positioning.size.width}
-                    onChange={e =>
-                      setEventData(prev => ({
-                        ...prev,
-                        positioning: {
-                          ...prev.positioning,
-                          size: { 
-                            ...prev.positioning.size, 
-                            width: getSafeSize(parseInt(e.target.value), prev.positioning.coordinates.x, mapWidth)
-                          },
-                        },
-                      }))
-                    }
-                    className="h-7 text-xs w-full"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] text-muted-foreground">Height</label>
-                  <Input
-                    type="number"
-                    min="1"
-                    max={mapHeight - eventData.positioning.coordinates.y}
-                    value={eventData.positioning.size.height}
-                    onChange={e =>
-                      setEventData(prev => ({
-                        ...prev,
-                        positioning: {
-                          ...prev.positioning,
-                          size: { 
-                            ...prev.positioning.size, 
-                            height: getSafeSize(parseInt(e.target.value), prev.positioning.coordinates.y, mapHeight)
-                          },
-                        },
-                      }))
-                    }
-                    className="h-7 text-xs w-full"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Hotspot */}
-            <div className={`space-y-2 transition-opacity ${!isHotspotEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
-              <div className="flex items-center gap-2">
-                <label className="text-xs font-medium text-foreground/80">Hotspot</label>
-                <Tooltip content="Property determines the specific clickable area for an interaction">
-                  <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
-                </Tooltip>
-              </div>
-              <div className="grid grid-cols-4 gap-2">
-                <div>
-                  <label className="text-[10px] text-muted-foreground">X</label>
-                  <Input
-                    type="number"
-                    min="0"
-                    value={eventData.positioning.hotspot.x}
-                    onChange={e =>
-                      setEventData(prev => ({
-                        ...prev,
-                        positioning: {
-                          ...prev.positioning,
-                          hotspot: { ...prev.positioning.hotspot, x: Math.max(0, parseInt(e.target.value) || 0) },
-                        },
-                      }))
-                    }
-                    className="h-7 text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] text-muted-foreground">Y</label>
-                  <Input
-                    type="number"
-                    min="0"
-                    value={eventData.positioning.hotspot.y}
-                    onChange={e =>
-                      setEventData(prev => ({
-                        ...prev,
-                        positioning: {
-                          ...prev.positioning,
-                          hotspot: { ...prev.positioning.hotspot, y: Math.max(0, parseInt(e.target.value) || 0) },
-                        },
-                      }))
-                    }
-                    className="h-7 text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] text-muted-foreground">Width</label>
-                  <Input
-                    type="number"
-                    min="1"
-                    value={eventData.positioning.hotspot.width}
-                    onChange={e =>
-                      setEventData(prev => ({
-                        ...prev,
-                        positioning: {
-                          ...prev.positioning,
-                          hotspot: { ...prev.positioning.hotspot, width: Math.max(1, parseInt(e.target.value) || 1) },
-                        },
-                      }))
-                    }
-                    className="h-7 text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] text-muted-foreground">Height</label>
-                  <Input
-                    type="number"
-                    min="1"
-                    value={eventData.positioning.hotspot.height}
-                    onChange={e =>
-                      setEventData(prev => ({
-                        ...prev,
-                        positioning: {
-                          ...prev.positioning,
-                          hotspot: { ...prev.positioning.hotspot, height: Math.max(1, parseInt(e.target.value) || 1) },
-                        },
-                      }))
-                    }
-                    className="h-7 text-xs"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Cooldown */}
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <label className="text-xs font-medium text-foreground/80">Cooldown (ms)</label>
-                <Tooltip content="Adds a waiting period between activations">
-                  <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
-                </Tooltip>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="flex-1 relative">
-                  <Input
-                    type="range"
-                    min="0"
-                    max="10000"
-                    step="500"
-                    list="cooldown-ticks"
-                    value={Math.min(eventData.timing.cooldown, 10000)}
-                    onChange={e =>
-                      setEventData(prev => ({
-                        ...prev,
-                        timing: { ...prev.timing, cooldown: parseInt(e.target.value) },
-                      }))
-                    }
-                    className="w-full"
-                  />
-                  <datalist id="cooldown-ticks">
-                    {[0, 500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 6500, 7000, 7500, 8000, 8500, 9000, 9500, 10000].map(v => (
-                      <option key={v} value={v} />
-                    ))}
-                  </datalist>
-                </div>
-                <Input
-                  type="number"
-                  min="0"
-                  value={eventData.timing.cooldown}
-                  onChange={e =>
-                    setEventData(prev => ({
-                      ...prev,
-                      timing: { ...prev.timing, cooldown: Math.max(0, parseInt(e.target.value) || 0) },
-                    }))
-                  }
-                  className="h-7 text-xs font-mono w-20"
-                />
-                <span className="text-[10px] text-muted-foreground">ms</span>
-              </div>
-            </div>
-
-            {/* Delay */}
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <label className="text-xs font-medium text-foreground/80">Delay (ms)</label>
-                <Tooltip content="Postpones the event's execution after it is triggered">
-                  <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
-                </Tooltip>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="flex-1 relative">
-                  <Input
-                    type="range"
-                    min="0"
-                    max="10000"
-                    step="500"
-                    list="delay-ticks"
-                    value={Math.min(eventData.timing.delay, 10000)}
-                    onChange={e =>
-                      setEventData(prev => ({
-                        ...prev,
-                        timing: { ...prev.timing, delay: parseInt(e.target.value) },
-                      }))
-                    }
-                    className="w-full"
-                  />
-                  <datalist id="delay-ticks">
-                    {[0, 500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 6500, 7000, 7500, 8000, 8500, 9000, 9500, 10000].map(v => (
-                      <option key={v} value={v} />
-                    ))}
-                  </datalist>
-                </div>
-                <Input
-                  type="number"
-                  min="0"
-                  value={eventData.timing.delay}
-                  onChange={e =>
-                    setEventData(prev => ({
-                      ...prev,
-                      timing: { ...prev.timing, delay: Math.max(0, parseInt(e.target.value) || 0) },
-                    }))
-                  }
-                  className="h-7 text-xs font-mono w-20"
-                />
-                <span className="text-[10px] text-muted-foreground">ms</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Requirements Section */}
-          <div className="space-y-4 border-b border-border/50 pb-4">
-            <div className="flex items-center gap-2">
-              <h3 className="text-sm font-semibold text-foreground">Requirements</h3>
-              <Tooltip content="Events can check specific player conditions before firing">
-                <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
-              </Tooltip>
-            </div>
-
-            {/* Status */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
+              {/* Activation */}
+              <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <label className="text-xs font-medium text-foreground/80">Status Checks</label>
-                  <Tooltip content="Checks for specific campaign or quest status">
+                  <label className="text-xs font-medium text-foreground/80">Activation</label>
+                  <Tooltip content="When this event executes">
                     <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
                   </Tooltip>
                 </div>
-                <Button size="sm" variant="outline" onClick={addStatusRequirement} className="h-6 text-xs">
-                  Add Status
-                </Button>
+                <div className="flex flex-wrap gap-1 items-start">
+                  {ACTIVATION_OPTIONS.map(activation => {
+                    const config = ACTIVATION_CONFIG[activation];
+                    const IconComponent = config.icon;
+                    const isActive = eventData.timing.activeActivation === activation;
+                    return (
+                      <Tooltip key={activation} content={config.tooltip} side="right">
+                        <button
+                          onClick={() => setActivation(activation)}
+                          className={`rounded-md border p-2 transition-colors ${
+                            isActive
+                              ? (ACTIVATION_COLORS[activation]?.active ?? 'border-orange-500/50 bg-orange-500/10 text-orange-600')
+                              : 'border-border/50 bg-muted/30 text-foreground/60 hover:bg-muted/50'
+                          }`}
+                        >
+                          <IconComponent className="h-5 w-5" />
+                        </button>
+                      </Tooltip>
+                    );
+                  })}
+                </div>
               </div>
-              <div className="space-y-2">
-                {eventData.requirements.status.map((status, index) => (
-                  <div key={index} className="flex gap-2">
-                    <Input
-                      value={status}
-                      onChange={e => updateStatusRequirement(index, e.target.value)}
-                      placeholder="Status name"
-                      className="h-7 text-xs flex-1"
-                    />
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => removeStatusRequirement(index)}
-                      className="h-7 w-7"
-                    >
-                      <X className="h-3 w-3" />
-                    </Button>
+
+              <div className="relative space-y-6">
+                {!eventData.timing.activeActivation && (
+                  <div className="absolute -inset-4 z-50 bg-black/50 backdrop-blur-[1px] rounded-lg flex items-start justify-center pt-20 pointer-events-auto">
+                    <div className="bg-background border border-border/50 shadow-lg px-6 py-3 rounded-xl flex items-center justify-center">
+                      <span className="text-sm font-medium text-foreground">Select an activation type</span>
+                    </div>
                   </div>
-                ))}
+                )}
+
+                <div className="space-y-4 border-b border-border/50 pb-4">
+                {/* Location and Size */}
+                <div className={`space-y-2 transition-opacity ${!isLocEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-medium text-foreground/80">Location and Size</label>
+                    <Tooltip content="Defines the physical area of the event">
+                      <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                    </Tooltip>
+                  </div>
+                  <div className="grid grid-cols-4 gap-2">
+                    <div>
+                      <label className="text-[10px] text-muted-foreground">X</label>
+                      <Input
+                        type="number"
+                        min="0"
+                        max={mapWidth - 1}
+                        value={eventData.positioning.coordinates.x}
+                        onChange={e =>
+                          setEventData(prev => ({
+                            ...prev,
+                            positioning: {
+                              ...prev.positioning,
+                              coordinates: { 
+                                ...prev.positioning.coordinates, 
+                                x: getSafeCoord(parseInt(e.target.value), mapWidth)
+                              },
+                              size: {
+                                ...prev.positioning.size,
+                                width: getSafeSize(prev.positioning.size.width, getSafeCoord(parseInt(e.target.value), mapWidth), mapWidth)
+                              }
+                            },
+                          }))
+                        }
+                        className="h-7 text-xs w-full"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-muted-foreground">Y</label>
+                      <Input
+                        type="number"
+                        min="0"
+                        max={mapHeight - 1}
+                        value={eventData.positioning.coordinates.y}
+                        onChange={e =>
+                          setEventData(prev => ({
+                            ...prev,
+                            positioning: {
+                              ...prev.positioning,
+                              coordinates: { 
+                                ...prev.positioning.coordinates, 
+                                y: getSafeCoord(parseInt(e.target.value), mapHeight)
+                              },
+                              size: {
+                                ...prev.positioning.size,
+                                height: getSafeSize(prev.positioning.size.height, getSafeCoord(parseInt(e.target.value), mapHeight), mapHeight)
+                              }
+                            },
+                          }))
+                        }
+                        className="h-7 text-xs w-full"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-muted-foreground">Width</label>
+                      <Input
+                        type="number"
+                        min="1"
+                        max={mapWidth - eventData.positioning.coordinates.x}
+                        value={eventData.positioning.size.width}
+                        onChange={e =>
+                          setEventData(prev => ({
+                            ...prev,
+                            positioning: {
+                              ...prev.positioning,
+                              size: { 
+                                ...prev.positioning.size, 
+                                width: getSafeSize(parseInt(e.target.value), prev.positioning.coordinates.x, mapWidth)
+                              },
+                            },
+                          }))
+                        }
+                        className="h-7 text-xs w-full"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-muted-foreground">Height</label>
+                      <Input
+                        type="number"
+                        min="1"
+                        max={mapHeight - eventData.positioning.coordinates.y}
+                        value={eventData.positioning.size.height}
+                        onChange={e =>
+                          setEventData(prev => ({
+                            ...prev,
+                            positioning: {
+                              ...prev.positioning,
+                              size: { 
+                                ...prev.positioning.size, 
+                                height: getSafeSize(parseInt(e.target.value), prev.positioning.coordinates.y, mapHeight)
+                              },
+                            },
+                          }))
+                        }
+                        className="h-7 text-xs w-full"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Hotspot */}
+                <div className={`space-y-2 transition-opacity ${!isHotspotEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-medium text-foreground/80">Hotspot</label>
+                    <Tooltip content="Property determines the specific clickable area for an interaction">
+                      <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                    </Tooltip>
+                  </div>
+                  <div className="grid grid-cols-4 gap-2">
+                    <div>
+                      <label className="text-[10px] text-muted-foreground">X</label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={eventData.positioning.hotspot.x}
+                        onChange={e =>
+                          setEventData(prev => ({
+                            ...prev,
+                            positioning: {
+                              ...prev.positioning,
+                              hotspot: { ...prev.positioning.hotspot, x: Math.max(0, parseInt(e.target.value) || 0) },
+                            },
+                          }))
+                        }
+                        className="h-7 text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-muted-foreground">Y</label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={eventData.positioning.hotspot.y}
+                        onChange={e =>
+                          setEventData(prev => ({
+                            ...prev,
+                            positioning: {
+                              ...prev.positioning,
+                              hotspot: { ...prev.positioning.hotspot, y: Math.max(0, parseInt(e.target.value) || 0) },
+                            },
+                          }))
+                        }
+                        className="h-7 text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-muted-foreground">Width</label>
+                      <Input
+                        type="number"
+                        min="1"
+                        value={eventData.positioning.hotspot.width}
+                        onChange={e =>
+                          setEventData(prev => ({
+                            ...prev,
+                            positioning: {
+                              ...prev.positioning,
+                              hotspot: { ...prev.positioning.hotspot, width: Math.max(1, parseInt(e.target.value) || 1) },
+                            },
+                          }))
+                        }
+                        className="h-7 text-xs"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-muted-foreground">Height</label>
+                      <Input
+                        type="number"
+                        min="1"
+                        value={eventData.positioning.hotspot.height}
+                        onChange={e =>
+                          setEventData(prev => ({
+                            ...prev,
+                            positioning: {
+                              ...prev.positioning,
+                              hotspot: { ...prev.positioning.hotspot, height: Math.max(1, parseInt(e.target.value) || 1) },
+                            },
+                          }))
+                        }
+                        className="h-7 text-xs"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Cooldown */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-medium text-foreground/80">Cooldown (ms)</label>
+                    <Tooltip content="Adds a waiting period between activations">
+                      <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                    </Tooltip>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 relative">
+                      <Input
+                        type="range"
+                        min="0"
+                        max="10000"
+                        step="500"
+                        list="cooldown-ticks"
+                        value={Math.min(eventData.timing.cooldown, 10000)}
+                        onChange={e =>
+                          setEventData(prev => ({
+                            ...prev,
+                            timing: { ...prev.timing, cooldown: parseInt(e.target.value) },
+                          }))
+                        }
+                        className="w-full"
+                      />
+                      <datalist id="cooldown-ticks">
+                        {[0, 500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 6500, 7000, 7500, 8000, 8500, 9000, 9500, 10000].map(v => (
+                          <option key={v} value={v} />
+                        ))}
+                      </datalist>
+                    </div>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={eventData.timing.cooldown}
+                      onChange={e =>
+                        setEventData(prev => ({
+                          ...prev,
+                          timing: { ...prev.timing, cooldown: Math.max(0, parseInt(e.target.value) || 0) },
+                        }))
+                      }
+                      className="h-7 text-xs font-mono w-20"
+                    />
+                    <span className="text-[10px] text-muted-foreground">ms</span>
+                  </div>
+                </div>
+
+                {/* Delay */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-medium text-foreground/80">Delay (ms)</label>
+                    <Tooltip content="Postpones the event's execution after it is triggered">
+                      <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                    </Tooltip>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 relative">
+                      <Input
+                        type="range"
+                        min="0"
+                        max="10000"
+                        step="500"
+                        list="delay-ticks"
+                        value={Math.min(eventData.timing.delay, 10000)}
+                        onChange={e =>
+                          setEventData(prev => ({
+                            ...prev,
+                            timing: { ...prev.timing, delay: parseInt(e.target.value) },
+                          }))
+                        }
+                        className="w-full"
+                      />
+                      <datalist id="delay-ticks">
+                        {[0, 500, 1000, 1500, 2000, 2500, 3000, 3500, 4000, 4500, 5000, 5500, 6000, 6500, 7000, 7500, 8000, 8500, 9000, 9500, 10000].map(v => (
+                          <option key={v} value={v} />
+                        ))}
+                      </datalist>
+                    </div>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={eventData.timing.delay}
+                      onChange={e =>
+                        setEventData(prev => ({
+                          ...prev,
+                          timing: { ...prev.timing, delay: Math.max(0, parseInt(e.target.value) || 0) },
+                        }))
+                      }
+                      className="h-7 text-xs font-mono w-20"
+                    />
+                    <span className="text-[10px] text-muted-foreground">ms</span>
+                  </div>
+                </div>
               </div>
             </div>
+          </div>
+          </CollapsibleSection>
 
-            {/* Level */}
-            <div className="space-y-2">
+          {/* Requirements Section */}
+          <CollapsibleSection
+            title="Requirements"
+            icon={SquareCheckBig}
+            id="requirements"
+            isExpanded={expandedSections.requirements}
+            onToggle={() => toggleSection('requirements')}
+          >
+            <div className="space-y-4">
               <div className="flex items-center gap-2">
-                <label className="text-xs font-medium text-foreground/80">Minimum Level</label>
-                <Tooltip content="Requires a minimum player level">
+                <h3 className="text-sm font-semibold text-foreground">Requirements</h3>
+                <Tooltip content="Events can check specific player conditions before firing">
                   <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
                 </Tooltip>
               </div>
-              <div className="flex items-center gap-3">
-                <Input
-                  type="range"
-                  min="0"
-                  max="999"
-                  value={eventData.requirements.minLevel}
-                  onChange={e =>
-                    setEventData(prev => ({
-                      ...prev,
-                      requirements: { ...prev.requirements, minLevel: parseInt(e.target.value) },
-                    }))
-                  }
-                  className="flex-1"
-                />
+
+              {/* Status */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-medium text-foreground/80">Status Checks</label>
+                    <Tooltip content="Checks for specific campaign or quest status">
+                      <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                    </Tooltip>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={addStatusRequirement} className="h-6 text-xs">
+                    Add Status
+                  </Button>
+                </div>
+                <div className="space-y-2">
+                  {eventData.requirements.status.map((status, index) => (
+                    <div key={index} className="flex gap-2">
+                      <Input
+                        value={status}
+                        onChange={e => updateStatusRequirement(index, e.target.value)}
+                        placeholder="Status name"
+                        className="h-7 text-xs flex-1"
+                      />
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => removeStatusRequirement(index)}
+                        className="h-7 w-7"
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Minimum Level */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-medium text-foreground/80">Minimum Level</label>
+                  <Tooltip content="Requires a minimum player level">
+                    <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                  </Tooltip>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Input
+                    type="range"
+                    min="0"
+                    max="999"
+                    value={eventData.requirements.minLevel}
+                    onChange={e =>
+                      setEventData(prev => ({
+                        ...prev,
+                        requirements: { ...prev.requirements, minLevel: parseInt(e.target.value) },
+                      }))
+                    }
+                    className="flex-1"
+                  />
+                  <Input
+                    type="number"
+                    min="0"
+                    value={eventData.requirements.minLevel}
+                    onChange={e =>
+                      setEventData(prev => ({
+                        ...prev,
+                        requirements: { ...prev.requirements, minLevel: Math.max(0, parseInt(e.target.value) || 0) },
+                      }))
+                    }
+                    className="h-7 text-xs font-mono w-16"
+                  />
+                </div>
+              </div>
+
+              {/* Item Requirements */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <label className="text-xs font-medium text-foreground/80">Item Requirements</label>
+                    <Tooltip content="Require or forbid a specific inventory item for this event">
+                      <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                    </Tooltip>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={addItemRequirement} className="h-6 text-xs">
+                    + Add
+                  </Button>
+                </div>
+                <div className="overflow-hidden rounded-md border border-border">
+                  <table className="min-w-full text-left text-xs">
+                    <thead className="bg-muted/50">
+                      <tr>
+                        <th className="px-2 py-2">Condition</th>
+                        <th className="px-2 py-2">Item</th>
+                        <th className="px-2 py-2">Qty</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {eventData.requirements.itemRequirements.map((itemReq) => (
+                        <tr key={itemReq.id}>
+                          <td className="px-2 py-2">
+                            <Select
+                              value={itemReq.type}
+                              onValueChange={(value) => updateItemRequirement(itemReq.id, { type: value as EventItemRequirement['type'] })}
+                            >
+                              <SelectTrigger className="h-8 text-xs w-full">
+                                <SelectValue placeholder="Select condition" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="requires_item" className="text-xs">Requires item</SelectItem>
+                                <SelectItem value="requires_not_item" className="text-xs">Requires not item</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </td>
+                          <td className="px-2 py-2">
+                            <Select
+                              value={itemReq.itemId}
+                              onValueChange={(value) => updateItemRequirement(itemReq.id, { itemId: value === '__none__' ? '' : value })}
+                            >
+                              <SelectTrigger className="h-8 text-xs w-full">
+                                <SelectValue placeholder="Select item" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="__none__" className="text-xs">None</SelectItem>
+                                {inventoryItems.map((item: any) => (
+                                  <SelectItem key={`extra-${itemReq.id}-${item.id}`} value={String(item.id)} className="text-xs">
+                                    {String(item.id)} {item.name || item.fileName || ''}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </td>
+                          <td className="px-2 py-2">
+                            <div className="flex items-center gap-2">
+                              <Input
+                                type="number"
+                                min="1"
+                                value={itemReq.itemQuantity}
+                                onChange={e => updateItemRequirement(itemReq.id, { itemQuantity: Math.max(1, parseInt(e.target.value) || 1) })}
+                                className="h-7 text-xs flex-1"
+                              />
+                              <Button size="icon" variant="ghost" onClick={() => removeItemRequirement(itemReq.id)} className="h-7 w-7">
+                                <X className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Currency */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-medium text-foreground/80">Currency Requirement</label>
+                  <Tooltip content="Checks if the player has enough money">
+                    <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                  </Tooltip>
+                </div>
                 <Input
                   type="number"
                   min="0"
-                  value={eventData.requirements.minLevel}
+                  value={eventData.requirements.currency}
                   onChange={e =>
                     setEventData(prev => ({
                       ...prev,
-                      requirements: { ...prev.requirements, minLevel: Math.max(0, parseInt(e.target.value) || 0) },
+                      requirements: { ...prev.requirements, currency: Math.max(0, parseInt(e.target.value) || 0) },
                     }))
                   }
-                  className="h-7 text-xs font-mono w-16"
+                  placeholder="Currency amount"
+                  className="h-7 text-xs"
                 />
               </div>
             </div>
-
-            {/* Item requirements */}
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <label className="text-xs font-medium text-foreground/80">Item Requirements</label>
-                <Tooltip content="Require or forbid a specific inventory item for this event">
-                  <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
-                </Tooltip>
-              </div>
-              <div className="overflow-hidden rounded-md border border-border">
-                <table className="min-w-full text-left text-xs">
-                  <thead className="bg-muted/50">
-                    <tr>
-                      <th className="px-2 py-2">Condition</th>
-                      <th className="px-2 py-2">Item</th>
-                      <th className="px-2 py-2">Qty</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    <tr>
-                      <td className="px-2 py-2">Requires item</td>
-                      <td className="px-2 py-2">
-                        <Select
-                          value={eventData.requirements.itemId}
-                          onValueChange={(value) =>
-                            setEventData(prev => ({
-                              ...prev,
-                              requirements: { ...prev.requirements, itemId: value === '__none__' ? '' : value },
-                            }))
-                          }
-                        >
-                          <SelectTrigger className="h-8 text-xs w-full">
-                            <SelectValue placeholder="Select item" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="__none__" className="text-xs">None</SelectItem>
-                            {inventoryItems.map((item: any) => (
-                              <SelectItem key={item.id} value={String(item.id)} className="text-xs">
-                                {String(item.id)} {item.name || item.fileName || ''}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </td>
-                      <td className="px-2 py-2">
-                        <Input
-                          type="number"
-                          min="1"
-                          value={eventData.requirements.itemQuantity}
-                          onChange={e =>
-                            setEventData(prev => ({
-                              ...prev,
-                              requirements: { ...prev.requirements, itemQuantity: Math.max(1, parseInt(e.target.value) || 1) },
-                            }))
-                          }
-                          className="h-7 text-xs w-full"
-                        />
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="px-2 py-2">Requires not item</td>
-                      <td className="px-2 py-2">
-                        <Select
-                          value={eventData.requirements.notItemId}
-                          onValueChange={(value) =>
-                            setEventData(prev => ({
-                              ...prev,
-                              requirements: { ...prev.requirements, notItemId: value === '__none__' ? '' : value },
-                            }))
-                          }
-                        >
-                          <SelectTrigger className="h-8 text-xs w-full">
-                            <SelectValue placeholder="Select item" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="__none__" className="text-xs">None</SelectItem>
-                            {inventoryItems.map((item: any) => (
-                              <SelectItem key={`not-${item.id}`} value={String(item.id)} className="text-xs">
-                                {String(item.id)} {item.name || item.fileName || ''}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </td>
-                      <td className="px-2 py-2">
-                        <Input
-                          type="number"
-                          min="1"
-                          value={eventData.requirements.notItemQuantity}
-                          onChange={e =>
-                            setEventData(prev => ({
-                              ...prev,
-                              requirements: { ...prev.requirements, notItemQuantity: Math.max(1, parseInt(e.target.value) || 1) },
-                            }))
-                          }
-                          className="h-7 text-xs w-full"
-                        />
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Currency */}
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <label className="text-xs font-medium text-foreground/80">Currency Requirement</label>
-                <Tooltip content="Checks if the player has enough money">
-                  <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
-                </Tooltip>
-              </div>
-              <Input
-                type="number"
-                min="0"
-                value={eventData.requirements.currency}
-                onChange={e =>
-                  setEventData(prev => ({
-                    ...prev,
-                    requirements: { ...prev.requirements, currency: Math.max(0, parseInt(e.target.value) || 0) },
-                  }))
-                }
-                placeholder="Currency amount"
-                className="h-7 text-xs"
-              />
-            </div>
-          </div>
+          </CollapsibleSection>
 
           {/* Actions and Rewards Section */}
-          <div className="space-y-4 border-b border-border/50 pb-4">
-            <h3 className="text-sm font-semibold text-foreground">Actions and Rewards</h3>
+          <CollapsibleSection
+            title="Actions and Rewards"
+            icon={LogIn}
+            id="actions-and-rewards"
+            isExpanded={expandedSections.rewards}
+            onToggle={() => toggleSection('rewards')}
+          >
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-foreground">Actions and Rewards</h3>
 
-            {/* Message */}
-            <div className="space-y-2">
-              <label className="text-xs font-medium text-foreground/80">Message</label>
-              <Input
-                value={eventData.rewards.message}
-                onChange={e =>
-                  setEventData(prev => ({
-                    ...prev,
-                    rewards: { ...prev.rewards, message: e.target.value },
-                  }))
-                }
-                placeholder="Display text message"
-                className="h-7 text-xs"
-              />
-            </div>
-
-            {/* EXP Reward */}
-            <div className="space-y-2">
-              <label className="text-xs font-medium text-foreground/80">EXP Reward</label>
-              <Input
-                type="number"
-                min="0"
-                value={eventData.rewards.expReward}
-                onChange={e =>
-                  setEventData(prev => ({
-                    ...prev,
-                    rewards: { ...prev.rewards, expReward: Math.max(0, parseInt(e.target.value) || 0) },
-                  }))
-                }
-                placeholder="Experience points"
-                className="h-7 text-xs"
-              />
-            </div>
-
-            {/* Inventory and Loot Effects */}
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <label className="text-xs font-medium text-foreground/80">Inventory & Loot Effects</label>
-                <Tooltip content="Take or give items, currency, or item groups when this event triggers">
-                  <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
-                </Tooltip>
-              </div>
-              <div className="overflow-hidden rounded-md border border-border">
-                <table className="min-w-full text-left text-xs">
-                  <thead className="bg-muted/50">
-                    <tr>
-                      <th className="px-2 py-2">Effect</th>
-                      <th className="px-2 py-2">Item / Group</th>
-                      <th className="px-2 py-2">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    <tr>
-                      <td className="px-2 py-2">Give gold</td>
-                      <td className="px-2 py-2 text-muted-foreground">Currency</td>
-                      <td className="px-2 py-2">
-                        <Input
-                          type="number"
-                          min="0"
-                          value={eventData.rewards.rewardCurrency}
-                          onChange={e =>
-                            setEventData(prev => ({
-                              ...prev,
-                              rewards: { ...prev.rewards, rewardCurrency: Math.max(0, parseInt(e.target.value) || 0) },
-                            }))
-                          }
-                          className="h-7 text-xs w-full"
-                        />
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="px-2 py-2">Take gold</td>
-                      <td className="px-2 py-2 text-muted-foreground">Currency</td>
-                      <td className="px-2 py-2">
-                        <Input
-                          type="number"
-                          min="0"
-                          value={eventData.rewards.removeCurrency}
-                          onChange={e =>
-                            setEventData(prev => ({
-                              ...prev,
-                              rewards: { ...prev.rewards, removeCurrency: Math.max(0, parseInt(e.target.value) || 0) },
-                            }))
-                          }
-                          className="h-7 text-xs w-full"
-                        />
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="px-2 py-2">Give item</td>
-                      <td className="px-2 py-2">
-                        <Select
-                          value={eventData.rewards.rewardItemId}
-                          onValueChange={(value) =>
-                            setEventData(prev => ({
-                              ...prev,
-                              rewards: { ...prev.rewards, rewardItemId: value === '__none__' ? '' : value },
-                            }))
-                          }
-                        >
-                          <SelectTrigger className="h-8 text-xs w-full">
-                            <SelectValue placeholder="Select item" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="__none__" className="text-xs">None</SelectItem>
-                            {inventoryItems.map((item: any) => (
-                              <SelectItem key={`give-${item.id}`} value={String(item.id)} className="text-xs">
-                                {String(item.id)} {item.name || item.fileName || ''}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </td>
-                      <td className="px-2 py-2">
-                        <Input
-                          type="number"
-                          min="1"
-                          value={eventData.rewards.rewardItemQuantity}
-                          onChange={e =>
-                            setEventData(prev => ({
-                              ...prev,
-                              rewards: { ...prev.rewards, rewardItemQuantity: Math.max(1, parseInt(e.target.value) || 1) },
-                            }))
-                          }
-                          className="h-7 text-xs w-full"
-                        />
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="px-2 py-2">Take item</td>
-                      <td className="px-2 py-2">
-                        <Select
-                          value={eventData.rewards.removeItemId}
-                          onValueChange={(value) =>
-                            setEventData(prev => ({
-                              ...prev,
-                              rewards: { ...prev.rewards, removeItemId: value === '__none__' ? '' : value },
-                            }))
-                          }
-                        >
-                          <SelectTrigger className="h-8 text-xs w-full">
-                            <SelectValue placeholder="Select item" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="__none__" className="text-xs">None</SelectItem>
-                            {inventoryItems.map((item: any) => (
-                              <SelectItem key={`take-${item.id}`} value={String(item.id)} className="text-xs">
-                                {String(item.id)} {item.name || item.fileName || ''}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </td>
-                      <td className="px-2 py-2">
-                        <Input
-                          type="number"
-                          min="1"
-                          value={eventData.rewards.removeItemQuantity}
-                          onChange={e =>
-                            setEventData(prev => ({
-                              ...prev,
-                              rewards: { ...prev.rewards, removeItemQuantity: Math.max(1, parseInt(e.target.value) || 1) },
-                            }))
-                          }
-                          className="h-7 text-xs w-full"
-                        />
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="px-2 py-2">Loot table</td>
-                      <td className="px-2 py-2" colSpan={2}>
-                        <Select
-                          value={eventData.rewards.lootGroup}
-                          onValueChange={(value) =>
-                            setEventData(prev => ({
-                              ...prev,
-                              rewards: { ...prev.rewards, lootGroup: value === '__none__' ? '' : value },
-                            }))
-                          }
-                        >
-                          <SelectTrigger className="h-8 text-xs w-full">
-                            <SelectValue placeholder="Select loot group" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="__none__" className="text-xs">None</SelectItem>
-                            {itemGroups.map((group: any) => (
-                              <SelectItem key={`loot-${group.id}`} value={String(group.id)} className="text-xs">
-                                {String(group.id)} {group.name || group.fileName || ''}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="px-2 py-2">Random loot reward</td>
-                      <td className="px-2 py-2">
-                        <Select
-                          value={eventData.rewards.rewardLootGroup}
-                          onValueChange={(value) =>
-                            setEventData(prev => ({
-                              ...prev,
-                              rewards: { ...prev.rewards, rewardLootGroup: value === '__none__' ? '' : value },
-                            }))
-                          }
-                        >
-                          <SelectTrigger className="h-8 text-xs w-full">
-                            <SelectValue placeholder="Select loot group" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="__none__" className="text-xs">None</SelectItem>
-                            {itemGroups.map((group: any) => (
-                              <SelectItem key={`reward-loot-${group.id}`} value={String(group.id)} className="text-xs">
-                                {String(group.id)} {group.name || group.fileName || ''}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </td>
-                      <td className="px-2 py-2 grid grid-cols-2 gap-1">
-                        <Input
-                          type="number"
-                          min="1"
-                          value={eventData.rewards.rewardLootCountMin}
-                          onChange={e =>
-                            setEventData(prev => ({
-                              ...prev,
-                              rewards: { ...prev.rewards, rewardLootCountMin: Math.max(1, parseInt(e.target.value) || 1) },
-                            }))
-                          }
-                          className="h-7 text-xs w-full"
-                          placeholder="Min"
-                        />
-                        <Input
-                          type="number"
-                          min="1"
-                          value={eventData.rewards.rewardLootCountMax}
-                          onChange={e =>
-                            setEventData(prev => ({
-                              ...prev,
-                              rewards: { ...prev.rewards, rewardLootCountMax: Math.max(1, parseInt(e.target.value) || 1) },
-                            }))
-                          }
-                          className="h-7 text-xs w-full"
-                          placeholder="Max"
-                        />
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Enemy Spawn */}
-            <div className="space-y-2">
-              <label className="text-xs font-medium text-foreground/80">Enemy Spawn</label>
-              <Input
-                value={eventData.rewards.enemySpawn}
-                onChange={e =>
-                  setEventData(prev => ({
-                    ...prev,
-                    rewards: { ...prev.rewards, enemySpawn: e.target.value },
-                  }))
-                }
-                placeholder="Enemy category"
-                className="h-7 text-xs"
-              />
-            </div>
-
-            {/* Teleport */}
-            <div className="space-y-2">
-              <label className="text-xs font-medium text-foreground/80">Teleport</label>
-              <div className="flex items-center gap-2">
-                <Select
-                  value={eventData.rewards.teleportMap}
-                  onValueChange={val =>
-                    setEventData(prev => ({
-                      ...prev,
-                      rewards: { ...prev.rewards, teleportMap: val === '__none__' ? '' : val },
-                    }))
-                  }
-                >
-                  <SelectTrigger className="h-7 text-xs flex-1">
-                    <SelectValue placeholder="Select map" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__" className="text-xs">None</SelectItem>
-                    {projectMaps.map((mapFile: string) => {
-                      const mapLabel = mapFile.replace(/\.(txt|json)$/i, '');
-                      const isCurrent = mapLabel === currentMapName;
-                      return (
-                        <SelectItem key={mapFile} value={mapLabel} className={`text-xs ${isCurrent ? 'text-orange-400' : ''}`}>
-                          {mapLabel}{isCurrent ? ' (current)' : ''}
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-                <div>
-                  <label className="text-[10px] text-muted-foreground">X</label>
-                  <Input
-                    type="number"
-                    value={eventData.rewards.teleportX}
-                    onChange={e =>
-                      setEventData(prev => ({
-                        ...prev,
-                        rewards: { ...prev.rewards, teleportX: parseInt(e.target.value) || 0 },
-                      }))
-                    }
-                    placeholder="Coordinate X"
-                    className="h-7 text-xs w-24"
-                  />
-                </div>
-                <div>
-                  <label className="text-[10px] text-muted-foreground">Y</label>
-                  <Input
-                    type="number"
-                    value={eventData.rewards.teleportY}
-                    onChange={e =>
-                      setEventData(prev => ({
-                        ...prev,
-                        rewards: { ...prev.rewards, teleportY: parseInt(e.target.value) || 0 },
-                      }))
-                    }
-                    placeholder="Coordinate Y"
-                    className="h-7 text-xs w-24"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Sound */}
-            <div className="space-y-2">
-              <label className="text-xs font-medium text-foreground/80">Sound File</label>
-              <Input
-                value={eventData.rewards.sound}
-                onChange={e =>
-                  setEventData(prev => ({
-                    ...prev,
-                    rewards: { ...prev.rewards, sound: e.target.value },
-                  }))
-                }
-                placeholder="Sound path"
-                className="h-7 text-xs"
-              />
-            </div>
-          </div>
-
-          {/* Engine Logic Section */}
-          <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-foreground">Engine Logic</h3>
-
-            {/* Chance */}
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <label className="text-xs font-medium text-foreground/80">Chance (%)</label>
-                <Tooltip content="Sets a percentage chance for the event to fire">
-                  <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
-                </Tooltip>
-              </div>
-              <div className="flex items-center gap-3">
+              {/* Message */}
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-foreground/80">Message</label>
                 <Input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={eventData.engine.chance}
+                  value={eventData.rewards.message}
                   onChange={e =>
                     setEventData(prev => ({
                       ...prev,
-                      engine: { ...prev.engine, chance: parseInt(e.target.value) },
+                      rewards: { ...prev.rewards, message: e.target.value },
                     }))
                   }
-                  className="flex-1"
+                  placeholder="Display text message"
+                  className="h-7 text-xs"
                 />
+              </div>
+
+              {/* EXP Reward */}
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-foreground/80">EXP Reward</label>
                 <Input
                   type="number"
                   min="0"
-                  max="100"
-                  value={eventData.engine.chance}
+                  value={eventData.rewards.expReward}
                   onChange={e =>
                     setEventData(prev => ({
                       ...prev,
-                      engine: { ...prev.engine, chance: Math.max(0, Math.min(100, parseInt(e.target.value) || 0)) },
+                      rewards: { ...prev.rewards, expReward: Math.max(0, parseInt(e.target.value) || 0) },
                     }))
                   }
-                  className="h-7 text-xs font-mono w-16"
+                  placeholder="Experience points"
+                  className="h-7 text-xs"
                 />
-                <span className="text-[10px] text-muted-foreground">%</span>
+              </div>
+
+              {/* Inventory and Loot Effects */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-medium text-foreground/80">Inventory & Loot Effects</label>
+                  <Tooltip content="Take or give items, currency, or item groups when this event triggers">
+                    <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                  </Tooltip>
+                </div>
+                <div className="overflow-hidden rounded-md border border-border">
+                  <table className="min-w-full text-left text-xs">
+                    <thead className="bg-muted/50">
+                      <tr>
+                        <th className="px-2 py-2">Effect</th>
+                        <th className="px-2 py-2">Item / Group</th>
+                        <th className="px-2 py-2">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      <tr>
+                        <td className="px-2 py-2">Give gold</td>
+                        <td className="px-2 py-2 text-muted-foreground">Currency</td>
+                        <td className="px-2 py-2">
+                          <Input
+                            type="number"
+                            min="0"
+                            value={eventData.rewards.rewardCurrency}
+                            onChange={e =>
+                              setEventData(prev => ({
+                                ...prev,
+                                rewards: { ...prev.rewards, rewardCurrency: Math.max(0, parseInt(e.target.value) || 0) },
+                              }))
+                            }
+                            className="h-7 text-xs w-full"
+                          />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="px-2 py-2">Take gold</td>
+                        <td className="px-2 py-2 text-muted-foreground">Currency</td>
+                        <td className="px-2 py-2">
+                          <Input
+                            type="number"
+                            min="0"
+                            value={eventData.rewards.removeCurrency}
+                            onChange={e =>
+                              setEventData(prev => ({
+                                ...prev,
+                                rewards: { ...prev.rewards, removeCurrency: Math.max(0, parseInt(e.target.value) || 0) },
+                              }))
+                            }
+                            className="h-7 text-xs w-full"
+                          />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="px-2 py-2">Give item</td>
+                        <td className="px-2 py-2">
+                          <Select
+                            value={eventData.rewards.rewardItemId}
+                            onValueChange={(value) =>
+                              setEventData(prev => ({
+                                ...prev,
+                                rewards: { ...prev.rewards, rewardItemId: value === '__none__' ? '' : value },
+                              }))
+                            }
+                          >
+                            <SelectTrigger className="h-8 text-xs w-full">
+                              <SelectValue placeholder="Select item" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__none__" className="text-xs">None</SelectItem>
+                              {inventoryItems.map((item: any) => (
+                                <SelectItem key={`give-${item.id}`} value={String(item.id)} className="text-xs">
+                                  {String(item.id)} {item.name || item.fileName || ''}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </td>
+                        <td className="px-2 py-2">
+                          <Input
+                            type="number"
+                            min="1"
+                            value={eventData.rewards.rewardItemQuantity}
+                            onChange={e =>
+                              setEventData(prev => ({
+                                ...prev,
+                                rewards: { ...prev.rewards, rewardItemQuantity: Math.max(1, parseInt(e.target.value) || 1) },
+                              }))
+                            }
+                            className="h-7 text-xs w-full"
+                          />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="px-2 py-2">Take item</td>
+                        <td className="px-2 py-2">
+                          <Select
+                            value={eventData.rewards.removeItemId}
+                            onValueChange={(value) =>
+                              setEventData(prev => ({
+                                ...prev,
+                                rewards: { ...prev.rewards, removeItemId: value === '__none__' ? '' : value },
+                              }))
+                            }
+                          >
+                            <SelectTrigger className="h-8 text-xs w-full">
+                              <SelectValue placeholder="Select item" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__none__" className="text-xs">None</SelectItem>
+                              {inventoryItems.map((item: any) => (
+                                <SelectItem key={`take-${item.id}`} value={String(item.id)} className="text-xs">
+                                  {String(item.id)} {item.name || item.fileName || ''}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </td>
+                        <td className="px-2 py-2">
+                          <Input
+                            type="number"
+                            min="1"
+                            value={eventData.rewards.removeItemQuantity}
+                            onChange={e =>
+                              setEventData(prev => ({
+                                ...prev,
+                                rewards: { ...prev.rewards, removeItemQuantity: Math.max(1, parseInt(e.target.value) || 1) },
+                              }))
+                            }
+                            className="h-7 text-xs w-full"
+                          />
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="px-2 py-2">Loot table</td>
+                        <td className="px-2 py-2" colSpan={2}>
+                          <Select
+                            value={eventData.rewards.lootGroup}
+                            onValueChange={(value) =>
+                              setEventData(prev => ({
+                                ...prev,
+                                rewards: { ...prev.rewards, lootGroup: value === '__none__' ? '' : value },
+                              }))
+                            }
+                          >
+                            <SelectTrigger className="h-8 text-xs w-full">
+                              <SelectValue placeholder="Select loot group" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__none__" className="text-xs">None</SelectItem>
+                              {itemGroups.map((group: any) => (
+                                <SelectItem key={`loot-${group.id}`} value={String(group.id)} className="text-xs">
+                                  {String(group.id)} {group.name || group.fileName || ''}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="px-2 py-2">Random loot reward</td>
+                        <td className="px-2 py-2">
+                          <Select
+                            value={eventData.rewards.rewardLootGroup}
+                            onValueChange={(value) =>
+                              setEventData(prev => ({
+                                ...prev,
+                                rewards: { ...prev.rewards, rewardLootGroup: value === '__none__' ? '' : value },
+                              }))
+                            }
+                          >
+                            <SelectTrigger className="h-8 text-xs w-full">
+                              <SelectValue placeholder="Select loot group" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__none__" className="text-xs">None</SelectItem>
+                              {itemGroups.map((group: any) => (
+                                <SelectItem key={`reward-loot-${group.id}`} value={String(group.id)} className="text-xs">
+                                  {String(group.id)} {group.name || group.fileName || ''}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </td>
+                        <td className="px-2 py-2 grid grid-cols-2 gap-1">
+                          <Input
+                            type="number"
+                            min="1"
+                            value={eventData.rewards.rewardLootCountMin}
+                            onChange={e =>
+                              setEventData(prev => ({
+                                ...prev,
+                                rewards: { ...prev.rewards, rewardLootCountMin: Math.max(1, parseInt(e.target.value) || 1) },
+                              }))
+                            }
+                            className="h-7 text-xs w-full"
+                            placeholder="Min"
+                          />
+                          <Input
+                            type="number"
+                            min="1"
+                            value={eventData.rewards.rewardLootCountMax}
+                            onChange={e =>
+                              setEventData(prev => ({
+                                ...prev,
+                                rewards: { ...prev.rewards, rewardLootCountMax: Math.max(1, parseInt(e.target.value) || 1) },
+                              }))
+                            }
+                            className="h-7 text-xs w-full"
+                            placeholder="Max"
+                          />
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Enemy Spawn */}
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-foreground/80">Enemy Spawn</label>
+                <Input
+                  value={eventData.rewards.enemySpawn}
+                  onChange={e =>
+                    setEventData(prev => ({
+                      ...prev,
+                      rewards: { ...prev.rewards, enemySpawn: e.target.value },
+                    }))
+                  }
+                  placeholder="Enemy category"
+                  className="h-7 text-xs"
+                />
+              </div>
+
+              {/* Teleport */}
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-foreground/80">Teleport</label>
+                <div className="flex items-center gap-2">
+                  <Select
+                    value={eventData.rewards.teleportMap}
+                    onValueChange={val =>
+                      setEventData(prev => ({
+                        ...prev,
+                        rewards: { ...prev.rewards, teleportMap: val === '__none__' ? '' : val },
+                      }))
+                    }
+                  >
+                    <SelectTrigger className="h-7 text-xs flex-1">
+                      <SelectValue placeholder="Select map" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__" className="text-xs">None</SelectItem>
+                      {projectMaps.map((mapFile: string) => {
+                        const mapLabel = mapFile.replace(/\.(txt|json)$/i, '');
+                        const isCurrent = mapLabel === currentMapName;
+                        return (
+                          <SelectItem key={mapFile} value={mapLabel} className={`text-xs ${isCurrent ? 'text-orange-400' : ''}`}>
+                            {mapLabel}{isCurrent ? ' (current)' : ''}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                  <div>
+                    <label className="text-[10px] text-muted-foreground">X</label>
+                    <Input
+                      type="number"
+                      value={eventData.rewards.teleportX}
+                      onChange={e =>
+                        setEventData(prev => ({
+                          ...prev,
+                          rewards: { ...prev.rewards, teleportX: parseInt(e.target.value) || 0 },
+                        }))
+                      }
+                      placeholder="Coordinate X"
+                      className="h-7 text-xs w-24"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] text-muted-foreground">Y</label>
+                    <Input
+                      type="number"
+                      value={eventData.rewards.teleportY}
+                      onChange={e =>
+                        setEventData(prev => ({
+                          ...prev,
+                          rewards: { ...prev.rewards, teleportY: parseInt(e.target.value) || 0 },
+                        }))
+                      }
+                      placeholder="Coordinate Y"
+                      className="h-7 text-xs w-24"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Sound */}
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-foreground/80">Sound File</label>
+                <Input
+                  value={eventData.rewards.sound}
+                  onChange={e =>
+                    setEventData(prev => ({
+                      ...prev,
+                      rewards: { ...prev.rewards, sound: e.target.value },
+                    }))
+                  }
+                  placeholder="Sound path"
+                  className="h-7 text-xs"
+                />
               </div>
             </div>
+          </CollapsibleSection>
 
-            {/* Auto Save */}
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="autoSave"
-                checked={eventData.engine.autoSave}
-                onChange={e =>
-                  setEventData(prev => ({
-                    ...prev,
-                    engine: { ...prev.engine, autoSave: e.target.checked },
-                  }))
-                }
-                className="h-4 w-4 rounded border-border/70"
-              />
-              <label htmlFor="autoSave" className="text-xs font-medium text-foreground/80">
-                Auto Save Game
-              </label>
-              <Tooltip content="Automatically saves the game and updates the respawn point">
-                <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
-              </Tooltip>
-            </div>
+          {/* Engine Logic Section */}
+          <CollapsibleSection
+            title="Engine Logic"
+            icon={Repeat2}
+            id="engine-logic"
+            isExpanded={expandedSections.engine}
+            onToggle={() => toggleSection('engine')}
+          >
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-foreground">Engine Logic</h3>
 
-            {/* Script */}
-            <div className="space-y-2">
+              {/* Chance */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-medium text-foreground/80">Chance (%)</label>
+                  <Tooltip content="Sets a percentage chance for the event to fire">
+                    <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                  </Tooltip>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={eventData.engine.chance}
+                    onChange={e =>
+                      setEventData(prev => ({
+                        ...prev,
+                        engine: { ...prev.engine, chance: parseInt(e.target.value) },
+                      }))
+                    }
+                    className="flex-1"
+                  />
+                  <Input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={eventData.engine.chance}
+                    onChange={e =>
+                      setEventData(prev => ({
+                        ...prev,
+                        engine: { ...prev.engine, chance: Math.max(0, Math.min(100, parseInt(e.target.value) || 0)) },
+                      }))
+                    }
+                    className="h-7 text-xs font-mono w-16"
+                  />
+                  <span className="text-[10px] text-muted-foreground">%</span>
+                </div>
+              </div>
+
+              {/* Auto Save */}
               <div className="flex items-center gap-2">
-                <label className="text-xs font-medium text-foreground/80">Script File</label>
-                <Tooltip content="Calls an external script file for complex logic">
+                <input
+                  type="checkbox"
+                  id="autoSave"
+                  checked={eventData.engine.autoSave}
+                  onChange={e =>
+                    setEventData(prev => ({
+                      ...prev,
+                      engine: { ...prev.engine, autoSave: e.target.checked },
+                    }))
+                  }
+                  className="h-4 w-4 rounded border-border/70"
+                />
+                <label htmlFor="autoSave" className="text-xs font-medium text-foreground/80">
+                  Auto Save Game
+                </label>
+                <Tooltip content="Automatically saves the game and updates the respawn point">
                   <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
                 </Tooltip>
               </div>
-              <Input
-                value={eventData.engine.script}
-                onChange={e =>
-                  setEventData(prev => ({
-                    ...prev,
-                    engine: { ...prev.engine, script: e.target.value },
-                  }))
-                }
-                placeholder="Script path"
-                className="h-7 text-xs"
-              />
+
+              {/* Script */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-medium text-foreground/80">Script File</label>
+                  <Tooltip content="Calls an external script file for complex logic">
+                    <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
+                  </Tooltip>
+                </div>
+                <Input
+                  value={eventData.engine.script}
+                  onChange={e =>
+                    setEventData(prev => ({
+                      ...prev,
+                      engine: { ...prev.engine, script: e.target.value },
+                    }))
+                  }
+                  placeholder="Script path"
+                  className="h-7 text-xs"
+                />
+              </div>
             </div>
-          </div>
-          </div>
+          </CollapsibleSection>
         </div>
 
         <div className="sticky bottom-0 border-t border-border/50 bg-background px-6 py-3 flex justify-end">

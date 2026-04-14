@@ -30,5 +30,21 @@
     "io.github.brightdata/brightdata-mcp",
     "microsoft/playwright-mcp"
   ],
-  "terminal.integrated.defaultProfile.linux": "bash"
+  "terminal.integrated.defaultProfile.linux": "bash",
+  "workbench.colorCustomizations": {
+    "editor.lineHighlightBackground": "#1073cf2d",
+    "editor.lineHighlightBorder": "#9fced11f",
+    "activityBar.background": "#411F4F",
+    "titleBar.activeBackground": "#5B2B6F",
+    "titleBar.activeForeground": "#FDFBFD",
+    "titleBar.inactiveBackground": "#411F4F",
+    "titleBar.inactiveForeground": "#FDFBFD",
+    "statusBar.background": "#411F4F",
+    "statusBar.foreground": "#FDFBFD",
+    "statusBar.debuggingBackground": "#411F4F",
+    "statusBar.debuggingForeground": "#FDFBFD",
+    "statusBar.noFolderBackground": "#411F4F",
+    "statusBar.noFolderForeground": "#FDFBFD"
+  },
+  "windowColors.baseColor": "#8e44ad"
 }

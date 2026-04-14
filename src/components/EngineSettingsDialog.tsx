@@ -271,27 +271,6 @@ const EngineSettingsDialog = ({
                 <p className="text-xs text-gray-500 mt-1">Toggle whether the Active GID badge is visible next to the hover coordinates.</p>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-2">Sidebar Collapse Button</label>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm">Show toggle</span>
-                  <button
-                    onClick={() => setShowSidebarToggle((s: boolean) => !s)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      showSidebarToggle ? 'bg-orange-600' : 'bg-gray-200'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        showSidebarToggle ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
-                    <span className="sr-only">Toggle sidebar collapse button</span>
-                  </button>
-                  <span className="text-sm">{showSidebarToggle ? 'Shown' : 'Hidden'}</span>
-                </div>
-                <p className="text-xs text-gray-500 mt-1">Show or hide the left-edge sidebar collapse/expand toggle.</p>
-              </div>
             </div>
           )}
         </div>

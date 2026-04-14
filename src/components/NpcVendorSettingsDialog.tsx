@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
 import Tooltip from '@/components/ui/tooltip';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 import { Gift, HandCoins, HelpCircle, Package, Save, Sparkles, ChevronDown, Table2, X } from 'lucide-react';
@@ -81,8 +82,8 @@ const NpcVendorSettingsDialog = ({
       onSelect: handleSelectConstantStockGroup,
       stockType: 'constant' as const,
       propertyKey: 'constant_stock_group' as const,
-      tooltip: 'Use an existing item group as Always Available stock.',
-      buttonTooltip: 'Create or update Always Available item group in background and open it for editing.',
+      tooltip: 'Items that vendor always sells.',
+      buttonTooltip: 'Use an item group or create a new one.',
     },
     {
       title: 'Unlockable',
@@ -90,8 +91,8 @@ const NpcVendorSettingsDialog = ({
       onSelect: handleSelectStatusStockGroup,
       stockType: 'status' as const,
       propertyKey: 'status_stock_group' as const,
-      tooltip: 'Use an existing item group as Unlockable stock.',
-      buttonTooltip: 'Create or update Unlockable item group in background and open it for editing.',
+      tooltip: 'Items that vendor sells after a certain status change.',
+      buttonTooltip: 'Use an item group or create a new one.',
     },
     {
       title: 'Random',
@@ -99,8 +100,8 @@ const NpcVendorSettingsDialog = ({
       onSelect: handleSelectRandomStockGroup,
       stockType: 'random' as const,
       propertyKey: 'random_stock_group' as const,
-      tooltip: 'Use an existing item group as Random stock.',
-      buttonTooltip: 'Create or update Random item group in background and open it for editing.',
+      tooltip: 'Items that vendor randomly sells.',
+      buttonTooltip: 'Use an item group or create a new one.',
     },
   ] as const;
 
@@ -222,30 +223,31 @@ const NpcVendorSettingsDialog = ({
               {vendorStockSections.map((section) => (
                 <div key={section.title} className="rounded-xl border border-border bg-muted/30 p-3">
                   <div className="space-y-4">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-foreground whitespace-nowrap">
                         <span>{section.title}</span>
-                        <Tooltip content={section.buttonTooltip}>
+                        <Tooltip content={section.tooltip}>
                           <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
                         </Tooltip>
                       </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Tooltip content={section.buttonTooltip}>
-                          <Button
-                            size="sm"
-                            className="inline-flex items-center gap-2 bg-orange-500 text-white hover:bg-orange-600"
-                            onClick={() => void handleCreateVendorStockItem(section.stockType, section.value === 'none' ? null : section.value, section.propertyKey)}
-                          >
-                            <Table2 className="w-4 h-4" />
-                            Stock
-                          </Button>
-                        </Tooltip>
+                      <div className="flex items-center gap-2 flex-nowrap">
+                        <Button
+                          size="sm"
+                          className="inline-flex items-center gap-2 bg-orange-500 text-white hover:bg-orange-600"
+                          onClick={() => void handleCreateVendorStockItem(section.stockType, section.value === 'none' ? null : section.value, section.propertyKey)}
+                        >
+                          <Table2 className="w-4 h-4" />
+                          + Create New
+                        </Button>
+                        <Badge variant="outline" className="h-7 px-2 text-[0.65rem] uppercase text-muted-foreground bg-muted border border-border hover:bg-muted">
+                          OR
+                        </Badge>
                         <Select value={section.value} onValueChange={section.onSelect}>
                           <SelectTrigger className="h-9 text-sm min-w-[160px]">
-                            <SelectValue placeholder="Select item group" />
+                            <SelectValue placeholder="Select Item Group" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="none" className="text-xs">None</SelectItem>
+                            <SelectItem value="none" className="text-[0.65rem]">Select Item Group</SelectItem>
                             {itemGroups.map((item) => (
                               <SelectItem key={item.id} value={String(item.id)} className="text-xs">
                                 {item.name || item.fileName}
@@ -253,7 +255,7 @@ const NpcVendorSettingsDialog = ({
                             ))}
                           </SelectContent>
                         </Select>
-                        <Tooltip content={section.tooltip}>
+                        <Tooltip content={section.buttonTooltip}>
                           <HelpCircle className="w-5 h-5 text-muted-foreground cursor-pointer" />
                         </Tooltip>
                       </div>

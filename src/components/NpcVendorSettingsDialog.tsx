@@ -5,7 +5,8 @@ import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import Tooltip from '@/components/ui/tooltip';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
-import { Gift, HandCoins, HelpCircle, Package, Save, Sparkles, ChevronDown, Table2, X } from 'lucide-react';
+import { parseRandomStockCount } from '@/utils/parsers';
+import { Gift, HandCoins, HelpCircle, Package, Save, Sparkles, ChevronDown, X } from 'lucide-react';
 import type { ItemSummary } from '@/utils/items';
 
 // PATCH TEST: verify file sync
@@ -13,9 +14,6 @@ import type { ItemSummary } from '@/utils/items';
 type NpcVendorSettingsDialogProps = {
   isOpen: boolean;
   onClose: () => void;
-  onOpenStockDialog: () => void;
-  onOpenUnlockDialog: () => void;
-  onOpenRandomDialog: () => void;
   onCreateVendorStockGroup: (stockType: 'constant' | 'status' | 'random', selectedGroupId: string | null, npcName: string) => Promise<ItemSummary | null>;
   itemsList: ItemSummary[];
   getEditingObjectProperty: (key: string, fallback?: string) => string;
@@ -26,9 +24,6 @@ type NpcVendorSettingsDialogProps = {
 const NpcVendorSettingsDialog = ({
   isOpen,
   onClose,
-  onOpenStockDialog,
-  onOpenUnlockDialog,
-  onOpenRandomDialog,
   onCreateVendorStockGroup,
   itemsList,
   getEditingObjectProperty,
@@ -50,7 +45,28 @@ const NpcVendorSettingsDialog = ({
   const constantStockGroup = getEditingObjectProperty('constant_stock_group', '') || 'none';
   const statusStockGroup = getEditingObjectProperty('status_stock_group', '') || 'none';
   const randomStockGroup = getEditingObjectProperty('random_stock_group', '') || 'none';
+  const rawRandomStockCount = getEditingObjectProperty('random_stock_count', '');
+  const hasRandomStockCount = rawRandomStockCount.trim().length > 0;
+  const randomStockCount = parseRandomStockCount(rawRandomStockCount);
+  const rawVendorRatioBuy = getEditingObjectProperty('vendor_ratio_buy', '');
+  const useGlobalVendorRatioBuy = rawVendorRatioBuy.trim().length === 0;
+  const rawVendorRatioSell = getEditingObjectProperty('vendor_ratio_sell', '');
+  const useGlobalVendorRatioSell = rawVendorRatioSell.trim().length === 0;
+  const rawVendorRatioSellOld = getEditingObjectProperty('vendor_ratio_sell_old', '');
+  const useGlobalVendorRatioSellOld = rawVendorRatioSellOld.trim().length === 0;
   const npcName = getEditingObjectProperty('name', 'Vendor');
+
+  const handleUpdateRandomStockCount = (field: 'min' | 'max', value: number) => {
+    const minValue = Math.max(1, Math.round(value));
+    const next = {
+      min: field === 'min' ? minValue : randomStockCount.min,
+      max: field === 'max' ? Math.max(randomStockCount.min, Math.round(value)) : Math.max(randomStockCount.min, randomStockCount.max),
+    };
+    if (field === 'min' && next.max < next.min) {
+      next.max = next.min;
+    }
+    updateEditingObjectProperty('random_stock_count', `${next.min},${next.max}`);
+  };
 
   const handleSelectConstantStockGroup = (groupId: string) => {
     updateEditingObjectProperty('constant_stock_group', groupId === 'none' ? null : groupId);
@@ -100,7 +116,7 @@ const NpcVendorSettingsDialog = ({
       onSelect: handleSelectRandomStockGroup,
       stockType: 'random' as const,
       propertyKey: 'random_stock_group' as const,
-      tooltip: 'Items that vendor randomly sells.',
+      tooltip: 'Items that the vendor sells randomly. Requires min. and max. number of items.',
       buttonTooltip: 'Use an item group or create a new one.',
     },
   ] as const;
@@ -138,23 +154,6 @@ const NpcVendorSettingsDialog = ({
         >
           <X className="w-4 h-4 text-muted-foreground" />
         </Button>
-      </div>
-
-      <div className="px-4 py-3 border-b border-border bg-muted/50 space-y-3">
-        <p className="text-sm text-muted-foreground">
-          Items created in the Items layer can be added to this vendor using the item-based dialogs below.
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="outline" onClick={onOpenStockDialog}>
-            Always Available
-          </Button>
-          <Button size="sm" variant="outline" onClick={onOpenUnlockDialog}>
-            Unlockable
-          </Button>
-          <Button size="sm" variant="outline" onClick={onOpenRandomDialog}>
-            Random Offers
-          </Button>
-        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -231,13 +230,32 @@ const NpcVendorSettingsDialog = ({
                         </Tooltip>
                       </div>
                       <div className="flex items-center gap-2 flex-nowrap">
+                        {section.stockType === 'random' && (
+                          <div className="flex items-center gap-1">
+                            <Input
+                              type="number"
+                              className="h-8 w-16 rounded-md px-2 text-xs"
+                              value={hasRandomStockCount ? randomStockCount.min : ''}
+                              min={1}
+                              onChange={(e) => handleUpdateRandomStockCount('min', Number(e.target.value))}
+                              placeholder="Min"
+                            />
+                            <Input
+                              type="number"
+                              className="h-8 w-16 rounded-md px-2 text-xs"
+                              value={hasRandomStockCount ? randomStockCount.max : ''}
+                              min={1}
+                              onChange={(e) => handleUpdateRandomStockCount('max', Number(e.target.value))}
+                              placeholder="Max"
+                            />
+                          </div>
+                        )}
                         <Button
                           size="sm"
-                          className="inline-flex items-center gap-2 bg-orange-500 text-white hover:bg-orange-600"
+                          className="inline-flex items-center rounded-md px-2 py-1 text-[0.65rem] gap-1 bg-orange-500 text-white hover:bg-orange-600"
                           onClick={() => void handleCreateVendorStockItem(section.stockType, section.value === 'none' ? null : section.value, section.propertyKey)}
                         >
-                          <Table2 className="w-4 h-4" />
-                          + Create New
+                          + New
                         </Button>
                         <Badge variant="outline" className="h-7 px-2 text-[0.65rem] uppercase text-muted-foreground bg-muted border border-border hover:bg-muted">
                           OR
@@ -280,8 +298,116 @@ const NpcVendorSettingsDialog = ({
             <ChevronDown className={`w-4 h-4 transition-transform ${vendorPricingExpanded ? 'rotate-180' : ''}`} />
           </button>
           {vendorPricingExpanded && (
-            <div className="px-3 pb-3">
-              <p className="text-sm text-muted-foreground">Vendor pricing placeholder</p>
+            <div className="px-3 pb-3 space-y-4">
+              <div className="grid gap-3">
+                <div className="grid gap-2">
+                  <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                    <span>Buy Ratio</span>
+                    <Tooltip content="Multiplier for item prices for the vendor.">
+                      <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
+                    </Tooltip>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      inputMode="decimal"
+                      className="h-9 w-32 rounded-md px-2 text-xs"
+                      value={useGlobalVendorRatioBuy ? '' : rawVendorRatioBuy}
+                      placeholder="Buy Ratio"
+                      disabled={useGlobalVendorRatioBuy}
+                      onChange={(e) => updateEditingObjectProperty('vendor_ratio_buy', e.target.value.trim() === '' ? null : e.target.value)}
+                    />
+                    <label className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+                      <input
+                        type="checkbox"
+                        checked={useGlobalVendorRatioBuy}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            updateEditingObjectProperty('vendor_ratio_buy', null);
+                          } else {
+                            updateEditingObjectProperty('vendor_ratio_buy', '1.0');
+                          }
+                        }}
+                        className="h-4 w-4 rounded border-border"
+                      />
+                      Use global settings
+                    </label>
+                  </div>
+                </div>
+
+                <div className="grid gap-2">
+                  <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                    <span>Sell Ratio</span>
+                    <Tooltip content="Multiplier for item prices for the vendor.">
+                      <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
+                    </Tooltip>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      inputMode="decimal"
+                      className="h-9 w-32 rounded-md px-2 text-xs"
+                      value={useGlobalVendorRatioSell ? '' : rawVendorRatioSell}
+                      placeholder="Sell Ratio"
+                      disabled={useGlobalVendorRatioSell}
+                      onChange={(e) => updateEditingObjectProperty('vendor_ratio_sell', e.target.value.trim() === '' ? null : e.target.value)}
+                    />
+                    <label className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+                      <input
+                        type="checkbox"
+                        checked={useGlobalVendorRatioSell}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            updateEditingObjectProperty('vendor_ratio_sell', null);
+                          } else {
+                            updateEditingObjectProperty('vendor_ratio_sell', '0.25');
+                          }
+                        }}
+                        className="h-4 w-4 rounded border-border"
+                      />
+                      Use global settings
+                    </label>
+                  </div>
+                </div>
+
+                <div className="grid gap-2">
+                  <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+                    <span>Buy Back Ratio</span>
+                    <Tooltip content="It is the multiplier that sets the price for items you sold previously, after you leave the shop and come back.">
+                      <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
+                    </Tooltip>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      inputMode="decimal"
+                      className="h-9 w-32 rounded-md px-2 text-xs"
+                      value={useGlobalVendorRatioSellOld ? '' : rawVendorRatioSellOld}
+                      placeholder="Buy Back Ratio"
+                      disabled={useGlobalVendorRatioSellOld}
+                      onChange={(e) => updateEditingObjectProperty('vendor_ratio_sell_old', e.target.value.trim() === '' ? null : e.target.value)}
+                    />
+                    <label className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+                      <input
+                        type="checkbox"
+                        checked={useGlobalVendorRatioSellOld}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            updateEditingObjectProperty('vendor_ratio_sell_old', null);
+                          } else {
+                            updateEditingObjectProperty('vendor_ratio_sell_old', '0.0');
+                          }
+                        }}
+                        className="h-4 w-4 rounded border-border"
+                      />
+                      Use global settings
+                    </label>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </div>

@@ -24,6 +24,8 @@ type ItemSummary = {
 
 type SidebarProps = {
   leftCollapsed: boolean;
+  sidebarWidth?: number;
+  onSidebarResizeMouseDown?: (event: React.MouseEvent<HTMLDivElement>) => void;
   actors: {
     isNpcLayer: boolean;
     isEnemyLayer: boolean;
@@ -130,7 +132,7 @@ type SidebarProps = {
 export default function AppSidebar(p: SidebarProps) {
 
   return (
-    <SidebarLayout leftCollapsed={p.leftCollapsed}>
+    <SidebarLayout leftCollapsed={p.leftCollapsed} width={p.sidebarWidth} onResizeMouseDown={p.onSidebarResizeMouseDown}>
       <section className="flex flex-col flex-1">
         {(p.actors.isNpcLayer || p.actors.isEnemyLayer) && (
           <SidebarActorArea

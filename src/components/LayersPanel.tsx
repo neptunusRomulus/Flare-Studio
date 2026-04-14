@@ -168,7 +168,7 @@ const LayersPanel: React.FC<Props> = ({
                       </Tooltip>
 
                       <div className="flex items-center gap-2">
-                        <Tooltip content={layer.type === 'rules' ? 'When this happens → do this' : layer.name}>
+                        <Tooltip content={layer.type === 'rules' ? 'Quest layer' : layer.name}>
                           <span className="text-xs font-medium truncate flex items-center gap-2">
                             {(() => {
                               switch ((layer.type || '').toLowerCase()) {
@@ -198,7 +198,7 @@ const LayersPanel: React.FC<Props> = ({
                           </span>
                         </Tooltip>
                         <span className={leftCollapsed ? 'sr-only text-xs font-medium' : 'text-xs font-medium truncate'} title={layer.name}>
-                          {layer.name.replace(/ Layer$/i, '')}
+                          {layer.type === 'rules' ? 'Quests' : layer.name.replace(/ Layer$/i, '')}
                         </span>
                       </div>
                     </div>

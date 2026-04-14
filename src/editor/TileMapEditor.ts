@@ -8087,8 +8087,9 @@ export class TileMapEditor {
 
       writeRepeatableEventProperty('requires_status');
       writeRepeatableEventProperty('requires_not_status');
+      writeRepeatableEventProperty('requires_item');
+      writeRepeatableEventProperty('requires_not_item');
       if (event.properties.requires_level) lines.push(`requires_level=${event.properties.requires_level}`);
-      if (event.properties.requires_item) lines.push(`requires_item=${event.properties.requires_item}`);
       if (event.properties.requires_currency) lines.push(`requires_currency=${event.properties.requires_currency}`);
       if (event.properties.requires_not_currency) lines.push(`requires_not_currency=${event.properties.requires_not_currency}`);
       if (event.properties.requires_class) lines.push(`requires_class=${event.properties.requires_class}`);

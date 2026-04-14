@@ -40,7 +40,6 @@ import type { EditorProjectData } from '@/editor/TileMapEditor';
 import type { MapObject } from '@/types';
 
 export default function useAppMainBuilder() {
-  const dialogsCtx = useDialogsCtx({});
   type EditorRefsType = ReturnType<typeof useEditorRefs>;
   type EditorSetupType = ReturnType<typeof useEditorSetup>;
   type EditorTabsType = ReturnType<typeof useEditorTabs>;
@@ -113,6 +112,86 @@ export default function useAppMainBuilder() {
   const [mapsDropdownPos, setMapsDropdownPos] = useState<{ left: number; top: number } | null>(null);
   const mapsButtonRef = useRef<HTMLButtonElement | null>(null);
   const mapsPortalRef = useRef<HTMLDivElement | null>(null);
+
+  const [showQuestDialog, setShowQuestDialog] = useState<boolean>(false);
+  const [questDraft, setQuestDraft] = useState(() => ({
+    name: '',
+    complete_status: '',
+    quest_text: '',
+    requires_status: '',
+    requires_not_status: '',
+    requires_level: '',
+    requires_not_level: '',
+    requires_currency: '',
+    requires_not_currency: '',
+    requires_item: '',
+    requires_not_item: '',
+    requires_class: '',
+    requires_not_class: ''
+  }));
+  const [rulesList, setRulesList] = useState<Array<{ id: string; name: string; startType: 'player' | 'game'; triggerId: string }>>([]);
+
+  const handleOpenQuestDialog = useCallback(() => {
+    setQuestDraft({
+      name: '',
+      complete_status: '',
+      quest_text: '',
+      requires_status: '',
+      requires_not_status: '',
+      requires_level: '',
+      requires_not_level: '',
+      requires_currency: '',
+      requires_not_currency: '',
+      requires_item: '',
+      requires_not_item: '',
+      requires_class: '',
+      requires_not_class: ''
+    });
+    setShowQuestDialog(true);
+  }, []);
+
+  const handleCloseQuestDialog = useCallback(() => {
+    setShowQuestDialog(false);
+  }, []);
+
+  const handleSaveQuest = useCallback(() => {
+    const nextName = questDraft.name.trim() || `Quest ${rulesList.length + 1}`;
+    setRulesList((prev) => [
+      ...prev,
+      {
+        id: `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
+        name: nextName,
+        startType: 'player',
+        triggerId: ''
+      }
+    ]);
+    setShowQuestDialog(false);
+    setQuestDraft({
+      name: '',
+      complete_status: '',
+      quest_text: '',
+      requires_status: '',
+      requires_not_status: '',
+      requires_level: '',
+      requires_not_level: '',
+      requires_currency: '',
+      requires_not_currency: '',
+      requires_item: '',
+      requires_not_item: '',
+      requires_class: '',
+      requires_not_class: ''
+    });
+  }, [questDraft, rulesList.length]);
+
+  const dialogsCtx = useDialogsCtx({
+    showQuestDialog,
+    setShowQuestDialog,
+    questDraft,
+    setQuestDraft,
+    handleOpenQuestDialog,
+    handleCloseQuestDialog,
+    handleSaveQuest
+  });
 
   const {
     editor,
@@ -821,8 +900,8 @@ export default function useAppMainBuilder() {
       },
       rules: {
         isRulesLayer,
-        rulesList: [],
-        handleAddRule: () => {},
+        rulesList,
+        handleAddRule: handleOpenQuestDialog,
       },
       items: {
         isItemsLayer,
@@ -979,6 +1058,8 @@ export default function useAppMainBuilder() {
     objectEditing,
     handleOpenItemEdit,
     handleOpenItemDialog,
+    handleOpenQuestDialog,
+    rulesList,
     projectManagerRecord,
     setShowImportReview,
     setImportReviewData,

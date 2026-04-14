@@ -23,7 +23,7 @@ const SidebarRulesPanel = ({ rulesList, onAddRule }: SidebarRulesPanelProps) => 
     <div className="flex-1 min-h-0 border border-dashed border-border rounded-md overflow-y-auto">
       {rulesList.length === 0 ? (
         <div className="flex items-center justify-center h-full text-sm text-muted-foreground px-4 text-center">
-          Click &quot;+ Rule&quot; to create your first rule.
+          Click &quot;+ Quest&quot; to create your first quest.
         </div>
       ) : (
         <div className="flex flex-col gap-1 p-2">
@@ -59,11 +59,11 @@ const SidebarRulesPanel = ({ rulesList, onAddRule }: SidebarRulesPanelProps) => 
       )}
     </div>
     <div className="flex justify-center py-2">
-      <Tooltip content="Add Rule" side="bottom">
+      <Tooltip content="Add Quest" side="bottom">
         <Button
           variant="default"
           size="sm"
-          aria-label="Add Rule"
+          aria-label="Add Quest"
           className="text-xs px-3 py-1 h-7 shadow-sm bg-orange-500 hover:bg-orange-600 text-white border-orange-500"
           onClick={(event) => {
             event.stopPropagation();
@@ -72,7 +72,7 @@ const SidebarRulesPanel = ({ rulesList, onAddRule }: SidebarRulesPanelProps) => 
           }}
         >
           <Plus className="w-3 h-3 mr-1" />
-          Rule
+          Quest
         </Button>
       </Tooltip>
     </div>

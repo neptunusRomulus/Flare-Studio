@@ -3,6 +3,7 @@ import SidebarLayout from '@/components/SidebarLayout';
 import SidebarActorArea from '@/components/SidebarActorArea';
 import SidebarEventArea from '@/components/SidebarEventArea';
 import SidebarRulesArea from '@/components/SidebarRulesArea';
+import SidebarStatusesArea from '@/components/SidebarStatusesArea';
 import SidebarItemsArea from '@/components/SidebarItemsArea';
 import TilesetPanel from '@/components/sidebar/TilesetPanel';
 import SidebarLayersArea from '@/components/SidebarLayersArea';
@@ -62,6 +63,10 @@ type SidebarProps = {
     handleEditRule: (ruleId: string) => void;
   };
 
+  statuses: {
+    isStatusesLayer: boolean;
+    handleOpenStatusDialog: () => void;
+  };
   items: {
     isItemsLayer: boolean;
     itemsList: ItemSummary[];
@@ -134,7 +139,7 @@ export default function AppSidebar(p: SidebarProps) {
 
   return (
     <SidebarLayout leftCollapsed={p.leftCollapsed} width={p.sidebarWidth} onResizeMouseDown={p.onSidebarResizeMouseDown}>
-      <section className="flex flex-col flex-1">
+      <section className="flex flex-col flex-1 min-h-0">
         {(p.actors.isNpcLayer || p.actors.isEnemyLayer) && (
           <SidebarActorArea
             isNpcLayer={p.actors.isNpcLayer}
@@ -170,6 +175,10 @@ export default function AppSidebar(p: SidebarProps) {
           />
         )}
 
+        {p.statuses?.isStatusesLayer && (
+          <SidebarStatusesArea handleOpenStatusDialog={p.statuses?.handleOpenStatusDialog ?? (() => {})} />
+        )}
+
         {p.rules.isRulesLayer && (
           <SidebarRulesArea rulesList={p.rules.rulesList} handleAddRule={p.rules.handleAddRule} handleEditRule={p.rules.handleEditRule} />
         )}
@@ -186,7 +195,7 @@ export default function AppSidebar(p: SidebarProps) {
           />
         )}
 
-        {!p.actors.isNpcLayer && !p.actors.isEnemyLayer && !p.events.isEventLayer && !p.items.isItemsLayer && !p.rules.isRulesLayer && (
+        {!p.actors.isNpcLayer && !p.actors.isEnemyLayer && !p.events.isEventLayer && !p.items.isItemsLayer && !p.rules.isRulesLayer && !p.statuses?.isStatusesLayer && (
           <>  
           <TilesetPanel
             editor={p.tileset.editor}

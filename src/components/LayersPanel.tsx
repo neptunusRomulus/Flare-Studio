@@ -15,7 +15,8 @@ import {
   Users,
   Locate,
   Clock,
-  Map as MapIcon
+  Map as MapIcon,
+  Tag
 } from 'lucide-react';
 
 type Props = {
@@ -183,6 +184,8 @@ const LayersPanel: React.FC<Props> = ({
                                   return <Box className="w-4 h-4" />;
                                 case 'items':
                                   return <Sword className="w-4 h-4" />;
+                                case 'status':
+                                  return <Tag className="w-4 h-4" />;
                                 case 'rules':
                                   return <GitBranch className="w-4 h-4" />;
                                 case 'npc':

@@ -40,20 +40,30 @@ const MapInitOverlay: React.FC<Props> = ({ mapInitialized, handleOpenCreateMapDi
     setClicked(true);
     setTimeout(() => setClicked(false), 700);
   };
+
+  const handleButtonMouseDown = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    handleClick(e);
+    triggerBlink();
+  };
+
   return (
     <div
       className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${!mapInitialized ? 'opacity-100 pointer-events-auto bg-background/80 backdrop-blur-sm' : 'opacity-0 pointer-events-none'}`}
-      aria-hidden={!mapInitialized}
+      aria-hidden={mapInitialized}
       onClick={() => { console.log('MapInitOverlay overlay clicked'); }}
       onMouseDown={() => { console.log('MapInitOverlay overlay mousedown'); }}
     >
       <div className={`flex items-center gap-3 px-4 py-2 rounded-full border-2 border-orange-500/80 bg-background/95 shadow-lg backdrop-blur-sm transition-opacity duration-200 ${!mapInitialized ? 'opacity-100' : 'opacity-0'}`}>
         <span className="text-sm font-medium text-muted-foreground">Create a map</span>
         <Button
+          type="button"
           size="sm"
           variant="default"
           className="w-9 h-9 p-0 rounded-full bg-orange-500 text-white shadow-sm transition-all duration-150 hover:bg-orange-600 hover:shadow-md hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2"
-          onClick={(e) => { handleClick(e); triggerBlink(); }}
+          onClick={(e) => { e.stopPropagation(); handleClick(e); triggerBlink(); }}
+          onMouseDown={handleButtonMouseDown}
           disabled={isPreparingNewMap}
         >
           {clicked ? <span className="text-xs font-semibold">OK</span> : <Plus className="w-4 h-4" />}

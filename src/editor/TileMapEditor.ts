@@ -1286,6 +1286,14 @@ export class TileMapEditor {
         transparency: 1.0
       },
       {
+        id: 10,
+        name: 'Statuses',
+        type: 'status',
+        data: new Array(this.mapWidth * this.mapHeight).fill(0),
+        visible: true,
+        transparency: 1.0
+      },
+      {
         id: 9,
         name: 'Actions',
         type: 'actions',
@@ -10811,6 +10819,27 @@ export class TileMapEditor {
           }
 
           this.nextLayerId = Math.max(this.nextLayerId, rulesLayer.id + 1);
+        }
+
+        if (!this.tileLayers.some(l => l.type === 'status')) {
+          const maxId = this.tileLayers.reduce((max, l) => Math.max(max, l.id), 0);
+          const statusLayer: TileLayer = {
+            id: maxId + 1,
+            name: 'Statuses',
+            type: 'status',
+            data: new Array(this.mapWidth * this.mapHeight).fill(0),
+            visible: true,
+            transparency: 1.0
+          };
+
+          const insertIndex = this.tileLayers.findIndex(l => l.type === 'items');
+          if (insertIndex >= 0) {
+            this.tileLayers.splice(insertIndex, 0, statusLayer);
+          } else {
+            this.tileLayers.unshift(statusLayer);
+          }
+
+          this.nextLayerId = Math.max(this.nextLayerId, statusLayer.id + 1);
         }
       } else {
         this.createDefaultLayers();

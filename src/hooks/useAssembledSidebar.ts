@@ -13,6 +13,7 @@ export default function useAssembledSidebar(params: unknown) {
   const actorsData = paramsRecord['actors'] as Record<string, unknown> | undefined;
   const rulesData = paramsRecord['rules'] as Record<string, unknown> | undefined;
   const itemsData = paramsRecord['items'] as Record<string, unknown> | undefined;
+  const statusesData = paramsRecord['statuses'] as Record<string, unknown> | undefined;
   
   // Flatten the nested structure for useActorsSidebar which expects flat params
   const flattenedParams: Partial<ActorsSidebarParams> = {
@@ -54,6 +55,7 @@ export default function useAssembledSidebar(params: unknown) {
     actors: actorsResult.actors,
     rules: actorsResult.rules,
     items: actorsResult.items,
+    statuses: statusesData,
     events,
     layers: layersObj,
     maps,
@@ -65,6 +67,7 @@ export default function useAssembledSidebar(params: unknown) {
     actors: ReturnType<typeof useActorsSidebar>['actors'];
     rules: ReturnType<typeof useActorsSidebar>['rules'];
     items: ReturnType<typeof useActorsSidebar>['items'];
+    statuses: unknown;
     events: unknown;
     layers: unknown;
     maps: ReturnType<typeof useMapsSidebar>;

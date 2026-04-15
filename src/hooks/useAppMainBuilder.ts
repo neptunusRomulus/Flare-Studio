@@ -97,6 +97,14 @@ export default function useAppMainBuilder() {
     handleSaveQuest
   });
 
+  const [showStatusDialog, setShowStatusDialog] = useState(false);
+  const handleOpenStatusDialog = useCallback(() => {
+    setShowStatusDialog(true);
+  }, []);
+  const handleCloseStatusDialog = useCallback(() => {
+    setShowStatusDialog(false);
+  }, []);
+
   const {
     editor,
     setEditor,
@@ -494,6 +502,7 @@ export default function useAppMainBuilder() {
 
   const isNpcLayer = activeLayer?.type === 'npc';
   const isEnemyLayer = activeLayer?.type === 'enemy';
+  const isStatusesLayer = activeLayer?.type === 'status';
   const isRulesLayer = activeLayer?.type === 'rules';
   const isItemsLayer = activeLayer?.type === 'items';
 
@@ -808,6 +817,10 @@ export default function useAppMainBuilder() {
         handleAddRule: handleOpenQuestDialog,
         handleEditRule: handleOpenQuestEditDialog,
       },
+      statuses: {
+        isStatusesLayer,
+        handleOpenStatusDialog,
+      },
       items: {
         isItemsLayer,
         itemsList: itemsList,
@@ -1021,6 +1034,11 @@ export default function useAppMainBuilder() {
 
     const defaultRules = { isRulesLayer: false, rulesList: [], handleAddRule: () => {} };
 
+    const defaultStatuses = {
+      isStatusesLayer: false,
+      handleOpenStatusDialog: () => {}
+    };
+
     const defaultItems = {
       isItemsLayer: false,
       itemsList: [],
@@ -1138,6 +1156,7 @@ export default function useAppMainBuilder() {
       handleSidebarToggle: () => {},
       actors: sb['actors'] ?? defaultActors,
       rules: sb['rules'] ?? defaultRules,
+      statuses: sb['statuses'] ?? defaultStatuses,
       items: sb['items'] ?? defaultItems,
       itemsList,
       events: sb['events'] ?? defaultEvents,
@@ -1174,6 +1193,8 @@ export default function useAppMainBuilder() {
       showSettings,
       handleCloseSettings,
       setIsDarkMode,
+      showStatusDialog,
+      handleCloseStatusDialog,
       editor: defaultEditor,
       syncMapObjectsWrapper: syncMapObjects,
       showActiveGid,
@@ -1390,6 +1411,20 @@ export default function useAppMainBuilder() {
           updateEditingObjectBoolean: objectEditing.updateEditingObjectBoolean,
           getEditingObjectProperty: objectEditing.getEditingObjectProperty,
           handleUpdateObject: objectEditing.handleUpdateObject,
+          showCreateMapDialog: mapConfig.showCreateMapDialog,
+          setShowCreateMapDialog: mapConfig.setShowCreateMapDialog,
+          newMapName: mapConfig.newMapName,
+          setNewMapName: mapConfig.setNewMapName,
+          newMapWidth: mapConfig.newMapWidth,
+          setNewMapWidth: mapConfig.setNewMapWidth,
+          newMapHeight: mapConfig.newMapHeight,
+          setNewMapHeight: mapConfig.setNewMapHeight,
+          newMapStarting: mapConfig.newMapStarting,
+          setNewMapStarting: mapConfig.setNewMapStarting,
+          createMapError: mapConfig.createMapError,
+          setCreateMapError: mapConfig.setCreateMapError,
+          isPreparingNewMap: mapConfig.isPreparingNewMap,
+          handleConfirmCreateMap: mapConfig.handleConfirmCreateMap,
         // Phase 3: Import Review Modal
         showImportReview,
         setShowImportReview,

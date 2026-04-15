@@ -10,7 +10,7 @@ type SidebarLayoutProps = {
 const SidebarLayout = ({ leftCollapsed, width, onResizeMouseDown, children }: SidebarLayoutProps) => (
   <aside
     className={
-      `relative border-r border-border bg-muted/30 p-2 overflow-visible flex flex-col transition-all duration-200 ease-in-out app-sidebar ` +
+      `relative h-full min-h-0 border-r border-border bg-muted/30 p-2 overflow-visible flex flex-col transition-all duration-200 ease-in-out app-sidebar ` +
       (leftCollapsed ? 'sidebar-collapsed' : '')
     }
     style={width !== undefined ? { width } : undefined}

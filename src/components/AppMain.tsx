@@ -13,6 +13,7 @@ import ConflictDialog from '@/components/ConflictDialog';
 import EditorArea from '@/components/EditorArea';
 import { Toaster } from '@/components/ui/toaster';
 import DialogsContainer from '@/components/DialogsContainer';
+import StatusEditDialog from '@/components/StatusEditDialog';
 import SessionRecoveryDialog from '@/components/SessionRecoveryDialog';
 import useCrashRecovery from '@/hooks/useCrashRecovery';
 import useManualSaveSetup from '@/hooks/useManualSaveSetup';
@@ -32,6 +33,7 @@ export default function AppMain() {
     leftCollapsed,
     handleSidebarToggle,
     actors,
+    statuses = { isStatusesLayer: false, handleOpenStatusDialog: () => {} },
     rules,
     items,
     events,
@@ -74,6 +76,8 @@ export default function AppMain() {
     canvasCtx,
     bottomToolbarProps,
     dialogsCtx,
+    showStatusDialog,
+    handleCloseStatusDialog,
     tooltip
   } = c;
 
@@ -259,8 +263,7 @@ export default function AppMain() {
             leftCollapsed={leftCollapsed}
             sidebarWidth={leftSidebarWidth}
             onSidebarResizeMouseDown={handleSidebarResizeMouseDown}
-            actors={actors}
-            rules={rules}
+            actors={actors}            statuses={statuses}            rules={rules}
             items={items}
             events={events}
             tileset={{
@@ -316,6 +319,8 @@ export default function AppMain() {
       <Toaster />
 
       <DialogsContainer ctx={c} />
+
+      <StatusEditDialog open={showStatusDialog} onClose={handleCloseStatusDialog} />
 
       <SessionRecoveryDialog
         isOpen={showRecoveryDialog && hasCrashBackup}

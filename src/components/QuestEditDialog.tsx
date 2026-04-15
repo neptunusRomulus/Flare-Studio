@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import Tooltip from '@/components/ui/tooltip';
-import { HelpCircle, X, Save } from 'lucide-react';
+import { ChevronDown, ChevronRight, HelpCircle, X, Save } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 
@@ -27,6 +27,7 @@ type QuestDraft = {
   itemRequirements: QuestItemRequirement[];
   requires_class: string;
   requires_not_class: string;
+  start_type?: 'player' | 'game';
 };
 
 type QuestEditDialogProps = {
@@ -35,6 +36,43 @@ type QuestEditDialogProps = {
   questDraft: QuestDraft;
   setQuestDraft: React.Dispatch<React.SetStateAction<QuestDraft>>;
   onSave: () => void;
+};
+
+const CollapsibleSection = ({
+  title,
+  icon: Icon,
+  children,
+  defaultOpen = false,
+  className = ''
+}: {
+  title: string;
+  icon: React.ElementType;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
+  className?: string;
+}) => {
+  const [isOpen, setIsOpen] = React.useState(defaultOpen);
+
+  return (
+    <div className={`space-y-3 border-b border-border/50 pb-4 ${className}`}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center justify-between group py-1"
+      >
+        <h4 className="text-sm font-semibold flex items-center gap-2">
+          <Icon className="w-4 h-4 text-orange-500" />
+          {title}
+        </h4>
+        {isOpen ? (
+          <ChevronDown className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+        ) : (
+          <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+        )}
+      </button>
+      {isOpen && <div className="animate-in fade-in slide-in-from-top-1 duration-200">{children}</div>}
+    </div>
+  );
 };
 
 const QuestEditDialog = ({ open, onOpenChange, questDraft, setQuestDraft, onSave }: QuestEditDialogProps) => {
@@ -79,7 +117,40 @@ const QuestEditDialog = ({ open, onOpenChange, questDraft, setQuestDraft, onSave
     }));
   };
 
+  const [nameError, setNameError] = React.useState('');
+  const nameIsValid = Boolean(questDraft.name?.trim());
+
+  React.useEffect(() => {
+    if (!open) {
+      setNameError('');
+    }
+  }, [open]);
+
+  const saveQuest = () => {
+    if (!nameIsValid) {
+      setNameError('Name is required.');
+      return;
+    }
+    onSave();
+  };
+
   const itemRequirements = questDraft.itemRequirements ?? [];
+
+  const startTypeOptions = [
+    { value: 'player', label: 'Player' },
+    { value: 'game', label: 'Game' },
+  ] as const;
+  const parseStatuses = (value: string) => value.split(/\s*,\s*/).filter(Boolean);
+  const requiredStatuses = parseStatuses(questDraft.requires_status);
+  const excludedStatuses = parseStatuses(questDraft.requires_not_status);
+  const flowSummary = [
+    `Quest name: ${questDraft.name || 'Unnamed quest'}`,
+    questDraft.start_type ? `Start type: ${questDraft.start_type}` : 'Start type: not selected',
+    questDraft.complete_status ? `Complete status: ${questDraft.complete_status}` : 'Complete status: not set',
+    requiredStatuses.length ? `Available when statuses are set: ${requiredStatuses.join(', ')}` : 'No required statuses defined',
+    excludedStatuses.length ? `Unavailable when statuses are set: ${excludedStatuses.join(', ')}` : 'No excluded statuses defined',
+    itemRequirements.length ? `Item requirements: ${itemRequirements.map((req) => `${req.type === 'requires_item' ? 'Needs' : 'Must not have'} ${req.itemQuantity}x ${req.itemId || 'Unknown item'}`).join('; ')}` : 'No item requirements defined',
+  ];
 
   const {
     position,
@@ -115,17 +186,6 @@ const QuestEditDialog = ({ open, onOpenChange, questDraft, setQuestDraft, onSave
           <p className="text-sm text-muted-foreground">Define the quest identity and requirements for this layer.</p>
         </div>
         <div className="flex items-center gap-2">
-          <Tooltip content="Save Quest" side="top">
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={onSave}
-              className="h-9 w-9 text-foreground/70 hover:text-foreground"
-              type="button"
-            >
-              <Save className="h-4 w-4" />
-            </Button>
-          </Tooltip>
           <Tooltip content="Close" side="top">
             <Button
               size="icon"
@@ -141,10 +201,7 @@ const QuestEditDialog = ({ open, onOpenChange, questDraft, setQuestDraft, onSave
       </div>
 
       <div className="flex-1 overflow-y-auto space-y-6 px-5 py-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/15 [&::-webkit-scrollbar-thumb]:rounded-full">
-          <div className="rounded-xl border border-border bg-muted/50 p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-semibold">Identity</h3>
-            </div>
+          <CollapsibleSection title="Identity" icon={HelpCircle} className="rounded-xl border border-border bg-muted/50 p-4" defaultOpen={false}>
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label className="flex items-center gap-2 text-sm font-medium mb-1">
@@ -155,10 +212,17 @@ const QuestEditDialog = ({ open, onOpenChange, questDraft, setQuestDraft, onSave
                 </label>
                 <Input
                   value={questDraft.name}
-                  onChange={(e) => updateField('name', e.target.value)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    updateField('name', value);
+                    if (nameError && value.trim()) {
+                      setNameError('');
+                    }
+                  }}
                   placeholder="Quest Name"
-                  className="h-10"
+                  className={`h-10 ${nameError ? 'border-destructive text-destructive focus:border-destructive focus-visible:ring-destructive/30' : ''}`}
                 />
+                {nameError ? <p className="mt-1 text-sm text-destructive">{nameError}</p> : null}
               </div>
               <div>
                 <label className="flex items-center gap-2 text-sm font-medium mb-1">
@@ -175,6 +239,31 @@ const QuestEditDialog = ({ open, onOpenChange, questDraft, setQuestDraft, onSave
                 />
               </div>
             </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="flex items-center gap-2 text-sm font-medium mb-1">
+                  Start Type
+                  <Tooltip content="Choose whether this quest is triggered by player action or game events.">
+                    <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
+                  </Tooltip>
+                </label>
+                <Select
+                  value={questDraft.start_type ?? ''}
+                  onValueChange={(value) => updateField('start_type', value)}
+                >
+                  <SelectTrigger className="h-10 w-full text-sm">
+                    <SelectValue placeholder="Select start type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {startTypeOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value} className="text-xs">
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
             <div className="mt-4">
               <label className="flex items-center gap-2 text-sm font-medium mb-1">
                 Quest Text
@@ -189,12 +278,9 @@ const QuestEditDialog = ({ open, onOpenChange, questDraft, setQuestDraft, onSave
                 className="w-full min-h-[100px] rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
             </div>
-          </div>
+          </CollapsibleSection>
 
-          <div className="rounded-xl border border-border bg-muted/50 p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-semibold">Requirements</h3>
-            </div>
+          <CollapsibleSection title="Requirements" icon={HelpCircle} className="rounded-xl border border-border bg-muted/50 p-4" defaultOpen={false}>
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label className="flex items-center gap-2 text-sm font-medium mb-1">
@@ -389,7 +475,57 @@ const QuestEditDialog = ({ open, onOpenChange, questDraft, setQuestDraft, onSave
                 />
               </div>
             </div>
-          </div>
+          </CollapsibleSection>
+
+          <CollapsibleSection title="Quest Flow" icon={HelpCircle} className="rounded-xl border border-border bg-muted/50 p-4" defaultOpen={false}>
+            <p className="text-sm text-muted-foreground mb-4">This flow is inferred from quest requirements, start type, and completion status. Use it to understand how statuses, item requirements, and completion are connected.</p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="rounded-xl border border-border bg-background p-3">
+                <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground mb-2">Availability</p>
+                <p className="text-sm">{requiredStatuses.length ? requiredStatuses.join(', ') : 'No required statuses'}</p>
+                <p className="text-sm text-muted-foreground mt-2">Requires all of these statuses to be set.</p>
+              </div>
+              <div className="rounded-xl border border-border bg-background p-3">
+                <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground mb-2">Exclusion</p>
+                <p className="text-sm">{excludedStatuses.length ? excludedStatuses.join(', ') : 'No excluded statuses'}</p>
+                <p className="text-sm text-muted-foreground mt-2">Quest is hidden when any of these statuses are active.</p>
+              </div>
+              <div className="rounded-xl border border-border bg-background p-3">
+                <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground mb-2">Completion</p>
+                <p className="text-sm">{questDraft.complete_status || 'Completion status not set'}</p>
+                <p className="text-sm text-muted-foreground mt-2">Quest is considered complete when this status is set.</p>
+              </div>
+              <div className="rounded-xl border border-border bg-background p-3">
+                <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground mb-2">Requirements</p>
+                <p className="text-sm">
+                  {itemRequirements.length
+                    ? itemRequirements.map((req) => `${req.type === 'requires_item' ? 'Needs' : 'Must not have'} ${req.itemQuantity}× ${req.itemId || 'Unknown item'}`).join('; ')
+                    : 'No item requirements'}
+                </p>
+              </div>
+            </div>
+            <div className="mt-4 rounded-xl border border-border bg-background p-3 text-sm">
+              <p className="font-semibold mb-2">Flow summary</p>
+              <ul className="list-disc list-inside text-sm space-y-1">
+                {flowSummary.map((line, index) => (
+                  <li key={`flow-summary-${index}`}>{line}</li>
+                ))}
+              </ul>
+            </div>
+          </CollapsibleSection>
+        </div>
+
+        <div className="flex justify-end border-t border-border/50 bg-background px-4 py-4">
+          <Button
+            size="icon"
+            variant="default"
+            onClick={saveQuest}
+            disabled={!nameIsValid}
+            className="h-10 w-10 rounded-full bg-orange-500 text-white hover:bg-orange-600 focus-visible:ring-orange-400 disabled:bg-orange-200 disabled:text-white/60"
+            type="button"
+          >
+            <Save className="h-4 w-4" />
+          </Button>
         </div>
 
         <div

@@ -59,6 +59,7 @@ type SidebarProps = {
     isRulesLayer: boolean;
     rulesList: Array<{ id: string; name: string; startType: RuleStartType; triggerId: string }>;
     handleAddRule: () => void;
+    handleEditRule: (ruleId: string) => void;
   };
 
   items: {
@@ -170,7 +171,7 @@ export default function AppSidebar(p: SidebarProps) {
         )}
 
         {p.rules.isRulesLayer && (
-          <SidebarRulesArea rulesList={p.rules.rulesList} handleAddRule={p.rules.handleAddRule} />
+          <SidebarRulesArea rulesList={p.rules.rulesList} handleAddRule={p.rules.handleAddRule} handleEditRule={p.rules.handleEditRule} />
         )}
 
         {p.items.isItemsLayer && (

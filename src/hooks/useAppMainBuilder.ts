@@ -1,14 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import useDialogsCtx from './useDialogsCtx';
 import buildConfirmDialogProps from './buildConfirmDialogProps';
-import useEditorRefs from './useEditorRefs';
-import useEditorSetup from './useEditorSetup';
+import useAppMainState, { AssetOriginPreset, ImportReviewData } from './useAppMainState';
 import useUndoRedoZoom from './useUndoRedoZoom';
 import useTooltip from './useTooltip';
-import usePreferences from './usePreferences';
-import useDarkModeSync from './useDarkModeSync';
-import useAppState from './useAppState';
-import useToolbarState from './useToolbarState';
 import useMapConfig from './useMapConfig';
 import useEditorTabs from './useEditorTabs';
 import type { EditorTab } from './useEditorTabs';
@@ -20,16 +15,12 @@ import useAppEffects from './useAppEffects';
 import useNpcDrag from './useNpcDrag';
 import useEventDrag from './useEventDrag';
 import useObjectEditing from './useObjectEditing';
-import useItems from './useItems';
 import useVendorDialogs from './useVendorDialogs';
-import useVendorState from './useVendorState';
-import useLoadProjectData from './useLoadProjectData';
 import useClearLayerHandler from './useClearLayerHandler';
 import { normalizeItemsForState } from '@/utils/items';
 import { buildConstantStockString } from '@/utils/parsers';
 // ItemRole type intentionally not imported — unused in this module
 import { toast } from '@/hooks/use-toast';
-import useHelpState from './useHelpState';
 import useActiveGidCallback from './useActiveGidCallback';
 import useHoverGidCallback from './useHoverGidCallback';
 import useDeleteActiveTab from './useDeleteActiveTab';
@@ -40,11 +31,8 @@ import type { EditorProjectData } from '@/editor/TileMapEditor';
 import type { MapObject } from '@/types';
 
 export default function useAppMainBuilder() {
-  type EditorRefsType = ReturnType<typeof useEditorRefs>;
-  type EditorSetupType = ReturnType<typeof useEditorSetup>;
   type EditorTabsType = ReturnType<typeof useEditorTabs>;
   type ProjectManagerType = ReturnType<typeof useProjectManager>;
-  type ToolbarStateType = ReturnType<typeof useToolbarState>;
   type ProjectManagerView = {
     projectMaps?: string[];
     handleOpenMapFromMapsFolder?: (filename: string) => Promise<void>;
@@ -56,132 +44,48 @@ export default function useAppMainBuilder() {
     saveProgress?: number;
   };
 
-  const editorRefs = useEditorRefs() as EditorRefsType;
-  const editorSetup = useEditorSetup(editorRefs.editorOptsRef) as EditorSetupType;
-  const { loadProjectData } = useLoadProjectData();
-  
-  const { isDarkMode, setIsDarkMode, showSidebarToggle, setShowSidebarToggle } = usePreferences();
-  useDarkModeSync(isDarkMode, editorSetup.editor as TileMapEditor | null);
+  const {
+    editorRefs,
+    editorSetup,
+    loadProjectData,
+    preferences,
+    appState,
+    toolbarState,
+    helpState,
+    currentProjectPath,
+    setCurrentProjectPath,
+    showActiveGid,
+    setShowActiveGid,
+    showImportReview,
+    setShowImportReview,
+    importReviewOriginPreset,
+    setImportReviewOriginPreset,
+    importReviewData,
+    setImportReviewData,
+    itemsHook,
+    vendorState,
+    mapsDropdownOpen,
+    setMapsDropdownOpen,
+    mapsSubOpen,
+    setMapsSubOpen,
+    mapsDropdownPos,
+    setMapsDropdownPos,
+    mapsButtonRef,
+    mapsPortalRef,
+    showQuestDialog,
+    setShowQuestDialog,
+    editingQuestId,
+    questDraft,
+    setQuestDraft,
+    rulesList,
+    handleOpenQuestDialog,
+    handleCloseQuestDialog,
+    handleOpenQuestEditDialog,
+    handleSaveQuest
+  } = useAppMainState();
 
-  const [showActiveGid, setShowActiveGid] = useState<boolean>(true);
-
-  const appState = useAppState();
-  const toolbarState = useToolbarState() as ToolbarStateType;
-
-  const helpState = useHelpState();
-
-  const [currentProjectPath, setCurrentProjectPath] = useState<string | null>(null);
-
-  // Phase 3: Import Review Modal state
-  type ImportReviewData = {
-    tilesetFileName: string;
-    detectedAssets: Array<{
-      gid: number;
-      sourceX: number;
-      sourceY: number;
-      width: number;
-      height: number;
-      confidence?: number;
-    }>;
-    _meta?: {
-      file: File;
-      layerType: string;
-      tabId: number;
-      projectPath?: string | null;
-      manualTileWidth?: number;
-      manualTileHeight?: number;
-      forceGridSlicing?: boolean;
-    };
-  };
-
-  type AssetOriginPreset = 'top-left' | 'top-center' | 'center' | 'bottom-left' | 'bottom-center';
-
-  // Fixed isometric tile dimensions — not user-configurable
-  const FIXED_TILE_WIDTH = 64;
-  const FIXED_TILE_HEIGHT = 32;
-
-  const [showImportReview, setShowImportReview] = useState<boolean>(false);
-  const [importReviewOriginPreset, setImportReviewOriginPreset] = useState<AssetOriginPreset>('bottom-center');
-  const [importReviewData, setImportReviewData] = useState<ImportReviewData | null>(null);
-  
-  const itemsHook = useItems({ currentProjectPath, toast, normalizeItemsForState });
+  const { isDarkMode, setIsDarkMode, showSidebarToggle, setShowSidebarToggle } = preferences;
   const { itemsList, expandedItemCategories, setExpandedItemCategories, handleOpenItemEdit, handleOpenItemDialog } = itemsHook;
-  const vendorState = useVendorState();
-  const [mapsDropdownOpen, setMapsDropdownOpen] = useState(false);
-  const [mapsSubOpen, setMapsSubOpen] = useState(false);
-  const [mapsDropdownPos, setMapsDropdownPos] = useState<{ left: number; top: number } | null>(null);
-  const mapsButtonRef = useRef<HTMLButtonElement | null>(null);
-  const mapsPortalRef = useRef<HTMLDivElement | null>(null);
-
-  const [showQuestDialog, setShowQuestDialog] = useState<boolean>(false);
-  const [questDraft, setQuestDraft] = useState(() => ({
-    name: '',
-    complete_status: '',
-    quest_text: '',
-    requires_status: '',
-    requires_not_status: '',
-    requires_level: '',
-    requires_not_level: '',
-    requires_currency: '',
-    requires_not_currency: '',
-    requires_item: '',
-    requires_not_item: '',
-    requires_class: '',
-    requires_not_class: ''
-  }));
-  const [rulesList, setRulesList] = useState<Array<{ id: string; name: string; startType: 'player' | 'game'; triggerId: string }>>([]);
-
-  const handleOpenQuestDialog = useCallback(() => {
-    setQuestDraft({
-      name: '',
-      complete_status: '',
-      quest_text: '',
-      requires_status: '',
-      requires_not_status: '',
-      requires_level: '',
-      requires_not_level: '',
-      requires_currency: '',
-      requires_not_currency: '',
-      requires_item: '',
-      requires_not_item: '',
-      requires_class: '',
-      requires_not_class: ''
-    });
-    setShowQuestDialog(true);
-  }, []);
-
-  const handleCloseQuestDialog = useCallback(() => {
-    setShowQuestDialog(false);
-  }, []);
-
-  const handleSaveQuest = useCallback(() => {
-    const nextName = questDraft.name.trim() || `Quest ${rulesList.length + 1}`;
-    setRulesList((prev) => [
-      ...prev,
-      {
-        id: `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
-        name: nextName,
-        startType: 'player',
-        triggerId: ''
-      }
-    ]);
-    setShowQuestDialog(false);
-    setQuestDraft({
-      name: '',
-      complete_status: '',
-      quest_text: '',
-      requires_status: '',
-      requires_not_status: '',
-      requires_level: '',
-      requires_not_level: '',
-      requires_currency: '',
-      requires_not_currency: '',
-      requires_item: '',
-      requires_not_item: '',
-      requires_class: '',
-      requires_not_class: ''
-    });
-  }, [questDraft, rulesList.length]);
 
   const dialogsCtx = useDialogsCtx({
     showQuestDialog,
@@ -208,7 +112,7 @@ export default function useAppMainBuilder() {
     handleFillSelection,
     handleDeleteSelection,
     handleClearSelection
-  } = editorSetup as EditorSetupType;
+  } = editorSetup;
 
   // Wire up active GID callback to track current brush GID
   useActiveGidCallback(editor as TileMapEditor | null, toolbarState.setActiveGidValue);
@@ -219,7 +123,7 @@ export default function useAppMainBuilder() {
   // Get the REAL syncMapObjects from useMapHandlers - not the wrapper
   // This needs to be before useAppEffects so the ref gets the real function
   const { syncMapObjects: realSyncMapObjects, updateLayersList: realUpdateLayersList } = useMapHandlers({
-    editor: editor ?? undefined,
+    editor: editor as any,
     setMapObjects: appState.setMapObjects,
     setLayers: appState.setLayers,
     setActiveLayerId: appState.setActiveLayerId
@@ -515,7 +419,7 @@ export default function useAppMainBuilder() {
   }, [editor, handleEditEvent]);
 
   const objectEditing = useObjectEditing({ 
-    editor: editor ?? undefined, 
+    editor: editor as any,
     syncMapObjects: realSyncMapObjects,
     createTabFor, 
     switchToTab, 
@@ -902,6 +806,7 @@ export default function useAppMainBuilder() {
         isRulesLayer,
         rulesList,
         handleAddRule: handleOpenQuestDialog,
+        handleEditRule: handleOpenQuestEditDialog,
       },
       items: {
         isItemsLayer,
@@ -1461,6 +1366,30 @@ export default function useAppMainBuilder() {
           handleItemSubmit: itemsHook.handleItemSubmit,
           handleConfirmDuplicateItem: itemsHook.handleConfirmDuplicateItem,
           clearPendingDuplicate: () => itemsHook.setPendingDuplicateItem(null),
+          showItemEditDialog: itemsHook.showItemEditDialog,
+          editingItem: itemsHook.editingItem,
+          updateEditingItemField: itemsHook.updateEditingItemField,
+          handleCloseItemEdit: itemsHook.handleCloseItemEdit,
+          handleSaveItemEdit: itemsHook.handleSaveItemEdit,
+          showLootGroupEditDialog: itemsHook.showLootGroupEditDialog,
+          lootGroupEditingItem: itemsHook.lootGroupEditingItem,
+          lootGroupEditingData: itemsHook.lootGroupEditingData,
+          updateLootGroupField: itemsHook.updateLootGroupField,
+          handleCloseLootGroupEdit: itemsHook.handleCloseLootGroupEdit,
+          handleSaveLootGroupEdit: itemsHook.handleSaveLootGroupEdit,
+          // Object management dialog state and handlers
+          showObjectDialog: objectEditing.showObjectDialog,
+          showEnemyEditor: objectEditing.showEnemyEditor,
+          setShowEnemyEditor: objectEditing.setShowEnemyEditor,
+          editingObject: objectEditing.editingObject,
+          objectValidationErrors: objectEditing.objectValidationErrors,
+          setEditingObject: objectEditing.setEditingObject,
+          handleObjectDialogClose: objectEditing.handleObjectDialogClose,
+          handleObjectDialogSave: objectEditing.handleObjectDialogSave,
+          updateEditingObjectProperty: objectEditing.updateEditingObjectProperty,
+          updateEditingObjectBoolean: objectEditing.updateEditingObjectBoolean,
+          getEditingObjectProperty: objectEditing.getEditingObjectProperty,
+          handleUpdateObject: objectEditing.handleUpdateObject,
         // Phase 3: Import Review Modal
         showImportReview,
         setShowImportReview,

@@ -22,6 +22,7 @@ export type ActorsSidebarParams = {
   isRulesLayer: boolean;
   rulesList: RulesListItem[];
   handleAddRule: () => void;
+  handleEditRule: (ruleId: string) => void;
 
   isItemsLayer: boolean;
   itemsList: unknown[];
@@ -80,6 +81,7 @@ export default function useActorsSidebar(params?: Partial<ActorsSidebarParams>) 
     isRulesLayer: false,
     rulesList: [],
     handleAddRule: noopNode,
+    handleEditRule: noopNode,
     isItemsLayer: false,
     itemsList: [],
     expandedItemCategories: new Set<ItemRole>(),
@@ -117,7 +119,7 @@ export default function useActorsSidebar(params?: Partial<ActorsSidebarParams>) 
     handleOpenActorDialog: p.handleOpenActorDialog
   };
 
-  const rules = { isRulesLayer: p.isRulesLayer, rulesList: p.rulesList, handleAddRule: p.handleAddRule };
+  const rules = { isRulesLayer: p.isRulesLayer, rulesList: p.rulesList, handleAddRule: p.handleAddRule, handleEditRule: p.handleEditRule };
 
   const items = {
     isItemsLayer: p.isItemsLayer,

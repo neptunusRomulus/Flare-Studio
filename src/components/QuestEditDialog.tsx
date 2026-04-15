@@ -1,9 +1,18 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import Tooltip from '@/components/ui/tooltip';
 import { HelpCircle, X, Save } from 'lucide-react';
+import { useAppContext } from '@/context/AppContext';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
+
+type QuestItemRequirement = {
+  id: string;
+  type: 'requires_item' | 'requires_not_item';
+  itemId: string;
+  itemQuantity: number;
+};
 
 type QuestDraft = {
   name: string;
@@ -15,8 +24,7 @@ type QuestDraft = {
   requires_not_level: string;
   requires_currency: string;
   requires_not_currency: string;
-  requires_item: string;
-  requires_not_item: string;
+  itemRequirements: QuestItemRequirement[];
   requires_class: string;
   requires_not_class: string;
 };
@@ -30,9 +38,48 @@ type QuestEditDialogProps = {
 };
 
 const QuestEditDialog = ({ open, onOpenChange, questDraft, setQuestDraft, onSave }: QuestEditDialogProps) => {
+  const { itemsList = [] } = useAppContext() as any;
+  const inventoryItems = React.useMemo(
+    () => (itemsList as any[]).filter((item) => item.role !== 'loot_groups'),
+    [itemsList]
+  );
+
   const updateField = (field: keyof QuestDraft, value: string) => {
     setQuestDraft((prev) => ({ ...prev, [field]: value }));
   };
+
+  const addItemRequirement = () => {
+    setQuestDraft((prev) => ({
+      ...prev,
+      itemRequirements: [
+        ...prev.itemRequirements,
+        {
+          id: `item-req-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          type: 'requires_item',
+          itemId: '',
+          itemQuantity: 1,
+        },
+      ],
+    }));
+  };
+
+  const updateItemRequirement = (id: string, updates: Partial<Omit<QuestItemRequirement, 'id'>>) => {
+    setQuestDraft((prev) => ({
+      ...prev,
+      itemRequirements: (prev.itemRequirements ?? []).map((req) =>
+        req.id === id ? { ...req, ...updates } : req
+      ),
+    }));
+  };
+
+  const removeItemRequirement = (id: string) => {
+    setQuestDraft((prev) => ({
+      ...prev,
+      itemRequirements: (prev.itemRequirements ?? []).filter((req) => req.id !== id),
+    }));
+  };
+
+  const itemRequirements = questDraft.itemRequirements ?? [];
 
   const {
     position,
@@ -237,33 +284,81 @@ const QuestEditDialog = ({ open, onOpenChange, questDraft, setQuestDraft, onSave
                   className="h-10"
                 />
               </div>
-              <div>
-                <label className="flex items-center gap-2 text-sm font-medium mb-1">
-                  quest.requires_item
-                  <Tooltip content="Quest requires specific item (not equipped).">
-                    <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
-                  </Tooltip>
-                </label>
-                <Input
-                  value={questDraft.requires_item}
-                  onChange={(e) => updateField('requires_item', e.target.value)}
-                  placeholder="comma-separated item IDs"
-                  className="h-10"
-                />
-              </div>
-              <div>
-                <label className="flex items-center gap-2 text-sm font-medium mb-1">
-                  quest.requires_not_item
-                  <Tooltip content="Quest requires not having a specific item (not equipped).">
-                    <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
-                  </Tooltip>
-                </label>
-                <Input
-                  value={questDraft.requires_not_item}
-                  onChange={(e) => updateField('requires_not_item', e.target.value)}
-                  placeholder="comma-separated item IDs"
-                  className="h-10"
-                />
+              <div className="sm:col-span-2 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-foreground/90">Item Requirements</label>
+                    <Tooltip content="Require or forbid a specific inventory item for this quest.">
+                      <HelpCircle className="h-4 w-4 text-muted-foreground cursor-pointer" />
+                    </Tooltip>
+                  </div>
+                  <Button size="sm" variant="outline" onClick={addItemRequirement} className="h-8 text-xs">
+                    + Add
+                  </Button>
+                </div>
+                <div className="overflow-hidden rounded-md border border-border">
+                  <table className="min-w-full text-left text-xs">
+                    <thead className="bg-muted/50">
+                      <tr>
+                        <th className="px-2 py-2">Condition</th>
+                        <th className="px-2 py-2">Item</th>
+                        <th className="px-2 py-2">Qty</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {itemRequirements.map((itemReq) => (
+                        <tr key={itemReq.id}>
+                          <td className="px-2 py-2">
+                            <Select
+                              value={itemReq.type}
+                              onValueChange={(value) => updateItemRequirement(itemReq.id, { type: value as QuestItemRequirement['type'] })}
+                            >
+                              <SelectTrigger className="h-9 text-xs w-full">
+                                <SelectValue placeholder="Condition" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="requires_item" className="text-xs">Requires item</SelectItem>
+                                <SelectItem value="requires_not_item" className="text-xs">Requires not item</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </td>
+                          <td className="px-2 py-2">
+                            <Select
+                              value={itemReq.itemId || '__none__'}
+                              onValueChange={(value) => updateItemRequirement(itemReq.id, { itemId: value === '__none__' ? '' : value })}
+                            >
+                              <SelectTrigger className="h-9 text-xs w-full">
+                                <SelectValue placeholder="Select item" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="__none__" className="text-xs">None</SelectItem>
+                                {inventoryItems.map((item: any) => (
+                                  <SelectItem key={`item-${itemReq.id}-${item.id}`} value={String(item.id)} className="text-xs">
+                                    {String(item.id)} {item.name || item.fileName || ''}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </td>
+                          <td className="px-2 py-2">
+                            <div className="flex items-center gap-2">
+                              <Input
+                                type="number"
+                                min="1"
+                                value={itemReq.itemQuantity}
+                                onChange={(e) => updateItemRequirement(itemReq.id, { itemQuantity: Math.max(1, parseInt(e.target.value, 10) || 1) })}
+                                className="h-9 text-xs flex-1"
+                              />
+                              <Button size="icon" variant="ghost" onClick={() => removeItemRequirement(itemReq.id)} className="h-8 w-8">
+                                <X className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
               <div>
                 <label className="flex items-center gap-2 text-sm font-medium mb-1">

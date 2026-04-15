@@ -149,7 +149,7 @@ const Tooltip: React.FC<TooltipProps> = ({ content, side = 'top', className = ''
   }, [clearTimer]);
 
   const handleToggleExpand = (e: React.MouseEvent) => {
-    e.stopPropagation();
+    if (e.target !== e.currentTarget) return;
     setIsExpanded(!isExpanded);
     // re-measure since size changed
     requestAnimationFrame(() => computeOffset());

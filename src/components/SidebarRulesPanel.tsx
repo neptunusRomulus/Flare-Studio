@@ -16,9 +16,10 @@ type RuleListEntry = {
 type SidebarRulesPanelProps = {
   rulesList: RuleListEntry[];
   onAddRule: () => void;
+  onEditRule: (ruleId: string) => void;
 };
 
-const SidebarRulesPanel = ({ rulesList, onAddRule }: SidebarRulesPanelProps) => (
+const SidebarRulesPanel = ({ rulesList, onAddRule, onEditRule }: SidebarRulesPanelProps) => (
   <div className="flex flex-col flex-1">
     <div className="flex-1 min-h-0 border border-dashed border-border rounded-md overflow-y-auto">
       {rulesList.length === 0 ? (
@@ -31,10 +32,12 @@ const SidebarRulesPanel = ({ rulesList, onAddRule }: SidebarRulesPanelProps) => 
             const triggerMeta = RULE_TRIGGER_LOOKUP[rule.triggerId];
             const TriggerIcon = triggerMeta?.icon;
             return (
-              <div
+              <button
                 key={rule.id}
-                className="flex items-center gap-3 p-2 bg-muted/50 hover:bg-muted rounded-md border border-border cursor-pointer transition-colors w-full"
+                type="button"
+                className="flex items-center gap-3 p-2 bg-muted/50 hover:bg-muted rounded-md border border-border cursor-pointer transition-colors w-full text-left"
                 title={rule.name}
+                onClick={() => onEditRule(rule.id)}
               >
                 <GitBranch className="w-4 h-4 text-orange-500 flex-shrink-0" />
                 <div className="flex-1 min-w-0">
@@ -52,7 +55,7 @@ const SidebarRulesPanel = ({ rulesList, onAddRule }: SidebarRulesPanelProps) => 
                     )}
                   </div>
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>

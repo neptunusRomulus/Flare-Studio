@@ -32,6 +32,7 @@ export default function useAssembledSidebar(params: unknown) {
     isRulesLayer: rulesData?.['isRulesLayer'] as boolean | undefined,
     rulesList: rulesData?.['rulesList'] as any | undefined,
     handleAddRule: rulesData?.['handleAddRule'] as any | undefined,
+    handleEditRule: rulesData?.['handleEditRule'] as any | undefined,
     isItemsLayer: itemsData?.['isItemsLayer'] as boolean | undefined,
     itemsList: itemsData?.['itemsList'] as any | undefined,
     expandedItemCategories: itemsData?.['expandedItemCategories'] as any | undefined,

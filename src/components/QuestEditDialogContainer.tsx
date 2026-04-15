@@ -11,8 +11,12 @@ type QuestDraft = {
   requires_not_level: string;
   requires_currency: string;
   requires_not_currency: string;
-  requires_item: string;
-  requires_not_item: string;
+  itemRequirements: {
+    id: string;
+    type: 'requires_item' | 'requires_not_item';
+    itemId: string;
+    itemQuantity: number;
+  }[];
   requires_class: string;
   requires_not_class: string;
 };
@@ -37,8 +41,7 @@ export default function QuestEditDialogContainer({ ctx }: { ctx: unknown }) {
     requires_not_level: '',
     requires_currency: '',
     requires_not_currency: '',
-    requires_item: '',
-    requires_not_item: '',
+    itemRequirements: [],
     requires_class: '',
     requires_not_class: ''
   };

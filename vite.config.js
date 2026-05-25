@@ -10,12 +10,12 @@ export default defineConfig({
     outDir: 'dist',
     rollupOptions: {
       input: {
-        main: resolve(__dirname, 'index.html')
+        main: resolve(__dirname, 'index.html'),
+        preload: resolve(__dirname, 'electron/preload.js')
       }
     }
   },
   server: {
-    // choose 5173 which matches the project's other scripts
     port: 5173
   },
   base: './',

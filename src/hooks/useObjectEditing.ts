@@ -100,6 +100,7 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
   const { editor = null, syncMapObjects, createTabFor, switchToTab } = opts || {};
 
   const [showObjectDialog, setShowObjectDialog] = useState(false);
+  const [showEnemyEditor, setShowEnemyEditor] = useState(false);
   const [editingObject, setEditingObject] = useState<MapObject | null>(null);
   const [objectValidationErrors, setObjectValidationErrors] = useState<string[]>([]);
   const [mapObjects, setMapObjects] = useState<MapObject[]>([]);
@@ -108,6 +109,8 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
   const [actorDialogState, setActorDialogState] = useState<ActorDialogState | null>(null);
   const [actorDialogError, setActorDialogError] = useState<string | null>(null);
   const [showDialogueTreeDialog, setShowDialogueTreeDialog] = useState(false);
+  const [showVendorSettingsDialog, setShowVendorSettingsDialog] = useState(false);
+  const [showQuestSettingsDialog, setShowQuestSettingsDialog] = useState(false);
   const [dialogueTrees, setDialogueTrees] = useState<DialogueTree[]>([]);
   const [activeDialogueTab, setActiveDialogueTab] = useState(0);
   const [dialogueTabToDelete, setDialogueTabToDelete] = useState<number | null>(null);
@@ -278,20 +281,16 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
 
     handleCloseActorDialog();
     if (editAfter && newObject) {
-      // Open the edit dialog for the newly created actor
       const objects = editor && typeof editor.getMapObjects === 'function' ? editor.getMapObjects() : [...mapObjects, newObject!];
       const obj = objects?.find(o => o.id === newObject!.id) || newObject;
-      if (obj.type === 'enemy' && typeof createTabFor === 'function') {
-        try {
-          const tab = createTabFor(obj.name || 'Enemy', null, { enemy: obj });
-          if (tab && typeof switchToTab === 'function') void switchToTab(tab.id);
-        } catch (err) {
-          console.warn('Failed to create tab for enemy edit:', err);
-        }
-      } else {
-        setEditingObject(obj);
-        setShowObjectDialog(true);
-        // New NPC has no dialogue trees yet
+      setEditingObject(obj);
+      setShowEnemyEditor(false);
+      setShowObjectDialog(true);
+      if (obj.type !== 'npc') {
+        setShowDeleteNpcConfirm(false);
+        setShowDeleteEnemyConfirm(false);
+      }
+      if (obj.type === 'npc') {
         try {
           const stored = obj.properties?.dialogueTrees;
           setDialogueTrees(stored ? JSON.parse(stored) : []);
@@ -311,34 +310,34 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
   }, [actorDialogState, editor, syncMapObjects, createTabFor, switchToTab, mapObjects, handleCloseActorDialog]);
 
   const handleEditObject = useCallback((objectId: number) => {
-    // If an editor instance is available use it to find the object
     const objects = editor && typeof editor.getMapObjects === 'function' ? editor.getMapObjects() : mapObjects;
     const obj = objects?.find(o => o.id === objectId) || null;
     if (!obj) return;
 
-    // If enemy and createTabFor provided, open an edit tab
-    if (obj.type === 'enemy' && typeof createTabFor === 'function') {
+    setEditingObject(obj);
+    setShowEnemyEditor(false);
+    setShowObjectDialog(true);
+    if (obj.type === 'npc') {
       try {
-        const tab = createTabFor(obj.name || 'Enemy', null, { enemy: obj });
-        if (tab && typeof switchToTab === 'function') void switchToTab(tab.id);
-        return;
-      } catch (err) {
-        console.warn('Failed to create tab for enemy edit:', err);
+        const stored = obj.properties?.dialogueTrees;
+        setDialogueTrees(stored ? JSON.parse(stored) : []);
+      } catch {
+        setDialogueTrees([]);
       }
+      setActiveDialogueTab(0);
+      setDialogueTabToDelete(null);
     }
+  }, [editor, mapObjects]);
+
+  const handleEditEnemyTemplate = useCallback((objectId: number) => {
+    const objects = editor && typeof editor.getMapObjects === 'function' ? editor.getMapObjects() : mapObjects;
+    const obj = objects?.find(o => o.id === objectId) || null;
+    if (!obj || obj.type !== 'enemy') return;
 
     setEditingObject(obj);
-    setShowObjectDialog(true);
-    // Load dialogue trees from the object's properties
-    try {
-      const stored = obj.properties?.dialogueTrees;
-      setDialogueTrees(stored ? JSON.parse(stored) : []);
-    } catch {
-      setDialogueTrees([]);
-    }
-    setActiveDialogueTab(0);
-    setDialogueTabToDelete(null);
-  }, [createTabFor, editor, mapObjects, switchToTab]);
+    setShowObjectDialog(false);
+    setShowEnemyEditor(true);
+  }, [editor, mapObjects]);
 
   const handleUpdateObject = useCallback((updatedObject: MapObject) => {
     try {
@@ -372,6 +371,24 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
     setActiveDialogueTab(0);
     setDialogueTabToDelete(null);
     setShowDialogueTreeDialog(false);
+    setShowVendorSettingsDialog(false);
+    setShowQuestSettingsDialog(false);
+  }, []);
+
+  const handleOpenVendorSettingsDialog = useCallback(() => {
+    setShowVendorSettingsDialog(true);
+  }, []);
+
+  const handleCloseVendorSettingsDialog = useCallback(() => {
+    setShowVendorSettingsDialog(false);
+  }, []);
+
+  const handleOpenQuestSettingsDialog = useCallback(() => {
+    setShowQuestSettingsDialog(true);
+  }, []);
+
+  const handleCloseQuestSettingsDialog = useCallback(() => {
+    setShowQuestSettingsDialog(false);
   }, []);
 
   const handleObjectDialogSave = useCallback(async () => {
@@ -497,6 +514,8 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
   return {
     showObjectDialog,
     setShowObjectDialog,
+    showEnemyEditor,
+    setShowEnemyEditor,
     editingObject,
     setEditingObject,
     objectValidationErrors,
@@ -519,6 +538,7 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
     handleActorPortraitBrowse,
     handleActorSubmit,
     handleEditObject,
+    handleEditEnemyTemplate,
     handleUpdateObject,
     handleObjectDialogClose,
     handleObjectDialogSave,
@@ -530,6 +550,12 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
     handleAutoDetectAnim,
     showDialogueTreeDialog,
     setShowDialogueTreeDialog,
+    showVendorSettingsDialog,
+    handleOpenVendorSettingsDialog,
+    handleCloseVendorSettingsDialog,
+    showQuestSettingsDialog,
+    handleOpenQuestSettingsDialog,
+    handleCloseQuestSettingsDialog,
     dialogueTrees,
     setDialogueTrees,
     activeDialogueTab,

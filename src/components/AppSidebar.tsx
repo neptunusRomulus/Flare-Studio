@@ -3,6 +3,7 @@ import SidebarLayout from '@/components/SidebarLayout';
 import SidebarActorArea from '@/components/SidebarActorArea';
 import SidebarEventArea from '@/components/SidebarEventArea';
 import SidebarRulesArea from '@/components/SidebarRulesArea';
+import SidebarStatusesArea from '@/components/SidebarStatusesArea';
 import SidebarItemsArea from '@/components/SidebarItemsArea';
 import TilesetPanel from '@/components/sidebar/TilesetPanel';
 import SidebarLayersArea from '@/components/SidebarLayersArea';
@@ -24,12 +25,15 @@ type ItemSummary = {
 
 type SidebarProps = {
   leftCollapsed: boolean;
+  sidebarWidth?: number;
+  onSidebarResizeMouseDown?: (event: React.MouseEvent<HTMLDivElement>) => void;
   actors: {
     isNpcLayer: boolean;
     isEnemyLayer: boolean;
     actorEntries: MapObject[];
     draggingNpcId: number | null;
     handleEditObject: (id: number) => void;
+    handleEditEnemyTemplate: (id: number) => void;
     handleDuplicateObject: (id: number) => void;
     handleDeleteObject: (id: number) => void;
     handleNpcDragStart: (e: React.DragEvent, actorId: number) => void;
@@ -56,8 +60,13 @@ type SidebarProps = {
     isRulesLayer: boolean;
     rulesList: Array<{ id: string; name: string; startType: RuleStartType; triggerId: string }>;
     handleAddRule: () => void;
+    handleEditRule: (ruleId: string) => void;
   };
 
+  statuses: {
+    isStatusesLayer: boolean;
+    handleOpenStatusDialog: () => void;
+  };
   items: {
     isItemsLayer: boolean;
     itemsList: ItemSummary[];
@@ -129,8 +138,8 @@ type SidebarProps = {
 export default function AppSidebar(p: SidebarProps) {
 
   return (
-    <SidebarLayout leftCollapsed={p.leftCollapsed}>
-      <section className="flex flex-col flex-1">
+    <SidebarLayout leftCollapsed={p.leftCollapsed} width={p.sidebarWidth} onResizeMouseDown={p.onSidebarResizeMouseDown}>
+      <section className="flex flex-col flex-1 min-h-0">
         {(p.actors.isNpcLayer || p.actors.isEnemyLayer) && (
           <SidebarActorArea
             isNpcLayer={p.actors.isNpcLayer}
@@ -139,6 +148,7 @@ export default function AppSidebar(p: SidebarProps) {
             leftCollapsed={p.leftCollapsed}
             draggingNpcId={p.actors.draggingNpcId}
             handleEditObject={p.actors.handleEditObject}
+            handleEditEnemyTemplate={p.actors.handleEditEnemyTemplate}
             handleDuplicateObject={p.actors.handleDuplicateObject}
             handleDeleteObject={p.actors.handleDeleteObject}
             handleNpcDragStart={p.actors.handleNpcDragStart}
@@ -165,8 +175,12 @@ export default function AppSidebar(p: SidebarProps) {
           />
         )}
 
+        {p.statuses?.isStatusesLayer && (
+          <SidebarStatusesArea handleOpenStatusDialog={p.statuses?.handleOpenStatusDialog ?? (() => {})} />
+        )}
+
         {p.rules.isRulesLayer && (
-          <SidebarRulesArea rulesList={p.rules.rulesList} handleAddRule={p.rules.handleAddRule} />
+          <SidebarRulesArea rulesList={p.rules.rulesList} handleAddRule={p.rules.handleAddRule} handleEditRule={p.rules.handleEditRule} />
         )}
 
         {p.items.isItemsLayer && (
@@ -181,7 +195,7 @@ export default function AppSidebar(p: SidebarProps) {
           />
         )}
 
-        {!p.actors.isNpcLayer && !p.actors.isEnemyLayer && !p.events.isEventLayer && !p.items.isItemsLayer && !p.rules.isRulesLayer && (
+        {!p.actors.isNpcLayer && !p.actors.isEnemyLayer && !p.events.isEventLayer && !p.items.isItemsLayer && !p.rules.isRulesLayer && !p.statuses?.isStatusesLayer && (
           <>  
           <TilesetPanel
             editor={p.tileset.editor}

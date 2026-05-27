@@ -3,6 +3,7 @@ import React from 'react';
 import ObjectManagementDialog from '@/components/ObjectManagementDialog';
 import type { MapObject, DialogueTree } from '@/types';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
+import type { ItemSummary } from '@/utils/items';
 
 type ObjMgmtCtx = {
   showObjectDialog?: boolean;
@@ -16,6 +17,7 @@ type ObjMgmtCtx = {
   getEditingObjectProperty?: (key: string, fallback?: string) => string;
   editor?: TileMapEditor | null;
   syncMapObjects?: () => void;
+  itemsList?: ItemSummary[];
   canUseTilesetDialog?: boolean;
   handleEditingTilesetBrowse?: () => Promise<void> | void;
   handleEditingPortraitBrowse?: () => Promise<void> | void;
@@ -23,6 +25,13 @@ type ObjMgmtCtx = {
   handleOpenVendorStockDialog?: () => void;
   handleOpenVendorUnlockDialog?: () => void;
   handleOpenVendorRandomDialog?: () => void;
+  handleCreateVendorStockGroup?: (stockType: 'constant' | 'status' | 'random', selectedGroupId: string | null, npcName: string) => Promise<ItemSummary | null>;
+  handleOpenVendorSettingsDialog?: () => void;
+  handleCloseVendorSettingsDialog?: () => void;
+  showVendorSettingsDialog?: boolean;
+  handleOpenQuestSettingsDialog?: () => void;
+  handleCloseQuestSettingsDialog?: () => void;
+  showQuestSettingsDialog?: boolean;
   setDialogueTrees?: (t: DialogueTree[]) => void;
   setActiveDialogueTab?: (id: number) => void;
   setShowDialogueTreeDialog?: (v: boolean) => void;
@@ -50,10 +59,18 @@ export default function ObjectManagementDialogContainer({ ctx }: { ctx: unknown 
       canUseTilesetDialog={!!c.canUseTilesetDialog}
       handleEditingTilesetBrowse={c.handleEditingTilesetBrowse ?? (() => {})}
       handleEditingPortraitBrowse={c.handleEditingPortraitBrowse ?? (() => {})}
+      itemsList={c.itemsList ?? []}
       handleAutoDetectAnim={c.handleAutoDetectAnim ?? (() => {})}
       handleOpenVendorStockDialog={c.handleOpenVendorStockDialog ?? (() => {})}
       handleOpenVendorUnlockDialog={c.handleOpenVendorUnlockDialog ?? (() => {})}
       handleOpenVendorRandomDialog={c.handleOpenVendorRandomDialog ?? (() => {})}
+      handleCreateVendorStockGroup={c.handleCreateVendorStockGroup ?? (async () => null)}
+      handleOpenVendorSettingsDialog={c.handleOpenVendorSettingsDialog ?? (() => {})}
+      handleCloseVendorSettingsDialog={c.handleCloseVendorSettingsDialog ?? (() => {})}
+      showVendorSettingsDialog={!!c.showVendorSettingsDialog}
+      handleOpenQuestSettingsDialog={c.handleOpenQuestSettingsDialog ?? (() => {})}
+      handleCloseQuestSettingsDialog={c.handleCloseQuestSettingsDialog ?? (() => {})}
+      showQuestSettingsDialog={!!c.showQuestSettingsDialog}
       setDialogueTrees={(trees) => (c.setDialogueTrees ? c.setDialogueTrees(trees) : undefined)}
       setActiveDialogueTab={(idx) => (c.setActiveDialogueTab ? c.setActiveDialogueTab(idx) : undefined)}
       setShowDialogueTreeDialog={(v) => (c.setShowDialogueTreeDialog ? c.setShowDialogueTreeDialog(v) : undefined)}

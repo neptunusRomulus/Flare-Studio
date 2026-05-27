@@ -461,7 +461,7 @@ export function parseNpcFile(
         npc.random_stock = value;
         break;
       case 'random_stock_count':
-        npc.random_stock_count = parseInt(value, 10);
+        npc.random_stock_count = value;
         break;
       case 'vendor_requires_status':
         npc.vendor_requires_status = value;

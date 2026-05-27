@@ -55,3 +55,7 @@ public/
 .cache/
 .parcel-cache/
 coverage/
+mods/
+flare-engine-master/
+qdrant-codebase-mcp-source/
+flare-engine.wiki

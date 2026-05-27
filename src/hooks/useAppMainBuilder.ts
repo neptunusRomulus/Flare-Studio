@@ -1,14 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import useDialogsCtx from './useDialogsCtx';
 import buildConfirmDialogProps from './buildConfirmDialogProps';
-import useEditorRefs from './useEditorRefs';
-import useEditorSetup from './useEditorSetup';
+import useAppMainState, { AssetOriginPreset, ImportReviewData } from './useAppMainState';
 import useUndoRedoZoom from './useUndoRedoZoom';
 import useTooltip from './useTooltip';
-import usePreferences from './usePreferences';
-import useDarkModeSync from './useDarkModeSync';
-import useAppState from './useAppState';
-import useToolbarState from './useToolbarState';
 import useMapConfig from './useMapConfig';
 import useEditorTabs from './useEditorTabs';
 import type { EditorTab } from './useEditorTabs';
@@ -20,14 +15,12 @@ import useAppEffects from './useAppEffects';
 import useNpcDrag from './useNpcDrag';
 import useEventDrag from './useEventDrag';
 import useObjectEditing from './useObjectEditing';
-import useItems from './useItems';
-import useLoadProjectData from './useLoadProjectData';
+import useVendorDialogs from './useVendorDialogs';
 import useClearLayerHandler from './useClearLayerHandler';
 import { normalizeItemsForState } from '@/utils/items';
 import { buildConstantStockString } from '@/utils/parsers';
 // ItemRole type intentionally not imported — unused in this module
 import { toast } from '@/hooks/use-toast';
-import useHelpState from './useHelpState';
 import useActiveGidCallback from './useActiveGidCallback';
 import useHoverGidCallback from './useHoverGidCallback';
 import useDeleteActiveTab from './useDeleteActiveTab';
@@ -35,14 +28,11 @@ import buildConfirmActionHandlers from './useConfirmActionHandlers';
 import useBeforeCreateMap from './useBeforeCreateMap';
 import { TileMapEditor } from '@/editor/TileMapEditor';
 import type { EditorProjectData } from '@/editor/TileMapEditor';
+import type { MapObject } from '@/types';
 
 export default function useAppMainBuilder() {
-  const dialogsCtx = useDialogsCtx({});
-  type EditorRefsType = ReturnType<typeof useEditorRefs>;
-  type EditorSetupType = ReturnType<typeof useEditorSetup>;
   type EditorTabsType = ReturnType<typeof useEditorTabs>;
   type ProjectManagerType = ReturnType<typeof useProjectManager>;
-  type ToolbarStateType = ReturnType<typeof useToolbarState>;
   type ProjectManagerView = {
     projectMaps?: string[];
     handleOpenMapFromMapsFolder?: (filename: string) => Promise<void>;
@@ -54,61 +44,66 @@ export default function useAppMainBuilder() {
     saveProgress?: number;
   };
 
-  const editorRefs = useEditorRefs() as EditorRefsType;
-  const editorSetup = useEditorSetup(editorRefs.editorOptsRef) as EditorSetupType;
-  const { loadProjectData } = useLoadProjectData();
-  
-  const { isDarkMode, setIsDarkMode, showSidebarToggle, setShowSidebarToggle } = usePreferences();
-  useDarkModeSync(isDarkMode, editorSetup.editor as TileMapEditor | null);
+  const {
+    editorRefs,
+    editorSetup,
+    loadProjectData,
+    preferences,
+    appState,
+    toolbarState,
+    helpState,
+    currentProjectPath,
+    setCurrentProjectPath,
+    showActiveGid,
+    setShowActiveGid,
+    showImportReview,
+    setShowImportReview,
+    importReviewOriginPreset,
+    setImportReviewOriginPreset,
+    importReviewData,
+    setImportReviewData,
+    itemsHook,
+    vendorState,
+    mapsDropdownOpen,
+    setMapsDropdownOpen,
+    mapsSubOpen,
+    setMapsSubOpen,
+    mapsDropdownPos,
+    setMapsDropdownPos,
+    mapsButtonRef,
+    mapsPortalRef,
+    showQuestDialog,
+    setShowQuestDialog,
+    editingQuestId,
+    questDraft,
+    setQuestDraft,
+    rulesList,
+    handleOpenQuestDialog,
+    handleCloseQuestDialog,
+    handleOpenQuestEditDialog,
+    handleSaveQuest
+  } = useAppMainState();
 
-  const [showActiveGid, setShowActiveGid] = useState<boolean>(true);
-
-  const appState = useAppState();
-  const toolbarState = useToolbarState() as ToolbarStateType;
-
-  const helpState = useHelpState();
-
-  const [currentProjectPath, setCurrentProjectPath] = useState<string | null>(null);
-
-  // Phase 3: Import Review Modal state
-  type ImportReviewData = {
-    tilesetFileName: string;
-    detectedAssets: Array<{
-      gid: number;
-      sourceX: number;
-      sourceY: number;
-      width: number;
-      height: number;
-      confidence?: number;
-    }>;
-    _meta?: {
-      file: File;
-      layerType: string;
-      tabId: number;
-      projectPath?: string | null;
-      manualTileWidth?: number;
-      manualTileHeight?: number;
-      forceGridSlicing?: boolean;
-    };
-  };
-
-  type AssetOriginPreset = 'top-left' | 'top-center' | 'center' | 'bottom-left' | 'bottom-center';
-
-  // Fixed isometric tile dimensions — not user-configurable
-  const FIXED_TILE_WIDTH = 64;
-  const FIXED_TILE_HEIGHT = 32;
-
-  const [showImportReview, setShowImportReview] = useState<boolean>(false);
-  const [importReviewOriginPreset, setImportReviewOriginPreset] = useState<AssetOriginPreset>('bottom-center');
-  const [importReviewData, setImportReviewData] = useState<ImportReviewData | null>(null);
-  
-  const itemsHook = useItems({ currentProjectPath, toast, normalizeItemsForState });
+  const { isDarkMode, setIsDarkMode, showSidebarToggle, setShowSidebarToggle } = preferences;
   const { itemsList, expandedItemCategories, setExpandedItemCategories, handleOpenItemEdit, handleOpenItemDialog } = itemsHook;
-  const [mapsDropdownOpen, setMapsDropdownOpen] = useState(false);
-  const [mapsSubOpen, setMapsSubOpen] = useState(false);
-  const [mapsDropdownPos, setMapsDropdownPos] = useState<{ left: number; top: number } | null>(null);
-  const mapsButtonRef = useRef<HTMLButtonElement | null>(null);
-  const mapsPortalRef = useRef<HTMLDivElement | null>(null);
+
+  const dialogsCtx = useDialogsCtx({
+    showQuestDialog,
+    setShowQuestDialog,
+    questDraft,
+    setQuestDraft,
+    handleOpenQuestDialog,
+    handleCloseQuestDialog,
+    handleSaveQuest
+  });
+
+  const [showStatusDialog, setShowStatusDialog] = useState(false);
+  const handleOpenStatusDialog = useCallback(() => {
+    setShowStatusDialog(true);
+  }, []);
+  const handleCloseStatusDialog = useCallback(() => {
+    setShowStatusDialog(false);
+  }, []);
 
   const {
     editor,
@@ -125,7 +120,7 @@ export default function useAppMainBuilder() {
     handleFillSelection,
     handleDeleteSelection,
     handleClearSelection
-  } = editorSetup as EditorSetupType;
+  } = editorSetup;
 
   // Wire up active GID callback to track current brush GID
   useActiveGidCallback(editor as TileMapEditor | null, toolbarState.setActiveGidValue);
@@ -136,7 +131,7 @@ export default function useAppMainBuilder() {
   // Get the REAL syncMapObjects from useMapHandlers - not the wrapper
   // This needs to be before useAppEffects so the ref gets the real function
   const { syncMapObjects: realSyncMapObjects, updateLayersList: realUpdateLayersList } = useMapHandlers({
-    editor: editor ?? undefined,
+    editor: editor as any,
     setMapObjects: appState.setMapObjects,
     setLayers: appState.setLayers,
     setActiveLayerId: appState.setActiveLayerId
@@ -432,11 +427,27 @@ export default function useAppMainBuilder() {
   }, [editor, handleEditEvent]);
 
   const objectEditing = useObjectEditing({ 
-    editor: editor ?? undefined, 
+    editor: editor as any,
     syncMapObjects: realSyncMapObjects,
     createTabFor, 
     switchToTab, 
     currentProjectPath 
+  });
+
+  const vendorDialogs = useVendorDialogs({
+    editingObject: objectEditing.editingObject,
+    setEditingObject: objectEditing.setEditingObject,
+    vendorStockSelection: vendorState.vendorStockSelection,
+    setVendorStockSelection: vendorState.setVendorStockSelection,
+    vendorUnlockEntries: vendorState.vendorUnlockEntries,
+    setVendorUnlockEntries: vendorState.setVendorUnlockEntries,
+    vendorRandomSelection: vendorState.vendorRandomSelection,
+    setVendorRandomSelection: vendorState.setVendorRandomSelection,
+    vendorRandomCount: vendorState.vendorRandomCount,
+    setVendorRandomCount: vendorState.setVendorRandomCount,
+    setShowVendorStockDialog: vendorState.setShowVendorStockDialog,
+    setShowVendorUnlockDialog: vendorState.setShowVendorUnlockDialog,
+    setShowVendorRandomDialog: vendorState.setShowVendorRandomDialog
   });
 
   // Wire canvas click on objects to open the edit dialog
@@ -491,8 +502,12 @@ export default function useAppMainBuilder() {
 
   const isNpcLayer = activeLayer?.type === 'npc';
   const isEnemyLayer = activeLayer?.type === 'enemy';
+  const isStatusesLayer = activeLayer?.type === 'status';
   const isRulesLayer = activeLayer?.type === 'rules';
   const isItemsLayer = activeLayer?.type === 'items';
+
+  const showEnemyActorArea = isEnemyLayer;
+  const showNpcActorArea = isNpcLayer;
 
   const handleToggleBrushTool = useCallback((tool: 'move' | 'merge' | 'separate' | 'remove') => {
     toolbarState.setBrushTool((current) => (current === tool ? 'none' : tool));
@@ -649,7 +664,7 @@ export default function useAppMainBuilder() {
   const handleReorderActors = useCallback((fromIndex: number, toIndex: number) => {
     if (!editor || typeof editor.reorderMapObjects !== 'function') return;
     // Map filtered actor indices to full objects array indices
-    const actorTypes = isNpcLayer ? ['npc'] : isEnemyLayer ? ['enemy'] : [];
+    const actorTypes = showNpcActorArea ? ['npc'] : showEnemyActorArea ? ['enemy'] : [];
     const allObjects = editor.getMapObjects();
     const actorIndices = allObjects.reduce<number[]>((acc, obj, i) => {
       if (actorTypes.includes(obj.type)) acc.push(i);
@@ -659,7 +674,7 @@ export default function useAppMainBuilder() {
       editor.reorderMapObjects(actorIndices[fromIndex], actorIndices[toIndex]);
       if (typeof realSyncMapObjects === 'function') realSyncMapObjects();
     }
-  }, [editor, isNpcLayer, isEnemyLayer, realSyncMapObjects]);
+  }, [editor, showNpcActorArea, showEnemyActorArea, realSyncMapObjects]);
 
   const handleReorderEvents = useCallback((fromIndex: number, toIndex: number) => {
     if (!editor || typeof editor.reorderMapObjects !== 'function') return;
@@ -754,18 +769,27 @@ export default function useAppMainBuilder() {
     return {
       leftCollapsed: appState.leftCollapsed,
       actors: {
-        isNpcLayer,
-        isEnemyLayer,
+        isNpcLayer: showNpcActorArea,
+        isEnemyLayer: showEnemyActorArea,
         actorEntries: (() => {
-          const filtered = isNpcLayer 
-            ? appState.mapObjects.filter((obj) => obj.type === 'npc')
-            : isEnemyLayer
-            ? appState.mapObjects.filter((obj) => obj.type === 'enemy')
-            : [];
-          return filtered;
+          if (showNpcActorArea) {
+            return appState.mapObjects.filter((obj) => obj.type === 'npc');
+          }
+          if (showEnemyActorArea) {
+            const seen = new Set<string>();
+            return appState.mapObjects.filter((obj) => {
+              if (obj.type !== 'enemy') return false;
+              const key = `${obj.type}:${obj.category || obj.name || obj.id}`;
+              if (seen.has(key)) return false;
+              seen.add(key);
+              return true;
+            });
+          }
+          return [];
         })(),
         draggingNpcId: appState.draggingNpcId,
         handleEditObject: objectEditing.handleEditObject,
+        handleEditEnemyTemplate: objectEditing.handleEditEnemyTemplate,
         handleDuplicateObject,
         handleDeleteObject,
         handleReorderActors,
@@ -789,8 +813,13 @@ export default function useAppMainBuilder() {
       },
       rules: {
         isRulesLayer,
-        rulesList: [],
-        handleAddRule: () => {},
+        rulesList,
+        handleAddRule: handleOpenQuestDialog,
+        handleEditRule: handleOpenQuestEditDialog,
+      },
+      statuses: {
+        isStatusesLayer,
+        handleOpenStatusDialog,
       },
       items: {
         isItemsLayer,
@@ -947,6 +976,8 @@ export default function useAppMainBuilder() {
     objectEditing,
     handleOpenItemEdit,
     handleOpenItemDialog,
+    handleOpenQuestDialog,
+    rulesList,
     projectManagerRecord,
     setShowImportReview,
     setImportReviewData,
@@ -1002,6 +1033,11 @@ export default function useAppMainBuilder() {
     };
 
     const defaultRules = { isRulesLayer: false, rulesList: [], handleAddRule: () => {} };
+
+    const defaultStatuses = {
+      isStatusesLayer: false,
+      handleOpenStatusDialog: () => {}
+    };
 
     const defaultItems = {
       isItemsLayer: false,
@@ -1120,7 +1156,9 @@ export default function useAppMainBuilder() {
       handleSidebarToggle: () => {},
       actors: sb['actors'] ?? defaultActors,
       rules: sb['rules'] ?? defaultRules,
+      statuses: sb['statuses'] ?? defaultStatuses,
       items: sb['items'] ?? defaultItems,
+      itemsList,
       events: sb['events'] ?? defaultEvents,
       tileset: {
         ...defaultTileset,
@@ -1155,6 +1193,8 @@ export default function useAppMainBuilder() {
       showSettings,
       handleCloseSettings,
       setIsDarkMode,
+      showStatusDialog,
+      handleCloseStatusDialog,
       editor: defaultEditor,
       syncMapObjectsWrapper: syncMapObjects,
       showActiveGid,
@@ -1322,7 +1362,6 @@ export default function useAppMainBuilder() {
         handleDeleteStamp: () => {},
         stampsState: { stamps: toolbarState.stamps, selectedStamp: toolbarState.selectedStamp, stampMode: toolbarState.stampMode, newStampName: toolbarState.newStampName }
       },
-      enemyPanelProps: {},
       dialogsCtx: (() => {
         const dialogCtx = {
           ...(dialogsCtx as Record<string, unknown>),
@@ -1348,6 +1387,44 @@ export default function useAppMainBuilder() {
           handleItemSubmit: itemsHook.handleItemSubmit,
           handleConfirmDuplicateItem: itemsHook.handleConfirmDuplicateItem,
           clearPendingDuplicate: () => itemsHook.setPendingDuplicateItem(null),
+          showItemEditDialog: itemsHook.showItemEditDialog,
+          editingItem: itemsHook.editingItem,
+          updateEditingItemField: itemsHook.updateEditingItemField,
+          handleCloseItemEdit: itemsHook.handleCloseItemEdit,
+          handleSaveItemEdit: itemsHook.handleSaveItemEdit,
+          showLootGroupEditDialog: itemsHook.showLootGroupEditDialog,
+          lootGroupEditingItem: itemsHook.lootGroupEditingItem,
+          lootGroupEditingData: itemsHook.lootGroupEditingData,
+          updateLootGroupField: itemsHook.updateLootGroupField,
+          handleCloseLootGroupEdit: itemsHook.handleCloseLootGroupEdit,
+          handleSaveLootGroupEdit: itemsHook.handleSaveLootGroupEdit,
+          // Object management dialog state and handlers
+          showObjectDialog: objectEditing.showObjectDialog,
+          showEnemyEditor: objectEditing.showEnemyEditor,
+          setShowEnemyEditor: objectEditing.setShowEnemyEditor,
+          editingObject: objectEditing.editingObject,
+          objectValidationErrors: objectEditing.objectValidationErrors,
+          setEditingObject: objectEditing.setEditingObject,
+          handleObjectDialogClose: objectEditing.handleObjectDialogClose,
+          handleObjectDialogSave: objectEditing.handleObjectDialogSave,
+          updateEditingObjectProperty: objectEditing.updateEditingObjectProperty,
+          updateEditingObjectBoolean: objectEditing.updateEditingObjectBoolean,
+          getEditingObjectProperty: objectEditing.getEditingObjectProperty,
+          handleUpdateObject: objectEditing.handleUpdateObject,
+          showCreateMapDialog: mapConfig.showCreateMapDialog,
+          setShowCreateMapDialog: mapConfig.setShowCreateMapDialog,
+          newMapName: mapConfig.newMapName,
+          setNewMapName: mapConfig.setNewMapName,
+          newMapWidth: mapConfig.newMapWidth,
+          setNewMapWidth: mapConfig.setNewMapWidth,
+          newMapHeight: mapConfig.newMapHeight,
+          setNewMapHeight: mapConfig.setNewMapHeight,
+          newMapStarting: mapConfig.newMapStarting,
+          setNewMapStarting: mapConfig.setNewMapStarting,
+          createMapError: mapConfig.createMapError,
+          setCreateMapError: mapConfig.setCreateMapError,
+          isPreparingNewMap: mapConfig.isPreparingNewMap,
+          handleConfirmCreateMap: mapConfig.handleConfirmCreateMap,
         // Phase 3: Import Review Modal
         showImportReview,
         setShowImportReview,
@@ -1449,14 +1526,18 @@ export default function useAppMainBuilder() {
       canUseTilesetDialog: typeof window !== 'undefined' && !!window.electronAPI?.selectTilesetFile,
       // Object management dialog (NPC edit on click)
       showObjectDialog: objectEditing.showObjectDialog,
+      showEnemyEditor: objectEditing.showEnemyEditor,
+      setShowEnemyEditor: objectEditing.setShowEnemyEditor,
       editingObject: objectEditing.editingObject,
       objectValidationErrors: objectEditing.objectValidationErrors,
       setEditingObject: objectEditing.setEditingObject,
       handleObjectDialogClose: objectEditing.handleObjectDialogClose,
       handleObjectDialogSave: objectEditing.handleObjectDialogSave,
+      handleUpdateObject: objectEditing.handleUpdateObject,
       updateEditingObjectProperty: objectEditing.updateEditingObjectProperty,
       updateEditingObjectBoolean: objectEditing.updateEditingObjectBoolean,
       getEditingObjectProperty: objectEditing.getEditingObjectProperty,
+      currentProjectPath,
       handleEditingTilesetBrowse: objectEditing.handleEditingTilesetBrowse,
       handleEditingPortraitBrowse: objectEditing.handleEditingPortraitBrowse,
       handleAutoDetectAnim: objectEditing.handleAutoDetectAnim,
@@ -1464,6 +1545,44 @@ export default function useAppMainBuilder() {
       setShowDeleteNpcConfirm: objectEditing.setShowDeleteNpcConfirm,
       showDeleteEnemyConfirm: objectEditing.showDeleteEnemyConfirm,
       setShowDeleteEnemyConfirm: objectEditing.setShowDeleteEnemyConfirm,
+      showVendorSettingsDialog: objectEditing.showVendorSettingsDialog,
+      handleOpenVendorSettingsDialog: objectEditing.handleOpenVendorSettingsDialog,
+      handleCloseVendorSettingsDialog: objectEditing.handleCloseVendorSettingsDialog,
+      vendorState: {
+        itemsList,
+        showVendorStockDialog: vendorState.showVendorStockDialog,
+        setShowVendorStockDialog: vendorState.setShowVendorStockDialog,
+        vendorStockSelection: vendorState.vendorStockSelection,
+        showVendorUnlockDialog: vendorState.showVendorUnlockDialog,
+        setShowVendorUnlockDialog: vendorState.setShowVendorUnlockDialog,
+        vendorUnlockEntries: vendorState.vendorUnlockEntries,
+        showVendorRandomDialog: vendorState.showVendorRandomDialog,
+        setShowVendorRandomDialog: vendorState.setShowVendorRandomDialog,
+        vendorRandomSelection: vendorState.vendorRandomSelection,
+        vendorRandomCount: vendorState.vendorRandomCount
+      },
+      vendorHandlers: {
+        handleUpdateVendorUnlockRequirement: vendorDialogs.handleUpdateVendorUnlockRequirement,
+        handleRemoveVendorUnlockRequirement: vendorDialogs.handleRemoveVendorUnlockRequirement,
+        handleToggleVendorUnlockItem: vendorDialogs.handleToggleVendorUnlockItem,
+        handleVendorUnlockQtyChange: vendorDialogs.handleVendorUnlockQtyChange,
+        handleAddVendorUnlockRequirement: vendorDialogs.handleAddVendorUnlockRequirement,
+        handleSaveVendorUnlock: vendorDialogs.handleSaveVendorUnlock,
+        handleToggleVendorRandomItem: vendorDialogs.handleToggleVendorRandomItem,
+        handleVendorRandomFieldChange: vendorDialogs.handleVendorRandomFieldChange,
+        handleRandomCountChange: vendorDialogs.handleRandomCountChange,
+        handleSaveVendorRandom: vendorDialogs.handleSaveVendorRandom,
+        handleToggleVendorStockItem: vendorDialogs.handleToggleVendorStockItem,
+        handleVendorStockQtyChange: vendorDialogs.handleVendorStockQtyChange,
+        handleSaveVendorStock: vendorDialogs.handleSaveVendorStock
+      },
+      handleOpenVendorStockDialog: vendorDialogs.handleOpenVendorStockDialog,
+      handleOpenVendorUnlockDialog: vendorDialogs.handleOpenVendorUnlockDialog,
+      handleOpenVendorRandomDialog: vendorDialogs.handleOpenVendorRandomDialog,
+      handleCreateVendorStockGroup: itemsHook.handleCreateVendorStockGroup,
+      showQuestSettingsDialog: objectEditing.showQuestSettingsDialog,
+      handleOpenQuestSettingsDialog: objectEditing.handleOpenQuestSettingsDialog,
+      handleCloseQuestSettingsDialog: objectEditing.handleCloseQuestSettingsDialog,
       setDialogueTrees: objectEditing.setDialogueTrees,
       setActiveDialogueTab: objectEditing.setActiveDialogueTab,
       showDialogueTreeDialog: objectEditing.showDialogueTreeDialog,
@@ -1490,6 +1609,12 @@ export default function useAppMainBuilder() {
       updateEditingItemField: itemsHook.updateEditingItemField,
       handleCloseItemEdit: itemsHook.handleCloseItemEdit,
       handleSaveItemEdit: itemsHook.handleSaveItemEdit,
+      showLootGroupEditDialog: itemsHook.showLootGroupEditDialog,
+      lootGroupEditingItem: itemsHook.lootGroupEditingItem,
+      lootGroupEditingData: itemsHook.lootGroupEditingData,
+      updateLootGroupField: itemsHook.updateLootGroupField,
+      handleCloseLootGroupEdit: itemsHook.handleCloseLootGroupEdit,
+      handleSaveLootGroupEdit: itemsHook.handleSaveLootGroupEdit,
       onDeleteItem: handleDeleteItem,
       tooltip: null
     } as Record<string, unknown>;

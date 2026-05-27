@@ -9,6 +9,7 @@ type Props = {
   leftCollapsed: boolean;
   draggingNpcId: number | null;
   handleEditObject: (id: number) => void;
+  handleEditEnemyTemplate: (id: number) => void;
   handleDuplicateObject: (id: number) => void;
   handleDeleteObject: (id: number) => void;
   handleNpcDragStart: (e: React.DragEvent, actorId: number) => void;
@@ -24,6 +25,7 @@ const SidebarActorArea: React.FC<Props> = ({
   leftCollapsed,
   draggingNpcId,
   handleEditObject,
+  handleEditEnemyTemplate,
   handleDuplicateObject,
   handleDeleteObject,
   handleNpcDragStart,
@@ -39,6 +41,7 @@ const SidebarActorArea: React.FC<Props> = ({
       leftCollapsed={leftCollapsed}
       draggingNpcId={draggingNpcId}
       onEditObject={handleEditObject}
+      onEditEnemyTemplate={handleEditEnemyTemplate}
       onDuplicateObject={handleDuplicateObject}
       onDeleteObject={handleDeleteObject}
       onDragStart={handleNpcDragStart}

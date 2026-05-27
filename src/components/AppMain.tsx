@@ -13,6 +13,7 @@ import ConflictDialog from '@/components/ConflictDialog';
 import EditorArea from '@/components/EditorArea';
 import { Toaster } from '@/components/ui/toaster';
 import DialogsContainer from '@/components/DialogsContainer';
+import StatusEditDialog from '@/components/StatusEditDialog';
 import SessionRecoveryDialog from '@/components/SessionRecoveryDialog';
 import useCrashRecovery from '@/hooks/useCrashRecovery';
 import useManualSaveSetup from '@/hooks/useManualSaveSetup';
@@ -32,6 +33,7 @@ export default function AppMain() {
     leftCollapsed,
     handleSidebarToggle,
     actors,
+    statuses = { isStatusesLayer: false, handleOpenStatusDialog: () => {} },
     rules,
     items,
     events,
@@ -73,8 +75,9 @@ export default function AppMain() {
     topBarProps,
     canvasCtx,
     bottomToolbarProps,
-    enemyPanelProps,
     dialogsCtx,
+    showStatusDialog,
+    handleCloseStatusDialog,
     tooltip
   } = c;
 
@@ -152,10 +155,56 @@ export default function AppMain() {
   const { handleManualSave, isManuallySaving } = useManualSaveSetup(editor, controls?.currentProjectPath, undefined, onAfterSave);
 
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [leftSidebarWidth, setLeftSidebarWidth] = useState<number>(() => {
+    if (typeof window === 'undefined') return 224;
+    try {
+      const saved = localStorage.getItem('leftSidebarWidth');
+      if (!saved) return 224;
+      const parsed = Number(saved);
+      if (Number.isFinite(parsed)) {
+        return Math.min(520, Math.max(200, parsed));
+      }
+    } catch {
+      // ignore
+    }
+    return 224;
+  });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem('leftSidebarWidth', leftSidebarWidth.toString());
+    } catch {
+      // ignore
+    }
+  }, [leftSidebarWidth]);
+
+  const handleSidebarResizeMouseDown = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const startX = event.clientX;
+    const startWidth = leftSidebarWidth;
+    document.body.style.cursor = 'col-resize';
+
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const nextWidth = Math.min(520, Math.max(200, startWidth + moveEvent.clientX - startX));
+      setLeftSidebarWidth(nextWidth);
+    };
+
+    const handleMouseUp = () => {
+      document.body.style.cursor = '';
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  }, [leftSidebarWidth]);
 
   useEffect(() => {
     if (!editor) return;
-    editor.setSaveStatusCallback((status) => {
+    editor.setSaveStatusCallback((status: string) => {
       setHasUnsavedChanges(status === 'unsaved' || status === 'error');
     });
   }, [editor]);
@@ -212,8 +261,9 @@ export default function AppMain() {
         {hasMap && (
           <AppSidebar
             leftCollapsed={leftCollapsed}
-            actors={actors}
-            rules={rules}
+            sidebarWidth={leftSidebarWidth}
+            onSidebarResizeMouseDown={handleSidebarResizeMouseDown}
+            actors={actors}            statuses={statuses}            rules={rules}
             items={items}
             events={events}
             tileset={{
@@ -226,7 +276,7 @@ export default function AppMain() {
           />
         )}
 
-        <EditorArea topBarProps={topBarProps} canvasCtx={canvasCtx} bottomToolbarProps={bottomToolbarProps} enemyPanelProps={enemyPanelProps} isDarkMode={isDarkMode} />
+        <EditorArea topBarProps={topBarProps} canvasCtx={canvasCtx} bottomToolbarProps={bottomToolbarProps} isDarkMode={isDarkMode} />
 
         <EngineSettingsDialog
           open={showSettings}
@@ -269,6 +319,8 @@ export default function AppMain() {
       <Toaster />
 
       <DialogsContainer ctx={c} />
+
+      <StatusEditDialog open={showStatusDialog} onClose={handleCloseStatusDialog} />
 
       <SessionRecoveryDialog
         isOpen={showRecoveryDialog && hasCrashBackup}

@@ -5,9 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Tooltip from '@/components/ui/tooltip';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
-import { AlertTriangle, Apple, Book, Box, Check, ChevronDown, ChevronRight, Coins, Folder, Gift, HelpCircle, Key, Layers, Save, Shield, Sparkles, Sword, Tag, Trash2, Volume2, X, Zap } from 'lucide-react';
+import { Apple, Book, Box, Check, ChevronDown, ChevronRight, Coins, Folder, Gift, HelpCircle, Key, Layers, Save, Shield, Sparkles, Sword, Tag, Trash2, Volume2, X, Zap } from 'lucide-react';
 import { ITEM_ROLE_META, ITEM_ROLE_SELECTIONS, RESOURCE_SUBTYPE_META } from '@/editor/itemRoles';
-import type { ItemResourceSubtype, ItemRole } from '@/editor/itemRoles';
+import type { ItemResourceSubtype } from '@/editor/itemRoles';
 
 const RoleIcon = ({ roleId, className }: { roleId: string; className?: string }) => {
   switch (roleId) {
@@ -25,17 +25,20 @@ type EditingItem = {
   id?: number;
   name?: string;
   flavor?: string;
+  icon?: string;
   level?: number;
   quality?: string;
   no_stash?: string;
   quest_item?: boolean;
   pickup_status?: string;
   price?: string | number;
+  price_per_level?: string | number;
   price_sell?: string | number;
   max_quantity?: number;
   resourceSubtype?: string;
   role?: string;
   item_type?: string;
+  type?: string;
   equip_flags?: string;
   requires_level?: number;
   requires_stat?: string;
@@ -46,6 +49,7 @@ type EditingItem = {
   bonus_power_level?: string;
   dmg?: string;
   abs?: string;
+  trait_elemental?: string;
   power?: string;
   power_desc?: string;
   replace_power?: string;
@@ -57,6 +61,18 @@ type EditingItem = {
   loot_animation?: string;
   randomizer_def?: string;
   loot_drops_max?: number;
+  wall_power?: string;
+  use_hazard?: boolean;
+  post_power?: string;
+  post_effect?: string;
+  speed?: string;
+  radius?: string;
+  requires_hpmp_state?: string;
+  requires_item?: string;
+  new_state?: string;
+  modifier_damage?: string;
+  lifespan?: string;
+  face?: boolean;
   [key: string]: unknown;
 };
 
@@ -79,7 +95,7 @@ const CollapsibleSection = ({
   className = ""
 }: {
   title: string;
-  icon: any;
+  icon: React.ElementType;
   children: React.ReactNode;
   defaultOpen?: boolean;
   className?: string;
@@ -205,12 +221,21 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
                   className="h-8"
                 />
               </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-muted-foreground">Icon</label>
+                <Input
+                  value={editingItem.icon ?? ''}
+                  onChange={(e) => updateEditingItemField('icon', e.target.value)}
+                  placeholder="Icon ID or filename"
+                  className="h-8"
+                />
+              </div>
               <div className="pt-2">
                 <label className="text-xs text-muted-foreground block mb-2">Category (Role)</label>
                 <div className="flex flex-wrap gap-1.5">
-                  {ITEM_ROLE_SELECTIONS.map((roleOpt) => {
+                  {ITEM_ROLE_SELECTIONS.filter((roleOpt) => roleOpt.id !== 'loot_groups').map((roleOpt) => {
                     const isActive = (editingItem.role || 'unspecified') === roleOpt.id;
-                    const meta = ITEM_ROLE_META[roleOpt.id];
+                    // const meta = ITEM_ROLE_META[roleOpt.id];
                     return (
                       <Tooltip key={roleOpt.id} content={roleOpt.description} side="bottom">
                         <Button
@@ -426,6 +451,18 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
                     })()}
                   </div>
                 </div>
+                <div className="space-y-2">
+                  <label className="text-xs text-muted-foreground">Price per Level</label>
+                  <input
+                    type="text"
+                    value={editingItem.price_per_level ?? ''}
+                    onChange={(e) => updateEditingItemField('price_per_level', e.target.value)}
+                    placeholder="10"
+                    className="h-8 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                  />
+                </div>
                 <div>
                   <div className="flex items-center gap-1">
                     <label className="text-xs text-muted-foreground">Max stack size</label>
@@ -640,6 +677,137 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
             </div>
           </CollapsibleSection>
         )}
+
+        <CollapsibleSection title="Advanced Item Attributes" icon={Box} defaultOpen={false}>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div>
+              <label className="text-xs text-muted-foreground">Type</label>
+              <Input
+                value={editingItem.type ?? ''}
+                onChange={(e) => updateEditingItemField('type', e.target.value)}
+                placeholder="fixed or custom type"
+                className="h-8"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Speed</label>
+              <Input
+                value={editingItem.speed ?? ''}
+                onChange={(e) => updateEditingItemField('speed', e.target.value)}
+                placeholder="16"
+                className="h-8"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Radius</label>
+              <Input
+                value={editingItem.radius ?? ''}
+                onChange={(e) => updateEditingItemField('radius', e.target.value)}
+                placeholder="1.0"
+                className="h-8"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Trait Elemental</label>
+              <Input
+                value={editingItem.trait_elemental ?? ''}
+                onChange={(e) => updateEditingItemField('trait_elemental', e.target.value)}
+                placeholder="fire,ice,lightning"
+                className="h-8"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Wall Power</label>
+              <Input
+                value={editingItem.wall_power ?? ''}
+                onChange={(e) => updateEditingItemField('wall_power', e.target.value)}
+                placeholder="power_id"
+                className="h-8"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                className="h-4 w-4"
+                checked={!!editingItem.use_hazard}
+                onChange={(e) => updateEditingItemField('use_hazard', e.target.checked)}
+              />
+              <label className="text-xs text-muted-foreground">Use Hazard</label>
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Post Power</label>
+              <Input
+                value={editingItem.post_power ?? ''}
+                onChange={(e) => updateEditingItemField('post_power', e.target.value)}
+                placeholder="power_id"
+                className="h-8"
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="text-xs text-muted-foreground">Post Effect</label>
+              <Input
+                value={editingItem.post_effect ?? ''}
+                onChange={(e) => updateEditingItemField('post_effect', e.target.value)}
+                placeholder="effect_id,delay,duration"
+                className="h-8"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Requires HP/MP State</label>
+              <Input
+                value={editingItem.requires_hpmp_state ?? ''}
+                onChange={(e) => updateEditingItemField('requires_hpmp_state', e.target.value)}
+                placeholder="all,not_percent,100,ignore,0"
+                className="h-8"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Requires Item</label>
+              <Input
+                value={editingItem.requires_item ?? ''}
+                onChange={(e) => updateEditingItemField('requires_item', e.target.value)}
+                placeholder="item_id"
+                className="h-8"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">New State</label>
+              <Input
+                value={editingItem.new_state ?? ''}
+                onChange={(e) => updateEditingItemField('new_state', e.target.value)}
+                placeholder="instant"
+                className="h-8"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Modifier Damage</label>
+              <Input
+                value={editingItem.modifier_damage ?? ''}
+                onChange={(e) => updateEditingItemField('modifier_damage', e.target.value)}
+                placeholder="multiply,175,175"
+                className="h-8"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Lifespan</label>
+              <Input
+                value={editingItem.lifespan ?? ''}
+                onChange={(e) => updateEditingItemField('lifespan', e.target.value)}
+                placeholder="800ms"
+                className="h-8"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                className="h-4 w-4"
+                checked={!!editingItem.face}
+                onChange={(e) => updateEditingItemField('face', e.target.checked)}
+              />
+              <label className="text-xs text-muted-foreground">Face</label>
+            </div>
+          </div>
+        </CollapsibleSection>
 
         {/* Quest-only */}
         {isQuest && (

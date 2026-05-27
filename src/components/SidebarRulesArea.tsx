@@ -11,10 +11,11 @@ type RuleListEntry = {
 type Props = {
   rulesList: RuleListEntry[];
   handleAddRule: () => void;
+  handleEditRule: (ruleId: string) => void;
 };
 
-const SidebarRulesArea: React.FC<Props> = ({ rulesList, handleAddRule }) => {
-  return <SidebarRulesPanel rulesList={rulesList} onAddRule={handleAddRule} />;
+const SidebarRulesArea: React.FC<Props> = ({ rulesList, handleAddRule, handleEditRule }) => {
+  return <SidebarRulesPanel rulesList={rulesList} onAddRule={handleAddRule} onEditRule={handleEditRule} />;
 };
 
 export default SidebarRulesArea;

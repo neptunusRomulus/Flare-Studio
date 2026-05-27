@@ -1,17 +1,19 @@
 import React from 'react';
 import TitleBar from '@/components/top/TitleBar';
-import SidebarToggle from '@/components/SidebarToggle';
 
 type Props = {
   titleBarProps: React.ComponentProps<typeof TitleBar>;
-  sidebarToggleProps: React.ComponentProps<typeof SidebarToggle>;
+  sidebarToggleProps?: {
+    show: boolean;
+    leftCollapsed: boolean;
+    onToggle: () => void;
+  };
 };
 
-export default function AppShell({ titleBarProps, sidebarToggleProps }: Props) {
+export default function AppShell({ titleBarProps }: Props) {
   return (
     <>
       <TitleBar {...titleBarProps} />
-      <SidebarToggle {...sidebarToggleProps} />
     </>
   );
 }

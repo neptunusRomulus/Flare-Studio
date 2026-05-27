@@ -47,7 +47,6 @@ export default function buildAppMainCtx(params: Record<string, unknown>) {
     topBarProps,
     canvasCtx,
     bottomToolbarProps,
-    enemyPanelProps,
     dialogsCtx,
     tooltip
   } = params as Record<string, unknown>;
@@ -100,7 +99,6 @@ export default function buildAppMainCtx(params: Record<string, unknown>) {
     topBarProps,
     canvasCtx,
     bottomToolbarProps,
-    enemyPanelProps,
     dialogsCtx,
     tooltip
   };

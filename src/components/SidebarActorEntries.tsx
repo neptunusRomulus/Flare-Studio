@@ -16,6 +16,7 @@ type ActorEntriesPanelProps = {
   leftCollapsed: boolean;
   draggingNpcId: number | null;
   onEditObject: (actorId: number) => void;
+  onEditEnemyTemplate: (actorId: number) => void;
   onDuplicateObject: (actorId: number) => void;
   onDeleteObject: (actorId: number) => void;
   onDragStart: (event: DragEvent<HTMLDivElement>, actorId: number) => void;
@@ -32,6 +33,7 @@ const SidebarActorEntries = ({
   leftCollapsed,
   draggingNpcId,
   onEditObject,
+  onEditEnemyTemplate,
   onDuplicateObject,
   onDeleteObject,
   onDragStart,
@@ -78,7 +80,7 @@ const SidebarActorEntries = ({
                 <ListItemTooltip key={actor.id} item={{ id: actor.id, name: actor.name || `${actor.type === 'npc' ? 'NPC' : 'Enemy'} #${actor.id}` }}>
                 <ElementContextMenu
                   elementType={isNpcLayer ? 'npc' : 'enemy'}
-                  onEdit={() => onEditObject(actor.id)}
+                  onEdit={() => isEnemyLayer ? onEditEnemyTemplate(actor.id) : onEditObject(actor.id)}
                   onDuplicate={() => onDuplicateObject(actor.id)}
                   onDelete={() => onDeleteObject(actor.id)}
                 >
@@ -87,7 +89,7 @@ const SidebarActorEntries = ({
                   className={`w-full box-border rounded-md px-2 py-2 hover:bg-background transition-colors cursor-pointer border border-dashed border-gray-400 dark:border-gray-600 flex ${
                     isPlacedOnMap ? 'bg-background/50' : 'bg-muted/20'
                   } ${draggingNpcId === actor.id ? 'opacity-50' : ''} ${reorderClass(index)}`}
-                  onClick={() => onEditObject(actor.id)}
+                  onClick={() => isEnemyLayer ? onEditEnemyTemplate(actor.id) : onEditObject(actor.id)}
                 >
                   <div className="flex items-center gap-2 w-full">
                     <div className={`flex-shrink-0 w-10 h-10 rounded border bg-muted/50 flex items-center justify-center overflow-hidden ${

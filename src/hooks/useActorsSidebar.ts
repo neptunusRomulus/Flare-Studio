@@ -10,6 +10,7 @@ export type ActorsSidebarParams = {
   actorEntries: MapObject[];
   draggingNpcId: number | null;
   handleEditObject: (id: number) => void;
+  handleEditEnemyTemplate: (id: number) => void;
   handleDuplicateObject: (id: number) => void;
   handleDeleteObject: (id: number) => void;
   handleReorderActors: (fromIndex: number, toIndex: number) => void;
@@ -21,6 +22,7 @@ export type ActorsSidebarParams = {
   isRulesLayer: boolean;
   rulesList: RulesListItem[];
   handleAddRule: () => void;
+  handleEditRule: (ruleId: string) => void;
 
   isItemsLayer: boolean;
   itemsList: unknown[];
@@ -68,6 +70,7 @@ export default function useActorsSidebar(params?: Partial<ActorsSidebarParams>) 
     actorEntries: [],
     draggingNpcId: null,
     handleEditObject: noopHandleNumber,
+    handleEditEnemyTemplate: noopHandleNumber,
     handleDuplicateObject: noopHandleNumber,
     handleDeleteObject: noopHandleNumber,
     handleReorderActors: noopTwoArgs,
@@ -78,6 +81,7 @@ export default function useActorsSidebar(params?: Partial<ActorsSidebarParams>) 
     isRulesLayer: false,
     rulesList: [],
     handleAddRule: noopNode,
+    handleEditRule: noopNode,
     isItemsLayer: false,
     itemsList: [],
     expandedItemCategories: new Set<ItemRole>(),
@@ -106,6 +110,7 @@ export default function useActorsSidebar(params?: Partial<ActorsSidebarParams>) 
     actorEntries: p.actorEntries,
     draggingNpcId: p.draggingNpcId,
     handleEditObject: p.handleEditObject,
+    handleEditEnemyTemplate: p.handleEditEnemyTemplate,
     handleDuplicateObject: p.handleDuplicateObject,
     handleDeleteObject: p.handleDeleteObject,
     handleReorderActors: p.handleReorderActors,
@@ -114,7 +119,7 @@ export default function useActorsSidebar(params?: Partial<ActorsSidebarParams>) 
     handleOpenActorDialog: p.handleOpenActorDialog
   };
 
-  const rules = { isRulesLayer: p.isRulesLayer, rulesList: p.rulesList, handleAddRule: p.handleAddRule };
+  const rules = { isRulesLayer: p.isRulesLayer, rulesList: p.rulesList, handleAddRule: p.handleAddRule, handleEditRule: p.handleEditRule };
 
   const items = {
     isItemsLayer: p.isItemsLayer,

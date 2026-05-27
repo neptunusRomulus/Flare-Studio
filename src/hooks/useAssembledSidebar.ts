@@ -13,6 +13,7 @@ export default function useAssembledSidebar(params: unknown) {
   const actorsData = paramsRecord['actors'] as Record<string, unknown> | undefined;
   const rulesData = paramsRecord['rules'] as Record<string, unknown> | undefined;
   const itemsData = paramsRecord['items'] as Record<string, unknown> | undefined;
+  const statusesData = paramsRecord['statuses'] as Record<string, unknown> | undefined;
   
   // Flatten the nested structure for useActorsSidebar which expects flat params
   const flattenedParams: Partial<ActorsSidebarParams> = {
@@ -21,6 +22,7 @@ export default function useAssembledSidebar(params: unknown) {
     actorEntries: actorsData?.['actorEntries'] as any | undefined,
     draggingNpcId: actorsData?.['draggingNpcId'] as number | null | undefined,
     handleEditObject: actorsData?.['handleEditObject'] as any | undefined,
+    handleEditEnemyTemplate: actorsData?.['handleEditEnemyTemplate'] as any | undefined,
     handleDuplicateObject: actorsData?.['handleDuplicateObject'] as any | undefined,
     handleDeleteObject: actorsData?.['handleDeleteObject'] as any | undefined,
     handleReorderActors: actorsData?.['handleReorderActors'] as any | undefined,
@@ -31,6 +33,7 @@ export default function useAssembledSidebar(params: unknown) {
     isRulesLayer: rulesData?.['isRulesLayer'] as boolean | undefined,
     rulesList: rulesData?.['rulesList'] as any | undefined,
     handleAddRule: rulesData?.['handleAddRule'] as any | undefined,
+    handleEditRule: rulesData?.['handleEditRule'] as any | undefined,
     isItemsLayer: itemsData?.['isItemsLayer'] as boolean | undefined,
     itemsList: itemsData?.['itemsList'] as any | undefined,
     expandedItemCategories: itemsData?.['expandedItemCategories'] as any | undefined,
@@ -52,6 +55,7 @@ export default function useAssembledSidebar(params: unknown) {
     actors: actorsResult.actors,
     rules: actorsResult.rules,
     items: actorsResult.items,
+    statuses: statusesData,
     events,
     layers: layersObj,
     maps,
@@ -63,6 +67,7 @@ export default function useAssembledSidebar(params: unknown) {
     actors: ReturnType<typeof useActorsSidebar>['actors'];
     rules: ReturnType<typeof useActorsSidebar>['rules'];
     items: ReturnType<typeof useActorsSidebar>['items'];
+    statuses: unknown;
     events: unknown;
     layers: unknown;
     maps: ReturnType<typeof useMapsSidebar>;

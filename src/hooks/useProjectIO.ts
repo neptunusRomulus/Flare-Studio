@@ -236,7 +236,7 @@ const useProjectIO = ({
               portrait: npc.properties?.portraitPath || undefined,
               constant_stock: npc.properties?.constant_stock || undefined,
               random_stock: npc.properties?.random_stock || undefined,
-              random_stock_count: npc.properties?.random_stock_count ? parseInt(npc.properties.random_stock_count, 10) : undefined,
+              random_stock_count: npc.properties?.random_stock_count || undefined,
               vendor_requires_status: npc.properties?.vendor_requires_status || undefined,
               vendor_requires_not_status: npc.properties?.vendor_requires_not_status || undefined,
               direction: npc.properties?.direction ? parseInt(npc.properties.direction, 10) as FlareNPC['direction'] : undefined,
@@ -255,7 +255,7 @@ const useProjectIO = ({
           console.warn('Failed to collect NPC files for export:', npcErr);
         }
 
-        const success = await window.electronAPI.saveExportFiles(
+        const result = await window.electronAPI.saveExportFiles(
           currentProjectPath,
           mapName,
           mapTxt,
@@ -271,8 +271,12 @@ const useProjectIO = ({
           }
         );
 
-        if (!success) {
-          throw new Error('Failed to save export files');
+        if (!result?.success) {
+          const validationDetails = result?.validation?.fileResults
+            ?.map((r) => `${r.filePath}: ${[...r.errors, ...r.warnings].join('; ')}`)
+            .filter(Boolean)
+            .join(' | ');
+          throw new Error(result?.message || validationDetails || 'Failed to save export files');
         }
 
         if (!silent) {

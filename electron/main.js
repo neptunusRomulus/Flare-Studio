@@ -1,8 +1,5 @@
-<<<<<<< HEAD
 const { app, BrowserWindow, Menu, ipcMain, dialog } = require('electron');
-=======
-const { app, BrowserWindow, Menu } = require('electron');
->>>>>>> 7bd82e7 (typescript transfer succelfully finished.)
+const fs = require('fs');
 const path = require('path');
 const isDev = process.env.NODE_ENV === 'development';
 
@@ -14,7 +11,6 @@ function createWindow() {
     height: 900,
     minWidth: 1200,
     minHeight: 800,
-<<<<<<< HEAD
     frame: false, // Remove the default window frame
     titleBarStyle: 'hidden', // Hide the title bar
     webPreferences: {
@@ -23,13 +19,6 @@ function createWindow() {
       enableRemoteModule: false,
       webSecurity: false,
       preload: path.join(__dirname, 'preload.js')
-=======
-    webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false,
-      enableRemoteModule: true,
-      webSecurity: false
->>>>>>> 7bd82e7 (typescript transfer succelfully finished.)
     },
     icon: path.join(__dirname, '../assets/icon.png'), // Add icon if available
     title: 'Isometric Tile Map Editor'
@@ -50,8 +39,6 @@ function createWindow() {
     mainWindow.webContents.send('before-close');
   });
 
-=======
->>>>>>> 7bd82e7 (typescript transfer succelfully finished.)
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
@@ -228,8 +215,49 @@ ipcMain.on('close-after-save', () => {
   }
 });
 
-=======
->>>>>>> 7bd82e7 (typescript transfer succelfully finished.)
+// Desktop project helpers
+ipcMain.handle('select-directory', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openDirectory'],
+    title: 'Select project folder'
+  });
+
+  if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+    return null;
+  }
+
+  return result.filePaths[0];
+});
+
+ipcMain.handle('create-map-project', async (_, config) => {
+  try {
+    if (!config || typeof config.name !== 'string' || typeof config.location !== 'string') {
+      return { success: false, error: 'Invalid project configuration' };
+    }
+
+    const projectDir = path.join(config.location, config.name.trim());
+    await fs.promises.mkdir(projectDir, { recursive: true });
+
+    return { success: true, projectPath: projectDir };
+  } catch (error) {
+    console.error('create-map-project failed:', error);
+    return { success: false, error: error?.message || 'Unable to create project folder' };
+  }
+});
+
+ipcMain.handle('check-project-exists', async (_, projectPath) => {
+  try {
+    await fs.promises.access(projectPath);
+    return true;
+  } catch {
+    return false;
+  }
+});
+
+ipcMain.handle('get-project-thumbnail', async () => {
+  return null;
+});
+
 app.whenReady().then(createWindow);
 
 app.on('window-all-closed', () => {

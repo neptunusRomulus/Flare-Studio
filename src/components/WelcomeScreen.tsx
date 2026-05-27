@@ -157,7 +157,9 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
           setMapConfig({ ...mapConfig, location: dirHandle.name });
         } else {
           // Fallback - just set a default location
-          const defaultLocation = 'C:\\Users\\' + (navigator.userAgent.includes('Windows') ? process.env.USERNAME || 'User' : 'User') + '\\Documents\\TileMaps';
+          const defaultLocation = navigator.userAgent.includes('Windows')
+            ? 'C:\\Users\\User\\Documents\\TileMaps'
+            : '/home/user/Documents/TileMaps';
           setMapConfig({ ...mapConfig, location: defaultLocation });
         }
       }
@@ -179,33 +181,35 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
     }
 
     try {
-      // Create the project folder and save the map
-      const projectPath = `${mapConfig.location}\\${mapConfig.name}`;
-      
       if (window.electronAPI?.createMapProject) {
-        const success = await window.electronAPI.createMapProject(mapConfig);
-        if (success) {
-          // Add to recent maps
+        const result = await window.electronAPI.createMapProject(mapConfig);
+        if (result?.success && result.projectPath) {
+          const projectPath = result.projectPath;
           const newRecentMap: RecentMap = {
             id: Date.now().toString(),
             name: mapConfig.name,
             lastModified: 'Just now',
             path: projectPath
           };
-          
+
           const updatedRecents = [newRecentMap, ...recentMaps.slice(0, 9)]; // Keep only 10 recent
           saveRecentMaps(updatedRecents);
-          
+
           onCreateNewMap(mapConfig, projectPath);
+          return;
         }
+
+        const message = result?.error || 'Unable to create project folder';
+        throw new Error(message);
       } else {
         // Fallback for web - just proceed without actual file creation
         console.log('Creating map project:', mapConfig);
         onCreateNewMap(mapConfig);
+        return;
       }
     } catch (error) {
       console.error('Error creating map project:', error);
-      alert('Error creating map project. Please try again.');
+      alert(`Error creating map project. Please try again. ${error instanceof Error ? error.message : ''}`);
     }
   };
 

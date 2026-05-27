@@ -206,6 +206,34 @@ ipcMainLocal.handle("file-exists", async (_event, filePath) => {
   }
 });
 
+ipcMainLocal.handle("create-map-project", async (_event, config) => {
+  try {
+    if (!config || typeof config.name !== "string" || typeof config.location !== "string") {
+      return { success: false, error: "Invalid project configuration" };
+    }
+
+    const projectDir = path.join(config.location, config.name.trim());
+    await fs.promises.mkdir(projectDir, { recursive: true });
+    return { success: true, projectPath: projectDir };
+  } catch (error) {
+    console.error("create-map-project failed:", error);
+    return { success: false, error: error?.message || "Unable to create project folder" };
+  }
+});
+
+ipcMainLocal.handle("check-project-exists", async (_event, projectPath) => {
+  try {
+    await fs.promises.access(projectPath);
+    return true;
+  } catch {
+    return false;
+  }
+});
+
+ipcMainLocal.handle("get-project-thumbnail", async () => {
+  return null;
+});
+
 // Window controls
 ipcMainLocal.on("window-minimize", () => {
   if (mainWindow) {

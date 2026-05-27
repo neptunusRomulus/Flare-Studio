@@ -46,7 +46,7 @@ declare global {
       closeAfterSave: () => void;
       selectDirectory: () => Promise<string | null>;
       selectTilesetFile: () => Promise<string | null>;
-      createMapProject: (config: MapConfig) => Promise<boolean>;
+      createMapProject: (config: MapConfig) => Promise<{ success: boolean; projectPath?: string; error?: string }>;
       openMapProject: (projectPath: string, mapName?: string) => Promise<EditorProjectData | null>;
       saveMapProject: (projectPath: string, mapData: ProjectMapData) => Promise<boolean>;
       // Phase 2: Tileset profile persistence

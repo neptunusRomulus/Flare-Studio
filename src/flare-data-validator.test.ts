@@ -2,7 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { describe, it, expect } from 'vitest';
-import { loadFlareDataSchema, validateSerializedFlareData, findFlareDataFiles, validateFlareDataFile } from './utils/flareDataValidator';
+import { SchemaTemplate, loadFlareDataSchema, validateSerializedFlareData, findFlareDataFiles, validateFlareDataFile } from './utils/flareDataValidator';
 
 const projectRoot = path.resolve(process.cwd());
 
@@ -18,7 +18,18 @@ describe('Flare Data Validator', () => {
   });
 
   it('should reject serialized output with invalid section or unknown key', () => {
-    const schema = loadFlareDataSchema(projectRoot);
+    const schema: SchemaTemplate = {
+      allowedSections: {
+        items: new Set(['item', 'quality', 'set', 'type', 'root']),
+        maps: new Set(['header', 'tilesets', 'layer', 'event', 'enemy', 'npc', 'root']),
+        npcs: new Set(['root', 'dialog', 'stance'])
+      },
+      allowedKeys: {
+        items: { item: new Set(['id', 'name', 'quality', 'item_type', 'icon']) },
+        maps: { header: new Set() },
+        npcs: { root: new Set() }
+      } as Record<FlareDataCategory, Record<string, Set<string>>>
+    };
     const badText = `[item]\nid=9001\nunknown_key=value\n`;
     const result = validateSerializedFlareData(projectRoot, 'mods/my-mod/items/bad_item.txt', badText, schema);
 

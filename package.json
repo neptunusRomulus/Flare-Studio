@@ -7,8 +7,8 @@
   "author": "",
   "license": "GPL-3.0-or-later",
   "scripts": {
-    "start": "electron .",
-    "electron-dev": "concurrently \"vite --port 5173\" \"wait-on http://localhost:5173 && electron .\"",
+    "start": "./node_modules/.bin/electron .",
+    "electron-dev": "concurrently \"vite --port 5173\" \"wait-on http://localhost:5173 && ./node_modules/.bin/electron .\"",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview --port 5173",
@@ -49,7 +49,7 @@
     "@vitejs/plugin-react": "^4.2.1",
     "autoprefixer": "^10.4.16",
     "concurrently": "^8.2.0",
-    "electron": "^39.2.6",
+    "electron": "^39.8.10",
     "electron-builder": "^26.8.1",
     "eslint": "^8.55.0",
     "eslint-plugin-react": "^7.37.5",
@@ -104,5 +104,8 @@
         ]
       }
     ]
+  },
+  "allowScripts": {
+    "electron@39.8.10": true
   }
 }

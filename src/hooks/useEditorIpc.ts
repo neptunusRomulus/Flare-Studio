@@ -52,6 +52,8 @@ export default function useEditorIpc(opts: UseEditorIpcOptions) {
         confirmClose?: (hasUnsaved: boolean) => Promise<void>;
         onSaveAndClose?: (cb: () => void) => void;
         closeAfterSave?: () => void;
+        onAppBeforeQuit?: (cb: () => void) => void;
+        appShutdownComplete?: () => void;
       };
 
       const api = (window as unknown as { electronAPI?: EditorAPI }).electronAPI;

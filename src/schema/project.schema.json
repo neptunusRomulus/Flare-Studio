@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://flarerpg.org/flare-studio/project.schema.json",
+  "title": "Flare Studio canonical project",
+  "description": "Versioned, engine-independent project document. Flare .txt files are an export of this document, not the source of truth.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "meta"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "meta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "version": { "type": "string" },
+        "game": { "type": "string" },
+        "requires": { "type": "array", "items": { "type": "string" } },
+        "engineVersionMin": { "type": "string" }
+      }
+    },
+    "tile": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "width": { "type": "integer" },
+        "height": { "type": "integer" },
+        "orientation": { "enum": ["isometric", "orthogonal"] }
+      }
+    },
+    "maps": { "type": "array", "items": { "type": "object" } },
+    "items": { "type": "array", "items": { "type": "object" } },
+    "enemies": { "type": "array", "items": { "type": "object" } },
+    "npcs": { "type": "array", "items": { "type": "object" } },
+    "powers": { "type": "array", "items": { "type": "object" } }
+  }
+}

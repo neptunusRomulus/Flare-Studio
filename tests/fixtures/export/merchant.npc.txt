@@ -1,0 +1,9 @@
+name=Merchant
+animations=animations/npcs/merchant.txt
+
+[dialog]
+id=hello
+topic=Hello
+portrait_him=images/portraits/m.png
+him=Welcome
+reward_currency=250

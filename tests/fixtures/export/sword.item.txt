@@ -1,0 +1,9 @@
+APPEND
+
+[item]
+id=12
+name=Sword
+item_type=main
+dmg_min=2
+dmg_max=4
+power=12

@@ -10,6 +10,7 @@ const path = require("path");
 const fs = require("fs");
 const { validateSerializedFlareData, loadFlareDataSchema } = require("./flareDataValidator.cjs");
 const flareLaunch = require("./flareLaunch.cjs");
+const flareAdapter = require("../src/adapters/flare/flareAdapter.cjs");
 const isDev = !app.isPackaged;
 const validationRoot = path.join(__dirname, "..");
 const PLAY_SESSION_DIR = ".flare-studio";
@@ -47,7 +48,94 @@ function ensureProjectEngineFiles(projectPath) {
   if (ensured.content !== miscBefore) {
     fs.writeFileSync(miscPath, ensured.content, "utf8");
   }
+
+  const tilesetConfigPath = path.join(engineDir, "tileset_config.txt");
+  if (!fs.existsSync(tilesetConfigPath)) {
+    fs.writeFileSync(tilesetConfigPath, flareAdapter.exportTilesetConfig(), "utf8");
+  }
   return { savePrefix: ensured.prefix, miscPath };
+}
+
+function writeAdapterFile(projectPath, relativePath, content) {
+  const dest = path.join(projectPath, relativePath);
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  fs.writeFileSync(dest, content, "utf8");
+}
+
+function collectProjectText(projectPath) {
+  const files = {};
+  const skipNames = new Set(["node_modules", ".git"]);
+  const walk = (dir, rel) => {
+    if (!fs.existsSync(dir)) return;
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (skipNames.has(entry.name)) continue;
+      const childRel = rel ? `${rel}/${entry.name}` : entry.name;
+      if (childRel === ".editor/migration-backup" || childRel.startsWith(".editor/migration-backup/")) continue;
+      const abs = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(abs, childRel);
+      } else if (/\.(txt|json)$/i.test(entry.name)) {
+        files[childRel] = fs.readFileSync(abs, "utf8");
+      }
+    }
+  };
+  walk(projectPath, "");
+  return files;
+}
+
+function migrateProjectIfNeeded(projectPath) {
+  const indexPath = path.join(projectPath, "project.json");
+  if (fs.existsSync(indexPath)) return { migrated: false };
+  const files = collectProjectText(projectPath);
+  if (Object.keys(files).length === 0) {
+    writeAdapterFile(
+      projectPath,
+      "project.json",
+      `${JSON.stringify(flareAdapter.emptyProject(path.basename(projectPath)), null, 2)}\n`
+    );
+    return { migrated: false, created: true };
+  }
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const backupRoot = path.join(projectPath, ".editor", "migration-backup", stamp);
+  for (const [rel, content] of Object.entries(files)) {
+    const dest = path.join(backupRoot, rel);
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.writeFileSync(dest, content, "utf8");
+  }
+  const result = flareAdapter.migrateFiles(files, path.basename(projectPath));
+  if (result.errors && result.errors.length > 0) {
+    console.warn("[migrate] kept the backup and did not write canonical files:", result.errors);
+    return { migrated: false, errors: result.errors, backup: backupRoot };
+  }
+  for (const file of result.files) writeAdapterFile(projectPath, file.path, file.content);
+  console.log("[migrate] wrote canonical project from", backupRoot);
+  return { migrated: true, backup: backupRoot };
+}
+
+function rememberCanonicalMap(projectPath, mapName, mapTxt) {
+  const imported = flareAdapter.importMapText(mapTxt);
+  const id = flareAdapter.slugFileName(mapName);
+  imported.id = id;
+  const indexPath = path.join(projectPath, "project.json");
+  let index = flareAdapter.emptyProject(path.basename(projectPath));
+  if (fs.existsSync(indexPath)) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(indexPath, "utf8"));
+      index = { ...index, ...parsed, meta: { ...index.meta, ...(parsed.meta || {}) } };
+    } catch (err) {
+      console.warn("Ignoring unreadable project.json:", err);
+    }
+  }
+  const maps = new Set(Array.isArray(index.maps) ? index.maps.map(String) : []);
+  maps.add(id);
+  index.schemaVersion = flareAdapter.SCHEMA_VERSION;
+  index.maps = Array.from(maps);
+  writeAdapterFile(projectPath, "project.json", `${JSON.stringify(index, null, 2)}\n`);
+  writeAdapterFile(projectPath, `content/maps/${id}.json`, `${JSON.stringify(imported, null, 2)}\n`);
+  const sessionPath = path.join(projectPath, ".editor", "session.json");
+  if (!fs.existsSync(sessionPath)) {
+    writeAdapterFile(projectPath, ".editor/session.json", `${JSON.stringify(flareAdapter.editorSession(), null, 2)}\n`);
+  }
 }
 
 function playSessionPath(projectPath) {
@@ -318,14 +406,12 @@ ipcMainLocal.handle(
         fs.mkdirSync(enemiesDir, { recursive: true });
       }
 
-      // Sanitize filename and ensure .txt extension
-      let safeName = filename
-        .replace(/[<>:"/\\|?*]/g, "_")
-        .replace(/\s+/g, "_");
-      if (!safeName.toLowerCase().endsWith(".txt")) safeName += ".txt";
+      const base = path.basename(String(filename)).replace(/\.txt$/i, "");
+      const safeName = `${flareAdapter.slugFileName(base)}.txt`;
+      const normalized = flareAdapter.normalizeEnemyText(content);
 
       const filePath = path.join(enemiesDir, safeName);
-      fs.writeFileSync(filePath, content, "utf8");
+      fs.writeFileSync(filePath, normalized.text, "utf8");
       console.log("Enemy preset saved:", filePath);
       return true;
     } catch (e) {
@@ -348,8 +434,8 @@ ipcMainLocal.handle(
         fs.mkdirSync(npcsFolder, { recursive: true });
       }
 
-      // Get just the filename part (strip npcs/ prefix if present)
-      const npcFilename = filename.replace(/^npcs[\/\\]/, "");
+      const npcBase = path.basename(String(filename)).replace(/\.txt$/i, "");
+      const npcFilename = `${flareAdapter.slugFileName(npcBase)}.txt`;
       const npcFilePath = path.join(npcsFolder, npcFilename);
 
       // Write the file
@@ -378,7 +464,7 @@ ipcMainLocal.handle("list-maps", async (event, projectPath) => {
     const rootFiles = fs.readdirSync(projectPath);
     for (const f of rootFiles) {
       const lower = f.toLowerCase();
-      if (lower.endsWith(".json") && lower !== ".flare-session.json") {
+      if (lower.endsWith(".json") && lower !== ".flare-session.json" && lower !== "project.json") {
         // Read the file to check if it's a valid map (has layers array with content)
         try {
           const filePath = path.join(projectPath, f);
@@ -588,6 +674,11 @@ ipcMainLocal.handle("create-map-project", async (event, config) => {
     // Save map configuration
     const mapConfigPath = path.join(projectPath, `${config.name}.json`);
     fs.writeFileSync(mapConfigPath, JSON.stringify(mapData, null, 2));
+    writeAdapterFile(
+      projectPath,
+      "project.json",
+      `${JSON.stringify(flareAdapter.emptyProject(config.name), null, 2)}\n`
+    );
 
     // Create images/tilesets folder structure
     const imagesPath = path.join(projectPath, "images");
@@ -631,6 +722,11 @@ ipcMainLocal.handle("open-map-project", async (event, projectPath, mapName) => {
     console.log("=== ELECTRON LOAD DEBUG ===");
     console.log("Loading project from:", projectPath);
     console.log("Requested map name:", mapName);
+    try {
+      migrateProjectIfNeeded(projectPath);
+    } catch (migrateErr) {
+      console.warn("Canonical migration failed:", migrateErr);
+    }
 
     // Look for map configuration file. If a specific mapName is provided
     // ONLY load that specific file - do NOT fall back to a random JSON file.
@@ -657,7 +753,10 @@ ipcMainLocal.handle("open-map-project", async (event, projectPath, mapName) => {
       // No specific map requested - find the first valid map file
       mapFile =
         files.find(
-          (file) => file.endsWith(".json") && file !== SESSION_FILENAME
+          (file) =>
+            file.endsWith(".json") &&
+            file !== SESSION_FILENAME &&
+            file !== "project.json"
         ) || null;
     }
 
@@ -1067,14 +1166,28 @@ ipcMainLocal.handle(
       const validationSchema = loadFlareDataSchema(validationRoot);
       const validationResults = [];
       const mapTargetPath = path.join("maps", `${sanitizedMapName}.txt`).split(path.sep).join("/");
+      const adapterMapErrors = flareAdapter
+        .validateText("maps", mapTxt, mapTargetPath)
+        .filter((issue) => issue.level === "error")
+        .map((issue) => issue.message);
+      if (adapterMapErrors.length > 0) {
+        return {
+          success: false,
+          message: `Export refused: ${adapterMapErrors.join(" | ")}`,
+          validation: {
+            success: false,
+            fileResults: [{ filePath: mapTargetPath, category: "maps", errors: adapterMapErrors, warnings: [] }],
+          },
+        };
+      }
       validationResults.push(
-        validateSerializedFlareData(validationRoot, mapTargetPath, mapTxt, validationSchema)
+        validateSerializedFlareData(projectPath, mapTargetPath, mapTxt, validationSchema)
       );
 
       if (options.spawn && options.spawn.enabled && typeof options.spawn.content === 'string') {
         const spawnFile = path.join("maps", options.spawn.filename || "spawn.txt").split(path.sep).join("/");
         validationResults.push(
-          validateSerializedFlareData(validationRoot, spawnFile, options.spawn.content, validationSchema)
+          validateSerializedFlareData(projectPath, spawnFile, options.spawn.content, validationSchema)
         );
       }
 
@@ -1083,7 +1196,7 @@ ipcMainLocal.handle(
           if (npcFile && npcFile.filename && typeof npcFile.content === 'string') {
             const npcTarget = path.join("npcs", npcFile.filename).split(path.sep).join("/");
             validationResults.push(
-              validateSerializedFlareData(validationRoot, npcTarget, npcFile.content, validationSchema)
+              validateSerializedFlareData(projectPath, npcTarget, npcFile.content, validationSchema)
             );
           }
         }
@@ -1112,6 +1225,11 @@ ipcMainLocal.handle(
 
       fs.writeFileSync(mapFilePath, mapTxt, "utf8");
       fs.writeFileSync(tilesetFilePath, tilesetDef, "utf8");
+      try {
+        rememberCanonicalMap(projectPath, mapName, mapTxt);
+      } catch (canonicalErr) {
+        console.warn("Failed to refresh canonical project.json:", canonicalErr);
+      }
 
       // Keep the mod manifest stable across exports. The map name is not the
       // mod description; an existing settings.txt is only filled in, not replaced.
@@ -1684,18 +1802,7 @@ ipcMainLocal.handle("create-npc-file", async (event, projectPath, npcData) => {
     }
 
     // Sanitize NPC name for filename
-    const sanitize = (input) => {
-      return (
-        String(input || "")
-          .toLowerCase()
-          .replace(/[<>:"/\\|?*]/g, "_")
-          .trim()
-          .replace(/\s+/g, "_")
-          .replace(/_{2,}/g, "_") || "unnamed_npc"
-      );
-    };
-
-    const sanitizedName = sanitize(npcData.name);
+    const sanitizedName = flareAdapter.slugFileName(npcData.name);
 
     // Only generate the sanitized filename here — the actual NPC .txt content
     // is written by the save-export flow (saveExportFiles) which produces the
@@ -1854,15 +1961,36 @@ function appendItemLines(lines, item) {
  * Rebuild a category .txt file from a full list of items (all belonging to this category).
  * For each item, writes an optional role comment, then the [item] block with all fields.
  */
-function writeCategoryFile(filePath, items) {
-  const lines = [];
-  for (const item of items) {
-    lines.push("");
-    lines.push("[item]");
-    appendItemLines(lines, item);
+function projectPathFromItemFile(filePath) {
+  const dir = path.dirname(filePath);
+  if (path.basename(dir) === "categories") return path.dirname(path.dirname(dir));
+  return path.dirname(dir);
+}
+
+function mergePowerFile(projectPath, powers) {
+  if (!projectPath || !powers || powers.length === 0) return;
+  const file = path.join(projectPath, "powers", "powers.txt");
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const existing = fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
+  const fresh = powers.filter((power) => {
+    const id = power && power.id != null ? String(power.id) : "";
+    if (!id) return true;
+    return !new RegExp(`^id=${id}$`, "m").test(existing);
+  });
+  if (fresh.length === 0) return;
+  const block = flareAdapter.exportPowerFile(fresh).replace(/^APPEND\s*\n/, "");
+  if (!existing.trim()) {
+    fs.writeFileSync(file, flareAdapter.exportPowerFile(fresh), "utf8");
+    return;
   }
-  lines.push("");
-  fs.writeFileSync(filePath, lines.join("\n"), "utf8");
+  const base = /^APPEND\b/m.test(existing) ? existing : flareAdapter.withAppend(existing);
+  fs.writeFileSync(file, `${base.endsWith("\n") ? base : `${base}\n`}\n${block}`, "utf8");
+}
+
+function writeCategoryFile(filePath, items) {
+  const rendered = flareAdapter.exportItemFile(items, { append: true });
+  fs.writeFileSync(filePath, rendered.text, "utf8");
+  mergePowerFile(projectPathFromItemFile(filePath), rendered.powers);
 }
 
 /**
@@ -1874,44 +2002,14 @@ function rebuildItemsIndex(projectPath) {
   const categoriesDir = path.join(itemsDir, "categories");
   if (!fs.existsSync(itemsDir)) return;
 
-  const lines = [
-    "####################",
-    "# Item Definitions #",
-    "####################",
-    ""
-  ];
-
-  // Check for 'Default' items embedded in items/items.txt itself
   const itemsIndexFile = path.join(itemsDir, "items.txt");
-  let defaultItems = [];
-  if (fs.existsSync(itemsIndexFile)) {
-    // Preserve any non-include content that was hand-authored
-    defaultItems = parseItemsInCategoryFile(itemsIndexFile);
-  }
-
-  // If there are default items, embed them directly
-  if (defaultItems.length > 0) {
-    lines.push("# Default items");
-    lines.push("");
-    for (const item of defaultItems) {
-      lines.push("");
-      lines.push("[item]");
-      appendItemLines(lines, item);
-      lines.push("");
-    }
-  }
-
-  // Add INCLUDE directives for each category .txt file
-  if (fs.existsSync(categoriesDir)) {
-    const entries = fs.readdirSync(categoriesDir);
-    const txtFiles = entries.filter(f => f.toLowerCase().endsWith(".txt")).sort();
-    for (const f of txtFiles) {
-      lines.push(`INCLUDE items/categories/${f}`);
-    }
-  }
-
-  lines.push("");
-  fs.writeFileSync(itemsIndexFile, lines.join("\n"), "utf8");
+  const defaultItems = fs.existsSync(itemsIndexFile) ? parseItemsInCategoryFile(itemsIndexFile) : [];
+  const includes = fs.existsSync(categoriesDir)
+    ? fs.readdirSync(categoriesDir).filter((f) => f.toLowerCase().endsWith(".txt")).sort().map((f) => `items/categories/${f}`)
+    : [];
+  const rendered = flareAdapter.exportItemFile(defaultItems, { append: true, includes });
+  fs.writeFileSync(itemsIndexFile, rendered.text, "utf8");
+  mergePowerFile(projectPath, rendered.powers);
   console.log("Rebuilt items index:", itemsIndexFile);
 }
 
@@ -2023,7 +2121,7 @@ name=Currency
 color=255,232,156
 overlay_icon=1031
 `;
-      fs.writeFileSync(qualitiesFile, qualitiesContent, "utf8");
+      fs.writeFileSync(qualitiesFile, flareAdapter.withAppend(qualitiesContent), "utf8");
       console.log("Created qualities.txt file:", qualitiesFile);
     }
 
@@ -2299,30 +2397,13 @@ function rebuildDefaultItems(itemsTxtPath, defaultItems, projectPath) {
   const itemsDir = path.join(projectPath, "items");
   if (!fs.existsSync(itemsDir)) return;
 
-  const lines = [];
-  lines.push("####################");
-  lines.push("# Item Definitions #");
-  lines.push("####################");
-  lines.push("");
-
-  for (const item of defaultItems) {
-    lines.push("[item]");
-    appendItemLines(lines, item);
-    lines.push("");
-  }
-
-  // Add INCLUDE lines for category files
   const categoriesDir = path.join(itemsDir, "categories");
-  if (fs.existsSync(categoriesDir)) {
-    const entries = fs.readdirSync(categoriesDir);
-    const txtFiles = entries.filter(f => f.toLowerCase().endsWith(".txt")).sort();
-    for (const f of txtFiles) {
-      lines.push(`INCLUDE items/categories/${f}`);
-    }
-  }
-
-  lines.push("");
-  fs.writeFileSync(itemsTxtPath, lines.join("\n"), "utf8");
+  const includes = fs.existsSync(categoriesDir)
+    ? fs.readdirSync(categoriesDir).filter((f) => f.toLowerCase().endsWith(".txt")).sort().map((f) => `items/categories/${f}`)
+    : [];
+  const rendered = flareAdapter.exportItemFile(defaultItems, { append: true, includes });
+  fs.writeFileSync(itemsTxtPath, rendered.text, "utf8");
+  mergePowerFile(projectPath, rendered.powers);
 }
 
 // List all items in the project

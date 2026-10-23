@@ -8,20 +8,15 @@
 
 const fs = require("fs");
 const path = require("path");
+const { slugFileName, legacyMapFileName } = require("../src/adapters/flare/slug.cjs");
 
 const DEFAULT_MOD_VERSION = "1.0";
 const DEFAULT_GAME = "flare-game";
 const DEFAULT_ENGINE_MIN = "1.13.01";
 
-/** Same filename rules as save-export-files in main.cjs. */
+/** ASCII slug. Play also tries the pre-slug filename so older maps still open. */
 function sanitizeMapFileName(input) {
-  return (
-    String(input || "")
-      .replace(/[<>:"/\|?*]/g, "_")
-      .trim()
-      .replace(/\s+/g, "_")
-      .replace(/_{2,}/g, "_") || "Map_Name"
-  );
+  return slugFileName(input);
 }
 
 /**
@@ -373,6 +368,10 @@ function candidateMapRelatives(mapName) {
   const leaf = raw.split("/").pop() || raw;
   const withoutExt = leaf.replace(/\.txt$/i, "");
   push(`maps/${sanitizeMapFileName(withoutExt)}.txt`);
+  const legacy = legacyMapFileName(withoutExt);
+  if (legacy && legacy !== sanitizeMapFileName(withoutExt)) {
+    push(`maps/${legacy}.txt`);
+  }
   return out;
 }
 

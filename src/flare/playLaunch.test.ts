@@ -278,8 +278,12 @@ describe('quick-launch avatar and map paths', () => {
   });
 
   it('sanitizes map names the same way export writes the file', () => {
-    expect(flare.sanitizeMapFileName('Town Map')).toBe('Town_Map');
-    expect(flare.candidateMapRelatives('Town Map')).toContain('maps/Town_Map.txt');
+    expect(flare.sanitizeMapFileName('Town Map')).toBe('town_map');
+    expect(flare.sanitizeMapFileName('ışık')).toBe('isik');
+    expect(flare.candidateMapRelatives('Town Map')).toEqual([
+      'maps/town_map.txt',
+      'maps/Town_Map.txt',
+    ]);
   });
 
   it('writes a spawn line the engine can teleport with', () => {

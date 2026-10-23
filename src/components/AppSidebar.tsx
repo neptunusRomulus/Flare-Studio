@@ -5,6 +5,7 @@ import SidebarEventArea from '@/components/SidebarEventArea';
 import SidebarRulesArea from '@/components/SidebarRulesArea';
 import SidebarStatusesArea from '@/components/SidebarStatusesArea';
 import SidebarItemsArea from '@/components/SidebarItemsArea';
+import SidebarGameSettingsArea from '@/components/SidebarGameSettingsArea';
 import TilesetPanel from '@/components/sidebar/TilesetPanel';
 import SidebarLayersArea from '@/components/SidebarLayersArea';
 import SidebarControlsArea, { ControlsProps } from '@/components/SidebarControlsArea';
@@ -76,6 +77,9 @@ type SidebarProps = {
     handleDuplicateItem: (item: ItemSummary) => void;
     handleDeleteItem: (item: ItemSummary) => void;
     handleOpenItemDialog: () => void;
+  };
+  gameSettings: {
+    isGameSettingsLayer: boolean;
   };
 
   tileset: {

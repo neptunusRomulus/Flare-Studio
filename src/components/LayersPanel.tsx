@@ -16,7 +16,8 @@ import {
   Locate,
   Clock,
   Map as MapIcon,
-  Tag
+  Tag,
+  Settings
 } from 'lucide-react';
 
 type Props = {
@@ -194,6 +195,8 @@ const LayersPanel: React.FC<Props> = ({
                                   return <Locate className="w-4 h-4" />;
                                 case 'event':
                                   return <Clock className="w-4 h-4" />;
+                                case 'gameSettings':
+                                  return <Settings className="w-4 h-4" />;
                                 default:
                                   return <MapIcon className="w-4 h-4" />;
                               }

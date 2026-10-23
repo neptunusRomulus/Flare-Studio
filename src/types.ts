@@ -1,9 +1,7 @@
-// Type definitions for the Isometric Tile Map Editor
-
 export interface TileLayer {
   id: number;
   name: string;
-  type: 'background' | 'object' | 'collision' | 'event' | 'enemy' | 'npc' | 'items' | 'status' | 'rules' | 'actions';
+  type: 'background' | 'object' | 'collision' | 'event' | 'enemy' | 'npc' | 'items' | 'status' | 'rules' | 'actions' | 'gameSettings';
   data: number[];
   visible: boolean;
   transparency?: number; // 0-1, where 1 is fully opaque
@@ -70,6 +68,7 @@ export interface ExportFlareTXTParams {
   tilesets: TilesetInfo[] | null;
   events: FlareEvent[] | null;
   npcs: FlareNPC[] | null;
+  enemies: FlareEnemy[] | null;
   heroPos?: string;
   music?: string;
   title?: string;
@@ -82,11 +81,83 @@ export interface FlareEvent {
   width: number;
   height: number;
   targetMap?: string;
+  type?: string;
+  tooltip?: string;
+  power?: string;
+  power_path?: string;
+  power_damage?: number;
+  power_stats?: string;
+  power_level?: number;
+  intermap?: string;
+  intermap_id?: number;
+  intramap?: number;
+  mapmod?: string;
+  mapmod_toggle?: boolean;
+  soundfx?: string;
+  loot?: string;
+  loot_count?: number;
+  msg?: string;
+  shakycam?: boolean;
+  requirements?: string;
+  reward_xp?: number;
+  reward_currency?: string;
+  reward_item?: string;
+  restore?: string;
+  spawn?: string;
+  spawn_level?: number;
+  stash?: string;
+  npc?: string;
+  music?: string;
+  cutscene?: string;
+  repeat?: boolean;
+  save_game?: boolean;
+  book?: string;
+  script?: string;
+  chance_exec?: boolean;
+  respec?: boolean;
+  show_on_minimap?: boolean;
+  parallax_layers?: string;
+  random_status?: string;
 }
 
-/**
- * Flare Engine NPC modeli.
- * 
+/** 
+ * Flare Engine Enemy modeli. 
+ * Enemy spawn bilgileri map dosyasına [enemy] sections olarak yazılır:
+ * - enemy.name=enemy_advanced
+ * - enemy.gfx=enemy_advanced.png
+ * - enemy.talker=true
+ * - enemy.vendor=true (+ stok)
+ */
+export interface FlareEnemy {
+  // Editor internal ID (unique within editor session)
+  id: number;
+
+  // === Map spawn bilgileri (map dosyasına yazılır) ===
+  x: number;
+  y: number;
+  width?: number;
+  height?: number;
+  
+  // Enemy properties
+  name?: string;
+  gfx?: string;
+  portrait?: string;
+  
+  // Optional spawn conditions
+  talker?: boolean;
+  vendor?: boolean;
+  constant_stock?: boolean;
+  random_stock?: boolean;
+  random_stock_count?: number;
+  vendor_requires_: string;
+  direction?: number;
+  waypoints?: string;
+  wander_radius?: number;
+  custom_properties?: string;
+}
+
+/** 
+ * Flare Engine NPC modeli. 
  * Flare'de "NPC türü" diye ayrı enum yok - NPC'nin rolü tamamen attribute'lerden gelir:
  * - Konuşmacı NPC: talker=true
  * - Vendor NPC: vendor=true (+ stok alanları)
@@ -99,7 +170,7 @@ export interface FlareEvent {
 export interface FlareNPC {
   // Editor internal ID (unique within editor session)
   id: number;
-  
+
   // === Map spawn bilgileri (map dosyasına yazılır) ===
   x: number;
   y: number;
@@ -118,87 +189,40 @@ export interface FlareNPC {
   requires_not_item?: string;
   requires_class?: string;
   requires_not_class?: string;
-  
+
   // === NPC dosyası içeriği (npcs/*.txt dosyasına yazılır) ===
   // Temel bilgiler
   name: string;
   // Görsel
   gfx?: string; // animations/npcs/my_npc.txt
   portrait?: string; // images/portraits/my_npc.png
-  
+
   // Davranış attribute'leri
-  talker: boolean; // npc.talker=true → oyuncu konuşabilir
-  vendor: boolean; // npc.vendor=true → ticaret yapılabilir
-  
+  talker: boolean; // npc.talker=true -> oyuncu konuşabilir
+  vendor: boolean; // npc.vendor=true -> ticaret yapılabilir
+
   // Vendor ayarları (vendor=true ise)
   constant_stock?: string; // npc.constant_stock=item_id,item_id,...
   random_stock?: string; // npc.random_stock=item_id,item_id,...
   random_stock_count?: number | string; // kaç random item gösterilecek, ya da aralık: min,max
   vendor_requires_status?: string;
   vendor_requires_not_status?: string;
-  
+
   // Hareket / AI
   direction?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7; // 0=N, 1=NE, 2=E, ... 7=NW
   waypoints?: string; // format: "x1,y1;x2,y2;..."
   wander_radius?: number;
-  
+
   // Diyalog dosyaları (include edilecek txt'ler)
   // TODO: Flare diyalog sistemi ayrı bir modül olarak ele alınabilir
   dialog_includes?: string[];
-  
+
   // Serbest key-value alanlar (bilinmeyen/yeni attribute'ler için)
   customProperties?: Record<string, string>;
 }
 
-/**
- * Flare Engine Dialogue Types
- */
-export interface DialogueLine {
-  id: string;
-  speaker: 'npc' | 'player';
-  text: string;
-  voice?: string;
-  portrait?: string;
-}
-
-export interface DialogueRequirement {
-  id: string;
-  type: 'status' | 'not_status' | 'item' | 'not_item' | 'level' | 'not_level' | 'currency' | 'not_currency' | 'class' | 'not_class';
-  value: string;
-}
-
-export interface DialogueReward {
-  id: string;
-  type: 'xp' | 'gold' | 'item' | 'remove_gold' | 'remove_item' | 'restore' | 'msg';
-  value: string;
-  quantity?: number;
-}
-
-export interface DialogueWorldEffect {
-  id: string;
-  type: 'set_status' | 'unset_status' | 'teleport' | 'spawn' | 'cutscene' | 'sound' | 'npc';
-  value: string;
-}
-
-export interface DialogueTree {
-  id: string;
-  dialogueId: string; // Flare dialog.id — unique identifier for response linking
-  topic: string;
-  group?: string; // Flare dialog.group — random selection within same group
-  responseOnly: boolean; // Flare dialog.response_only — hidden from topic list, reachable only via response
-  responses: string[]; // Flare dialog.response — array of dialogueId strings this node links to
-  requirements: DialogueRequirement[];
-  dialogues: DialogueLine[];
-  rewards: DialogueReward[];
-  worldEffects: DialogueWorldEffect[];
-  _reqExpanded?: boolean;
-  _dlgExpanded?: boolean;
-  _rewExpanded?: boolean;
-  _wfExpanded?: boolean;
-}
-
-/**
- * NPC'yi Flare txt formatına serialize etmek için yardımcı tip.
+/** 
+ * Flare Engine NPC'yi Flare txt formatına serialize etmek için yardımcı tip. 
  * Map dosyası ve NPC dosyası ayrı ayrı export edilir.
  */
 export interface FlareNPCExportResult {
@@ -215,7 +239,6 @@ export interface UndoRedoState {
   activeLayerId: number | null;
   timestamp: number;
 }
-
 
 export type Tool = 'tiles' | 'brush' | 'eraser' | 'bucket' | 'selection' | 'shape' | 'eyedropper' | 'stamp' | 'collision' | 'objects';
 
@@ -277,14 +300,13 @@ export type StampMode = 'select' | 'create' | 'place';
 // Phase 1: Asset Record & Object Instance Model (Non-breaking additions)
 // ============================================================================
 
-/**
+/** 
  * AssetRecord: Persistent definition of a tileset asset with metadata
  * Decouples visual dimensions from logical gameplay footprint and collision
  */
 export interface AssetRecord {
   id: string;                    // Unique identifier for this asset within the project
   profileId: string;             // Reference to parent TilesetProfile that defines this asset
-  name?: string;                 // Human-readable label (e.g., "Stone Wall", "Tree")
   
   // Source rectangle within the tileset image
   sourceX: number;               // X offset in tileset (pixels)
@@ -317,7 +339,7 @@ export interface AssetRecord {
   lastModified?: string;         // ISO timestamp for updates
 }
 
-/**
+/** 
  * ObjectInstance: A placed sprite object on the map
  * References an AssetRecord definition and stores placement + properties
  */
@@ -344,7 +366,7 @@ export interface ObjectInstance {
   lastModified?: string;         // ISO timestamp
 }
 
-/**
+/** 
  * TilesetProfile: Persistent registry of asset definitions for a tileset
  * Stored at project level to avoid re-detection on every load
  */
@@ -366,7 +388,7 @@ export interface TilesetProfile {
   lastModified?: string;         // ISO timestamp
 }
 
-/**
+/** 
  * PaintMode: Determines which structures are modified during painting
  */
 export type PaintMode = 'ground' | 'object';

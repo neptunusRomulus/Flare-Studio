@@ -10,6 +10,7 @@ import {
   ExportFlareTXTParams,
   FlareEvent,
   FlareNPC,
+  FlareEnemy,
   UndoRedoState,
   Tool,
   Orientation
@@ -68,6 +69,10 @@ export class TileMapEditor {
   private tileLayers: TileLayer[] = [];
   private activeLayerId: number | null = null;
   private nextLayerId: number = 1;
+
+  // Enemy and NPC management
+  private npcs: FlareNPC[] = [];
+  private enemies: FlareEnemy[] = [];
 
   // Collision and object management
   private collisionData: number[] = [];
@@ -760,6 +765,7 @@ export class TileMapEditor {
       tilesets: this.tilesets && this.tilesets.length > 0 ? this.tilesets : null,
       events: events.length > 0 ? events : null,
       npcs: npcs.length > 0 ? npcs : null,
+      enemies: this.enemies && this.enemies.length > 0 ? this.enemies : null,
       heroPos: '1,1',
       music: 'none',
       title: 'GeneratedMap'
@@ -890,6 +896,43 @@ ${csvData}
         output += `location=${event.x},${event.y},${event.width},${event.height}\n`;
         output += 'activate=on_trigger\n';
         output += `map=${event.targetMap || 'othermap.txt'}\n`;
+        if (event.type) output += `type=${event.type}\n`;
+        if (event.tooltip) output += `tooltip=${event.tooltip}\n`;
+        if (event.power) output += `power=${event.power}\n`;
+        if (event.power_path) output += `power_path=${event.power_path}\n`;
+        if (event.power_damage !== undefined) output += `power_damage=${event.power_damage}\n`;
+        if (event.power_stats) output += `power_stats=${event.power_stats}\n`;
+        if (event.power_level !== undefined) output += `power_level=${event.power_level}\n`;
+        if (event.intermap) output += `intermap=${event.intermap}\n`;
+        if (event.intermap_id !== undefined) output += `intermap_id=${event.intermap_id}\n`;
+        if (event.intramap !== undefined) output += `intramap=${event.intramap}\n`;
+        if (event.mapmod) output += `mapmod=${event.mapmod}\n`;
+        if (event.mapmod_toggle !== undefined) output += `mapmod_toggle=${event.mapmod_toggle}\n`;
+        if (event.soundfx) output += `soundfx=${event.soundfx}\n`;
+        if (event.loot) output += `loot=${event.loot}\n`;
+        if (event.loot_count !== undefined) output += `loot_count=${event.loot_count}\n`;
+        if (event.msg) output += `msg=${event.msg}\n`;
+        if (event.shakycam !== undefined) output += `shakycam=${event.shakycam}\n`;
+        if (event.requirements) output += `requirements=${event.requirements}\n`;
+        if (event.reward_xp !== undefined) output += `reward_xp=${event.reward_xp}\n`;
+        if (event.reward_currency) output += `reward_currency=${event.reward_currency}\n`;
+        if (event.reward_item) output += `reward_item=${event.reward_item}\n`;
+        if (event.restore) output += `restore=${event.restore}\n`;
+        if (event.spawn) output += `spawn=${event.spawn}\n`;
+        if (event.spawn_level !== undefined) output += `spawn_level=${event.spawn_level}\n`;
+        if (event.stash) output += `stash=${event.stash}\n`;
+        if (event.npc) output += `npc=${event.npc}\n`;
+        if (event.music) output += `music=${event.music}\n`;
+        if (event.cutscene) output += `cutscene=${event.cutscene}\n`;
+        if (event.repeat !== undefined) output += `repeat=${event.repeat}\n`;
+        if (event.save_game !== undefined) output += `save_game=${event.save_game}\n`;
+        if (event.book) output += `book=${event.book}\n`;
+        if (event.script) output += `script=${event.script}\n`;
+        if (event.chance_exec !== undefined) output += `chance_exec=${event.chance_exec}\n`;
+        if (event.respec !== undefined) output += `respec=${event.respec}\n`;
+        if (event.show_on_minimap !== undefined) output += `show_on_minimap=${event.show_on_minimap}\n`;
+        if (event.parallax_layers) output += `parallax_layers=${event.parallax_layers}\n`;
+        if (event.random_status) output += `random_status=${event.random_status}\n`;
         output += '\n';
       });
     }
@@ -904,6 +947,29 @@ ${csvData}
       });
     }
     
+    // Enemy export
+    if (params.enemies && params.enemies.length > 0) {
+      params.enemies.forEach(enemy => {
+        output += "[enemy]\n";
+        output += "type=enemy\n";
+        output += `location=${enemy.x},${enemy.y},${enemy.width},${enemy.height}\n`;
+        if (enemy.name) output += `name=${enemy.name}\n`;
+        if (enemy.gfx) output += `gfx=${enemy.gfx}\n`;
+        if (enemy.portrait) output += `portrait=${enemy.portrait}\n`;
+        if (enemy.talker !== undefined) output += `talker=${enemy.talker}\n`;
+        if (enemy.vendor !== undefined) output += `vendor=${enemy.vendor}\n`;
+        if (enemy.constant_stock !== undefined) output += `constant_stock=${enemy.constant_stock}\n`;
+        if (enemy.random_stock !== undefined) output += `random_stock=${enemy.random_stock}\n`;
+        if (enemy.random_stock_count !== undefined) output += `random_stock_count=${enemy.random_stock_count}\n`;
+        if (enemy.vendor_requires_ !== undefined) output += `vendor_requires_=${enemy.vendor_requires_}\n`;
+        if (enemy.direction !== undefined) output += `direction=${enemy.direction}\n`;
+        if (enemy.waypoints) output += `waypoints=${enemy.waypoints}\n`;
+        if (enemy.wander_radius !== undefined) output += `wander_radius=${enemy.wander_radius}\n`;
+        if (enemy.custom_properties) output += `custom_properties=${enemy.custom_properties}\n`;
+        output += "\n";
+      });
+    }
+
     return output;
   }
 

@@ -50,7 +50,7 @@ const EngineSettingsDialog = ({
     handleResizeMouseDown,
   } = useDraggableResizable({ id: 'engine_settings', initialWidth: 450, initialHeight: 500, minWidth: 380, minHeight: 400 });
 
-  if (!open) return null; 
+  if (!open) return null;
 
   const tabs: { id: SettingsTab; icon: React.ReactNode; label: string }[] = [
     { id: 'general', icon: <Settings className="w-4 h-4" />, label: 'General' },
@@ -60,7 +60,7 @@ const EngineSettingsDialog = ({
 
   const dialogContent = (
     <>
-      <div 
+      <div
         ref={dialogRef}
         className="bg-background border border-border/70 rounded-lg flex flex-col shadow-xl"
         style={{
@@ -75,7 +75,7 @@ const EngineSettingsDialog = ({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div 
+        <div
           className="flex justify-between items-center p-4 border-b border-border cursor-move select-none"
           onMouseDown={handleHeaderMouseDown}
         >
@@ -126,8 +126,7 @@ const EngineSettingsDialog = ({
                     <span
                       className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
                         isDarkMode ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
+                      }`} />
                     <span className="sr-only">Toggle dark mode</span>
                   </button>
                   <span className="text-sm flex items-center gap-1">
@@ -155,8 +154,7 @@ const EngineSettingsDialog = ({
                     <span
                       className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
                         editor?.getDebugMode() ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
+                      }`} />
                     <span className="sr-only">Toggle debug mode</span>
                   </button>
                   <span className="text-sm flex items-center gap-1">
@@ -187,8 +185,7 @@ const EngineSettingsDialog = ({
                     <span
                       className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
                         editor?.getMinimapMode() === 'isometric' ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
+                      }`} />
                     <span className="sr-only">Toggle Minimap View Mode</span>
                   </button>
                   <span className="text-sm">Isometric (Grid)</span>
@@ -201,11 +198,11 @@ const EngineSettingsDialog = ({
               <div>
                 <label className="block text-sm font-medium mb-1">Minimap Window Size</label>
                 <div className="flex items-center gap-3">
-                  <input 
-                    type="range" 
-                    min="0.5" 
-                    max="3.0" 
-                    step="0.1" 
+                  <input
+                    type="range"
+                    min="0.5"
+                    max="3.0"
+                    step="0.1"
                     value={editor?.getMinimapWindowScale() || 1.0}
                     onChange={(e) => {
                       if (editor) {
@@ -262,15 +259,13 @@ const EngineSettingsDialog = ({
                     <span
                       className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
                         showActiveGid ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
+                      }`} />
                     <span className="sr-only">Toggle Active GID Indicator</span>
                   </button>
                   <span className="text-sm">{showActiveGid ? 'Shown' : 'Hidden'}</span>
                 </div>
                 <p className="text-xs text-gray-500 mt-1">Toggle whether the Active GID badge is visible next to the hover coordinates.</p>
               </div>
-
             </div>
           )}
         </div>

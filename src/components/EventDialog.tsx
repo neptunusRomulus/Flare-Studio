@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import { HelpCircle, X, Save, MapPinPlus, MousePointerClick, MapPinMinus, LogIn, LogOut, SquareCheckBig, Repeat2, ChevronDown, ChevronUp } from 'lucide-react';
+import { HelpCircle, X, Save, MapPinPlus, MousePointerClick, MapPinMinus, LogIn, LogOut, SquareCheckBig, Repeat2, ChevronDown, ChevronUp, Zap } from 'lucide-react';
 import Tooltip from '@/components/ui/tooltip';
 import { useAppContext } from '@/context/AppContext';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
@@ -56,6 +56,26 @@ type EventData = {
     teleportX: number;
     teleportY: number;
     sound: string;
+    // NEW: Power & spell effects
+    power: string;
+    powerPath: string;
+    powerDamage: number;
+    powerStats: string;
+    powerLevel: number;
+    // NEW: Map modification
+    mapmod: string;
+    mapmodToggle: boolean;
+    // NEW: Restore
+    restore: string;
+    // NEW: NPC / Music / Book
+    npc: string;
+    music: string;
+    book: string;
+    // NEW: Advanced
+    respec: boolean;
+    showOnMinimap: boolean;
+    parallaxLayers: string;
+    randomStatus: string;
   };
   engine: {
     chance: number;
@@ -215,6 +235,32 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
     if (eventData.engine.autoSave) props.save_game = 'true';
     if (eventData.engine.script.trim()) props.script = eventData.engine.script.trim();
     if (eventData.description.trim()) props._description = eventData.description.trim();
+
+    // NEW: Power & spell effects
+    if (eventData.rewards.power.trim()) props.power = eventData.rewards.power.trim();
+    if (eventData.rewards.powerPath.trim()) props.power_path = eventData.rewards.powerPath.trim();
+    if (eventData.rewards.powerDamage !== undefined && eventData.rewards.powerDamage > 0) props.power_damage = String(eventData.rewards.powerDamage);
+    if (eventData.rewards.powerStats.trim()) props.power_stats = eventData.rewards.powerStats.trim();
+    if (eventData.rewards.powerLevel !== undefined && eventData.rewards.powerLevel > 0) props.power_level = String(eventData.rewards.powerLevel);
+
+    // NEW: Map modification
+    if (eventData.rewards.mapmod.trim()) props.mapmod = eventData.rewards.mapmod.trim();
+    if (eventData.rewards.mapmodToggle) props.mapmod_toggle = 'true';
+
+    // NEW: Restore
+    if (eventData.rewards.restore.trim()) props.restore = eventData.rewards.restore.trim();
+
+    // NEW: NPC / Music / Book
+    if (eventData.rewards.npc.trim()) props.npc = eventData.rewards.npc.trim();
+    if (eventData.rewards.music.trim()) props.music = eventData.rewards.music.trim();
+    if (eventData.rewards.book.trim()) props.book = eventData.rewards.book.trim();
+
+    // NEW: Advanced
+    if (eventData.rewards.respec) props.respec = 'true';
+    if (eventData.rewards.showOnMinimap) props.show_on_minimap = 'true';
+    if (eventData.rewards.parallaxLayers.trim()) props.parallax_layers = eventData.rewards.parallaxLayers.trim();
+    if (eventData.rewards.randomStatus.trim()) props.random_status = eventData.rewards.randomStatus.trim();
+
     return props;
   };
 
@@ -308,6 +354,22 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
       teleportX: 0,
       teleportY: 0,
       sound: '',
+      // NEW
+      power: '',
+      powerPath: '',
+      powerDamage: 0,
+      powerStats: '',
+      powerLevel: 0,
+      mapmod: '',
+      mapmodToggle: false,
+      restore: '',
+      npc: '',
+      music: '',
+      book: '',
+      respec: false,
+      showOnMinimap: false,
+      parallaxLayers: '',
+      randomStatus: '',
     },
     engine: {
       chance: 100,
@@ -420,6 +482,22 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
             teleportX: intermapParts.length >= 3 ? parseInt(intermapParts[1]) || 0 : 0,
             teleportY: intermapParts.length >= 3 ? parseInt(intermapParts[2]) || 0 : 0,
             sound: p.soundfx || '',
+            // NEW
+            power: p.power || '',
+            powerPath: p.power_path || '',
+            powerDamage: parseInt(p.power_damage || '0') || 0,
+            powerStats: p.power_stats || '',
+            powerLevel: parseInt(p.power_level || '0') || 0,
+            mapmod: p.mapmod || '',
+            mapmodToggle: p.mapmod_toggle === 'true',
+            restore: p.restore || '',
+            npc: p.npc || '',
+            music: p.music || '',
+            book: p.book || '',
+            respec: p.respec === 'true',
+            showOnMinimap: p.show_on_minimap === 'true',
+            parallaxLayers: p.parallax_layers || '',
+            randomStatus: p.random_status || '',
           },
           engine: {
             chance: parseInt(p.chance_exec || '100') || 100,
@@ -590,6 +668,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
     positioning: true,
     requirements: true,
     rewards: true,
+    advancedEffects: false,
     engine: true,
   });
 
@@ -1570,6 +1649,200 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                   placeholder="Sound path"
                   className="h-7 text-xs"
                 />
+              </div>
+            </div>
+          </CollapsibleSection>
+
+          {/* Advanced Effects Section */}
+          <CollapsibleSection
+            title="Advanced Effects"
+            icon={Zap}
+            id="advanced-effects"
+            isExpanded={expandedSections.advancedEffects}
+            onToggle={() => toggleSection('advancedEffects')}
+          >
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-foreground">Advanced Effects</h3>
+
+              {/* Power Effects */}
+              <div className="space-y-4 border-t pt-4">
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">Power & Spell Effects</label>
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-foreground/80">Power ID</label>
+                    <Input
+                      value={eventData.rewards.power}
+                      onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, power: e.target.value } }))}
+                      placeholder="e.g. fireball, heal, lightning"
+                      className="h-7 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-foreground/80">Power Path</label>
+                    <Input
+                      value={eventData.rewards.powerPath}
+                      onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, powerPath: e.target.value } }))}
+                      placeholder="data1,data2[,hero]"
+                      className="h-7 text-xs"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-foreground/80">Power Damage</label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={eventData.rewards.powerDamage}
+                        onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, powerDamage: Math.max(0, parseInt(e.target.value) || 0) } }))}
+                        placeholder="Damage amount"
+                        className="h-7 text-xs"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-foreground/80">Power Level</label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={eventData.rewards.powerLevel}
+                        onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, powerLevel: Math.max(0, parseInt(e.target.value) || 0) } }))}
+                        placeholder="Power level"
+                        className="h-7 text-xs"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-foreground/80">Power Stats</label>
+                    <Input
+                      value={eventData.rewards.powerStats}
+                      onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, powerStats: e.target.value } }))}
+                      placeholder="Stat modifications"
+                      className="h-7 text-xs"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Map Modification */}
+              <div className="space-y-4 border-t pt-4">
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">Map Modification</label>
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-foreground/80">MapMod</label>
+                    <Input
+                      value={eventData.rewards.mapmod}
+                      onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, mapmod: e.target.value } }))}
+                      placeholder="s,data1,data2,data3"
+                      className="h-7 text-xs"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="mapmodToggle"
+                      checked={eventData.rewards.mapmodToggle}
+                      onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, mapmodToggle: e.target.checked } }))}
+                      className="h-4 w-4 rounded border-border/70"
+                    />
+                    <label htmlFor="mapmodToggle" className="text-xs font-medium text-foreground/80">
+                      MapMod Toggle
+                    </label>
+                    <Tooltip content="Toggle map modification on/off instead of just applying">
+                      <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
+                    </Tooltip>
+                  </div>
+                </div>
+              </div>
+
+              {/* Restore */}
+              <div className="space-y-4 border-t pt-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-foreground/80">Restore</label>
+                  <Input
+                    value={eventData.rewards.restore}
+                    onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, restore: e.target.value } }))}
+                    placeholder="e.g. hp,mp,stats"
+                    className="h-7 text-xs"
+                  />
+                </div>
+              </div>
+
+              {/* NPC, Music, Book */}
+              <div className="space-y-4 border-t pt-4">
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">NPC / Music / Book</label>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-foreground/80">NPC</label>
+                    <Input
+                      value={eventData.rewards.npc}
+                      onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, npc: e.target.value } }))}
+                      placeholder="NPC reference"
+                      className="h-7 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-foreground/80">Music</label>
+                    <Input
+                      value={eventData.rewards.music}
+                      onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, music: e.target.value } }))}
+                      placeholder="Music track"
+                      className="h-7 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-foreground/80">Book</label>
+                    <Input
+                      value={eventData.rewards.book}
+                      onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, book: e.target.value } }))}
+                      placeholder="Book text"
+                      className="h-7 text-xs"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Advanced Flags */}
+              <div className="space-y-4 border-t pt-4">
+                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">Advanced Flags</label>
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={eventData.rewards.respec}
+                        onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, respec: e.target.checked } }))}
+                        className="h-4 w-4 rounded border-border/70"
+                      />
+                      <span className="text-xs">Respec (XP/Stats/Powers)</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={eventData.rewards.showOnMinimap}
+                        onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, showOnMinimap: e.target.checked } }))}
+                        className="h-4 w-4 rounded border-border/70"
+                      />
+                      <span className="text-xs">Show on Minimap</span>
+                    </label>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-foreground/80">Parallax Layers</label>
+                    <Input
+                      value={eventData.rewards.parallaxLayers}
+                      onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, parallaxLayers: e.target.value } }))}
+                      placeholder="Layer configuration"
+                      className="h-7 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-foreground/80">Random Status</label>
+                    <Input
+                      value={eventData.rewards.randomStatus}
+                      onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, randomStatus: e.target.value } }))}
+                      placeholder="mode,status_name"
+                      className="h-7 text-xs"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           </CollapsibleSection>

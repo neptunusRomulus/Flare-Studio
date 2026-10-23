@@ -128,6 +128,7 @@ export interface EditorProjectData {
 
 const INTERNAL_TILESET_FILENAMES = new Set<string>(['collision-tile.png', 'collision_tileset.png']);
 const COLLISION_LAYER_TYPE = 'collision';
+const GAME_SETTINGS_LAYER_TYPE = 'gameSettings';
 
 export class TileMapEditor {
   public isStartingMap: boolean = false;
@@ -1275,94 +1276,102 @@ export class TileMapEditor {
   }
 
   private createDefaultLayers(): void {
-    // Create all 8 layers in the correct order (Rules -> Items -> NPC -> Enemy -> Event -> Collision -> Object -> Background)
-    this.tileLayers = [
-      {
-        id: 1,
-        name: 'Rules',
-        type: 'rules',
-        data: new Array(this.mapWidth * this.mapHeight).fill(0),
-        visible: true,
-        transparency: 1.0
-      },
-      {
-        id: 10,
-        name: 'Statuses',
-        type: 'status',
-        data: new Array(this.mapWidth * this.mapHeight).fill(0),
-        visible: true,
-        transparency: 1.0
-      },
-      {
-        id: 9,
-        name: 'Actions',
-        type: 'actions',
-        data: new Array(this.mapWidth * this.mapHeight).fill(0),
-        visible: true,
-        transparency: 1.0
-      },
-      {
-        id: 2,
-        name: 'Items',
-        type: 'items',
-        data: new Array(this.mapWidth * this.mapHeight).fill(0),
-        visible: true,
-        transparency: 1.0
-      },
-      {
-        id: 3,
-        name: 'NPC Layer',
-        type: 'npc',
-        data: new Array(this.mapWidth * this.mapHeight).fill(0),
-        visible: true,
-        transparency: 1.0
-      },
-      {
-        id: 4,
-        name: 'Enemy Layer',
-        type: 'enemy',
-        data: new Array(this.mapWidth * this.mapHeight).fill(0),
-        visible: true,
-        transparency: 1.0
-      },
-      {
-        id: 5,
-        name: 'Event Layer',
-        type: 'event',
-        data: new Array(this.mapWidth * this.mapHeight).fill(0),
-        visible: true,
-        transparency: 1.0
-      },
-      {
-        id: 6,
-        name: 'Collision Layer',
-        type: 'collision',
-        data: new Array(this.mapWidth * this.mapHeight).fill(0),
-        visible: true,
-        transparency: 1.0
-      },
-      {
-        id: 7,
-        name: 'Object Layer',
-        type: 'object',
-        data: new Array(this.mapWidth * this.mapHeight).fill(0),
-        visible: true,
-        transparency: 1.0
-      },
-      {
-        id: 8,
-        name: 'Background Layer',
-        type: 'background',
-        data: new Array(this.mapWidth * this.mapHeight).fill(0),
-        visible: true,
-        transparency: 1.0
-      }
-    ];
-    
-    // Set the background layer as active by default
-    this.activeLayerId = 8;
-    this.nextLayerId = 10;
-    this.sortLayersByPriority();
+      // Create all 9 layers in the correct order (Rules -> Statuses -> Actions -> Items -> NPC -> Enemy -> Event -> Collision -> Object -> Background -> Game Settings)
+      this.tileLayers = [
+        {
+          id: 1,
+          name: 'Rules',
+          type: 'rules',
+          data: new Array(this.mapWidth * this.mapHeight).fill(0),
+          visible: true,
+          transparency: 1.0
+        },
+        {
+          id: 10,
+          name: 'Statuses',
+          type: 'status',
+          data: new Array(this.mapWidth * this.mapHeight).fill(0),
+          visible: true,
+          transparency: 1.0
+        },
+        {
+          id: 9,
+          name: 'Actions',
+          type: 'actions',
+          data: new Array(this.mapWidth * this.mapHeight).fill(0),
+          visible: true,
+          transparency: 1.0
+        },
+        {
+          id: 2,
+          name: 'Items',
+          type: 'items',
+          data: new Array(this.mapWidth * this.mapHeight).fill(0),
+          visible: true,
+          transparency: 1.0
+        },
+        {
+          id: 3,
+          name: 'NPC Layer',
+          type: 'npc',
+          data: new Array(this.mapWidth * this.mapHeight).fill(0),
+          visible: true,
+          transparency: 1.0
+        },
+        {
+          id: 4,
+          name: 'Enemy Layer',
+          type: 'enemy',
+          data: new Array(this.mapWidth * this.mapHeight).fill(0),
+          visible: true,
+          transparency: 1.0
+        },
+        {
+          id: 5,
+          name: 'Event Layer',
+          type: 'event',
+          data: new Array(this.mapWidth * this.mapHeight).fill(0),
+          visible: true,
+          transparency: 1.0
+        },
+        {
+          id: 6,
+          name: 'Collision Layer',
+          type: 'collision',
+          data: new Array(this.mapWidth * this.mapHeight).fill(0),
+          visible: true,
+          transparency: 1.0
+        },
+        {
+          id: 7,
+          name: 'Object Layer',
+          type: 'object',
+          data: new Array(this.mapWidth * this.mapHeight).fill(0),
+          visible: true,
+          transparency: 1.0
+        },
+        {
+          id: 8,
+          name: 'Background Layer',
+          type: 'background',
+          data: new Array(this.mapWidth * this.mapHeight).fill(0),
+          visible: true,
+          transparency: 1.0
+        },
+        {
+          id: 11,
+          name: 'Game Settings',
+          type: 'gameSettings',
+          data: new Array(this.mapWidth * this.mapHeight).fill(0),
+          visible: true,
+          transparency: 1.0
+        }
+      ];
+
+      // Set the background layer as active by default
+      this.activeLayerId = 8;
+      this.nextLayerId = 11;
+      this.sortLayersByPriority();
     // Initialize layer tabs for background and object with one tab each
     try {
       // Clear any previous tab data

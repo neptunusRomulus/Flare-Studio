@@ -505,6 +505,7 @@ export default function useAppMainBuilder() {
   const isStatusesLayer = activeLayer?.type === 'status';
   const isRulesLayer = activeLayer?.type === 'rules';
   const isItemsLayer = activeLayer?.type === 'items';
+  const isGameSettingsLayer = activeLayer?.type === 'gameSettings';
 
   const showEnemyActorArea = isEnemyLayer;
   const showNpcActorArea = isNpcLayer;
@@ -830,6 +831,9 @@ export default function useAppMainBuilder() {
         handleDuplicateItem,
         handleDeleteItem,
         handleOpenItemDialog: handleOpenItemDialog,
+      },
+      gameSettings: {
+        isGameSettingsLayer,
       },
       tileset: {
         layers: appState.layers,

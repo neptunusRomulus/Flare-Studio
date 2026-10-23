@@ -15,6 +15,8 @@ import useAppEffects from './useAppEffects';
 import useNpcDrag from './useNpcDrag';
 import useEventDrag from './useEventDrag';
 import useObjectEditing from './useObjectEditing';
+import useAppMainObjectCommands from './useAppMainObjectCommands';
+import useAppMainSidebarDeps from './useAppMainSidebarDeps';
 import useVendorDialogs from './useVendorDialogs';
 import useClearLayerHandler from './useClearLayerHandler';
 import { normalizeItemsForState } from '@/utils/items';
@@ -416,14 +418,15 @@ export default function useAppMainBuilder() {
 
   // Wire canvas double-click on events to open the edit dialog
   useEffect(() => {
-    if (editor && typeof (editor as any).setEventEditCallback === 'function') {
-      (editor as any).setEventEditCallback((eventId: number) => {
+    if (editor && typeof editor.setEventEditCallback === 'function') {
+      editor.setEventEditCallback((eventId: number) => {
         handleEditEvent(eventId);
       });
       return () => {
-        (editor as any).setEventEditCallback(null);
+        editor.setEventEditCallback(null);
       };
     }
+    return undefined;
   }, [editor, handleEditEvent]);
 
   const objectEditing = useObjectEditing({ 
@@ -452,16 +455,17 @@ export default function useAppMainBuilder() {
 
   // Wire canvas click on objects to open the edit dialog
   useEffect(() => {
-    if (editor && typeof (editor as any).setObjectEditCallback === 'function') {
-      (editor as any).setObjectEditCallback((objectId: number) => {
+    if (editor && typeof editor.setObjectEditCallback === 'function') {
+      editor.setObjectEditCallback((objectId: number) => {
         if (objectEditing && objectEditing.handleEditObject) {
           objectEditing.handleEditObject(objectId);
         }
       });
       return () => {
-        (editor as any).setObjectEditCallback(null);
+        editor.setObjectEditCallback(null);
       };
     }
+    return undefined;
   }, [editor, objectEditing]);
 
   useEffect(() => {
@@ -601,392 +605,86 @@ export default function useAppMainBuilder() {
   const [showSettings, setShowSettings] = useState(false);
   const [showMapSettingsOnly, setShowMapSettingsOnly] = useState(false);
 
-  // --- Context menu handlers for duplicate / delete ---
+  const {
+    handleDuplicateObject,
+    handleDeleteObject,
+    handleDuplicateEvent,
+    handleDeleteEvent,
+    handleReorderActors,
+    handleReorderEvents,
+    handleDuplicateItem,
+    handleDeleteItem,
+  } = useAppMainObjectCommands({
+    editor: editor ?? null,
+    realSyncMapObjects,
+    showNpcActorArea,
+    showEnemyActorArea,
+    currentProjectPath,
+    itemsHook,
+  });
 
-  const handleDuplicateObject = useCallback((objectId: number) => {
-    if (!editor) return;
-    const objects = typeof editor.getMapObjects === 'function' ? editor.getMapObjects() : [];
-    const source = objects.find((o: MapObject) => o.id === objectId);
-    if (!source) return;
-    const newObj = editor.addMapObject(source.type as 'npc' | 'enemy', -1, -1, source.width ?? 1, source.height ?? 1);
-    if (newObj && typeof editor.updateMapObject === 'function') {
-      editor.updateMapObject(newObj.id, {
-        name: `${source.name || source.type} (copy)`,
-        type: source.type,
-        category: source.category,
-        x: -1,
-        y: -1,
-        wander_radius: source.wander_radius,
-        properties: { ...(source.properties || {}) },
-      });
-    }
-    if (typeof realSyncMapObjects === 'function') realSyncMapObjects();
-  }, [editor, realSyncMapObjects]);
-
-  const handleDeleteObject = useCallback((objectId: number) => {
-    if (!editor || typeof editor.removeMapObject !== 'function') return;
-    editor.removeMapObject(objectId);
-    if (typeof realSyncMapObjects === 'function') realSyncMapObjects();
-  }, [editor, realSyncMapObjects]);
-
-  const handleDuplicateEvent = useCallback((eventId: number) => {
-    if (!editor) return;
-    const objects = typeof editor.getMapObjects === 'function' ? editor.getMapObjects() : [];
-    const source = objects.find((o: MapObject) => o.id === eventId);
-    if (!source) return;
-    const srcX = source.x ?? -1;
-    const srcY = source.y ?? -1;
-    const newObj = editor.addMapObject('event', srcX, srcY, source.width ?? 1, source.height ?? 1);
-    if (newObj && typeof editor.updateMapObject === 'function') {
-      editor.updateMapObject(newObj.id, {
-        name: `${source.name || 'Event'} (copy)`,
-        activate: source.activate,
-        hotspot: source.hotspot,
-        tooltip: source.tooltip,
-        intermap: source.intermap,
-        loot: source.loot,
-        soundfx: source.soundfx,
-        mapmod: source.mapmod,
-        repeat: source.repeat,
-        properties: { ...(source.properties || {}) },
-        x: srcX,
-        y: srcY,
-      });
-    }
-    if (typeof realSyncMapObjects === 'function') realSyncMapObjects();
-  }, [editor, realSyncMapObjects]);
-
-  const handleDeleteEvent = useCallback((eventId: number) => {
-    if (!editor || typeof editor.removeMapObject !== 'function') return;
-    editor.removeMapObject(eventId);
-    if (typeof realSyncMapObjects === 'function') realSyncMapObjects();
-  }, [editor, realSyncMapObjects]);
-
-  const handleReorderActors = useCallback((fromIndex: number, toIndex: number) => {
-    if (!editor || typeof editor.reorderMapObjects !== 'function') return;
-    // Map filtered actor indices to full objects array indices
-    const actorTypes = showNpcActorArea ? ['npc'] : showEnemyActorArea ? ['enemy'] : [];
-    const allObjects = editor.getMapObjects();
-    const actorIndices = allObjects.reduce<number[]>((acc, obj, i) => {
-      if (actorTypes.includes(obj.type)) acc.push(i);
-      return acc;
-    }, []);
-    if (fromIndex < actorIndices.length && toIndex < actorIndices.length) {
-      editor.reorderMapObjects(actorIndices[fromIndex], actorIndices[toIndex]);
-      if (typeof realSyncMapObjects === 'function') realSyncMapObjects();
-    }
-  }, [editor, showNpcActorArea, showEnemyActorArea, realSyncMapObjects]);
-
-  const handleReorderEvents = useCallback((fromIndex: number, toIndex: number) => {
-    if (!editor || typeof editor.reorderMapObjects !== 'function') return;
-    const allObjects = editor.getMapObjects();
-    const eventIndices = allObjects.reduce<number[]>((acc, obj, i) => {
-      if (obj.type === 'event') acc.push(i);
-      return acc;
-    }, []);
-    if (fromIndex < eventIndices.length && toIndex < eventIndices.length) {
-      editor.reorderMapObjects(eventIndices[fromIndex], eventIndices[toIndex]);
-      if (typeof realSyncMapObjects === 'function') realSyncMapObjects();
-    }
-  }, [editor, realSyncMapObjects]);
-
-  const handleDuplicateItem = useCallback(async (item: { id: number; name: string; category: string; filePath: string; fileName: string; role?: string; resourceSubtype?: string }) => {
-    if (!currentProjectPath) return;
-    try {
-      let nextId = item.id + 1;
-      if (window.electronAPI?.getNextItemId) {
-        const idResult = await window.electronAPI.getNextItemId(currentProjectPath);
-        if (idResult.success) nextId = idResult.nextId;
-      }
-      // Read original item data then create a copy
-      let itemData: Record<string, unknown> = {};
-      if (window.electronAPI?.readItemFile) {
-        const readResult = await window.electronAPI.readItemFile(item.filePath);
-        if (readResult.success && readResult.data) itemData = readResult.data;
-      }
-      if (window.electronAPI?.createItemFile) {
-        const createResult = await window.electronAPI.createItemFile(currentProjectPath, {
-          name: `${item.name} (copy)`,
-          id: nextId,
-          category: item.category,
-          role: item.role,
-          resourceSubtype: item.resourceSubtype
-        });
-        if (createResult.success && createResult.filePath && window.electronAPI?.writeItemFile) {
-          await window.electronAPI.writeItemFile(createResult.filePath, { ...itemData, id: nextId, name: `${item.name} (copy)` });
-        }
-      }
-      await itemsHook.refreshItemsList(currentProjectPath);
-      toast({ title: 'Item Duplicated', description: `${item.name} has been duplicated.` });
-    } catch (err) {
-      console.error('Failed to duplicate item:', err);
-      toast({ title: 'Error', description: 'Failed to duplicate item.', variant: 'destructive' });
-    }
-  }, [currentProjectPath, itemsHook, toast]);
-
-  const handleDeleteItem = useCallback(async (item: { id: number; name: string; filePath: string }) => {
-    if (!currentProjectPath) return;
-    try {
-      if (window.electronAPI?.deleteItemFile) {
-        const result = await window.electronAPI.deleteItemFile(item.filePath);
-        if (result.success) {
-          await itemsHook.refreshItemsList(currentProjectPath);
-          toast({ title: 'Item Deleted', description: `${item.name} has been deleted.` });
-        } else {
-          toast({ title: 'Error', description: result.error || 'Failed to delete item.', variant: 'destructive' });
-        }
-      }
-    } catch (err) {
-      console.error('Failed to delete item:', err);
-      toast({ title: 'Error', description: 'Failed to delete item file.', variant: 'destructive' });
-    }
-  }, [currentProjectPath, itemsHook, toast]);
-
-  const sidebarDeps = useMemo(() => {
-    const projectMapsList = (projectManagerRecord as ProjectManagerView)?.projectMaps ?? [];
-    const handleOpenMapFromMapsFolderFn =
-      typeof (projectManagerRecord as ProjectManagerView)?.handleOpenMapFromMapsFolder === 'function'
-        ? (projectManagerRecord as ProjectManagerView).handleOpenMapFromMapsFolder!
-        : async () => undefined;
-    const handleManualSaveFn =
-      typeof (projectManagerRecord as ProjectManagerView)?.handleManualSave === 'function'
-        ? (projectManagerRecord as ProjectManagerView).handleManualSave!
-        : async () => undefined;
-    const refreshProjectMapsFn =
-      typeof (projectManagerRecord as ProjectManagerView)?.refreshProjectMaps === 'function'
-        ? (projectManagerRecord as ProjectManagerView).refreshProjectMaps!
-        : async () => undefined;
-    const isExportingValue = Boolean((projectManagerRecord as ProjectManagerView)?.isExporting);
-    const exportProgressValue =
-      typeof (projectManagerRecord as ProjectManagerView)?.exportProgress === 'number'
-        ? (projectManagerRecord as ProjectManagerView).exportProgress!
-        : 0;
-    const isManuallySavingValue = Boolean((projectManagerRecord as ProjectManagerView)?.isManuallySaving);
-    const saveProgressValue =
-      typeof (projectManagerRecord as ProjectManagerView)?.saveProgress === 'number'
-        ? (projectManagerRecord as ProjectManagerView).saveProgress!
-        : 0;
-
-    return {
-      leftCollapsed: appState.leftCollapsed,
-      actors: {
-        isNpcLayer: showNpcActorArea,
-        isEnemyLayer: showEnemyActorArea,
-        actorEntries: (() => {
-          if (showNpcActorArea) {
-            return appState.mapObjects.filter((obj) => obj.type === 'npc');
-          }
-          if (showEnemyActorArea) {
-            const seen = new Set<string>();
-            return appState.mapObjects.filter((obj) => {
-              if (obj.type !== 'enemy') return false;
-              const key = `${obj.type}:${obj.category || obj.name || obj.id}`;
-              if (seen.has(key)) return false;
-              seen.add(key);
-              return true;
-            });
-          }
-          return [];
-        })(),
-        draggingNpcId: appState.draggingNpcId,
-        handleEditObject: objectEditing.handleEditObject,
-        handleEditEnemyTemplate: objectEditing.handleEditEnemyTemplate,
-        handleDuplicateObject,
-        handleDeleteObject,
-        handleReorderActors,
-        setNpcHoverTooltip: appState.setNpcHoverTooltip,
-        handleNpcDragStart,
-        handleNpcDragEnd,
-        handleOpenActorDialog: objectEditing.handleOpenActorDialog,
-      },
-      events: {
-        isEventLayer: activeLayer?.type === 'event',
-        eventEntries: activeLayer?.type === 'event' ? appState.mapObjects.filter((obj) => obj.type === 'event') : [],
-        draggingEventId: appState.draggingEventId,
-        handleEditEvent,
-        handleDuplicateEvent,
-        handleDeleteEvent,
-        handleReorderEvents,
-        setEventHoverTooltip: appState.setNpcHoverTooltip,
-        handleEventDragStart,
-        handleEventDragEnd,
-        handleOpenEventDialog,
-      },
-      rules: {
-        isRulesLayer,
-        rulesList,
-        handleAddRule: handleOpenQuestDialog,
-        handleEditRule: handleOpenQuestEditDialog,
-      },
-      statuses: {
-        isStatusesLayer,
-        handleOpenStatusDialog,
-      },
-      items: {
-        isItemsLayer,
-        itemsList: itemsList,
-        expandedItemCategories,
-        setExpandedItemCategories,
-        handleOpenItemEdit: handleOpenItemEdit,
-        handleDuplicateItem,
-        handleDeleteItem,
-        handleOpenItemDialog: handleOpenItemDialog,
-      },
-      gameSettings: {
-        isGameSettingsLayer,
-      },
-      tileset: {
-        layers: appState.layers,
-        activeLayerId: appState.activeLayerId,
-        hoveredLayerId: appState.hoveredLayerId,
-        layersPanelExpanded: appState.layersPanelExpanded,
-        setLayersPanelExpanded: appState.setLayersPanelExpanded,
-        setHoveredLayerId: appState.setHoveredLayerId,
-        handleSetActiveLayer,
-        handleToggleLayerVisibility,
-        handleLayerTransparencyChange,
-        showTooltipWithDelay,
-        hideTooltip,
-        uiHelpers,
-        editor,
-        activeLayer,
-        tabTick: appState.tabTick,
-        setTabTick: appState.setTabTick,
-        brushTool: toolbarState.brushTool,
-        isCollisionLayer: activeLayer?.type === 'collision',
-        handleFileUpload,
-        handleToggleBrushTool,
-        handleDeleteActiveTab: handleDeleteTilesetTab,
-        toast,
-        handleOpenActorDialog: objectEditing.handleOpenActorDialog,
-        stampsState: {
-          stamps: toolbarState.stamps,
-          selectedStamp: toolbarState.selectedStamp,
-          stampMode: toolbarState.stampMode
-        },
-        currentProjectPath,
-        onShowImportReview: (data: unknown) => {
-          const parsedData = data as ImportReviewData;
-          setImportReviewOriginPreset('bottom-center');
-          setImportReviewData(parsedData);
-          setShowImportReview(true);
-        },
-        isExporting: isExportingValue,
-        exportProgress: exportProgressValue,
-        onSaveAndQuit: async () => {
-          if (handleManualSaveFn) await handleManualSaveFn();
-          appState.setShowWelcome(true);
-        },
-        onQuit: () => { appState.setShowWelcome(true); },
-        onShowProjectFolder: () => {
-          if (currentProjectPath) {
-            try { (window as unknown as { electronAPI?: { showItemInFolder?: (p: string) => Promise<boolean> } }).electronAPI?.showItemInFolder?.(currentProjectPath); } catch (e) { console.warn(e); }
-          }
-        },
-        onShowHelp: () => { if (typeof helpState.setShowHelp === 'function') helpState.setShowHelp(true); },
-        onSaveAsCopy: async () => {
-          try {
-            const api = (window as unknown as { electronAPI?: { selectDirectory?: () => Promise<string | null>; copyProject?: (src: string, dest: string) => Promise<{ success: boolean; error?: string }> } }).electronAPI;
-            if (!api?.selectDirectory || !api?.copyProject || !currentProjectPath) return;
-            if (handleManualSaveFn) await handleManualSaveFn();
-            const destPath = await api.selectDirectory();
-            if (!destPath) return;
-            const result = await api.copyProject(currentProjectPath, destPath);
-            if (result.success) {
-              toast({ title: 'Copy complete', description: `Project copied to ${destPath}` });
-            } else {
-              toast({ title: 'Copy failed', description: result.error || 'Unknown error', variant: 'destructive' });
-            }
-          } catch (e) { console.warn('Save as copy failed', e); toast({ title: 'Copy failed', description: String(e), variant: 'destructive' }); }
-        },
-        onRestart: () => {
-          try { (window as unknown as { electronAPI?: { restartApp?: () => void } }).electronAPI?.restartApp?.(); } catch (e) { console.warn(e); }
-        },
-        onExport: () => { toast({ title: 'Export', description: 'Export is not yet available.' }); },
-        onCheckUpdates: () => { toast({ title: 'Updates', description: 'Update checking is not yet available.' }); },
-        handleManualSave: handleManualSaveFn,
-        isManuallySaving: isManuallySavingValue,
-        saveProgress: saveProgressValue,
-        isPreparingNewMap: mapConfig.isPreparingNewMap,
-      },
-      layers: {
-        layers: appState.layers,
-        activeLayerId: appState.activeLayerId,
-        hoveredLayerId: appState.hoveredLayerId,
-        layersPanelExpanded: appState.layersPanelExpanded,
-        setLayersPanelExpanded: appState.setLayersPanelExpanded,
-        setHoveredLayerId: appState.setHoveredLayerId,
-        handleSetActiveLayer,
-        handleToggleLayerVisibility,
-        handleLayerTransparencyChange,
-        showTooltipWithDelay,
-        hideTooltip,
-        uiHelpers,
-        leftCollapsed: appState.leftCollapsed
-      }
-    };
-  }, [
-    appState.layers,
-    appState.activeLayerId,
-    appState.hoveredLayerId,
-    appState.layersPanelExpanded,
-    appState.setLayersPanelExpanded,
-    appState.setHoveredLayerId,
+  const sidebarDeps = useAppMainSidebarDeps({
+    projectManagerRecord,
+    appState,
+    showNpcActorArea,
+    showEnemyActorArea,
+    objectEditing,
+    handleDuplicateObject,
+    handleDeleteObject,
+    handleReorderActors,
+    handleNpcDragStart,
+    handleNpcDragEnd,
+    activeLayer,
+    handleEditEvent,
+    handleDuplicateEvent,
+    handleDeleteEvent,
+    handleReorderEvents,
+    handleEventDragStart,
+    handleEventDragEnd,
+    handleOpenEventDialog,
+    isRulesLayer,
+    rulesList,
+    handleOpenQuestDialog,
+    handleOpenQuestEditDialog,
+    isStatusesLayer,
+    handleOpenStatusDialog,
+    isItemsLayer,
+    itemsList,
+    expandedItemCategories,
+    setExpandedItemCategories,
+    handleOpenItemEdit,
+    handleDuplicateItem,
+    handleDeleteItem,
+    handleOpenItemDialog,
+    isGameSettingsLayer,
     handleSetActiveLayer,
     handleToggleLayerVisibility,
     handleLayerTransparencyChange,
     showTooltipWithDelay,
     hideTooltip,
     uiHelpers,
-    appState.leftCollapsed,
-    isNpcLayer,
-    isEnemyLayer,
-    appState.mapObjects,
-    appState.draggingNpcId,
-    appState.draggingEventId,
-    appState.setNpcHoverTooltip,
-    handleNpcDragStart,
-    handleNpcDragEnd,
-    handleReorderActors,
-    handleEventDragStart,
-    handleEventDragEnd,
-    handleReorderEvents,
-    isRulesLayer,
-    isItemsLayer,
-    itemsList,
-    expandedItemCategories,
-    setExpandedItemCategories,
     editor,
-    activeLayer,
-    appState.tabTick,
-    appState.setTabTick,
-    toolbarState.brushTool,
     handleFileUpload,
     handleToggleBrushTool,
     handleDeleteTilesetTab,
-    toolbarState.stamps,
-    toolbarState.selectedStamp,
-    toolbarState.stampMode,
+    toolbarState,
+    currentProjectPath,
+    setImportReviewOriginPreset,
+    setImportReviewData,
+    setShowImportReview,
+    helpState,
+    mapConfig,
+    isNpcLayer,
+    isEnemyLayer,
     mapsDropdownOpen,
     mapsSubOpen,
     mapsDropdownPos,
     setMapsDropdownPos,
     mapsButtonRef,
     mapsPortalRef,
-    currentProjectPath,
-    mapConfig.handleOpenCreateMapDialog,
-    mapConfig.isPreparingNewMap,
     setShowSettings,
-    objectEditing,
-    handleOpenItemEdit,
-    handleOpenItemDialog,
-    handleOpenQuestDialog,
-    rulesList,
-    projectManagerRecord,
-    setShowImportReview,
-    setImportReviewData,
-    setImportReviewOriginPreset
-  ]);
+  });
+
   const handleCloseSettings = useCallback(() => setShowSettings(false), []);
   const handleCloseMapSettings = useCallback(() => setShowMapSettingsOnly(false), []);
   const handleMapResize = useCallback(() => {

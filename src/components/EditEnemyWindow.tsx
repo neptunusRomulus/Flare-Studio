@@ -7,6 +7,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { Badge } from '@/components/ui/badge';
 import { User, Eye, Sword, Gift, Flag, MapPin, Volume2, HelpCircle, X, Save, Plus, Check, Rabbit, Sigma, Zap, ChevronDown, ChevronUp } from 'lucide-react';
 import type { MapObject } from '@/types';
+import { propertyRecord, propertyText } from '@/editor/propertyText';
 import type { LucideIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import useItems from '@/hooks/useItems';
@@ -65,7 +66,7 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
   const [rarity, setRarity] = useState<'common'|'uncommon'|'rare'|'unique'>(() => (enemy?.properties?.rarity as 'common'|'uncommon'|'rare'|'unique') || 'common');
   const [count, setCount] = useState<number>(() => enemy?.number ?? 1);
   const [category, setCategory] = useState(() => enemy?.category || '');
-  const [include, setInclude] = useState<string>(() => enemy?.properties?.include || '');
+  const [include, setInclude] = useState<string>(() => propertyText(enemy?.properties?.include));
   const [isHumanoid, setIsHumanoid] = useState<boolean>(() => (enemy?.properties?.humanoid === 'true'));
   const [isLifeform, setIsLifeform] = useState<boolean>(() => (enemy?.properties?.lifeform === 'false' ? false : true));
   const [isAddingCategory, setIsAddingCategory] = useState(false);
@@ -240,79 +241,79 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
   const [tilesetPath, setTilesetPath] = useState<string>(() => (enemy?.properties?.tilesetPath as string) || '');
   const [portraitPath, setPortraitPath] = useState<string>(() => (enemy?.properties?.portraitPath as string) || '');
   const [gfx, setGfx] = useState<string>(() => (enemy?.properties?.gfx as string) || '');
-  const [renderLayers, setRenderLayers] = useState<string>(() => enemy?.properties?.render_layers || '');
-  const [animationSlots, setAnimationSlots] = useState<string>(() => enemy?.properties?.animation_slots || '');
+  const [renderLayers, setRenderLayers] = useState<string>(() => propertyText(enemy?.properties?.render_layers));
+  const [animationSlots, setAnimationSlots] = useState<string>(() => propertyText(enemy?.properties?.animation_slots));
   const [suppressHp, setSuppressHp] = useState<boolean>(() => (enemy?.properties?.suppress_hp === 'true'));
 
   // Audio
-  const [sfxAttack, setSfxAttack] = useState<string>(() => enemy?.properties?.sfx_attack || '');
-  const [sfxHit, setSfxHit] = useState<string>(() => enemy?.properties?.sfx_hit || '');
-  const [sfxDie, setSfxDie] = useState<string>(() => enemy?.properties?.sfx_die || '');
-  const [sfxCritDie, setSfxCritDie] = useState<string>(() => enemy?.properties?.sfx_critdie || '');
+  const [sfxAttack, setSfxAttack] = useState<string>(() => propertyText(enemy?.properties?.sfx_attack));
+  const [sfxHit, setSfxHit] = useState<string>(() => propertyText(enemy?.properties?.sfx_hit));
+  const [sfxDie, setSfxDie] = useState<string>(() => propertyText(enemy?.properties?.sfx_die));
+  const [sfxCritDie, setSfxCritDie] = useState<string>(() => propertyText(enemy?.properties?.sfx_critdie));
 
   // Stats
-  const [hp, setHp] = useState<string>(() => enemy?.properties?.hp || '');
-  const [mp, setMp] = useState<string>(() => enemy?.properties?.mp || '');
-  const [attack, setAttack] = useState<string>(() => enemy?.properties?.attack || '');
-  const [defense, setDefense] = useState<string>(() => enemy?.properties?.defense || '');
-  const [speed, setSpeed] = useState<string>(() => enemy?.properties?.speed || '');
-  const [xp, setXp] = useState<string>(() => enemy?.properties?.xp || '');
-  const [gold, setGold] = useState<string>(() => enemy?.properties?.gold || '');
-  const [meleeRange, setMeleeRange] = useState<string>(() => enemy?.properties?.melee_range || '');
-  const [threadRange, setThreadRange] = useState<string>(() => enemy?.properties?.thread_range || '');
+  const [hp, setHp] = useState<string>(() => propertyText(enemy?.properties?.hp));
+  const [mp, setMp] = useState<string>(() => propertyText(enemy?.properties?.mp));
+  const [attack, setAttack] = useState<string>(() => propertyText(enemy?.properties?.attack));
+  const [defense, setDefense] = useState<string>(() => propertyText(enemy?.properties?.defense));
+  const [speed, setSpeed] = useState<string>(() => propertyText(enemy?.properties?.speed));
+  const [xp, setXp] = useState<string>(() => propertyText(enemy?.properties?.xp));
+  const [gold, setGold] = useState<string>(() => propertyText(enemy?.properties?.gold));
+  const [meleeRange, setMeleeRange] = useState<string>(() => propertyText(enemy?.properties?.melee_range));
+  const [threadRange, setThreadRange] = useState<string>(() => propertyText(enemy?.properties?.thread_range));
 
   // Advanced
-  const [statPerLevel, setStatPerLevel] = useState<string>(() => enemy?.properties?.stat_per_level || '');
-  const [xpScaling, setXpScaling] = useState<string>(() => enemy?.properties?.xp_scaling || '');
-  const [vulnerable, setVulnerable] = useState<string>(() => enemy?.properties?.vulnerable || '');
+  const [statPerLevel, setStatPerLevel] = useState<string>(() => propertyText(enemy?.properties?.stat_per_level));
+  const [xpScaling, setXpScaling] = useState<string>(() => propertyText(enemy?.properties?.xp_scaling));
+  const [vulnerable, setVulnerable] = useState<string>(() => propertyText(enemy?.properties?.vulnerable));
   // More advanced stats (resists, regen, utility)
-  const [resistDamageOverTime, setResistDamageOverTime] = useState<string>(() => enemy?.properties?.resist_damage_over_time || '');
-  const [resistSlow, setResistSlow] = useState<string>(() => enemy?.properties?.resist_slow || '');
-  const [resistStun, setResistStun] = useState<string>(() => enemy?.properties?.resist_stun || '');
-  const [resistKnockback, setResistKnockback] = useState<string>(() => enemy?.properties?.resist_knockback || '');
-  const [resistStatDebuff, setResistStatDebuff] = useState<string>(() => enemy?.properties?.resist_stat_debuff || '');
-  const [resistDamageReflect, setResistDamageReflect] = useState<string>(() => enemy?.properties?.resist_damage_reflect || '');
-  const [xpGain, setXpGain] = useState<string>(() => enemy?.properties?.xp_gain || '');
-  const [hpRegen, setHpRegen] = useState<string>(() => enemy?.properties?.hp_regen || '');
-  const [mpRegen, setMpRegen] = useState<string>(() => enemy?.properties?.mp_regen || '');
-  const [hpSteal, setHpSteal] = useState<string>(() => enemy?.properties?.hp_steal || '');
-  const [mpSteal, setMpSteal] = useState<string>(() => enemy?.properties?.mp_steal || '');
-  const [accuracy, setAccuracy] = useState<string>(() => enemy?.properties?.accuracy || '');
-  const [avoidance, setAvoidance] = useState<string>(() => enemy?.properties?.avoidance || '');
-  const [crit, setCrit] = useState<string>(() => enemy?.properties?.crit || '');
-  const [absorbMin, setAbsorbMin] = useState<string>(() => enemy?.properties?.absorb_min || '');
-  const [absorbMax, setAbsorbMax] = useState<string>(() => enemy?.properties?.absorb_max || '');
-  const [poise, setPoise] = useState<string>(() => enemy?.properties?.poise || '');
-  const [reflectChance, setReflectChance] = useState<string>(() => enemy?.properties?.reflect_chance || '');
-  const [returnDamage, setReturnDamage] = useState<string>(() => enemy?.properties?.return_damage || '');
-  const [currencyFind, setCurrencyFind] = useState<string>(() => enemy?.properties?.currency_find || '');
-  const [itemFind, setItemFind] = useState<string>(() => enemy?.properties?.item_find || '');
-  const [stealth, setStealth] = useState<string>(() => enemy?.properties?.stealth || '');
+  const [resistDamageOverTime, setResistDamageOverTime] = useState<string>(() => propertyText(enemy?.properties?.resist_damage_over_time));
+  const [resistSlow, setResistSlow] = useState<string>(() => propertyText(enemy?.properties?.resist_slow));
+  const [resistStun, setResistStun] = useState<string>(() => propertyText(enemy?.properties?.resist_stun));
+  const [resistKnockback, setResistKnockback] = useState<string>(() => propertyText(enemy?.properties?.resist_knockback));
+  const [resistStatDebuff, setResistStatDebuff] = useState<string>(() => propertyText(enemy?.properties?.resist_stat_debuff));
+  const [resistDamageReflect, setResistDamageReflect] = useState<string>(() => propertyText(enemy?.properties?.resist_damage_reflect));
+  const [xpGain, setXpGain] = useState<string>(() => propertyText(enemy?.properties?.xp_gain));
+  const [hpRegen, setHpRegen] = useState<string>(() => propertyText(enemy?.properties?.hp_regen));
+  const [mpRegen, setMpRegen] = useState<string>(() => propertyText(enemy?.properties?.mp_regen));
+  const [hpSteal, setHpSteal] = useState<string>(() => propertyText(enemy?.properties?.hp_steal));
+  const [mpSteal, setMpSteal] = useState<string>(() => propertyText(enemy?.properties?.mp_steal));
+  const [accuracy, setAccuracy] = useState<string>(() => propertyText(enemy?.properties?.accuracy));
+  const [avoidance, setAvoidance] = useState<string>(() => propertyText(enemy?.properties?.avoidance));
+  const [crit, setCrit] = useState<string>(() => propertyText(enemy?.properties?.crit));
+  const [absorbMin, setAbsorbMin] = useState<string>(() => propertyText(enemy?.properties?.absorb_min));
+  const [absorbMax, setAbsorbMax] = useState<string>(() => propertyText(enemy?.properties?.absorb_max));
+  const [poise, setPoise] = useState<string>(() => propertyText(enemy?.properties?.poise));
+  const [reflectChance, setReflectChance] = useState<string>(() => propertyText(enemy?.properties?.reflect_chance));
+  const [returnDamage, setReturnDamage] = useState<string>(() => propertyText(enemy?.properties?.return_damage));
+  const [currencyFind, setCurrencyFind] = useState<string>(() => propertyText(enemy?.properties?.currency_find));
+  const [itemFind, setItemFind] = useState<string>(() => propertyText(enemy?.properties?.item_find));
+  const [stealth, setStealth] = useState<string>(() => propertyText(enemy?.properties?.stealth));
 
   // Combat & powers (dmg stats)
-  const [dmgMeleeMin, setDmgMeleeMin] = useState<string>(() => enemy?.properties?.dmg_melee_min || '');
-  const [dmgMeleeMax, setDmgMeleeMax] = useState<string>(() => enemy?.properties?.dmg_melee_max || '');
-  const [dmgRangedMin, setDmgRangedMin] = useState<string>(() => enemy?.properties?.dmg_ranged_min || '');
-  const [dmgRangedMax, setDmgRangedMax] = useState<string>(() => enemy?.properties?.dmg_ranged_max || '');
-  const [animations, setAnimations] = useState<string>(() => enemy?.properties?.animations || '');
+  const [dmgMeleeMin, setDmgMeleeMin] = useState<string>(() => propertyText(enemy?.properties?.dmg_melee_min));
+  const [dmgMeleeMax, setDmgMeleeMax] = useState<string>(() => propertyText(enemy?.properties?.dmg_melee_max));
+  const [dmgRangedMin, setDmgRangedMin] = useState<string>(() => propertyText(enemy?.properties?.dmg_ranged_min));
+  const [dmgRangedMax, setDmgRangedMax] = useState<string>(() => propertyText(enemy?.properties?.dmg_ranged_max));
+  const [animations, setAnimations] = useState<string>(() => propertyText(enemy?.properties?.animations));
 
   const [powers, setPowers] = useState<Array<{ state: string; id: string; chance: number }>>(() => {
     try {
-      const p = enemy?.properties?.powers;
+      const p = propertyText(enemy?.properties?.powers);
       if (!p) return [];
       // If it's a string from old version, try to parse it or keep as is?
-      // For Flare, powers can be multiple lines. In our MapObject properties, 
+      // For Flare, powers can be multiple lines. In our MapObject properties,
       // we might have stored it as JSON or a raw string.
       return JSON.parse(p);
     } catch {
       return [];
     }
   });
-  const [script, setScript] = useState<string>(() => enemy?.properties?.script || '');
+  const [script, setScript] = useState<string>(() => propertyText(enemy?.properties?.script));
 
   // Loot
-  const [lootTable, setLootTable] = useState<string>(() => enemy?.properties?.loot || '');
-  const [dropChance, setDropChance] = useState<string>(() => enemy?.properties?.drop_chance || '');
+  const [lootTable, setLootTable] = useState<string>(() => propertyText(enemy?.properties?.loot));
+  const [dropChance, setDropChance] = useState<string>(() => propertyText(enemy?.properties?.drop_chance));
 
   // Behavior flags
   const [isMelee, setIsMelee] = useState<boolean>(() => (enemy?.properties?.melee === 'true'));
@@ -325,31 +326,31 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
 
   // Movement & AI
   const [combatStyle, setCombatStyle] = useState<'default'|'aggressive'|'passive'>(() => ((enemy?.properties?.combat_style as 'default'|'aggressive'|'passive') || 'default'));
-  const [threatRange, setThreatRange] = useState<string>(() => enemy?.properties?.threat_range || '');
-  const [fleeRange, setFleeRange] = useState<string>(() => enemy?.properties?.flee_range || '');
-  const [fleeDuration, setFleeDuration] = useState<string>(() => enemy?.properties?.flee_duration || '');
-  const [fleeCooldown, setFleeCooldown] = useState<string>(() => enemy?.properties?.flee_cooldown || '');
-  const [chancePursue, setChancePursue] = useState<string>(() => enemy?.properties?.chance_pursue || '');
-  const [chanceFlee, setChanceFlee] = useState<string>(() => enemy?.properties?.chance_flee || '');
-  const [turnDelay, setTurnDelay] = useState<string>(() => enemy?.properties?.turn_delay || '');
-  const [wanderRadius, setWanderRadius] = useState<string>(() => enemy?.properties?.wander_radius || '');
-  const [waypoints, setWaypoints] = useState<string>(() => enemy?.properties?.waypoints || '');
-  const [waypointPause, setWaypointPause] = useState<string>(() => enemy?.properties?.waypoint_pause || '');
+  const [threatRange, setThreatRange] = useState<string>(() => propertyText(enemy?.properties?.threat_range));
+  const [fleeRange, setFleeRange] = useState<string>(() => propertyText(enemy?.properties?.flee_range));
+  const [fleeDuration, setFleeDuration] = useState<string>(() => propertyText(enemy?.properties?.flee_duration));
+  const [fleeCooldown, setFleeCooldown] = useState<string>(() => propertyText(enemy?.properties?.flee_cooldown));
+  const [chancePursue, setChancePursue] = useState<string>(() => propertyText(enemy?.properties?.chance_pursue));
+  const [chanceFlee, setChanceFlee] = useState<string>(() => propertyText(enemy?.properties?.chance_flee));
+  const [turnDelay, setTurnDelay] = useState<string>(() => propertyText(enemy?.properties?.turn_delay));
+  const [wanderRadius, setWanderRadius] = useState<string>(() => propertyText(enemy?.properties?.wander_radius));
+  const [waypoints, setWaypoints] = useState<string>(() => propertyText(enemy?.properties?.waypoints));
+  const [waypointPause, setWaypointPause] = useState<string>(() => propertyText(enemy?.properties?.waypoint_pause));
   const [isFacing, setIsFacing] = useState<boolean>(() => (enemy?.properties?.facing === 'true'));
   const [isFlying, setIsFlying] = useState<boolean>(() => (enemy?.properties?.flying === 'true'));
   const [isIntangible, setIsIntangible] = useState<boolean>(() => (enemy?.properties?.intangible === 'true'));
 
   // Attack & Skills
-  const [powersList, setPowersList] = useState<string>(() => enemy?.properties?.powers || '');
-  const [passivePowers, setPassivePowers] = useState<string>(() => enemy?.properties?.passive_powers || '');
-  const [cooldown, setCooldown] = useState<string>(() => enemy?.properties?.cooldown || '');
-  const [cooldownHit, setCooldownHit] = useState<string>(() => enemy?.properties?.cooldown_hit || '');
-  const [powerFilter, setPowerFilter] = useState<string>(() => enemy?.properties?.power_filter || '');
+  const [powersList, setPowersList] = useState<string>(() => propertyText(enemy?.properties?.powers));
+  const [passivePowers, setPassivePowers] = useState<string>(() => propertyText(enemy?.properties?.passive_powers));
+  const [cooldown, setCooldown] = useState<string>(() => propertyText(enemy?.properties?.cooldown));
+  const [cooldownHit, setCooldownHit] = useState<string>(() => propertyText(enemy?.properties?.cooldown_hit));
+  const [powerFilter, setPowerFilter] = useState<string>(() => propertyText(enemy?.properties?.power_filter));
 
   // Actions / Abilities
   const [abilitiesList, setAbilitiesList] = useState<Array<{ id: string; name: string; type: string }>>(() => {
     try {
-      const abs = enemy?.properties?.abilities;
+      const abs = propertyText(enemy?.properties?.abilities);
       return abs ? JSON.parse(abs) : [];
     } catch {
       return [];
@@ -357,12 +358,12 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
   });
 
   // Loot
-  const [loot, setLoot] = useState<string>(() => enemy?.properties?.loot || '');
+  const [loot, setLoot] = useState<string>(() => propertyText(enemy?.properties?.loot));
   const [lootCountMin, setLootCountMin] = useState<string>('');
   const [lootCountMax, setLootCountMax] = useState<string>('');
   const [lootGroup, setLootGroup] = useState<string>(() => '');
   const [lootSelection, setLootSelection] = useState<Record<number, number>>(() => ({}));
-  const [firstDefeatLoot, setFirstDefeatLoot] = useState<string>(() => enemy?.properties?.first_defeat_loot || '');
+  const [firstDefeatLoot, setFirstDefeatLoot] = useState<string>(() => propertyText(enemy?.properties?.first_defeat_loot));
 
   const parseLootCount = (value: string | undefined) => {
     const defaultValue = ['', ''];
@@ -380,8 +381,8 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
   };
 
   // Quest
-  const [questLoot, setQuestLoot] = useState<string>(() => enemy?.properties?.quest_loot || '');
-  const [defeatStatus, setDefeatStatus] = useState<string>(() => enemy?.properties?.defeat_status || '');
+  const [questLoot, setQuestLoot] = useState<string>(() => propertyText(enemy?.properties?.quest_loot));
+  const [defeatStatus, setDefeatStatus] = useState<string>(() => propertyText(enemy?.properties?.defeat_status));
 
   const buildLootString = useCallback((groupId: string, selection: Record<number, number>) => {
     const parts: string[] = [];
@@ -459,33 +460,33 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
       setCategory(enemy?.category || '');
       setIsHumanoid(enemy?.properties?.humanoid === 'true');
       setIsLifeform(enemy?.properties?.lifeform === 'false' ? false : true);
-      setInclude(enemy?.properties?.include || '');
+      setInclude(propertyText(enemy?.properties?.include));
 
       setTilesetPath((enemy?.properties?.tilesetPath as string) || '');
       setPortraitPath((enemy?.properties?.portraitPath as string) || '');
       setGfx((enemy?.properties?.gfx as string) || '');
-      setRenderLayers(enemy?.properties?.render_layers || '');
-      setAnimationSlots(enemy?.properties?.animation_slots || '');
+      setRenderLayers(propertyText(enemy?.properties?.render_layers));
+      setAnimationSlots(propertyText(enemy?.properties?.animation_slots));
       setSuppressHp(enemy?.properties?.suppress_hp === 'true');
 
-      setSfxAttack(enemy?.properties?.sfx_attack || '');
-      setSfxHit(enemy?.properties?.sfx_hit || '');
-      setSfxDie(enemy?.properties?.sfx_die || '');
-      setSfxCritDie(enemy?.properties?.sfx_critdie || '');
+      setSfxAttack(propertyText(enemy?.properties?.sfx_attack));
+      setSfxHit(propertyText(enemy?.properties?.sfx_hit));
+      setSfxDie(propertyText(enemy?.properties?.sfx_die));
+      setSfxCritDie(propertyText(enemy?.properties?.sfx_critdie));
 
-      setHp(enemy?.properties?.hp || '');
-      setMp(enemy?.properties?.mp || '');
-      setAttack(enemy?.properties?.attack || '');
-      setDefense(enemy?.properties?.defense || '');
-      setSpeed(enemy?.properties?.speed || '');
-      setXp(enemy?.properties?.xp || '');
-      setGold(enemy?.properties?.gold || '');
-      setMeleeRange(enemy?.properties?.melee_range || '');
-      setThreadRange(enemy?.properties?.thread_range || '');
+      setHp(propertyText(enemy?.properties?.hp));
+      setMp(propertyText(enemy?.properties?.mp));
+      setAttack(propertyText(enemy?.properties?.attack));
+      setDefense(propertyText(enemy?.properties?.defense));
+      setSpeed(propertyText(enemy?.properties?.speed));
+      setXp(propertyText(enemy?.properties?.xp));
+      setGold(propertyText(enemy?.properties?.gold));
+      setMeleeRange(propertyText(enemy?.properties?.melee_range));
+      setThreadRange(propertyText(enemy?.properties?.thread_range));
 
-      setStatPerLevel(enemy?.properties?.stat_per_level || '');
-      setXpScaling(enemy?.properties?.xp_scaling || '');
-      setVulnerable(enemy?.properties?.vulnerable || '');
+      setStatPerLevel(propertyText(enemy?.properties?.stat_per_level));
+      setXpScaling(propertyText(enemy?.properties?.xp_scaling));
+      setVulnerable(propertyText(enemy?.properties?.vulnerable));
 
       setIsMelee(enemy?.properties?.melee === 'true');
       setIsRanged(enemy?.properties?.ranged === 'true');
@@ -496,53 +497,53 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
       setIsStationary(enemy?.properties?.stationary === 'true');
 
       setCombatStyle((enemy?.properties?.combat_style as 'default'|'aggressive'|'passive') || 'default');
-      setThreatRange(enemy?.properties?.threat_range || '');
-      setFleeRange(enemy?.properties?.flee_range || '');
-      setFleeDuration(enemy?.properties?.flee_duration || '');
-      setFleeCooldown(enemy?.properties?.flee_cooldown || '');
-      setChancePursue(enemy?.properties?.chance_pursue || '');
-      setChanceFlee(enemy?.properties?.chance_flee || '');
-      setTurnDelay(enemy?.properties?.turn_delay || '');
-      setWanderRadius(enemy?.properties?.wander_radius || '');
+      setThreatRange(propertyText(enemy?.properties?.threat_range));
+      setFleeRange(propertyText(enemy?.properties?.flee_range));
+      setFleeDuration(propertyText(enemy?.properties?.flee_duration));
+      setFleeCooldown(propertyText(enemy?.properties?.flee_cooldown));
+      setChancePursue(propertyText(enemy?.properties?.chance_pursue));
+      setChanceFlee(propertyText(enemy?.properties?.chance_flee));
+      setTurnDelay(propertyText(enemy?.properties?.turn_delay));
+      setWanderRadius(propertyText(enemy?.properties?.wander_radius));
 
       try {
-        const abs = enemy?.properties?.abilities;
+        const abs = propertyText(enemy?.properties?.abilities);
         setAbilitiesList(abs ? JSON.parse(abs) : []);
       } catch {
         setAbilitiesList([]);
       }
-      setWaypoints(enemy?.properties?.waypoints || '');
-      setWaypointPause(enemy?.properties?.waypoint_pause || '');
+      setWaypoints(propertyText(enemy?.properties?.waypoints));
+      setWaypointPause(propertyText(enemy?.properties?.waypoint_pause));
       setIsFacing(enemy?.properties?.facing === 'true');
       setIsFlying(enemy?.properties?.flying === 'true');
       setIsIntangible(enemy?.properties?.intangible === 'true');
 
-      setDmgMeleeMin(enemy?.properties?.dmg_melee_min || '');
-      setDmgMeleeMax(enemy?.properties?.dmg_melee_max || '');
-      setDmgRangedMin(enemy?.properties?.dmg_ranged_min || '');
-      setDmgRangedMax(enemy?.properties?.dmg_ranged_max || '');
-      setAnimations(enemy?.properties?.animations || '');
+      setDmgMeleeMin(propertyText(enemy?.properties?.dmg_melee_min));
+      setDmgMeleeMax(propertyText(enemy?.properties?.dmg_melee_max));
+      setDmgRangedMin(propertyText(enemy?.properties?.dmg_ranged_min));
+      setDmgRangedMax(propertyText(enemy?.properties?.dmg_ranged_max));
+      setAnimations(propertyText(enemy?.properties?.animations));
 
       try {
-        const p = enemy?.properties?.powers;
+        const p = propertyText(enemy?.properties?.powers);
         setPowers(p ? JSON.parse(p) : []);
       } catch {
         setPowers([]);
       }
 
-      setPassivePowers(enemy?.properties?.passive_powers || '');
-      setCooldown(enemy?.properties?.cooldown || '');
-      setCooldownHit(enemy?.properties?.cooldown_hit || '');
-      setPowerFilter(enemy?.properties?.power_filter || '');
+      setPassivePowers(propertyText(enemy?.properties?.passive_powers));
+      setCooldown(propertyText(enemy?.properties?.cooldown));
+      setCooldownHit(propertyText(enemy?.properties?.cooldown_hit));
+      setPowerFilter(propertyText(enemy?.properties?.power_filter));
 
-      setLoot(enemy?.properties?.loot || '');
-      const [minCount, maxCount] = parseLootCount(enemy?.properties?.loot_count);
+      setLoot(propertyText(enemy?.properties?.loot));
+      const [minCount, maxCount] = parseLootCount(propertyText(enemy?.properties?.loot_count) || undefined);
       setLootCountMin(minCount);
       setLootCountMax(maxCount);
-      setFirstDefeatLoot(enemy?.properties?.first_defeat_loot || '');
+      setFirstDefeatLoot(propertyText(enemy?.properties?.first_defeat_loot));
 
-      setQuestLoot(enemy?.properties?.quest_loot || '');
-      setDefeatStatus(enemy?.properties?.defeat_status || '');
+      setQuestLoot(propertyText(enemy?.properties?.quest_loot));
+      setDefeatStatus(propertyText(enemy?.properties?.defeat_status));
 
       setCustomPropsRaw(() => {
         if (!enemy?.properties) return '';
@@ -551,7 +552,7 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
       });
 
       setCategory(enemy?.category || '');
-      setInclude(enemy?.properties?.include || '');
+      setInclude(propertyText(enemy?.properties?.include));
 
     }, 0);
 
@@ -566,7 +567,7 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
       return;
     }
 
-    const newProps: Record<string, string> = { ...(enemy.properties || {}) };
+    const newProps: Record<string, string> = propertyRecord(enemy.properties);
     const knownKeys = [
       'tilesetPath','portraitPath','gfx','render_layers','animation_slots','suppress_hp','hp','mp','attack','defense','speed','xp','gold',
       'melee','ranged','caster','summoner','boss','passive','stationary','humanoid','lifeform',

@@ -220,7 +220,8 @@ export default function EditorCanvas(props: Props) {
 
   // Set up cell right-click context menu callback
   React.useEffect(() => {
-    if (!editorRef.current) {
+    const canvasEditor = editorRef.current;
+    if (!canvasEditor) {
       return;
     }
 
@@ -229,10 +230,10 @@ export default function EditorCanvas(props: Props) {
       contextMenu.openAtPosition(screenX, screenY);
     };
 
-    editorRef.current.setCellRightClickCallback(handleCellRightClick);
+    canvasEditor.setCellRightClickCallback(handleCellRightClick);
 
     return () => {
-      editorRef.current.setCellRightClickCallback(null);
+      canvasEditor.setCellRightClickCallback(null);
     };
   }, [editorRef, contextMenu]);
 
@@ -411,14 +412,15 @@ export default function EditorCanvas(props: Props) {
           const canvasX = e.clientX - rect.left;
           const canvasY = e.clientY - rect.top;
 
+          const canvasEditor = editorRef.current;
           if (draggingNpcId) {
             e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
-            editorRef.current.setNpcDragHover(canvasX, canvasY);
+            canvasEditor?.setNpcDragHover(canvasX, canvasY);
           } else if (draggingEventId) {
             e.preventDefault();
             e.dataTransfer.dropEffect = 'move';
-            editorRef.current.setEventDragHover(canvasX, canvasY);
+            canvasEditor?.setEventDragHover(canvasX, canvasY);
           }
         }
       }}

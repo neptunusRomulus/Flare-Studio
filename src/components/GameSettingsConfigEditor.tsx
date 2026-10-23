@@ -2,37 +2,43 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Save, RefreshCw, Search, ChevronDown, ChevronUp, Settings, Sword, Gamepad2, Palette, Music, Wrench, FileText, Globe, Monitor, Layers, Eye, Skull } from 'lucide-react';
+import { useAppContext } from '@/context/AppContext';
+import { toast } from '@/hooks/use-toast';
+import { loadConfigDocument, saveConfigDocument } from '@/editor/projectFiles';
 
 type Props = {
   leftCollapsed: boolean;
 };
 
 const GAME_SETTINGS_CONFIG_FILES = [
-  { id: 'combat', name: 'combat.txt', icon: Sword, category: 'Gameplay' },
-  { id: 'gameplay', name: 'gameplay.txt', icon: Gamepad2, category: 'Gameplay' },
-  { id: 'misc', name: 'misc.txt', icon: Settings, category: 'Gameplay' },
-  { id: 'death_penalty', name: 'death_penalty.txt', icon: Skull, category: 'Gameplay' },
-  { id: 'default_music', name: 'default_music.txt', icon: Music, category: 'Audio' },
-  { id: 'font_settings', name: 'font_settings.txt', icon: FileText, category: 'UI' },
-  { id: 'font_colors', name: 'font_colors.txt', icon: Palette, category: 'UI' },
-  { id: 'icons', name: 'icons.txt', icon: Eye, category: 'UI' },
-  { id: 'languages', name: 'languages.txt', icon: Globe, category: 'UI' },
-  { id: 'resolutions', name: 'resolutions.txt', icon: Monitor, category: 'UI' },
-  { id: 'tileset_config', name: 'tileset_config.txt', icon: Layers, category: 'Graphics' },
-  { id: 'tooltips', name: 'tooltips.txt', icon: Wrench, category: 'UI' },
+  { id: 'combat', name: 'combat.txt', relative: 'engine/combat.txt', icon: Sword, category: 'Gameplay' },
+  { id: 'gameplay', name: 'gameplay.txt', relative: 'engine/gameplay.txt', icon: Gamepad2, category: 'Gameplay' },
+  { id: 'misc', name: 'misc.txt', relative: 'engine/misc.txt', icon: Settings, category: 'Gameplay' },
+  { id: 'death_penalty', name: 'death_penalty.txt', relative: 'engine/death_penalty.txt', icon: Skull, category: 'Gameplay' },
+  { id: 'default_music', name: 'default_music.txt', relative: 'engine/default_music.txt', icon: Music, category: 'Audio' },
+  { id: 'font_settings', name: 'font_settings.txt', relative: 'engine/font_settings.txt', icon: FileText, category: 'UI' },
+  { id: 'font_colors', name: 'font_colors.txt', relative: 'engine/font_colors.txt', icon: Palette, category: 'UI' },
+  { id: 'icons', name: 'icons.txt', relative: 'engine/icons.txt', icon: Eye, category: 'UI' },
+  { id: 'languages', name: 'languages.txt', relative: 'engine/languages.txt', icon: Globe, category: 'UI' },
+  { id: 'resolutions', name: 'resolutions.txt', relative: 'engine/resolutions.txt', icon: Monitor, category: 'UI' },
+  { id: 'tileset_config', name: 'tileset_config.txt', relative: 'engine/tileset_config.txt', icon: Layers, category: 'Graphics' },
+  { id: 'tooltips', name: 'tooltips.txt', relative: 'engine/tooltips.txt', icon: Wrench, category: 'UI' },
 ];
 
 export default function GameSettingsConfigEditor({ leftCollapsed }: Props) {
+  const ctx = useAppContext();
+  const currentProjectPath = typeof ctx.currentProjectPath === 'string' ? ctx.currentProjectPath : null;
   const [activeFile, setActiveFile] = React.useState<string>('combat');
   const [searchText, setSearchText] = React.useState('');
   const [content, setContent] = React.useState<string>('');
   const [isEditing, setIsEditing] = React.useState(false);
 
   const loadFile = async (fileId: string) => {
+    const file = GAME_SETTINGS_CONFIG_FILES.find((entry) => entry.id === fileId);
+    setActiveFile(fileId);
+    if (!file) return;
     try {
-      const filePath = `mods/example/${fileId}.txt`;
-      setContent(`# ${fileId} configuration\n# This would load from ${filePath}\n\n[GameSetting]\nkey = example\nvalue = 100\n`);
-      setActiveFile(fileId);
+      setContent(await loadConfigDocument(currentProjectPath, file.relative));
       setIsEditing(false);
     } catch (e) {
       console.error('Failed to load file:', e);
@@ -40,7 +46,15 @@ export default function GameSettingsConfigEditor({ leftCollapsed }: Props) {
   };
 
   const saveFile = async () => {
-    console.log('Save:', activeFile, content);
+    const file = GAME_SETTINGS_CONFIG_FILES.find((entry) => entry.id === activeFile);
+    if (!file || !currentProjectPath) {
+      toast({ title: 'No project', description: 'Open a project before saving this file.', variant: 'destructive' });
+      return;
+    }
+    const saved = await saveConfigDocument(currentProjectPath, file.relative, content);
+    toast(saved
+      ? { title: 'Saved', description: file.relative }
+      : { title: 'Save failed', description: file.relative, variant: 'destructive' });
   };
 
   const refreshFile = async () => {
@@ -48,8 +62,8 @@ export default function GameSettingsConfigEditor({ leftCollapsed }: Props) {
   };
 
   React.useEffect(() => {
-    loadFile(activeFile);
-  }, [activeFile]);
+    void loadFile(activeFile);
+  }, [activeFile, currentProjectPath]);
 
   // Group files by category
   const groupedFiles = GAME_SETTINGS_CONFIG_FILES.reduce((acc, file) => {

@@ -14,6 +14,9 @@ import type { ItemSummary } from '@/utils/items';
 type NpcVendorSettingsDialogProps = {
   isOpen: boolean;
   onClose: () => void;
+  onOpenStockDialog?: () => void;
+  onOpenUnlockDialog?: () => void;
+  onOpenRandomDialog?: () => void;
   onCreateVendorStockGroup: (stockType: 'constant' | 'status' | 'random', selectedGroupId: string | null, npcName: string) => Promise<ItemSummary | null>;
   itemsList: ItemSummary[];
   getEditingObjectProperty: (key: string, fallback?: string) => string;

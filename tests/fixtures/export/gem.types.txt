@@ -1,0 +1,9 @@
+APPEND
+
+[settings]
+sort_order=consumable,gem
+
+[type]
+id=gem
+name=Gem
+auto_pickup=true

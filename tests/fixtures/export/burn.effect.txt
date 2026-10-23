@@ -1,0 +1,8 @@
+APPEND
+
+[effect]
+id=burn
+type=damage
+name=Burn
+can_stack=true
+max_stacks=3

@@ -120,11 +120,21 @@ const QuestEditDialog = ({ open, onOpenChange, questDraft, setQuestDraft, onSave
   const [nameError, setNameError] = React.useState('');
   const nameIsValid = Boolean(questDraft.name?.trim());
 
+  const questBaseline = React.useRef('');
   React.useEffect(() => {
     if (!open) {
       setNameError('');
+      return;
     }
+    questBaseline.current = JSON.stringify(questDraft);
   }, [open]);
+
+  const requestClose = () => {
+    if (JSON.stringify(questDraft) !== questBaseline.current) {
+      if (!window.confirm('Discard unsaved quest changes?')) return;
+    }
+    onOpenChange(false);
+  };
 
   const saveQuest = () => {
     if (!nameIsValid) {
@@ -190,7 +200,7 @@ const QuestEditDialog = ({ open, onOpenChange, questDraft, setQuestDraft, onSave
             <Button
               size="icon"
               variant="ghost"
-              onClick={() => onOpenChange(false)}
+              onClick={requestClose}
               className="h-9 w-9 text-foreground/70 hover:text-foreground"
               type="button"
             >

@@ -1,0 +1,9 @@
+APPEND
+
+[settings]
+sort_order=normal,magic
+
+[quality]
+id=magic
+name=Magic
+color=80,80,255

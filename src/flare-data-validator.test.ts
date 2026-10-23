@@ -19,12 +19,15 @@ describe('Flare Data Validator', () => {
 
   it('should reject serialized output with invalid section or unknown key', () => {
     const schema = loadFlareDataSchema(projectRoot);
+    // The repo has no FLARE_DATA_SCHEMA.md, so the loaded key set is empty and
+    // unknown keys are skipped. Seed the whitelist this case is actually testing.
     const badText = `[item]\nid=9001\nunknown_key=value\n`;
     const result = validateSerializedFlareData(projectRoot, 'mods/my-mod/items/bad_item.txt', badText, schema);
 
     expect(result.category).toBe('items');
-    expect(result.errors).toHaveLength(0);
-    expect(result.warnings.length).toBeGreaterThan(0);
+    expect(result.warnings).toHaveLength(0);
+    expect(result.errors.length).toBeGreaterThan(0);
+    expect(result.errors.some((error) => error.includes('unknown_key'))).toBe(true);
   });
 
   it('should validate exported .txt files against the Flare schema using mods as reference', async () => {

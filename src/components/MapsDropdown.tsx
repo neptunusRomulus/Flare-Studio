@@ -13,7 +13,7 @@ type Props = {
   setMapsDropdownOpen: React.Dispatch<React.SetStateAction<boolean>>;
   
   handleOpenCreateMapDialog: () => void;
-  handleOpenMap: (path: string) => Promise<void>;
+  handleOpenMap: (path: string, createTab?: boolean, mapName?: string) => Promise<void>;
   toast: (args: { title: string; description: string; variant?: 'default' | 'destructive' }) => void;
 };
 

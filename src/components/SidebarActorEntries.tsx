@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import Tooltip from '@/components/ui/tooltip';
 import { GripVertical, HelpCircle, Plus } from 'lucide-react';
 import type { MapObject } from '@/types';
+import { propertyText } from '@/editor/propertyText';
 import { ENEMY_ROLE_META_LOOKUP } from '@/editor/actorRoles';
 import ElementContextMenu from '@/components/ElementContextMenu';
 import ListItemTooltip from '@/components/ListItemTooltip';
@@ -73,7 +74,7 @@ const SidebarActorEntries = ({
                 stationary: actor.properties?.stationary === 'true' || actor.properties?.stationary === '1'
               };
               const hasEnemyRole = Object.values(enemyRoles).some(Boolean);
-              const portraitPath = actor.properties?.portraitPath;
+              const portraitPath = propertyText(actor.properties?.portraitPath) || undefined;
               const isPlacedOnMap = actor.x >= 0 && actor.y >= 0;
 
               return (

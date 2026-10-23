@@ -11,6 +11,13 @@ import { AppProvider } from './context/AppContext';
 import AppMain from './components/AppMain';
 import useAppController from './hooks/useAppController';
 
+function sidebarRecord(value: unknown): Record<string, unknown> {
+  if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  return {};
+}
+
 function AppMainWrapper({ 
   sidebarDeps, 
   buildAppMainCtxFromSidebar
@@ -19,7 +26,7 @@ function AppMainWrapper({
   buildAppMainCtxFromSidebar: (s: Record<string, unknown> | null) => Record<string, unknown>;
 }) {
   return (
-    <SidebarProvider deps={useSidebarDeps(sidebarDeps)}>
+    <SidebarProvider deps={useSidebarDeps(sidebarRecord(sidebarDeps))}>
       {(assembledSidebar: unknown) => {
         // Build context directly on each render - getting fresh state from useAppMainBuilder hooks
         const appCtx = buildAppMainCtxFromSidebar(assembledSidebar as Record<string, unknown> | null);

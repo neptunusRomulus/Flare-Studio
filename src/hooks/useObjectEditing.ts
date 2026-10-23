@@ -3,6 +3,7 @@ import type { DialogueTree, MapObject } from '@/types';
 import { EMPTY_ACTOR_ROLES } from '@/editor/actorRoles';
 import type { ActorDialogState, EnemyRoleKey } from '@/editor/actorRoles';
 import { validateAndSanitizeObject } from '@/editor/objectValidation';
+import { propertyText } from '@/editor/propertyText';
 
 /**
  * Load an image from an absolute file path via Electron and return its pixel dimensions.
@@ -296,7 +297,7 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
       }
       if (obj.type === 'npc') {
         try {
-          const stored = obj.properties?.dialogueTrees;
+          const stored = propertyText(obj.properties?.dialogueTrees);
           setDialogueTrees(stored ? JSON.parse(stored) : []);
         } catch {
           setDialogueTrees([]);
@@ -323,7 +324,7 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
     setShowObjectDialog(true);
     if (obj.type === 'npc') {
       try {
-        const stored = obj.properties?.dialogueTrees;
+        const stored = propertyText(obj.properties?.dialogueTrees);
         setDialogueTrees(stored ? JSON.parse(stored) : []);
       } catch {
         setDialogueTrees([]);
@@ -433,7 +434,7 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
 
   const getEditingObjectProperty = useCallback((key: string, fallback = '') => {
     if (!editingObject || !editingObject.properties) return fallback;
-    return editingObject.properties[key] ?? fallback;
+    return propertyText(editingObject.properties[key], fallback);
   }, [editingObject]);
 
   const handleEditingTilesetBrowse = useCallback(async () => {

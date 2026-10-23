@@ -137,6 +137,7 @@ declare global {
       isFlareRunning: () => Promise<boolean>;
       onFlareEngineExited: (callback: (payload?: { error?: string }) => void) => void;
     };
+    __ISM_TILE_PROJECT_MAPS__?: string[];
   }
 }
 

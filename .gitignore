@@ -5,9 +5,6 @@ ai-docs/
 roadmap/
 
 # --- AI & Agent Trash ---
-*.md
-!README.md
-!CONTRIBUTING.md
 .aider*
 .cursor/
 .windsurf/
@@ -23,21 +20,17 @@ dist/
 release/
 out/
 archive/
-package-lock.json
 yarn.lock
 
 # --- OS & IDE ---
 .vscode/
 .idea/
-.git/
 .DS_Store
 Thumbs.db
 electron-output.log
 *.log
 
 # --- Assets & Binaries (Kod olmadığı için indekslenmemeli) ---
-public/
-*.png
 *.jpg
 *.jpeg
 *.gif
@@ -55,7 +48,8 @@ public/
 .cache/
 .parcel-cache/
 coverage/
-mods/
+playwright-report/
+test-results/
 flare-engine-master/
 qdrant-codebase-mcp-source/
 flare-engine.wiki

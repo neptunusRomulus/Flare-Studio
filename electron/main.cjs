@@ -11,6 +11,21 @@ const fs = require("fs");
 const { validateSerializedFlareData, loadFlareDataSchema } = require("./flareDataValidator.cjs");
 const flareLaunch = require("./flareLaunch.cjs");
 const flareAdapter = require("../src/adapters/flare/flareAdapter.cjs");
+const { isInsideRoot } = require("../src/editor/pathGuard.cjs");
+const allowedProjectRoots = new Set();
+
+function rememberProjectRoot(projectPath) {
+  if (typeof projectPath !== "string" || !projectPath) return;
+  allowedProjectRoots.add(path.resolve(projectPath));
+}
+
+function isAllowedProjectPath(targetPath) {
+  if (typeof targetPath !== "string" || !targetPath) return false;
+  for (const root of allowedProjectRoots) {
+    if (isInsideRoot(root, targetPath)) return true;
+  }
+  return false;
+}
 const isDev = !app.isPackaged;
 const validationRoot = path.join(__dirname, "..");
 const PLAY_SESSION_DIR = ".flare-studio";
@@ -455,6 +470,7 @@ ipcMainLocal.handle(
 // 2. .txt map files in maps/ folder (Flare export format)
 ipcMainLocal.handle("list-maps", async (event, projectPath) => {
   try {
+    rememberProjectRoot(projectPath);
     if (!projectPath) return [];
 
     const maps = [];
@@ -614,6 +630,7 @@ ipcMainLocal.handle(
 
 ipcMainLocal.handle("read-spawn-file", async (_event, projectPath) => {
   try {
+    rememberProjectRoot(projectPath);
     if (!projectPath) return null;
     const spawnPath = path.join(projectPath, "maps", "spawn.txt");
     if (!fs.existsSync(spawnPath)) return null;
@@ -630,6 +647,7 @@ ipcMainLocal.handle("select-directory", async () => {
   });
 
   if (!result.canceled && result.filePaths.length > 0) {
+    rememberProjectRoot(result.filePaths[0]);
     return result.filePaths[0];
   }
   return null;
@@ -654,6 +672,8 @@ ipcMainLocal.handle("select-tileset-file", async () => {
 ipcMainLocal.handle("create-map-project", async (event, config) => {
   try {
     const projectPath = path.join(config.location, config.name);
+    rememberProjectRoot(config.location);
+    rememberProjectRoot(projectPath);
 
     // Create project directory
     if (!fs.existsSync(projectPath)) {
@@ -719,6 +739,7 @@ ipcMainLocal.handle("create-map-project", async (event, config) => {
 
 ipcMainLocal.handle("open-map-project", async (event, projectPath, mapName) => {
   try {
+    rememberProjectRoot(projectPath);
     console.log("=== ELECTRON LOAD DEBUG ===");
     console.log("Loading project from:", projectPath);
     console.log("Requested map name:", mapName);
@@ -983,6 +1004,7 @@ ipcMainLocal.handle("load-tileset-profiles", async (event, projectPath) => {
 // Save map project data
 ipcMainLocal.handle("save-map-project", async (event, projectPath, mapData) => {
   try {
+    rememberProjectRoot(projectPath);
     console.log("=== ELECTRON SAVE DEBUG ===");
     console.log("Project path:", projectPath);
     console.log("Map data received:", !!mapData);
@@ -2610,7 +2632,7 @@ ipcMainLocal.handle("write-item-file", async (event, filePath, itemData) => {
 // Delete item file — removes the [item] block from the category .txt
 ipcMainLocal.handle("read-file", async (event, filePath) => {
   try {
-    if (!filePath || !fs.existsSync(filePath)) {
+    if (!isAllowedProjectPath(filePath) || !fs.existsSync(filePath)) {
       return null;
     }
     return fs.readFileSync(filePath, "utf8");
@@ -2622,7 +2644,7 @@ ipcMainLocal.handle("read-file", async (event, filePath) => {
 
 ipcMainLocal.handle("create-folder-if-not-exists", async (_event, folderPath) => {
   try {
-    if (!folderPath) return false;
+    if (!isAllowedProjectPath(folderPath)) return false;
     fs.mkdirSync(folderPath, { recursive: true });
     return true;
   } catch (error) {
@@ -2633,7 +2655,7 @@ ipcMainLocal.handle("create-folder-if-not-exists", async (_event, folderPath) =>
 
 ipcMainLocal.handle("write-file", async (_event, filePath, content) => {
   try {
-    if (!filePath) return false;
+    if (!isAllowedProjectPath(filePath)) return false;
     const directory = path.dirname(filePath);
     if (!fs.existsSync(directory)) {
       fs.mkdirSync(directory, { recursive: true });
@@ -2648,7 +2670,7 @@ ipcMainLocal.handle("write-file", async (_event, filePath, content) => {
 
 ipcMainLocal.handle("read-dir", async (_event, dirPath) => {
   try {
-    if (!dirPath || !fs.existsSync(dirPath)) {
+    if (!isAllowedProjectPath(dirPath) || !fs.existsSync(dirPath)) {
       return [];
     }
     const entries = fs.readdirSync(dirPath, { withFileTypes: true });

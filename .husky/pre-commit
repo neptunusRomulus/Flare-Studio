@@ -1,5 +1,5 @@
 #!/bin/sh
-# Refuse staged files over 5 MB, then run the unit tests once (not watch mode).
+# Refuse staged files over 5 MB, lint the staged files, then run the unit tests once.
 node << 'EOF'
 const { execFileSync } = require('child_process');
 const fs = require('fs');
@@ -24,4 +24,6 @@ if (failed) {
 }
 EOF
 
+npx lint-staged
+npx tsc --noEmit --pretty false
 npx vitest run

@@ -25,6 +25,7 @@ export default function useEditorAreaProps(params: any) {
     hoverCoords,
     showActiveGid,
     activeGidValue,
+    hoverGidValue,
     npcDeletePopup,
     setNpcDeletePopup,
     handleUnplaceActorFromMap,

@@ -5,6 +5,9 @@ export interface TileLayer {
   data: number[];
   visible: boolean;
   transparency?: number; // 0-1, where 1 is fully opaque
+  opacity?: number;
+  width?: number;
+  height?: number;
 }
 
 export interface TilesetInfo {

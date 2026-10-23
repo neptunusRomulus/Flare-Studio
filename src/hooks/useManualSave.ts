@@ -10,6 +10,7 @@ import useAtomicSave from './useAtomicSave';
 import useSaveSequencing from './useSaveSequencing';
 import useSaveErrorNotification from './useSaveErrorNotification';
 import useFileConflictDetection from './useFileConflictDetection';
+import { propertyRecord, propertyText } from '@/editor/propertyText';
 
 // Helper to safely get file stats from Electron
 const getFileStatsSafe = async (path: string) => {
@@ -135,7 +136,7 @@ export default function useManualSave(args: {
   const { checkFileConflict, registerFileSave: registerFileConflictSave } = useFileConflictDetection();
   
   // Initialize save sequencing for NPC/Item/Enemy coordination
-  const saveSequencing = useSaveSequencing(editor, {
+  const saveSequencing = useSaveSequencing(editor ?? null, {
     onSequencingStart: () => {
       console.log('[ManualSave] Save sequencing started');
     },
@@ -190,7 +191,7 @@ export default function useManualSave(args: {
             currentProjectPath || undefined
           );
           setLastErrorId(errorId);
-          return false;
+          return;
         }
 
         // Check for file conflicts before attempting save
@@ -214,7 +215,7 @@ export default function useManualSave(args: {
             };
 
             // Check if there's actually a conflict
-            const currentFileSize = editor.getCurrentProjectFileSize?.() ?? 0;
+            const currentFileSize = editor.getCurrentProjectFileSize();
             const conflictResult = await checkFileConflict(
               currentProjectPath,
               currentFileSize,
@@ -223,7 +224,7 @@ export default function useManualSave(args: {
             );
 
             // Only show conflict prompt if there's actually a real conflict
-            if (conflictResult.hasConflict) {
+            if (conflictResult.hasConflict && conflictResult.severity !== 'none') {
               console.log('[ManualSave] Actual file conflict detected, showing prompt to user');
               const resolution = await showConflictPrompt({
                 filePath: currentProjectPath,
@@ -235,11 +236,11 @@ export default function useManualSave(args: {
               if (resolution === 'cancel') {
                 console.log('[ManualSave] User cancelled save due to conflict');
                 setLastErrorMessage('Save cancelled - file conflict detected');
-                return false;
+                return;
               } else if (resolution === 'reload') {
                 console.log('[ManualSave] User chose to reload external version');
                 setLastErrorMessage('Reload not yet implemented - please use File > Revert');
-                return false;
+                return;
               }
               // resolution === 'keep_app' or 'merge' - proceed with save
             } else {
@@ -373,7 +374,7 @@ export default function useManualSave(args: {
                   // Resolve portrait: if we have the original source path, compute the
                   // relative Flare path and queue the file for copying into the project.
                   let portraitRelative: string | undefined;
-                  const portraitSource = npc.properties?.portraitSourcePath || '';
+                  const portraitSource = propertyText(npc.properties?.portraitSourcePath);
                   if (portraitSource) {
                     // Extract just the filename from the absolute path
                     const portraitFilename = portraitSource.replace(/\\/g, '/').split('/').pop() || '';
@@ -403,8 +404,8 @@ export default function useManualSave(args: {
                   }
                   // Fallback: if portrait was already a relative path (not a data URL), keep it
                   if (!portraitRelative && npc.properties?.portraitPath) {
-                    const pp = npc.properties.portraitPath;
-                    if (!pp.startsWith('data:')) {
+                    const pp = propertyText(npc.properties.portraitPath);
+                    if (pp && !pp.startsWith('data:')) {
                       portraitRelative = pp;
                     }
                   }
@@ -413,7 +414,7 @@ export default function useManualSave(args: {
                   // copy the image to images/npcs/ and create an animation definition
                   // file at animations/npcs/<npcname>.txt that references it.
                   let gfxRelative: string | undefined;
-                  const tilesetSource = npc.properties?.tilesetSourcePath || '';
+                  const tilesetSource = propertyText(npc.properties?.tilesetSourcePath);
                   if (tilesetSource) {
                     const tilesetFilename = tilesetSource.replace(/\\/g, '/').split('/').pop() || '';
                     if (tilesetFilename) {
@@ -451,7 +452,7 @@ export default function useManualSave(args: {
                       }
                       // Create the animation definition file content with [stance]
                       // Pass stored anim_* properties from the NPC Edit Dialog UI
-                      const animProps = npc.properties || {};
+                      const animProps = propertyRecord(npc.properties);
                       npcAnimationFiles.push({
                         filename: `${sanitizedName}.txt`,
                         content: buildAnimationFileContent(`images/npcs/${tilesetFilename}`, dims, animProps)
@@ -461,8 +462,8 @@ export default function useManualSave(args: {
                   // Fallback: if gfx was already a relative path, keep it.
                   // Also accept absolute paths if the file was already exported to images/npcs/
                   if (!gfxRelative && npc.properties?.tilesetPath) {
-                    const tp = npc.properties.tilesetPath;
-                    if (!tp.startsWith('data:') && !tp.includes(':')) {
+                    const tp = propertyText(npc.properties.tilesetPath);
+                    if (tp && !tp.startsWith('data:') && !tp.includes(':')) {
                       gfxRelative = tp;
                     } else if (tp.includes(':') && !tp.startsWith('data:') && currentProjectPath) {
                       // Absolute path left from a previous session — extract filename and
@@ -479,23 +480,23 @@ export default function useManualSave(args: {
                     id: npc.id,
                     x: npc.x,
                     y: npc.y,
-                    filename: npc.properties?.npcFilename || `npcs/${sanitizedName}.txt`,
+                    filename: propertyText(npc.properties?.npcFilename, `npcs/${sanitizedName}.txt`),
                     name: npcName,
                     talker: npc.properties?.talker === 'true' || npc.properties?.vendor === 'true' || npc.properties?.questGiver === 'true',
                     vendor: npc.properties?.vendor === 'true',
                     gfx: gfxRelative || undefined,
                     portrait: portraitRelative || undefined,
-                    constant_stock: npc.properties?.constant_stock || undefined,
-                    random_stock: npc.properties?.random_stock || undefined,
-                    random_stock_count: npc.properties?.random_stock_count || undefined,
-                    vendor_requires_status: npc.properties?.vendor_requires_status || undefined,
-                    vendor_requires_not_status: npc.properties?.vendor_requires_not_status || undefined,
-                    direction: npc.properties?.direction ? parseInt(npc.properties.direction, 10) as FlareNPC['direction'] : undefined,
-                    waypoints: npc.properties?.waypoints || undefined,
-                    wander_radius: npc.properties?.wander_radius ? parseInt(npc.properties.wander_radius, 10) : undefined,
+                    constant_stock: propertyText(npc.properties?.constant_stock) || undefined,
+                    random_stock: propertyText(npc.properties?.random_stock) || undefined,
+                    random_stock_count: propertyText(npc.properties?.random_stock_count) || undefined,
+                    vendor_requires_status: propertyText(npc.properties?.vendor_requires_status) || undefined,
+                    vendor_requires_not_status: propertyText(npc.properties?.vendor_requires_not_status) || undefined,
+                    direction: propertyText(npc.properties?.direction) ? parseInt(propertyText(npc.properties?.direction), 10) as FlareNPC['direction'] : undefined,
+                    waypoints: propertyText(npc.properties?.waypoints) || undefined,
+                    wander_radius: propertyText(npc.properties?.wander_radius) ? parseInt(propertyText(npc.properties?.wander_radius), 10) : undefined,
                     customProperties: {
-                      ...(npc.properties?.dialogueTrees ? { dialogueTrees: npc.properties.dialogueTrees } : {}),
-                      ...(npc.properties?.status_stock_entries ? { status_stock_entries: npc.properties.status_stock_entries } : {}),
+                      ...(propertyText(npc.properties?.dialogueTrees) ? { dialogueTrees: propertyText(npc.properties?.dialogueTrees) } : {}),
+                      ...(propertyText(npc.properties?.status_stock_entries) ? { status_stock_entries: propertyText(npc.properties?.status_stock_entries) } : {}),
                     },
                   };
 
@@ -671,7 +672,7 @@ export default function useManualSave(args: {
           
           // Update file conflict detection tracking after successful save
           if (currentProjectPath) {
-            const currentFileSize = editor.getCurrentProjectFileSize?.() ?? 0;
+            const currentFileSize = editor.getCurrentProjectFileSize();
             
             // Get function to retrieve actual file stats
             const getFileStats = async () => {
@@ -735,6 +736,7 @@ export default function useManualSave(args: {
         editor.unlockSave?.();
         setIsManuallySaving(false);
       }
+      return;
     })();
 
     // Register this save with the queue

@@ -5725,6 +5725,11 @@ export class TileMapEditor {
     return this.mapName;
   }
 
+  /** The editor does not track the on-disk project file size, so conflict checks keep a zero baseline. */
+  public getCurrentProjectFileSize(): number {
+    return 0;
+  }
+
   public setMapSize(width: number, height: number): void {
     this.mapWidth = width;
     this.mapHeight = height;

@@ -2,6 +2,14 @@
 // This file allows importing assets like `import img from '/logo.png?url'` in TS
 // and returns a string URL at runtime.
 
+interface ImportMetaEnv {
+  readonly BASE_URL: string;
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
+}
+
 declare module '*?url' {
   const src: string;
   export default src;

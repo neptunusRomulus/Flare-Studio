@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install
+        run: npm ci
+      # tsc currently reports a few hundred errors that predate this workflow
+      # (mostly string | string[] property bags and a missing DialogueTree type).
+      # The step stays visible so the log is there, and it does not fail the job.
+      # Unit tests are the required check until those errors are cleaned up.
+      - name: Typecheck
+        continue-on-error: true
+        run: npm run typecheck
+      - name: Unit tests
+        run: npx vitest run

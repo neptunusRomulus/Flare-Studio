@@ -19,6 +19,8 @@ interface MapConfig {
   width: number;
   height: number;
   tileSize: number;
+  tileHeight?: number;
+  orientation?: 'isometric' | 'orthogonal';
   location: string;
   isStartingMap?: boolean;
 }
@@ -116,26 +118,28 @@ declare global {
       ensureFlareModLink: (options: {
         flarePath: string;
         projectPath: string;
-      }) => Promise<{ success: boolean; modName?: string; junctionCreated?: boolean; error?: string }>;
+      }) => Promise<{ success: boolean; modName?: string; junctionCreated?: boolean; mods?: string[]; missingMods?: string[]; error?: string }>;
       prepareFlareQuickLaunch: (options: {
         flarePath: string;
         projectPath: string;
         mapName: string;
         mode: 'current-map' | 'new-game';
-      }) => Promise<{ success: boolean; slotNum?: number; error?: string }>;
+      }) => Promise<{ success: boolean; slotNum?: number; loadSlot?: number; mods?: string[]; error?: string }>;
       restoreSpawnBackup: (options: {
         projectPath: string;
       }) => Promise<boolean>;
       launchFlareEngine: (options: {
         flarePath: string;
         dataPath?: string;
+        projectPath?: string;
         mods?: string[];
         loadSlot?: string;
         loadScript?: string;
       }) => Promise<{ success: boolean; pid?: number; error?: string }>;
       isFlareRunning: () => Promise<boolean>;
-      onFlareEngineExited: (callback: () => void) => void;
+      onFlareEngineExited: (callback: (payload?: { error?: string }) => void) => void;
     };
+    __ISM_TILE_PROJECT_MAPS__?: string[];
   }
 }
 

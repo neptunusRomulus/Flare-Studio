@@ -278,10 +278,10 @@ const BrushToolbar = ({
                               currentEditor.setActiveLayerTab(layerType, targetTabId);
                             }
 
-                            // Fixed isometric tile dimensions (64x32) — not user-configurable.
-                            // Variable-size detection runs first; grid fallback uses these values.
-                            const manualTileWidth = 64;
-                            const manualTileHeight = 32;
+                            // Grid fallback uses the project tile size. Variable-size detection still runs first.
+                            const groundTile = currentEditor.getGroundTileSize?.() ?? { width: 64, height: 32 };
+                            const manualTileWidth = groundTile.width;
+                            const manualTileHeight = groundTile.height;
 
                             // Import into the editor/tab with fixed-grid slicing.
                             // Fall back to legacy import call if runtime class shape differs.

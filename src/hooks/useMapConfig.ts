@@ -384,7 +384,17 @@ const useMapConfig = ({
             .replace(/\s+/g, '_')
             .replace(/_{2,}/g, '_')
             .trim() || 'map';
-          createTabFor(tabName, currentProjectPath ?? null, { name: resolvedName, width, height, tileSize: 64 });
+          const ground = typeof targetEditor?.getGroundTileSize === 'function'
+            ? targetEditor.getGroundTileSize()
+            : { width: 64, height: 32, orientation: 'isometric' as const };
+          createTabFor(tabName, currentProjectPath ?? null, {
+            name: resolvedName,
+            width,
+            height,
+            tileSize: ground.width,
+            tileHeight: ground.height,
+            orientation: ground.orientation,
+          });
         } catch (e) {
           console.warn('Failed to create tab for new in-project map:', e);
         }

@@ -78,7 +78,7 @@ type SidebarProps = {
     handleDeleteItem: (item: ItemSummary) => void;
     handleOpenItemDialog: () => void;
   };
-  gameSettings: {
+  gameSettings?: {
     isGameSettingsLayer: boolean;
   };
 

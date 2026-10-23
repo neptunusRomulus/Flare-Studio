@@ -2,6 +2,7 @@ import { useCallback, useState, useRef, useEffect } from 'react';
 import type { MapObject, FlareNPC } from '@/types';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 import { buildSpawnContent, computeIntermapTarget, STARTING_MAP_INVALID_NAMES } from '@/editor/mapSpawnUtils';
+import { legacyMapFileName, slugFileName } from '../adapters/flare/flareAdapter.cjs';
 import { serializeNpcFile } from '@/utils/flareNpcUtils';
 
 type ProjectIOOptions = {
@@ -42,13 +43,16 @@ const useProjectIO = ({
 
   const checkExportFilesExist = useCallback(async (targetMapName: string) => {
     if (!window.electronAPI?.resolvePathRelative || !currentProjectPath) return false;
-    const sanitizedMapName = targetMapName.replace(/[<>:"/\\|?*]/g, '_').trim().replace(/\s+/g, '_').replace(/_{2,}/g, '_') || 'Map_Name';
-    const mapFilePath = `${currentProjectPath}/maps/${sanitizedMapName}.txt`;
-    const tilesetFilePath = `${currentProjectPath}/tilesetdefs/tileset_${sanitizedMapName}.txt`;
+    const names = Array.from(new Set([slugFileName(targetMapName), legacyMapFileName(targetMapName)]));
     try {
-      const mapExists = await window.electronAPI.fileExists?.(mapFilePath);
-      const tilesetExists = await window.electronAPI.fileExists?.(tilesetFilePath);
-      return !!mapExists || !!tilesetExists;
+      for (const sanitizedMapName of names) {
+        const mapFilePath = `${currentProjectPath}/maps/${sanitizedMapName}.txt`;
+        const tilesetFilePath = `${currentProjectPath}/tilesetdefs/tileset_${sanitizedMapName}.txt`;
+        const mapExists = await window.electronAPI.fileExists?.(mapFilePath);
+        const tilesetExists = await window.electronAPI.fileExists?.(tilesetFilePath);
+        if (mapExists || tilesetExists) return true;
+      }
+      return false;
     } catch {
       return false;
     }
@@ -215,36 +219,37 @@ const useProjectIO = ({
           const npcObjects = mapObjects.filter(obj => obj.type === 'npc');
           for (const npc of npcObjects) {
             const npcName = npc.name || `npc_${npc.id}`;
-            const sanitizedName = npcName
-              .toLowerCase()
-              .replace(/[<>:"/\\|?*]/g, '_')
-              .trim()
-              .replace(/\s+/g, '_')
-              .replace(/_{2,}/g, '_') || 'unnamed_npc';
+            const sanitizedName = slugFileName(npcName);
+            const asText = (value: string | string[] | undefined): string | undefined =>
+              Array.isArray(value) ? value[0] : value;
 
             const filename = `${sanitizedName}.txt`;
+            const talker = asText(npc.properties?.talker);
+            const vendor = asText(npc.properties?.vendor);
+            const questGiver = asText(npc.properties?.questGiver);
+            const direction = asText(npc.properties?.direction);
+            const dialogueTrees = asText(npc.properties?.dialogueTrees);
+            const statusStock = asText(npc.properties?.status_stock_entries);
 
             const flareNpc: FlareNPC = {
               id: npc.id,
               x: npc.x,
               y: npc.y,
-              filename: npc.properties?.npcFilename || `npcs/${sanitizedName}.txt`,
+              filename: asText(npc.properties?.npcFilename) || `npcs/${sanitizedName}.txt`,
               name: npcName,
-              talker: npc.properties?.talker === 'true' || npc.properties?.vendor === 'true' || npc.properties?.questGiver === 'true',
-              vendor: npc.properties?.vendor === 'true',
-              gfx: npc.properties?.tilesetPath || undefined,
-              portrait: npc.properties?.portraitPath || undefined,
-              constant_stock: npc.properties?.constant_stock || undefined,
-              random_stock: npc.properties?.random_stock || undefined,
-              random_stock_count: npc.properties?.random_stock_count || undefined,
-              vendor_requires_status: npc.properties?.vendor_requires_status || undefined,
-              vendor_requires_not_status: npc.properties?.vendor_requires_not_status || undefined,
-              direction: npc.properties?.direction ? parseInt(npc.properties.direction, 10) as FlareNPC['direction'] : undefined,
-              waypoints: npc.properties?.waypoints || undefined,
-              wander_radius: npc.properties?.wander_radius ? parseInt(npc.properties.wander_radius, 10) : undefined,
+              talker: talker === 'true' || vendor === 'true' || questGiver === 'true',
+              vendor: vendor === 'true',
+              gfx: asText(npc.properties?.tilesetPath),
+              portrait: asText(npc.properties?.portraitPath),
+              constant_stock: asText(npc.properties?.constant_stock),
+              random_stock: asText(npc.properties?.random_stock),
+              random_stock_count: asText(npc.properties?.random_stock_count),
+              vendor_requires_status: asText(npc.properties?.vendor_requires_status),
+              vendor_requires_not_status: asText(npc.properties?.vendor_requires_not_status),
+              direction: direction ? parseInt(direction, 10) as FlareNPC['direction'] : undefined,
               customProperties: {
-                ...(npc.properties?.dialogueTrees ? { dialogueTrees: npc.properties.dialogueTrees } : {}),
-                ...(npc.properties?.status_stock_entries ? { status_stock_entries: npc.properties.status_stock_entries } : {}),
+                ...(dialogueTrees ? { dialogueTrees } : {}),
+                ...(statusStock ? { status_stock_entries: statusStock } : {}),
               },
             };
 
@@ -359,13 +364,15 @@ const useProjectIO = ({
   const handleOpenMapFromMapsFolder = useCallback(async (filename: string) => {
     if (!currentProjectPath) return;
     try {
-      const exported = await performExport({ silent: true });
-      if (!exported) {
-        toast({ title: 'Export failed', description: 'Failed to export current map before opening a new one.', variant: 'destructive' });
-        return;
+      const shouldExport = window.confirm('Export the current map before opening another?');
+      if (shouldExport) {
+        const exported = await performExport({ silent: true });
+        if (!exported) {
+          toast({ title: 'Export failed', description: 'Failed to export current map before opening a new one.', variant: 'destructive' });
+          return;
+        }
+        if (typeof handleManualSaveRef.current === 'function') await handleManualSaveRef.current();
       }
-
-      if (typeof handleManualSaveRef.current === 'function') await handleManualSaveRef.current();
 
       const content = await window.electronAPI.readMapFile(currentProjectPath, filename);
       if (!content) {

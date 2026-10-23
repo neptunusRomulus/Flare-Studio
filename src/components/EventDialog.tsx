@@ -61,10 +61,17 @@ type EventData = {
     powerPath: string;
     powerDamage: number;
     powerStats: string;
-    powerLevel: number;
+    powerLevel: string;
     // NEW: Map modification
     mapmod: string;
-    mapmodToggle: boolean;
+    mapmodToggle: string;
+    requiresTile: string;
+    requiresNotTile: string;
+    spawnLevel: string;
+    intermapId: string;
+    procgenFilename: string;
+    procgenLink: string;
+    procgenDoorLevel: string;
     // NEW: Restore
     restore: string;
     // NEW: NPC / Music / Book
@@ -241,11 +248,20 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
     if (eventData.rewards.powerPath.trim()) props.power_path = eventData.rewards.powerPath.trim();
     if (eventData.rewards.powerDamage !== undefined && eventData.rewards.powerDamage > 0) props.power_damage = String(eventData.rewards.powerDamage);
     if (eventData.rewards.powerStats.trim()) props.power_stats = eventData.rewards.powerStats.trim();
-    if (eventData.rewards.powerLevel !== undefined && eventData.rewards.powerLevel > 0) props.power_level = String(eventData.rewards.powerLevel);
+    if (eventData.rewards.powerLevel.trim()) props.power_level = eventData.rewards.powerLevel.trim();
 
-    // NEW: Map modification
+    // NEW: Map modification. mapmod_toggle is "layer,x,y,tileA,tileB", never the boolean true.
     if (eventData.rewards.mapmod.trim()) props.mapmod = eventData.rewards.mapmod.trim();
-    if (eventData.rewards.mapmodToggle) props.mapmod_toggle = 'true';
+    if (eventData.rewards.mapmodToggle.trim() && eventData.rewards.mapmodToggle.trim().toLowerCase() !== 'true') {
+      props.mapmod_toggle = eventData.rewards.mapmodToggle.trim();
+    }
+    if (eventData.rewards.requiresTile.trim()) props.requires_tile = eventData.rewards.requiresTile.trim();
+    if (eventData.rewards.requiresNotTile.trim()) props.requires_not_tile = eventData.rewards.requiresNotTile.trim();
+    if (eventData.rewards.spawnLevel.trim()) props.spawn_level = eventData.rewards.spawnLevel.trim();
+    if (eventData.rewards.intermapId.trim()) props.intermap_id = eventData.rewards.intermapId.trim();
+    if (eventData.rewards.procgenFilename.trim()) props.procgen_filename = eventData.rewards.procgenFilename.trim();
+    if (eventData.rewards.procgenLink.trim()) props.procgen_link = eventData.rewards.procgenLink.trim();
+    if (eventData.rewards.procgenDoorLevel.trim()) props.procgen_door_level = eventData.rewards.procgenDoorLevel.trim();
 
     // NEW: Restore
     if (eventData.rewards.restore.trim()) props.restore = eventData.rewards.restore.trim();
@@ -359,9 +375,16 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
       powerPath: '',
       powerDamage: 0,
       powerStats: '',
-      powerLevel: 0,
+      powerLevel: '',
       mapmod: '',
-      mapmodToggle: false,
+      mapmodToggle: '',
+      requiresTile: '',
+      requiresNotTile: '',
+      spawnLevel: '',
+      intermapId: '',
+      procgenFilename: '',
+      procgenLink: '',
+      procgenDoorLevel: '',
       restore: '',
       npc: '',
       music: '',
@@ -419,18 +442,26 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
           : p.requires_not_item ? [p.requires_not_item] : [];
 
         itemRequirements.push(
-          ...requiresItemValues.map((item: string) => ({
-            id: `item-req-${Math.random().toString(36).slice(2)}`,
-            type: 'requires_item' as const,
-            ...parseItemValue(item),
-          }))
+          ...requiresItemValues.map((item: string) => {
+            const parsed = parseItemValue(item);
+            return {
+              id: `item-req-${Math.random().toString(36).slice(2)}`,
+              type: 'requires_item' as const,
+              itemId: parsed.id,
+              itemQuantity: parsed.quantity,
+            };
+          })
         );
         itemRequirements.push(
-          ...requiresNotItemValues.map((item: string) => ({
-            id: `item-req-${Math.random().toString(36).slice(2)}`,
-            type: 'requires_not_item' as const,
-            ...parseItemValue(item),
-          }))
+          ...requiresNotItemValues.map((item: string) => {
+            const parsed = parseItemValue(item);
+            return {
+              id: `item-req-${Math.random().toString(36).slice(2)}`,
+              type: 'requires_not_item' as const,
+              itemId: parsed.id,
+              itemQuantity: parsed.quantity,
+            };
+          })
         );
         const rewardItemParts = parseItemValue(p.reward_item || '');
         const removeItemParts = parseItemValue(p.remove_item || '');
@@ -487,9 +518,16 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
             powerPath: p.power_path || '',
             powerDamage: parseInt(p.power_damage || '0') || 0,
             powerStats: p.power_stats || '',
-            powerLevel: parseInt(p.power_level || '0') || 0,
+            powerLevel: p.power_level || '',
             mapmod: p.mapmod || '',
-            mapmodToggle: p.mapmod_toggle === 'true',
+            mapmodToggle: p.mapmod_toggle && p.mapmod_toggle !== 'true' ? p.mapmod_toggle : '',
+            requiresTile: p.requires_tile || '',
+            requiresNotTile: p.requires_not_tile || '',
+            spawnLevel: p.spawn_level || '',
+            intermapId: p.intermap_id || '',
+            procgenFilename: p.procgen_filename || '',
+            procgenLink: p.procgen_link || '',
+            procgenDoorLevel: p.procgen_door_level || '',
             restore: p.restore || '',
             npc: p.npc || '',
             music: p.music || '',
@@ -523,7 +561,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
         },
         timing: { activeActivation: null, cooldown: 0, delay: 0 },
         requirements: { status: [], minLevel: 0, itemRequirements: [], currency: 0 },
-        rewards: { message: '', expReward: 0, rewardCurrency: 0, removeCurrency: 0, rewardItemId: '', rewardItemQuantity: 1, removeItemId: '', removeItemQuantity: 1, lootGroup: '', rewardLootGroup: '', rewardLootCountMin: 1, rewardLootCountMax: 1, enemySpawn: '', teleportMap: '', teleportX: 0, teleportY: 0, sound: '' },
+        rewards: { message: '', expReward: 0, rewardCurrency: 0, removeCurrency: 0, rewardItemId: '', rewardItemQuantity: 1, removeItemId: '', removeItemQuantity: 1, lootGroup: '', rewardLootGroup: '', rewardLootCountMin: 1, rewardLootCountMax: 1, enemySpawn: '', teleportMap: '', teleportX: 0, teleportY: 0, sound: '', power: '', powerPath: '', powerDamage: 0, powerStats: '', powerLevel: '', mapmod: '', mapmodToggle: '', requiresTile: '', requiresNotTile: '', spawnLevel: '', intermapId: '', procgenFilename: '', procgenLink: '', procgenDoorLevel: '', restore: '', npc: '', music: '', book: '', respec: false, showOnMinimap: false, parallaxLayers: '', randomStatus: '' },
         engine: { chance: 100, autoSave: false, script: '' },
       });
     }
@@ -1701,11 +1739,9 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                     <div className="space-y-1">
                       <label className="text-xs font-medium text-foreground/80">Power Level</label>
                       <Input
-                        type="number"
-                        min="0"
                         value={eventData.rewards.powerLevel}
-                        onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, powerLevel: Math.max(0, parseInt(e.target.value) || 0) } }))}
-                        placeholder="Power level"
+                        onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, powerLevel: e.target.value } }))}
+                        placeholder="1 or hero_level,1"
                         className="h-7 text-xs"
                       />
                     </div>
@@ -1735,20 +1771,44 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                       className="h-7 text-xs"
                     />
                   </div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="mapmodToggle"
-                      checked={eventData.rewards.mapmodToggle}
-                      onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, mapmodToggle: e.target.checked } }))}
-                      className="h-4 w-4 rounded border-border/70"
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-foreground/80">MapMod Toggle</label>
+                    <Input
+                      value={eventData.rewards.mapmodToggle}
+                      onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, mapmodToggle: e.target.value } }))}
+                      placeholder="layer,x,y,tileA,tileB"
+                      className="h-7 text-xs"
                     />
-                    <label htmlFor="mapmodToggle" className="text-xs font-medium text-foreground/80">
-                      MapMod Toggle
-                    </label>
-                    <Tooltip content="Toggle map modification on/off instead of just applying">
-                      <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
-                    </Tooltip>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-foreground/80">Requires Tile</label>
+                      <Input value={eventData.rewards.requiresTile} onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, requiresTile: e.target.value } }))} placeholder="layer,x,y,tile" className="h-7 text-xs" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-foreground/80">Requires Not Tile</label>
+                      <Input value={eventData.rewards.requiresNotTile} onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, requiresNotTile: e.target.value } }))} placeholder="layer,x,y,tile" className="h-7 text-xs" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-foreground/80">Spawn Level</label>
+                      <Input value={eventData.rewards.spawnLevel} onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, spawnLevel: e.target.value } }))} placeholder="fixed,2 or level,min,max" className="h-7 text-xs" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-foreground/80">Intermap Id</label>
+                      <Input value={eventData.rewards.intermapId} onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, intermapId: e.target.value } }))} className="h-7 text-xs" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-foreground/80">Procgen File</label>
+                      <Input value={eventData.rewards.procgenFilename} onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, procgenFilename: e.target.value } }))} className="h-7 text-xs" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-foreground/80">Procgen Link</label>
+                      <Input value={eventData.rewards.procgenLink} onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, procgenLink: e.target.value } }))} className="h-7 text-xs" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-foreground/80">Procgen Door Level</label>
+                      <Input value={eventData.rewards.procgenDoorLevel} onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, procgenDoorLevel: e.target.value } }))} className="h-7 text-xs" />
+                    </div>
                   </div>
                 </div>
               </div>

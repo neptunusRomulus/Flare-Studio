@@ -10,6 +10,7 @@ import {
   isImageFilePath,
 } from '../utils/animationUtils';
 import type { MapObject, FlareNPC } from '../types';
+import { propertyText } from '../editor/propertyText';
 
 type Params = {
   editingObject: MapObject | null;
@@ -32,7 +33,7 @@ export default function useObjectDialogHandlers({ editingObject, setEditingObjec
     setObjectValidationErrors([]);
 
     if (editingObject.type === 'npc' && window.electronAPI?.writeNpcFile && currentProjectPath) {
-      const existingFilename = sanitized.npcFilename || editingObject.properties?.npcFilename;
+      const existingFilename = sanitized.npcFilename || propertyText(editingObject.properties?.npcFilename);
       if (existingFilename) {
         try {
           const parsedDirection = sanitized.direction ? Math.max(0, Math.min(7, parseInt(sanitized.direction, 10))) as FlareNPC['direction'] : undefined;

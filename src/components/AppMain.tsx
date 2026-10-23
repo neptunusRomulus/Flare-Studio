@@ -303,6 +303,7 @@ export default function AppMain() {
           updateStartingMap={updateStartingMap}
           handleMapResize={handleMapResize}
           handleDeleteMap={handleDeleteMap}
+          editor={editor}
         />
 
         <EventDialog open={eventDialogOpen} onOpenChange={setEventDialogOpen} eventLocation={eventDialogLocation} editingEventId={editingEventId} />

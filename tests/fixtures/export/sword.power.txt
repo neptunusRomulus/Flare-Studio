@@ -1,0 +1,7 @@
+APPEND
+
+[power]
+id=12
+type=fixed
+name=Sword
+speed=8

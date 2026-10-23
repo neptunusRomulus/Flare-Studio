@@ -1,0 +1,8 @@
+APPEND
+
+id=1
+name=Twin Blades
+items=sword,dagger
+color=255,255,255
+bonus=2,dmg,5
+bonus_power_level=2,12,1

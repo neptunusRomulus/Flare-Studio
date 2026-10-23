@@ -8,7 +8,7 @@ const VITE_PORT = 5173;
 const VITE_URL = `http://${VITE_HOST}:${VITE_PORT}`;
 
 export async function startViteServer(): Promise<ChildProcess | null> {
-  const rootDir = path.resolve(__dirname, '..');
+  const rootDir = path.resolve(__dirname, '../..');
 
   try {
     await waitOn({ resources: [VITE_URL], timeout: 5000, interval: 500, tcpTimeout: 1000 });
@@ -67,21 +67,14 @@ export async function launchElectronApp(): Promise<{ app: ElectronApplication; w
 }
 
 export async function getAppWindow(electronApp: ElectronApplication): Promise<Page> {
-  const getMainWindow = () => {
-    return electronApp.windows().find((w) => {
-      const url = w.url();
-      return url && !url.startsWith('devtools://') && !url.startsWith('about:blank');
+  const deadline = Date.now() + 30_000;
+  while (Date.now() < deadline) {
+    const existing = electronApp.windows().find((window) => {
+      const url = window.url();
+      return Boolean(url) && !url.startsWith('devtools://') && !url.startsWith('about:blank');
     });
-  };
-
-  const existing = getMainWindow();
-  if (existing) return existing;
-
-  while (true) {
-    const next = await electronApp.waitForEvent('window');
-    const url = next.url();
-    if (url && !url.startsWith('devtools://') && !url.startsWith('about:blank')) {
-      return next;
-    }
+    if (existing) return existing;
+    await new Promise((resolve) => setTimeout(resolve, 200));
   }
+  throw new Error('Timed out waiting for the Electron window');
 }

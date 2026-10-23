@@ -1,0 +1,10 @@
+id=loot_chest
+name=Loot Chest
+description=Test loot group
+[loot]
+id=1
+chance=0.75
+quantity=2
+requires_status=gold_key
+requires_level=2,5
+quantity_per_level=1,2

@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { allowedSections as adapterSections, keysFor } from '../adapters/flare/attributeKeys.cjs';
 
 export type FlareDataCategory = 'items' | 'maps' | 'npcs';
 
@@ -26,7 +27,7 @@ export interface FlareDataValidationResult {
 const ALLOWED_SECTIONS: Record<FlareDataCategory, Set<string>> = {
   items: new Set(['item', 'quality', 'set', 'type', 'root']),
   maps: new Set(['header', 'tilesets', 'layer', 'event', 'enemy', 'npc', 'root']),
-  npcs: new Set(['root', 'dialog', 'stance'])
+  npcs: new Set(['root', 'dialog', 'npc', 'visual_effect', 'stats'])
 };
 
 const CATEGORY_PATHS: Array<[FlareDataCategory, string]> = [
@@ -151,13 +152,10 @@ export function loadFlareDataSchema(root: string): SchemaTemplate {
   const allowedKeys: Record<FlareDataCategory, Record<string, Set<string>>> = {
     items: { item: new Set(), quality: new Set(), set: new Set(), type: new Set(), root: new Set() },
     maps: { header: new Set(), tilesets: new Set(), layer: new Set(), event: new Set(), enemy: new Set(), npc: new Set(), root: new Set() },
-    npcs: { root: new Set(), dialog: new Set(), stance: new Set() }
+    npcs: { root: new Set(), dialog: new Set(), npc: new Set(), visual_effect: new Set(), stats: new Set() }
   };
 
-  if (!fs.existsSync(schemaPath)) {
-    return { allowedSections, allowedKeys };
-  }
-
+  if (fs.existsSync(schemaPath)) {
   const text = fs.readFileSync(schemaPath, 'utf-8');
   const lines = text.split(/\r?\n/);
   let currentCategory: FlareDataCategory | null = null;
@@ -206,8 +204,27 @@ export function loadFlareDataSchema(root: string): SchemaTemplate {
       allowedKeys[currentCategory][currentSection].add(key);
     }
   }
+  }
 
+  applyAttributeKeys(allowedSections, allowedKeys);
   return { allowedSections, allowedKeys };
+}
+
+function applyAttributeKeys(
+  sections: Record<FlareDataCategory, Set<string>>,
+  keys: Record<FlareDataCategory, Record<string, Set<string>>>
+): void {
+  for (const category of ['items', 'maps', 'npcs'] as const) {
+    const known = adapterSections(category);
+    if (!known) continue;
+    for (const section of known) {
+      sections[category].add(section);
+      if (!keys[category][section]) keys[category][section] = new Set();
+      const sectionKeys = keysFor(category, section === 'root' ? '' : section);
+      if (!sectionKeys) continue;
+      for (const key of sectionKeys) keys[category][section].add(key);
+    }
+  }
 }
 
 export function validateSerializedFlareData(root: string, filePath: string, content: string, schema?: SchemaTemplate): FlareDataValidationResult {
@@ -237,14 +254,17 @@ export function validateSerializedFlareData(root: string, filePath: string, cont
       const allowedKeysForSection = resolvedSchema.allowedKeys[category][sectionName];
       if (allowedKeysForSection && allowedKeysForSection.size > 0) {
         if (!allowedKeysForSection.has(entry.key)) {
-          warnings.push(`Line ${entry.line}: Unknown key '${entry.key}' in section [${sectionName}] for category ${category}.`);
+          errors.push(`Line ${entry.line}: Unknown key '${entry.key}' in section [${sectionName}] for category ${category}.`);
         }
       }
     }
   }
 
   for (const includeTarget of parseResult.includes) {
-    let candidate = path.resolve(path.dirname(path.resolve(root, filePath)), includeTarget);
+    const fromProject = path.resolve(root, includeTarget);
+    let candidate = fs.existsSync(fromProject)
+      ? fromProject
+      : path.resolve(path.dirname(path.resolve(root, filePath)), includeTarget);
     if (!fs.existsSync(candidate)) {
       const parts = filePath.split('/');
       const modName = parts.length >= 2 ? parts[1] : '';

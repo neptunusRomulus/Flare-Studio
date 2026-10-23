@@ -1,10 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Tooltip from '@/components/ui/tooltip';
 import { HelpCircle, X, Save, Trash2, Check } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
+import type { TileMapEditor } from '@/editor/TileMapEditor';
+import { emptyMapPresentation, type MapPresentation } from '@/editor/studioDrafts';
+import { MapPresentationFields, TileSizeForm } from '@/components/studio/studioEditors';
 
 type MapSettingsDialogProps = {
   open: boolean;
@@ -19,6 +22,7 @@ type MapSettingsDialogProps = {
   updateStartingMap: (nextValue: boolean) => void;
   handleMapResize: () => void;
   handleDeleteMap: () => Promise<boolean>;
+  editor?: TileMapEditor | null;
 };
 
 const MapSettingsDialog = ({
@@ -33,17 +37,24 @@ const MapSettingsDialog = ({
   isStartingMap,
   updateStartingMap,
   handleMapResize,
-  handleDeleteMap
+  handleDeleteMap,
+  editor
 }: MapSettingsDialogProps) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [presentation, setPresentation] = useState<MapPresentation>(() => emptyMapPresentation());
   const {
     position,
     size,
     dialogRef,
     handleHeaderMouseDown,
     handleResizeMouseDown,
-  } = useDraggableResizable({ id: 'map_settings', initialWidth: 420, initialHeight: 350, minWidth: 380, minHeight: 300 });
+  } = useDraggableResizable({ id: 'map_settings', initialWidth: 460, initialHeight: 640, minWidth: 400, minHeight: 420 });
   
+  useEffect(() => {
+    if (!open || !editor?.getMapPresentation) return;
+    setPresentation(editor.getMapPresentation());
+  }, [open, editor]);
+
   const handleConfirmDelete = async () => {
     const success = await handleDeleteMap();
     if (success) {
@@ -138,6 +149,8 @@ const MapSettingsDialog = ({
               aria-label="Set this map as the starting map"
             />
           </div>
+          <TileSizeForm editor={editor} />
+          <MapPresentationFields value={presentation} onChange={setPresentation} />
           <div className="flex items-center justify-between gap-2 mt-6">
             <Tooltip content="Delete Map">
               <Button
@@ -156,6 +169,7 @@ const MapSettingsDialog = ({
                 variant="outline"
                 size="icon"
                 onClick={() => {
+                  editor?.setMapPresentation?.(presentation);
                   handleMapResize();
                   onClose();
                 }}

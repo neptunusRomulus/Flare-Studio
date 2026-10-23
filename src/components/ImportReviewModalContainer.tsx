@@ -30,10 +30,17 @@ type ImportReviewModalCtx = {
 };
 
 export default function ImportReviewModalContainer({ ctx }: { ctx: unknown }) {
-  const c = (ctx as any)?.dialogsCtx as ImportReviewModalCtx || {};
+  const raw = (ctx ?? {}) as { dialogsCtx?: ImportReviewModalCtx; editor?: { getGroundTileSize?: () => { width?: number; height?: number } } };
+  const c = (raw.dialogsCtx ?? raw) as ImportReviewModalCtx;
+  const editor = (c as { editor?: { getGroundTileSize?: () => { width?: number; height?: number } } }).editor ?? raw.editor;
+  const ground = editor?.getGroundTileSize?.();
+  const tileWidth = ground && ground.width && ground.width > 0 ? ground.width : 64;
+  const tileHeight = ground && ground.height && ground.height > 0 ? ground.height : 32;
 
   return (
     <ImportReviewModal
+      tileWidth={tileWidth}
+      tileHeight={tileHeight}
       isOpen={c.showImportReview ?? false}
       tilesetFileName={c.importReviewData?.tilesetFileName ?? ''}
       detectedAssets={c.importReviewData?.detectedAssets ?? []}

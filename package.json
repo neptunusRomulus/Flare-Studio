@@ -16,13 +16,17 @@
     "playwright:watch": "npx playwright test --watch",
     "playwright:electron": "npx playwright test tests/e2e/create-project.spec.ts",
     "electron:build": "electron-builder",
-    "lint": "eslint . --ext .ts,.tsx,.js",
-    "test": "vitest",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "test:watch": "vitest --watch",
     "dev:watch": "concurrently \"npm run test:watch\" \"vite --port 5173\" \"wait-on http://localhost:5173 && electron .\"",
     "dw": "npm run dev:watch",
     "playwright:ui": "npx playwright test --ui",
     "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{js,cjs,mjs,ts,tsx}": "eslint"
   },
   "dependencies": {
     "@radix-ui/react-context-menu": "^2.2.16",
@@ -32,7 +36,6 @@
     "@radix-ui/react-toast": "^1.2.15",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
-    "docker": "^1.0.0",
     "lucide-react": "^1.7.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
@@ -51,7 +54,9 @@
     "concurrently": "^8.2.0",
     "electron": "^39.8.10",
     "electron-builder": "^26.15.3",
-    "eslint": "^8.55.0",
+    "eslint": "^9.39.0",
+    "globals": "^15.15.0",
+    "lint-staged": "^15.5.2",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.0.1",
     "husky": "^9.1.7",

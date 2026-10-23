@@ -1,8 +1,9 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DialogueTree, MapObject } from '@/types';
 import { EMPTY_ACTOR_ROLES } from '@/editor/actorRoles';
 import type { ActorDialogState, EnemyRoleKey } from '@/editor/actorRoles';
 import { validateAndSanitizeObject } from '@/editor/objectValidation';
+import { propertyText } from '@/editor/propertyText';
 
 /**
  * Load an image from an absolute file path via Electron and return its pixel dimensions.
@@ -102,6 +103,10 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
   const [showObjectDialog, setShowObjectDialog] = useState(false);
   const [showEnemyEditor, setShowEnemyEditor] = useState(false);
   const [editingObject, setEditingObject] = useState<MapObject | null>(null);
+  const objectBaselineRef = useRef('');
+  useEffect(() => {
+    if (showObjectDialog && editingObject) objectBaselineRef.current = JSON.stringify(editingObject);
+  }, [showObjectDialog]);
   const [objectValidationErrors, setObjectValidationErrors] = useState<string[]>([]);
   const [mapObjects, setMapObjects] = useState<MapObject[]>([]);
   const [showDeleteNpcConfirm, setShowDeleteNpcConfirm] = useState(false);
@@ -292,7 +297,7 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
       }
       if (obj.type === 'npc') {
         try {
-          const stored = obj.properties?.dialogueTrees;
+          const stored = propertyText(obj.properties?.dialogueTrees);
           setDialogueTrees(stored ? JSON.parse(stored) : []);
         } catch {
           setDialogueTrees([]);
@@ -319,7 +324,7 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
     setShowObjectDialog(true);
     if (obj.type === 'npc') {
       try {
-        const stored = obj.properties?.dialogueTrees;
+        const stored = propertyText(obj.properties?.dialogueTrees);
         setDialogueTrees(stored ? JSON.parse(stored) : []);
       } catch {
         setDialogueTrees([]);
@@ -361,6 +366,9 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
   }, [editor, syncMapObjects]);
 
   const handleObjectDialogClose = useCallback(() => {
+    if (editingObject && objectBaselineRef.current && JSON.stringify(editingObject) !== objectBaselineRef.current) {
+      if (!window.confirm('Discard unsaved actor changes?')) return;
+    }
     setShowObjectDialog(false);
     setEditingObject(null);
     setObjectValidationErrors([]);
@@ -373,7 +381,7 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
     setShowDialogueTreeDialog(false);
     setShowVendorSettingsDialog(false);
     setShowQuestSettingsDialog(false);
-  }, []);
+  }, [editingObject]);
 
   const handleOpenVendorSettingsDialog = useCallback(() => {
     setShowVendorSettingsDialog(true);
@@ -426,7 +434,7 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
 
   const getEditingObjectProperty = useCallback((key: string, fallback = '') => {
     if (!editingObject || !editingObject.properties) return fallback;
-    return editingObject.properties[key] ?? fallback;
+    return propertyText(editingObject.properties[key], fallback);
   }, [editingObject]);
 
   const handleEditingTilesetBrowse = useCallback(async () => {

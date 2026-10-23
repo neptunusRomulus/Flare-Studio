@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { dataPathFromFlareSelection } from '@/flare/playLaunch';
 
 export type FlareLaunchMode = 'current-map' | 'new-game' | 'main-menu';
 
@@ -33,11 +34,12 @@ export default function useFlareEngine({ currentProjectPath, mapName, onBeforeLa
 
   // Listen for the exit event from main process
   useEffect(() => {
-    const api = (window as unknown as { electronAPI?: { onFlareEngineExited?: (cb: () => void) => void } }).electronAPI;
+    const api = (window as unknown as { electronAPI?: { onFlareEngineExited?: (cb: (payload?: { error?: string }) => void) => void } }).electronAPI;
     if (api?.onFlareEngineExited) {
-      api.onFlareEngineExited(() => {
+      api.onFlareEngineExited((payload) => {
         setIsRunning(false);
-        // Run any registered exit handler (e.g. restore spawn.txt backup)
+        if (payload?.error) setLastError(payload.error);
+        // Run any registered exit handler (restore the playtest save and misc.txt)
         if (exitHandlerRef.current) {
           exitHandlerRef.current();
           exitHandlerRef.current = null;
@@ -100,61 +102,66 @@ export default function useFlareEngine({ currentProjectPath, mapName, onBeforeLa
       }
     }
 
-    // Build launch options
+    // data-path is the directory that contains the executable (mods/ lives there).
+    // A legacy stored folder is kept as-is; the main process confirms with stat.
     const options: {
       flarePath: string;
       dataPath?: string;
+      projectPath?: string;
       mods?: string[];
       loadSlot?: string;
-    } = { flarePath: activeFlarePath };
+    } = {
+      flarePath: activeFlarePath,
+      dataPath: dataPathFromFlareSelection(activeFlarePath),
+    };
 
-    if (mode === 'current-map' || mode === 'new-game') {
-      if (currentProjectPath) {
-        // Ensure the project is accessible as a Flare mod (junction if needed)
-        if (api.ensureFlareModLink) {
-          const linkResult = await api.ensureFlareModLink({
-            flarePath: activeFlarePath,
-            projectPath: currentProjectPath,
-          });
-          if (!linkResult.success) {
-            setLastError(linkResult.error || 'Failed to link project into Flare mods folder');
-            return;
-          }
-          if (linkResult.junctionCreated) {
-            console.log('[FlareEngine] Junction created for project mod');
-          }
+    if (currentProjectPath) {
+      options.projectPath = currentProjectPath;
+      const normalized = currentProjectPath.replace(/\\/g, '/').replace(/\/$/, '');
+      const modName = normalized.split('/').pop() || '';
+
+      if (api.ensureFlareModLink) {
+        const linkResult = await api.ensureFlareModLink({
+          flarePath: activeFlarePath,
+          projectPath: currentProjectPath,
+        });
+        if (!linkResult.success) {
+          setLastError(linkResult.error || 'Failed to link project into the Flare mods folder');
+          return;
         }
+        if (linkResult.missingMods && linkResult.missingMods.length > 0) {
+          setLastError(
+            `Missing Flare mods: ${linkResult.missingMods.join(', ')}. Install them where Flare looks for mods, or remove them from settings.txt requires=.`
+          );
+          return;
+        }
+        options.mods = linkResult.mods && linkResult.mods.length > 0 ? linkResult.mods : [modName];
+      } else if (modName) {
+        options.mods = [modName];
+      }
 
-        // The mod name is just the project folder name
-        const normalized = currentProjectPath.replace(/\\/g, '/').replace(/\/$/, '');
-        const parts = normalized.split('/');
-        const modName = parts[parts.length - 1];
-
-        // data-path = the Flare install directory (where mods/ folder lives)
-        const flareDir = activeFlarePath.replace(/\\/g, '/').split('/').slice(0, -1).join('/');
-        options.dataPath = flareDir;
-        options.mods = ['fantasycore', modName];
-
-        // Prepare quick-launch files: spawn.txt, gameplay.txt, save slot
-        // This makes Flare skip the title screen and load directly into the map
-        if (api.prepareFlareQuickLaunch) {
-          const prepResult = await api.prepareFlareQuickLaunch({
-            flarePath: activeFlarePath,
-            projectPath: currentProjectPath,
-            mapName: mapName || '',
-            mode,
-          });
-          if (!prepResult.success) {
-            setLastError(prepResult.error || 'Failed to prepare quick-launch files');
-            return;
-          }
-          // Use the auto-found save slot to skip title screen entirely
-          options.loadSlot = String(prepResult.slotNum);
-          console.log(`[FlareEngine] Quick-launch prepared: slot ${prepResult.slotNum}`);
+      // current-map and new-game skip the title screen via a temporary test save.
+      if ((mode === 'current-map' || mode === 'new-game') && api.prepareFlareQuickLaunch) {
+        const prepResult = await api.prepareFlareQuickLaunch({
+          flarePath: activeFlarePath,
+          projectPath: currentProjectPath,
+          mapName: mapName || '',
+          mode,
+        });
+        if (!prepResult.success) {
+          setLastError(prepResult.error || 'Failed to prepare quick-launch files');
+          return;
+        }
+        if (prepResult.mods && prepResult.mods.length > 0) {
+          options.mods = prepResult.mods;
+        }
+        const slot = prepResult.loadSlot ?? prepResult.slotNum;
+        if (slot != null) {
+          options.loadSlot = String(slot);
+          console.log(`[FlareEngine] Quick-launch prepared: load-slot ${slot}`);
         }
       }
     }
-    // mode === 'main-menu' — launch with --mods only to skip mod selection
 
     try {
       const result = await api.launchFlareEngine(options);

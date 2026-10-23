@@ -1,13 +1,8 @@
+import { exportMapText, slugFileName } from '../adapters/flare/flareAdapter.cjs';
+
 const STARTING_MAP_INVALID_NAMES = new Set(['', 'untitled map', 'map name', 'untitled_map']);
 
-const sanitizeMapFileBase = (rawName: string): string => {
-  const sanitized = rawName
-    .replace(/[<>:"/|?*]/g, '_')
-    .trim()
-    .replace(/\s+/g, '_')
-    .replace(/_{2,}/g, '_');
-  return sanitized || 'Untitled_Map';
-};
+const sanitizeMapFileBase = (rawName: string): string => slugFileName(rawName) || 'unnamed';
 
 const computeIntermapTarget = (starting: boolean, rawName: string | undefined | null): string | null => {
   if (!starting) return null;
@@ -22,25 +17,28 @@ const buildSpawnContent = (
   intermapTarget: string | null,
   heroPos?: { x: number; y: number }
 ): string => {
-  let intermapLine = `intermap=${intermapTarget ?? ''}`;
+  let intermap = intermapTarget ?? '';
   if (intermapTarget && heroPos !== undefined) {
-    intermapLine = `intermap=${intermapTarget},${heroPos.x},${heroPos.y}`;
+    intermap = `${intermapTarget},${heroPos.x},${heroPos.y}`;
   }
+  const event: Record<string, string> = {
+    activate: 'on_load',
+    location: '0,0,1,1',
+  };
+  if (intermap) event.intermap = intermap;
+  const exported = exportMapText({
+    width: 1,
+    height: 1,
+    heroX: 0,
+    heroY: 0,
+    layers: [],
+    events: [event],
+  });
   return [
     '# this file is automatically loaded when a New Game starts.',
     "# it's a dummy map to send the player to the actual starting point.",
     '',
-    '[header]',
-    'width=1',
-    'height=1',
-    'hero_pos=0,0',
-    '',
-    '[event]',
-    'type=event',
-    'location=0,0,1,1',
-    'activate=on_load',
-    intermapLine,
-    ''
+    exported.text,
   ].join('\n');
 };
 

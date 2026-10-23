@@ -1,0 +1,4 @@
+[layer]
+image=images/sky.png
+speed=0.2
+map_layer=background

@@ -1,0 +1,7 @@
+name=Antlion
+level=1
+animations=animations/antlion.txt
+categories=antlion
+
+[render_layers]
+layer=0,body

@@ -5,11 +5,17 @@ import { Save, RefreshCw, FileText, Plus, Trash2, ChevronDown, ChevronUp, Search
 import Tooltip from '@/components/ui/tooltip';
 import { useAppContext } from '@/context/AppContext';
 import { toast } from '@/hooks/use-toast';
+import {
+  engineTextFromSections,
+  exportTilesetConfig,
+  sectionsFromEngineText,
+} from '@/adapters/flare/flareAdapter.cjs';
+import { projectRoot, saveConfigDocument } from '@/editor/projectFiles';
 
 interface ParsedSection {
   type: string;
   fields: ConfigField[];
-  rawLines: string[];
+  rawLines?: string[];
 }
 
 interface ConfigField {
@@ -39,19 +45,9 @@ const ENGINE_CONFIG_FILES = [
   { name: 'tooltips.txt', displayName: 'Tooltips', description: 'Tooltip definitions' },
 ];
 
-// Electron API types (partial, only what we need)
-interface ElectronFileAPI {
-  readFile: (path: string) => Promise<{ success: boolean; content?: string; error?: string }>;
-  writeFile: (path: string, content: string) => Promise<{ success: boolean; error?: string }>;
-}
-
-function getElectronAPI(): ElectronFileAPI | undefined {
-  if (typeof window === 'undefined') return undefined;
-  return (window as unknown as { electronAPI?: ElectronFileAPI }).electronAPI;
-}
-
 export function EngineConfigEditor() {
-  const { currentProjectPath, setCurrentProjectPath } = useAppContext();
+  const ctx = useAppContext();
+  const currentProjectPath = typeof ctx.currentProjectPath === 'string' ? ctx.currentProjectPath : null;
   const [activeTab, setActiveTab] = useState<string>('classes.txt');
   const [fileContents, setFileContents] = useState<Record<string, string>>({});
   const [parsedData, setParsedData] = useState<Record<string, ParsedSection[]>>({});
@@ -65,22 +61,36 @@ export function EngineConfigEditor() {
     
     setIsLoading(true);
     try {
-      const enginePath = `${currentProjectPath}/mods/default/engine`;
+      const enginePath = `${projectRoot(currentProjectPath)}/engine`;
       const contents: Record<string, string> = {};
       const parsed: Record<string, ParsedSection[]> = {};
       
       for (const file of ENGINE_CONFIG_FILES) {
         try {
-          const api = getElectronAPI();
-          if (api?.readFile) {
-            const response = await api.readFile(`${enginePath}/${file.name}`);
-            if (response.success && response.content !== undefined) {
-              contents[file.name] = response.content;
-              parsed[file.name] = parseEngineConfig(response.content);
-            } else {
-              contents[file.name] = '';
-              parsed[file.name] = [];
+          const response = window.electronAPI?.readFile
+            ? await window.electronAPI.readFile(`${enginePath}/${file.name}`)
+            : null;
+          if (typeof response === 'string' && response.length > 0) {
+            contents[file.name] = response;
+            parsed[file.name] = sectionsFromEngineText(response);
+          } else if (file.name === 'tileset_config.txt') {
+            const indexText = window.electronAPI?.readFile
+              ? await window.electronAPI.readFile(`${projectRoot(currentProjectPath)}/project.json`)
+              : null;
+            let tile: { width?: number; height?: number; orientation?: string } | undefined;
+            if (indexText) {
+              try {
+                tile = JSON.parse(indexText).tile;
+              } catch {
+                tile = undefined;
+              }
             }
+            const seeded = exportTilesetConfig(tile);
+            contents[file.name] = seeded;
+            parsed[file.name] = sectionsFromEngineText(seeded);
+          } else {
+            contents[file.name] = '';
+            parsed[file.name] = [];
           }
         } catch (e) {
           contents[file.name] = '';
@@ -102,86 +112,23 @@ export function EngineConfigEditor() {
     loadAllConfigs();
   }, [currentProjectPath]);
 
-  // Parse engine config format
-  const parseEngineConfig = (content: string): ParsedSection[] => {
-    const lines = content.split('\n');
-    const sections: ParsedSection[] = [];
-    let currentSection: ParsedSection | null = null;
-    let sectionRawLines: string[] = [];
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const trimmed = line.trim();
-      
-      if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
-        if (currentSection) {
-          currentSection.rawLines = sectionRawLines;
-          sections.push(currentSection);
-        }
-        currentSection = {
-          type: trimmed.slice(1, -1),
-          fields: [],
-          rawLines: []
-        };
-        sectionRawLines = [line];
-      } else if (trimmed.startsWith('#') || trimmed === '') {
-        if (currentSection) {
-          currentSection.fields.push({ key: '', value: '', comment: trimmed });
-        }
-        sectionRawLines.push(line);
-      } else if (trimmed.includes('=')) {
-        const [key, ...valueParts] = trimmed.split('=');
-        const value = valueParts.join('=');
-        if (currentSection) {
-          currentSection.fields.push({ key: key.trim(), value: value.trim() });
-        }
-        sectionRawLines.push(line);
-      } else {
-        sectionRawLines.push(line);
-      }
-    }
-    
-    if (currentSection) {
-      currentSection.rawLines = sectionRawLines;
-      sections.push(currentSection);
-    }
-    
-    return sections;
-  };
-
-  // Generate config content from parsed data
-  const generateConfigContent = (sections: ParsedSection[]): string => {
-    return sections.map(section => {
-      const lines: string[] = [];
-      lines.push(`[${section.type}]`);
-      section.fields.forEach(field => {
-        if (field.comment) {
-          lines.push(field.comment);
-        } else if (field.key) {
-          lines.push(`${field.key}=${field.value}`);
-        }
-      });
-      return lines.join('\n');
-    }).join('\n\n');
+  const rememberSections = (fileName: string, sections: ParsedSection[]) => {
+    const text = engineTextFromSections(sections);
+    setFileContents((prev) => ({ ...prev, [fileName]: text }));
+    setHasUnsavedChanges((prev) => ({ ...prev, [fileName]: true }));
   };
 
   const saveConfig = async (fileName: string) => {
-    if (!currentProjectPath) return;
-    
-    const content = fileContents[fileName];
+    if (!currentProjectPath || !hasUnsavedChanges[fileName]) return;
+    const content = engineTextFromSections(parsedData[fileName] || []) || fileContents[fileName];
     if (!content) return;
-    
     try {
-      const enginePath = `${currentProjectPath}/mods/default/engine`;
-      const api = getElectronAPI();
-      if (api?.writeFile) {
-        const result = await api.writeFile(`${enginePath}/${fileName}`, content);
-        if (result.success) {
-          setHasUnsavedChanges(prev => ({ ...prev, [fileName]: false }));
-          toast({ title: 'Success', description: `Saved ${fileName}` });
-        } else {
-          toast({ title: 'Error', description: result.error || `Failed to save ${fileName}`, variant: 'destructive' });
-        }
+      const saved = await saveConfigDocument(currentProjectPath, `engine/${fileName}`, content);
+      if (saved) {
+        setHasUnsavedChanges(prev => ({ ...prev, [fileName]: false }));
+        toast({ title: 'Success', description: `Saved engine/${fileName}` });
+      } else {
+        toast({ title: 'Error', description: `Failed to save ${fileName}`, variant: 'destructive' });
       }
     } catch (error) {
       toast({ title: 'Error', description: `Failed to save ${fileName}`, variant: 'destructive' });
@@ -190,60 +137,49 @@ export function EngineConfigEditor() {
 
   const handleFieldChange = (fileName: string, sectionIndex: number, fieldIndex: number, key: string, value: string) => {
     setParsedData(prev => {
-      const newParsed = { ...prev };
-      const sections = [...(newParsed[fileName] || [])];
+      const sections = [...(prev[fileName] || [])];
       const section = { ...sections[sectionIndex] };
       const fields = [...section.fields];
       fields[fieldIndex] = { ...fields[fieldIndex], [key]: value };
       section.fields = fields;
       sections[sectionIndex] = section;
-      newParsed[fileName] = sections;
-      return newParsed;
-    });
-    
-    // Also update raw content
-    setFileContents(prev => {
-      const newContent = generateConfigContent(parsedData[fileName] || []);
-      setHasUnsavedChanges(p => ({ ...p, [fileName]: true }));
-      return { ...prev, [fileName]: newContent };
+      rememberSections(fileName, sections);
+      return { ...prev, [fileName]: sections };
     });
   };
 
   const addField = (fileName: string, sectionIndex: number) => {
     setParsedData(prev => {
-      const newParsed = { ...prev };
-      const sections = [...(newParsed[fileName] || [])];
+      const sections = [...(prev[fileName] || [])];
       const section = { ...sections[sectionIndex] };
       section.fields = [...section.fields, { key: '', value: '' }];
       sections[sectionIndex] = section;
-      newParsed[fileName] = sections;
-      return newParsed;
+      rememberSections(fileName, sections);
+      return { ...prev, [fileName]: sections };
     });
   };
 
   const removeField = (fileName: string, sectionIndex: number, fieldIndex: number) => {
     setParsedData(prev => {
-      const newParsed = { ...prev };
-      const sections = [...(newParsed[fileName] || [])];
+      const sections = [...(prev[fileName] || [])];
       const section = { ...sections[sectionIndex] };
       section.fields = section.fields.filter((_, i) => i !== fieldIndex);
       sections[sectionIndex] = section;
-      newParsed[fileName] = sections;
-      return newParsed;
+      rememberSections(fileName, sections);
+      return { ...prev, [fileName]: sections };
     });
   };
 
   const addSection = (fileName: string) => {
     setParsedData(prev => {
-      const newParsed = { ...prev };
-      const sections = [...(newParsed[fileName] || [])];
+      const sections = [...(prev[fileName] || [])];
       sections.push({
         type: 'new_section',
         fields: [{ key: '', value: '' }],
         rawLines: []
       });
-      newParsed[fileName] = sections;
-      return newParsed;
+      rememberSections(fileName, sections);
+      return { ...prev, [fileName]: sections };
     });
   };
 
@@ -281,7 +217,9 @@ export function EngineConfigEditor() {
           </Tooltip>
           <Tooltip content="Save all changes">
             <Button variant="default" size="sm" onClick={() => {
-              Object.keys(fileContents).forEach(f => saveConfig(f));
+              Object.keys(fileContents).forEach((fileName) => {
+                if (hasUnsavedChanges[fileName]) void saveConfig(fileName);
+              });
             }} disabled={!Object.values(hasUnsavedChanges).some(v => v)}>
               <Save className="w-4 h-4 mr-1" />
               Save All
@@ -474,7 +412,7 @@ function SectionEditor({ section, sectionIndex, fileName, isEditing, onToggleEdi
           >
             {isEditing ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </Button>
-          <span className="font-mono text-xs text-accent">[{section.type}]</span>
+          <span className="font-mono text-xs text-accent">{section.type ? `[${section.type}]` : '(no section)'}</span>
         </div>
         {isEditing && (
           <Button variant="ghost" size="sm" onClick={() => onAddField(fileName, sectionIndex)}>
@@ -489,7 +427,7 @@ function SectionEditor({ section, sectionIndex, fileName, isEditing, onToggleEdi
         <div className="p-3 space-y-2">
           {section.fields.map((field, fieldIndex) => (
             <div key={`${fileName}-${sectionIndex}-${fieldIndex}`} className="flex items-center gap-2">
-              {field.comment ? (
+              {field.comment !== undefined && !field.key ? (
                 <span className="text-[10px] text-muted-foreground italic flex-1">{field.comment}</span>
               ) : (
                 <>

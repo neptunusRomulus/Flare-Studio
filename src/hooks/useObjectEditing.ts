@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DialogueTree, MapObject } from '@/types';
 import { EMPTY_ACTOR_ROLES } from '@/editor/actorRoles';
 import type { ActorDialogState, EnemyRoleKey } from '@/editor/actorRoles';
@@ -102,6 +102,10 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
   const [showObjectDialog, setShowObjectDialog] = useState(false);
   const [showEnemyEditor, setShowEnemyEditor] = useState(false);
   const [editingObject, setEditingObject] = useState<MapObject | null>(null);
+  const objectBaselineRef = useRef('');
+  useEffect(() => {
+    if (showObjectDialog && editingObject) objectBaselineRef.current = JSON.stringify(editingObject);
+  }, [showObjectDialog]);
   const [objectValidationErrors, setObjectValidationErrors] = useState<string[]>([]);
   const [mapObjects, setMapObjects] = useState<MapObject[]>([]);
   const [showDeleteNpcConfirm, setShowDeleteNpcConfirm] = useState(false);
@@ -361,6 +365,9 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
   }, [editor, syncMapObjects]);
 
   const handleObjectDialogClose = useCallback(() => {
+    if (editingObject && objectBaselineRef.current && JSON.stringify(editingObject) !== objectBaselineRef.current) {
+      if (!window.confirm('Discard unsaved actor changes?')) return;
+    }
     setShowObjectDialog(false);
     setEditingObject(null);
     setObjectValidationErrors([]);
@@ -373,7 +380,7 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
     setShowDialogueTreeDialog(false);
     setShowVendorSettingsDialog(false);
     setShowQuestSettingsDialog(false);
-  }, []);
+  }, [editingObject]);
 
   const handleOpenVendorSettingsDialog = useCallback(() => {
     setShowVendorSettingsDialog(true);

@@ -130,5 +130,5 @@ contextBridge.exposeInMainWorld("electronAPI", {
   isFlareRunning: () =>
     ipcRenderer.invoke("is-flare-running"),
   onFlareEngineExited: (callback) =>
-    ipcRenderer.on("flare-engine-exited", () => callback && callback()),
+    ipcRenderer.on("flare-engine-exited", (_event, payload) => callback && callback(payload)),
 });

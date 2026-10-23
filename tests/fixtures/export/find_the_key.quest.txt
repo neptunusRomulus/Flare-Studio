@@ -1,0 +1,15 @@
+name=Find the Key
+complete_status=key_found
+
+[quest]
+requires_status=talked_to_guard
+requires_not_status=key_found
+requires_level=2
+requires_not_level=99
+requires_currency=10
+requires_not_currency=0
+requires_item=gold_key:2
+requires_not_item=fake_key
+requires_class=warrior
+requires_not_class=mage
+quest_text=Find the cellar key.

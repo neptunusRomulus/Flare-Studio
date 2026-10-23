@@ -1,4 +1,27 @@
 #!/bin/sh
-. "$(dirname "$0")/_/husky.sh"
+# Refuse staged files over 5 MB, then run the unit tests once (not watch mode).
+node << 'EOF'
+const { execFileSync } = require('child_process');
+const fs = require('fs');
 
-npm test
+const maxBytes = 5 * 1024 * 1024;
+const listed = execFileSync('git', ['diff', '--cached', '--name-only', '--diff-filter=ACMR', '-z']);
+const files = listed.toString('utf8').split('\0').filter(Boolean);
+let failed = false;
+
+for (const file of files) {
+  if (!fs.existsSync(file) || !fs.statSync(file).isFile()) continue;
+  const size = fs.statSync(file).size;
+  if (size > maxBytes) {
+    console.error(`pre-commit: '${file}' is ${size} bytes (limit is 5 MB).`);
+    failed = true;
+  }
+}
+
+if (failed) {
+  console.error('pre-commit: refusing to commit files larger than 5 MB.');
+  process.exit(1);
+}
+EOF
+
+npx vitest run

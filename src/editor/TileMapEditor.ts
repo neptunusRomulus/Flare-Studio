@@ -11,6 +11,8 @@
   PaintMode
 } from '../types';
 import { TileDetector } from './tileDetection';
+import { exportMapText, importMapText, slugFileName, tilePixelOffset } from '../adapters/flare/flareAdapter.cjs';
+import { clipboardFromTiles, pasteTileGrid, type TileClipboard } from './tileClipboard';
 
 interface LayerTilesetEntry {
   image: HTMLImageElement | null;
@@ -173,12 +175,6 @@ export class TileMapEditor {
   public tilesetColumns: number = 0;
   public tilesetRows: number = 0;
   public tileCount: number = 0;
-
-  // Stub: load a Flare-format TXT into the editor.
-  // Implementing a full parser is optional; this stub exists to provide a typed
-  // entry point so the renderer can call the loader without using `any`.
-  // Parameters: the raw text contents of the .txt map file.
-  public loadFlareMapTxt?(txt: string): void;
 
   public getTileCount(): number {
     return this.tileCount;
@@ -691,6 +687,14 @@ export class TileMapEditor {
   // Hero position management
   private heroX: number = 0;
   private heroY: number = 0;
+  /** Written to the map header only when the user set a track. The engine default is not hardcoded. */
+  private mapMusic: string = '';
+  /**
+   * Tile ids loaded from a Flare map file. Unpainted cells are written back as
+   * those ids so a second export does not add the tileset offset again.
+   * Not verified in-game.
+   */
+  private importedTileSnapshots: Map<string, number[]> = new Map();
   private isDraggingHero: boolean = false;
   private clickStartX: number = 0;
   private clickStartY: number = 0;
@@ -724,6 +728,7 @@ export class TileMapEditor {
     tiles: []
   };
   private isSelecting: boolean = false;
+  private tileClipboard: TileClipboard | null = null;
 
   // Shape drawing state
   private shapeDrawing: {
@@ -1946,6 +1951,14 @@ export class TileMapEditor {
         case 'KeyA':
           event.preventDefault();
           this.selectAll();
+          break;
+        case 'KeyC':
+          event.preventDefault();
+          this.copySelection();
+          break;
+        case 'KeyV':
+          event.preventDefault();
+          this.pasteSelection();
           break;
       }
     }
@@ -5826,6 +5839,39 @@ export class TileMapEditor {
     return layer.data[index] || 0;
   }
 
+  private copySelection(): void {
+    if (!this.selection.active || this.selection.tiles.length === 0) return;
+    const layer = this.getActiveLayer();
+    const keys = layer ? this.layerCellTilesetKey.get(layer.type) : undefined;
+    const tiles = this.selection.tiles.map((tile) => ({
+      x: tile.x,
+      y: tile.y,
+      gid: tile.gid,
+      tilesetKey: keys ? keys[tile.y * this.mapWidth + tile.x] ?? null : null,
+    }));
+    this.tileClipboard = clipboardFromTiles(tiles);
+  }
+
+  private pasteSelection(): void {
+    if (!this.tileClipboard) return;
+    const layer = this.getActiveLayer();
+    if (!layer) return;
+    const originX = this.hoverX >= 0 ? this.hoverX : this.tileClipboard.originX;
+    const originY = this.hoverY >= 0 ? this.hoverY : this.tileClipboard.originY;
+    this.saveState();
+    const pasted = pasteTileGrid(layer.data, this.mapWidth, this.mapHeight, this.tileClipboard, originX, originY);
+    layer.data = pasted.data;
+    if (pasted.tilesetWrites.length > 0) {
+      let keys = this.layerCellTilesetKey.get(layer.type);
+      if (!keys) {
+        keys = new Array(this.mapWidth * this.mapHeight).fill(null);
+        this.layerCellTilesetKey.set(layer.type, keys);
+      }
+      for (const write of pasted.tilesetWrites) keys[write.index] = write.key;
+    }
+    this.draw();
+  }
+
   public getActiveLayer(): TileLayer | null {
     if (this.activeLayerId !== null) {
       return this.tileLayers.find(l => l.id === this.activeLayerId) || null;
@@ -7922,36 +7968,14 @@ export class TileMapEditor {
     return { data, cellTilesetKeys };
   }
 
-  public generateFlareMapTxt(options: FlareExportOptions = {}): string {
-    const lines: string[] = [];
+  private isFlareTileLayer(type: string): boolean {
+    return !['rules', 'status', 'actions', 'items', 'npc', 'enemy', 'event', 'gamesettings'].includes(type.toLowerCase());
+  }
 
-    lines.push(`[header]`);
-    lines.push(`width=${this.mapWidth}`);
-    lines.push(`height=${this.mapHeight}`);
-    lines.push(`tilewidth=${this.tileSizeX}`);
-    lines.push(`tileheight=${this.tileSizeY}`);
-    lines.push(`orientation=isometric`);
-    lines.push(`hero_pos=${this.heroX},${this.heroY}`);
-    lines.push(`music=music/default_theme.ogg`);
-    // Use the exported tilesetdefs/tileset_mapname.txt for this map
-    const sanitizedMapName = (this.mapName || 'Map_Name')
-      .replace(/[<>:"/\\|?*]/g, '_')
-      .trim()
-      .replace(/\s+/g, '_')
-      .replace(/_{2,}/g, '_');
-    lines.push(`tileset=tilesetdefs/tileset_${sanitizedMapName}.txt`);
-    const mapTitle = (options.mapName && options.mapName.trim())
-      || this.mapName
-      || (this.tilesetFileName ? this.tilesetFileName.replace(/\.[^/.]+$/, '') : 'Untitled Map');
-    lines.push(`title=${mapTitle}`);
-    lines.push('');
-
+  private layerRowsForExport(layer: TileLayer): number[][] {
     const globalTilesets = this.collectGlobalTilesets();
     const mapTilesets = globalTilesets.filter(t => t.fileName && !this.isInternalTilesetFile(t.fileName));
-    
-    // Calculate proper offsets for each tileset
     this.assignTilesetOffsets(mapTilesets);
-    
     const tilesetOffsets = new Map<string, number>();
     const tilesetLayerByKey = new Map<string, string>();
     for (const tileset of mapTilesets) {
@@ -7959,288 +7983,228 @@ export class TileMapEditor {
       this.registerTilesetOffsetAliases(tilesetOffsets, tileset.fileName, tileset.offset);
       tilesetLayerByKey.set(tileset.fileName, tileset.layerType);
       const normalizedKey = this.normalizeTilesetKey(tileset.fileName);
-      if (normalizedKey) {
-        tilesetLayerByKey.set(normalizedKey, tileset.layerType);
-      }
+      if (normalizedKey) tilesetLayerByKey.set(normalizedKey, tileset.layerType);
     }
 
-    lines.push(`[tilesets]`);
-    // Always use the exported/copy location for the tileset image
-    for (const tileset of mapTilesets) {
-      if (!tileset.fileName) continue;
-      // Use relative path to images/tilesets folder from map file
-      const exportPath = `images/tilesets/${tileset.fileName}`;
-      lines.push(`tileset=${exportPath},${tileset.tileWidth},${tileset.tileHeight},${tileset.spacing},${tileset.margin}`);
+    const layerType = layer.type;
+    const layerTileset = this.getLayerTilesetOrFallback(layerType);
+    const isCollisionLayer = layerType === COLLISION_LAYER_TYPE;
+    let exportLayerData = layer.data;
+    let exportCellTilesetKeys = this.layerCellTilesetKey.get(layerType);
+    if (layerType === 'object') {
+      const objectExportState = this.buildObjectLayerExportState(layer);
+      exportLayerData = objectExportState.data;
+      exportCellTilesetKeys = objectExportState.cellTilesetKeys;
     }
-    lines.push('');
 
-    const flareLayerOrder = ['background', 'object', 'collision'];
-
-    for (const layerType of flareLayerOrder) {
-      const layer = this.tileLayers.find(l => l.type === layerType && l.visible);
-      if (!layer) continue;
-
-      lines.push(`[layer]`);
-      lines.push(`type=${layer.type}`);
-      lines.push(`data=`);
-
-      const layerTileset = this.getLayerTilesetOrFallback(layerType);
-      const isCollisionLayer = layerType === COLLISION_LAYER_TYPE;
-      let exportLayerData = layer.data;
-      let exportCellTilesetKeys = this.layerCellTilesetKey.get(layerType);
-
-      if (layerType === 'object') {
-        const objectExportState = this.buildObjectLayerExportState(layer);
-        exportLayerData = objectExportState.data;
-        exportCellTilesetKeys = objectExportState.cellTilesetKeys;
-      }
-
-      for (let y = 0; y < this.mapHeight; y++) {
-        const row: string[] = [];
-        for (let x = 0; x < this.mapWidth; x++) {
-          const index = y * this.mapWidth + x;
-          const localTileId = exportLayerData[index];
-          let globalTileId = 0;
-          if (localTileId > 0) {
-            // Determine which tileset this specific cell belongs to (per-cell key set at paint time)
-            const cellTilesetKey = exportCellTilesetKeys ? exportCellTilesetKeys[index] : (layerTileset ? layerTileset.fileName ?? null : null);
-            let effectiveTilesetKey = cellTilesetKey;
-
-            // Guard against cross-layer key leakage (e.g. background cells referencing object tileset keys).
-            if (!isCollisionLayer && effectiveTilesetKey) {
-              const normalizedCellKey = this.normalizeTilesetKey(effectiveTilesetKey);
-              const resolvedCellLayerType = tilesetLayerByKey.get(effectiveTilesetKey)
-                || (normalizedCellKey ? tilesetLayerByKey.get(normalizedCellKey) : undefined)
-                || null;
-
-              if (
-                resolvedCellLayerType &&
-                resolvedCellLayerType !== layerType &&
-                layerTileset?.fileName
-              ) {
-                effectiveTilesetKey = layerTileset.fileName;
-              }
-            }
-
-            let tilesetOffset = undefined as number | undefined;
-            if (!isCollisionLayer && effectiveTilesetKey) {
-              tilesetOffset = this.resolveTilesetOffset(tilesetOffsets, effectiveTilesetKey);
-            }
-
-            // Final fallback: use the layer's own tileset when per-cell key is missing/unresolvable.
-            if (!isCollisionLayer && (tilesetOffset === undefined) && layerTileset?.fileName) {
-              tilesetOffset = this.resolveTilesetOffset(tilesetOffsets, layerTileset.fileName);
-            }
-
-            if (tilesetOffset !== undefined && tilesetOffset >= 1) {
-              globalTileId = tilesetOffset + (localTileId - 1);
-            } else {
-              // Fallback: if no tileset offset, write the local id directly
-              globalTileId = localTileId;
+    const snapshot = this.importedTileSnapshots.get(layerType);
+    const rows: number[][] = [];
+    for (let y = 0; y < this.mapHeight; y++) {
+      const row: number[] = [];
+      for (let x = 0; x < this.mapWidth; x++) {
+        const index = y * this.mapWidth + x;
+        const localTileId = exportLayerData[index] || 0;
+        if (snapshot && snapshot.length === exportLayerData.length && snapshot[index] === localTileId) {
+          row.push(localTileId);
+          continue;
+        }
+        let globalTileId = 0;
+        if (localTileId > 0) {
+          const cellTilesetKey = exportCellTilesetKeys ? exportCellTilesetKeys[index] : (layerTileset ? layerTileset.fileName ?? null : null);
+          let effectiveTilesetKey = cellTilesetKey;
+          if (!isCollisionLayer && effectiveTilesetKey) {
+            const normalizedCellKey = this.normalizeTilesetKey(effectiveTilesetKey);
+            const resolvedCellLayerType = tilesetLayerByKey.get(effectiveTilesetKey)
+              || (normalizedCellKey ? tilesetLayerByKey.get(normalizedCellKey) : undefined)
+              || null;
+            if (resolvedCellLayerType && resolvedCellLayerType !== layerType && layerTileset?.fileName) {
+              effectiveTilesetKey = layerTileset.fileName;
             }
           }
-          row.push(globalTileId.toString());
+          let tilesetOffset: number | undefined;
+          if (!isCollisionLayer && effectiveTilesetKey) {
+            tilesetOffset = this.resolveTilesetOffset(tilesetOffsets, effectiveTilesetKey);
+          }
+          if (!isCollisionLayer && tilesetOffset === undefined && layerTileset?.fileName) {
+            tilesetOffset = this.resolveTilesetOffset(tilesetOffsets, layerTileset.fileName);
+          }
+          if (tilesetOffset !== undefined && tilesetOffset >= 1) globalTileId = tilesetOffset + (localTileId - 1);
+          else globalTileId = localTileId;
         }
-        lines.push(row.join(','));
+        row.push(globalTileId);
       }
-      lines.push('');
+      rows.push(row);
+    }
+    return rows;
+  }
+
+  private eventRecord(event: MapObject): Record<string, unknown> {
+    const record: Record<string, unknown> = { ...(event.properties || {}) };
+    if (!record.activate) record.activate = event.activate || 'on_trigger';
+    if (!record.location && event.x >= 0 && event.y >= 0) {
+      record.location = `${event.x},${event.y},${event.width},${event.height}`;
+    }
+    if (!record.hotspot && event.hotspot) record.hotspot = event.hotspot;
+    const tooltip = record.tooltip || event.tooltip;
+    if (!record.tooltip && event.name && event.name !== 'Event' && !String(event.name).startsWith('event_')) {
+      record.tooltip = event.name;
+    }
+    if (tooltip && String(tooltip).trim().toLowerCase() === 'event') delete record.tooltip;
+    if (record.repeat == null && event.repeat !== undefined) record.repeat = event.repeat ? 'true' : 'false';
+    if (!record.intermap && event.intermap) record.intermap = event.intermap;
+    if (!record.soundfx && event.soundfx) record.soundfx = event.soundfx;
+    if (!record.mapmod && event.mapmod) record.mapmod = event.mapmod;
+    if (!record.loot && event.loot) record.loot = event.loot;
+    delete record._description;
+    delete record.type;
+    return record;
+  }
+
+  private enemyRecord(enemy: MapObject): Record<string, unknown> {
+    const record: Record<string, unknown> = { ...(enemy.properties || {}) };
+    if (!record.location) record.location = `${enemy.x},${enemy.y},${enemy.width},${enemy.height}`;
+    if (enemy.category) record.category = enemy.category;
+    if (enemy.level) record.level = String(enemy.level);
+    if (enemy.number) record.number = String(enemy.number);
+    if (enemy.wander_radius !== undefined) record.wander_radius = String(enemy.wander_radius);
+    delete record.type;
+    return record;
+  }
+
+  private npcRecord(npc: MapObject): Record<string, unknown> {
+    const record: Record<string, unknown> = { ...(npc.properties || {}) };
+    if (!record.location) record.location = `${npc.x},${npc.y},${npc.width},${npc.height}`;
+    const named = npc.properties?.npcFilename;
+    const filename = typeof named === 'string' && named.trim()
+      ? named
+      : `npcs/${slugFileName(npc.name || `npc_${npc.id}`)}.txt`;
+    record.filename = filename;
+    delete record.type;
+    delete record.npcFilename;
+    return record;
+  }
+
+  public loadFlareMapTxt(txt: string): void {
+    const map = importMapText(txt) as {
+      width?: number;
+      height?: number;
+      title?: string;
+      music?: string;
+      heroX?: number;
+      heroY?: number;
+      layers?: Array<{ type?: string; rows?: number[][] }>;
+      events?: Array<Record<string, string | string[]>>;
+      enemies?: Array<Record<string, string>>;
+      npcs?: Array<Record<string, string>>;
+    };
+    const width = Math.max(1, Number(map.width) || 1);
+    const height = Math.max(1, Number(map.height) || 1);
+    this.resizeMap(width, height);
+    if (map.title) this.setMapName(map.title);
+    this.mapMusic = typeof map.music === 'string' ? map.music : '';
+    this.setHeroPosition(Number(map.heroX) || 0, Number(map.heroY) || 0);
+    this.importedTileSnapshots.clear();
+
+    for (const layer of map.layers || []) {
+      const type = layer.type || 'layer';
+      if (!this.isFlareTileLayer(type)) continue;
+      let target = this.tileLayers.find(entry => entry.type === type);
+      if (!target) {
+        target = {
+          id: this.nextLayerId++,
+          name: type,
+          type,
+          data: new Array(this.mapWidth * this.mapHeight).fill(0),
+          visible: true,
+          transparency: 1,
+        };
+        this.tileLayers.push(target);
+      }
+      const flat = new Array(this.mapWidth * this.mapHeight).fill(0);
+      (layer.rows || []).forEach((row, y) => {
+        if (y >= this.mapHeight) return;
+        row.forEach((cell, x) => {
+          if (x >= this.mapWidth) return;
+          flat[y * this.mapWidth + x] = cell;
+        });
+      });
+      target.data = flat.slice();
+      target.visible = true;
+      this.importedTileSnapshots.set(type, flat.slice());
     }
 
-    const events = this.objects.filter(obj => obj.type === 'event');
-    for (const event of events) {
-      // Write comment line with event name and optional description
-      const eName = event.name || '';
-      const eDesc = event.description || event.properties?._description || '';
-      if (eName) {
-        const commentLine = eDesc ? `#${eName} - ${eDesc}` : `#${eName}`;
-        lines.push(commentLine);
+    this.objects = this.objects.filter(object => object.type !== 'event' && object.type !== 'enemy' && object.type !== 'npc');
+    const place = (type: 'event' | 'enemy' | 'npc', fields: Record<string, string | string[]>) => {
+      const location = typeof fields.location === 'string' ? fields.location.split(',').map(part => parseInt(part, 10) || 0) : [0, 0, 1, 1];
+      const properties: Record<string, string | string[]> = {};
+      for (const [key, value] of Object.entries(fields)) {
+        if (value == null || value === '') continue;
+        properties[key] = value;
       }
-      lines.push(`[event]`);
-
-      // activate (always first)
-      const activate = event.properties.activate || event.activate || 'on_trigger';
-      lines.push(`activate=${activate}`);
-
-      // location
-      if (event.properties.location) {
-        lines.push(`location=${event.properties.location}`);
-      } else if (event.x >= 0 && event.y >= 0) {
-        lines.push(`location=${event.x},${event.y},${event.width},${event.height}`);
-      }
-
-      // hotspot
-      if (event.properties.hotspot) {
-        lines.push(`hotspot=${event.properties.hotspot}`);
-      } else if (event.hotspot) {
-        lines.push(`hotspot=${event.hotspot}`);
-      }
-
-      // tooltip (use event name if set)
-      if (event.properties.tooltip) {
-        lines.push(`tooltip=${event.properties.tooltip}`);
-      } else if (event.name && event.name !== 'Event' && !event.name.startsWith('event_')) {
-        lines.push(`tooltip=${event.name}`);
-      } else if (event.tooltip) {
-        lines.push(`tooltip=${event.tooltip}`);
-      }
-
-      // cooldown / delay
-      if (event.properties.cooldown) lines.push(`cooldown=${event.properties.cooldown}`);
-      if (event.properties.delay) lines.push(`delay=${event.properties.delay}`);
-
-      // requirements
-      const writeRepeatableEventProperty = (key: string) => {
-        const value = event.properties[key];
-        if (Array.isArray(value)) {
-          for (const item of value) {
-            if (item && String(item).trim()) {
-              lines.push(`${key}=${item}`);
-            }
-          }
-        } else if (value) {
-          lines.push(`${key}=${value}`);
-        }
+      const object: MapObject = {
+        id: this.nextObjectId++,
+        name: type === 'event' && typeof fields.tooltip === 'string' ? fields.tooltip : `${type}_${this.nextObjectId - 1}`,
+        type,
+        x: location[0] || 0,
+        y: location[1] || 0,
+        width: location[2] || 1,
+        height: location[3] || 1,
+        properties,
       };
+      if (typeof fields.category === 'string') object.category = fields.category;
+      if (typeof fields.activate === 'string') object.activate = fields.activate;
+      if (typeof fields.hotspot === 'string') object.hotspot = fields.hotspot;
+      this.objects.push(object);
+    };
+    for (const event of map.events || []) place('event', event);
+    for (const enemy of map.enemies || []) place('enemy', enemy);
+    for (const npc of map.npcs || []) place('npc', npc);
+    this.notifyObjectsChanged();
+    this.draw();
+  }
 
-      writeRepeatableEventProperty('requires_status');
-      writeRepeatableEventProperty('requires_not_status');
-      writeRepeatableEventProperty('requires_item');
-      writeRepeatableEventProperty('requires_not_item');
-      if (event.properties.requires_level) lines.push(`requires_level=${event.properties.requires_level}`);
-      if (event.properties.requires_currency) lines.push(`requires_currency=${event.properties.requires_currency}`);
-      if (event.properties.requires_not_currency) lines.push(`requires_not_currency=${event.properties.requires_not_currency}`);
-      if (event.properties.requires_class) lines.push(`requires_class=${event.properties.requires_class}`);
-
-      // actions / rewards
-      if (event.properties.msg) lines.push(`msg=${event.properties.msg}`);
-      if (event.properties.reward_xp) lines.push(`reward_xp=${event.properties.reward_xp}`);
-      if (event.properties.reward_currency) lines.push(`reward_currency=${event.properties.reward_currency}`);
-      if (event.properties.reward_item) lines.push(`reward_item=${event.properties.reward_item}`);
-      if (event.properties.reward_loot) lines.push(`reward_loot=${event.properties.reward_loot}`);
-      if (event.properties.reward_loot_count) lines.push(`reward_loot_count=${event.properties.reward_loot_count}`);
-      if (event.properties.spawn) lines.push(`spawn=${event.properties.spawn}`);
-      if (event.properties.set_status) lines.push(`set_status=${event.properties.set_status}`);
-      if (event.properties.unset_status) lines.push(`unset_status=${event.properties.unset_status}`);
-      if (event.properties.remove_item) lines.push(`remove_item=${event.properties.remove_item}`);
-      if (event.properties.remove_currency) lines.push(`remove_currency=${event.properties.remove_currency}`);
-
-      // teleport / map transitions
-      if (event.properties.intermap) {
-        lines.push(`intermap=${event.properties.intermap}`);
-      } else if (event.intermap) {
-        lines.push(`intermap=${event.intermap}`);
-      }
-      if (event.properties.intermap_random) lines.push(`intermap_random=${event.properties.intermap_random}`);
-      if (event.properties.intramap) lines.push(`intramap=${event.properties.intramap}`);
-
-      // sound / music / visual
-      if (event.properties.soundfx) {
-        lines.push(`soundfx=${event.properties.soundfx}`);
-      } else if (event.soundfx) {
-        lines.push(`soundfx=${event.soundfx}`);
-      }
-      if (event.properties.music) lines.push(`music=${event.properties.music}`);
-      if (event.properties.shakycam) lines.push(`shakycam=${event.properties.shakycam}`);
-
-      // map modifications
-      if (event.properties.mapmod) {
-        lines.push(`mapmod=${event.properties.mapmod}`);
-      } else if (event.mapmod) {
-        lines.push(`mapmod=${event.mapmod}`);
-      }
-
-      // npcs / loot
-      if (event.properties.npc) lines.push(`npc=${event.properties.npc}`);
-      if (event.properties.loot) {
-        lines.push(`loot=${event.properties.loot}`);
-      } else if (event.loot) {
-        lines.push(`loot=${event.loot}`);
-      }
-      if (event.properties.loot_count) lines.push(`loot_count=${event.properties.loot_count}`);
-
-      // power
-      if (event.properties.power) lines.push(`power=${event.properties.power}`);
-      if (event.properties.power_damage) lines.push(`power_damage=${event.properties.power_damage}`);
-      if (event.properties.power_path) lines.push(`power_path=${event.properties.power_path}`);
-
-      // engine/utility
-      if (event.properties.chance_exec) lines.push(`chance_exec=${event.properties.chance_exec}`);
-      if (event.properties.save_game) lines.push(`save_game=${event.properties.save_game}`);
-      if (event.properties.script) lines.push(`script=${event.properties.script}`);
-      if (event.properties.respec) lines.push(`respec=${event.properties.respec}`);
-      if (event.properties.stash) lines.push(`stash=${event.properties.stash}`);
-      if (event.properties.book) lines.push(`book=${event.properties.book}`);
-      if (event.properties.restore) lines.push(`restore=${event.properties.restore}`);
-      if (event.properties.cutscene) lines.push(`cutscene=${event.properties.cutscene}`);
-      if (event.properties.parallax_layers) lines.push(`parallax_layers=${event.properties.parallax_layers}`);
-      if (event.properties.random_status) lines.push(`random_status=${event.properties.random_status}`);
-      if (event.properties.show_on_minimap) lines.push(`show_on_minimap=${event.properties.show_on_minimap}`);
-      if (event.properties.reachable_from) lines.push(`reachable_from=${event.properties.reachable_from}`);
-
-      // repeat
-      if (event.properties.repeat !== undefined) {
-        lines.push(`repeat=${event.properties.repeat}`);
-      } else if (event.repeat !== undefined) {
-        lines.push(`repeat=${event.repeat}`);
-      }
-
-      lines.push('');
+  public generateFlareMapTxt(options: FlareExportOptions = {}): string {
+    const slug = slugFileName(this.mapName || options.mapName || 'map');
+    const mapTitle = (options.mapName && options.mapName.trim())
+      || this.mapName
+      || (this.tilesetFileName ? this.tilesetFileName.replace(/\.[^/.]+$/, '') : 'Untitled Map');
+    const globalTilesets = this.collectGlobalTilesets();
+    const mapTilesets = globalTilesets.filter(t => t.fileName && !this.isInternalTilesetFile(t.fileName));
+    const tilesetImages = mapTilesets
+      .filter(tileset => tileset.fileName)
+      .map(tileset => ({
+        file: `images/tilesets/${tileset.fileName}`,
+        tileWidth: tileset.tileWidth,
+        tileHeight: tileset.tileHeight,
+        spacing: tileset.spacing,
+        margin: tileset.margin,
+      }));
+    const layers = this.tileLayers
+      .filter(layer => this.isFlareTileLayer(layer.type))
+      .map(layer => ({
+        type: layer.type,
+        visible: layer.visible,
+        rows: this.layerRowsForExport(layer),
+      }));
+    const exported = exportMapText({
+      width: this.mapWidth,
+      height: this.mapHeight,
+      tileset: `tilesetdefs/tileset_${slug}.txt`,
+      title: mapTitle,
+      heroX: this.heroX,
+      heroY: this.heroY,
+      music: this.mapMusic || undefined,
+      tilesetImages,
+      layers,
+      events: this.objects.filter(object => object.type === 'event').map(object => this.eventRecord(object)),
+      enemies: this.objects.filter(object => object.type === 'enemy').map(object => this.enemyRecord(object)),
+      npcs: this.objects.filter(object => object.type === 'npc').map(object => this.npcRecord(object)),
+      knownEnemyCategories: this.getEnemyCategories(),
+    });
+    if (exported.errors.length > 0) {
+      console.error('Map export blocked:', exported.errors.join(' | '));
     }
-
-    const enemies = this.objects.filter(obj => obj.type === 'enemy');
-    for (const enemy of enemies) {
-      lines.push(`[enemy]`);
-      lines.push(`type=enemy`);
-      lines.push(`location=${enemy.x},${enemy.y},${enemy.width},${enemy.height}`);
-
-      if (enemy.category) lines.push(`category=${enemy.category}`);
-      if (enemy.level) lines.push(`level=${enemy.level}`);
-      if (enemy.number) lines.push(`number=${enemy.number}`);
-      if (enemy.wander_radius !== undefined) lines.push(`wander_radius=${enemy.wander_radius}`);
-
-      for (const [key, value] of Object.entries(enemy.properties)) {
-        lines.push(`${key}=${value}`);
-      }
-
-      lines.push('');
-    }
-
-    const npcs = this.objects.filter(obj => obj.type === 'npc');
-    for (const npc of npcs) {
-      lines.push(`[npc]`);
-      lines.push(`type=npc`);
-      lines.push(`location=${npc.x},${npc.y},${npc.width},${npc.height}`);
-
-      const npcFilename = npc.properties?.npcFilename;
-      if (npcFilename) {
-        lines.push(`filename=${npcFilename}`);
-      } else {
-        const sanitized = (npc.name || `npc_${npc.id}`)
-          .toLowerCase()
-          .replace(/[<>:"/\\|?*]/g, '_')
-          .trim()
-          .replace(/\s+/g, '_')
-          .replace(/_{2,}/g, '_') || 'unnamed_npc';
-        lines.push(`filename=npcs/${sanitized}.txt`);
-      }
-
-      const conditionKeys = [
-        'requires_status', 'requires_not_status',
-        'requires_level', 'requires_not_level',
-        'requires_currency', 'requires_not_currency',
-        'requires_item', 'requires_not_item',
-        'requires_class', 'requires_not_class',
-      ];
-      for (const key of conditionKeys) {
-        if (npc.properties?.[key]) {
-          lines.push(`${key}=${npc.properties[key]}`);
-        }
-      }
-
-      lines.push('');
-    }
-
-    return lines.join('\n');
+    return exported.text;
   }
 
   public generateFlareTilesetDef(_options: FlareExportOptions = {}): string {
@@ -8258,10 +8222,10 @@ export class TileMapEditor {
 
     // Build strict per-tileset local-id lookup so tiles from one image can never
     // resolve rect/origin data from another image.
-    const detectedByTileset = new Map<string, Map<number, { sourceX: number; sourceY: number; width: number; height: number }>>();
+    const detectedByTileset = new Map<string, Map<number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }>>();
     for (const tileset of exportedTilesets) {
       if (!tileset.fileName) continue;
-      const lookup = new Map<number, { sourceX: number; sourceY: number; width: number; height: number }>();
+      const lookup = new Map<number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }>();
 
       // Primary source: layer-specific detected tiles for this exact tileset key.
       const matchingLayerTypes = new Set<string>();
@@ -8277,14 +8241,14 @@ export class TileMapEditor {
         const layerMap = this.layerTileData.get(layerType);
         if (!layerMap) continue;
         for (const [gid, data] of layerMap.entries()) {
-          lookup.set(gid, { sourceX: data.sourceX, sourceY: data.sourceY, width: data.width, height: data.height });
+          lookup.set(gid, { sourceX: data.sourceX, sourceY: data.sourceY, width: data.width, height: data.height, originX: data.originX, originY: data.originY });
         }
       }
 
       // Single-tileset legacy fallback only.
       if (lookup.size === 0 && exportedTilesets.length === 1 && this.detectedTileData && this.detectedTileData.size > 0) {
         for (const [gid, data] of this.detectedTileData.entries()) {
-          lookup.set(gid, { sourceX: data.sourceX, sourceY: data.sourceY, width: data.width, height: data.height });
+          lookup.set(gid, { sourceX: data.sourceX, sourceY: data.sourceY, width: data.width, height: data.height, originX: data.originX, originY: data.originY });
         }
       }
 
@@ -8300,7 +8264,7 @@ export class TileMapEditor {
       const columns = Math.max(1, tileset.columns);
       const tileWidth = tileset.tileWidth || this.tileSizeX;
       const tileHeight = tileset.tileHeight || this.tileSizeY;
-      const localLookup = detectedByTileset.get(tileset.fileName) || new Map<number, { sourceX: number; sourceY: number; width: number; height: number }>();
+      const localLookup = detectedByTileset.get(tileset.fileName) || new Map<number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }>();
 
       for (let i = 0; i < tileset.count; i++) {
         const globalId = tileset.offset + i;
@@ -8318,18 +8282,22 @@ export class TileMapEditor {
           top_y = detected.sourceY;
           width = detected.width;
           height = detected.height;
-          // Use bottom-center anchor for detected sprites so they align to ground
-          offset_x = Math.floor(width / 2);
-          offset_y = height;
         } else {
           left_x = (i % columns) * tileWidth;
           top_y = Math.floor(i / columns) * tileHeight;
           width = tileWidth;
           height = tileHeight;
-          // For grid-based tiles default to bottom-center as well
-          offset_x = Math.floor(width / 2);
-          offset_y = height;
         }
+        // GUI anchors the sprite bottom-center on the diamond bottom. The engine
+        // subtracts offset from a point tile_h/2 higher, so offset_y = originY - tileSizeY/2.
+        // Not verified in-game (T-109 / T-201).
+        const pixelOffset = tilePixelOffset(
+          detected?.originX != null ? detected.originX : Math.floor(width / 2),
+          detected?.originY != null ? detected.originY : height,
+          this.tileSizeY
+        );
+        offset_x = pixelOffset.offsetX;
+        offset_y = pixelOffset.offsetY;
 
         lines.push(`tile=${globalId},${left_x},${top_y},${width},${height},${offset_x},${offset_y}`);
       }
@@ -9820,9 +9788,9 @@ export class TileMapEditor {
         normalized.category = 'npc';
         normalized.type = 'npc';
         normalized.wander_radius = 0;
-      } else if (normalized.category === 'enemy' || normalized.category === 'creature' || normalized.type === 'enemy') {
+      } else if (normalized.category === 'creature' || normalized.type === 'enemy') {
         normalized.type = 'enemy';
-        normalized.category = normalized.category || 'enemy';
+        if (normalized.category === 'creature') delete normalized.category;
       }
 
       return normalized;
@@ -9845,9 +9813,9 @@ export class TileMapEditor {
     if (type === 'event') {
       object.activate = 'on_trigger';
       object.hotspot = 'location';
-      object.tooltip = 'Event';
     } else if (type === 'enemy') {
-      object.category = 'enemy';
+      const known = this.getEnemyCategories();
+      if (known.length > 0) object.category = known[0];
       object.level = 1;
       object.number = 1;
       object.wander_radius = 4;

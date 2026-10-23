@@ -30,13 +30,14 @@ export interface ImportReviewModalProps {
   onEditAsset?: (gid: number) => void;
   onOriginChange?: (originPreset: AssetOriginPreset) => void;
   defaultOriginPreset?: AssetOriginPreset;
+  tileWidth?: number;
+  tileHeight?: number;
 }
 
 /**
  * ImportReviewModal: Shows detected assets from tileset import for user review
  * Allows confirming asset definitions, editing anchors/footprints, or canceling
  */
-// Fixed isometric tile dimensions — not user-configurable
 const TILE_WIDTH = 64;
 const TILE_HEIGHT = 32;
 
@@ -47,10 +48,10 @@ export const ImportReviewModal: React.FC<ImportReviewModalProps> = ({
   onConfirm,
   onCancel,
   onOriginChange,
-  defaultOriginPreset = 'bottom-center'
+  defaultOriginPreset = 'bottom-center',
+  tileWidth = TILE_WIDTH,
+  tileHeight = TILE_HEIGHT,
 }) => {
-  const tileWidth = TILE_WIDTH;
-  const tileHeight = TILE_HEIGHT;
   const [originPreset, setOriginPreset] = React.useState<AssetOriginPreset>(defaultOriginPreset);
 
   const {
@@ -189,7 +190,7 @@ export const ImportReviewModal: React.FC<ImportReviewModalProps> = ({
               </span>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Fixed isometric grid. Use merge/separate tools to adjust tile boundaries after import.
+              Project tile size from tileset settings. Use merge/separate tools to adjust tile boundaries after import.
             </p>
           </div>
 

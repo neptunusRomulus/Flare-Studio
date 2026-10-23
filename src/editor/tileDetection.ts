@@ -37,6 +37,11 @@ export class TileDetector {
     this.config = config;
   }
 
+  setTileSize(tileSizeX: number, tileSizeY: number): void {
+    this.config.tileSizeX = tileSizeX;
+    this.config.tileSizeY = tileSizeY;
+  }
+
   isPixelTransparent(data: Uint8ClampedArray, x: number, y: number, width: number): boolean {
     const index = (y * width + x) * 4 + 3;
     return data[index] <= this.config.contentThreshold;

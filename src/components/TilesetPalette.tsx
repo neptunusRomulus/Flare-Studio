@@ -180,7 +180,8 @@ const TilesetPalette = ({
             if (typeof tw === 'number' && tw > 0 && typeof th === 'number' && th > 0) {
               setTileSize({ width: tw, height: th });
             } else {
-              setTileSize({ width: DEFAULT_TILE_WIDTH, height: DEFAULT_TILE_HEIGHT });
+              const ground = (editor as { getGroundTileSize?: () => { width: number; height: number } }).getGroundTileSize?.();
+              setTileSize(ground && ground.width > 0 && ground.height > 0 ? { width: ground.width, height: ground.height } : { width: DEFAULT_TILE_WIDTH, height: DEFAULT_TILE_HEIGHT });
             }
           } catch (_e) { void _e; }
           
@@ -209,7 +210,8 @@ const TilesetPalette = ({
             const editorTilesetImage = (editor as unknown as { tilesetImage?: HTMLImageElement | null }).tilesetImage;
             if (editorTilesetImage) {
               setTilesetImage(editorTilesetImage);
-              setTileSize({ width: DEFAULT_TILE_WIDTH, height: DEFAULT_TILE_HEIGHT });
+              const ground = (editor as { getGroundTileSize?: () => { width: number; height: number } }).getGroundTileSize?.();
+              setTileSize(ground && ground.width > 0 && ground.height > 0 ? { width: ground.width, height: ground.height } : { width: DEFAULT_TILE_WIDTH, height: DEFAULT_TILE_HEIGHT });
               if (editorTilesetImage.complete && editorTilesetImage.naturalWidth > 0 && editorTilesetImage.naturalHeight > 0) {
                 setImageSize({ width: editorTilesetImage.naturalWidth, height: editorTilesetImage.naturalHeight });
               }

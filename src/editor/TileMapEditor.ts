@@ -3,7 +3,6 @@
   TilesetInfo,
   MapObject,
   Tool,
-  Orientation,
   Stamp,
   StampTile,
   AssetRecord,
@@ -13,6 +12,7 @@
 import { TileDetector } from './tileDetection';
 import { exportMapText, importMapText, slugFileName, tilePixelOffset } from '../adapters/flare/flareAdapter.cjs';
 import { clipboardFromTiles, pasteTileGrid, type TileClipboard } from './tileClipboard';
+import { mapHeaderForExport, type MapPresentation } from './studioDrafts';
 
 interface LayerTilesetEntry {
   image: HTMLImageElement | null;
@@ -86,6 +86,14 @@ export interface EditorProjectData {
   width?: number;
   height?: number;
   tileSize?: number;
+  tileHeight?: number;
+  orientation?: 'isometric' | 'orthogonal';
+  parallax?: string;
+  fogofwar?: string;
+  save_fogofwar?: string;
+  procgen_type?: string;
+  procgen_unique_status?: string;
+  procgen_reset_status?: string;
   layers?: TileLayer[];
   objects?: MapObject[];
   heroX?: number;
@@ -571,9 +579,15 @@ export class TileMapEditor {
   private mapHeight: number = 15;
   private mapName: string = 'Untitled Map';
   private currentProjectPath: string | null = null;
-  private readonly tileSizeX: number = 64;
-  private readonly tileSizeY: number = 32;
-  private readonly orientation: Orientation = 'isometric';
+  private tileSizeX: number = 64;
+  private tileSizeY: number = 32;
+  private orientation: 'isometric' | 'orthogonal' = 'isometric';
+  private mapParallax = '';
+  private mapFog = '';
+  private mapSaveFog = '';
+  private mapProcgenType = '';
+  private mapProcgenUnique = '';
+  private mapProcgenReset = '';
   
   // Tile detection settings
   private tileContentThreshold: number = 10; // Minimum alpha value to consider as content
@@ -2966,11 +2980,13 @@ export class TileMapEditor {
   
   // Threshold for determining if a sprite is a "tall object" vs a "ground tile"
   // Sprites taller than this will be rendered as objects regardless of layer
-  private readonly tallSpriteThreshold = this.tileSizeY * 1.5; // > 48px height for 32px tiles
+  private get tallSpriteThreshold(): number {
+    return this.tileSizeY * 1.5;
+  }
 
   /**
    * Check if a sprite should be rendered as an object (tall/oversized) or as a ground tile.
-   * Ground tiles are exactly tileSizeX x tileSizeY (64x32).
+   * Ground tiles use the project tile size (64x32 unless tileset config says otherwise).
    * Anything larger is considered a tall object (walls, trees, pillars).
    */
   private isTallSprite(width: number, height: number): boolean {
@@ -5715,6 +5731,52 @@ export class TileMapEditor {
 
   public setCurrentProjectPath(path: string | null): void {
     this.currentProjectPath = path;
+    if (!path || typeof window === 'undefined' || !window.electronAPI?.readFile) return;
+    const requested = path;
+    const indexPath = `${path.replace(/\\/g, '/').replace(/\/$/, '')}/project.json`;
+    void window.electronAPI.readFile(indexPath).then((text) => {
+      if (this.currentProjectPath !== requested || !text) return;
+      try {
+        const tile = JSON.parse(text).tile as { width?: number; height?: number; orientation?: string } | undefined;
+        if (tile && typeof tile === 'object') this.setGroundTileSize(tile);
+      } catch {
+        /* keep the current tile size */
+      }
+    }).catch(() => undefined);
+  }
+
+  public getGroundTileSize(): { width: number; height: number; orientation: 'isometric' | 'orthogonal' } {
+    return { width: this.tileSizeX, height: this.tileSizeY, orientation: this.orientation };
+  }
+
+  public setGroundTileSize(tile: { width?: number; height?: number; orientation?: string }, redraw = true): void {
+    const width = Math.floor(Number(tile.width));
+    const height = Math.floor(Number(tile.height));
+    if (Number.isFinite(width) && width > 0) this.tileSizeX = width;
+    if (Number.isFinite(height) && height > 0) this.tileSizeY = height;
+    if (tile.orientation === 'orthogonal' || tile.orientation === 'isometric') this.orientation = tile.orientation;
+    this.tileDetector.setTileSize(this.tileSizeX, this.tileSizeY);
+    if (redraw) this.draw();
+  }
+
+  public getMapPresentation(): MapPresentation {
+    return {
+      parallax: this.mapParallax,
+      fogofwar: this.mapFog,
+      save_fogofwar: this.mapSaveFog,
+      procgen_type: this.mapProcgenType,
+      procgen_unique_status: this.mapProcgenUnique,
+      procgen_reset_status: this.mapProcgenReset,
+    };
+  }
+
+  public setMapPresentation(next: Partial<MapPresentation>): void {
+    if (typeof next.parallax === 'string') this.mapParallax = next.parallax;
+    if (typeof next.fogofwar === 'string') this.mapFog = next.fogofwar;
+    if (typeof next.save_fogofwar === 'string') this.mapSaveFog = next.save_fogofwar;
+    if (typeof next.procgen_type === 'string') this.mapProcgenType = next.procgen_type;
+    if (typeof next.procgen_unique_status === 'string') this.mapProcgenUnique = next.procgen_unique_status;
+    if (typeof next.procgen_reset_status === 'string') this.mapProcgenReset = next.procgen_reset_status;
   }
 
   public getCurrentProjectPath(): string | null {
@@ -8097,6 +8159,12 @@ export class TileMapEditor {
       music?: string;
       heroX?: number;
       heroY?: number;
+      parallax?: string;
+      fogofwar?: string;
+      save_fogofwar?: string;
+      procgen_type?: string;
+      procgen_unique_status?: string;
+      procgen_reset_status?: string;
       layers?: Array<{ type?: string; rows?: number[][] }>;
       events?: Array<Record<string, string | string[]>>;
       enemies?: Array<Record<string, string>>;
@@ -8108,6 +8176,14 @@ export class TileMapEditor {
     if (map.title) this.setMapName(map.title);
     this.mapMusic = typeof map.music === 'string' ? map.music : '';
     this.setHeroPosition(Number(map.heroX) || 0, Number(map.heroY) || 0);
+    this.setMapPresentation({
+      parallax: typeof map.parallax === 'string' ? map.parallax : '',
+      fogofwar: map.fogofwar != null ? String(map.fogofwar) : '',
+      save_fogofwar: map.save_fogofwar != null ? String(map.save_fogofwar) : '',
+      procgen_type: typeof map.procgen_type === 'string' ? map.procgen_type : '',
+      procgen_unique_status: typeof map.procgen_unique_status === 'string' ? map.procgen_unique_status : '',
+      procgen_reset_status: typeof map.procgen_reset_status === 'string' ? map.procgen_reset_status : '',
+    });
     this.importedTileSnapshots.clear();
 
     for (const layer of map.layers || []) {
@@ -8199,6 +8275,7 @@ export class TileMapEditor {
       heroX: this.heroX,
       heroY: this.heroY,
       music: this.mapMusic || undefined,
+      ...mapHeaderForExport(this.getMapPresentation()),
       tilesetImages,
       layers,
       events: this.objects.filter(object => object.type === 'event').map(object => this.eventRecord(object)),
@@ -8741,6 +8818,13 @@ export class TileMapEditor {
         tilesetImage: this.tilesetImage ? this.canvasToDataURL(this.tilesetImage) : null,
         tileSizeX: this.tileSizeX,
         tileSizeY: this.tileSizeY,
+        orientation: this.orientation,
+        parallax: this.mapParallax,
+        fogofwar: this.mapFog,
+        save_fogofwar: this.mapSaveFog,
+        procgen_type: this.mapProcgenType,
+        procgen_unique_status: this.mapProcgenUnique,
+        procgen_reset_status: this.mapProcgenReset,
         mapName: this.mapName,
         // Save brush data for proper restoration
         detectedTileData: Array.from(this.detectedTileData.entries()),
@@ -8832,6 +8916,21 @@ export class TileMapEditor {
 
       this.mapWidth = typeof data.mapWidth === 'number' ? data.mapWidth : this.mapWidth;
       this.mapHeight = typeof data.mapHeight === 'number' ? data.mapHeight : this.mapHeight;
+      if (typeof data.tileSizeX === 'number' || typeof data.tileSizeY === 'number' || typeof data.orientation === 'string') {
+        this.setGroundTileSize({
+          width: typeof data.tileSizeX === 'number' ? data.tileSizeX : undefined,
+          height: typeof data.tileSizeY === 'number' ? data.tileSizeY : undefined,
+          orientation: typeof data.orientation === 'string' ? data.orientation : undefined,
+        }, false);
+      }
+      this.setMapPresentation({
+        parallax: typeof data.parallax === 'string' ? data.parallax : '',
+        fogofwar: typeof data.fogofwar === 'string' ? data.fogofwar : '',
+        save_fogofwar: typeof data.save_fogofwar === 'string' ? data.save_fogofwar : '',
+        procgen_type: typeof data.procgen_type === 'string' ? data.procgen_type : '',
+        procgen_unique_status: typeof data.procgen_unique_status === 'string' ? data.procgen_unique_status : '',
+        procgen_reset_status: typeof data.procgen_reset_status === 'string' ? data.procgen_reset_status : '',
+      });
       this.tileLayers = (Array.isArray(data.layers) ? data.layers : this.tileLayers) as TileLayer[];
       const loadedObjects = this.normalizeLoadedObjects((Array.isArray(data.objects) ? data.objects : []) as MapObject[]);
       this.objects = loadedObjects;
@@ -9184,6 +9283,14 @@ export class TileMapEditor {
       width: this.mapWidth,
       height: this.mapHeight,
       tileSize: this.tileSizeX,
+      tileHeight: this.tileSizeY,
+      orientation: this.orientation,
+      parallax: this.mapParallax,
+      fogofwar: this.mapFog,
+      save_fogofwar: this.mapSaveFog,
+      procgen_type: this.mapProcgenType,
+      procgen_unique_status: this.mapProcgenUnique,
+      procgen_reset_status: this.mapProcgenReset,
       layers: this.getLayers(),
       objects: this.getMapObjects(),
       tilesets: tilesets.length > 0 ? tilesets : undefined,
@@ -10262,6 +10369,14 @@ export class TileMapEditor {
     this.heroX = 0;
     this.heroY = 0;
     this.isDraggingHero = false;
+    this.setMapPresentation({
+      parallax: '',
+      fogofwar: '',
+      save_fogofwar: '',
+      procgen_type: '',
+      procgen_unique_status: '',
+      procgen_reset_status: '',
+    });
     
     // Reset layer-specific tilesets (per-map data)
     this.layerTilesets.clear();
@@ -10875,6 +10990,22 @@ export class TileMapEditor {
         this.heroX = 0;
         this.heroY = 0;
       }
+
+      if (typeof projectData.tileSize === 'number' || typeof projectData.tileHeight === 'number' || projectData.orientation) {
+        this.setGroundTileSize({
+          width: projectData.tileSize,
+          height: projectData.tileHeight,
+          orientation: projectData.orientation,
+        }, false);
+      }
+      this.setMapPresentation({
+        parallax: typeof projectData.parallax === 'string' ? projectData.parallax : '',
+        fogofwar: typeof projectData.fogofwar === 'string' ? projectData.fogofwar : '',
+        save_fogofwar: typeof projectData.save_fogofwar === 'string' ? projectData.save_fogofwar : '',
+        procgen_type: typeof projectData.procgen_type === 'string' ? projectData.procgen_type : '',
+        procgen_unique_status: typeof projectData.procgen_unique_status === 'string' ? projectData.procgen_unique_status : '',
+        procgen_reset_status: typeof projectData.procgen_reset_status === 'string' ? projectData.procgen_reset_status : '',
+      });
       
       this.ensureCollisionTileset();
       

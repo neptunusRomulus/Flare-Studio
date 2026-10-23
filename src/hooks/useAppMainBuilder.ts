@@ -1067,6 +1067,7 @@ export default function useAppMainBuilder() {
       dialogsCtx: (() => {
         const dialogCtx = {
           ...(dialogsCtx as Record<string, unknown>),
+          editor,
           // Actor dialog state and handlers
           actorDialogState: objectEditing.actorDialogState,
           setActorDialogState: objectEditing.setActorDialogState,

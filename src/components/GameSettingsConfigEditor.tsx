@@ -5,6 +5,7 @@ import { Save, RefreshCw, Search, ChevronDown, ChevronUp, Settings, Sword, Gamep
 import { useAppContext } from '@/context/AppContext';
 import { toast } from '@/hooks/use-toast';
 import { loadConfigDocument, saveConfigDocument } from '@/editor/projectFiles';
+import { TileSizeForm } from '@/components/studio/studioEditors';
 
 type Props = {
   leftCollapsed: boolean;
@@ -132,6 +133,12 @@ export default function GameSettingsConfigEditor({ leftCollapsed }: Props) {
             </Button>
           </div>
         </div>
+
+        {activeFile === 'tileset_config' && (
+          <div className="border-b border-border p-2">
+            <TileSizeForm onSaved={() => { void loadFile('tileset_config'); }} />
+          </div>
+        )}
 
         {/* Content Area */}
         <div className="flex-1 overflow-auto p-3 font-mono text-sm">

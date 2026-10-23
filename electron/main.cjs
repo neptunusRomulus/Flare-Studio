@@ -45,7 +45,7 @@ function writeProjectSettings(projectPath, projectName) {
   return true;
 }
 
-function ensureProjectEngineFiles(projectPath) {
+function ensureProjectEngineFiles(projectPath, tile) {
   const engineDir = path.join(projectPath, "engine");
   fs.mkdirSync(engineDir, { recursive: true });
 
@@ -66,7 +66,7 @@ function ensureProjectEngineFiles(projectPath) {
 
   const tilesetConfigPath = path.join(engineDir, "tileset_config.txt");
   if (!fs.existsSync(tilesetConfigPath)) {
-    fs.writeFileSync(tilesetConfigPath, flareAdapter.exportTilesetConfig(), "utf8");
+    fs.writeFileSync(tilesetConfigPath, flareAdapter.exportTilesetConfig(tile), "utf8");
   }
   return { savePrefix: ensured.prefix, miscPath };
 }
@@ -680,12 +680,20 @@ ipcMainLocal.handle("create-map-project", async (event, config) => {
       fs.mkdirSync(projectPath, { recursive: true });
     }
 
+    const tile = {
+      width: Number(config.tileSize) || 64,
+      height: Number(config.tileHeight) || 32,
+      orientation: config.orientation === "orthogonal" ? "orthogonal" : "isometric",
+    };
+
     // Create basic project structure
     const mapData = {
       name: config.name,
       width: config.width,
       height: config.height,
-      tileSize: config.tileSize,
+      tileSize: tile.width,
+      tileHeight: tile.height,
+      orientation: tile.orientation,
       layers: [],
       tilesets: [],
       version: "1.0",
@@ -694,10 +702,18 @@ ipcMainLocal.handle("create-map-project", async (event, config) => {
     // Save map configuration
     const mapConfigPath = path.join(projectPath, `${config.name}.json`);
     fs.writeFileSync(mapConfigPath, JSON.stringify(mapData, null, 2));
+    const project = flareAdapter.emptyProject(config.name);
+    project.tile = tile;
+    const tilesetText = flareAdapter.exportTilesetConfig(tile);
     writeAdapterFile(
       projectPath,
       "project.json",
-      `${JSON.stringify(flareAdapter.emptyProject(config.name), null, 2)}\n`
+      `${JSON.stringify(project, null, 2)}\n`
+    );
+    writeAdapterFile(
+      projectPath,
+      "content/documents/engine/tileset_config.txt.json",
+      flareAdapter.canonicalJson("document", { path: "engine/tileset_config.txt", text: tilesetText })
     );
 
     // Create images/tilesets folder structure
@@ -720,7 +736,7 @@ ipcMainLocal.handle("create-map-project", async (event, config) => {
     // do not replace a file the user already edited.
     try {
       writeProjectSettings(projectPath, config.name);
-      ensureProjectEngineFiles(projectPath);
+      ensureProjectEngineFiles(projectPath, tile);
     } catch (settingsErr) {
       console.warn(
         "Failed to write default settings.txt during project creation:",

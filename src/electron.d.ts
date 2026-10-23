@@ -19,6 +19,8 @@ interface MapConfig {
   width: number;
   height: number;
   tileSize: number;
+  tileHeight?: number;
+  orientation?: 'isometric' | 'orthogonal';
   location: string;
   isStartingMap?: boolean;
 }

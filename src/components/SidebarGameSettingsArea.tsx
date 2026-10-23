@@ -1,10 +1,11 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { Settings, Users, Sword, Tag, FileText, Database, Wrench, Layers, Palette, Gamepad2 } from 'lucide-react';
+import { Settings, Users, Sword, Tag, FileText, Database, Wrench, Layers, Palette, Gamepad2, Library } from 'lucide-react';
 import ItemConfigEditor from './ItemConfigEditor';
 import StatusConfigEditor from './StatusConfigEditor';
 import ActorConfigEditor from './ActorConfigEditor';
 import GameSettingsConfigEditor from './GameSettingsConfigEditor';
+import { StudioWorldPanel } from './studio/studioEditors';
 
 type Props = {
   isGameSettingsLayer: boolean;
@@ -14,13 +15,14 @@ type Props = {
 export default function SidebarGameSettingsArea({ isGameSettingsLayer, leftCollapsed }: Props) {
   if (!isGameSettingsLayer) return null;
 
-  const [activeTab, setActiveTab] = React.useState<'items' | 'statuses' | 'actors' | 'game'>('items');
+  const [activeTab, setActiveTab] = React.useState<'items' | 'statuses' | 'actors' | 'game' | 'world'>('items');
 
   const tabs = [
     { id: 'items' as const, icon: Sword, label: 'Items', description: 'Items, categories, qualities' },
     { id: 'statuses' as const, icon: Tag, label: 'Statuses', description: 'Damage types, stats, resources' },
     { id: 'actors' as const, icon: Users, label: 'Actors', description: 'Classes, powers, spells, equip flags' },
     { id: 'game' as const, icon: Settings, label: 'Game', description: 'Combat, gameplay, UI, global settings' },
+    { id: 'world' as const, icon: Library, label: 'World', description: 'Cutscenes, languages, parallax, fog, procgen' },
   ];
 
   return (
@@ -50,6 +52,7 @@ export default function SidebarGameSettingsArea({ isGameSettingsLayer, leftColla
         {activeTab === 'statuses' && <StatusConfigEditor leftCollapsed={leftCollapsed} />}
         {activeTab === 'actors' && <ActorConfigEditor leftCollapsed={leftCollapsed} />}
         {activeTab === 'game' && <GameSettingsConfigEditor leftCollapsed={leftCollapsed} />}
+        {activeTab === 'world' && <StudioWorldPanel />}
       </div>
     </div>
   );

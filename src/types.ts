@@ -1,7 +1,7 @@
 export interface TileLayer {
   id: number;
   name: string;
-  type: 'background' | 'object' | 'collision' | 'event' | 'enemy' | 'npc' | 'items' | 'status' | 'rules' | 'actions' | 'gameSettings';
+  type: 'background' | 'object' | 'collision' | 'event' | 'enemy' | 'npc' | 'items' | 'status' | 'rules' | 'actions' | 'gameSettings' | (string & {});
   data: number[];
   visible: boolean;
   transparency?: number; // 0-1, where 1 is fully opaque
@@ -232,6 +232,50 @@ export interface FlareNPCExportResult {
   npcFileContent: string;
 }
 
+export interface DialogueRequirement {
+  id: string;
+  type: 'status' | 'not_status' | 'item' | 'not_item' | 'level' | 'not_level' | 'currency' | 'not_currency' | 'class' | 'not_class';
+  value: string;
+}
+
+export interface DialogueLine {
+  id: string;
+  speaker: 'npc' | 'player';
+  text: string;
+  voice?: string;
+  portrait?: string;
+}
+
+export interface DialogueReward {
+  id?: string;
+  type: 'xp' | 'gold' | 'item' | 'remove_gold' | 'remove_item' | 'restore' | 'msg';
+  value: string;
+  quantity?: number;
+}
+
+export interface DialogueWorldEffect {
+  id?: string;
+  type: 'set_status' | 'unset_status' | 'teleport' | 'spawn' | 'cutscene' | 'sound' | 'npc';
+  value: string;
+}
+
+export interface DialogueTree {
+  id: string;
+  dialogueId: string;
+  topic: string;
+  group?: string;
+  responseOnly?: boolean;
+  responses: string[];
+  requirements: DialogueRequirement[];
+  dialogues: DialogueLine[];
+  rewards: DialogueReward[];
+  worldEffects: DialogueWorldEffect[];
+  _reqExpanded?: boolean;
+  _dlgExpanded?: boolean;
+  _rewExpanded?: boolean;
+  _wfExpanded?: boolean;
+}
+
 export interface UndoRedoState {
   layerData: number[];
   collisionData: number[];
@@ -306,6 +350,7 @@ export type StampMode = 'select' | 'create' | 'place';
  */
 export interface AssetRecord {
   id: string;                    // Unique identifier for this asset within the project
+  name?: string;
   profileId: string;             // Reference to parent TilesetProfile that defines this asset
   
   // Source rectangle within the tileset image

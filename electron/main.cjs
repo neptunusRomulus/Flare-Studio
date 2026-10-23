@@ -9,8 +9,202 @@ const {
 const path = require("path");
 const fs = require("fs");
 const { validateSerializedFlareData, loadFlareDataSchema } = require("./flareDataValidator.cjs");
+const flareLaunch = require("./flareLaunch.cjs");
+const flareAdapter = require("../src/adapters/flare/flareAdapter.cjs");
 const isDev = !app.isPackaged;
 const validationRoot = path.join(__dirname, "..");
+const PLAY_SESSION_DIR = ".flare-studio";
+const PLAY_SESSION_FILE = "play-session.json";
+
+function currentPathUser() {
+  return flareLaunch.resolvePathUser(process.platform, process.env, process.cwd());
+}
+
+function writeProjectSettings(projectPath, projectName) {
+  const settingsPath = path.join(projectPath, "settings.txt");
+  const existing = fs.existsSync(settingsPath) ? fs.readFileSync(settingsPath, "utf8") : null;
+  const plan = flareLaunch.planSettingsWrite(existing, projectName || path.basename(projectPath));
+  if (!plan.write) return false;
+  fs.writeFileSync(settingsPath, plan.content, "utf8");
+  console.log("Wrote settings.txt at", settingsPath);
+  return true;
+}
+
+function ensureProjectEngineFiles(projectPath) {
+  const engineDir = path.join(projectPath, "engine");
+  fs.mkdirSync(engineDir, { recursive: true });
+
+  const gameplayPath = path.join(engineDir, "gameplay.txt");
+  const gameplayBefore = fs.existsSync(gameplayPath) ? fs.readFileSync(gameplayPath, "utf8") : "";
+  const gameplayAfter = flareLaunch.upsertKey(gameplayBefore, "enable_playgame", "1", { appendIfEmpty: true });
+  if (gameplayAfter !== gameplayBefore) {
+    fs.writeFileSync(gameplayPath, gameplayAfter, "utf8");
+  }
+
+  const miscPath = path.join(engineDir, "misc.txt");
+  const miscBefore = fs.existsSync(miscPath) ? fs.readFileSync(miscPath, "utf8") : "";
+  const suggested = flareLaunch.readKey(miscBefore, "save_prefix") || flareLaunch.slugSavePrefix(path.basename(projectPath));
+  const ensured = flareLaunch.ensureSavePrefix(miscBefore, suggested);
+  if (ensured.content !== miscBefore) {
+    fs.writeFileSync(miscPath, ensured.content, "utf8");
+  }
+
+  const tilesetConfigPath = path.join(engineDir, "tileset_config.txt");
+  if (!fs.existsSync(tilesetConfigPath)) {
+    fs.writeFileSync(tilesetConfigPath, flareAdapter.exportTilesetConfig(), "utf8");
+  }
+  return { savePrefix: ensured.prefix, miscPath };
+}
+
+function writeAdapterFile(projectPath, relativePath, content) {
+  const dest = path.join(projectPath, relativePath);
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  fs.writeFileSync(dest, content, "utf8");
+}
+
+function collectProjectText(projectPath) {
+  const files = {};
+  const skipNames = new Set(["node_modules", ".git"]);
+  const walk = (dir, rel) => {
+    if (!fs.existsSync(dir)) return;
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (skipNames.has(entry.name)) continue;
+      const childRel = rel ? `${rel}/${entry.name}` : entry.name;
+      if (childRel === ".editor/migration-backup" || childRel.startsWith(".editor/migration-backup/")) continue;
+      const abs = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        walk(abs, childRel);
+      } else if (/\.(txt|json)$/i.test(entry.name)) {
+        files[childRel] = fs.readFileSync(abs, "utf8");
+      }
+    }
+  };
+  walk(projectPath, "");
+  return files;
+}
+
+function migrateProjectIfNeeded(projectPath) {
+  const indexPath = path.join(projectPath, "project.json");
+  if (fs.existsSync(indexPath)) return { migrated: false };
+  const files = collectProjectText(projectPath);
+  if (Object.keys(files).length === 0) {
+    writeAdapterFile(
+      projectPath,
+      "project.json",
+      `${JSON.stringify(flareAdapter.emptyProject(path.basename(projectPath)), null, 2)}\n`
+    );
+    return { migrated: false, created: true };
+  }
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const backupRoot = path.join(projectPath, ".editor", "migration-backup", stamp);
+  for (const [rel, content] of Object.entries(files)) {
+    const dest = path.join(backupRoot, rel);
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.writeFileSync(dest, content, "utf8");
+  }
+  const result = flareAdapter.migrateFiles(files, path.basename(projectPath));
+  if (result.errors && result.errors.length > 0) {
+    console.warn("[migrate] kept the backup and did not write canonical files:", result.errors);
+    return { migrated: false, errors: result.errors, backup: backupRoot };
+  }
+  for (const file of result.files) writeAdapterFile(projectPath, file.path, file.content);
+  console.log("[migrate] wrote canonical project from", backupRoot);
+  return { migrated: true, backup: backupRoot };
+}
+
+function rememberCanonicalMap(projectPath, mapName, mapTxt) {
+  const imported = flareAdapter.importMapText(mapTxt);
+  const id = flareAdapter.slugFileName(mapName);
+  imported.id = id;
+  const indexPath = path.join(projectPath, "project.json");
+  let index = flareAdapter.emptyProject(path.basename(projectPath));
+  if (fs.existsSync(indexPath)) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(indexPath, "utf8"));
+      index = { ...index, ...parsed, meta: { ...index.meta, ...(parsed.meta || {}) } };
+    } catch (err) {
+      console.warn("Ignoring unreadable project.json:", err);
+    }
+  }
+  const maps = new Set(Array.isArray(index.maps) ? index.maps.map(String) : []);
+  maps.add(id);
+  index.schemaVersion = flareAdapter.SCHEMA_VERSION;
+  index.maps = Array.from(maps);
+  writeAdapterFile(projectPath, "project.json", `${JSON.stringify(index, null, 2)}\n`);
+  writeAdapterFile(projectPath, `content/maps/${id}.json`, `${JSON.stringify(imported, null, 2)}\n`);
+  const sessionPath = path.join(projectPath, ".editor", "session.json");
+  if (!fs.existsSync(sessionPath)) {
+    writeAdapterFile(projectPath, ".editor/session.json", `${JSON.stringify(flareAdapter.editorSession(), null, 2)}\n`);
+  }
+}
+
+function playSessionPath(projectPath) {
+  return path.join(projectPath, PLAY_SESSION_DIR, PLAY_SESSION_FILE);
+}
+
+function restoreSpawnBackup(projectPath) {
+  try {
+    const spawnPath = path.join(projectPath, "maps", "spawn.txt");
+    const backupPath = path.join(projectPath, "maps", "spawn.txt.bak");
+    if (!fs.existsSync(backupPath)) return false;
+    fs.copyFileSync(backupPath, spawnPath);
+    fs.unlinkSync(backupPath);
+    console.log("[FlareEngine] Restored original spawn.txt");
+    return true;
+  } catch (err) {
+    console.error("[FlareEngine] restore-spawn-backup error:", err);
+    return false;
+  }
+}
+
+function cleanupPlaySession(projectPath) {
+  if (!projectPath) return false;
+  const sessionFile = playSessionPath(projectPath);
+  let session = null;
+  if (fs.existsSync(sessionFile)) {
+    try {
+      session = JSON.parse(fs.readFileSync(sessionFile, "utf8"));
+    } catch (err) {
+      console.warn("[FlareEngine] Ignoring unreadable play session:", err);
+    }
+  }
+
+  if (session && typeof session.previousMisc === "string") {
+    const miscPath = path.join(projectPath, "engine", "misc.txt");
+    try {
+      fs.mkdirSync(path.dirname(miscPath), { recursive: true });
+      fs.writeFileSync(miscPath, session.previousMisc, "utf8");
+    } catch (err) {
+      console.error("[FlareEngine] Failed to restore engine/misc.txt:", err);
+    }
+  }
+
+  if (session && session.testSaveDir) {
+    try {
+      const savesRoot = path.join(currentPathUser(), "saves");
+      const relative = path.relative(path.resolve(savesRoot), path.resolve(session.testSaveDir));
+      const safe = relative && !relative.startsWith("..") && !path.isAbsolute(relative);
+      if (safe) {
+        fs.rmSync(session.testSaveDir, { recursive: true, force: true });
+        console.log("[FlareEngine] Removed test save", session.testSaveDir);
+      } else {
+        console.warn("[FlareEngine] Refusing to delete test save outside path_user/saves:", session.testSaveDir);
+      }
+    } catch (err) {
+      console.error("[FlareEngine] Failed to delete test save:", err);
+    }
+  }
+
+  if (fs.existsSync(sessionFile)) {
+    try {
+      fs.unlinkSync(sessionFile);
+    } catch {
+      /* ignore */
+    }
+  }
+  restoreSpawnBackup(projectPath);
+  return Boolean(session);
+}
 
 const getPlatformIcon = () => {
   // PNG works for taskbar/window icon on both Windows and Linux
@@ -53,6 +247,17 @@ function createWindow() {
 
   mainWindow.on("closed", () => {
     mainWindow = null;
+  });
+
+  // The title-bar close button asks the renderer before the window goes away.
+  mainWindow.on("close", (event) => {
+    if (allowQuit) return;
+    event.preventDefault();
+    if (closePromptOpen) return;
+    closePromptOpen = true;
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("before-close");
+    }
   });
 
   // Create application menu
@@ -201,14 +406,12 @@ ipcMainLocal.handle(
         fs.mkdirSync(enemiesDir, { recursive: true });
       }
 
-      // Sanitize filename and ensure .txt extension
-      let safeName = filename
-        .replace(/[<>:"/\\|?*]/g, "_")
-        .replace(/\s+/g, "_");
-      if (!safeName.toLowerCase().endsWith(".txt")) safeName += ".txt";
+      const base = path.basename(String(filename)).replace(/\.txt$/i, "");
+      const safeName = `${flareAdapter.slugFileName(base)}.txt`;
+      const normalized = flareAdapter.normalizeEnemyText(content);
 
       const filePath = path.join(enemiesDir, safeName);
-      fs.writeFileSync(filePath, content, "utf8");
+      fs.writeFileSync(filePath, normalized.text, "utf8");
       console.log("Enemy preset saved:", filePath);
       return true;
     } catch (e) {
@@ -231,8 +434,8 @@ ipcMainLocal.handle(
         fs.mkdirSync(npcsFolder, { recursive: true });
       }
 
-      // Get just the filename part (strip npcs/ prefix if present)
-      const npcFilename = filename.replace(/^npcs[\/\\]/, "");
+      const npcBase = path.basename(String(filename)).replace(/\.txt$/i, "");
+      const npcFilename = `${flareAdapter.slugFileName(npcBase)}.txt`;
       const npcFilePath = path.join(npcsFolder, npcFilename);
 
       // Write the file
@@ -261,7 +464,7 @@ ipcMainLocal.handle("list-maps", async (event, projectPath) => {
     const rootFiles = fs.readdirSync(projectPath);
     for (const f of rootFiles) {
       const lower = f.toLowerCase();
-      if (lower.endsWith(".json") && lower !== ".flare-session.json") {
+      if (lower.endsWith(".json") && lower !== ".flare-session.json" && lower !== "project.json") {
         // Read the file to check if it's a valid map (has layers array with content)
         try {
           const filePath = path.join(projectPath, f);
@@ -471,6 +674,11 @@ ipcMainLocal.handle("create-map-project", async (event, config) => {
     // Save map configuration
     const mapConfigPath = path.join(projectPath, `${config.name}.json`);
     fs.writeFileSync(mapConfigPath, JSON.stringify(mapData, null, 2));
+    writeAdapterFile(
+      projectPath,
+      "project.json",
+      `${JSON.stringify(flareAdapter.emptyProject(config.name), null, 2)}\n`
+    );
 
     // Create images/tilesets folder structure
     const imagesPath = path.join(projectPath, "images");
@@ -488,16 +696,11 @@ ipcMainLocal.handle("create-map-project", async (event, config) => {
       fs.mkdirSync(mapsPath);
     }
 
-    // Create a default settings.txt in the project root so the project is recognized by Flare
+    // settings.txt is the mod manifest. Write it from the project name, and
+    // do not replace a file the user already edited.
     try {
-      const settingsContent =
-        `description=${config.name || "--> Project Name comes here."}\n` +
-        `game=flare-game\n` +
-        `version=1.14\n` +
-        `engine_version_min=1.13.01\n`;
-      const settingsPath = path.join(projectPath, "settings.txt");
-      fs.writeFileSync(settingsPath, settingsContent, "utf8");
-      console.log("Created default settings.txt at", settingsPath);
+      writeProjectSettings(projectPath, config.name);
+      ensureProjectEngineFiles(projectPath);
     } catch (settingsErr) {
       console.warn(
         "Failed to write default settings.txt during project creation:",
@@ -519,6 +722,11 @@ ipcMainLocal.handle("open-map-project", async (event, projectPath, mapName) => {
     console.log("=== ELECTRON LOAD DEBUG ===");
     console.log("Loading project from:", projectPath);
     console.log("Requested map name:", mapName);
+    try {
+      migrateProjectIfNeeded(projectPath);
+    } catch (migrateErr) {
+      console.warn("Canonical migration failed:", migrateErr);
+    }
 
     // Look for map configuration file. If a specific mapName is provided
     // ONLY load that specific file - do NOT fall back to a random JSON file.
@@ -545,7 +753,10 @@ ipcMainLocal.handle("open-map-project", async (event, projectPath, mapName) => {
       // No specific map requested - find the first valid map file
       mapFile =
         files.find(
-          (file) => file.endsWith(".json") && file !== SESSION_FILENAME
+          (file) =>
+            file.endsWith(".json") &&
+            file !== SESSION_FILENAME &&
+            file !== "project.json"
         ) || null;
     }
 
@@ -945,17 +1156,7 @@ ipcMainLocal.handle(
         fs.mkdirSync(tilesetDefsDir, { recursive: true });
       }
 
-      const sanitize = (input) => {
-        return (
-          String(input || "")
-            .replace(/[<>:"/\|?*]/g, "_")
-            .trim()
-            .replace(/\s+/g, "_")
-            .replace(/_{2,}/g, "_") || "Map_Name"
-        );
-      };
-
-      const sanitizedMapName = sanitize(mapName);
+      const sanitizedMapName = flareLaunch.sanitizeMapFileName(mapName);
       const mapFilePath = path.join(mapsDir, `${sanitizedMapName}.txt`);
       const tilesetFilePath = path.join(
         tilesetDefsDir,
@@ -965,14 +1166,28 @@ ipcMainLocal.handle(
       const validationSchema = loadFlareDataSchema(validationRoot);
       const validationResults = [];
       const mapTargetPath = path.join("maps", `${sanitizedMapName}.txt`).split(path.sep).join("/");
+      const adapterMapErrors = flareAdapter
+        .validateText("maps", mapTxt, mapTargetPath)
+        .filter((issue) => issue.level === "error")
+        .map((issue) => issue.message);
+      if (adapterMapErrors.length > 0) {
+        return {
+          success: false,
+          message: `Export refused: ${adapterMapErrors.join(" | ")}`,
+          validation: {
+            success: false,
+            fileResults: [{ filePath: mapTargetPath, category: "maps", errors: adapterMapErrors, warnings: [] }],
+          },
+        };
+      }
       validationResults.push(
-        validateSerializedFlareData(validationRoot, mapTargetPath, mapTxt, validationSchema)
+        validateSerializedFlareData(projectPath, mapTargetPath, mapTxt, validationSchema)
       );
 
       if (options.spawn && options.spawn.enabled && typeof options.spawn.content === 'string') {
         const spawnFile = path.join("maps", options.spawn.filename || "spawn.txt").split(path.sep).join("/");
         validationResults.push(
-          validateSerializedFlareData(validationRoot, spawnFile, options.spawn.content, validationSchema)
+          validateSerializedFlareData(projectPath, spawnFile, options.spawn.content, validationSchema)
         );
       }
 
@@ -981,7 +1196,7 @@ ipcMainLocal.handle(
           if (npcFile && npcFile.filename && typeof npcFile.content === 'string') {
             const npcTarget = path.join("npcs", npcFile.filename).split(path.sep).join("/");
             validationResults.push(
-              validateSerializedFlareData(validationRoot, npcTarget, npcFile.content, validationSchema)
+              validateSerializedFlareData(projectPath, npcTarget, npcFile.content, validationSchema)
             );
           }
         }
@@ -1010,21 +1225,17 @@ ipcMainLocal.handle(
 
       fs.writeFileSync(mapFilePath, mapTxt, "utf8");
       fs.writeFileSync(tilesetFilePath, tilesetDef, "utf8");
-
-      // Also create a settings.txt in the project root so the exported mod is recognized by Flare
       try {
-        const settingsContent =
-          `description=${
-            (mapName && String(mapName).trim()) ||
-            sanitizedMapName ||
-            "--> Project Name comes here."
-          }\n` +
-          `game=flare-game\n` +
-          `version=1.14\n` +
-          `engine_version_min=1.13.01\n`;
-        const settingsPath = path.join(projectPath, "settings.txt");
-        fs.writeFileSync(settingsPath, settingsContent, "utf8");
-        console.log("Created settings.txt at", settingsPath);
+        rememberCanonicalMap(projectPath, mapName, mapTxt);
+      } catch (canonicalErr) {
+        console.warn("Failed to refresh canonical project.json:", canonicalErr);
+      }
+
+      // Keep the mod manifest stable across exports. The map name is not the
+      // mod description; an existing settings.txt is only filled in, not replaced.
+      try {
+        writeProjectSettings(projectPath, path.basename(projectPath));
+        ensureProjectEngineFiles(projectPath);
       } catch (settingsErr) {
         console.warn("Failed to write settings.txt:", settingsErr);
       }
@@ -1463,12 +1674,105 @@ function createMenu() {
   Menu.setApplicationMenu(menu);
 }
 
+let allowQuit = false;
+let closePromptOpen = false;
+let shutdownWait = null;
+let shutdownTimer = null;
+
+function requestRendererShutdown() {
+  return new Promise((resolve) => {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      resolve();
+      return;
+    }
+    if (shutdownTimer) clearTimeout(shutdownTimer);
+    shutdownTimer = setTimeout(() => {
+      console.warn("[Shutdown] Timed out waiting for the renderer; quitting anyway");
+      shutdownWait = null;
+      shutdownTimer = null;
+      resolve();
+    }, 35000);
+    shutdownWait = () => {
+      if (shutdownTimer) clearTimeout(shutdownTimer);
+      shutdownTimer = null;
+      shutdownWait = null;
+      resolve();
+    };
+    console.log("[Shutdown] Requesting renderer to flush pending saves");
+    mainWindow.webContents.send("app-before-quit");
+  });
+}
+
+async function finishClose() {
+  await requestRendererShutdown();
+  allowQuit = true;
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.destroy();
+  }
+  app.quit();
+}
+
 app.whenReady().then(createWindow);
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     app.quit();
   }
+});
+
+// Quit only after the renderer finishes pending saves.
+app.on("before-quit", (event) => {
+  if (allowQuit) return;
+  event.preventDefault();
+  requestRendererShutdown()
+    .catch((err) => console.error("[Shutdown] Failed while flushing saves:", err))
+    .finally(() => {
+      allowQuit = true;
+      app.quit();
+    });
+});
+
+ipcMainLocal.on("app-shutdown-complete", () => {
+  console.log("[Shutdown] Renderer finished pending saves");
+  if (shutdownWait) shutdownWait();
+});
+
+ipcMainLocal.handle("confirm-close", async (_event, hasUnsavedChanges) => {
+  closePromptOpen = false;
+  if (!hasUnsavedChanges) {
+    await finishClose();
+    return true;
+  }
+
+  const result = await dialog.showMessageBox(mainWindow, {
+    type: "warning",
+    title: "Unsaved Changes",
+    message: "You have unsaved changes.",
+    detail: "Save before closing?",
+    buttons: ["Save and Close", "Close Without Saving", "Cancel"],
+    defaultId: 0,
+    cancelId: 2,
+  });
+
+  if (result.response === 0) {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("save-and-close");
+    }
+    return false;
+  }
+  if (result.response === 1) {
+    allowQuit = true;
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.destroy();
+    }
+    app.quit();
+    return true;
+  }
+  return false;
+});
+
+ipcMainLocal.on("close-after-save", () => {
+  finishClose().catch((err) => console.error("[Shutdown] close-after-save failed:", err));
 });
 
 app.on("activate", () => {
@@ -1498,18 +1802,7 @@ ipcMainLocal.handle("create-npc-file", async (event, projectPath, npcData) => {
     }
 
     // Sanitize NPC name for filename
-    const sanitize = (input) => {
-      return (
-        String(input || "")
-          .toLowerCase()
-          .replace(/[<>:"/\\|?*]/g, "_")
-          .trim()
-          .replace(/\s+/g, "_")
-          .replace(/_{2,}/g, "_") || "unnamed_npc"
-      );
-    };
-
-    const sanitizedName = sanitize(npcData.name);
+    const sanitizedName = flareAdapter.slugFileName(npcData.name);
 
     // Only generate the sanitized filename here — the actual NPC .txt content
     // is written by the save-export flow (saveExportFiles) which produces the
@@ -1668,15 +1961,36 @@ function appendItemLines(lines, item) {
  * Rebuild a category .txt file from a full list of items (all belonging to this category).
  * For each item, writes an optional role comment, then the [item] block with all fields.
  */
-function writeCategoryFile(filePath, items) {
-  const lines = [];
-  for (const item of items) {
-    lines.push("");
-    lines.push("[item]");
-    appendItemLines(lines, item);
+function projectPathFromItemFile(filePath) {
+  const dir = path.dirname(filePath);
+  if (path.basename(dir) === "categories") return path.dirname(path.dirname(dir));
+  return path.dirname(dir);
+}
+
+function mergePowerFile(projectPath, powers) {
+  if (!projectPath || !powers || powers.length === 0) return;
+  const file = path.join(projectPath, "powers", "powers.txt");
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const existing = fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
+  const fresh = powers.filter((power) => {
+    const id = power && power.id != null ? String(power.id) : "";
+    if (!id) return true;
+    return !new RegExp(`^id=${id}$`, "m").test(existing);
+  });
+  if (fresh.length === 0) return;
+  const block = flareAdapter.exportPowerFile(fresh).replace(/^APPEND\s*\n/, "");
+  if (!existing.trim()) {
+    fs.writeFileSync(file, flareAdapter.exportPowerFile(fresh), "utf8");
+    return;
   }
-  lines.push("");
-  fs.writeFileSync(filePath, lines.join("\n"), "utf8");
+  const base = /^APPEND\b/m.test(existing) ? existing : flareAdapter.withAppend(existing);
+  fs.writeFileSync(file, `${base.endsWith("\n") ? base : `${base}\n`}\n${block}`, "utf8");
+}
+
+function writeCategoryFile(filePath, items) {
+  const rendered = flareAdapter.exportItemFile(items, { append: true });
+  fs.writeFileSync(filePath, rendered.text, "utf8");
+  mergePowerFile(projectPathFromItemFile(filePath), rendered.powers);
 }
 
 /**
@@ -1688,44 +2002,14 @@ function rebuildItemsIndex(projectPath) {
   const categoriesDir = path.join(itemsDir, "categories");
   if (!fs.existsSync(itemsDir)) return;
 
-  const lines = [
-    "####################",
-    "# Item Definitions #",
-    "####################",
-    ""
-  ];
-
-  // Check for 'Default' items embedded in items/items.txt itself
   const itemsIndexFile = path.join(itemsDir, "items.txt");
-  let defaultItems = [];
-  if (fs.existsSync(itemsIndexFile)) {
-    // Preserve any non-include content that was hand-authored
-    defaultItems = parseItemsInCategoryFile(itemsIndexFile);
-  }
-
-  // If there are default items, embed them directly
-  if (defaultItems.length > 0) {
-    lines.push("# Default items");
-    lines.push("");
-    for (const item of defaultItems) {
-      lines.push("");
-      lines.push("[item]");
-      appendItemLines(lines, item);
-      lines.push("");
-    }
-  }
-
-  // Add INCLUDE directives for each category .txt file
-  if (fs.existsSync(categoriesDir)) {
-    const entries = fs.readdirSync(categoriesDir);
-    const txtFiles = entries.filter(f => f.toLowerCase().endsWith(".txt")).sort();
-    for (const f of txtFiles) {
-      lines.push(`INCLUDE items/categories/${f}`);
-    }
-  }
-
-  lines.push("");
-  fs.writeFileSync(itemsIndexFile, lines.join("\n"), "utf8");
+  const defaultItems = fs.existsSync(itemsIndexFile) ? parseItemsInCategoryFile(itemsIndexFile) : [];
+  const includes = fs.existsSync(categoriesDir)
+    ? fs.readdirSync(categoriesDir).filter((f) => f.toLowerCase().endsWith(".txt")).sort().map((f) => `items/categories/${f}`)
+    : [];
+  const rendered = flareAdapter.exportItemFile(defaultItems, { append: true, includes });
+  fs.writeFileSync(itemsIndexFile, rendered.text, "utf8");
+  mergePowerFile(projectPath, rendered.powers);
   console.log("Rebuilt items index:", itemsIndexFile);
 }
 
@@ -1837,7 +2121,7 @@ name=Currency
 color=255,232,156
 overlay_icon=1031
 `;
-      fs.writeFileSync(qualitiesFile, qualitiesContent, "utf8");
+      fs.writeFileSync(qualitiesFile, flareAdapter.withAppend(qualitiesContent), "utf8");
       console.log("Created qualities.txt file:", qualitiesFile);
     }
 
@@ -2113,30 +2397,13 @@ function rebuildDefaultItems(itemsTxtPath, defaultItems, projectPath) {
   const itemsDir = path.join(projectPath, "items");
   if (!fs.existsSync(itemsDir)) return;
 
-  const lines = [];
-  lines.push("####################");
-  lines.push("# Item Definitions #");
-  lines.push("####################");
-  lines.push("");
-
-  for (const item of defaultItems) {
-    lines.push("[item]");
-    appendItemLines(lines, item);
-    lines.push("");
-  }
-
-  // Add INCLUDE lines for category files
   const categoriesDir = path.join(itemsDir, "categories");
-  if (fs.existsSync(categoriesDir)) {
-    const entries = fs.readdirSync(categoriesDir);
-    const txtFiles = entries.filter(f => f.toLowerCase().endsWith(".txt")).sort();
-    for (const f of txtFiles) {
-      lines.push(`INCLUDE items/categories/${f}`);
-    }
-  }
-
-  lines.push("");
-  fs.writeFileSync(itemsTxtPath, lines.join("\n"), "utf8");
+  const includes = fs.existsSync(categoriesDir)
+    ? fs.readdirSync(categoriesDir).filter((f) => f.toLowerCase().endsWith(".txt")).sort().map((f) => `items/categories/${f}`)
+    : [];
+  const rendered = flareAdapter.exportItemFile(defaultItems, { append: true, includes });
+  fs.writeFileSync(itemsTxtPath, rendered.text, "utf8");
+  mergePowerFile(projectPath, rendered.powers);
 }
 
 // List all items in the project
@@ -2441,22 +2708,331 @@ ipcMainLocal.handle("delete-item-file", async (event, filePath) => {
 });
 
 // Launch Flare engine with optional arguments
-const { spawn: spawnProcess, execSync: execSyncProcess } = require("child_process");
+const { spawn: spawnProcess } = require("child_process");
 
 let activeFlareProcess = null;
-// Track junctions we created so we can clean them up on exit
+// Symlinks this process created under path_user/mods. They are left in place
+// so the next Play can reuse them; the set records what we added.
 const createdJunctions = new Set();
 
-// --- Select flare.exe via native file dialog ---
 ipcMainLocal.handle("select-flare-exe", async () => {
-  const result = await dialog.showOpenDialog(mainWindow, {
-    properties: ["openDirectory"],
-  });
-
+  const options = {
+    title: "Select the Flare executable",
+    properties: ["openFile"],
+  };
+  if (process.platform === "win32") {
+    options.filters = [
+      { name: "Flare executable", extensions: ["exe"] },
+      { name: "All files", extensions: ["*"] },
+    ];
+  }
+  const result = await dialog.showOpenDialog(mainWindow, options);
   if (!result.canceled && result.filePaths.length > 0) {
     return result.filePaths[0];
   }
   return null;
+});
+
+function flarePathProbe() {
+  return {
+    platform: process.platform,
+    exists: (candidate) => fs.existsSync(candidate),
+    isDirectory: (candidate) => {
+      try {
+        return fs.statSync(candidate).isDirectory();
+      } catch {
+        return false;
+      }
+    },
+  };
+}
+
+function readProjectMods(projectPath, flarePath) {
+  const modName = path.basename(String(projectPath || "").replace(/[\\/]+$/, ""));
+  const settingsPath = path.join(projectPath, "settings.txt");
+  const settingsText = fs.existsSync(settingsPath) ? fs.readFileSync(settingsPath, "utf8") : "";
+  const mods = flareLaunch.buildModList(flareLaunch.parseRequires(settingsText), modName);
+  const pathUser = currentPathUser();
+  const probe = flarePathProbe();
+  const target = flarePath ? flareLaunch.resolveFlareLaunchTarget(flarePath, probe) : null;
+  const dataPath = target && !target.error ? target.dataPath : flareLaunch.dataPathFromFlareSelection(flarePath || "");
+  const cwd = target && !target.error ? target.cwd : dataPath;
+  const passDataPath = Boolean(target && !target.error && target.passDataPath);
+  const missingMods = flareLaunch.findMissingMods(mods, {
+    pathUser,
+    dataPath,
+    cwd,
+    passDataPath,
+    platform: process.platform,
+    env: process.env,
+    projectModName: modName,
+    exists: probe.exists,
+  });
+  return { modName, mods, missingMods, pathUser, dataPath };
+}
+
+ipcMainLocal.handle("ensure-flare-mod-link", async (_event, { flarePath, projectPath } = {}) => {
+  try {
+    if (!projectPath) return { success: false, error: "Project path is required." };
+    const pathUser = currentPathUser();
+    fs.mkdirSync(path.join(pathUser, "mods"), { recursive: true });
+    fs.mkdirSync(path.join(pathUser, "saves"), { recursive: true });
+
+    const dataPath = flareLaunch.dataPathFromFlareSelection(flarePath || "");
+    const resolvedProject = path.resolve(projectPath);
+    const dataMods = dataPath ? path.resolve(dataPath, "mods") : "";
+    let linkResult;
+    if (dataMods && flareLaunch.isPathInside(dataMods, resolvedProject)) {
+      linkResult = {
+        success: true,
+        modName: path.basename(resolvedProject),
+        junctionCreated: false,
+      };
+    } else {
+      linkResult = flareLaunch.linkProjectMod(projectPath, pathUser);
+      if (linkResult.junctionCreated && linkResult.linkPath) {
+        createdJunctions.add(linkResult.linkPath);
+      }
+    }
+    if (!linkResult.success) return linkResult;
+
+    const modsInfo = readProjectMods(projectPath, flarePath);
+    return {
+      ...linkResult,
+      mods: modsInfo.mods,
+      missingMods: modsInfo.missingMods,
+    };
+  } catch (err) {
+    console.error("[FlareEngine] ensure-flare-mod-link error:", err);
+    return { success: false, error: err.message };
+  }
+});
+
+function readOptionalText(filePath) {
+  try {
+    if (!filePath || !fs.existsSync(filePath)) return "";
+    return fs.readFileSync(filePath, "utf8");
+  } catch {
+    return "";
+  }
+}
+
+function resolveQuickLaunchMap(projectPath, mapName, mode) {
+  if (mode === "new-game") {
+    const spawnText = readOptionalText(path.join(projectPath, "maps", "spawn.txt"))
+      || readOptionalText(path.join(projectPath, "maps", "spawn.txt.bak"));
+    const intermap = flareLaunch.parseIntermap(spawnText);
+    if (intermap) {
+      return { relativePath: intermap.map, x: intermap.x, y: intermap.y, fromIntermap: true };
+    }
+  }
+  const candidates = flareLaunch.candidateMapRelatives(mapName);
+  for (const relativePath of candidates) {
+    if (fs.existsSync(path.join(projectPath, relativePath))) {
+      return { relativePath, x: null, y: null, fromIntermap: false };
+    }
+  }
+  return { relativePath: candidates[0] || "", x: null, y: null, fromIntermap: false };
+}
+
+ipcMainLocal.handle("prepare-flare-quick-launch", async (_event, { flarePath, projectPath, mapName, mode } = {}) => {
+  let previousMisc = null;
+  let miscPath = null;
+  let testSaveDir = null;
+  try {
+    if (!projectPath) return { success: false, error: "Project path is required." };
+    cleanupPlaySession(projectPath);
+
+    const engineInfo = ensureProjectEngineFiles(projectPath);
+    miscPath = engineInfo.miscPath;
+    // A crashed launch can leave the temporary playtest prefix in misc.txt.
+    let stablePrefix = engineInfo.savePrefix;
+    if (stablePrefix.endsWith("_playtest")) {
+      stablePrefix = stablePrefix.slice(0, -"_playtest".length) || stablePrefix;
+      const healed = flareLaunch.upsertKey(fs.readFileSync(miscPath, "utf8"), "save_prefix", stablePrefix);
+      fs.writeFileSync(miscPath, healed, "utf8");
+    }
+    const modsInfo = readProjectMods(projectPath, flarePath);
+    if (modsInfo.missingMods.length > 0) {
+      return {
+        success: false,
+        error: `Missing Flare mods: ${modsInfo.missingMods.join(", ")}. Install them where Flare looks for mods, or remove them from settings.txt requires=.`,
+      };
+    }
+
+    const target = resolveQuickLaunchMap(projectPath, mapName, mode);
+    if (!target.relativePath) {
+      return { success: false, error: "No map is available to launch. Save the map first." };
+    }
+    const mapFile = path.join(projectPath, target.relativePath);
+    if (!fs.existsSync(mapFile)) {
+      return {
+        success: false,
+        error: `Map file not found: ${target.relativePath}. Save the project before playing.`,
+      };
+    }
+
+    let x = target.x;
+    let y = target.y;
+    if (!target.fromIntermap) {
+      const hero = flareLaunch.parseHeroPos(fs.readFileSync(mapFile, "utf8"));
+      x = hero ? hero.x : 0;
+      y = hero ? hero.y : 0;
+    }
+
+    const className = flareLaunch.firstHeroClassName(readOptionalText(path.join(projectPath, "engine", "classes.txt")));
+    const testPrefix = flareLaunch.playtestPrefix(stablePrefix);
+    previousMisc = fs.readFileSync(miscPath, "utf8");
+    const playMisc = flareLaunch.upsertKey(previousMisc, "save_prefix", testPrefix, { appendIfEmpty: true });
+    fs.writeFileSync(miscPath, playMisc, "utf8");
+
+    const pathUser = currentPathUser();
+    testSaveDir = path.join(pathUser, "saves", testPrefix);
+    fs.rmSync(testSaveDir, { recursive: true, force: true });
+    const slotDir = path.join(testSaveDir, "1");
+    fs.mkdirSync(slotDir, { recursive: true });
+    const avatar = flareLaunch.buildAvatarText({
+      name: "StudioTest",
+      className,
+      mapPath: target.relativePath.replace(/\\/g, "/"),
+      x,
+      y,
+    });
+    fs.writeFileSync(path.join(slotDir, "avatar.txt"), avatar, "utf8");
+
+    const slotNames = fs.readdirSync(testSaveDir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name);
+    const loadSlot = flareLaunch.loadSlotIndex(slotNames, "1");
+    if (!loadSlot) {
+      throw new Error("Could not resolve a --load-slot index for the test save.");
+    }
+
+    const sessionDir = path.join(projectPath, PLAY_SESSION_DIR);
+    fs.mkdirSync(sessionDir, { recursive: true });
+    fs.writeFileSync(
+      playSessionPath(projectPath),
+      JSON.stringify({ previousMisc, testSaveDir, testPrefix, loadSlot }, null, 2),
+      "utf8"
+    );
+
+    console.log(`[FlareEngine] Quick launch ${target.relativePath} at ${x},${y} via --load-slot=${loadSlot} (${testPrefix})`);
+    return {
+      success: true,
+      loadSlot,
+      slotNum: loadSlot,
+      mods: modsInfo.mods,
+    };
+  } catch (err) {
+    console.error("[FlareEngine] prepare-flare-quick-launch error:", err);
+    if (previousMisc != null && miscPath) {
+      try {
+        fs.writeFileSync(miscPath, previousMisc, "utf8");
+      } catch (restoreErr) {
+        console.error("[FlareEngine] Failed to roll back misc.txt:", restoreErr);
+      }
+    }
+    if (testSaveDir) {
+      try {
+        fs.rmSync(testSaveDir, { recursive: true, force: true });
+      } catch {
+        /* ignore */
+      }
+    }
+    try {
+      const sessionFile = projectPath ? playSessionPath(projectPath) : "";
+      if (sessionFile && fs.existsSync(sessionFile)) fs.unlinkSync(sessionFile);
+    } catch {
+      /* ignore */
+    }
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMainLocal.handle("restore-spawn-backup", async (_event, { projectPath } = {}) => {
+  try {
+    if (!projectPath) return false;
+    cleanupPlaySession(projectPath);
+    return true;
+  } catch (err) {
+    console.error("[FlareEngine] restore-spawn-backup error:", err);
+    return false;
+  }
+});
+
+ipcMainLocal.handle("launch-flare-engine", async (_event, options = {}) => {
+  const flarePath = options.flarePath;
+  const target = flareLaunch.resolveFlareLaunchTarget(flarePath, flarePathProbe());
+  if (target.error) {
+    if (options.projectPath) cleanupPlaySession(options.projectPath);
+    return { success: false, error: target.error };
+  }
+
+  if (activeFlareProcess && !activeFlareProcess.killed) {
+    try {
+      process.kill(activeFlareProcess.pid, 0);
+      return { success: false, error: "Flare is already running. Close it first." };
+    } catch {
+      activeFlareProcess = null;
+    }
+  }
+
+  const args = flareLaunch.buildFlareArgs({
+    dataPath: target.passDataPath ? target.dataPath : undefined,
+    mods: options.mods,
+    loadSlot: options.loadSlot,
+    loadScript: options.loadScript,
+  });
+
+  try {
+    console.log("[FlareEngine] Launching:", target.exePath, args.join(" "), "cwd:", target.cwd);
+    const child = spawnProcess(target.exePath, args, {
+      cwd: target.cwd,
+      detached: true,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const logChunk = (prefix, chunk) => {
+      const text = chunk.toString().trim();
+      if (text) console.log(`[FlareEngine] ${prefix} ${text}`);
+    };
+    child.stdout?.on("data", (chunk) => logChunk("stdout", chunk));
+    child.stderr?.on("data", (chunk) => logChunk("stderr", chunk));
+    child.unref();
+    activeFlareProcess = child;
+
+    let settled = false;
+    const onFlareStopped = (payload) => {
+      if (settled) return;
+      settled = true;
+      activeFlareProcess = null;
+      if (options.projectPath) cleanupPlaySession(options.projectPath);
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send("flare-engine-exited", payload);
+      }
+    };
+    child.on("exit", () => onFlareStopped());
+    child.on("error", (err) => {
+      console.error("[FlareEngine] Process error:", err);
+      onFlareStopped({ error: err.message });
+    });
+
+    return { success: true, pid: child.pid };
+  } catch (err) {
+    console.error("[FlareEngine] Failed to launch:", err);
+    if (options.projectPath) cleanupPlaySession(options.projectPath);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMainLocal.handle("is-flare-running", async () => {
+  if (!activeFlareProcess) return false;
+  try {
+    process.kill(activeFlareProcess.pid, 0);
+    return true;
+  } catch {
+    activeFlareProcess = null;
+    return false;
+  }
 });
 
 ipcMainLocal.handle("file-exists", async (_event, filePath) => {
@@ -2464,29 +3040,6 @@ ipcMainLocal.handle("file-exists", async (_event, filePath) => {
     return fs.existsSync(filePath);
   } catch {
     return false;
-  }
-});
-  
-// Window controls
-ipcMainLocal.on("window-minimize", () => {
-  if (mainWindow) {
-    mainWindow.minimize();
-  }
-});
-
-ipcMainLocal.on("window-maximize", () => {
-  if (mainWindow) {
-    if (mainWindow.isMaximized()) {
-      mainWindow.unmaximize();
-    } else {
-      mainWindow.maximize();
-    }
-  }
-});
-
-ipcMainLocal.on("window-close", () => {
-  if (mainWindow) {
-    mainWindow.close();
   }
 });
 

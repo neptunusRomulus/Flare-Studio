@@ -1,0 +1,12 @@
+caption_margins=10,10
+music=music/intro.ogg
+
+[scene]
+caption=Hello
+image=images/intro.png,2
+pause=2s
+
+[vscroll]
+text=The end
+image=images/credits.png
+separator=8

@@ -1,0 +1,15 @@
+[header]
+radius=4
+bits_per_tile=4
+
+[bits]
+bit=BIT_0,0
+bit=BIT_N,1
+
+[tiles]
+tile=ALL,BIT_0,BIT_N
+
+[mask]
+data=
+ALL,ALL
+ALL,ALL

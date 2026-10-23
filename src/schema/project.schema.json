@@ -34,6 +34,9 @@
     "items": { "type": "array", "items": { "type": "object" } },
     "enemies": { "type": "array", "items": { "type": "object" } },
     "npcs": { "type": "array", "items": { "type": "object" } },
-    "powers": { "type": "array", "items": { "type": "object" } }
+    "powers": { "type": "array", "items": { "type": "object" } },
+    "quests": { "type": "array", "items": { "type": "object" } },
+    "loot": { "type": "array", "items": { "type": "object" } },
+    "effects": { "type": "array", "items": { "type": "object" } }
   }
 }

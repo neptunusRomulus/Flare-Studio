@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -8,6 +8,9 @@ import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 import { Apple, Book, Box, Check, ChevronDown, ChevronRight, Coins, Folder, Gift, HelpCircle, Key, Layers, Save, Shield, Sparkles, Sword, Tag, Trash2, Volume2, X, Zap } from 'lucide-react';
 import { ITEM_ROLE_META, ITEM_ROLE_SELECTIONS, RESOURCE_SUBTYPE_META } from '@/editor/itemRoles';
 import type { ItemResourceSubtype } from '@/editor/itemRoles';
+import { useAppContext } from '@/context/AppContext';
+import { listPowerIds } from '@/adapters/flare/flareAdapter.cjs';
+import { projectRoot } from '@/editor/projectFiles';
 
 const RoleIcon = ({ roleId, className }: { roleId: string; className?: string }) => {
   switch (roleId) {
@@ -134,6 +137,22 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
     onDeleteItem
   } = props;
   const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false);
+  const [powerIds, setPowerIds] = useState<string[]>([]);
+  const ctx = useAppContext();
+  const currentProjectPath = typeof ctx.currentProjectPath === 'string' ? ctx.currentProjectPath : null;
+  const itemBaseline = React.useRef('');
+  const itemOpen = React.useRef(false);
+  if (showItemEditDialog && editingItem && !itemOpen.current) {
+    itemBaseline.current = JSON.stringify(editingItem);
+    itemOpen.current = true;
+  }
+  if (!showItemEditDialog && itemOpen.current) itemOpen.current = false;
+  const requestCloseItem = () => {
+    if (editingItem && JSON.stringify(editingItem) !== itemBaseline.current) {
+      if (!window.confirm('Discard unsaved item changes?')) return;
+    }
+    handleCloseItemEdit();
+  };
   const {
     position,
     size,
@@ -145,11 +164,25 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
   useEffect(() => {
     if (!showItemEditDialog) return;
     const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') handleCloseItemEdit();
+      if (e.key === 'Escape') requestCloseItem();
     };
     document.addEventListener('keydown', handleEsc);
     return () => document.removeEventListener('keydown', handleEsc);
-  }, [showItemEditDialog, handleCloseItemEdit]);
+  }, [showItemEditDialog, handleCloseItemEdit, editingItem]);
+
+  useEffect(() => {
+    if (!showItemEditDialog || !currentProjectPath || !window.electronAPI?.readFile) {
+      setPowerIds([]);
+      return;
+    }
+    let cancelled = false;
+    void window.electronAPI.readFile(`${projectRoot(currentProjectPath)}/powers/powers.txt`).then((text) => {
+      if (!cancelled) setPowerIds(text ? listPowerIds(text) : []);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [showItemEditDialog, currentProjectPath]);
 
   if (!showItemEditDialog || !editingItem) return null;
 
@@ -185,7 +218,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
         <Button
           size="icon"
           variant="ghost"
-          onClick={handleCloseItemEdit}
+          onClick={requestCloseItem}
           className="h-6 w-6 text-foreground/60 hover:text-foreground"
         >
           <X className="h-4 w-4" />
@@ -640,12 +673,28 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs text-muted-foreground">Power ID</label>
-                <Input
-                  value={editingItem.power}
-                  onChange={(e) => updateEditingItemField('power', e.target.value)}
-                  placeholder="power_id"
-                  className="h-8"
-                />
+                {powerIds.length > 0 ? (
+                  <select
+                    className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm"
+                    value={editingItem.power || ''}
+                    onChange={(e) => updateEditingItemField('power', e.target.value)}
+                  >
+                    <option value="">Select a power</option>
+                    {(editingItem.power && !powerIds.includes(String(editingItem.power))
+                      ? [String(editingItem.power), ...powerIds]
+                      : powerIds
+                    ).map((id) => (
+                      <option key={id} value={id}>{id}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <Input
+                    value={editingItem.power}
+                    onChange={(e) => updateEditingItemField('power', e.target.value)}
+                    placeholder="power_id"
+                    className="h-8"
+                  />
+                )}
               </div>
               <div>
                 <label className="text-xs text-muted-foreground">Power Description</label>

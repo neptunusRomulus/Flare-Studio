@@ -1,0 +1,8 @@
+[settings]
+doors_max=3
+main_path_length_min=4
+main_path_length_max=8
+
+[chunks]
+filename=maps/chunks/start.txt
+filename=maps/chunks/hall.txt

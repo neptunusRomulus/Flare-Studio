@@ -78,6 +78,11 @@ function exportMapText(map) {
   if (map.title) lines.push(`title=${map.title}`);
   if (map.parallax) lines.push(`parallax_layers=${map.parallax}`);
   if (map.backgroundColor) lines.push(`background_color=${map.backgroundColor}`);
+  if (map.fogofwar != null && map.fogofwar !== "") lines.push(`fogofwar=${map.fogofwar}`);
+  if (map.save_fogofwar != null && map.save_fogofwar !== "") lines.push(`save_fogofwar=${map.save_fogofwar}`);
+  if (map.procgen_type) lines.push(`procgen_type=${map.procgen_type}`);
+  if (map.procgen_unique_status) lines.push(`procgen_unique_status=${map.procgen_unique_status}`);
+  if (map.procgen_reset_status) lines.push(`procgen_reset_status=${map.procgen_reset_status}`);
   lines.push("");
 
   if (Array.isArray(map.tilesetImages) && map.tilesetImages.length > 0) {
@@ -600,6 +605,11 @@ function importMapText(content) {
       else if (key === "tileset") map.tileset = value;
       else if (key === "parallax_layers") map.parallax = value;
       else if (key === "background_color") map.backgroundColor = value;
+      else if (key === "fogofwar") map.fogofwar = value;
+      else if (key === "save_fogofwar") map.save_fogofwar = value;
+      else if (key === "procgen_type") map.procgen_type = value;
+      else if (key === "procgen_unique_status") map.procgen_unique_status = value;
+      else if (key === "procgen_reset_status") map.procgen_reset_status = value;
     } else if (section === "tilesets" && key === "tileset") {
       const [file, tileWidth, tileHeight, spacing, margin] = value.split(",");
       map.tilesetImages.push({

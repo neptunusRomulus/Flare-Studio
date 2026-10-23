@@ -1,0 +1,4 @@
+# keep me
+save_prefix=playtest
+
+enable_playgame=true

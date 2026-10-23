@@ -7,6 +7,7 @@ const { slugFileName, legacyMapFileName } = require("./slug.cjs");
 const { parseDocument, validateLayerRows, toIntFlare } = require("./fileParser.cjs");
 const { keysFor, allowedSections } = require("./attributeKeys.cjs");
 const serializers = require("./serializers.cjs");
+const content = require("./content.cjs");
 
 const SCHEMA_VERSION = 1;
 const ID = "flare";
@@ -32,6 +33,9 @@ function emptyProject(name) {
     enemies: [],
     npcs: [],
     powers: [],
+    quests: [],
+    loot: [],
+    effects: [],
   };
 }
 
@@ -103,6 +107,9 @@ function exportProject(project) {
     enemies: [],
     npcs: [],
     powers: [],
+    quests: [],
+    loot: [],
+    effects: [],
   };
 
   files.push({
@@ -166,6 +173,37 @@ function exportProject(project) {
     files.push({ path: npcPath, content: text });
     files.push({ path: `content/npcs/${id}.json`, content: `${JSON.stringify(npc, null, 2)}\n` });
     errors.push(...validateText("npcs", text, npcPath));
+  }
+
+  for (const quest of source.quests || []) {
+    const id = slugFileName(quest.id || quest.name || "quest");
+    index.quests.push(id);
+    const questPath = `quests/${id}.txt`;
+    const text = content.exportQuestFile(quest);
+    files.push({ path: questPath, content: text });
+    files.push({ path: `content/quests/${id}.json`, content: `${JSON.stringify({ ...quest, id }, null, 2)}\n` });
+    errors.push(...validateText("quests", text, questPath));
+  }
+
+  for (const table of source.loot || []) {
+    const id = slugFileName(table.id || table.name || "loot");
+    index.loot.push(id);
+    const lootPath = `loot/${id}.txt`;
+    const text = content.exportLootFile({ ...table, id });
+    files.push({ path: lootPath, content: text });
+    files.push({ path: `content/loot/${id}.json`, content: `${JSON.stringify({ ...table, id }, null, 2)}\n` });
+    errors.push(...validateText("loot", text, lootPath));
+  }
+
+  if ((source.effects || []).length > 0) {
+    const effectText = content.exportEffectFile(source.effects);
+    files.push({ path: "powers/effects.txt", content: effectText });
+    errors.push(...validateText("effects", effectText, "powers/effects.txt"));
+    source.effects.forEach((effect) => {
+      const id = slugFileName(effect.name || effect.id || "effect");
+      index.effects.push(id);
+      files.push({ path: `content/effects/${id}.json`, content: `${JSON.stringify(effect, null, 2)}\n` });
+    });
   }
 
   const tilesetConfig = source.tileConfigText || serializers.exportTilesetConfig(source.tile);
@@ -233,8 +271,18 @@ function importProject(files) {
         if (path.startsWith("content/enemies/") && path.endsWith(".json")) project.enemies.push(JSON.parse(content));
         if (path.startsWith("content/npcs/") && path.endsWith(".json")) project.npcs.push(JSON.parse(content));
         if (path.startsWith("content/powers/") && path.endsWith(".json")) project.powers.push(JSON.parse(content));
+        if (path.startsWith("content/quests/") && path.endsWith(".json")) project.quests.push(JSON.parse(content));
+        if (path.startsWith("content/loot/") && path.endsWith(".json")) project.loot.push(JSON.parse(content));
+        if (path.startsWith("content/effects/") && path.endsWith(".json")) project.effects.push(JSON.parse(content));
       }
-      if (project.maps.length || project.items.length || project.npcs.length) return project;
+      if (
+        project.maps.length ||
+        project.items.length ||
+        project.npcs.length ||
+        project.quests.length ||
+        project.loot.length ||
+        project.effects.length
+      ) return project;
     } catch {
       /* fall through to txt import */
     }
@@ -245,22 +293,22 @@ function importProject(files) {
 function migrateFiles(files, projectName) {
   const project = emptyProject(projectName || "Project");
   const backup = [];
-  for (const [path, content] of Object.entries(files || {})) {
+  for (const [path, fileText] of Object.entries(files || {})) {
     const normalized = path.replace(/\\/g, "/");
     if (normalized.startsWith(".editor/migration-backup/")) continue;
     if (/\.(txt|json)$/i.test(normalized)) backup.push(normalized);
     if (normalized === "settings.txt") {
       project.meta = {
         ...project.meta,
-        ...parseSettings(content),
-        _settingsText: content.endsWith("\n") ? content : `${content}\n`,
+        ...parseSettings(fileText),
+        _settingsText: fileText.endsWith("\n") ? fileText : `${fileText}\n`,
       };
     }
     if (normalized === "engine/tileset_config.txt") {
-      project.tileConfigText = content.endsWith("\n") ? content : `${content}\n`;
+      project.tileConfigText = fileText.endsWith("\n") ? fileText : `${fileText}\n`;
     }
     if (normalized.startsWith("maps/") && normalized.endsWith(".txt") && !normalized.endsWith("/spawn.txt")) {
-      const imported = serializers.importMapText(content);
+      const imported = serializers.importMapText(fileText);
       const base = normalized.split("/").pop().replace(/\.txt$/i, "");
       imported.id = slugFileName(base);
       imported.sourcePath = normalized;
@@ -271,7 +319,7 @@ function migrateFiles(files, projectName) {
       const enemy = { name: base, sourcePath: normalized };
       const render = [];
       const slots = [];
-      for (const section of parseDocument(content)) {
+      for (const section of parseDocument(fileText)) {
         if (section.name === "render_layers") {
           for (const entry of section.entries) if (entry.key === "layer") render.push(entry.value);
           continue;
@@ -291,12 +339,28 @@ function migrateFiles(files, projectName) {
       project.enemies.push(enemy);
     }
     if (normalized.startsWith("npcs/") && normalized.endsWith(".txt")) {
-      const npc = serializers.importNpcText(content);
+      const npc = serializers.importNpcText(fileText);
       const base = normalized.split("/").pop().replace(/\.txt$/i, "");
       if (!npc.name) npc.name = base;
       npc.sourcePath = normalized;
       project.npcs.push(npc);
     }
+    const isLootTable = normalized.endsWith(".txt") && (normalized.startsWith("loot/") || normalized.includes("/loot/")) && !normalized.endsWith("/loot.txt") && !normalized.includes("engine/");
+    if (isLootTable) {
+      const imported = content.importLootText(fileText);
+      const base = normalized.split("/").pop().replace(/\.txt$/i, "");
+      imported.id = imported.id || slugFileName(base);
+      if (!imported.name) imported.name = base;
+      project.loot.push(imported);
+    }
+    if (normalized.startsWith("quests/") && normalized.endsWith(".txt")) {
+      const imported = content.importQuestText(fileText);
+      const base = normalized.split("/").pop().replace(/\.txt$/i, "");
+      imported.id = slugFileName(imported.name || base);
+      project.quests.push(imported);
+    }
+    if (normalized === "powers/powers.txt") project.powers.push(...content.importPowerText(fileText));
+    if (normalized === "powers/effects.txt") project.effects.push(...content.importEffectText(fileText));
   }
   if (projectName) project.meta.name = projectName;
   const exported = exportProject(project);
@@ -319,4 +383,5 @@ module.exports = {
   legacyMapFileName,
   toIntFlare,
   ...serializers,
+  ...content,
 };

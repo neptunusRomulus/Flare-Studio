@@ -1,4 +1,6 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { canonicalJson, contentSlug, exportQuestFile, importQuestText } from '../adapters/flare/flareAdapter.cjs';
+import { projectRoot, writeProjectFiles } from '../editor/projectFiles';
 import useEditorRefs from './useEditorRefs';
 import useEditorSetup from './useEditorSetup';
 import useLoadProjectData from './useLoadProjectData';
@@ -36,6 +38,13 @@ export type ImportReviewData = {
 
 export type AssetOriginPreset = 'top-left' | 'top-center' | 'center' | 'bottom-left' | 'bottom-center';
 
+export type QuestItemRequirement = {
+  id: string;
+  type: 'requires_item' | 'requires_not_item';
+  itemId: string;
+  itemQuantity: number;
+};
+
 export type QuestDraft = {
   name: string;
   complete_status: string;
@@ -46,10 +55,58 @@ export type QuestDraft = {
   requires_not_level: string;
   requires_currency: string;
   requires_not_currency: string;
-  itemRequirements: unknown[];
+  itemRequirements: QuestItemRequirement[];
   requires_class: string;
   requires_not_class: string;
+  start_type?: 'player' | 'game';
 };
+
+export type StoredQuest = QuestDraft & {
+  id: string;
+  startType: 'player' | 'game';
+  triggerId: string;
+};
+
+const emptyQuestDraft = (): QuestDraft => ({
+  name: '',
+  complete_status: '',
+  quest_text: '',
+  requires_status: '',
+  requires_not_status: '',
+  requires_level: '',
+  requires_not_level: '',
+  requires_currency: '',
+  requires_not_currency: '',
+  itemRequirements: [],
+  requires_class: '',
+  requires_not_class: ''
+});
+
+function storedQuestFromRecord(value: Record<string, unknown>, fallbackId: string): StoredQuest {
+  const itemRequirements = Array.isArray(value.itemRequirements)
+    ? value.itemRequirements as QuestItemRequirement[]
+    : emptyQuestDraft().itemRequirements;
+  const startType = value.startType === 'game' || value.start_type === 'game' ? 'game' : 'player';
+  return {
+    ...emptyQuestDraft(),
+    name: typeof value.name === 'string' ? value.name : fallbackId,
+    complete_status: typeof value.complete_status === 'string' ? value.complete_status : '',
+    quest_text: typeof value.quest_text === 'string' ? value.quest_text : '',
+    requires_status: typeof value.requires_status === 'string' ? value.requires_status : '',
+    requires_not_status: typeof value.requires_not_status === 'string' ? value.requires_not_status : '',
+    requires_level: typeof value.requires_level === 'string' ? value.requires_level : '',
+    requires_not_level: typeof value.requires_not_level === 'string' ? value.requires_not_level : '',
+    requires_currency: typeof value.requires_currency === 'string' ? value.requires_currency : '',
+    requires_not_currency: typeof value.requires_not_currency === 'string' ? value.requires_not_currency : '',
+    requires_class: typeof value.requires_class === 'string' ? value.requires_class : '',
+    requires_not_class: typeof value.requires_not_class === 'string' ? value.requires_not_class : '',
+    start_type: startType,
+    itemRequirements,
+    id: typeof value.id === 'string' && value.id ? value.id : fallbackId,
+    startType,
+    triggerId: typeof value.triggerId === 'string' ? value.triggerId : ''
+  };
+}
 
 export default function useAppMainState() {
   const editorRefs = useEditorRefs();
@@ -81,38 +138,12 @@ export default function useAppMainState() {
 
   const [showQuestDialog, setShowQuestDialog] = useState<boolean>(false);
   const [editingQuestId, setEditingQuestId] = useState<string | null>(null);
-  const [questDraft, setQuestDraft] = useState<QuestDraft>(() => ({
-    name: '',
-    complete_status: '',
-    quest_text: '',
-    requires_status: '',
-    requires_not_status: '',
-    requires_level: '',
-    requires_not_level: '',
-    requires_currency: '',
-    requires_not_currency: '',
-    itemRequirements: [],
-    requires_class: '',
-    requires_not_class: ''
-  }));
-  const [rulesList, setRulesList] = useState<Array<{ id: string; name: string; startType: 'player' | 'game'; triggerId: string }>>([]);
+  const [questDraft, setQuestDraft] = useState<QuestDraft>(() => emptyQuestDraft());
+  const [rulesList, setRulesList] = useState<StoredQuest[]>([]);
 
   const handleOpenQuestDialog = useCallback(() => {
     setEditingQuestId(null);
-    setQuestDraft({
-      name: '',
-      complete_status: '',
-      quest_text: '',
-      requires_status: '',
-      requires_not_status: '',
-      requires_level: '',
-      requires_not_level: '',
-      requires_currency: '',
-      requires_not_currency: '',
-      itemRequirements: [],
-      requires_class: '',
-      requires_not_class: ''
-    });
+    setQuestDraft(emptyQuestDraft());
     setShowQuestDialog(true);
   }, []);
 
@@ -127,60 +158,87 @@ export default function useAppMainState() {
 
     setEditingQuestId(ruleId);
     setQuestDraft({
+      ...emptyQuestDraft(),
+      ...existingRule,
       name: existingRule.name,
-      complete_status: '',
-      quest_text: '',
-      requires_status: '',
-      requires_not_status: '',
-      requires_level: '',
-      requires_not_level: '',
-      requires_currency: '',
-      requires_not_currency: '',
-      itemRequirements: [],
-      requires_class: '',
-      requires_not_class: ''
+      start_type: existingRule.startType,
+      itemRequirements: existingRule.itemRequirements || []
     });
     setShowQuestDialog(true);
   }, [rulesList]);
 
+  useEffect(() => {
+    if (!currentProjectPath || !window.electronAPI?.readDir || !window.electronAPI.readFile) return;
+    let cancelled = false;
+    const root = projectRoot(currentProjectPath);
+    const load = async () => {
+      const loaded: StoredQuest[] = [];
+      const seen = new Set<string>();
+      const jsonEntries = await window.electronAPI.readDir(`${root}/content/quests`);
+      for (const entry of jsonEntries || []) {
+        if (entry.isDirectory || !entry.name.endsWith('.json')) continue;
+        const text = await window.electronAPI.readFile(`${root}/content/quests/${entry.name}`);
+        if (!text) continue;
+        try {
+          const id = entry.name.replace(/\.json$/, '');
+          loaded.push(storedQuestFromRecord(JSON.parse(text) as Record<string, unknown>, id));
+          seen.add(id);
+        } catch {
+          /* skip a broken quest document */
+        }
+      }
+      const txtEntries = await window.electronAPI.readDir(`${root}/quests`);
+      for (const entry of txtEntries || []) {
+        if (entry.isDirectory || !entry.name.endsWith('.txt')) continue;
+        const id = entry.name.replace(/\.txt$/, '');
+        if (seen.has(id)) continue;
+        const text = await window.electronAPI.readFile(`${root}/quests/${entry.name}`);
+        if (!text) continue;
+        const parsed = importQuestText(text) as Record<string, unknown>;
+        loaded.push(storedQuestFromRecord({ ...parsed, id }, id));
+      }
+      if (!cancelled && loaded.length > 0) setRulesList(loaded);
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [currentProjectPath]);
+
   const handleSaveQuest = useCallback(() => {
     const nextName = questDraft.name.trim() || `Quest ${rulesList.length + 1}`;
+    const existing = rulesList.find((rule) => rule.id === editingQuestId);
+    const id = existing?.id || contentSlug(nextName, 'quest');
+    const startType = questDraft.start_type || existing?.startType || 'player';
+    const stored: StoredQuest = {
+      ...questDraft,
+      id,
+      name: nextName,
+      startType,
+      start_type: startType,
+      triggerId: existing?.triggerId || '',
+      itemRequirements: questDraft.itemRequirements || []
+    };
     setRulesList((prev) => {
-      if (editingQuestId) {
-        return prev.map((rule) =>
-          rule.id === editingQuestId
-            ? { ...rule, name: nextName }
-            : rule
-        );
-      }
-      return [
-        ...prev,
-        {
-          id: `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`,
-          name: nextName,
-          startType: 'player',
-          triggerId: ''
-        }
-      ];
+      if (existing) return prev.map((rule) => (rule.id === existing.id ? stored : rule));
+      return [...prev, stored];
     });
 
     setShowQuestDialog(false);
     setEditingQuestId(null);
-    setQuestDraft({
-      name: '',
-      complete_status: '',
-      quest_text: '',
-      requires_status: '',
-      requires_not_status: '',
-      requires_level: '',
-      requires_not_level: '',
-      requires_currency: '',
-      requires_not_currency: '',
-      itemRequirements: [],
-      requires_class: '',
-      requires_not_class: ''
+    setQuestDraft(emptyQuestDraft());
+
+    if (!currentProjectPath) return;
+    const text = exportQuestFile(stored);
+    void writeProjectFiles(currentProjectPath, [
+      { path: `quests/${id}.txt`, content: text },
+      { path: `content/quests/${id}.json`, content: canonicalJson('quest', stored) }
+    ]).then((saved) => {
+      if (!saved) {
+        toast({ title: 'Quest save failed', description: 'Could not write the quests folder.', variant: 'destructive' });
+      }
     });
-  }, [editingQuestId, questDraft, rulesList.length]);
+  }, [currentProjectPath, editingQuestId, questDraft, rulesList]);
 
   return {
     editorRefs,

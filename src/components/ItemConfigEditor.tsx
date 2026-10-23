@@ -3,30 +3,35 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Save, RefreshCw, FileText, Search, ChevronDown, ChevronUp, Sword, Tag, Box, Package } from 'lucide-react';
+import { useAppContext } from '@/context/AppContext';
+import { toast } from '@/hooks/use-toast';
+import { loadConfigDocument, saveConfigDocument } from '@/editor/projectFiles';
 
 type Props = {
   leftCollapsed: boolean;
 };
 
 const ITEM_CONFIG_FILES = [
-  { id: 'items', name: 'items.txt', icon: Sword, category: 'Core' },
-  { id: 'categories', name: 'categories.txt', icon: Tag, category: 'Core' },
-  { id: 'qualities', name: 'qualities.txt', icon: Tag, category: 'Core' },
+  { id: 'items', name: 'items.txt', relative: 'items/items.txt', icon: Sword, category: 'Core' },
+  { id: 'types', name: 'types.txt', relative: 'items/types.txt', icon: Tag, category: 'Core' },
+  { id: 'qualities', name: 'qualities.txt', relative: 'items/qualities.txt', icon: Box, category: 'Core' },
+  { id: 'sets', name: 'sets.txt', relative: 'items/sets.txt', icon: Package, category: 'Core' },
 ];
 
 export default function ItemConfigEditor({ leftCollapsed }: Props) {
+  const ctx = useAppContext();
+  const currentProjectPath = typeof ctx.currentProjectPath === 'string' ? ctx.currentProjectPath : null;
   const [activeFile, setActiveFile] = React.useState<string>('items');
   const [searchText, setSearchText] = React.useState('');
   const [content, setContent] = React.useState<string>('');
   const [isEditing, setIsEditing] = React.useState(false);
 
   const loadFile = async (fileId: string) => {
+    const file = ITEM_CONFIG_FILES.find((entry) => entry.id === fileId);
+    setActiveFile(fileId);
+    if (!file) return;
     try {
-      // Use electronAPI to read file
-      const filePath = `mods/example/${fileId === 'items' ? 'items.txt' : `items/${fileId}.txt`}`;
-      // For now, show placeholder
-      setContent(`# ${fileId} configuration\n# This would load from ${filePath}\n\n[Item]\nid = example_item\nname = Example Item\ndescription = An example item\n`);
-      setActiveFile(fileId);
+      setContent(await loadConfigDocument(currentProjectPath, file.relative));
       setIsEditing(false);
     } catch (e) {
       console.error('Failed to load file:', e);
@@ -34,8 +39,15 @@ export default function ItemConfigEditor({ leftCollapsed }: Props) {
   };
 
   const saveFile = async () => {
-    // Save via electronAPI
-    console.log('Save:', activeFile, content);
+    const file = ITEM_CONFIG_FILES.find((entry) => entry.id === activeFile);
+    if (!file || !currentProjectPath) {
+      toast({ title: 'No project', description: 'Open a project before saving this file.', variant: 'destructive' });
+      return;
+    }
+    const saved = await saveConfigDocument(currentProjectPath, file.relative, content);
+    toast(saved
+      ? { title: 'Saved', description: file.relative }
+      : { title: 'Save failed', description: file.relative, variant: 'destructive' });
   };
 
   const refreshFile = async () => {
@@ -43,8 +55,8 @@ export default function ItemConfigEditor({ leftCollapsed }: Props) {
   };
 
   React.useEffect(() => {
-    loadFile(activeFile);
-  }, [activeFile]);
+    void loadFile(activeFile);
+  }, [activeFile, currentProjectPath]);
 
   return (
     <div className="space-y-3">

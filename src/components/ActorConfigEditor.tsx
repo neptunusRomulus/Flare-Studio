@@ -1,30 +1,36 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Save, RefreshCw, Search, ChevronDown, ChevronUp, Users, Sparkles, BookOpen, Shield, Sword, Tag } from 'lucide-react';
+import { Save, RefreshCw, Search, ChevronDown, ChevronUp, Users, Sparkles, Shield } from 'lucide-react';
+import { useAppContext } from '@/context/AppContext';
+import { toast } from '@/hooks/use-toast';
+import { loadConfigDocument, saveConfigDocument } from '@/editor/projectFiles';
+import PowerEffectForm from '@/components/PowerEffectForm';
 
 type Props = {
   leftCollapsed: boolean;
 };
 
 const ACTOR_CONFIG_FILES = [
-  { id: 'classes', name: 'classes.txt', icon: Users, category: 'Core' },
-  { id: 'powers', name: 'powers.txt', icon: Sparkles, category: 'Core' },
-  { id: 'spells', name: 'spells.txt', icon: BookOpen, category: 'Core' },
-  { id: 'equip_flags', name: 'equip_flags.txt', icon: Shield, category: 'Core' },
+  { id: 'classes', name: 'classes.txt', relative: 'engine/classes.txt', icon: Users, category: 'Core' },
+  { id: 'powers', name: 'powers.txt', relative: 'powers/powers.txt', icon: Sparkles, category: 'Core' },
+  { id: 'equip_flags', name: 'equip_flags.txt', relative: 'engine/equip_flags.txt', icon: Shield, category: 'Core' },
 ];
 
 export default function ActorConfigEditor({ leftCollapsed }: Props) {
+  const ctx = useAppContext();
+  const currentProjectPath = typeof ctx.currentProjectPath === 'string' ? ctx.currentProjectPath : null;
   const [activeFile, setActiveFile] = React.useState<string>('classes');
   const [searchText, setSearchText] = React.useState('');
   const [content, setContent] = React.useState<string>('');
   const [isEditing, setIsEditing] = React.useState(false);
 
   const loadFile = async (fileId: string) => {
+    const file = ACTOR_CONFIG_FILES.find((entry) => entry.id === fileId);
+    setActiveFile(fileId);
+    if (!file) return;
     try {
-      const filePath = `mods/example/${fileId}.txt`;
-      setContent(`# ${fileId} configuration\n# This would load from ${filePath}\n\n[Class]\nid = warrior\nname = Warrior\nhealth = 100\nmana = 20\n`);
-      setActiveFile(fileId);
+      setContent(await loadConfigDocument(currentProjectPath, file.relative));
       setIsEditing(false);
     } catch (e) {
       console.error('Failed to load file:', e);
@@ -32,7 +38,15 @@ export default function ActorConfigEditor({ leftCollapsed }: Props) {
   };
 
   const saveFile = async () => {
-    console.log('Save:', activeFile, content);
+    const file = ACTOR_CONFIG_FILES.find((entry) => entry.id === activeFile);
+    if (!file || !currentProjectPath) {
+      toast({ title: 'No project', description: 'Open a project before saving this file.', variant: 'destructive' });
+      return;
+    }
+    const saved = await saveConfigDocument(currentProjectPath, file.relative, content);
+    toast(saved
+      ? { title: 'Saved', description: file.relative }
+      : { title: 'Save failed', description: file.relative, variant: 'destructive' });
   };
 
   const refreshFile = async () => {
@@ -40,11 +54,12 @@ export default function ActorConfigEditor({ leftCollapsed }: Props) {
   };
 
   React.useEffect(() => {
-    loadFile(activeFile);
-  }, [activeFile]);
+    void loadFile(activeFile);
+  }, [activeFile, currentProjectPath]);
 
   return (
     <div className="space-y-3">
+      <PowerEffectForm />
       {/* File Selector */}
       <div className="space-y-2">
         <label className="text-xs font-medium text-muted-foreground uppercase tracking-wide">

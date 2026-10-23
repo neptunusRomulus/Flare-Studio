@@ -52,6 +52,9 @@ export interface CanonicalProject {
   enemies?: Array<Record<string, unknown>>;
   npcs?: Array<Record<string, unknown>>;
   powers?: Array<Record<string, unknown>>;
+  quests?: Array<Record<string, unknown>>;
+  loot?: Array<Record<string, unknown>>;
+  effects?: Array<Record<string, unknown>>;
 }
 
 export interface EditorSession {

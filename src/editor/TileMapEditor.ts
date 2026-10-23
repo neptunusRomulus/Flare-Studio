@@ -12,6 +12,7 @@
 } from '../types';
 import { TileDetector } from './tileDetection';
 import { exportMapText, importMapText, slugFileName, tilePixelOffset } from '../adapters/flare/flareAdapter.cjs';
+import { clipboardFromTiles, pasteTileGrid, type TileClipboard } from './tileClipboard';
 
 interface LayerTilesetEntry {
   image: HTMLImageElement | null;
@@ -727,6 +728,7 @@ export class TileMapEditor {
     tiles: []
   };
   private isSelecting: boolean = false;
+  private tileClipboard: TileClipboard | null = null;
 
   // Shape drawing state
   private shapeDrawing: {
@@ -1949,6 +1951,14 @@ export class TileMapEditor {
         case 'KeyA':
           event.preventDefault();
           this.selectAll();
+          break;
+        case 'KeyC':
+          event.preventDefault();
+          this.copySelection();
+          break;
+        case 'KeyV':
+          event.preventDefault();
+          this.pasteSelection();
           break;
       }
     }
@@ -5827,6 +5837,39 @@ export class TileMapEditor {
     if (!layer || x < 0 || y < 0 || x >= this.mapWidth || y >= this.mapHeight) return 0;
     const index = y * this.mapWidth + x;
     return layer.data[index] || 0;
+  }
+
+  private copySelection(): void {
+    if (!this.selection.active || this.selection.tiles.length === 0) return;
+    const layer = this.getActiveLayer();
+    const keys = layer ? this.layerCellTilesetKey.get(layer.type) : undefined;
+    const tiles = this.selection.tiles.map((tile) => ({
+      x: tile.x,
+      y: tile.y,
+      gid: tile.gid,
+      tilesetKey: keys ? keys[tile.y * this.mapWidth + tile.x] ?? null : null,
+    }));
+    this.tileClipboard = clipboardFromTiles(tiles);
+  }
+
+  private pasteSelection(): void {
+    if (!this.tileClipboard) return;
+    const layer = this.getActiveLayer();
+    if (!layer) return;
+    const originX = this.hoverX >= 0 ? this.hoverX : this.tileClipboard.originX;
+    const originY = this.hoverY >= 0 ? this.hoverY : this.tileClipboard.originY;
+    this.saveState();
+    const pasted = pasteTileGrid(layer.data, this.mapWidth, this.mapHeight, this.tileClipboard, originX, originY);
+    layer.data = pasted.data;
+    if (pasted.tilesetWrites.length > 0) {
+      let keys = this.layerCellTilesetKey.get(layer.type);
+      if (!keys) {
+        keys = new Array(this.mapWidth * this.mapHeight).fill(null);
+        this.layerCellTilesetKey.set(layer.type, keys);
+      }
+      for (const write of pasted.tilesetWrites) keys[write.index] = write.key;
+    }
+    this.draw();
   }
 
   public getActiveLayer(): TileLayer | null {

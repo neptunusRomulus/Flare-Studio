@@ -334,7 +334,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
               />
             </div>
 
-            <p className="text-xs text-muted-foreground">Tiles are 64×32 isometric (Flare default).</p>
+            <p className="text-xs text-muted-foreground">Tiles are 64×32 isometric (Flare default). You can change this later in Engine Settings → tileset_config.</p>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">

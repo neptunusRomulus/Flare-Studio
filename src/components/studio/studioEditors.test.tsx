@@ -19,15 +19,14 @@ function render(node: React.ReactNode) {
 }
 
 describe('studio editor screens', () => {
-  it('renders an editable tile size instead of a fixed 64 label', () => {
+  it('renders a project-wide isometric tile size with 2:1 presets', () => {
     const html = render(<TileSizeForm />);
     expect(html).toContain('Tile size');
-    expect(html).toContain('Tile width');
+    expect(html).toContain('whole game');
     expect(html).toContain('value="64"');
-    expect(html).toContain('value="32"');
-    expect(html).toContain('orthogonal');
-    expect(html).toContain('Write tileset config');
-    expect(html).not.toContain('not user-configurable');
+    expect(html).toContain('192×96');
+    expect(html).not.toContain('orthogonal');
+    expect(html).toContain('Apply tile size');
   });
 
   it('renders the cutscene editor', () => {

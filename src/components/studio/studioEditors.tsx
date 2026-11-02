@@ -85,38 +85,50 @@ export function TileSizeForm({ editor, onSaved }: { editor?: StudioEditor | null
     return () => { cancelled = true; };
   }, [projectPath]);
 
-  const update = (next: TileDraft) => {
-    const normalized = normalizeTileDraft(next);
-    setTile(normalized);
-    studioEditor?.setGroundTileSize?.(normalized);
-  };
+  const [width, setWidth] = useState<number>(64);
+  useEffect(() => { setWidth(tile.width); }, [tile.width]);
+  const draftWidth = Math.max(2, Math.floor(Number(width) || 64) & ~1);
+  const draft: TileDraft = { width: draftWidth, height: draftWidth / 2, orientation: 'isometric' };
+  const changed = draft.width !== tile.width || draft.height !== tile.height;
 
   const save = async () => {
+    if (changed && typeof window !== 'undefined' && !window.confirm(
+      `Change the tile size to ${draft.width}×${draft.height} for the whole game?\n\n` +
+      'Every map and tileset in this project will use this size. Tilesets you already imported must be re-imported.'
+    )) return;
     const indexText = projectPath && window.electronAPI?.readFile
       ? await window.electronAPI.readFile(`${projectRoot(projectPath)}/project.json`)
       : null;
     const saved = await persist(
       projectPath,
-      tileFiles(indexText, tile),
+      tileFiles(indexText, draft),
       'engine/tileset_config.txt',
       'Could not write engine/tileset_config.txt.'
     );
-    if (saved) onSaved?.();
+    if (saved) {
+      setTile(draft);
+      studioEditor?.setGroundTileSize?.(draft);
+      onSaved?.();
+    }
   };
 
   return (
     <div className="space-y-2 rounded-lg border border-border p-3">
-      <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Tile size</div>
-      <label className="block text-xs text-muted-foreground" htmlFor="tile-width">Tile width</label>
-      <Input id="tile-width" type="number" min={1} value={tile.width} className="h-8" onChange={(event) => update({ ...tile, width: Number(event.target.value) })} />
-      <label className="block text-xs text-muted-foreground" htmlFor="tile-height">Tile height</label>
-      <Input id="tile-height" type="number" min={1} value={tile.height} className="h-8" onChange={(event) => update({ ...tile, height: Number(event.target.value) })} />
-      <label className="block text-xs text-muted-foreground" htmlFor="tile-orientation">Orientation</label>
-      <select id="tile-orientation" className={selectClass} value={tile.orientation} onChange={(event) => update({ ...tile, orientation: event.target.value === 'orthogonal' ? 'orthogonal' : 'isometric' })}>
-        <option value="isometric">isometric</option>
-        <option value="orthogonal">orthogonal</option>
-      </select>
-      <Button type="button" size="sm" onClick={() => { void save(); }}>Write tileset config</Button>
+      <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Tile size (isometric)</div>
+      <p className="text-xs text-muted-foreground">
+        One size for the whole game. 64×32 is the Flare default; larger sizes are for high-resolution art.
+      </p>
+      <div className="flex gap-1">
+        {[64, 128, 192].map((w) => (
+          <Button key={w} type="button" size="sm" variant={draftWidth === w ? 'default' : 'outline'} onClick={() => setWidth(w)}>
+            {w}×{w / 2}
+          </Button>
+        ))}
+      </div>
+      <label className="block text-xs text-muted-foreground" htmlFor="tile-width">Tile width (height is half)</label>
+      <Input id="tile-width" type="number" min={2} step={2} value={width} className="h-8" onChange={(event) => setWidth(Number(event.target.value))} />
+      <div className="text-xs text-muted-foreground">Current: {tile.width}×{tile.height}. New: {draft.width}×{draft.height}.</div>
+      <Button type="button" size="sm" disabled={!changed} onClick={() => { void save(); }}>Apply tile size</Button>
     </div>
   );
 }

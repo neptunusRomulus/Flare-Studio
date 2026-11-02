@@ -331,59 +331,7 @@ const BrushToolbar = ({
                             // Increment tabTick to trigger TilesetPalette effect
                             safeIncrementTabTick();
                             
-                            // Phase 3: Show import review modal to confirm asset definitions
-                            // Refetch tabs to get the latest data after import
-                            const refreshedTabs = currentEditor.getLayerTabs ? currentEditor.getLayerTabs(layerType) : [];
-                            const activeTab = refreshedTabs.find(t => t.id === targetTabId);
-
-                            // Extract detected assets if available (may be empty)
-                            let detectedTilesArray: Array<{
-                              gid: number;
-                              sourceX: number;
-                              sourceY: number;
-                              width: number;
-                              height: number;
-                              confidence?: number;
-                            }> = [];
-                            
-                            if (activeTab?.detectedTiles && typeof activeTab.detectedTiles === 'object') {
-                              try {
-                                detectedTilesArray = Array.from(
-                                  activeTab.detectedTiles as Map<number, { sourceX: number; sourceY: number; width: number; height: number }>
-                                ).map(([gid, data]) => ({
-                                  gid,
-                                  sourceX: data.sourceX,
-                                  sourceY: data.sourceY,
-                                  width: data.width,
-                                  height: data.height,
-                                  confidence: 0.95 // Default high confidence for auto-detected
-                                }));
-                              } catch (e) {
-                              }
-                            } else {
-                            }
-                            
-                            // Always show the modal after import to allow user to confirm/customize
-                            // Notify parent to sync to global context
-                            onShowImportReview?.({
-                              tilesetFileName: file.name,
-                              detectedAssets: detectedTilesArray,
-                              // Metadata for re-import on tile-size change
-                              _meta: {
-                                file,
-                                layerType,
-                                tabId: targetTabId,
-                                projectPath: currentProjectPath,
-                                manualTileWidth,
-                                manualTileHeight,
-                                forceGridSlicing: true
-                              }
-                            });
-                            if (detectedTilesArray.length > 0) {
-                              toastInvoke({ title: 'Review Import', description: 'Please review detected tileset assets.' });
-                            } else {
-                              toastInvoke({ title: 'Review Import', description: 'No assets auto-detected. Confirm or add assets manually.' });
-                            }
+                            toastInvoke({ title: 'Tileset imported', description: file.name });
                           } catch (err) {
                             toastInvoke({ title: 'Import failed', description: `Unable to import into editor: ${String(err)}`, variant: 'destructive' });
                           }

@@ -273,6 +273,17 @@ function createWindow() {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send("before-close");
     }
+    // If no renderer screen answers (for example on the welcome screen),
+    // close anyway instead of leaving a window that can't be closed.
+    closeFallbackTimer = setTimeout(() => {
+      closeFallbackTimer = null;
+      if (!closePromptOpen) return;
+      console.warn("[Close] Renderer did not answer before-close; closing");
+      closePromptOpen = false;
+      allowQuit = true;
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.destroy();
+      app.quit();
+    }, 1500);
   });
 
   // Create application menu
@@ -1717,6 +1728,7 @@ function createMenu() {
 
 let allowQuit = false;
 let closePromptOpen = false;
+let closeFallbackTimer = null;
 let shutdownWait = null;
 let shutdownTimer = null;
 
@@ -1779,6 +1791,8 @@ ipcMainLocal.on("app-shutdown-complete", () => {
 });
 
 ipcMainLocal.handle("confirm-close", async (_event, hasUnsavedChanges) => {
+  if (closeFallbackTimer) clearTimeout(closeFallbackTimer);
+  closeFallbackTimer = null;
   closePromptOpen = false;
   if (!hasUnsavedChanges) {
     await finishClose();

@@ -334,46 +334,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1" htmlFor="welcome-tile-width">
-                  Tile width
-                </label>
-                <Input
-                  id="welcome-tile-width"
-                  type="number"
-                  min={1}
-                  value={mapConfig.tileSize}
-                  onChange={(e) => setMapConfig({ ...mapConfig, tileSize: Number(e.target.value) })}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1" htmlFor="welcome-tile-height">
-                  Tile height
-                </label>
-                <Input
-                  id="welcome-tile-height"
-                  type="number"
-                  min={1}
-                  value={mapConfig.tileHeight}
-                  onChange={(e) => setMapConfig({ ...mapConfig, tileHeight: Number(e.target.value) })}
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1" htmlFor="welcome-orientation">
-                Orientation
-              </label>
-              <select
-                id="welcome-orientation"
-                className="h-10 w-full rounded-md border border-input bg-background px-2 text-sm"
-                value={mapConfig.orientation}
-                onChange={(e) => setMapConfig({ ...mapConfig, orientation: e.target.value === 'orthogonal' ? 'orthogonal' : 'isometric' })}
-              >
-                <option value="isometric">isometric</option>
-                <option value="orthogonal">orthogonal</option>
-              </select>
-            </div>
+            <p className="text-xs text-muted-foreground">Tiles are 64×32 isometric (Flare default).</p>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">

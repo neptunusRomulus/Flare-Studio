@@ -691,11 +691,9 @@ ipcMainLocal.handle("create-map-project", async (event, config) => {
       fs.mkdirSync(projectPath, { recursive: true });
     }
 
-    const tile = {
-      width: Number(config.tileSize) || 64,
-      height: Number(config.tileHeight) || 32,
-      orientation: config.orientation === "orthogonal" ? "orthogonal" : "isometric",
-    };
+    // Tile size is fixed to Flare's default 64x32 isometric grid.
+    // Larger art is handled with merge/separate in the palette.
+    const tile = { width: 64, height: 32, orientation: "isometric" };
 
     // Create basic project structure
     const mapData = {

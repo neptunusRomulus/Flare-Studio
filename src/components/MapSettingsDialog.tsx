@@ -7,7 +7,7 @@ import { createPortal } from 'react-dom';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 import { emptyMapPresentation, type MapPresentation } from '@/editor/studioDrafts';
-import { MapPresentationFields, TileSizeForm } from '@/components/studio/studioEditors';
+import { MapPresentationFields } from '@/components/studio/studioEditors';
 
 type MapSettingsDialogProps = {
   open: boolean;
@@ -149,7 +149,6 @@ const MapSettingsDialog = ({
               aria-label="Set this map as the starting map"
             />
           </div>
-          <TileSizeForm editor={editor} />
           <MapPresentationFields value={presentation} onChange={setPresentation} />
           <div className="flex items-center justify-between gap-2 mt-6">
             <Tooltip content="Delete Map">

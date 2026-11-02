@@ -9,6 +9,7 @@
   ObjectInstance,
   PaintMode
 } from '../types';
+import { parseTilesetDefTiles } from './tilesetDef';
 import { TileDetector } from './tileDetection';
 import { exportMapText, importMapText, slugFileName, tilePixelOffset } from '../adapters/flare/flareAdapter.cjs';
 import { clipboardFromTiles, pasteTileGrid, type TileClipboard } from './tileClipboard';
@@ -7001,6 +7002,14 @@ export class TileMapEditor {
     if (candidate && typeof candidate === 'string') {
       return this.normalizePath(candidate);
     }
+    // Electron 32+ removed File.path; ask the preload bridge instead.
+    try {
+      const api = (window as unknown as { electronAPI?: { getPathForFile?: (f: File) => string | null } }).electronAPI;
+      const real = api?.getPathForFile?.(file);
+      if (real) return this.normalizePath(real);
+    } catch {
+      // fall through to the file name
+    }
     if (file.name) {
       return file.name;
     }
@@ -7316,12 +7325,14 @@ export class TileMapEditor {
       const reader = new FileReader();
       reader.onload = (e) => {
         const img = new Image();
-        img.onload = () => {
+        img.onload = async () => {
           const tabs = this.layerTabs.get(layerType) || [];
           const tab = tabs.find(t => t.id === tabId);
           if (!tab) {
             return reject(new Error('Tab not found'));
           }
+          // A Flare tileset definition next to the image wins over guessing.
+          const tilesetDefTiles = await this.loadTilesetDefTiles(file);
           if (!tab.brushes) tab.brushes = [];
           tab.brushes.push({ image: img as HTMLImageElement, fileName: file.name, width: img.width, height: img.height });
           // Fixed isometric tile dimensions — always 64x32
@@ -7369,7 +7380,13 @@ export class TileMapEditor {
           const importedDetectedTiles = new Map<number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }>();
           let gidCounter = 1;
 
-          if (!forceGridSlicing) {
+          if (tilesetDefTiles && tilesetDefTiles.size > 0) {
+            for (const [id, data] of tilesetDefTiles.entries()) {
+              importedDetectedTiles.set(id, data);
+            }
+          }
+
+          if (importedDetectedTiles.size === 0 && !forceGridSlicing) {
             try {
               const prevTilesetImage = this.tilesetImage;
               this.tilesetImage = img as HTMLImageElement;
@@ -7458,6 +7475,28 @@ export class TileMapEditor {
       };
       reader.readAsDataURL(file);
     });
+  }
+
+  /**
+   * Read the Flare tilesetdefs file that belongs to an imported image, if one
+   * exists, and return its tiles keyed by their Flare tile ids.
+   */
+  private async loadTilesetDefTiles(file: File): Promise<Map<number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }> | null> {
+    try {
+      const api = (window as unknown as { electronAPI?: { findTilesetDef?: (p: string) => Promise<{ path: string; text: string } | null> } }).electronAPI;
+      const sourcePath = this.extractFileSourcePath(file);
+      if (!api?.findTilesetDef || !sourcePath || !/[\\/]/.test(sourcePath)) return null;
+      const found = await api.findTilesetDef(sourcePath);
+      if (!found?.text) return null;
+      const tiles = parseTilesetDefTiles(found.text);
+      if (tiles.size > 0) {
+        console.log(`Loaded ${tiles.size} tiles from ${found.path}`);
+      }
+      return tiles.size > 0 ? tiles : null;
+    } catch (err) {
+      console.warn('Could not read tileset definition:', err);
+      return null;
+    }
   }
 
   public removeLayerTab(layerType: string, tabId: number): void {

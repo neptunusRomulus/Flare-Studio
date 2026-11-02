@@ -11,6 +11,8 @@ const fs = require("fs");
 const { validateSerializedFlareData, loadFlareDataSchema } = require("./flareDataValidator.cjs");
 const flareLaunch = require("./flareLaunch.cjs");
 const flareAdapter = require("../src/adapters/flare/flareAdapter.cjs");
+/** Map file base name; same slug Play and the adapter use. */
+const sanitizeMapNameForFilename = (name) => flareAdapter.slugFileName(name);
 const { isInsideRoot } = require("../src/editor/pathGuard.cjs");
 const allowedProjectRoots = new Set();
 

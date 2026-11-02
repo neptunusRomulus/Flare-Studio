@@ -7331,8 +7331,6 @@ export class TileMapEditor {
           if (!tab) {
             return reject(new Error('Tab not found'));
           }
-          // A Flare tileset definition next to the image wins over guessing.
-          const tilesetDefTiles = await this.loadTilesetDefTiles(file);
           if (!tab.brushes) tab.brushes = [];
           tab.brushes.push({ image: img as HTMLImageElement, fileName: file.name, width: img.width, height: img.height });
           // Fixed isometric tile dimensions — always 64x32
@@ -7375,42 +7373,10 @@ export class TileMapEditor {
             tab.tileset.sourcePath = sourcePath;
           }
 
-          // Populate detected tiles on import.
-          // Prefer variable-size detection unless fixed-grid slicing is explicitly requested.
+          // Always slice into single 64x32 tiles; multi-tile objects are made with merge.
+          void overrideSensitivity; void forceIsometric; void forceGridSlicing;
           const importedDetectedTiles = new Map<number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }>();
           let gidCounter = 1;
-
-          if (tilesetDefTiles && tilesetDefTiles.size > 0) {
-            for (const [id, data] of tilesetDefTiles.entries()) {
-              importedDetectedTiles.set(id, data);
-            }
-          }
-
-          if (importedDetectedTiles.size === 0 && !forceGridSlicing) {
-            try {
-              const prevTilesetImage = this.tilesetImage;
-              this.tilesetImage = img as HTMLImageElement;
-              const variableDetected = this.tileDetector.detectVariableSizedTiles(this.tilesetImage, overrideSensitivity, forceIsometric);
-              this.tilesetImage = prevTilesetImage;
-
-              const maxReasonable = Math.max(count * 4, 64);
-              if (variableDetected.length > 0 && variableDetected.length <= maxReasonable) {
-                for (const tile of variableDetected) {
-                  importedDetectedTiles.set(gidCounter, {
-                    sourceX: tile.sourceX,
-                    sourceY: tile.sourceY,
-                    width: tile.width,
-                    height: tile.height,
-                    originX: Math.floor(tile.width / 2),
-                    originY: tile.height
-                  });
-                  gidCounter++;
-                }
-              }
-            } catch (_e) {
-              void _e;
-            }
-          }
 
           if (importedDetectedTiles.size === 0) {
             for (let row = 0; row < rows; row++) {

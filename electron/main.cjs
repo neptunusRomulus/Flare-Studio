@@ -746,10 +746,13 @@ ipcMainLocal.handle("create-map-project", async (event, config) => {
 
     // Do not create spawn.txt yet. It will be generated when a starting map is selected.
 
-    return true;
+    return { success: true, projectPath };
   } catch (error) {
     console.error("Error creating map project:", error);
-    return false;
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
   }
 });
 

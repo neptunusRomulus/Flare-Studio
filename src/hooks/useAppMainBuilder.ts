@@ -860,6 +860,7 @@ export default function useAppMainBuilder() {
       rules: sb['rules'] ?? defaultRules,
       statuses: sb['statuses'] ?? defaultStatuses,
       items: sb['items'] ?? defaultItems,
+      gameSettings: sb['gameSettings'] ?? { isGameSettingsLayer: false },
       itemsList,
       events: sb['events'] ?? defaultEvents,
       tileset: {

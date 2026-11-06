@@ -37,6 +37,7 @@ export default function AppMain() {
     rules,
     items,
     events,
+    gameSettings,
     tileset,
     layersObj,
     exportStatus,
@@ -266,6 +267,7 @@ export default function AppMain() {
             actors={actors}            statuses={statuses}            rules={rules}
             items={items}
             events={events}
+            gameSettings={gameSettings}
             tileset={{
               ...tileset,
               currentProjectPath: controls?.currentProjectPath

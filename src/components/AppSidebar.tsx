@@ -199,7 +199,9 @@ export default function AppSidebar(p: SidebarProps) {
           />
         )}
 
-        {!p.actors.isNpcLayer && !p.actors.isEnemyLayer && !p.events.isEventLayer && !p.items.isItemsLayer && !p.rules.isRulesLayer && !p.statuses?.isStatusesLayer && (
+        {p.gameSettings?.isGameSettingsLayer && <SidebarGameSettingsArea />}
+
+        {!p.actors.isNpcLayer && !p.actors.isEnemyLayer && !p.events.isEventLayer && !p.items.isItemsLayer && !p.rules.isRulesLayer && !p.statuses?.isStatusesLayer && !p.gameSettings?.isGameSettingsLayer && (
           <>  
           <TilesetPanel
             editor={p.tileset.editor}

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { ItemSummary } from '@/utils/items';
-import { ArrowUp, ArrowUpRight, ArrowRight, ArrowDownRight, ArrowDown, ArrowDownLeft, ArrowLeft, ArrowUpLeft, Check, HelpCircle, Save, Trash2, User, X } from 'lucide-react';
+import { ArrowUp, ArrowUpRight, ArrowRight, ArrowDownRight, ArrowDown, ArrowDownLeft, ArrowLeft, ArrowUpLeft, HelpCircle, Save, Trash2, User, X } from 'lucide-react';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 import Tooltip from '@/components/ui/tooltip';
 import EventEditDialog from '@/components/EventEditDialog';
@@ -12,6 +12,7 @@ import NpcQuestSettingsDialog from '@/components/NpcQuestSettingsDialog';
 import NpcVendorSettingsDialog from '@/components/NpcVendorSettingsDialog';
 import type { DialogueTree, MapObject } from '@/types';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
+import { InlineConfirm } from '@/components/ui/inline-confirm';
 
 type ObjectManagementDialogProps = {
   showObjectDialog: boolean;
@@ -401,86 +402,54 @@ const ObjectManagementDialog = ({
         <div className="flex items-center gap-2">
           {editingObject?.type === 'npc' && (
             <>
-              {showDeleteNpcConfirm ? (
-                <>
-                  <span className="text-xs text-muted-foreground">Delete?</span>
-                  <Button
-                    variant="destructive"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => {
+              <InlineConfirm
+                open={showDeleteNpcConfirm}
+                onCancel={() => setShowDeleteNpcConfirm(false)}
+                onConfirm={() => {
                       if (editingObject) {
                         editor?.removeMapObject(editingObject.id);
                         syncMapObjects();
                         handleObjectDialogClose();
                         setShowDeleteNpcConfirm(false);
                       }
-                    }}
-                  >
-                    <Check className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => setShowDeleteNpcConfirm(false)}
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
-                </>
-              ) : (
+                }}
+              >
                 <Button
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                  onClick={() => setShowDeleteNpcConfirm(true)}
+                  onClick={() => setShowDeleteNpcConfirm(!showDeleteNpcConfirm)}
                   aria-label="Delete NPC"
                 >
                   <Trash2 className="w-4 h-4" />
                 </Button>
-              )}
+              </InlineConfirm>
             </>
           )}
           {editingObject?.type === 'enemy' && (
             <>
-              {showDeleteEnemyConfirm ? (
-                <>
-                  <span className="text-xs text-muted-foreground">Delete?</span>
-                  <Button
-                    variant="destructive"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => {
+              <InlineConfirm
+                open={showDeleteEnemyConfirm}
+                onCancel={() => setShowDeleteEnemyConfirm(false)}
+                onConfirm={() => {
                       if (editingObject) {
                         editor?.removeMapObject(editingObject.id);
                         syncMapObjects();
                         handleObjectDialogClose();
                         setShowDeleteEnemyConfirm(false);
                       }
-                    }}
-                  >
-                    <Check className="w-4 h-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-8 w-8"
-                    onClick={() => setShowDeleteEnemyConfirm(false)}
-                  >
-                    <X className="w-4 h-4" />
-                  </Button>
-                </>
-              ) : (
+                }}
+              >
                 <Button
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                  onClick={() => setShowDeleteEnemyConfirm(true)}
+                  onClick={() => setShowDeleteEnemyConfirm(!showDeleteEnemyConfirm)}
                   aria-label="Delete Enemy"
                 >
                   <Trash2 className="w-4 h-4" />
                 </Button>
-              )}
+              </InlineConfirm>
             </>
           )}
         </div>

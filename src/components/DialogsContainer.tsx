@@ -12,7 +12,7 @@ import MapDialogsContainer from '@/components/MapDialogsContainer';
 import OverwriteExportDialogContainer from '@/components/OverwriteExportDialogContainer';
 import ExportSuccessModalContainer from '@/components/ExportSuccessModalContainer';
 import ImportReviewModalContainer from '@/components/ImportReviewModalContainer';
-import SeparateBrushDialog from '@/components/SeparateBrushDialog';
+import { AnchoredConfirm } from '@/components/ui/inline-confirm';
 import SaveErrorNotificationPanel from '@/components/SaveErrorNotificationPanel';
 import EditEnemyWindow from '@/components/EditEnemyWindow';
 import QuestEditDialogContainer from '@/components/QuestEditDialogContainer';
@@ -41,9 +41,9 @@ export default function DialogsContainer({ ctx }: { ctx: unknown }) {
     <>
       <SaveErrorNotificationPanel position="bottom" />
 
-      <SeparateBrushDialog
+      <AnchoredConfirm
         open={local.showSeparateDialog ?? false}
-        onOpenChange={local.setShowSeparateDialog ?? (() => {})}
+        onCancel={() => local.setShowSeparateDialog?.(false)}
         onConfirm={local.confirmSeparateBrush ?? (() => {})}
       />
 

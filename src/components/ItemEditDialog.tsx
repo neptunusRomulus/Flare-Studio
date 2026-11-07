@@ -11,6 +11,7 @@ import type { ItemResourceSubtype } from '@/editor/itemRoles';
 import { useAppContext } from '@/context/AppContext';
 import { listPowerIds } from '@/adapters/flare/flareAdapter.cjs';
 import { projectRoot } from '@/editor/projectFiles';
+import { askConfirm, InlineConfirm } from '@/components/ui/inline-confirm';
 
 const RoleIcon = ({ roleId, className }: { roleId: string; className?: string }) => {
   switch (roleId) {
@@ -147,9 +148,9 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
     itemOpen.current = true;
   }
   if (!showItemEditDialog && itemOpen.current) itemOpen.current = false;
-  const requestCloseItem = () => {
+  const requestCloseItem = async () => {
     if (editingItem && JSON.stringify(editingItem) !== itemBaseline.current) {
-      if (!window.confirm('Discard unsaved item changes?')) return;
+      if (!(await askConfirm('Discard changes?'))) return;
     }
     handleCloseItemEdit();
   };
@@ -973,25 +974,11 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
       {/* Footer */}
       <div className="sticky bottom-0 border-t border-border/50 bg-background px-6 py-3 flex justify-between items-center">
         <div>
-          {!showDeleteConfirm ? (
-            <Tooltip content="Delete Item" side="top">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setShowDeleteConfirm(true)}
-                className="h-9 w-9 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-              >
-                <Trash2 className="h-5 w-5" />
-              </Button>
-            </Tooltip>
-          ) : (
-            <div className="flex items-center gap-2 animate-in fade-in slide-in-from-left-2 duration-200">
-              <span className="text-xs font-medium text-destructive">Delete this item?</span>
-              <Button
-                size="sm"
-                variant="destructive"
-                className="h-7 px-2 text-[10px]"
-                onClick={async () => {
+          <InlineConfirm
+            open={showDeleteConfirm}
+            side="top"
+            onCancel={() => setShowDeleteConfirm(false)}
+            onConfirm={async () => {
                   if (onDeleteItem && editingItem) {
                     await onDeleteItem({ 
                       id: editingItem.id as number, 
@@ -1001,20 +988,19 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
                     handleCloseItemEdit();
                   }
                   setShowDeleteConfirm(false);
-                }}
-              >
-                Confirm
-              </Button>
+            }}
+          >
+            <Tooltip content="Delete Item" side="top">
               <Button
-                size="sm"
                 variant="ghost"
-                className="h-7 px-2 text-[10px]"
-                onClick={() => setShowDeleteConfirm(false)}
+                size="icon"
+                onClick={() => setShowDeleteConfirm(!showDeleteConfirm)}
+                className="h-9 w-9 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
               >
-                Cancel
+                <Trash2 className="h-5 w-5" />
               </Button>
-            </div>
-          )}
+            </Tooltip>
+          </InlineConfirm>
         </div>
         <Tooltip content="Save Item" side="top">
           <Button

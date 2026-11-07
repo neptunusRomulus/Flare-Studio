@@ -4,11 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { AlignLeft, ArrowLeft, ArrowRight, Check, ChevronDown, ChevronUp, Coins, Eye, EyeOff, Fingerprint, Gift, HelpCircle, Image, Link2, MessageSquare, Package, Plus, Save, Shield, Tag, User, Volume2, X, Zap } from 'lucide-react';
+import { AlignLeft, ArrowLeft, ArrowRight, ChevronDown, ChevronUp, Coins, Eye, EyeOff, Fingerprint, Gift, HelpCircle, Image, Link2, MessageSquare, Package, Plus, Save, Shield, Tag, User, Volume2, X, Zap } from 'lucide-react';
 import Tooltip from '@/components/ui/tooltip';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 import { useAppContext } from '@/context/AppContext';
 import type { DialogueLine, DialogueRequirement, DialogueReward, DialogueWorldEffect, DialogueTree, MapObject } from '@/types';
+import { InlineConfirm } from '@/components/ui/inline-confirm';
+import { AnchoredConfirm } from '@/components/ui/inline-confirm';
 
 /** Generate a short unique dialogue ID like "dlg_a3f9" */
 function generateDialogueId(): string {
@@ -265,6 +267,24 @@ const DialogueTreeDialog = ({
     <div className="flex-1 flex gap-4 overflow-hidden p-4">
       {/* Tab sidebar */}
       <div className="w-52 flex flex-col border-r pr-4">
+        <AnchoredConfirm
+          open={dialogueTabToDelete !== null}
+          onCancel={() => setDialogueTabToDelete(null)}
+          onConfirm={() => {
+            const index = dialogueTabToDelete;
+            if (index === null) return;
+                        const deletedId = dialogueTrees[index].dialogueId;
+                        const newTrees = dialogueTrees.filter((_, i) => i !== index).map(t => ({
+                          ...t,
+                          responses: (t.responses || []).filter(r => r !== deletedId)
+                        }));
+                        setDialogueTrees(newTrees);
+                        setDialogueTabToDelete(null);
+                        if (activeDialogueTab >= newTrees.length) {
+                          setActiveDialogueTab(Math.max(0, newTrees.length - 1));
+                        }
+          }}
+        />
         <div className="flex-1 space-y-1 overflow-y-auto minimal-scroll">
           {dialogueTrees.map((tree, index) => {
             const hasResponses = (tree.responses || []).length > 0;
@@ -289,49 +309,11 @@ const DialogueTreeDialog = ({
                 }
               }}
               className={`w-full px-3 py-2 text-left text-sm rounded-md transition-colors ${
-                dialogueTabToDelete === index
-                  ? 'bg-red-500/20 border border-red-500/50 text-red-600 dark:text-red-400'
-                  : activeDialogueTab === index
+                activeDialogueTab === index
                   ? 'bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/50'
                   : 'hover:bg-muted border border-transparent'
               }`}
             >
-              {dialogueTabToDelete === index ? (
-                <div className="flex items-center gap-2">
-                  <span className="text-xs">Delete?</span>
-                  <div className="flex gap-1">
-                    <button
-                      type="button"
-                      className="p-0.5 rounded hover:bg-red-500/30"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const deletedId = dialogueTrees[index].dialogueId;
-                        const newTrees = dialogueTrees.filter((_, i) => i !== index).map(t => ({
-                          ...t,
-                          responses: (t.responses || []).filter(r => r !== deletedId)
-                        }));
-                        setDialogueTrees(newTrees);
-                        setDialogueTabToDelete(null);
-                        if (activeDialogueTab >= newTrees.length) {
-                          setActiveDialogueTab(Math.max(0, newTrees.length - 1));
-                        }
-                      }}
-                    >
-                      <Check className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      className="p-0.5 rounded hover:bg-muted"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDialogueTabToDelete(null);
-                      }}
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              ) : (
                 <div className="flex flex-col gap-0.5">
                   <div className="flex items-center gap-1.5">
                     <span className="truncate">{tree.topic || `Dialogue ${index + 1}`}</span>
@@ -346,7 +328,6 @@ const DialogueTreeDialog = ({
                     )}
                   </div>
                 </div>
-              )}
             </button>
             );
           })}
@@ -422,14 +403,10 @@ const DialogueTreeDialog = ({
                 </div>
                 {editingIdIndex === activeDialogueTab ? (
                   <div className="space-y-1">
-                    {idConfirmShown && (
-                      <div className="text-[10px] text-amber-500 bg-amber-500/10 border border-amber-500/30 rounded px-1.5 py-0.5">
-                        Changing ID will break existing response links. Are you sure?
-                        <div className="flex gap-1 mt-0.5">
-                          <button
-                            type="button"
-                            className="text-[10px] text-emerald-500 hover:underline"
-                            onClick={() => {
+                    <InlineConfirm
+                      open={idConfirmShown}
+                      onCancel={() => { setEditingIdIndex(null); setIdConfirmShown(false); }}
+                      onConfirm={() => {
                               const oldId = activeTree.dialogueId;
                               // Update all trees that reference the old ID
                               const newTrees = dialogueTrees.map((t, i) => {
@@ -444,16 +421,8 @@ const DialogueTreeDialog = ({
                               setDialogueTrees(newTrees);
                               setEditingIdIndex(null);
                               setIdConfirmShown(false);
-                            }}
-                          >Yes, update</button>
-                          <button
-                            type="button"
-                            className="text-[10px] text-muted-foreground hover:underline"
-                            onClick={() => { setEditingIdIndex(null); setIdConfirmShown(false); }}
-                          >Cancel</button>
-                        </div>
-                      </div>
-                    )}
+                      }}
+                    >
                     <Input
                       value={pendingIdValue}
                       onChange={(e) => setPendingIdValue(e.target.value.replace(/[^a-zA-Z0-9_]/g, ''))}
@@ -468,6 +437,7 @@ const DialogueTreeDialog = ({
                       className="h-8 text-xs font-mono"
                       autoFocus
                     />
+                    </InlineConfirm>
                   </div>
                 ) : (
                   <button

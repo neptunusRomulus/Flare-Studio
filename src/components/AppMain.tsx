@@ -6,8 +6,7 @@ import AppSidebar from '@/components/AppSidebar';
 import EngineSettingsDialog from '@/components/EngineSettingsDialog';
 import MapSettingsDialog from '@/components/MapSettingsDialog';
 import EventDialog from '@/components/EventDialog';
-import ClearLayerDialog from '@/components/ClearLayerDialog';
-import ConfirmActionDialog from '@/components/ConfirmActionDialog';
+import { AnchoredConfirm } from '@/components/ui/inline-confirm';
 import HelpDialog from '@/components/HelpDialog';
 import ConflictDialog from '@/components/ConflictDialog';
 import EditorArea from '@/components/EditorArea';
@@ -338,9 +337,9 @@ export default function AppMain() {
 
         <EventDialog open={eventDialogOpen} onOpenChange={setEventDialogOpen} eventLocation={eventDialogLocation} editingEventId={editingEventId} />
 
-        <ClearLayerDialog open={showClearLayerDialog} onClose={handleClearLayerClose} onConfirm={handleClearLayerConfirm} />
+        <AnchoredConfirm open={!!showClearLayerDialog} onCancel={handleClearLayerClose} onConfirm={handleClearLayerConfirm} />
 
-        <ConfirmActionDialog {...confirmDialogProps} />
+        <AnchoredConfirm open={!!confirmDialogProps.action} onCancel={confirmDialogProps.onCancel} onConfirm={confirmDialogProps.onConfirm} />
 
         <HelpDialog open={showHelp} activeTab={activeHelpTab} setActiveTab={setActiveHelpTab} onClose={handleHelpClose} />
 

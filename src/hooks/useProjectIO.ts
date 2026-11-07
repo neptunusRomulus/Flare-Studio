@@ -4,6 +4,7 @@ import type { TileMapEditor } from '@/editor/TileMapEditor';
 import { buildSpawnContent, computeIntermapTarget, STARTING_MAP_INVALID_NAMES } from '@/editor/mapSpawnUtils';
 import { legacyMapFileName, slugFileName } from '../adapters/flare/flareAdapter.cjs';
 import { serializeNpcFile } from '@/utils/flareNpcUtils';
+import { askConfirm } from '@/components/ui/inline-confirm';
 
 type ProjectIOOptions = {
   editor: TileMapEditor | null;
@@ -364,7 +365,7 @@ const useProjectIO = ({
   const handleOpenMapFromMapsFolder = useCallback(async (filename: string) => {
     if (!currentProjectPath) return;
     try {
-      const shouldExport = window.confirm('Export the current map before opening another?');
+      const shouldExport = await askConfirm('Export current map first?');
       if (shouldExport) {
         const exported = await performExport({ silent: true });
         if (!exported) {

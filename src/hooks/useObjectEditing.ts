@@ -4,6 +4,7 @@ import { EMPTY_ACTOR_ROLES } from '@/editor/actorRoles';
 import type { ActorDialogState, EnemyRoleKey } from '@/editor/actorRoles';
 import { validateAndSanitizeObject } from '@/editor/objectValidation';
 import { propertyText } from '@/editor/propertyText';
+import { askConfirm } from '@/components/ui/inline-confirm';
 
 /**
  * Load an image from an absolute file path via Electron and return its pixel dimensions.
@@ -365,9 +366,9 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
     }
   }, [editor, syncMapObjects]);
 
-  const handleObjectDialogClose = useCallback(() => {
+  const handleObjectDialogClose = useCallback(async () => {
     if (editingObject && objectBaselineRef.current && JSON.stringify(editingObject) !== objectBaselineRef.current) {
-      if (!window.confirm('Discard unsaved actor changes?')) return;
+      if (!(await askConfirm('Discard changes?'))) return;
     }
     setShowObjectDialog(false);
     setEditingObject(null);

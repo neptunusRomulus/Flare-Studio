@@ -6,6 +6,7 @@ import Tooltip from '@/components/ui/tooltip';
 import { ChevronDown, ChevronRight, HelpCircle, X, Save } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
+import { askConfirm } from '@/components/ui/inline-confirm';
 
 type QuestItemRequirement = {
   id: string;
@@ -129,9 +130,9 @@ const QuestEditDialog = ({ open, onOpenChange, questDraft, setQuestDraft, onSave
     questBaseline.current = JSON.stringify(questDraft);
   }, [open]);
 
-  const requestClose = () => {
+  const requestClose = async () => {
     if (JSON.stringify(questDraft) !== questBaseline.current) {
-      if (!window.confirm('Discard unsaved quest changes?')) return;
+      if (!(await askConfirm('Discard changes?'))) return;
     }
     onOpenChange(false);
   };

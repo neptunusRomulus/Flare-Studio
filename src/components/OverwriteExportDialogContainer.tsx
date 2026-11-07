@@ -1,5 +1,5 @@
 import React from 'react';
-import OverwriteExportDialog from '@/components/OverwriteExportDialog';
+import { AnchoredConfirm } from '@/components/ui/inline-confirm';
 
 type OverwriteExportCtx = {
   showOverwriteDialog: boolean;
@@ -10,8 +10,9 @@ type OverwriteExportCtx = {
 export default function OverwriteExportDialogContainer({ ctx }: { ctx: unknown }) {
   const c = ctx as OverwriteExportCtx;
   return (
-    <OverwriteExportDialog
-      open={c.showOverwriteDialog}
+    <AnchoredConfirm
+      open={!!c.showOverwriteDialog}
+      message="Overwrite old export?"
       onConfirm={c.handleOverwriteConfirm}
       onCancel={c.handleOverwriteCancel}
     />

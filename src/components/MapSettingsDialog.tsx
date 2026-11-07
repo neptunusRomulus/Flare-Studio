@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Tooltip from '@/components/ui/tooltip';
-import { HelpCircle, X, Save, Trash2, Check } from 'lucide-react';
+import { HelpCircle, X, Save, Trash2 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 import { emptyMapPresentation, type MapPresentation } from '@/editor/studioDrafts';
 import { MapPresentationFields } from '@/components/studio/studioEditors';
+import { AnchoredConfirm } from '@/components/ui/inline-confirm';
 
 type MapSettingsDialogProps = {
   open: boolean;
@@ -190,33 +191,7 @@ const MapSettingsDialog = ({
           <div className="w-1.5 h-1.5 bg-foreground/40 rounded-sm m-1" />
         </div>
       </div>
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black/40 z-50" style={{ zIndex: 60 }}>
-          <div className="flex flex-col items-center gap-3 rounded-xl border border-border bg-background px-4 py-5 shadow-lg w-64 text-center">
-            <p className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">are you sure?</p>
-            <div className="flex items-center gap-3">
-              <Button
-                variant="default"
-                size="icon"
-                className="h-10 w-10 rounded-full bg-emerald-600 text-white hover:bg-emerald-700"
-                aria-label="Confirm delete map"
-                onClick={handleConfirmDelete}
-              >
-                <Check className="w-4 h-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-10 w-10 rounded-full"
-                aria-label="Cancel delete map"
-                onClick={() => setShowDeleteConfirm(false)}
-              >
-                <X className="w-4 h-4 text-foreground" />
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <AnchoredConfirm open={showDeleteConfirm} onCancel={() => setShowDeleteConfirm(false)} onConfirm={handleConfirmDelete} />
     </>
   );
 

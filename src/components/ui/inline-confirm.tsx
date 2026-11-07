@@ -1,35 +1,122 @@
-import React from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  placeConfirm, lastAnchorRect, subscribeConfirm, getPendingConfirm, answerConfirm,
+  type Rect, type ConfirmSide,
+} from './inlineConfirmCore';
+
+export { askConfirm } from './inlineConfirmCore';
+
+/** The floating "Are you sure? ✕ ✓" bubble, portaled to body at a fixed spot next to the anchor. */
+function ConfirmBubble({ anchor, side = 'auto', message, onCancel, onConfirm, triggerRef }: {
+  anchor: Rect; side?: ConfirmSide; message: string; onCancel: () => void; onConfirm: () => void;
+  triggerRef?: React.RefObject<HTMLElement | null>;
+}) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    setPos(placeConfirm(anchor, el.offsetWidth, el.offsetHeight, window.innerWidth, window.innerHeight, side));
+  }, [anchor, side, message]);
+
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as Node;
+      // Presses on the trigger itself are left to its own onClick (it usually toggles).
+      if (ref.current?.contains(t) || triggerRef?.current?.contains(t)) return;
+      onCancel();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); onCancel(); }
+    };
+    document.addEventListener('mousedown', onDown, true);
+    document.addEventListener('keydown', onKey, true);
+    return () => {
+      document.removeEventListener('mousedown', onDown, true);
+      document.removeEventListener('keydown', onKey, true);
+    };
+  }, [onCancel, triggerRef]);
+
+  if (typeof document === 'undefined') return null;
+  return createPortal(
+    <div
+      ref={ref}
+      data-inline-confirm
+      role="alertdialog"
+      aria-label={message}
+      style={{ position: 'fixed', left: pos?.left ?? -9999, top: pos?.top ?? -9999, zIndex: 20000 }}
+      className="flex items-center gap-1 whitespace-nowrap rounded-md border border-border bg-background px-2 py-1 shadow-lg"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <span className="text-xs">{message}</span>
+      <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={onCancel} aria-label="Cancel">
+        <X className="h-4 w-4" />
+      </Button>
+      <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={onConfirm} aria-label="Confirm" autoFocus>
+        <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
+      </Button>
+    </div>,
+    document.body,
+  );
+}
 
 type InlineConfirmProps = {
   open: boolean;
   onCancel: () => void;
   onConfirm: () => void;
   message?: string;
+  side?: ConfirmSide;
   children: React.ReactNode;
 };
 
 /**
- * Small "Are you sure?" popover shown right under its trigger.
- * It floats over the layout, so opening it never resizes the parent.
+ * Small "Are you sure?" popover anchored to its children (the trigger).
+ * It floats over the layout (portaled), flips above near the bottom edge,
+ * and closes on Escape or an outside click.
  */
-export function InlineConfirm({ open, onCancel, onConfirm, message = 'Are you sure?', children }: InlineConfirmProps) {
+export function InlineConfirm({ open, onCancel, onConfirm, message = 'Are you sure?', side = 'auto', children }: InlineConfirmProps) {
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const [anchor, setAnchor] = useState<Rect | null>(null);
+  useLayoutEffect(() => {
+    if (!open || !wrapRef.current) { setAnchor(null); return; }
+    const r = wrapRef.current.getBoundingClientRect();
+    setAnchor({ left: r.left, top: r.top, width: r.width, height: r.height });
+  }, [open]);
   return (
-    <div className="relative">
+    <div ref={wrapRef} className="relative">
       {children}
-      {open && (
-        <div className="absolute left-1/2 top-full z-50 mt-1 flex -translate-x-1/2 items-center gap-1 whitespace-nowrap rounded-md border border-border bg-background px-2 py-1 shadow-lg">
-          <span className="text-xs">{message}</span>
-          <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={onCancel} aria-label="Cancel">
-            <X className="h-4 w-4" />
-          </Button>
-          <Button type="button" variant="ghost" size="sm" className="h-6 w-6 p-0" onClick={onConfirm} aria-label="Confirm">
-            <Check className="h-4 w-4 text-green-600 dark:text-green-400" />
-          </Button>
-        </div>
-      )}
+      {open && anchor && <ConfirmBubble anchor={anchor} side={side} message={message} onCancel={onCancel} onConfirm={onConfirm} triggerRef={wrapRef} />}
     </div>
+  );
+}
+
+/**
+ * Same bubble for confirms driven by state far from their button
+ * (e.g. a hook sets "pending delete"): it anchors to the control the user last pressed.
+ */
+export function AnchoredConfirm({ open, onCancel, onConfirm, message = 'Are you sure?', side = 'auto' }: Omit<InlineConfirmProps, 'children'>) {
+  const [anchor, setAnchor] = useState<Rect | null>(null);
+  useLayoutEffect(() => { setAnchor(open ? lastAnchorRect() : null); }, [open]);
+  if (!open || !anchor) return null;
+  return <ConfirmBubble anchor={anchor} side={side} message={message} onCancel={onCancel} onConfirm={onConfirm} />;
+}
+
+/** Mount once at the app root; renders askConfirm() requests. */
+export function InlineConfirmHost() {
+  const pending = useSyncExternalStore(subscribeConfirm, getPendingConfirm, () => null);
+  if (!pending) return null;
+  return (
+    <ConfirmBubble
+      key={pending.id}
+      anchor={pending.anchor}
+      message={pending.message}
+      onCancel={() => answerConfirm(false)}
+      onConfirm={() => answerConfirm(true)}
+    />
   );
 }
 

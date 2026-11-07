@@ -9,6 +9,7 @@ import { SaveErrorProvider } from './context/SaveErrorContext';
 import useSidebarDeps from './hooks/useSidebarDeps';
 import { AppProvider } from './context/AppContext';
 import AppMain from './components/AppMain';
+import { InlineConfirmHost } from './components/ui/inline-confirm';
 import useAppController from './hooks/useAppController';
 
 function sidebarRecord(value: unknown): Record<string, unknown> {
@@ -51,6 +52,7 @@ export default function App() {
             <ConflictResolutionProvider>
               <ToolbarProvider value={toolbarValue}>
                 <AppMainWrapper sidebarDeps={sidebarDeps} buildAppMainCtxFromSidebar={buildAppMainCtxFromSidebar} />
+                <InlineConfirmHost />
               </ToolbarProvider>
             </ConflictResolutionProvider>
           </SaveQueueProvider>

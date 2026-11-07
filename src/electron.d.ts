@@ -151,6 +151,8 @@ declare global {
         callback: (payload: { variant: 'modern' | 'classic'; received: number; total: number }) => void
       ) => () => void;
       openExternal: (url: string) => Promise<boolean>;
+      /** Flare tilesetdef for a PNG: its own mod first, then the engine's mods by file name. */
+      findTilesetDef?: (imagePath: string, flarePath?: string | null) => Promise<{ path: string; text: string } | null>;
       listTemplateTilesets: (flarePath: string) => Promise<{
         ok: boolean;
         error?: string;

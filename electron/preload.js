@@ -19,7 +19,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
       return null;
     }
   },
-  findTilesetDef: (imagePath) => ipcRenderer.invoke("find-tileset-def", imagePath),
+  findTilesetDef: (imagePath, flarePath) => ipcRenderer.invoke("find-tileset-def", imagePath, flarePath),
   fileExists: (filePath) => ipcRenderer.invoke("file-exists", filePath),
   minimize: () => ipcRenderer.send("window-minimize"),
   maximize: () => ipcRenderer.send("window-maximize"),

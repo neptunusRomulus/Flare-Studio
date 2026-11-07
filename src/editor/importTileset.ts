@@ -4,6 +4,8 @@
  * A tab holds one tileset; a layer has at most MAX_LAYER_TABS tabs.
  */
 import type { TileMapEditor } from './TileMapEditor';
+import { defTilesForImage, type DefSlicedTile } from './tilesetDef';
+import { getStoredFlarePath } from '@/flare/flarePathStore';
 
 export const MAX_LAYER_TABS = 10;
 
@@ -44,21 +46,53 @@ export function nextEmptyTab(editor: TilesetImportEditor, layerType: string): nu
   return editor.createLayerTab(layerType);
 }
 
-/** Slice the image into project-size tiles in that tab (same call the Upload button always used). */
+export type TilesetImportOptions = {
+  /** Real path of the PNG (template import passes the engine file); manual import asks the preload bridge. */
+  imagePath?: string | null;
+  /** Engine whose mods are searched by file name when the PNG's own mod has no def. */
+  flarePath?: string | null;
+};
+
+/** Tiles from the matching Flare tilesetdef, or null when there is none (then grid slicing is used). */
+export async function findDefTiles(
+  file: File,
+  groundHeight: number,
+  opts: TilesetImportOptions = {},
+): Promise<Map<number, DefSlicedTile> | null> {
+  const api = typeof window !== 'undefined' ? window.electronAPI : undefined;
+  if (!api?.findTilesetDef) return null;
+  let imagePath = opts.imagePath ?? null;
+  if (!imagePath) {
+    try { imagePath = (api as { getPathForFile?: (f: File) => string | null }).getPathForFile?.(file) ?? null; } catch { imagePath = null; }
+  }
+  try {
+    const found = await api.findTilesetDef(imagePath || file.name, opts.flarePath ?? getStoredFlarePath());
+    if (!found?.text) return null;
+    const tiles = defTilesForImage(found.text, file.name, groundHeight);
+    return tiles.size > 0 ? tiles : null;
+  } catch (err) {
+    console.warn('[Tileset] def lookup failed', err);
+    return null;
+  }
+}
+
+/**
+ * Import a tileset PNG into a tab: sliced by its Flare tilesetdef when one is
+ * found (tile ids and origins kept), otherwise into a uniform ground-size grid.
+ * Returns how it was sliced.
+ */
 export async function importTilesetIntoTab(
   editor: TilesetImportEditor,
   layerType: string,
   tabId: number,
   file: File,
   projectPath?: string,
-): Promise<void> {
+  opts: TilesetImportOptions = {},
+): Promise<{ fromDef: boolean }> {
   const ground = editor.getGroundTileSize?.() ?? { width: 192, height: 96 };
-  try {
-    await editor.importBrushImageToLayerTab(layerType, tabId, file, projectPath, undefined, undefined, ground.width, ground.height, true);
-  } catch {
-    // Fall back to the legacy call if the runtime class shape differs.
-    await editor.importBrushImageToLayerTab(layerType, tabId, file, projectPath);
-  }
+  const defTiles = await findDefTiles(file, ground.height, opts);
+  await editor.importBrushImageToLayerTab(layerType, tabId, file, projectPath, undefined, undefined, ground.width, ground.height, true, defTiles ?? undefined);
+  return { fromDef: !!defTiles };
 }
 
 /** File from a data: URL, for images read by the main process. */
@@ -119,7 +153,7 @@ export async function importTemplateTilesets(
     try {
       const dataUrl = await api.readFileAsDataURL(entry.path);
       if (!dataUrl) throw new Error('unreadable');
-      await importTilesetIntoTab(editor, layerType, tabId, fileFromDataUrl(dataUrl, entry.name), projectPath);
+      await importTilesetIntoTab(editor, layerType, tabId, fileFromDataUrl(dataUrl, entry.name), projectPath, { imagePath: entry.path, flarePath });
       if (firstTab === null) firstTab = tabId;
       result.imported.push(entry.name);
     } catch (err) {

@@ -409,12 +409,16 @@ const TilesetPalette = ({
   }, []);
 
   const getDetectedGidAtPosition = useCallback((x: number, y: number): number | null => {
+    // Def tiles can overlap in the atlas; the smallest rect under the cursor wins.
+    let best: { gid: number; area: number } | null = null;
     for (const tile of detectedTiles) {
       const withinX = x >= tile.sourceX && x <= (tile.sourceX + tile.width);
       const withinY = y >= tile.sourceY && y <= (tile.sourceY + tile.height);
-      if (withinX && withinY) return tile.gid;
+      if (!withinX || !withinY) continue;
+      const area = tile.width * tile.height;
+      if (!best || area < best.area) best = { gid: tile.gid, area };
     }
-    return null;
+    return best ? best.gid : null;
   }, [detectedTiles]);
 
   const applyDetectedTilesToActiveTab = useCallback((nextTiles: DetectedTileRect[]) => {

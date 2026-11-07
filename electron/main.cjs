@@ -12,6 +12,7 @@ const { validateSerializedFlareData, loadFlareDataSchema } = require("./flareDat
 const flareLaunch = require("./flareLaunch.cjs");
 const flareInstaller = require("./flareInstaller.cjs");
 const flareTemplate = require("./flareTemplate.cjs");
+const tilesetDefLookup = require("./tilesetDefLookup.cjs");
 const flareAdapter = require("../src/adapters/flare/flareAdapter.cjs");
 /** Map file base name; same slug Play and the adapter use. */
 const sanitizeMapNameForFilename = (name) => flareAdapter.slugFileName(name);
@@ -2681,29 +2682,14 @@ ipcMainLocal.handle("write-item-file", async (event, filePath, itemData) => {
 // Look for the Flare tileset definition that belongs to a tileset image the
 // user just picked. Only .txt files in the usual Flare spots next to the image
 // are read, and only when their img= line names that same image.
-ipcMainLocal.handle("find-tileset-def", async (_event, imagePath) => {
+ipcMainLocal.handle("find-tileset-def", async (_event, imagePath, flarePath) => {
   try {
-    if (typeof imagePath !== "string" || !/\.png$/i.test(imagePath)) return null;
-    const resolved = path.resolve(imagePath);
-    if (!fs.existsSync(resolved)) return null;
-    const dir = path.dirname(resolved);
-    const base = path.basename(resolved, path.extname(resolved));
-    const imageName = path.basename(resolved);
-    const candidates = [
-      path.join(dir, "..", "..", "tilesetdefs", `${base}.txt`),
-      path.join(dir, "..", "tilesetdefs", `${base}.txt`),
-      path.join(dir, `${base}.txt`),
-    ];
-    for (const candidate of candidates) {
-      if (!fs.existsSync(candidate)) continue;
-      const text = fs.readFileSync(candidate, "utf8");
-      const imgLine = text.split(/\r?\n/).find((l) => l.trim().startsWith("img="));
-      if (!imgLine) continue;
-      const imgRef = imgLine.trim().slice(4).trim();
-      if (path.basename(imgRef) !== imageName) continue;
-      return { path: candidate, text };
+    const modsDirs = [];
+    if (typeof flarePath === "string" && flarePath) {
+      const target = flareLaunch.resolveFlareLaunchTarget(flarePath, flarePathProbe());
+      if (target && !target.error && target.dataPath) modsDirs.push(path.join(target.dataPath, "mods"));
     }
-    return null;
+    return tilesetDefLookup.findTilesetDefForImage(imagePath, modsDirs);
   } catch (error) {
     console.error("Error finding tileset definition:", error);
     return null;

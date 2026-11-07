@@ -9,7 +9,8 @@
   ObjectInstance,
   PaintMode
 } from '../types';
-import { parseTilesetDefTiles } from './tilesetDef';
+import { parseTilesetDefTiles, tileDrawTopLeft } from './tilesetDef';
+import { assignExportOffsets } from './tilesetIds';
 import { TileDetector } from './tileDetection';
 import { exportMapText, importMapText, slugFileName, tilePixelOffset } from '../adapters/flare/flareAdapter.cjs';
 import { clipboardFromTiles, pasteTileGrid, type TileClipboard } from './tileClipboard';
@@ -26,6 +27,8 @@ interface LayerTilesetEntry {
   spacing?: number;
   margin?: number;
   sourcePath?: string | null;
+  /** 'def' = sliced from a Flare tilesetdef (local ids = Flare tile ids); missing/'grid' = uniform grid. */
+  tileSource?: 'def' | 'grid';
 }
 
 interface GlobalTilesetInfo extends LayerTilesetEntry {
@@ -39,6 +42,8 @@ interface GlobalTilesetInfo extends LayerTilesetEntry {
   margin: number;
   sourcePath: string | null;
   offset: number;
+  /** Local ids present, for def-sliced tilesets (export keeps Flare ids). */
+  defIds?: number[] | null;
 }
 
 interface TilesetExportInfo {
@@ -80,6 +85,7 @@ export interface SavedTilesetEntry {
   detectedTiles?: SerializedDetectedTile[];
   originX?: number;
   originY?: number;
+  tileSource?: 'def' | 'grid';
 }
 
 export interface EditorProjectData {
@@ -3282,15 +3288,15 @@ export class TileMapEditor {
     const scaledTileX = tileWidth * this.zoom;
     const scaledTileY = tileHeight * this.zoom;
 
-    // For ground tiles, position so the tile fills the diamond cell
-    // The sprite should be centered horizontally on the tile center
-    // and positioned so its bottom aligns with the diamond's bottom
-    const halfTileY = (this.tileSizeY / 2) * this.zoom;
-    const groundY = screenPos.y + halfTileY;
-    
-    // Center-bottom anchor for ground tiles
-    const destX = screenPos.x - (tileWidth / 2) * this.zoom;
-    const destY = groundY - tileHeight * this.zoom;
+    // Anchor: the tile's origin (Flare def offset, or bottom-center for grid tiles)
+    // sits on the diamond's bottom point. Fallback rects above have no origin.
+    const useOrigin = !invalidRect && !!tileData && typeof tileData.originX === 'number' && typeof tileData.originY === 'number';
+    const { x: destX, y: destY } = tileDrawTopLeft(screenPos.x, screenPos.y, this.tileSizeY, this.zoom, {
+      width: tileWidth,
+      height: tileHeight,
+      originX: useOrigin ? tileData!.originX : undefined,
+      originY: useOrigin ? tileData!.originY : undefined,
+    });
     
     this.ctx.drawImage(
       layerTileset.image,
@@ -7319,7 +7325,8 @@ export class TileMapEditor {
     forceIsometric?: boolean,
     _manualTileWidth?: number,
     _manualTileHeight?: number,
-    forceGridSlicing?: boolean
+    forceGridSlicing?: boolean,
+    defTiles?: Map<number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }>
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -7338,7 +7345,9 @@ export class TileMapEditor {
           const tileHeight = this.tileSizeY;
           const columns = Math.max(1, Math.floor(img.width / tileWidth));
           const rows = Math.max(1, Math.floor(img.height / tileHeight));
-          const count = Math.max(1, columns * rows);
+          const fromDef = !!defTiles && defTiles.size > 0;
+          // Def-sliced: local ids are the Flare tile ids, so count spans up to the highest id.
+          const count = fromDef ? Math.max(...defTiles!.keys()) : Math.max(1, columns * rows);
           const sourcePath = this.extractFileSourcePath(file);
           
           // Store just the filename (not full path) for tilesetImages key
@@ -7357,7 +7366,8 @@ export class TileMapEditor {
               tileHeight,
               spacing: 0,
               margin: 0,
-              sourcePath
+              sourcePath,
+              tileSource: fromDef ? 'def' : 'grid'
             };
           } else {
             // Update tileset metadata so it stays in sync with latest import
@@ -7371,12 +7381,19 @@ export class TileMapEditor {
             tab.tileset.spacing = 0;
             tab.tileset.margin = 0;
             tab.tileset.sourcePath = sourcePath;
+            tab.tileset.tileSource = fromDef ? 'def' : 'grid';
           }
 
           // Always slice into single project-size tiles; multi-tile objects are made with merge.
           void overrideSensitivity; void forceIsometric; void forceGridSlicing;
           const importedDetectedTiles = new Map<number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }>();
           let gidCounter = 1;
+
+          if (fromDef) {
+            for (const [id, t] of defTiles!.entries()) {
+              importedDetectedTiles.set(id, { sourceX: t.sourceX, sourceY: t.sourceY, width: t.width, height: t.height, originX: t.originX, originY: t.originY });
+            }
+          }
 
           if (importedDetectedTiles.size === 0) {
             for (let row = 0; row < rows; row++) {
@@ -7755,11 +7772,22 @@ export class TileMapEditor {
     // Calculate cumulative offsets for each tileset.
     // Offset starts at 1 (0 is reserved for empty/no-tile), and each tileset
     // gets offset = cumulative count
-    let currentOffset = 1;
-    for (const tileset of tilesets) {
-      tileset.offset = currentOffset;
-      currentOffset += tileset.count;
-    }
+    const offsets = assignExportOffsets(tilesets);
+    tilesets.forEach((tileset, i) => { tileset.offset = offsets[i]; });
+  }
+
+  /** Tab whose tileset is this entry (same object or same file name) on the layer. */
+  private findTabForTileset(layerType: string, fileName: string | null | undefined) {
+    if (!fileName) return undefined;
+    const norm = this.normalizeTilesetKey(fileName);
+    return (this.layerTabs.get(layerType) || []).find(t => t.tileset?.fileName && (t.tileset.fileName === fileName || this.normalizeTilesetKey(t.tileset.fileName) === norm));
+  }
+
+  private defIdsForTileset(layerType: string, tileset: LayerTilesetEntry): number[] | null {
+    if (tileset.tileSource !== 'def') return null;
+    const tab = this.findTabForTileset(layerType, tileset.fileName);
+    const tiles = tab?.detectedTiles ?? this.layerTileData.get(layerType);
+    return tiles && tiles.size > 0 ? [...tiles.keys()].sort((a, b) => a - b) : null;
   }
 
   private collectGlobalTilesets(): GlobalTilesetInfo[] {
@@ -7778,6 +7806,7 @@ export class TileMapEditor {
       margin: number;
       sourcePath: string | null;
       image: HTMLImageElement | null;
+      defIds?: number[] | null;
     }) => {
       if (!entry.fileName) {
         return;
@@ -7811,7 +7840,8 @@ export class TileMapEditor {
         margin,
         sourcePath: entry.sourcePath,
         image: entry.image,
-        offset: 0
+        offset: 0,
+        defIds: entry.defIds ?? null
       });
 
       added.add(uniqueKey);
@@ -7858,8 +7888,34 @@ export class TileMapEditor {
         spacing: tileset.spacing ?? 0,
         margin: tileset.margin ?? 0,
         sourcePath: tileset.sourcePath ?? null,
-        image: tileset.image ?? null
+        image: tileset.image ?? null,
+        defIds: this.defIdsForTileset(layerType, tileset)
       });
+    }
+
+    // Every slot's tileset, not just the active one per layer, so painted cells
+    // from other slots resolve to their own ids on export.
+    for (const [layerType, tabs] of this.layerTabs.entries()) {
+      for (const tab of tabs) {
+        const ts = tab.tileset;
+        if (!ts || !ts.fileName || this.isInternalTilesetFile(ts.fileName)) continue;
+        const columns = ts.columns || (ts.image ? Math.max(1, Math.floor(ts.image.width / this.tileSizeX)) : 1);
+        const rows = ts.rows || (ts.image ? Math.max(1, Math.floor(ts.image.height / this.tileSizeY)) : 1);
+        pushTileset({
+          layerType,
+          fileName: ts.fileName,
+          count: ts.count || Math.max(1, columns * rows),
+          columns,
+          rows,
+          tileWidth: ts.tileWidth ?? this.tileSizeX,
+          tileHeight: ts.tileHeight ?? this.tileSizeY,
+          spacing: ts.spacing ?? 0,
+          margin: ts.margin ?? 0,
+          sourcePath: ts.sourcePath ?? null,
+          image: ts.image ?? null,
+          defIds: ts.tileSource === 'def' && tab.detectedTiles ? [...tab.detectedTiles.keys()].sort((x, y) => x - y) : null
+        });
+      }
     }
 
     const layerPriority: Record<string, number> = {
@@ -7883,12 +7939,7 @@ export class TileMapEditor {
       return 0;
     });
 
-    let currentOffset = 1;
-    for (const entry of results) {
-      entry.offset = currentOffset;
-      currentOffset += Math.max(1, entry.count);
-    }
-
+    this.assignTilesetOffsets(results);
     return results;
   }
 
@@ -8332,6 +8383,16 @@ export class TileMapEditor {
         }
       }
 
+      // Slot data for this exact tileset (covers non-active slots too).
+      if (lookup.size === 0) {
+        const tab = this.findTabForTileset(tileset.layerType, tileset.fileName);
+        if (tab?.detectedTiles) {
+          for (const [gid, data] of tab.detectedTiles.entries()) {
+            lookup.set(gid, { sourceX: data.sourceX, sourceY: data.sourceY, width: data.width, height: data.height, originX: data.originX, originY: data.originY });
+          }
+        }
+      }
+
       // Single-tileset legacy fallback only.
       if (lookup.size === 0 && exportedTilesets.length === 1 && this.detectedTileData && this.detectedTileData.size > 0) {
         for (const [gid, data] of this.detectedTileData.entries()) {
@@ -8353,9 +8414,13 @@ export class TileMapEditor {
       const tileHeight = tileset.tileHeight || this.tileSizeY;
       const localLookup = detectedByTileset.get(tileset.fileName) || new Map<number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }>();
 
-      for (let i = 0; i < tileset.count; i++) {
+      // Def-sliced tilesets only have the ids their def has; don't invent grid tiles in the gaps.
+      const localIds = tileset.defIds && tileset.defIds.length > 0
+        ? tileset.defIds
+        : Array.from({ length: tileset.count }, (_, i) => i + 1);
+      for (const localId of localIds) {
+        const i = localId - 1;
         const globalId = tileset.offset + i;
-        const localId = i + 1;
         const detected = localLookup.get(localId);
         let left_x: number;
         let top_y: number;
@@ -9361,6 +9426,7 @@ export class TileMapEditor {
               spacing: t.tileset.spacing,
               margin: t.tileset.margin,
               sourcePath: t.tileset.sourcePath ?? null,
+              tileSource: t.tileset.tileSource,
               detectedTiles: t.detectedTiles ? Array.from(t.detectedTiles.entries()) : undefined,
               originX: (t.tileset as unknown as { originX?: number }).originX,
               originY: (t.tileset as unknown as { originY?: number }).originY
@@ -10590,7 +10656,8 @@ export class TileMapEditor {
                   tileHeight: t.tileset.tileHeight,
                   spacing: t.tileset.spacing ?? 0,
                   margin: t.tileset.margin ?? 0,
-                  sourcePath: t.tileset.sourcePath ?? null
+                  sourcePath: t.tileset.sourcePath ?? null,
+                  tileSource: t.tileset.tileSource === 'def' ? 'def' : undefined
                 };
                 // restore optional origin if present
                 try { (ts as unknown as { originX?: number }).originX = (t.tileset as unknown as { originX?: number }).originX ?? 0; } catch (_err) { void _err; }

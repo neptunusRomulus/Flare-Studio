@@ -2,6 +2,7 @@ import React, { useEffect, useCallback, useState, useRef, useLayoutEffect, useMe
 import type { TileLayer } from '@/types';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 import usePreferences from '@/hooks/usePreferences';
+import TilesetTabPicker from '@/components/TilesetTabPicker';
 import { Check, X, FlipHorizontal2, FlipVertical2 } from 'lucide-react';
 
 type TilesetPaletteProps = {
@@ -828,42 +829,19 @@ const TilesetPalette = ({
         if (!showTabs) return null;
         return (
           <div key={tabTick} className="flex items-center gap-2 px-2 py-2 overflow-visible">
-            <div
-              className={`flex-1 flex items-center gap-1 overflow-x-auto overflow-y-visible py-1 tabs-scroll ${(() => {
-                try {
-                  const tabs = editor && activeLayerType ? (editor.getLayerTabs ? editor.getLayerTabs(activeLayerType) : []) : [];
-                  return tabs && tabs.length > 5 ? 'tabs-limited' : '';
-                } catch { return ''; }
-              })()}`}
-              onWheel={(event: React.WheelEvent<HTMLDivElement>) => {
-                const el = event.currentTarget as HTMLDivElement;
-                if (el.scrollWidth > el.clientWidth) {
-                  event.preventDefault();
-                  el.scrollLeft += event.deltaY;
-                }
-              }}
-            >
-              {editor ? (
-                (editor.getLayerTabs ? editor.getLayerTabs(activeLayerType!) : []).map((tab: { id: number; name?: string; }, idx: number) => (
-                  <button
-                    key={tab.id}
-                    title={tab.name ?? `Tab ${idx + 1}`}
-                    aria-label={tab.name ? `${tab.name} (Tab ${idx + 1})` : `Tab ${idx + 1}`}
-                    className="tab-number"
-                    onClick={() => {
-                      if (!editor) return;
-                      editor.setActiveLayerTab(activeLayerType!, tab.id);
-                      setTabTick(t => t + 1);
-                      setSelection(null);
-                    }}
-                  >
-                    {idx + 1}
-                  </button>
-                ))
-              ) : (
-                <div className="text-xs text-muted-foreground">No tabs</div>
-              )}
-            </div>
+            {editor ? (
+              <TilesetTabPicker
+                tabs={editor.getLayerTabs ? editor.getLayerTabs(activeLayerType!) : []}
+                activeId={editor.getActiveLayerTabId ? editor.getActiveLayerTabId(activeLayerType!) : null}
+                onSelect={(id) => {
+                  editor.setActiveLayerTab(activeLayerType!, id);
+                  setTabTick(t => t + 1);
+                  setSelection(null);
+                }}
+              />
+            ) : (
+              <div className="text-xs text-muted-foreground">No tabs</div>
+            )}
           </div>
         );
       })()}

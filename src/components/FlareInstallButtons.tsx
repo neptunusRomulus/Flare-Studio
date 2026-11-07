@@ -78,7 +78,7 @@ const FlareInstallButtons: React.FC = () => {
       if (result.ok) {
         setStoredFlarePath(result.exePath);
         setInstalled({ variant, version: result.version });
-      } else {
+      } else if (!result.cancelled) {
         setError(result.error);
       }
     } catch (err) {
@@ -113,6 +113,19 @@ const FlareInstallButtons: React.FC = () => {
                 </span>
               </Button>
             </Tooltip>
+            {installing === v.id && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                aria-label="Cancel install"
+                data-testid={`flare-install-cancel-${v.id}`}
+                className="absolute left-full top-1/2 ml-1 h-7 w-7 -translate-y-1/2 p-0"
+                onClick={() => { void window.electronAPI?.cancelInstallFlare?.(v.id); }}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
             {installing === v.id && percent !== null && (
               <span className="pointer-events-none absolute left-0 right-0 top-full mt-1 text-center text-xs tabular-nums text-gray-500 dark:text-gray-400">
                 {percent}%

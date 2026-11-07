@@ -138,6 +138,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   isFlareRunning: () =>
     ipcRenderer.invoke("is-flare-running"),
   installFlare: (variant) => ipcRenderer.invoke("install-flare", variant),
+  cancelInstallFlare: (variant) => ipcRenderer.invoke("cancel-install-flare", variant),
   onInstallFlareProgress: (callback) => {
     const listener = (_event, payload) => callback && callback(payload);
     ipcRenderer.on("install-flare-progress", listener);

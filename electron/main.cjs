@@ -3148,14 +3148,27 @@ ipcMainLocal.handle("launch-flare-engine", async (_event, options = {}) => {
 });
 
 // One-click Flare install (engine + content) from the Welcome screen.
+const flareInstallControllers = new Map();
 ipcMainLocal.handle("install-flare", async (event, variant) => {
   const sender = event.sender;
+  const controller = new AbortController();
+  flareInstallControllers.set(variant, controller);
   return flareInstaller.installFlare(variant, {
+    signal: controller.signal,
     log: (message) => console.log(message),
     onProgress: ({ received, total }) => {
       if (!sender.isDestroyed()) sender.send("install-flare-progress", { variant, received, total });
     },
+  }).finally(() => {
+    if (flareInstallControllers.get(variant) === controller) flareInstallControllers.delete(variant);
   });
+});
+
+ipcMainLocal.handle("cancel-install-flare", async (_event, variant) => {
+  const controller = flareInstallControllers.get(variant);
+  if (!controller) return false;
+  controller.abort();
+  return true;
 });
 
 ipcMainLocal.handle("open-external", async (_event, url) => {

@@ -120,7 +120,13 @@ function parseFlareVersion(output) {
  * Stream url to dest, following redirects. Writes dest + ".part" and renames
  * on success; the .part file is removed on failure.
  */
-function downloadFile(url, dest, { onProgress, maxRedirects = 8, get = https.get } = {}) {
+function cancelledError() {
+  const err = new Error("Install cancelled.");
+  err.cancelled = true;
+  return err;
+}
+
+function downloadFile(url, dest, { onProgress, maxRedirects = 8, get = https.get, signal } = {}) {
   const partPath = `${dest}.part`;
   return new Promise((resolve, reject) => {
     let finished = false;
@@ -135,8 +141,19 @@ function downloadFile(url, dest, { onProgress, maxRedirects = 8, get = https.get
       reject(err);
     };
 
+    if (signal?.aborted) {
+      fail(cancelledError());
+      return;
+    }
+    let currentReq = null;
+    const onAbort = () => {
+      fail(cancelledError());
+      if (currentReq) currentReq.destroy();
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+
     const request = (target, redirectsLeft) => {
-      const req = get(target, { headers: { "User-Agent": "Flare-Studio" } }, (res) => {
+      const req = currentReq = get(target, { headers: { "User-Agent": "Flare-Studio" } }, (res) => {
         const status = res.statusCode || 0;
         if (status >= 300 && status < 400 && res.headers.location) {
           res.resume();
@@ -156,6 +173,7 @@ function downloadFile(url, dest, { onProgress, maxRedirects = 8, get = https.get
         let received = 0;
         let lastEmit = 0;
         const out = fs.createWriteStream(partPath);
+        signal?.addEventListener("abort", () => { res.destroy(); out.destroy(); }, { once: true });
         res.on("data", (chunk) => {
           received += chunk.length;
           const now = Date.now();
@@ -195,6 +213,10 @@ function downloadFile(url, dest, { onProgress, maxRedirects = 8, get = https.get
 function run(file, args, options = {}) {
   return new Promise((resolve, reject) => {
     execFile(file, args, { maxBuffer: 64 * 1024 * 1024, timeout: 10 * 60 * 1000, ...options }, (err, stdout, stderr) => {
+      if (err && options.signal?.aborted) {
+        reject(cancelledError());
+        return;
+      }
       if (err) {
         err.message = `${err.message}\n${String(stderr || "").slice(-500)}`;
         reject(err);
@@ -282,14 +304,16 @@ async function doInstall(variant, options) {
 
     if (!fs.existsSync(downloadPath)) {
       log(`[FlareInstall] Downloading ${asset.url}`);
-      await downloadFile(asset.url, downloadPath, { onProgress: options.onProgress, get: options.get });
+      await downloadFile(asset.url, downloadPath, { onProgress: options.onProgress, get: options.get, signal: options.signal });
     }
 
     fs.chmodSync(downloadPath, 0o755);
     fs.rmSync(tmpExtract, { recursive: true, force: true });
     fs.mkdirSync(tmpExtract, { recursive: true });
     log(`[FlareInstall] Extracting ${asset.file}`);
-    await run(downloadPath, ["--appimage-extract"], { cwd: tmpExtract });
+    if (options.signal?.aborted) throw cancelledError();
+    await run(downloadPath, ["--appimage-extract"], { cwd: tmpExtract, signal: options.signal });
+    if (options.signal?.aborted) throw cancelledError();
     const extracted = path.join(tmpExtract, EXTRACT_DIR);
     if (!fs.existsSync(path.join(extracted, "AppRun"))) {
       throw new Error("The downloaded file did not unpack into a Flare install.");
@@ -313,6 +337,10 @@ async function doInstall(variant, options) {
       fs.rmSync(tmpExtract, { recursive: true, force: true });
     } catch {
       /* ignore */
+    }
+    if (err && err.cancelled) {
+      log(`[FlareInstall] ${asset.tag} cancelled`);
+      return { ok: false, cancelled: true, error: "Install cancelled." };
     }
     log(`[FlareInstall] ${asset.tag} failed: ${err.message}`);
     const lines = String(err.message || err).split("\n").map((l) => l.trim()).filter(Boolean);

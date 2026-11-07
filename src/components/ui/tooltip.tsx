@@ -204,7 +204,7 @@ const Tooltip: React.FC<TooltipProps> = ({ content, side = 'top', className = ''
         onMouseLeave={onTriggerLeave}
         onBlur={onTriggerLeave}
         onClick={handleToggleExpand}
-        className={`relative inline-flex cursor-help ${className}`}
+        className={`relative inline-flex ${className}`}
       >
         {trigger}
       </span>

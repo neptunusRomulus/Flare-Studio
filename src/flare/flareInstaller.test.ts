@@ -191,3 +191,15 @@ describe('preferSystemLibs', () => {
     expect(fs.existsSync(`${bundled}.bundled`)).toBe(true);
   });
 });
+
+describe('install cancel', () => {
+  it('rejects a download as cancelled when the signal is aborted', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'flare-cancel-'));
+    const controller = new AbortController();
+    controller.abort();
+    await expect(
+      installer.downloadFile('https://example.invalid/x', path.join(dir, 'x'), { signal: controller.signal, get: () => { throw new Error('should not request'); } })
+    ).rejects.toMatchObject({ cancelled: true });
+    expect(fs.existsSync(path.join(dir, 'x.part'))).toBe(false);
+  });
+});

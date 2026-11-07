@@ -143,8 +143,9 @@ declare global {
       // One-click Flare install (Linux for now)
       installFlare: (variant: 'modern' | 'classic') => Promise<
         | { ok: true; variant: 'modern' | 'classic'; version: string; exePath: string; dataPath: string; installDir: string; alreadyInstalled: boolean }
-        | { ok: false; error: string }
+        | { ok: false; error: string; cancelled?: boolean }
       >;
+      cancelInstallFlare?: (variant: 'modern' | 'classic') => Promise<boolean>;
       onInstallFlareProgress: (
         callback: (payload: { variant: 'modern' | 'classic'; received: number; total: number }) => void
       ) => () => void;

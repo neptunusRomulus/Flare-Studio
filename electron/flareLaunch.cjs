@@ -253,6 +253,11 @@ function resolveFlareLaunchTarget(flarePath, { platform, exists, isDirectory }) 
   }
   if (!isDirectory(flarePath)) {
     const directory = path.dirname(flarePath);
+    // An out-of-source build (flare-engine/build/flare) keeps mods/ one level up.
+    const parent = path.dirname(directory);
+    if (!exists(path.join(directory, "mods")) && parent !== directory && exists(path.join(parent, "mods", "default"))) {
+      return { exePath: flarePath, dataPath: parent, cwd: parent, passDataPath: true };
+    }
     return {
       exePath: flarePath,
       dataPath: directory,

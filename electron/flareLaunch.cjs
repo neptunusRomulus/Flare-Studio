@@ -219,13 +219,14 @@ function ensureSavePrefix(content, prefix) {
 /**
  * String-only guess used by the renderer. The main process re-checks the
  * filesystem, because a saved legacy value may be a directory.
- * A path whose last segment contains a dot, or is exactly "flare", is a file.
+ * A path whose last segment contains a dot, or is exactly "flare" or
+ * "AppRun", is a file.
  */
 function dataPathFromFlareSelection(flarePath) {
   const normalized = String(flarePath || "").replace(/\\/g, "/").replace(/\/+$/, "");
   if (!normalized) return "";
   const base = normalized.split("/").pop() || "";
-  const looksLikeFile = base.includes(".") || base === "flare";
+  const looksLikeFile = base.includes(".") || base === "flare" || base === "AppRun";
   if (!looksLikeFile) return normalized;
   const slash = normalized.lastIndexOf("/");
   if (slash <= 0) return normalized;
@@ -255,6 +256,12 @@ function resolveFlareLaunchTarget(flarePath, { platform, exists, isDirectory }) 
   }
   if (!isDirectory(flarePath)) {
     const directory = path.dirname(flarePath);
+    // An extracted AppImage (Studio's one-click install): <root>/AppRun with
+    // the data in <root>/usr/share/flare. AppRun sets up its own libraries.
+    const appImageData = path.join(directory, "usr", "share", "flare");
+    if (path.basename(flarePath) === "AppRun" && exists(path.join(appImageData, "mods", "default"))) {
+      return { exePath: flarePath, dataPath: appImageData, cwd: directory, passDataPath: true };
+    }
     // An out-of-source build (flare-engine/build/flare) keeps mods/ one level up.
     const parent = path.dirname(directory);
     if (!exists(path.join(directory, "mods")) && parent !== directory && exists(path.join(parent, "mods", "default"))) {

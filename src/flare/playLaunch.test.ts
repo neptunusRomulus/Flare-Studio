@@ -13,6 +13,7 @@ describe('data path from the selected Flare executable', () => {
     'C:/Flare/flare.exe',
     'C:\\Flare\\flare.exe',
     '/usr/games/flare',
+    '/home/u/.local/share/flare-studio/engines/v1.14/squashfs-root/AppRun',
     '/home/user/flare-game',
     '/home/user/flare-game/',
     '',

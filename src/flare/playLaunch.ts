@@ -4,12 +4,12 @@
  * src/flare/playLaunch.test.ts fails if the two copies drift.
  */
 
-/** A path whose last segment contains a dot, or is exactly "flare", is a file. */
+/** A path whose last segment contains a dot, or is exactly "flare" or "AppRun", is a file. */
 export function dataPathFromFlareSelection(flarePath: string): string {
   const normalized = String(flarePath || '').replace(/\\/g, '/').replace(/\/+$/, '');
   if (!normalized) return '';
   const base = normalized.split('/').pop() || '';
-  const looksLikeFile = base.includes('.') || base === 'flare';
+  const looksLikeFile = base.includes('.') || base === 'flare' || base === 'AppRun';
   if (!looksLikeFile) return normalized;
   const slash = normalized.lastIndexOf('/');
   if (slash <= 0) return normalized;

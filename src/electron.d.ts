@@ -23,6 +23,8 @@ interface MapConfig {
   orientation?: 'isometric' | 'orthogonal';
   location: string;
   isStartingMap?: boolean;
+  /** Saved Flare path; picks the starting tile size (Classic 1.14 = 64x32). */
+  flarePath?: string;
 }
 
 interface ProjectMapData extends EditorProjectData {
@@ -138,6 +140,15 @@ declare global {
       }) => Promise<{ success: boolean; pid?: number; error?: string }>;
       isFlareRunning: () => Promise<boolean>;
       onFlareEngineExited: (callback: (payload?: { error?: string }) => void) => void;
+      // One-click Flare install (Linux for now)
+      installFlare: (variant: 'modern' | 'classic') => Promise<
+        | { ok: true; variant: 'modern' | 'classic'; version: string; exePath: string; dataPath: string; installDir: string; alreadyInstalled: boolean }
+        | { ok: false; error: string }
+      >;
+      onInstallFlareProgress: (
+        callback: (payload: { variant: 'modern' | 'classic'; received: number; total: number }) => void
+      ) => () => void;
+      openExternal: (url: string) => Promise<boolean>;
     };
     __ISM_TILE_PROJECT_MAPS__?: string[];
   }

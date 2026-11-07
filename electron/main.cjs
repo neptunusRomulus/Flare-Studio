@@ -10,6 +10,7 @@ const path = require("path");
 const fs = require("fs");
 const { validateSerializedFlareData, loadFlareDataSchema } = require("./flareDataValidator.cjs");
 const flareLaunch = require("./flareLaunch.cjs");
+const flareInstaller = require("./flareInstaller.cjs");
 const flareAdapter = require("../src/adapters/flare/flareAdapter.cjs");
 /** Map file base name; same slug Play and the adapter use. */
 const sanitizeMapNameForFilename = (name) => flareAdapter.slugFileName(name);
@@ -693,8 +694,10 @@ ipcMainLocal.handle("create-map-project", async (event, config) => {
       fs.mkdirSync(projectPath, { recursive: true });
     }
 
-    // New projects use fantasycore's 192x96 isometric grid (changeable in Game Settings).
-    const tile = { width: 192, height: 96, orientation: "isometric" };
+    // New projects use fantasycore's grid for the active Flare install:
+    // 192x96 for Modern (1.15) and other engines, 64x32 for Classic (1.14).
+    // Changeable later in Game Settings.
+    const tile = { ...flareInstaller.tileForFlarePath(config.flarePath), orientation: "isometric" };
 
     // Create basic project structure
     const mapData = {
@@ -3142,6 +3145,23 @@ ipcMainLocal.handle("launch-flare-engine", async (_event, options = {}) => {
     if (options.projectPath) cleanupPlaySession(options.projectPath);
     return { success: false, error: err.message };
   }
+});
+
+// One-click Flare install (engine + content) from the Welcome screen.
+ipcMainLocal.handle("install-flare", async (event, variant) => {
+  const sender = event.sender;
+  return flareInstaller.installFlare(variant, {
+    log: (message) => console.log(message),
+    onProgress: ({ received, total }) => {
+      if (!sender.isDestroyed()) sender.send("install-flare-progress", { variant, received, total });
+    },
+  });
+});
+
+ipcMainLocal.handle("open-external", async (_event, url) => {
+  if (typeof url !== "string" || !/^https:\/\//i.test(url)) return false;
+  await shell.openExternal(url);
+  return true;
 });
 
 ipcMainLocal.handle("is-flare-running", async () => {

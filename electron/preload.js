@@ -137,6 +137,13 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("launch-flare-engine", options),
   isFlareRunning: () =>
     ipcRenderer.invoke("is-flare-running"),
+  installFlare: (variant) => ipcRenderer.invoke("install-flare", variant),
+  onInstallFlareProgress: (callback) => {
+    const listener = (_event, payload) => callback && callback(payload);
+    ipcRenderer.on("install-flare-progress", listener);
+    return () => ipcRenderer.removeListener("install-flare-progress", listener);
+  },
+  openExternal: (url) => ipcRenderer.invoke("open-external", url),
   onFlareEngineExited: (callback) =>
     ipcRenderer.on("flare-engine-exited", (_event, payload) => callback && callback(payload)),
 });

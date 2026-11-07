@@ -56,6 +56,7 @@ export default function useAssembledSidebar(params: unknown) {
     rules: actorsResult.rules,
     items: actorsResult.items,
     statuses: statusesData,
+    gameSettings: paramsRecord['gameSettings'],
     events,
     layers: layersObj,
     maps,
@@ -68,6 +69,7 @@ export default function useAssembledSidebar(params: unknown) {
     rules: ReturnType<typeof useActorsSidebar>['rules'];
     items: ReturnType<typeof useActorsSidebar>['items'];
     statuses: unknown;
+    gameSettings: unknown;
     events: unknown;
     layers: unknown;
     maps: ReturnType<typeof useMapsSidebar>;

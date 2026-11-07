@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { X, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAppContext } from '@/context/AppContext';
@@ -103,11 +105,10 @@ export function TileSizeForm({ editor, onSaved }: { editor?: StudioEditor | null
   ];
   const selectedWidth = presets.some((preset) => preset.width === width) ? width : 192;
 
+  const [confirmOpen, setConfirmOpen] = useState(false);
+
   const save = async () => {
-    if (changed && typeof window !== 'undefined' && !window.confirm(
-      `Change the tile size to ${draft.width}×${draft.height} for the whole game?\n\n` +
-      'Every map and tileset in this project will use this size. Tilesets you already imported must be re-imported.'
-    )) return;
+    setConfirmOpen(false);
     const indexText = projectPath && window.electronAPI?.readFile
       ? await window.electronAPI.readFile(`${projectRoot(projectPath)}/project.json`)
       : null;
@@ -146,7 +147,32 @@ export function TileSizeForm({ editor, onSaved }: { editor?: StudioEditor | null
           </p>
         ))}
       </div>
-      <Button type="button" size="sm" disabled={!changed} onClick={() => { void save(); }}>Apply tile size</Button>
+      <Button type="button" size="sm" disabled={!changed} onClick={() => setConfirmOpen(true)}>Apply tile size</Button>
+      {confirmOpen && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-background border border-border rounded-lg p-6 w-80">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">Confirm</h3>
+              <Button variant="ghost" size="sm" onClick={() => setConfirmOpen(false)} className="w-8 h-8 p-0">
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+            <div className="text-sm text-foreground mb-4 space-y-2">
+              <p>Change the tile size to {draft.width}×{draft.height} for the whole game?</p>
+              <p className="text-muted-foreground">Every map and tileset in this project will use this size. Tilesets you already imported must be re-imported.</p>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <Button variant="ghost" size="sm" onClick={() => setConfirmOpen(false)} className="w-10">
+                <X className="w-5 h-5" />
+              </Button>
+              <Button size="sm" onClick={() => { void save(); }} className="w-10">
+                <Check className="w-5 h-5 text-green-600 dark:text-green-400" />
+              </Button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

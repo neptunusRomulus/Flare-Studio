@@ -10,11 +10,11 @@ export function tilesetDisplayName(fileName: string | null | undefined): string 
   return base.replace(/^tileset[_-]/i, '');
 }
 
-/** Custom tab name, else the tileset file name, else "Tab N". */
+/** Custom tab name, else the tileset file name, else "Slot N". */
 export function tabLabel(
   tab: { name?: string; tileset?: { fileName?: string | null } | null },
   index: number,
 ): string {
-  const custom = tab.name && !/^Tab \d+$/.test(tab.name) ? tab.name : '';
-  return custom || tilesetDisplayName(tab.tileset?.fileName) || `Tab ${index + 1}`;
+  const custom = tab.name && !/^(Tab|Slot) \d+$/.test(tab.name) ? tab.name : '';
+  return custom || tilesetDisplayName(tab.tileset?.fileName) || `Slot ${index + 1}`;
 }

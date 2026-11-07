@@ -13,10 +13,10 @@ describe('tilesetDisplayName', () => {
 });
 
 describe('tabLabel', () => {
-  it('prefers a custom name, then the tileset, then Tab N', () => {
+  it('prefers a custom name, then the tileset, then Slot N', () => {
     expect(tabLabel({ name: 'Walls' }, 0)).toBe('Walls');
     expect(tabLabel({ name: 'Tab 3', tileset: { fileName: 'tileset_cave.png' } }, 2)).toBe('cave');
-    expect(tabLabel({ name: 'Tab 2' }, 1)).toBe('Tab 2');
-    expect(tabLabel({}, 4)).toBe('Tab 5');
+    expect(tabLabel({ name: 'Tab 2' }, 1)).toBe('Slot 2');
+    expect(tabLabel({}, 4)).toBe('Slot 5');
   });
 });

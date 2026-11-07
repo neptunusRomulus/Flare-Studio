@@ -19,7 +19,7 @@ const ConfirmActionDialog: React.FC<Props> = ({ action, onCancel, onConfirm }) =
       case 'removeTileset':
         return 'Are you sure you want to remove the tileset for this layer? This will clear the tileset but keep any placed tiles.';
       case 'removeTab':
-        return 'Are you sure you want to remove this tileset tab?';
+        return 'Are you sure you want to remove this slot?';
       default:
         return '';
     }

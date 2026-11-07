@@ -166,7 +166,9 @@ const BrushToolbar = ({
           <>
             {editor && activeLayer && (activeLayer.type === 'background' || activeLayer.type === 'object') && (
               <div className="flex-shrink-0 flex items-center gap-1">
-                <AppWindow className="w-3.5 h-3.5 text-muted-foreground" aria-hidden />
+                <Tooltip content="Slots" side="bottom">
+                  <AppWindow className="w-3.5 h-3.5 text-muted-foreground" aria-label="Slots" />
+                </Tooltip>
                 <TilesetTabPicker
                   tabs={editor.getLayerTabs ? editor.getLayerTabs(activeLayer.type) : []}
                   activeId={editor.getActiveLayerTabId ? editor.getActiveLayerTabId(activeLayer.type) : null}
@@ -179,8 +181,9 @@ const BrushToolbar = ({
             )}
             <div className="flex-shrink-0 flex items-center gap-1">
               {(activeLayer?.type === 'background' || activeLayer?.type === 'object') && (
-                <Tooltip content="Add tab" side="bottom">
+                <Tooltip content="New Slot" side="bottom">
                   <Button
+                    aria-label="New Slot"
                     variant="outline"
                     size="sm"
                     className="text-xs px-1 py-1 h-6"
@@ -188,7 +191,7 @@ const BrushToolbar = ({
                       if (!editor || !activeLayer) return;
                       const tabs = editor.getLayerTabs ? editor.getLayerTabs(activeLayer.type) : [];
                       if (tabs && tabs.length >= MAX_LAYER_TABS) {
-                        toastInvoke({ title: 'Maximum tabs reached', description: `You can have up to ${MAX_LAYER_TABS} tabs per layer.`, variant: 'destructive' });
+                        toastInvoke({ title: 'Maximum slots reached', description: `You can have up to ${MAX_LAYER_TABS} slots per layer.`, variant: 'destructive' });
                         return;
                       }
                       const newId = editor.createLayerTab(activeLayer.type);
@@ -285,7 +288,7 @@ const BrushToolbar = ({
                             // Ensure there is an active tab for the layer, then import (shared with project templates)
                             const targetTabId = ensureActiveTab(currentEditor, layerType);
                             if (targetTabId === null) {
-                              toastInvoke({ title: 'Maximum tabs reached', description: `You can have up to ${MAX_LAYER_TABS} tabs per layer.`, variant: 'destructive' });
+                              toastInvoke({ title: 'Maximum slots reached', description: `You can have up to ${MAX_LAYER_TABS} slots per layer.`, variant: 'destructive' });
                               return;
                             }
                             await importTilesetIntoTab(currentEditor, layerType, targetTabId, file, currentProjectPath ?? undefined);
@@ -378,7 +381,7 @@ const BrushToolbar = ({
             <div
               className={`flex-shrink-0 overflow-hidden transition-all duration-300 ease-out ${expanded ? 'opacity-100 scale-100 max-w-[2.5rem] w-auto' : 'opacity-0 scale-90 max-w-0 w-0 pointer-events-none'}`}
             >
-              <Tooltip content={tabCount <= 1 ? 'Cannot delete - must have at least one tab' : 'Delete tileset tab'}>
+              <Tooltip content={tabCount <= 1 ? 'Cannot delete - must have at least one slot' : 'Delete slot'}>
                 <Button
                   variant="outline"
                   size="sm"

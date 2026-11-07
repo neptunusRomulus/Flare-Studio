@@ -28,14 +28,14 @@ export default function useDeleteActiveTab(args: {
     }
     const activeTabId = editor.getActiveLayerTabId ? editor.getActiveLayerTabId(layerType) : null;
     if (typeof activeTabId !== 'number' || activeTabId === null) {
-      toast({ title: 'No tab selected', description: 'There is no active tileset tab to delete for this layer.', variant: 'destructive' });
+      toast({ title: 'No slot selected', description: 'There is no active slot to delete for this layer.', variant: 'destructive' });
       return;
     }
     
     // Check if there's only one tab - prevent deletion
     const tabs = editor.getLayerTabs ? editor.getLayerTabs(layerType) : [];
     if (tabs && tabs.length <= 1) {
-      toast({ title: 'Cannot delete tab', description: 'You must have at least one tileset tab.', variant: 'destructive' });
+      toast({ title: 'Cannot delete slot', description: 'You must have at least one slot.', variant: 'destructive' });
       return;
     }
     

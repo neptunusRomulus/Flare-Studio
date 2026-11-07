@@ -245,7 +245,7 @@ export default function AppMain() {
       try { tileset?.setTabTick?.((t: number) => (t || 0) + 1); } catch { /* ignore */ }
       if (result.imported.length > 0) {
         const notes = [
-          result.skipped.length > 0 ? `${result.skipped.length} skipped (tab limit)` : '',
+          result.skipped.length > 0 ? `${result.skipped.length} skipped (slot limit)` : '',
           result.failed.length > 0 ? `${result.failed.length} failed` : '',
         ].filter(Boolean).join(', ');
         toast({ title: 'Template tilesets imported', description: notes || undefined });

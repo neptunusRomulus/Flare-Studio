@@ -5,7 +5,7 @@
  */
 import type { TileMapEditor } from './TileMapEditor';
 
-export const MAX_LAYER_TABS = 5;
+export const MAX_LAYER_TABS = 10;
 
 type TabLike = { id: number; tileset?: unknown };
 

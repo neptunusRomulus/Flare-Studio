@@ -92,7 +92,7 @@ describe('tab use for imports', () => {
   it('fills the empty starting tab first, then adds tabs up to the limit', () => {
     const { editor, tabs } = fakeEditor(1);
     const used: Array<number | null> = [];
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < MAX_LAYER_TABS + 3; i++) {
       const id = nextEmptyTab(editor, 'background');
       used.push(id);
       if (id !== null) tabs.find((t) => t.id === id)!.tileset = {};

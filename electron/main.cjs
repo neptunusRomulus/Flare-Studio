@@ -11,6 +11,7 @@ const fs = require("fs");
 const { validateSerializedFlareData, loadFlareDataSchema } = require("./flareDataValidator.cjs");
 const flareLaunch = require("./flareLaunch.cjs");
 const flareInstaller = require("./flareInstaller.cjs");
+const flareTemplate = require("./flareTemplate.cjs");
 const flareAdapter = require("../src/adapters/flare/flareAdapter.cjs");
 /** Map file base name; same slug Play and the adapter use. */
 const sanitizeMapNameForFilename = (name) => flareAdapter.slugFileName(name);
@@ -3169,6 +3170,15 @@ ipcMainLocal.handle("cancel-install-flare", async (_event, variant) => {
   if (!controller) return false;
   controller.abort();
   return true;
+});
+
+// "Start with template": PNGs in the installed Flare's fantasycore/images/tilesets.
+ipcMainLocal.handle("list-template-tilesets", async (_event, flarePath) => {
+  try {
+    return flareTemplate.listTemplateTilesets(typeof flarePath === "string" ? flarePath : "");
+  } catch (err) {
+    return { ok: false, error: err.message, files: [] };
+  }
 });
 
 ipcMainLocal.handle("open-external", async (_event, url) => {

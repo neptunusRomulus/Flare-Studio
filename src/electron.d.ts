@@ -150,6 +150,13 @@ declare global {
         callback: (payload: { variant: 'modern' | 'classic'; received: number; total: number }) => void
       ) => () => void;
       openExternal: (url: string) => Promise<boolean>;
+      listTemplateTilesets: (flarePath: string) => Promise<{
+        ok: boolean;
+        error?: string;
+        dataPath?: string;
+        dir?: string;
+        files: Array<{ name: string; path: string }>;
+      }>;
     };
     __ISM_TILE_PROJECT_MAPS__?: string[];
   }

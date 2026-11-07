@@ -1,4 +1,5 @@
 import React from 'react';
+import { MAX_LAYER_TABS, ensureActiveTab, importTilesetIntoTab } from '@/editor/importTileset';
 import { Button } from '@/components/ui/button';
 import Tooltip from '@/components/ui/tooltip';
 import { ZoomIn, ZoomOut, Upload, X, XCircle } from 'lucide-react';
@@ -172,8 +173,8 @@ const BrushToolbar = ({
                     onClick={() => {
                       if (!editor || !activeLayer) return;
                       const tabs = editor.getLayerTabs ? editor.getLayerTabs(activeLayer.type) : [];
-                      if (tabs && tabs.length >= 5) {
-                        toastInvoke({ title: 'Maximum tabs reached', description: 'You can have up to 5 tabs per layer.', variant: 'destructive' });
+                      if (tabs && tabs.length >= MAX_LAYER_TABS) {
+                        toastInvoke({ title: 'Maximum tabs reached', description: `You can have up to ${MAX_LAYER_TABS} tabs per layer.`, variant: 'destructive' });
                         return;
                       }
                       const newId = editor.createLayerTab(activeLayer.type);
@@ -266,45 +267,13 @@ const BrushToolbar = ({
 
                           try {
                             const layerType = currentActiveLayer.type;
-                            // Ensure there is an active tab for the layer
-                            const tabs = currentEditor.getLayerTabs ? currentEditor.getLayerTabs(layerType) : [];
-                            let targetTabId = currentEditor.getActiveLayerTabId ? currentEditor.getActiveLayerTabId(layerType) : null;
-                            if (typeof targetTabId !== 'number' || targetTabId === null) {
-                              if (tabs && tabs.length >= 5) {
-                                  toastInvoke({ title: 'Maximum tabs reached', description: 'You can have up to 5 tabs per layer.', variant: 'destructive' });
-                                  return;
-                                }
-                              targetTabId = currentEditor.createLayerTab(layerType);
-                              currentEditor.setActiveLayerTab(layerType, targetTabId);
+                            // Ensure there is an active tab for the layer, then import (shared with project templates)
+                            const targetTabId = ensureActiveTab(currentEditor, layerType);
+                            if (targetTabId === null) {
+                              toastInvoke({ title: 'Maximum tabs reached', description: `You can have up to ${MAX_LAYER_TABS} tabs per layer.`, variant: 'destructive' });
+                              return;
                             }
-
-                            // Grid fallback uses the project tile size. Variable-size detection still runs first.
-                            const groundTile = currentEditor.getGroundTileSize?.() ?? { width: 192, height: 96 };
-                            const manualTileWidth = groundTile.width;
-                            const manualTileHeight = groundTile.height;
-
-                            // Import into the editor/tab with fixed-grid slicing.
-                            // Fall back to legacy import call if runtime class shape differs.
-                            try {
-                              await currentEditor.importBrushImageToLayerTab(
-                                layerType,
-                                targetTabId,
-                                file,
-                                currentProjectPath ?? undefined,
-                                undefined,
-                                undefined,
-                                manualTileWidth,
-                                manualTileHeight,
-                                true
-                              );
-                            } catch (importErr) {
-                              await currentEditor.importBrushImageToLayerTab(
-                                layerType,
-                                targetTabId,
-                                file,
-                                currentProjectPath ?? undefined
-                              );
-                            }
+                            await importTilesetIntoTab(currentEditor, layerType, targetTabId, file, currentProjectPath ?? undefined);
 
                             // Compute placement origin (snap to 32) based on current viewport/zoom and set on the tab
                             try {

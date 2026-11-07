@@ -18,6 +18,9 @@ import SessionRecoveryDialog from '@/components/SessionRecoveryDialog';
 import useCrashRecovery from '@/hooks/useCrashRecovery';
 import useManualSaveSetup from '@/hooks/useManualSaveSetup';
 import useFlareEngine from '@/hooks/useFlareEngine';
+import { takeTemplateImport } from '@/flare/projectTemplate';
+import { importTemplateTilesets, type TilesetImportEditor } from '@/editor/importTileset';
+import { toast } from '@/hooks/use-toast';
 
 export default function AppMain() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -226,6 +229,31 @@ export default function AppMain() {
     mapName: mapName ?? null,
     onBeforeLaunch: flareEngineSave,
   });
+
+  // "Start with template": import fantasycore tilesets once the new project's editor is ready.
+  const templateProjectPath: string | null = controls?.currentProjectPath ?? null;
+  useEffect(() => {
+    if (!editor || !hasMap || !templateProjectPath) return;
+    const layers = typeof editor.getLayers === 'function' ? editor.getLayers() : [];
+    const background = layers.find((l: { type: string }) => l.type === 'background');
+    if (!background) return;
+    const flarePath = takeTemplateImport(templateProjectPath);
+    if (!flarePath) return;
+    void (async () => {
+      const result = await importTemplateTilesets(editor as TilesetImportEditor, flarePath, templateProjectPath);
+      try { await layersObj?.handleSetActiveLayer?.(background.id); } catch { /* ignore */ }
+      try { tileset?.setTabTick?.((t: number) => (t || 0) + 1); } catch { /* ignore */ }
+      if (result.imported.length > 0) {
+        const notes = [
+          result.skipped.length > 0 ? `${result.skipped.length} skipped (tab limit)` : '',
+          result.failed.length > 0 ? `${result.failed.length} failed` : '',
+        ].filter(Boolean).join(', ');
+        toast({ title: 'Template tilesets imported', description: notes || undefined });
+      } else {
+        toast({ title: 'Template import failed', variant: 'destructive' });
+      }
+    })();
+  }, [editor, hasMap, templateProjectPath, layersObj, tileset]);
 
   // Merge flare engine state into titleBarProps
   const enhancedTitleBarProps = useMemo(() => ({

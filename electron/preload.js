@@ -144,6 +144,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on("install-flare-progress", listener);
     return () => ipcRenderer.removeListener("install-flare-progress", listener);
   },
+  listTemplateTilesets: (flarePath) => ipcRenderer.invoke("list-template-tilesets", flarePath),
   openExternal: (url) => ipcRenderer.invoke("open-external", url),
   onFlareEngineExited: (callback) =>
     ipcRenderer.on("flare-engine-exited", (_event, payload) => callback && callback(payload)),

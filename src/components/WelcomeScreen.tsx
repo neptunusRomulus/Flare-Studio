@@ -5,7 +5,9 @@ import { Plus, FolderOpen, Grid3X3, Folder, Minus, Square, X } from 'lucide-reac
 import flareIconUrl from '/flare-ico.png?url';
 import flareLogoUrl from '/flare-logo.png?url';
 import FlareInstallButtons from '@/components/FlareInstallButtons';
-import { getStoredFlarePath } from '@/flare/flarePathStore';
+import { getStoredFlarePath, FLARE_PATH_EVENT } from '@/flare/flarePathStore';
+import ProjectStartToggle from '@/components/ProjectStartToggle';
+import { isTemplateAvailable, queueTemplateImport, type ProjectStart } from '@/flare/projectTemplate';
 
 interface WelcomeScreenProps {
   onCreateNewMap: (config: MapConfig, projectPath?: string) => void;
@@ -45,6 +47,32 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
     location: '',
     isStartingMap: false
   });
+
+  const [templateAvailable, setTemplateAvailable] = useState(false);
+  const [projectStart, setProjectStart] = useState<ProjectStart>('scratch');
+
+  // Template needs an installed Flare with fantasycore tilesets; re-check when the path changes.
+  useEffect(() => {
+    let alive = true;
+    const check = () => {
+      void isTemplateAvailable(getStoredFlarePath()).then((ok) => {
+        if (!alive) return;
+        setTemplateAvailable(ok);
+        if (!ok) setProjectStart('scratch');
+      });
+    };
+    check();
+    window.addEventListener(FLARE_PATH_EVENT, check);
+    return () => {
+      alive = false;
+      window.removeEventListener(FLARE_PATH_EVENT, check);
+    };
+  }, []);
+
+  const openCreateForm = () => {
+    setProjectStart(templateAvailable ? 'template' : 'scratch');
+    setShowCreateForm(true);
+  };
 
   // Load recent maps from localStorage on component mount and prune any missing projects (desktop)
   useEffect(() => {
@@ -202,9 +230,13 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
 
     try {
       if (window.electronAPI?.createMapProject) {
-        const result = await window.electronAPI.createMapProject({ ...mapConfig, flarePath: getStoredFlarePath() || undefined });
+        const flarePath = getStoredFlarePath();
+        const result = await window.electronAPI.createMapProject({ ...mapConfig, flarePath: flarePath || undefined });
         if (result?.success && result.projectPath) {
           const projectPath = result.projectPath;
+          if (projectStart === 'template' && templateAvailable && flarePath) {
+            queueTemplateImport(projectPath, flarePath);
+          }
           const newRecentMap: RecentMap = {
             id: Date.now().toString(),
             name: mapConfig.name,
@@ -335,6 +367,8 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
                 placeholder="Enter map name"
               />
             </div>
+
+            <ProjectStartToggle value={projectStart} onChange={setProjectStart} templateAvailable={templateAvailable} />
 
             <p className="text-xs text-muted-foreground">Tiles are 192×96 isometric and the game builds on fantasycore. You can change the tile size later in Game Settings.</p>
 
@@ -476,7 +510,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
             {/* Action Buttons */}
             <div className="space-y-3">
               <Button 
-                onClick={() => setShowCreateForm(true)}
+                onClick={openCreateForm}
                 className="w-full h-12 text-lg"
                 size="lg"
               >

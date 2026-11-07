@@ -205,6 +205,30 @@ function run(file, args, options = {}) {
   });
 }
 
+/**
+ * The 1.15 AppImage bundles an old libpipewire. On systems with pipewire-jack
+ * (e.g. Arch), the system libjack.so then loads against that old copy and fails
+ * with "undefined symbol: pw_log_topic_register". When the system has its own
+ * libpipewire, set the bundled one aside so the matching system copy is used.
+ */
+const SYSTEM_LIB_DIRS = ["/usr/lib", "/usr/lib64", "/usr/lib/x86_64-linux-gnu", "/lib/x86_64-linux-gnu"];
+const SYSTEM_PREFERRED_LIBS = ["libpipewire-0.3.so.0"];
+
+function preferSystemLibs(root, { exists = fs.existsSync, rename = fs.renameSync, libDirs = SYSTEM_LIB_DIRS } = {}) {
+  const moved = [];
+  for (const lib of SYSTEM_PREFERRED_LIBS) {
+    if (!libDirs.some((dir) => exists(path.join(dir, lib)))) continue;
+    for (const dir of [path.join(root, "lib", "x86_64-linux-gnu"), path.join(root, "usr", "lib"), path.join(root, "usr", "lib", "x86_64-linux-gnu")]) {
+      const bundled = path.join(dir, lib);
+      if (exists(bundled)) {
+        rename(bundled, `${bundled}.bundled`);
+        moved.push(bundled);
+      }
+    }
+  }
+  return moved;
+}
+
 async function readInstalledVersion(exePath, cwd) {
   const { stdout, stderr } = await run(exePath, ["--version"], { cwd, timeout: 30000 });
   return parseFlareVersion(`${stdout}\n${stderr}`);
@@ -246,6 +270,7 @@ async function doInstall(variant, options) {
     fs.mkdirSync(installDir, { recursive: true });
 
     if (isExtracted(layout)) {
+      preferSystemLibs(layout.root);
       const version = await readInstalledVersion(layout.exePath, layout.root);
       if (version) {
         log(`[FlareInstall] ${asset.tag} already installed (${version})`);
@@ -274,6 +299,7 @@ async function doInstall(variant, options) {
     fs.rmSync(tmpExtract, { recursive: true, force: true });
 
     if (!isExtracted(layout)) throw new Error("Flare data (mods/default) is missing after unpacking.");
+    for (const lib of preferSystemLibs(layout.root)) log(`[FlareInstall] Using the system copy of ${path.basename(lib)}`);
     const version = await readInstalledVersion(layout.exePath, layout.root);
     if (!version) throw new Error("Flare was unpacked but `--version` did not report a version.");
     fs.rmSync(downloadPath, { force: true });
@@ -289,7 +315,9 @@ async function doInstall(variant, options) {
       /* ignore */
     }
     log(`[FlareInstall] ${asset.tag} failed: ${err.message}`);
-    return { ok: false, error: String(err.message || err).split("\n")[0] };
+    const lines = String(err.message || err).split("\n").map((l) => l.trim()).filter(Boolean);
+    const detail = lines.length > 1 ? ` (${lines[lines.length - 1].slice(0, 200)})` : "";
+    return { ok: false, error: `${lines[0] || "Install failed"}${detail}` };
   }
 }
 
@@ -305,6 +333,7 @@ module.exports = {
   variantForFlarePath,
   tileForFlarePath,
   parseFlareVersion,
+  preferSystemLibs,
   downloadFile,
   installFlare,
 };

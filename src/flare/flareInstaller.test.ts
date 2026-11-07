@@ -174,3 +174,20 @@ describe('Welcome screen install buttons', () => {
     expect(html).not.toContain('Recommended');
   });
 });
+
+describe('preferSystemLibs', () => {
+  it('sets the bundled libpipewire aside only when the system has one', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'flare-libs-'));
+    const sys = fs.mkdtempSync(path.join(os.tmpdir(), 'flare-sys-'));
+    const libDir = path.join(root, 'lib', 'x86_64-linux-gnu');
+    fs.mkdirSync(libDir, { recursive: true });
+    const bundled = path.join(libDir, 'libpipewire-0.3.so.0');
+    fs.writeFileSync(bundled, '');
+    expect(installer.preferSystemLibs(root, { libDirs: [sys] })).toEqual([]);
+    expect(fs.existsSync(bundled)).toBe(true);
+    fs.writeFileSync(path.join(sys, 'libpipewire-0.3.so.0'), '');
+    expect(installer.preferSystemLibs(root, { libDirs: [sys] })).toEqual([bundled]);
+    expect(fs.existsSync(bundled)).toBe(false);
+    expect(fs.existsSync(`${bundled}.bundled`)).toBe(true);
+  });
+});

@@ -1,5 +1,14 @@
 const { contextBridge, ipcRenderer, webUtils } = require("electron");
 
+// Ack every close request at once so main knows the renderer is alive.
+// handled=false (no screen listening, e.g. welcome) lets main close directly.
+// Only the latest handler runs, so a double-registered listener can't open two prompts.
+let beforeCloseHandler = null;
+ipcRenderer.on("before-close", () => {
+  ipcRenderer.send("before-close-ack", !!beforeCloseHandler);
+  if (beforeCloseHandler) beforeCloseHandler();
+});
+
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
 contextBridge.exposeInMainWorld("electronAPI", {
@@ -15,10 +24,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
   minimize: () => ipcRenderer.send("window-minimize"),
   maximize: () => ipcRenderer.send("window-maximize"),
   close: () => ipcRenderer.send("window-close"),
-  confirmClose: (hasUnsavedChanges) =>
-    ipcRenderer.invoke("confirm-close", hasUnsavedChanges),
-  onBeforeClose: (callback) =>
-    ipcRenderer.on("before-close", () => callback && callback()),
+  confirmClose: (decision) =>
+    ipcRenderer.invoke("confirm-close", decision),
+  onBeforeClose: (callback) => {
+    beforeCloseHandler = typeof callback === "function" ? callback : null;
+  },
   onSaveAndClose: (callback) =>
     ipcRenderer.on("save-and-close", () => callback && callback()),
   closeAfterSave: () => ipcRenderer.send("close-after-save"),

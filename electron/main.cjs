@@ -272,22 +272,7 @@ function createWindow() {
   mainWindow.on("close", (event) => {
     if (allowQuit) return;
     event.preventDefault();
-    if (closePromptOpen) return;
-    closePromptOpen = true;
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send("before-close");
-    }
-    // If no renderer screen answers (for example on the welcome screen),
-    // close anyway instead of leaving a window that can't be closed.
-    closeFallbackTimer = setTimeout(() => {
-      closeFallbackTimer = null;
-      if (!closePromptOpen) return;
-      console.warn("[Close] Renderer did not answer before-close; closing");
-      closePromptOpen = false;
-      allowQuit = true;
-      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.destroy();
-      app.quit();
-    }, 1500);
+    promptClose();
   });
 
   // Create application menu
@@ -1768,6 +1753,55 @@ async function finishClose() {
   app.quit();
 }
 
+function quitWithoutSaving() {
+  allowQuit = true;
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.destroy();
+  app.quit();
+}
+
+/**
+ * Ask the renderer about closing. It acks at once ("before-close-ack");
+ * without a listener (e.g. welcome screen) it acks handled=false and we close.
+ * No ack within 3s means the renderer is hung: fall back to the OS dialog.
+ */
+function promptClose() {
+  if (closePromptOpen) return;
+  if (!mainWindow || mainWindow.isDestroyed()) { quitWithoutSaving(); return; }
+  closePromptOpen = true;
+  mainWindow.webContents.send("before-close");
+  if (closeFallbackTimer) clearTimeout(closeFallbackTimer);
+  closeFallbackTimer = setTimeout(() => {
+    closeFallbackTimer = null;
+    if (!closePromptOpen) return;
+    console.warn("[Close] Renderer did not answer before-close; using OS dialog");
+    showFallbackCloseDialog().catch((err) => console.error("[Close] fallback dialog failed:", err));
+  }, 3000);
+}
+
+async function showFallbackCloseDialog() {
+  if (!mainWindow || mainWindow.isDestroyed()) { quitWithoutSaving(); return; }
+  const result = await dialog.showMessageBox(mainWindow, {
+    type: "warning",
+    title: "Flare Studio is not responding",
+    message: "Close anyway?",
+    detail: "Unsaved changes may be lost.",
+    buttons: ["Close", "Cancel"],
+    defaultId: 1,
+    cancelId: 1,
+  });
+  closePromptOpen = false;
+  if (result.response === 0) quitWithoutSaving();
+}
+
+ipcMainLocal.on("before-close-ack", (_event, handled) => {
+  if (closeFallbackTimer) clearTimeout(closeFallbackTimer);
+  closeFallbackTimer = null;
+  if (!handled) {
+    closePromptOpen = false;
+    finishClose().catch((err) => console.error("[Shutdown] close failed:", err));
+  }
+});
+
 app.whenReady().then(createWindow);
 
 app.on("window-all-closed", () => {
@@ -1776,16 +1810,12 @@ app.on("window-all-closed", () => {
   }
 });
 
-// Quit only after the renderer finishes pending saves.
+// Ctrl+Q / menu Quit asks the same way as closing the window.
 app.on("before-quit", (event) => {
   if (allowQuit) return;
+  if (!mainWindow || mainWindow.isDestroyed()) return;
   event.preventDefault();
-  requestRendererShutdown()
-    .catch((err) => console.error("[Shutdown] Failed while flushing saves:", err))
-    .finally(() => {
-      allowQuit = true;
-      app.quit();
-    });
+  promptClose();
 });
 
 ipcMainLocal.on("app-shutdown-complete", () => {
@@ -1793,40 +1823,22 @@ ipcMainLocal.on("app-shutdown-complete", () => {
   if (shutdownWait) shutdownWait();
 });
 
-ipcMainLocal.handle("confirm-close", async (_event, hasUnsavedChanges) => {
+// Renderer answer to before-close: false/"close" = nothing unsaved, "save", "discard", "cancel".
+ipcMainLocal.handle("confirm-close", async (_event, decision) => {
   if (closeFallbackTimer) clearTimeout(closeFallbackTimer);
   closeFallbackTimer = null;
   closePromptOpen = false;
-  if (!hasUnsavedChanges) {
-    await finishClose();
-    return true;
-  }
-
-  const result = await dialog.showMessageBox(mainWindow, {
-    type: "warning",
-    title: "Unsaved Changes",
-    message: "You have unsaved changes.",
-    detail: "Save before closing?",
-    buttons: ["Save and Close", "Close Without Saving", "Cancel"],
-    defaultId: 0,
-    cancelId: 2,
-  });
-
-  if (result.response === 0) {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send("save-and-close");
-    }
+  if (decision === "save") {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("save-and-close");
     return false;
   }
-  if (result.response === 1) {
-    allowQuit = true;
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.destroy();
-    }
-    app.quit();
+  if (decision === "discard") {
+    quitWithoutSaving();
     return true;
   }
-  return false;
+  if (decision === "cancel") return false;
+  await finishClose();
+  return true;
 });
 
 ipcMainLocal.on("close-after-save", () => {

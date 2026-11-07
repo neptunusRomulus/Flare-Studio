@@ -32,3 +32,22 @@ describe('askConfirm', () => {
     await expect(second).resolves.toBe(false);
   });
 });
+
+import { askChoice, answerChoice, getPendingChoice } from './inlineConfirmCore';
+
+describe('askChoice', () => {
+  it('resolves with the chosen option id', async () => {
+    const p = askChoice({ title: 'File changed on disk', options: [{ id: 'reload', label: 'Reload' }], cancelId: 'cancel', anchor: a });
+    expect(getPendingChoice()?.title).toBe('File changed on disk');
+    answerChoice('reload');
+    await expect(p).resolves.toBe('reload');
+    expect(getPendingChoice()).toBeNull();
+  });
+  it('a newer request cancels the older one with its cancelId', async () => {
+    const first = askChoice({ title: 'one', options: [], cancelId: 'cancel', anchor: a });
+    const second = askChoice({ title: 'two', options: [], anchor: a });
+    await expect(first).resolves.toBe('cancel');
+    answerChoice('x');
+    await expect(second).resolves.toBe('x');
+  });
+});

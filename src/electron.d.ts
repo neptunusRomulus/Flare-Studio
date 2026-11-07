@@ -44,7 +44,8 @@ declare global {
       minimize: () => void;
       maximize: () => void;
       close: () => void;
-      confirmClose: (hasUnsavedChanges: boolean) => Promise<boolean>;
+      /** false/'close' = nothing unsaved; 'save' | 'discard' | 'cancel' = the user's answer. */
+      confirmClose: (decision: boolean | 'close' | 'save' | 'discard' | 'cancel') => Promise<boolean>;
       onBeforeClose: (callback: () => void) => void;
       onSaveAndClose: (callback: () => void) => void;
       closeAfterSave: () => void;

@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import type { TileMapEditor } from '../editor/TileMapEditor';
 import { useSaveQueue } from '@/context/SaveQueueContext';
+import { decideClose, type CloseDecision } from '@/hooks/closePrompt';
 
 type UseEditorIpcOptions = {
   handleManualSaveRef: React.RefObject<(() => Promise<void>) | undefined>;
@@ -49,7 +50,7 @@ export default function useEditorIpc(opts: UseEditorIpcOptions) {
         onMenuUndo?: (cb: () => void) => void;
         onMenuRedo?: (cb: () => void) => void;
         onBeforeClose?: (cb: () => void) => void;
-        confirmClose?: (hasUnsaved: boolean) => Promise<void>;
+        confirmClose?: (decision: CloseDecision) => Promise<unknown>;
         onSaveAndClose?: (cb: () => void) => void;
         closeAfterSave?: () => void;
         onAppBeforeQuit?: (cb: () => void) => void;
@@ -89,7 +90,7 @@ export default function useEditorIpc(opts: UseEditorIpcOptions) {
 
       api.onBeforeClose?.(async () => {
         try {
-          await api.confirmClose?.(hasUnsavedRef.current);
+          await api.confirmClose?.(await decideClose(!!hasUnsavedRef.current));
         } catch (err) {
           console.error('onBeforeClose handler failed:', err);
         }

@@ -1,23 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { dataPathFromFlareSelection } from '@/flare/playLaunch';
+import { FLARE_PATH_EVENT, getStoredFlarePath, setStoredFlarePath } from '@/flare/flarePathStore';
 
 export type FlareLaunchMode = 'current-map' | 'new-game' | 'main-menu';
-
-const FLARE_PATH_KEY = 'flarePath';
-
-function getStoredFlarePath(): string | null {
-  try {
-    return localStorage.getItem(FLARE_PATH_KEY);
-  } catch {
-    return null;
-  }
-}
-
-function setStoredFlarePath(p: string) {
-  try {
-    localStorage.setItem(FLARE_PATH_KEY, p);
-  } catch { /* ignore */ }
-}
 
 interface UseFlareEngineArgs {
   currentProjectPath?: string | null;
@@ -31,6 +16,17 @@ export default function useFlareEngine({ currentProjectPath, mapName, onBeforeLa
   const [flarePath, setFlarePath] = useState<string | null>(getStoredFlarePath);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const exitHandlerRef = useRef<(() => void) | null>(null);
+
+  // The Welcome screen installer (or another window) can change the saved path.
+  useEffect(() => {
+    const sync = () => setFlarePath(getStoredFlarePath());
+    window.addEventListener(FLARE_PATH_EVENT, sync);
+    window.addEventListener('storage', sync);
+    return () => {
+      window.removeEventListener(FLARE_PATH_EVENT, sync);
+      window.removeEventListener('storage', sync);
+    };
+  }, []);
 
   // Listen for the exit event from main process
   useEffect(() => {

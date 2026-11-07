@@ -4,6 +4,8 @@ import { Input } from '@/components/ui/input';
 import { Plus, FolderOpen, Grid3X3, Folder, Minus, Square, X } from 'lucide-react';
 import flareIconUrl from '/flare-ico.png?url';
 import flareLogoUrl from '/flare-logo.png?url';
+import FlareInstallButtons from '@/components/FlareInstallButtons';
+import { getStoredFlarePath } from '@/flare/flarePathStore';
 
 interface WelcomeScreenProps {
   onCreateNewMap: (config: MapConfig, projectPath?: string) => void;
@@ -200,7 +202,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
 
     try {
       if (window.electronAPI?.createMapProject) {
-        const result = await window.electronAPI.createMapProject(mapConfig);
+        const result = await window.electronAPI.createMapProject({ ...mapConfig, flarePath: getStoredFlarePath() || undefined });
         if (result?.success && result.projectPath) {
           const projectPath = result.projectPath;
           const newRecentMap: RecentMap = {
@@ -492,6 +494,8 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
                 Open Existing Project
               </Button>
             </div>
+
+            <FlareInstallButtons />
           </div>
         </div>
       </div>

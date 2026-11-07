@@ -232,13 +232,7 @@ const Tooltip: React.FC<TooltipProps> = ({ content, side = 'top', className = ''
         >
           <span
             ref={tooltipRef}
-            className={`inline-block text-xs px-3 py-2 rounded-md shadow-xl transition-all duration-100 break-words bg-black text-white border border-white/10 ${isExpanded ? 'max-w-[24rem]' : 'max-w-[18rem]'}`}
-            style={{
-              display: isExpanded ? 'block' : '-webkit-box',
-              WebkitLineClamp: isExpanded ? 'none' : 2,
-              WebkitBoxOrient: 'vertical',
-              overflow: isExpanded ? 'visible' : 'hidden'
-            }}
+            className="block w-max max-w-[20rem] whitespace-normal break-words text-left leading-snug text-xs px-3 py-2 rounded-md shadow-xl transition-all duration-100 bg-black text-white border border-white/10"
           >
             {content}
           </span>

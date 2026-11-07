@@ -357,13 +357,13 @@
     opacity: 0;
 }
 
-/* Limit tooltip to 2 lines for the anchored left tooltip */
+/* Tooltip text always shows in full: wrap, never clamp or cut with "..." */
 .custom-tooltip > * {
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-    max-width: 12rem;
+    display: block;
+    overflow: visible;
+    max-width: 20rem;
+    white-space: normal;
+    overflow-wrap: break-word;
 }
 
 /* Tool button click effects */
@@ -695,4 +695,4 @@ input[type="number"]::-webkit-outer-spin-button {
 }
 input[type="number"] {
   -moz-appearance: textfield;
-}
+}

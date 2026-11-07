@@ -101,8 +101,7 @@ export function TileSizeForm({ editor, onSaved }: { editor?: StudioEditor | null
       description: 'One size for the whole game: 192×96 tiles. This matches fantasycore, the default base mod, so its menus, HUD, hero and animations work as they are.',
     },
   ];
-  const selected = presets.find((preset) => preset.width === width) ?? presets[1];
-  const currentLabel = presets.find((preset) => preset.width === tile.width)?.label ?? `${tile.width}×${tile.height}`;
+  const selectedWidth = presets.some((preset) => preset.width === width) ? width : 192;
 
   const save = async () => {
     if (changed && typeof window !== 'undefined' && !window.confirm(
@@ -130,13 +129,23 @@ export function TileSizeForm({ editor, onSaved }: { editor?: StudioEditor | null
       <div className="text-base font-semibold">Tile Size</div>
       <div className="flex gap-2">
         {presets.map((preset) => (
-          <Button key={preset.width} type="button" size="sm" className="flex-1" variant={width === preset.width ? 'default' : 'outline'} onClick={() => setWidth(preset.width)}>
+          <Button key={preset.width} type="button" size="sm" className="flex-1" variant={selectedWidth === preset.width ? 'default' : 'outline'} onClick={() => setWidth(preset.width)}>
             {preset.label}
           </Button>
         ))}
       </div>
-      <p className="text-xs text-muted-foreground">{selected.description}</p>
-      <div className="text-xs text-muted-foreground">Current: {currentLabel}</div>
+      {/* Both texts share one grid cell so the box keeps the height of the longer one. */}
+      <div className="grid">
+        {presets.map((preset) => (
+          <p
+            key={preset.width}
+            className={`col-start-1 row-start-1 text-xs text-muted-foreground ${selectedWidth === preset.width ? '' : 'invisible'}`}
+            aria-hidden={selectedWidth !== preset.width}
+          >
+            {preset.description}
+          </p>
+        ))}
+      </div>
       <Button type="button" size="sm" disabled={!changed} onClick={() => { void save(); }}>Apply tile size</Button>
     </div>
   );

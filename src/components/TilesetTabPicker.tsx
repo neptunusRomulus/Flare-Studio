@@ -3,16 +3,7 @@ import { ChevronDown } from 'lucide-react';
 import Tooltip from '@/components/ui/tooltip';
 import { tabLabel } from '@/editor/tabLabel';
 
-export type PickerTab = { id: number; name?: string; tileset?: { fileName?: string | null; image?: HTMLImageElement | null } | null };
-
-function Thumb({ tab }: { tab: PickerTab }) {
-  const src = tab.tileset?.image?.src;
-  return (
-    <span className="w-7 h-7 shrink-0 rounded-sm bg-muted/40 border border-border overflow-hidden flex items-center justify-center">
-      {src ? <img src={src} alt="" className="w-full h-full object-cover object-left-top" style={{ imageRendering: 'pixelated' }} draggable={false} /> : null}
-    </span>
-  );
-}
+export type PickerTab = { id: number; name?: string; tileset?: { fileName?: string | null } | null };
 
 export default function TilesetTabPicker({ tabs, activeId, onSelect }: { tabs: PickerTab[]; activeId: number | null; onSelect: (id: number) => void }) {
   const [open, setOpen] = useState(false);
@@ -40,9 +31,8 @@ export default function TilesetTabPicker({ tabs, activeId, onSelect }: { tabs: P
           aria-haspopup="listbox"
           aria-expanded={open}
           onClick={() => setOpen((o) => !o)}
-          className="w-40 h-8 flex items-center gap-2 px-1.5 rounded-md border border-border bg-background hover:bg-accent text-xs text-foreground"
+          className="w-40 h-7 flex items-center gap-2 px-2 rounded-md border border-border bg-background hover:bg-accent text-xs text-foreground"
         >
-          <Thumb tab={active} />
           <span className="flex-1 min-w-0 truncate text-left">{label}</span>
           <ChevronDown className="w-3.5 h-3.5 shrink-0 opacity-70" />
         </button>
@@ -56,9 +46,8 @@ export default function TilesetTabPicker({ tabs, activeId, onSelect }: { tabs: P
                 <button
                   type="button"
                   onClick={() => { setOpen(false); if (!isActive) onSelect(tab.id); }}
-                  className={`w-full flex items-center gap-2 px-2 py-1 text-xs text-left ${isActive ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/60'}`}
+                  className={`w-full flex items-center gap-2 px-2 py-1.5 text-xs text-left ${isActive ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/60'}`}
                 >
-                  <Thumb tab={tab} />
                   <span className="truncate">{tabLabel(tab, idx)}</span>
                 </button>
               </li>

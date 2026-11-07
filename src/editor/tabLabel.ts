@@ -1,15 +1,16 @@
-/** Display name for a tileset tab: custom name, else the tileset file name, else "Tab N". */
+/**
+ * Plain tileset file name for a tab label: no folder, no extension, and no
+ * save-time "background_tab3_" key prefix or "tileset_" prefix.
+ * "background_tab3_tileset_snowplains_ice.png" -> "snowplains_ice".
+ */
 export function tilesetDisplayName(fileName: string | null | undefined): string {
   if (!fileName) return '';
-  const base = fileName.split(/[\\/]/).pop() || '';
-  const words = base
-    .replace(/\.[a-z0-9]+$/i, '')
-    .replace(/^tileset[_\-\s]+/i, '')
-    .split(/[_\-\s]+/)
-    .filter(Boolean);
-  return words.map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+  let base = (fileName.split(/[\\/]/).pop() || '').replace(/\.[a-z0-9]+$/i, '');
+  while (/^[a-zA-Z]+[_-]tab\d*_/.test(base)) base = base.replace(/^[a-zA-Z]+[_-]tab\d*_/, '');
+  return base.replace(/^tileset[_-]/i, '');
 }
 
+/** Custom tab name, else the tileset file name, else "Tab N". */
 export function tabLabel(
   tab: { name?: string; tileset?: { fileName?: string | null } | null },
   index: number,

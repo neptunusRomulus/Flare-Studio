@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { X, Check } from 'lucide-react';
+import { InlineConfirm } from '@/components/ui/inline-confirm';
+import Tooltip from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAppContext } from '@/context/AppContext';
@@ -87,28 +87,24 @@ export function TileSizeForm({ editor, onSaved }: { editor?: StudioEditor | null
     return () => { cancelled = true; };
   }, [projectPath]);
 
-  const [width, setWidth] = useState<number>(192);
-  useEffect(() => { setWidth(tile.width); }, [tile.width]);
-  const draft: TileDraft = { width, height: width / 2, orientation: 'isometric' };
-  const changed = draft.width !== tile.width || draft.height !== tile.height;
   const presets = [
     {
       width: 64,
       label: 'Low Res',
-      description: 'One size for the whole game: 64×32 tiles, for low-resolution art. fantasycore, the default base mod, is drawn at 192×96, so you cannot use its menus, hero or animations with this size. You need your own 64×32 art.',
+      description: 'Whole game uses 64×32 tiles, for low-resolution art. fantasycore (192×96) does not fit this size, so you need 64×32 art.',
     },
     {
       width: 192,
       label: 'High Res',
-      description: 'One size for the whole game: 192×96 tiles. This matches fantasycore, the default base mod, so its menus, HUD, hero and animations work as they are.',
+      description: 'Whole game uses 192×96 tiles. Matches fantasycore, the default base mod, so its menus, hero and animations work as they are.',
     },
   ];
-  const selectedWidth = presets.some((preset) => preset.width === width) ? width : 192;
+  // Preset waiting for the inline "Are you sure?" answer.
+  const [pending, setPending] = useState<number | null>(null);
 
-  const [confirmOpen, setConfirmOpen] = useState(false);
-
-  const save = async () => {
-    setConfirmOpen(false);
+  const save = async (width: number) => {
+    setPending(null);
+    const draft: TileDraft = { width, height: width / 2, orientation: 'isometric' };
     const indexText = projectPath && window.electronAPI?.readFile
       ? await window.electronAPI.readFile(`${projectRoot(projectPath)}/project.json`)
       : null;
@@ -130,49 +126,27 @@ export function TileSizeForm({ editor, onSaved }: { editor?: StudioEditor | null
       <div className="text-base font-semibold">Tile Size</div>
       <div className="flex gap-2">
         {presets.map((preset) => (
-          <Button key={preset.width} type="button" size="sm" className="flex-1" variant={selectedWidth === preset.width ? 'default' : 'outline'} onClick={() => setWidth(preset.width)}>
-            {preset.label}
-          </Button>
-        ))}
-      </div>
-      {/* Both texts share one grid cell so the box keeps the height of the longer one. */}
-      <div className="grid">
-        {presets.map((preset) => (
-          <p
-            key={preset.width}
-            className={`col-start-1 row-start-1 text-xs text-muted-foreground ${selectedWidth === preset.width ? '' : 'invisible'}`}
-            aria-hidden={selectedWidth !== preset.width}
-          >
-            {preset.description}
-          </p>
-        ))}
-      </div>
-      <Button type="button" size="sm" disabled={!changed} onClick={() => setConfirmOpen(true)}>Apply tile size</Button>
-      {confirmOpen && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-background border border-border rounded-lg p-6 w-80">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Confirm</h3>
-              <Button variant="ghost" size="sm" onClick={() => setConfirmOpen(false)} className="w-8 h-8 p-0">
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-            <div className="text-sm text-foreground mb-4 space-y-2">
-              <p>Change the tile size to {draft.width}×{draft.height} for the whole game?</p>
-              <p className="text-muted-foreground">Every map and tileset in this project will use this size. Tilesets you already imported must be re-imported.</p>
-            </div>
-            <div className="flex gap-2 justify-end">
-              <Button variant="ghost" size="sm" onClick={() => setConfirmOpen(false)} className="w-10">
-                <X className="w-5 h-5" />
-              </Button>
-              <Button size="sm" onClick={() => { void save(); }} className="w-10">
-                <Check className="w-5 h-5 text-green-600 dark:text-green-400" />
-              </Button>
-            </div>
+          <div key={preset.width} className="flex-1">
+            <InlineConfirm
+              open={pending === preset.width}
+              onCancel={() => setPending(null)}
+              onConfirm={() => { void save(preset.width); }}
+            >
+              <Tooltip content={preset.description} side="bottom">
+                <Button
+                  type="button"
+                  size="sm"
+                  className="w-full"
+                  variant={tile.width === preset.width ? 'default' : 'outline'}
+                  onClick={() => setPending(tile.width === preset.width ? null : preset.width)}
+                >
+                  {preset.label}
+                </Button>
+              </Tooltip>
+            </InlineConfirm>
           </div>
-        </div>,
-        document.body
-      )}
+        ))}
+      </div>
     </div>
   );
 }

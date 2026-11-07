@@ -24,11 +24,10 @@ describe('studio editor screens', () => {
     expect(html).toContain('Tile Size');
     expect(html).toContain('Low Res');
     expect(html).toContain('High Res');
-    expect(html).toContain('whole game');
-    expect(html).toContain('fantasycore');
     expect(html).not.toContain('128');
     expect(html).not.toContain('type="number"');
-    expect(html).toContain('Apply tile size');
+    expect(html).not.toContain('Apply');
+    expect(html).not.toContain('Are you sure?');
   });
 
   it('renders the cutscene editor', () => {

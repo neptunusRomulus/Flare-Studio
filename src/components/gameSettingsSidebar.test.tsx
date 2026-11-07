@@ -37,7 +37,7 @@ describe('Game Settings sidebar', () => {
 
   it('shows the tile size form instead of the tileset palette', () => {
     const html = renderToStaticMarkup(<AppProvider value={{ currentProjectPath: null }}><AppSidebar {...sidebarProps(true)} /></AppProvider>);
-    expect(html).toContain('Apply tile size');
+    expect(html).toContain('High Res');
     expect(html).not.toContain('No tileset loaded');
   });
 });

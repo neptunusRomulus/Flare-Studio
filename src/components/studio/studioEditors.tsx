@@ -87,9 +87,22 @@ export function TileSizeForm({ editor, onSaved }: { editor?: StudioEditor | null
 
   const [width, setWidth] = useState<number>(192);
   useEffect(() => { setWidth(tile.width); }, [tile.width]);
-  const draftWidth = Math.max(2, Math.floor(Number(width) || 192) & ~1);
-  const draft: TileDraft = { width: draftWidth, height: draftWidth / 2, orientation: 'isometric' };
+  const draft: TileDraft = { width, height: width / 2, orientation: 'isometric' };
   const changed = draft.width !== tile.width || draft.height !== tile.height;
+  const presets = [
+    {
+      width: 64,
+      label: 'Low Res',
+      description: 'One size for the whole game: 64×32 tiles, for low-resolution art. fantasycore, the default base mod, is drawn at 192×96, so you cannot use its menus, hero or animations with this size. You need your own 64×32 art.',
+    },
+    {
+      width: 192,
+      label: 'High Res',
+      description: 'One size for the whole game: 192×96 tiles. This matches fantasycore, the default base mod, so its menus, HUD, hero and animations work as they are.',
+    },
+  ];
+  const selected = presets.find((preset) => preset.width === width) ?? presets[1];
+  const currentLabel = presets.find((preset) => preset.width === tile.width)?.label ?? `${tile.width}×${tile.height}`;
 
   const save = async () => {
     if (changed && typeof window !== 'undefined' && !window.confirm(
@@ -113,21 +126,17 @@ export function TileSizeForm({ editor, onSaved }: { editor?: StudioEditor | null
   };
 
   return (
-    <div className="space-y-2 rounded-lg border border-border p-3">
-      <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Tile size (isometric)</div>
-      <p className="text-xs text-muted-foreground">
-        One size for the whole game. 192×96 matches fantasycore, the default base mod. Smaller sizes are for low-resolution art.
-      </p>
-      <div className="flex gap-1">
-        {[64, 128, 192].map((w) => (
-          <Button key={w} type="button" size="sm" variant={draftWidth === w ? 'default' : 'outline'} onClick={() => setWidth(w)}>
-            {w}×{w / 2}
+    <div className="space-y-3 rounded-lg border border-border p-3">
+      <div className="text-base font-semibold">Tile Size</div>
+      <div className="flex gap-2">
+        {presets.map((preset) => (
+          <Button key={preset.width} type="button" size="sm" className="flex-1" variant={width === preset.width ? 'default' : 'outline'} onClick={() => setWidth(preset.width)}>
+            {preset.label}
           </Button>
         ))}
       </div>
-      <label className="block text-xs text-muted-foreground" htmlFor="tile-width">Tile width (height is half)</label>
-      <Input id="tile-width" type="number" min={2} step={2} value={width} className="h-8" onChange={(event) => setWidth(Number(event.target.value))} />
-      <div className="text-xs text-muted-foreground">Current: {tile.width}×{tile.height}. New: {draft.width}×{draft.height}.</div>
+      <p className="text-xs text-muted-foreground">{selected.description}</p>
+      <div className="text-xs text-muted-foreground">Current: {currentLabel}</div>
       <Button type="button" size="sm" disabled={!changed} onClick={() => { void save(); }}>Apply tile size</Button>
     </div>
   );

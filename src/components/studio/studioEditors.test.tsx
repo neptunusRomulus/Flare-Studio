@@ -19,13 +19,15 @@ function render(node: React.ReactNode) {
 }
 
 describe('studio editor screens', () => {
-  it('renders a project-wide isometric tile size with 2:1 presets', () => {
+  it('renders a project-wide tile size with Low Res and High Res', () => {
     const html = render(<TileSizeForm />);
-    expect(html).toContain('Tile size');
+    expect(html).toContain('Tile Size');
+    expect(html).toContain('Low Res');
+    expect(html).toContain('High Res');
     expect(html).toContain('whole game');
-    expect(html).toContain('value="192"');
-    expect(html).toContain('192×96');
-    expect(html).not.toContain('orthogonal');
+    expect(html).toContain('fantasycore');
+    expect(html).not.toContain('128');
+    expect(html).not.toContain('type="number"');
     expect(html).toContain('Apply tile size');
   });
 

@@ -386,7 +386,7 @@ const useMapConfig = ({
             .trim() || 'map';
           const ground = typeof targetEditor?.getGroundTileSize === 'function'
             ? targetEditor.getGroundTileSize()
-            : { width: 64, height: 32, orientation: 'isometric' as const };
+            : { width: 192, height: 96, orientation: 'isometric' as const };
           createTabFor(tabName, currentProjectPath ?? null, {
             name: resolvedName,
             width,

@@ -200,6 +200,7 @@ describe('settings.txt generation', () => {
     expect(plan.content).toContain('description=My Village');
     expect(plan.content).toContain('version=1.0');
     expect(plan.content).toContain('game=flare-game');
+    expect(plan.content).toContain('requires=fantasycore');
     expect(plan.content).not.toContain('Town');
   });
 

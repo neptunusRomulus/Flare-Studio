@@ -23,7 +23,7 @@ describe('studio editor screens', () => {
     const html = render(<TileSizeForm />);
     expect(html).toContain('Tile size');
     expect(html).toContain('whole game');
-    expect(html).toContain('value="64"');
+    expect(html).toContain('value="192"');
     expect(html).toContain('192×96');
     expect(html).not.toContain('orthogonal');
     expect(html).toContain('Apply tile size');

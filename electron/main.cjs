@@ -693,9 +693,8 @@ ipcMainLocal.handle("create-map-project", async (event, config) => {
       fs.mkdirSync(projectPath, { recursive: true });
     }
 
-    // Tile size is fixed to Flare's default 64x32 isometric grid.
-    // Larger art is handled with merge/separate in the palette.
-    const tile = { width: 64, height: 32, orientation: "isometric" };
+    // New projects use fantasycore's 192x96 isometric grid (changeable in Game Settings).
+    const tile = { width: 192, height: 96, orientation: "isometric" };
 
     // Create basic project structure
     const mapData = {
@@ -2834,6 +2833,38 @@ function flarePathProbe() {
   };
 }
 
+/**
+ * Link required mods that Flare cannot see (e.g. fantasycore from a flare-game
+ * checkout next to flare-engine) into path_user/mods. Existing entries are kept.
+ */
+function linkMissingRequiredMods(projectPath, flarePath) {
+  const info = readProjectMods(projectPath, flarePath);
+  if (info.missingMods.length === 0) return;
+  const target = flarePath ? flareLaunch.resolveFlareLaunchTarget(flarePath, flarePathProbe()) : null;
+  const dataPath = target && !target.error ? target.dataPath : "";
+  const searchDirs = [
+    dataPath ? path.join(path.dirname(dataPath), "flare-game", "mods") : "",
+    dataPath ? path.join(dataPath, "..", "..", "flare-game", "mods") : "",
+    "/usr/local/share/flare/mods",
+    "/usr/share/flare/mods",
+    "/usr/share/games/flare/mods",
+  ].filter(Boolean);
+  const userMods = path.join(info.pathUser, "mods");
+  fs.mkdirSync(userMods, { recursive: true });
+  for (const mod of info.missingMods) {
+    const linkPath = path.join(userMods, mod);
+    if (fs.existsSync(linkPath)) continue;
+    const source = searchDirs.map((dir) => path.resolve(dir, mod)).find((dir) => fs.existsSync(path.join(dir, "settings.txt")));
+    if (!source) continue;
+    try {
+      fs.symlinkSync(source, linkPath, process.platform === "win32" ? "junction" : "dir");
+      console.log(`[FlareEngine] Linked required mod ${mod} -> ${source}`);
+    } catch (err) {
+      console.warn(`[FlareEngine] Could not link required mod ${mod}:`, err.message);
+    }
+  }
+}
+
 function readProjectMods(projectPath, flarePath) {
   const modName = path.basename(String(projectPath || "").replace(/[\\/]+$/, ""));
   const settingsPath = path.join(projectPath, "settings.txt");
@@ -2883,6 +2914,7 @@ ipcMainLocal.handle("ensure-flare-mod-link", async (_event, { flarePath, project
     }
     if (!linkResult.success) return linkResult;
 
+    linkMissingRequiredMods(projectPath, flarePath);
     const modsInfo = readProjectMods(projectPath, flarePath);
     return {
       ...linkResult,
@@ -2939,6 +2971,7 @@ ipcMainLocal.handle("prepare-flare-quick-launch", async (_event, { flarePath, pr
       const healed = flareLaunch.upsertKey(fs.readFileSync(miscPath, "utf8"), "save_prefix", stablePrefix);
       fs.writeFileSync(miscPath, healed, "utf8");
     }
+    linkMissingRequiredMods(projectPath, flarePath);
     const modsInfo = readProjectMods(projectPath, flarePath);
     if (modsInfo.missingMods.length > 0) {
       return {

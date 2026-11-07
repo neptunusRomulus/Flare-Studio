@@ -383,7 +383,8 @@ function engineTextFromSections(sections) {
 }
 
 function tileFromTilesetConfig(content) {
-  const tile = { width: 64, height: 32, orientation: "isometric" };
+  // No tile_size means the base mod (fantasycore) value applies.
+  const tile = { width: 192, height: 96, orientation: "isometric" };
   for (const entry of importEngineText(content)) {
     if (entry.kind !== "key") continue;
     if (entry.key === "tile_size") {

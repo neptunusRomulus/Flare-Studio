@@ -13,6 +13,8 @@ const { slugFileName, legacyMapFileName } = require("../src/adapters/flare/slug.
 const DEFAULT_MOD_VERSION = "1.0";
 const DEFAULT_GAME = "flare-game";
 const DEFAULT_ENGINE_MIN = "1.13.01";
+// Base mod for new projects: menus, HUD, hero and animations come from fantasycore.
+const DEFAULT_REQUIRES = ["fantasycore"];
 
 /** ASCII slug. Play also tries the pre-slug filename so older maps still open. */
 function sanitizeMapFileName(input) {
@@ -146,7 +148,7 @@ function planSettingsWrite(existingText, projectName) {
   if (existingText == null || !String(existingText).trim()) {
     return {
       write: true,
-      content: renderSettings({ description }),
+      content: renderSettings({ description, requires: DEFAULT_REQUIRES }),
     };
   }
   const existing = String(existingText);

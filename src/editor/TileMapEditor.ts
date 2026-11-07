@@ -580,8 +580,8 @@ export class TileMapEditor {
   private mapHeight: number = 15;
   private mapName: string = 'Untitled Map';
   private currentProjectPath: string | null = null;
-  private tileSizeX: number = 64;
-  private tileSizeY: number = 32;
+  private tileSizeX: number = 192;
+  private tileSizeY: number = 96;
   private orientation: 'isometric' | 'orthogonal' = 'isometric';
   private mapParallax = '';
   private mapFog = '';
@@ -7373,7 +7373,7 @@ export class TileMapEditor {
             tab.tileset.sourcePath = sourcePath;
           }
 
-          // Always slice into single 64x32 tiles; multi-tile objects are made with merge.
+          // Always slice into single project-size tiles; multi-tile objects are made with merge.
           void overrideSensitivity; void forceIsometric; void forceGridSlicing;
           const importedDetectedTiles = new Map<number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }>();
           let gidCounter = 1;

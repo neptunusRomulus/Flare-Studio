@@ -279,7 +279,7 @@ const BrushToolbar = ({
                             }
 
                             // Grid fallback uses the project tile size. Variable-size detection still runs first.
-                            const groundTile = currentEditor.getGroundTileSize?.() ?? { width: 64, height: 32 };
+                            const groundTile = currentEditor.getGroundTileSize?.() ?? { width: 192, height: 96 };
                             const manualTileWidth = groundTile.width;
                             const manualTileHeight = groundTile.height;
 

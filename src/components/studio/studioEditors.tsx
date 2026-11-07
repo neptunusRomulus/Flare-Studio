@@ -68,7 +68,7 @@ function stringField(record: Record<string, unknown>, key: string): string {
 export function TileSizeForm({ editor, onSaved }: { editor?: StudioEditor | null; onSaved?: () => void }) {
   const projectPath = useProjectPath();
   const studioEditor = useStudioEditor(editor);
-  const [tile, setTile] = useState<TileDraft>({ width: 64, height: 32, orientation: 'isometric' });
+  const [tile, setTile] = useState<TileDraft>({ width: 192, height: 96, orientation: 'isometric' });
 
   useEffect(() => {
     if (typeof window === 'undefined' || !projectPath || !window.electronAPI?.readFile) return;
@@ -85,9 +85,9 @@ export function TileSizeForm({ editor, onSaved }: { editor?: StudioEditor | null
     return () => { cancelled = true; };
   }, [projectPath]);
 
-  const [width, setWidth] = useState<number>(64);
+  const [width, setWidth] = useState<number>(192);
   useEffect(() => { setWidth(tile.width); }, [tile.width]);
-  const draftWidth = Math.max(2, Math.floor(Number(width) || 64) & ~1);
+  const draftWidth = Math.max(2, Math.floor(Number(width) || 192) & ~1);
   const draft: TileDraft = { width: draftWidth, height: draftWidth / 2, orientation: 'isometric' };
   const changed = draft.width !== tile.width || draft.height !== tile.height;
 
@@ -116,7 +116,7 @@ export function TileSizeForm({ editor, onSaved }: { editor?: StudioEditor | null
     <div className="space-y-2 rounded-lg border border-border p-3">
       <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Tile size (isometric)</div>
       <p className="text-xs text-muted-foreground">
-        One size for the whole game. 64×32 is the Flare default; larger sizes are for high-resolution art.
+        One size for the whole game. 192×96 matches fantasycore, the default base mod. Smaller sizes are for low-resolution art.
       </p>
       <div className="flex gap-1">
         {[64, 128, 192].map((w) => (

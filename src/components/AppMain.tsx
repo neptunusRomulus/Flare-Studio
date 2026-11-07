@@ -246,6 +246,7 @@ export default function AppMain() {
         const notes = [
           result.skipped.length > 0 ? `${result.skipped.length} skipped (slot limit)` : '',
           result.failed.length > 0 ? `${result.failed.length} failed` : '',
+          result.misfit.length > 0 ? `${result.misfit.length} don't fit the tile size` : '',
         ].filter(Boolean).join(', ');
         toast({ title: 'Template tilesets imported', description: notes || undefined });
       } else {

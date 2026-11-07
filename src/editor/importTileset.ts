@@ -53,6 +53,17 @@ export type TilesetImportOptions = {
   flarePath?: string | null;
 };
 
+/**
+ * Warning for grid slicing when the image isn't an exact multiple of the tile size
+ * (the right/bottom remainder is dropped). null = fits, or sizes unknown/invalid.
+ */
+export function gridFitWarning(imageW: number, imageH: number, tileW: number, tileH: number): string | null {
+  const ok = (n: number) => Number.isFinite(n) && n > 0;
+  if (![imageW, imageH, tileW, tileH].every(ok)) return null;
+  if (imageW % tileW === 0 && imageH % tileH === 0) return null;
+  return `This tileset doesn't fit ${tileW}×${tileH} tiles (${imageW}×${imageH})`;
+}
+
 /** Tiles from the matching Flare tilesetdef, or null when there is none (then grid slicing is used). */
 export async function findDefTiles(
   file: File,
@@ -88,11 +99,17 @@ export async function importTilesetIntoTab(
   file: File,
   projectPath?: string,
   opts: TilesetImportOptions = {},
-): Promise<{ fromDef: boolean }> {
+): Promise<{ fromDef: boolean; warning: string | null }> {
   const ground = editor.getGroundTileSize?.() ?? { width: 192, height: 96 };
   const defTiles = await findDefTiles(file, ground.height, opts);
   await editor.importBrushImageToLayerTab(layerType, tabId, file, projectPath, undefined, undefined, ground.width, ground.height, true, defTiles ?? undefined);
-  return { fromDef: !!defTiles };
+  let warning: string | null = null;
+  if (!defTiles) {
+    const tab = (editor.getLayerTabs(layerType) || []).find((t) => t.id === tabId) as { tileset?: { image?: HTMLImageElement | null } } | undefined;
+    const img = tab?.tileset?.image;
+    if (img) warning = gridFitWarning(img.naturalWidth || img.width, img.naturalHeight || img.height, ground.width, ground.height);
+  }
+  return { fromDef: !!defTiles, warning };
 }
 
 /** File from a data: URL, for images read by the main process. */
@@ -126,7 +143,7 @@ export function orderTemplateTilesets<T extends { name: string }>(files: T[]): T
   return [...files].sort((a, b) => rank(a.name) - rank(b.name) || a.name.localeCompare(b.name));
 }
 
-export type TemplateImportResult = { imported: string[]; skipped: string[]; failed: string[] };
+export type TemplateImportResult = { imported: string[]; skipped: string[]; failed: string[]; misfit: string[] };
 
 /**
  * Import the installed Flare's fantasycore tilesets into the Background
@@ -138,7 +155,7 @@ export async function importTemplateTilesets(
   projectPath?: string,
   layerType = 'background',
 ): Promise<TemplateImportResult> {
-  const result: TemplateImportResult = { imported: [], skipped: [], failed: [] };
+  const result: TemplateImportResult = { imported: [], skipped: [], failed: [], misfit: [] };
   const api = typeof window !== 'undefined' ? window.electronAPI : undefined;
   if (!api?.listTemplateTilesets || !api.readFileAsDataURL) return result;
   const listing = await api.listTemplateTilesets(flarePath);
@@ -153,7 +170,8 @@ export async function importTemplateTilesets(
     try {
       const dataUrl = await api.readFileAsDataURL(entry.path);
       if (!dataUrl) throw new Error('unreadable');
-      await importTilesetIntoTab(editor, layerType, tabId, fileFromDataUrl(dataUrl, entry.name), projectPath, { imagePath: entry.path, flarePath });
+      const { warning } = await importTilesetIntoTab(editor, layerType, tabId, fileFromDataUrl(dataUrl, entry.name), projectPath, { imagePath: entry.path, flarePath });
+      if (warning) result.misfit.push(entry.name);
       if (firstTab === null) firstTab = tabId;
       result.imported.push(entry.name);
     } catch (err) {

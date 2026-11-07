@@ -291,7 +291,7 @@ const BrushToolbar = ({
                               toastInvoke({ title: 'Maximum slots reached', description: `You can have up to ${MAX_LAYER_TABS} slots per layer.`, variant: 'destructive' });
                               return;
                             }
-                            const { fromDef } = await importTilesetIntoTab(currentEditor, layerType, targetTabId, file, currentProjectPath ?? undefined);
+                            const { fromDef, warning } = await importTilesetIntoTab(currentEditor, layerType, targetTabId, file, currentProjectPath ?? undefined);
 
                             // Compute placement origin (snap to 32) based on current viewport/zoom and set on the tab
                             try {
@@ -319,6 +319,7 @@ const BrushToolbar = ({
                             safeIncrementTabTick();
                             
                             toastInvoke({ title: 'Tileset imported', description: fromDef ? `${file.name} (Flare tilesetdef)` : file.name });
+                            if (warning) toastInvoke({ title: warning, variant: 'destructive' });
                           } catch (err) {
                             toastInvoke({ title: 'Import failed', description: `Unable to import into editor: ${String(err)}`, variant: 'destructive' });
                           }

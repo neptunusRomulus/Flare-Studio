@@ -2,7 +2,8 @@ import React from 'react';
 import { MAX_LAYER_TABS, ensureActiveTab, importTilesetIntoTab } from '@/editor/importTileset';
 import { Button } from '@/components/ui/button';
 import Tooltip from '@/components/ui/tooltip';
-import { ZoomIn, ZoomOut, Upload, X, XCircle } from 'lucide-react';
+import { ZoomIn, ZoomOut, Upload, X, XCircle, AppWindow } from 'lucide-react';
+import TilesetTabPicker from '@/components/TilesetTabPicker';
 import type { TileLayer } from '@/types';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 import useBrushToolbar from '@/hooks/useBrushToolbar';
@@ -163,6 +164,19 @@ const BrushToolbar = ({
       >
         {!isCollisionLayer && (
           <>
+            {editor && activeLayer && (activeLayer.type === 'background' || activeLayer.type === 'object') && (
+              <div className="flex-shrink-0 flex items-center gap-1">
+                <AppWindow className="w-3.5 h-3.5 text-muted-foreground" aria-hidden />
+                <TilesetTabPicker
+                  tabs={editor.getLayerTabs ? editor.getLayerTabs(activeLayer.type) : []}
+                  activeId={editor.getActiveLayerTabId ? editor.getActiveLayerTabId(activeLayer.type) : null}
+                  onSelect={(id) => {
+                    editor.setActiveLayerTab(activeLayer.type, id);
+                    setTabTick(t => t + 1);
+                  }}
+                />
+              </div>
+            )}
             <div className="flex-shrink-0 flex items-center gap-1">
               {(activeLayer?.type === 'background' || activeLayer?.type === 'object') && (
                 <Tooltip content="Add tab" side="bottom">
@@ -217,17 +231,18 @@ const BrushToolbar = ({
                 }
 
                 return (
-                  <Tooltip content={tooltip} side="bottom">
+                  <Tooltip content="Import Tileset" side="bottom">
                     <Button
                       variant="default"
                       size="sm"
-                      aria-label={tooltip}
+                      aria-label="Import Tileset"
                       className="relative text-xs px-1 py-1 h-6 shadow-sm bg-orange-500 hover:bg-orange-600 text-white border-orange-500"
                     >
                       <Upload className="w-3 h-3 text-white" />
                       <input
                         type="file"
                         accept="image/png"
+                        title=""
                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                         onChange={async (event) => {
                           const file = event.target.files?.[0];

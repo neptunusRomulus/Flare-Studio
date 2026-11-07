@@ -2,7 +2,6 @@ import React, { useEffect, useCallback, useState, useRef, useLayoutEffect, useMe
 import type { TileLayer } from '@/types';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 import usePreferences from '@/hooks/usePreferences';
-import TilesetTabPicker from '@/components/TilesetTabPicker';
 import { Check, X, FlipHorizontal2, FlipVertical2 } from 'lucide-react';
 
 type TilesetPaletteProps = {
@@ -89,6 +88,16 @@ const TilesetPalette = ({
     3: 'Hidden Full Collision: Same as "Full Collision" but not visible on map.',
     4: 'Hidden Ground Collision: Same as "Ground Collision" but not visible on map.'
   }), []);
+
+  // Clear the tile selection when the active tab changes (tab picker lives in BrushToolbar).
+  const lastTabRef = useRef<string | null>(null);
+  useEffect(() => {
+    const type = activeLayer?.type;
+    const id = type && editor?.getActiveLayerTabId ? editor.getActiveLayerTabId(type) : null;
+    const key = `${type ?? ''}:${id ?? ''}`;
+    if (lastTabRef.current !== null && lastTabRef.current !== key) setSelection(null);
+    lastTabRef.current = key;
+  }, [editor, activeLayer, tabTick]);
 
   // Create a clear selection function to pass to parent
   const clearSelection = useCallback(() => {
@@ -822,30 +831,6 @@ const TilesetPalette = ({
 
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-visible p-0 m-0">
-      {/* Tab navigation */}
-      {(() => {
-        const activeLayerType = activeLayer?.type;
-        const showTabs = activeLayerType === 'background' || activeLayerType === 'object';
-        if (!showTabs) return null;
-        return (
-          <div key={tabTick} className="flex items-center gap-2 px-2 py-2 overflow-visible">
-            {editor ? (
-              <TilesetTabPicker
-                tabs={editor.getLayerTabs ? editor.getLayerTabs(activeLayerType!) : []}
-                activeId={editor.getActiveLayerTabId ? editor.getActiveLayerTabId(activeLayerType!) : null}
-                onSelect={(id) => {
-                  editor.setActiveLayerTab(activeLayerType!, id);
-                  setTabTick(t => t + 1);
-                  setSelection(null);
-                }}
-              />
-            ) : (
-              <div className="text-xs text-muted-foreground">No tabs</div>
-            )}
-          </div>
-        );
-      })()}
-
       {/* Main tileset palette area */}
       <div className="relative flex-1 min-h-0 overflow-hidden flex flex-col">
         <div className="tile-palette-container flex flex-col flex-1 min-h-0 overflow-hidden p-0 m-0">

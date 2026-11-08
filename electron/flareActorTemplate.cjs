@@ -45,6 +45,17 @@ function listTxt(dir, fsImpl) {
   }
 }
 
+function listPng(dir, fsImpl) {
+  try {
+    return fsImpl.readdirSync(dir, { withFileTypes: true })
+      .filter((e) => e.isFile() && /\.png$/i.test(e.name))
+      .map((e) => e.name)
+      .sort();
+  } catch {
+    return [];
+  }
+}
+
 /**
  * NPC looks (animations/npcs/*.txt), NPC definitions (npcs/*.txt, raw) and enemy
  * definitions (enemies/*.txt and enemies/base/*.txt, raw) of the template mod.
@@ -52,7 +63,7 @@ function listTxt(dir, fsImpl) {
  */
 function listTemplateActors(flarePath, { probe, fsImpl = fs } = {}) {
   const resolved = flareTemplate.templateTilesetDir(flarePath, probe);
-  if (resolved.error) return { ok: false, error: resolved.error, npcLooks: [], npcs: [], enemies: [], missing: [] };
+  if (resolved.error) return { ok: false, error: resolved.error, npcLooks: [], portraits: [], npcs: [], enemies: [], missing: [] };
   const modDir = path.join(resolved.dataPath, "mods", flareTemplate.TEMPLATE_MOD);
   const read = (rel) => { try { return fsImpl.readFileSync(path.join(modDir, rel), "utf8"); } catch { return null; } };
   const missing = new Set();
@@ -68,6 +79,12 @@ function listTemplateActors(flarePath, { probe, fsImpl = fs } = {}) {
     check(rel, text);
     const image = firstValue(text, "image");
     npcLooks.push({ key: name.replace(/\.txt$/i, ""), animation: rel, image, imagePath: image ? path.join(modDir, image) : null });
+  }
+
+  const portraits = [];
+  for (const name of listPng(path.join(modDir, "images", "portraits"), fsImpl)) {
+    const rel = `images/portraits/${name}`;
+    portraits.push({ key: name.replace(/\.png$/i, ""), path: rel, imagePath: path.join(modDir, rel) });
   }
 
   const npcs = [];
@@ -89,7 +106,7 @@ function listTemplateActors(flarePath, { probe, fsImpl = fs } = {}) {
       enemies.push({ key: name.replace(/\.txt$/i, ""), file: rel, raw: text, isBase });
     }
   }
-  return { ok: true, mod: flareTemplate.TEMPLATE_MOD, modDir, npcLooks, npcs, enemies, missing: [...missing].sort() };
+  return { ok: true, mod: flareTemplate.TEMPLATE_MOD, modDir, npcLooks, portraits, npcs, enemies, missing: [...missing].sort() };
 }
 
 module.exports = { collectFlareRefs, firstValue, listTemplateActors };

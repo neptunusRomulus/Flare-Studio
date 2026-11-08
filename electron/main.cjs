@@ -3176,7 +3176,7 @@ ipcMainLocal.handle("list-template-actors", async (_event, flarePath) => {
   try {
     return flareActorTemplate.listTemplateActors(typeof flarePath === "string" ? flarePath : "");
   } catch (err) {
-    return { ok: false, error: err.message, npcLooks: [], npcs: [], enemies: [], missing: [] };
+    return { ok: false, error: err.message, npcLooks: [], portraits: [], npcs: [], enemies: [], missing: [] };
   }
 });
 

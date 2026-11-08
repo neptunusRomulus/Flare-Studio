@@ -5,6 +5,7 @@ import type { ActorDialogState, EnemyRoleKey } from '@/editor/actorRoles';
 import { validateAndSanitizeObject } from '@/editor/objectValidation';
 import { propertyText } from '@/editor/propertyText';
 import { askConfirm } from '@/components/ui/inline-confirm';
+import { resolveDefaultNpcAppearance } from '@/flare/npcAppearance';
 
 /**
  * Load an image from an absolute file path via Electron and return its pixel dimensions.
@@ -203,10 +204,15 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
     }
 
     const name = actorDialogState.name.trim();
-    const tilesetPath = actorDialogState.tilesetPath?.trim() || '';
+    let tilesetPath = actorDialogState.tilesetPath?.trim() || '';
     const tilesetSourcePath = actorDialogState.tilesetSourcePath?.trim() || '';
     const portraitPath = actorDialogState.portraitPath?.trim() || '';
     const portraitSourcePath = actorDialogState.portraitSourcePath?.trim() || '';
+    let defaultAppearance: Record<string, string> = {};
+    if (actorDialogState.type === 'npc' && !tilesetPath) {
+      defaultAppearance = await resolveDefaultNpcAppearance();
+      tilesetPath = defaultAppearance.tilesetPath || '';
+    }
 
     const roleProperties: Record<string, string> = {};
     if (actorDialogState.type === 'npc') {
@@ -224,6 +230,13 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
     // Add creates the definition only (unplaced, -1,-1); placing it on the map creates the instance position
     const actorX = -1;
     const actorY = -1;
+    const appearanceProps = {
+      ...defaultAppearance,
+      ...(tilesetPath ? { tilesetPath } : {}),
+      ...(tilesetSourcePath ? { tilesetSourcePath } : {}),
+      ...(portraitPath ? { portraitPath } : {}),
+      ...(portraitSourcePath ? { portraitSourcePath } : {}),
+    };
 
     let newObject: MapObject | null = null;
     try {
@@ -240,10 +253,7 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
             properties: {
               ...(newObject.properties || {}),
               ...roleProperties,
-              ...(tilesetPath ? { tilesetPath } : {}),
-              ...(tilesetSourcePath ? { tilesetSourcePath } : {}),
-              ...(portraitPath ? { portraitPath } : {}),
-              ...(portraitSourcePath ? { portraitSourcePath } : {})
+              ...appearanceProps,
             }
           });
         }
@@ -260,10 +270,7 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
           height: 1,
           properties: {
             ...roleProperties,
-            ...(tilesetPath ? { tilesetPath } : {}),
-            ...(tilesetSourcePath ? { tilesetSourcePath } : {}),
-            ...(portraitPath ? { portraitPath } : {}),
-            ...(portraitSourcePath ? { portraitSourcePath } : {})
+            ...appearanceProps,
           }
         } as MapObject;
         setMapObjects(prev => [...prev, newObject as MapObject]);

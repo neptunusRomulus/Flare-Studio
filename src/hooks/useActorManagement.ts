@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import type { ActorDialogState as CanonActorDialogState } from '@/editor/actorRoles';
+import { resolveDefaultNpcAppearance } from '@/flare/npcAppearance';
 import type { TileMapEditor } from '../editor/TileMapEditor';
 import type { MapObject } from '../types';
 
@@ -57,10 +58,15 @@ export default function useActorManagement({
     }
 
     const name = actorDialogState.name.trim();
-    const tilesetPath = actorDialogState.tilesetPath.trim();
+    let tilesetPath = actorDialogState.tilesetPath.trim();
     const tilesetSourcePath = actorDialogState.tilesetSourcePath?.trim() || '';
     const portraitPath = actorDialogState.portraitPath.trim();
     const portraitSourcePath = actorDialogState.portraitSourcePath?.trim() || '';
+    let defaultAppearance: Record<string, string> = {};
+    if (actorDialogState.type === 'npc' && !tilesetPath) {
+      defaultAppearance = await resolveDefaultNpcAppearance();
+      tilesetPath = defaultAppearance.tilesetPath || '';
+    }
     const {
       isTalker,
       isVendor,
@@ -124,6 +130,7 @@ export default function useActorManagement({
       properties: {
         ...(newObject.properties || {}),
         ...roleProperties,
+        ...defaultAppearance,
         ...(tilesetPath ? { tilesetPath } : {}),
         ...(tilesetSourcePath ? { tilesetSourcePath } : {}),
         ...(portraitPath ? { portraitPath } : {}),

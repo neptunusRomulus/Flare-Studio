@@ -13,6 +13,7 @@ const listing: TemplateActorListing = {
   ok: true,
   mod: 'fantasycore',
   npcLooks: [{ key: 'peasant_man1', animation: 'animations/npcs/peasant_man1.txt', image: 'images/npcs/peasant_man1.png', imagePath: null }],
+  portraits: [{ key: 'male01', path: 'images/portraits/male01.png', imagePath: null }],
   npcs: [],
   enemies: [
     { key: 'beacon', file: 'enemies/base/beacon.txt', raw: 'speed=0\n', isBase: true },
@@ -33,8 +34,10 @@ describe('template actor references', () => {
     const mod = path.join(root, 'mods', 'fantasycore');
     for (const d of ['images/tilesets', 'animations/npcs', 'images/npcs', 'enemies/base']) fs.mkdirSync(path.join(mod, d), { recursive: true });
     fs.writeFileSync(path.join(mod, 'settings.txt'), '');
+    fs.mkdirSync(path.join(mod, 'images/portraits'), { recursive: true });
     fs.writeFileSync(path.join(mod, 'animations/npcs/knight.txt'), 'image=images/npcs/knight.png\n');
     fs.writeFileSync(path.join(mod, 'images/npcs/knight.png'), '');
+    fs.writeFileSync(path.join(mod, 'images/portraits/male01.png'), '');
     fs.writeFileSync(path.join(mod, 'enemies/base/zombie.txt'), 'animations=animations/enemies/zombie.txt\n');
     const probe = { platform: 'linux', exists: (p: string) => fs.existsSync(p), isDirectory: (p: string) => fs.existsSync(p) && fs.statSync(p).isDirectory() };
     const flareTemplate = require('../../electron/flareTemplate.cjs');
@@ -44,6 +47,7 @@ describe('template actor references', () => {
       const out = listTemplateActors('/x', { probe });
       expect(out.ok).toBe(true);
       expect(out.npcLooks).toEqual([expect.objectContaining({ key: 'knight', animation: 'animations/npcs/knight.txt', image: 'images/npcs/knight.png' })]);
+      expect(out.portraits).toEqual([expect.objectContaining({ key: 'male01', path: 'images/portraits/male01.png' })]);
       expect(out.enemies).toEqual([expect.objectContaining({ key: 'zombie', file: 'enemies/base/zombie.txt', isBase: true })]);
       expect(out.missing).toEqual(['enemies/base/zombie.txt -> animations/enemies/zombie.txt']);
     } finally {

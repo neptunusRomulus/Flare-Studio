@@ -13,6 +13,8 @@ export type TemplateActorListing = {
   mod?: string;
   modDir?: string;
   npcLooks: Array<{ key: string; animation: string; image: string | null; imagePath: string | null }>;
+  /** fantasycore images/portraits/*.png (mod-relative path + absolute imagePath for thumbnails). */
+  portraits?: Array<{ key: string; path: string; imagePath: string | null }>;
   npcs: Array<{ key: string; file: string; raw: string }>;
   enemies: Array<{ key: string; file: string; raw: string; isBase: boolean }>;
   missing: string[];

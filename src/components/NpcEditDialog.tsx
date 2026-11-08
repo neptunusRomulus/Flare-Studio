@@ -1,10 +1,9 @@
-import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
+import React, { useEffect, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 import Tooltip from '@/components/ui/tooltip';
 import AnimationPreview from '@/components/AnimationPreview';
-import { Check, ChevronDown, ChevronUp, HandCoins, HelpCircle, Image, MessagesSquare, MessageCircleQuestionMark, Sparkles, User } from 'lucide-react';
+import { ChevronDown, ChevronUp, HandCoins, HelpCircle, MessagesSquare, MessageCircleQuestionMark } from 'lucide-react';
 import type { MapObject } from '@/types';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 import type { ItemSummary } from '@/utils/items';
@@ -14,6 +13,10 @@ import DirectionField from '@/components/DirectionField';
 import MinimapToggle from '@/components/MinimapToggle';
 import SpawnFieldOverlay from '@/components/SpawnFieldOverlay';
 import NpcAdvancedSection from '@/components/NpcAdvancedSection';
+import NpcAppearanceSection from '@/components/NpcAppearanceSection';
+import NpcAssetThumb from '@/components/NpcAssetThumb';
+import { getStoredFlarePath } from '@/flare/flarePathStore';
+import { isAnimationDefinitionFilePath, isImageFilePath } from '@/utils/animationUtils';
 
 export type NpcEditDialogProps = {
   editingObject: MapObject;
@@ -128,14 +131,83 @@ const NpcEditDialog = ({
   handleOpenQuestSettingsDialog,
   setShowDialogueTreeDialog,
 }: NpcEditDialogProps) => {
-  const [appearanceExpanded, setAppearanceExpanded] = useState(false);
-  const [animationExpanded, setAnimationExpanded] = useState(false);
   const [advancedExpanded, setAdvancedExpanded] = useState(false);
+  const [previewSpritePath, setPreviewSpritePath] = useState<string | null>(null);
+  const [previewPortraitPath, setPreviewPortraitPath] = useState<string | null>(null);
 
   const isTalker = editingObject?.properties?.talker === 'true';
   const isVendor = editingObject?.properties?.vendor === 'true';
   const isQuestGiver = editingObject?.properties?.questGiver === 'true';
   const advancedChanged = countAdvancedChanges(editingObject.properties, getEditingObjectProperty);
+  const tilesetPath = getEditingObjectProperty('tilesetPath', '');
+  const templateImage = getEditingObjectProperty('templateImage', '');
+  const tilesetSourcePath = getEditingObjectProperty('tilesetSourcePath', '');
+  const portraitPath = getEditingObjectProperty('portraitPath', '');
+  const projectPath = editor?.getCurrentProjectPath() ?? null;
+  const showAnimPreview = Boolean(
+    (tilesetSourcePath || (tilesetPath && isImageFilePath(tilesetPath)))
+    && getEditingObjectProperty('anim_render_width', ''),
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    const resolve = async () => {
+      const api = window.electronAPI;
+      const root = projectPath?.replace(/\\/g, '/').replace(/\/$/, '') || '';
+      let sprite: string | null = null;
+      if (tilesetSourcePath) sprite = tilesetSourcePath;
+      else if (tilesetPath && isImageFilePath(tilesetPath)) {
+        sprite = /^([a-zA-Z]:|\/)/.test(tilesetPath) ? tilesetPath : (root ? `${root}/${tilesetPath}` : tilesetPath);
+      } else if (templateImage) {
+        const flarePath = getStoredFlarePath();
+        if (flarePath && api?.listTemplateActors) {
+          try {
+            const listing = await api.listTemplateActors(flarePath);
+            const match = listing.npcLooks?.find((l) => l.animation === tilesetPath || l.image === templateImage);
+            sprite = match?.imagePath || (listing.modDir && templateImage ? `${listing.modDir.replace(/\\/g, '/')}/${templateImage}` : null);
+          } catch {
+            sprite = null;
+          }
+        }
+      } else if (tilesetPath && isAnimationDefinitionFilePath(tilesetPath) && api?.listTemplateActors) {
+        const flarePath = getStoredFlarePath();
+        if (flarePath) {
+          try {
+            const listing = await api.listTemplateActors(flarePath);
+            sprite = listing.npcLooks?.find((l) => l.animation === tilesetPath)?.imagePath || null;
+          } catch {
+            sprite = null;
+          }
+        }
+      }
+
+      let portrait: string | null = null;
+      if (portraitPath.startsWith('data:')) portrait = portraitPath;
+      else if (portraitPath && /^([a-zA-Z]:|\/)/.test(portraitPath)) portrait = portraitPath;
+      else if (portraitPath) {
+        if (root && api?.fileExists && await api.fileExists(`${root}/${portraitPath}`)) portrait = `${root}/${portraitPath}`;
+        else {
+          const flarePath = getStoredFlarePath();
+          if (flarePath && api?.listTemplateActors) {
+            try {
+              const listing = await api.listTemplateActors(flarePath);
+              portrait = listing.portraits?.find((p) => p.path === portraitPath)?.imagePath
+                || (listing.modDir ? `${listing.modDir.replace(/\\/g, '/')}/${portraitPath}` : null);
+            } catch {
+              portrait = null;
+            }
+          }
+        }
+      }
+
+      if (!cancelled) {
+        setPreviewSpritePath(sprite);
+        setPreviewPortraitPath(portrait);
+      }
+    };
+    void resolve();
+    return () => { cancelled = true; };
+  }, [tilesetPath, templateImage, tilesetSourcePath, portraitPath, projectPath]);
 
   const setPositionX = (newX: number) => {
     if (editor) {
@@ -157,6 +229,20 @@ const NpcEditDialog = ({
     setEditingObject({ ...editingObject, y: newY });
   };
 
+  const applyPropertyBag = (props: Record<string, string | null>) => {
+    setEditingObject({
+      ...editingObject,
+      properties: (() => {
+        const next = { ...(editingObject.properties || {}) };
+        for (const [key, value] of Object.entries(props)) {
+          if (value === null) delete next[key];
+          else next[key] = value;
+        }
+        return next;
+      })(),
+    });
+  };
+
   const roleActionClass = (enabled: boolean) =>
     `h-7 px-2 text-xs rounded-md border border-border bg-background hover:bg-muted ${
       enabled ? '' : 'opacity-40 pointer-events-none'
@@ -164,72 +250,58 @@ const NpcEditDialog = ({
 
   return (
     <>
-      <div className="flex gap-3 items-end border border-border rounded-md p-3 bg-muted/20">
-        <div className="flex-1">
+      <div className="flex gap-3 items-start border border-border rounded-md p-3 bg-muted/20">
+        <div className="shrink-0">
+          {showAnimPreview ? (
+            <AnimationPreview
+              tilesetPath={tilesetSourcePath || tilesetPath}
+              direction={parseInt(getEditingObjectProperty('direction', '0'), 10) || 0}
+              properties={{
+                anim_render_width: getEditingObjectProperty('anim_render_width', ''),
+                anim_render_height: getEditingObjectProperty('anim_render_height', ''),
+                anim_render_offset_x: getEditingObjectProperty('anim_render_offset_x', ''),
+                anim_render_offset_y: getEditingObjectProperty('anim_render_offset_y', ''),
+                anim_frames: getEditingObjectProperty('anim_frames', ''),
+                anim_duration: getEditingObjectProperty('anim_duration', ''),
+                anim_type: getEditingObjectProperty('anim_type', ''),
+                anim_blend_mode: getEditingObjectProperty('anim_blend_mode', ''),
+                anim_alpha_mod: getEditingObjectProperty('anim_alpha_mod', ''),
+                anim_color_mod: getEditingObjectProperty('anim_color_mod', ''),
+                anim_image_width: getEditingObjectProperty('anim_image_width', ''),
+                anim_image_height: getEditingObjectProperty('anim_image_height', ''),
+              }}
+            />
+          ) : (
+            <NpcAssetThumb imagePath={previewSpritePath} alt="Sprite" className="h-20 w-20" />
+          )}
+        </div>
+        <NpcAssetThumb imagePath={previewPortraitPath || (portraitPath.startsWith('data:') ? portraitPath : null)} alt="Portrait" className="h-20 w-20 shrink-0" />
+        <div className="flex-1 min-w-0 space-y-2">
           <NameField
             value={editingObject.name || ''}
             onChange={(value) => setEditingObject({ ...editingObject, name: value })}
             placeholder="NPC name"
           />
-        </div>
-        <div className="w-24">
-          <PositionField x={editingObject.x} y={editingObject.y} onChangeX={setPositionX} onChangeY={setPositionY} />
-        </div>
-      </div>
-
-      <div className="border border-border rounded-md bg-muted/20">
-        <button
-          type="button"
-          onClick={() => setAppearanceExpanded(!appearanceExpanded)}
-          className="w-full px-3 py-2 flex items-center gap-2 text-sm font-semibold hover:bg-muted/50 rounded-t-md text-left"
-        >
-          {appearanceExpanded ? <ChevronUp className="w-4 h-4 shrink-0" /> : <ChevronDown className="w-4 h-4 shrink-0" />}
-          <span>Identity</span>
-        </button>
-        {appearanceExpanded && (
-          <div className="space-y-3 px-3 pb-3">
-            <div className="space-y-2">
-              {getEditingObjectProperty('portraitPath', '') && (
-                <div className="w-20 h-20 border border-border rounded bg-muted/40 flex items-center justify-center overflow-hidden">
-                  <img
-                    src={getEditingObjectProperty('portraitPath', '')}
-                    alt="Portrait"
-                    className="max-w-full max-h-full object-contain"
-                    style={{ imageRendering: 'pixelated' }}
-                  />
-                </div>
-              )}
-              <div className="flex gap-2">
-                <div className="relative">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-7 px-2 gap-1.5"
-                    onClick={() => { void handleEditingPortraitBrowse(); }}
-                    disabled={!canUseTilesetDialog}
-                  >
-                    <User className="w-3.5 h-3.5" />
-                    <span className="text-xs">Portrait</span>
-                  </Button>
-                  {getEditingObjectProperty('portraitPath', '') && (
-                    <span className="absolute -top-1 -right-1 flex items-center justify-center w-3.5 h-3.5 rounded-full bg-green-500">
-                      <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <DirectionField
-              value={getEditingObjectProperty('direction', '')}
-              onChange={(value) => updateEditingObjectProperty('direction', value)}
-              label="Stance direction"
-              tooltip="direction — The direction to use for this NPC's stance animation"
-            />
+          <div className="w-24">
+            <PositionField x={editingObject.x} y={editingObject.y} onChangeX={setPositionX} onChangeY={setPositionY} />
           </div>
-        )}
+        </div>
       </div>
+
+      <NpcAppearanceSection
+        projectPath={projectPath}
+        selectedAnimation={tilesetPath}
+        selectedPortrait={portraitPath}
+        stanceDirection={getEditingObjectProperty('direction', '')}
+        canUseTilesetDialog={canUseTilesetDialog}
+        hasTilesetPath={Boolean(tilesetPath)}
+        onSelectLook={applyPropertyBag}
+        onSelectPortrait={applyPropertyBag}
+        onStanceChange={(value) => updateEditingObjectProperty('direction', value)}
+        onImportTileset={() => { void handleEditingTilesetBrowse(); }}
+        onAutoDetect={() => { void handleAutoDetectAnim(); }}
+        onBrowsePortrait={() => { void handleEditingPortraitBrowse(); }}
+      />
 
       <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
         <div className="flex items-center gap-1">
@@ -332,77 +404,6 @@ const NpcEditDialog = ({
             </button>
           </div>
         </div>
-      </div>
-
-      <div className="border border-border rounded-md bg-muted/20">
-        <button
-          type="button"
-          onClick={() => setAnimationExpanded(!animationExpanded)}
-          className="w-full px-3 py-2 flex items-center gap-2 text-sm font-semibold hover:bg-muted/50 rounded-t-md text-left"
-        >
-          {animationExpanded ? <ChevronUp className="w-4 h-4 shrink-0" /> : <ChevronDown className="w-4 h-4 shrink-0" />}
-          <span>Animation</span>
-        </button>
-        {animationExpanded && (
-          <div className="space-y-3 px-3 pb-3">
-            <AnimationPreview
-              tilesetPath={getEditingObjectProperty('tilesetPath', '')}
-              direction={parseInt(getEditingObjectProperty('direction', '0'), 10) || 0}
-              properties={{
-                anim_render_width: getEditingObjectProperty('anim_render_width', ''),
-                anim_render_height: getEditingObjectProperty('anim_render_height', ''),
-                anim_render_offset_x: getEditingObjectProperty('anim_render_offset_x', ''),
-                anim_render_offset_y: getEditingObjectProperty('anim_render_offset_y', ''),
-                anim_frames: getEditingObjectProperty('anim_frames', ''),
-                anim_duration: getEditingObjectProperty('anim_duration', ''),
-                anim_type: getEditingObjectProperty('anim_type', ''),
-                anim_blend_mode: getEditingObjectProperty('anim_blend_mode', ''),
-                anim_alpha_mod: getEditingObjectProperty('anim_alpha_mod', ''),
-                anim_color_mod: getEditingObjectProperty('anim_color_mod', ''),
-                anim_image_width: getEditingObjectProperty('anim_image_width', ''),
-                anim_image_height: getEditingObjectProperty('anim_image_height', ''),
-              }}
-            />
-
-            <div className="flex gap-2 items-center">
-              <div className="relative">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-7 px-2 gap-1.5"
-                  onClick={() => { void handleEditingTilesetBrowse(); }}
-                  disabled={!canUseTilesetDialog}
-                >
-                  <Image className="w-3.5 h-3.5" />
-                  <span className="text-xs">Import Tileset</span>
-                </Button>
-                {getEditingObjectProperty('tilesetPath', '') && (
-                  <span className="absolute -top-1 -right-1 flex items-center justify-center w-3.5 h-3.5 rounded-full bg-green-500">
-                    <Check className="w-2.5 h-2.5 text-white" strokeWidth={3} />
-                  </span>
-                )}
-              </div>
-              {getEditingObjectProperty('tilesetPath', '') && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 px-2 gap-1.5 text-orange-500 hover:text-orange-600 hover:bg-orange-500/10"
-                  onClick={() => { void handleAutoDetectAnim(); }}
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span className="text-xs">Auto Detect</span>
-                </Button>
-              )}
-              {getEditingObjectProperty('anim_image_width', '') && (
-                <span className="text-[10px] text-muted-foreground">
-                  {getEditingObjectProperty('anim_image_width', '?')}×{getEditingObjectProperty('anim_image_height', '?')} • {getEditingObjectProperty('anim_frames', '?')} frame{getEditingObjectProperty('anim_frames', '1') !== '1' ? 's' : ''}
-                </span>
-              )}
-            </div>
-          </div>
-        )}
       </div>
 
       <div className="border border-border rounded-md bg-muted/20">

@@ -70,6 +70,28 @@ const SidebarEventEntries = ({
 
   return (
   <>
+    {/* Add button sits right under the sub-switch, above the list */}
+      {isEventLayer && (
+        <div className="flex justify-center py-2">
+          <Tooltip content="Add Event" side="bottom">
+            <Button
+              variant="default"
+              size="sm"
+              aria-label="Add Event"
+              className="text-xs px-3 py-1 h-7 shadow-sm bg-orange-500 hover:bg-orange-600 text-white border-orange-500"
+              onClick={(event) => {
+                event.stopPropagation();
+                event.preventDefault();
+                console.log('[UI] Add Event button clicked');
+                onAddEvent();
+              }}
+            >
+              <Plus className="w-3 h-3 mr-1" />
+              Event
+            </Button>
+          </Tooltip>
+        </div>
+      )}
     {isEventLayer && (
       <div className="flex-1 min-h-0 flex flex-col gap-3">
         {eventEntries.length === 0 ? (
@@ -152,27 +174,6 @@ const SidebarEventEntries = ({
         )}
       </div>
     )}
-      {isEventLayer && (
-        <div className="flex justify-center py-2">
-          <Tooltip content="Add Event" side="bottom">
-            <Button
-              variant="default"
-              size="sm"
-              aria-label="Add Event"
-              className="text-xs px-3 py-1 h-7 shadow-sm bg-orange-500 hover:bg-orange-600 text-white border-orange-500"
-              onClick={(event) => {
-                event.stopPropagation();
-                event.preventDefault();
-                console.log('[UI] Add Event button clicked');
-                onAddEvent();
-              }}
-            >
-              <Plus className="w-3 h-3 mr-1" />
-              Event
-            </Button>
-          </Tooltip>
-        </div>
-      )}
     </>
   );
 };

@@ -558,7 +558,9 @@ export default function EditorCanvas(props: Props) {
 
       <MapInitOverlay mapInitialized={mapInitialized} handleOpenCreateMapDialog={handleOpenCreateMapDialog} isPreparingNewMap={isPreparingNewMap} />
 
-      <MapHoverDisplay hoverCoords={hoverCoords} showActiveGid={showActiveGid} activeGidValue={activeGidValue} hoverGidValue={hoverGidValue} isEnemyTabActive={isEnemyTabActive} />
+      <MapHoverDisplay hoverCoords={hoverCoords} showActiveGid={showActiveGid} activeGidValue={activeGidValue} hoverGidValue={hoverGidValue} isEnemyTabActive={isEnemyTabActive}
+        debugMode={!!editorRef.current?.getDebugMode?.()}
+        left={(() => { const b = editorRef.current?.getLastMiniMapBounds?.(); return b ? b.x + b.w + 12 : 16; })()} />
 
       <NpcDeletePopup npcDeletePopup={npcDeletePopup} onConfirm={handleUnplaceActorFromMap} onCancel={() => setNpcDeletePopup(null)} />
 

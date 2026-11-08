@@ -4309,20 +4309,12 @@ export class TileMapEditor {
   private drawMiniMap(): void {
     if (!this.showMinimap) return;
 
-    // Minimap dimensions and position (bottom-right corner)
+    // Minimap dimensions and position (bottom-left corner of the canvas; the right dock sits to the right)
     const minimapWidth = Math.floor(150 * this.minimapWindowScale);
     const minimapHeight = Math.floor(120 * this.minimapWindowScale);
     const padding = 10;
-    // Anchor minimap to the screen's bottom-right corner so it doesn't
-    // shift during layout transitions (sidebar open/close). We compute the
-    // desired minimap position in screen coordinates and convert it to the
-    // canvas coordinate space by subtracting the canvas container's top-left.
-    const containerRect = this.mapCanvas.getBoundingClientRect();
-    const screenX = window.innerWidth - minimapWidth - padding;
-    const screenY = window.innerHeight - minimapHeight - padding;
-    // Convert to canvas-local coordinates
-    let x = Math.floor(screenX - containerRect.left);
-    let y = Math.floor(screenY - containerRect.top);
+    let x = padding;
+    let y = this.mapCanvas.height - minimapHeight - padding;
     // Clamp inside canvas to avoid drawing outside if the canvas is smaller
     x = Math.max(0, Math.min(this.mapCanvas.width - minimapWidth, x));
     y = Math.max(0, Math.min(this.mapCanvas.height - minimapHeight, y));

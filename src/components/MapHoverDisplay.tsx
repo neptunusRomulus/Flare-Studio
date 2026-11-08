@@ -7,9 +7,14 @@ type Props = {
   activeGidValue: string;
   hoverGidValue: string;
   isEnemyTabActive: boolean;
+  /** Readout is a debug aid: only shown while Engine Settings > Debug Mode is on. */
+  debugMode?: boolean;
+  /** Left offset in px (kept clear of the bottom-left minimap). */
+  left?: number;
 };
 
-const MapHoverDisplay: React.FC<Props> = ({ hoverCoords, showActiveGid, activeGidValue, hoverGidValue, isEnemyTabActive }) => {
+const MapHoverDisplay: React.FC<Props> = ({ hoverCoords, showActiveGid, activeGidValue, hoverGidValue, isEnemyTabActive, debugMode = false, left = 16 }) => {
+  if (!debugMode) return null;
   
   // Show nothing if no hover coords and not showing active GID
   if (!hoverCoords && (!showActiveGid || isEnemyTabActive)) return null;
@@ -20,7 +25,8 @@ const MapHoverDisplay: React.FC<Props> = ({ hoverCoords, showActiveGid, activeGi
   
   return (
     <div
-      className={`absolute bottom-4 left-4 z-10 p-2 rounded-md text-xs font-mono flex items-center gap-2 transition-opacity duration-200 ${hasContent ? 'opacity-100 pointer-events-auto bg-white/90 dark:bg-neutral-900/90 border border-gray-200 dark:border-neutral-600 text-gray-800 dark:text-white shadow-sm' : 'opacity-0 pointer-events-none'}`}
+      className={`absolute bottom-4 z-10 p-2 rounded-md text-xs font-mono flex items-center gap-2 transition-opacity duration-200 ${hasContent ? 'opacity-100 pointer-events-auto bg-white/90 dark:bg-neutral-900/90 border border-gray-200 dark:border-neutral-600 text-gray-800 dark:text-white shadow-sm' : 'opacity-0 pointer-events-none'}`}
+      style={{ left }}
       aria-hidden={!hasContent}
     >
       {hoverCoords && (

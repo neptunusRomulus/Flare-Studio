@@ -76,7 +76,13 @@ const LayersPanel: React.FC<Props> = ({
               const visible = layersPanelExpanded || isActive;
               return (
                 <React.Fragment key={layer.id}>
-                {groupBreak && <div aria-hidden className="mx-2 my-[10px] h-px bg-primary/50" />}
+                {groupBreak && (
+                  // Parent uses space-y-0.5 (margin-top on siblings), which overrides child margins.
+                  // Padding gives 10px above; 8px below + next row's 2px space-y = 10px.
+                  <div aria-hidden className="flex-shrink-0" style={{ marginTop: 0, paddingTop: 10, paddingBottom: 8 }}>
+                    <div className="mx-2 h-px bg-primary/50" />
+                  </div>
+                )}
                 <div
                   className={`block w-full max-w-xs px-2 py-1 rounded transition-all text-xs transform-gpu ${
                     isActive

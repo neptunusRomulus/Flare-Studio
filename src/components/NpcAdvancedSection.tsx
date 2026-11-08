@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import Tooltip from '@/components/ui/tooltip';
-import { InlineConfirm } from '@/components/ui/inline-confirm';
-import { ChevronDown, ChevronUp, HelpCircle, Plus, X } from 'lucide-react';
+import { HelpCircle, Plus, X } from 'lucide-react';
 import { parseSectionProperty, sectionsFromNpcText, type KeyValue } from '@/utils/npcFileUpdate';
 
 type Props = {
@@ -10,9 +9,8 @@ type Props = {
   projectPath: string | null;
   getEditingObjectProperty: (key: string, fallback?: string) => string;
   updateEditingObjectProperty: (key: string, value: string | null) => void;
-  /** When true, render only the stats/effects body (parent owns the Advanced accordion). */
+  /** When true, render only the stats/effects body (parent owns the accordion). */
   embedded?: boolean;
-  /** Force content visible even when the local accordion is collapsed (used with embedded). */
   forceExpanded?: boolean;
 };
 
@@ -35,6 +33,18 @@ const setValue = (entries: KeyValue[], key: string, value: string): KeyValue[] =
   return entries.map((e, j) => (j === i ? { key, value } : e));
 };
 
+export function countStatsAndEffects(
+  get: (key: string, fallback?: string) => string,
+  fileStatsLen = 0,
+  fileEffectsLen = 0,
+): number {
+  const statsProp = get('npc_stats', '');
+  const vfxProp = get('npc_visual_effects', '');
+  const statsLen = statsProp ? (parseSectionProperty(statsProp)[0] || []).filter((e) => e.key || e.value).length : fileStatsLen;
+  const effectsLen = vfxProp ? parseSectionProperty(vfxProp).length : fileEffectsLen;
+  return statsLen + effectsLen;
+}
+
 /**
  * [stats] and [visual_effect] of the NPC file. Until edited, the file's values are only shown;
  * the first edit makes the list authoritative (it then replaces those sections on save).
@@ -49,7 +59,6 @@ const NpcAdvancedSection = ({
 }: Props) => {
   const [expanded, setExpanded] = useState(false);
   const [fileSections, setFileSections] = useState<{ stats: KeyValue[][]; visual_effect: KeyValue[][] } | null>(null);
-  const [confirmVfx, setConfirmVfx] = useState<number | null>(null);
   const statsProp = getEditingObjectProperty('npc_stats', '');
   const vfxProp = getEditingObjectProperty('npc_visual_effects', '');
   const isOpen = forceExpanded || expanded;
@@ -71,79 +80,77 @@ const NpcAdvancedSection = ({
 
   const body = (
     <div className={embedded ? 'space-y-3' : 'space-y-3 px-3 pb-3'}>
-      <div>
-        <div className="flex items-center gap-1 mb-1">
-          <label className="text-xs text-muted-foreground">Stats</label>
-          <Tooltip content="[stats] section, read by StatBlock (e.g. speed=, stat=hp,100). Repeated keys are allowed.">
-            <HelpCircle className="w-3 h-3 text-muted-foreground" />
-          </Tooltip>
-          <button type="button" className="ml-auto h-5 w-5 flex items-center justify-center rounded hover:bg-muted" onClick={() => writeStats([...stats, { key: '', value: '' }])} aria-label="Add stat">
-            <Plus className="w-3 h-3" />
-          </button>
-        </div>
-        <div className="space-y-1">
-          {stats.map((entry, i) => (
-            <div key={i} className="flex gap-1">
-              <Input className="h-7 text-xs font-mono w-28" value={entry.key} placeholder="key"
+      <div className="space-y-1.5">
+        {stats.map((entry, i) => (
+          <div key={i} className="flex gap-1">
+            <Tooltip content="[stats] key (e.g. speed, or stat)">
+              <Input className="h-7 text-xs font-mono w-28" value={entry.key} placeholder="Key"
                 onChange={(e) => writeStats(stats.map((s, j) => (j === i ? { ...s, key: e.target.value } : s)))} />
-              <Input className="h-7 text-xs font-mono flex-1" value={entry.value} placeholder="value"
+            </Tooltip>
+            <Tooltip content="[stats] value">
+              <Input className="h-7 text-xs font-mono flex-1" value={entry.value} placeholder="Value"
                 onChange={(e) => writeStats(stats.map((s, j) => (j === i ? { ...s, value: e.target.value } : s)))} />
-              <button type="button" className="h-7 w-7 shrink-0 flex items-center justify-center rounded hover:bg-muted" onClick={() => writeStats(stats.filter((_, j) => j !== i))} aria-label="Remove stat">
-                <X className="w-3 h-3" />
-              </button>
-            </div>
-          ))}
-        </div>
+            </Tooltip>
+            <button type="button" className="h-7 w-7 shrink-0 flex items-center justify-center rounded hover:bg-muted" onClick={() => writeStats(stats.filter((_, j) => j !== i))} aria-label="Remove stat">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        ))}
+        <button
+          type="button"
+          className="h-7 px-2 text-xs rounded-md border border-dashed border-border text-muted-foreground hover:bg-muted/50 hover:text-foreground inline-flex items-center gap-1"
+          onClick={() => writeStats([...stats, { key: '', value: '' }])}
+        >
+          <Plus className="w-3.5 h-3.5" />
+          Add stat
+        </button>
       </div>
 
-      <div>
-        <div className="flex items-center gap-1 mb-1">
-          <label className="text-xs text-muted-foreground">Visual Effects</label>
-          <Tooltip content="[visual_effect] sections. Trigger one from a dialog with visual_effect=<id>, or set Automatic.">
-            <HelpCircle className="w-3 h-3 text-muted-foreground" />
-          </Tooltip>
-          <button type="button" className="ml-auto h-5 w-5 flex items-center justify-center rounded hover:bg-muted" onClick={() => writeVfx([...effects, [{ key: 'id', value: `effect_${effects.length + 1}` }]])} aria-label="Add visual effect">
-            <Plus className="w-3 h-3" />
-          </button>
-        </div>
-        <div className="space-y-2">
-          {effects.map((fx, i) => (
-            <div key={i} className="rounded border border-border p-2 space-y-1">
-              <div className="grid grid-cols-2 gap-1">
-                {VFX_FIELDS.filter((f) => !f.bool).map((f) => (
-                  <Tooltip key={f.key} content={`${f.key}: ${f.tooltip}`}>
-                    <Input className="h-7 text-xs font-mono" value={valueOf(fx, f.key)} placeholder={f.key === 'id' ? 'id' : `${f.key}${f.placeholder && f.placeholder !== f.key ? ` (${f.placeholder})` : ''}`}
-                      onChange={(e) => writeVfx(effects.map((x, j) => (j === i ? setValue(x, f.key, e.target.value) : x)))} />
-                  </Tooltip>
-                ))}
-              </div>
-              <div className="flex items-center gap-3 text-xs">
-                {VFX_FIELDS.filter((f) => f.bool).map((f) => {
-                  const def = f.key === 'render_above';
-                  const raw = valueOf(fx, f.key);
-                  const on = raw ? raw === 'true' || raw === '1' : def;
-                  return (
-                    <Tooltip key={f.key} content={f.tooltip}>
-                      <label className="inline-flex items-center gap-1.5">
-                        <input type="checkbox" className="h-3.5 w-3.5" checked={on}
-                          onChange={(e) => writeVfx(effects.map((x, j) => (j === i ? setValue(x, f.key, e.target.checked === def ? '' : String(e.target.checked)) : x)))} />
-                        {f.key === 'render_above' ? 'Above NPC' : 'Automatic'}
-                      </label>
-                    </Tooltip>
-                  );
-                })}
-                <div className="ml-auto">
-                  <InlineConfirm open={confirmVfx === i} message="Remove this effect?" onCancel={() => setConfirmVfx(null)}
-                    onConfirm={() => { setConfirmVfx(null); writeVfx(effects.filter((_, j) => j !== i)); }}>
-                    <button type="button" className="h-6 w-6 flex items-center justify-center rounded hover:bg-muted" onClick={() => setConfirmVfx(i)} aria-label="Remove visual effect">
-                      <X className="w-3 h-3" />
-                    </button>
-                  </InlineConfirm>
-                </div>
-              </div>
+      <div className="space-y-2">
+        {effects.map((fx, i) => (
+          <div key={i} className="rounded border border-border p-2 space-y-1">
+            <div className="grid grid-cols-2 gap-1">
+              {VFX_FIELDS.filter((f) => !f.bool).map((f) => (
+                <Tooltip key={f.key} content={`${f.key}: ${f.tooltip}`}>
+                  <Input className="h-7 text-xs font-mono" value={valueOf(fx, f.key)} placeholder={f.key === 'id' ? 'id' : f.key}
+                    onChange={(e) => writeVfx(effects.map((x, j) => (j === i ? setValue(x, f.key, e.target.value) : x)))} />
+                </Tooltip>
+              ))}
             </div>
-          ))}
-        </div>
+            <div className="flex items-center gap-3 text-xs">
+              {VFX_FIELDS.filter((f) => f.bool).map((f) => {
+                const def = f.key === 'render_above';
+                const raw = valueOf(fx, f.key);
+                const on = raw ? raw === 'true' || raw === '1' : def;
+                return (
+                  <Tooltip key={f.key} content={`${f.key}: ${f.tooltip}`}>
+                    <label className="inline-flex items-center gap-1.5">
+                      <input type="checkbox" className="h-3.5 w-3.5" checked={on}
+                        onChange={(e) => writeVfx(effects.map((x, j) => (j === i ? setValue(x, f.key, e.target.checked === def ? '' : String(e.target.checked)) : x)))} />
+                      {f.key === 'render_above' ? 'Above NPC' : 'Automatic'}
+                    </label>
+                  </Tooltip>
+                );
+              })}
+              <button
+                type="button"
+                className="ml-auto h-6 w-6 flex items-center justify-center rounded hover:bg-muted"
+                onClick={() => writeVfx(effects.filter((_, j) => j !== i))}
+                aria-label="Remove visual effect"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        ))}
+        <button
+          type="button"
+          className="h-7 px-2 text-xs rounded-md border border-dashed border-border text-muted-foreground hover:bg-muted/50 hover:text-foreground inline-flex items-center gap-1"
+          onClick={() => writeVfx([...effects, [{ key: 'id', value: `effect_${effects.length + 1}` }]])}
+        >
+          <Plus className="w-3.5 h-3.5" />
+          Add effect
+        </button>
       </div>
     </div>
   );
@@ -157,8 +164,10 @@ const NpcAdvancedSection = ({
         onClick={() => setExpanded(!expanded)}
         className="w-full px-3 py-2 flex items-center gap-2 text-sm font-semibold hover:bg-muted/50 rounded-t-md text-left"
       >
-        {expanded ? <ChevronUp className="w-4 h-4 shrink-0" /> : <ChevronDown className="w-4 h-4 shrink-0" />}
         <span>Stats &amp; Effects</span>
+        <Tooltip content="[stats] and [visual_effect] sections from the NPC file.">
+          <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
+        </Tooltip>
       </button>
       {expanded && body}
     </div>

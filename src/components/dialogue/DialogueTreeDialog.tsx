@@ -342,6 +342,8 @@ const DialogueTreeDialog = ({
   const [pendingIdValue, setPendingIdValue] = useState('');
   const [idConfirmShown, setIdConfirmShown] = useState(false);
   const [recipeMenuOpen, setRecipeMenuOpen] = useState(false);
+  const [effectMenuOpen, setEffectMenuOpen] = useState(false);
+  const [effectQuery, setEffectQuery] = useState('');
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { controls } = useAppContext() as any;
@@ -429,6 +431,18 @@ const DialogueTreeDialog = ({
 
   const lootCount = activeTree ? lootCountOf(activeTree) : { min: '', max: '' };
   const groundLootCount = activeTree ? groundLootCountOf(activeTree) : { min: '', max: '' };
+
+  // Searchable effect palette: same list as the per-row dropdown, in the same groups.
+  const filteredEffects = useMemo(() => {
+    const query = effectQuery.trim().toLowerCase();
+    const all = EFFECT_GROUPS.flatMap((group) =>
+      group.options.map((option) => ({ ...option, group: group.label })),
+    );
+    if (!query) return all;
+    return all.filter((option) =>
+      `${option.label} ${option.value} ${option.group}`.toLowerCase().includes(query),
+    );
+  }, [effectQuery]);
 
   // Collect all dialogueIds for response dropdown
   const allDialogueIds = useMemo(() => {
@@ -1272,12 +1286,47 @@ const DialogueTreeDialog = ({
               </button>
               {activeTree._wfExpanded && (
                 <div className="px-3 pb-3 space-y-2">
-                  <p className="text-xs text-muted-foreground">What happens in the world after this?</p>
+                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                    <span>What happens in the world after this?</span>
+                    <Tooltip content="Effects run top to bottom, the same order as the lines in the dialog block.">
+                      <HelpCircle className="w-3.5 h-3.5 cursor-help" />
+                    </Tooltip>
+                  </div>
                   <datalist id="dialogue-visual-effect-ids">
                     {visualEffectIds.map((id) => <option key={id} value={id} />)}
                   </datalist>
                   {(activeTree.worldEffects || []).map((wf, wfIndex) => (
-                    <div key={wf.id} className="flex gap-2 items-center p-2 rounded-md bg-purple-500/10 border-l-2 border-l-purple-500/50">
+                    <div key={wf.id || wfIndex} className="flex gap-2 items-center p-2 rounded-md bg-purple-500/10 border-l-2 border-l-purple-500/50">
+                      <div className="flex flex-col shrink-0">
+                        <button
+                          type="button"
+                          className="h-3.5 w-4 flex items-center justify-center rounded hover:bg-muted disabled:opacity-30"
+                          aria-label="Move effect up"
+                          disabled={wfIndex === 0}
+                          onClick={() => {
+                            if (wfIndex === 0) return;
+                            const list = [...(activeTree.worldEffects || [])];
+                            [list[wfIndex - 1], list[wfIndex]] = [list[wfIndex], list[wfIndex - 1]];
+                            updateTree(activeDialogueTab, { worldEffects: list });
+                          }}
+                        >
+                          <ChevronUp className="w-3 h-3" />
+                        </button>
+                        <button
+                          type="button"
+                          className="h-3.5 w-4 flex items-center justify-center rounded hover:bg-muted disabled:opacity-30"
+                          aria-label="Move effect down"
+                          disabled={wfIndex === (activeTree.worldEffects || []).length - 1}
+                          onClick={() => {
+                            const list = [...(activeTree.worldEffects || [])];
+                            if (wfIndex >= list.length - 1) return;
+                            [list[wfIndex + 1], list[wfIndex]] = [list[wfIndex], list[wfIndex + 1]];
+                            updateTree(activeDialogueTab, { worldEffects: list });
+                          }}
+                        >
+                          <ChevronDown className="w-3 h-3" />
+                        </button>
+                      </div>
                       <select
                         value={wf.type}
                         onChange={(e) => {
@@ -1727,23 +1776,52 @@ const DialogueTreeDialog = ({
                       </Button>
                     </div>
                   ))}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-xs gap-1"
-                    onClick={() => {
-                      const newTrees = [...dialogueTrees];
-                      const newWf: DialogueWorldEffect = { id: String(Date.now()), type: 'set_status', value: '' };
-                      newTrees[activeDialogueTab] = {
-                        ...newTrees[activeDialogueTab],
-                        worldEffects: [...(newTrees[activeDialogueTab].worldEffects || []), newWf]
-                      };
-                      setDialogueTrees(newTrees);
-                    }}
-                  >
-                    <Plus className="w-3 h-3" />
-                    Add Effect
-                  </Button>
+                  <div className="relative">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs gap-1"
+                      onClick={() => setEffectMenuOpen((open) => !open)}
+                    >
+                      <Plus className="w-3 h-3" />
+                      Add Effect
+                    </Button>
+                    {effectMenuOpen && (
+                      <div className="absolute z-30 mt-1 w-64 rounded-md border border-border bg-background shadow-md">
+                        <Input
+                          className="h-8 text-xs rounded-none border-0 border-b border-border"
+                          placeholder="Search effects…"
+                          value={effectQuery}
+                          onChange={(e) => setEffectQuery(e.target.value)}
+                          autoFocus
+                        />
+                        <div className="max-h-56 overflow-y-auto py-1">
+                          {filteredEffects.length === 0 ? (
+                            <p className="px-3 py-2 text-xs text-muted-foreground">No matches</p>
+                          ) : filteredEffects.map((option) => (
+                            <button
+                              key={option.value}
+                              type="button"
+                              className="w-full px-3 py-1.5 text-left text-xs hover:bg-muted"
+                              onClick={() => {
+                                const defaultValue =
+                                  option.value === 'stash' || option.value === 'save_game' ? 'true'
+                                  : option.value === 'respec' ? 'stats'
+                                  : option.value === 'spawn_level' || option.value === 'power_level' ? 'default'
+                                  : '';
+                                const list = [...(activeTree.worldEffects || []), { id: String(Date.now()), type: option.value, value: defaultValue } as DialogueWorldEffect];
+                                updateTree(activeDialogueTab, { worldEffects: list });
+                                setEffectMenuOpen(false);
+                                setEffectQuery('');
+                              }}
+                            >
+                              {option.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>

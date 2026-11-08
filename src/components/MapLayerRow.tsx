@@ -1,6 +1,6 @@
 import React from 'react';
 import Tooltip from '@/components/ui/tooltip';
-import { Image as MapImage, Box, Grid, Map as MapIcon, Mouse, Users, Locate, Clock, Shapes } from 'lucide-react';
+import { Image as MapImage, Box, Grid, Map as MapIcon, Mouse, Users, Locate, Clock, Shapes, Sword, Tag, GitBranch, Library } from 'lucide-react';
 import type { TileLayer } from '@/types';
 import { MAP_GROUP, lastGroupTarget, type TargetGroup } from '@/components/targetGroups';
 
@@ -13,9 +13,12 @@ export const TARGET_ICON: Record<string, IconC> = {
   npc: Users,
   enemy: Locate,
   event: Clock,
+  items: Sword,
+  status: Tag,
+  rules: GitBranch,
 };
 export const MAP_TARGET_ICON = TARGET_ICON;
-export const GROUP_ICON: Record<string, IconC> = { map: MapIcon, entities: Shapes };
+export const GROUP_ICON: Record<string, IconC> = { map: MapIcon, entities: Shapes, content: Library };
 
 type Props = {
   group?: TargetGroup;
@@ -58,6 +61,22 @@ const MapLayerRow: React.FC<Props> = ({ group = MAP_GROUP, targets, activeLayerI
         <div className={`flex items-center gap-1 ${active ? 'opacity-100' : 'opacity-80'}`} onClick={(e) => e.stopPropagation()}>
           {targets.map(l => {
             const Icon = TARGET_ICON[l.type] ?? MapIcon;
+            if (group.hasVisibility === false) {
+              const sel = l.id === activeLayerId;
+              return (
+                <Tooltip key={l.id} content={group.labels[l.type] ?? l.name}>
+                  <button
+                    type="button"
+                    aria-label={group.labels[l.type] ?? l.name}
+                    aria-pressed={sel}
+                    className={`w-5 h-5 inline-flex items-center justify-center rounded hover:bg-gray-200 dark:hover:bg-gray-700 ${sel ? 'text-primary' : 'text-gray-400 dark:text-gray-500'}`}
+                    onClick={() => onSelect(l.id)}
+                  >
+                    <Icon className="w-4 h-4" />
+                  </button>
+                </Tooltip>
+              );
+            }
             return (
               <button
                 key={l.id}

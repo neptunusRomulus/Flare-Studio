@@ -1,8 +1,5 @@
 import React from 'react';
 import SidebarLayout from '@/components/SidebarLayout';
-import SidebarRulesArea from '@/components/SidebarRulesArea';
-import SidebarStatusesArea from '@/components/SidebarStatusesArea';
-import SidebarItemsArea from '@/components/SidebarItemsArea';
 import SidebarGameSettingsArea from '@/components/SidebarGameSettingsArea';
 import TilesetPanel from '@/components/sidebar/TilesetPanel';
 import { isDrawingLayer } from '@/components/paletteLayout';
@@ -145,25 +142,7 @@ export default function AppSidebar(p: SidebarProps) {
       <section className="flex flex-col flex-1 min-h-0">
         {/* NPC / Enemy / Event lists live in the right dock (Entities layer) */}
 
-        {p.statuses?.isStatusesLayer && (
-          <SidebarStatusesArea handleOpenStatusDialog={p.statuses?.handleOpenStatusDialog ?? (() => {})} />
-        )}
-
-        {p.rules.isRulesLayer && (
-          <SidebarRulesArea rulesList={p.rules.rulesList} handleAddRule={p.rules.handleAddRule} handleEditRule={p.rules.handleEditRule} />
-        )}
-
-        {p.items.isItemsLayer && (
-          <SidebarItemsArea
-            itemsList={p.items.itemsList}
-            expandedItemCategories={p.items.expandedItemCategories}
-            setExpandedItemCategories={p.items.setExpandedItemCategories}
-            handleOpenItemEdit={p.items.handleOpenItemEdit}
-            handleDuplicateItem={p.items.handleDuplicateItem}
-            handleDeleteItem={p.items.handleDeleteItem}
-            handleOpenItemDialog={p.items.handleOpenItemDialog}
-          />
-        )}
+        {/* Items / Statuses / Quests lists live in the right dock (Content layer) */}
 
         {p.gameSettings?.isGameSettingsLayer && <SidebarGameSettingsArea />}
 

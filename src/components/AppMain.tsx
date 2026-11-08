@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import EntityDock from '@/components/EntityDock';
-import { groupOfType, ENTITY_GROUP } from '@/components/targetGroups';
+import { groupOfType, ENTITY_GROUP, CONTENT_GROUP } from '@/components/targetGroups';
+import ContentDock from '@/components/ContentDock';
 import LoadingOverlay from '@/components/LoadingOverlay';
 import { loadingOverlay } from '@/components/loadingOverlayStore';
 import { useAppContext } from '../context/AppContext';
@@ -343,7 +344,7 @@ export default function AppMain() {
           {...tileset}
           mapLayers={layersObj?.layers}
           onSelectLayer={layersObj?.handleSetActiveLayer}
-          open={showPanels && (isDrawingLayer(tileset.activeLayer?.type) || groupOfType(tileset.activeLayer?.type) === ENTITY_GROUP)}
+          open={showPanels && (isDrawingLayer(tileset.activeLayer?.type) || groupOfType(tileset.activeLayer?.type) === ENTITY_GROUP || groupOfType(tileset.activeLayer?.type) === CONTENT_GROUP)}
           currentProjectPath={controls?.currentProjectPath}
           content={groupOfType(tileset.activeLayer?.type) === ENTITY_GROUP ? (
             <EntityDock
@@ -352,6 +353,15 @@ export default function AppMain() {
               onSelectLayer={layersObj?.handleSetActiveLayer ?? (() => {})}
               actors={{ ...actors, isNpcLayer: false, isEnemyLayer: false }}
               events={{ ...events, isEventLayer: true }}
+            />
+          ) : groupOfType(tileset.activeLayer?.type) === CONTENT_GROUP ? (
+            <ContentDock
+              layers={layersObj?.layers ?? []}
+              activeLayer={tileset.activeLayer}
+              onSelectLayer={layersObj?.handleSetActiveLayer ?? (() => {})}
+              items={items}
+              statuses={{ handleOpenStatusDialog: statuses?.handleOpenStatusDialog ?? (() => {}) }}
+              rules={{ rulesList: rules.rulesList, handleAddRule: rules.handleAddRule, handleEditRule: rules.handleEditRule }}
             />
           ) : undefined}
         />

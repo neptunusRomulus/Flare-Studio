@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ENTITY_GROUP, MAP_GROUP, collapseTargetGroups, cycleInGroup, groupOfType, normalizeTileRect, tabTargetFor } from './targetGroups';
+import { CONTENT_GROUP, ENTITY_GROUP, MAP_GROUP, collapseTargetGroups, cycleInGroup, groupOfType, normalizeTileRect, tabTargetFor } from './targetGroups';
 import { groupLayers, layerGroupIndex } from './layerGroups';
 
 const div = { tagName: 'DIV', closest: () => null };
@@ -15,7 +15,8 @@ describe('target groups', () => {
     expect(tabTargetFor({ key: 'Tab' }, 'enemy', div)).toBe('event');
     expect(tabTargetFor({ key: 'Tab' }, 'object', div)).toBe('collision');
     expect(tabTargetFor({ key: 'Tab', shiftKey: true }, 'npc', div)).toBe('event');
-    expect(tabTargetFor({ key: 'Tab' }, 'items', div)).toBeNull();
+    expect(tabTargetFor({ key: 'Tab' }, 'gameSettings', div)).toBeNull();
+    expect(tabTargetFor({ key: 'Tab' }, 'rules', div)).toBe('items');
     expect(tabTargetFor({ key: 'Tab' }, 'npc', { tagName: 'TEXTAREA' })).toBeNull();
     expect(tabTargetFor({ key: 'Tab' }, 'npc', { tagName: 'DIV', closest: () => ({}) })).toBeNull();
   });
@@ -23,11 +24,19 @@ describe('target groups', () => {
     const types = ['gameSettings', 'rules', 'event', 'status', 'items', 'enemy', 'npc', 'object', 'collision', 'background'];
     const entries = collapseTargetGroups(groupLayers(types.map((type, id) => ({ id, type }))));
     const names = entries.map(e => e.kind === 'group' ? e.group.label : e.layer.type);
-    expect(names).toEqual(['Map', 'Entities', 'items', 'status', 'rules', 'gameSettings']);
+    expect(names).toEqual(['Map', 'Entities', 'Content', 'gameSettings']);
     const groupIdx = entries.map(e => layerGroupIndex(e.kind === 'group' ? e.targets[0].type : e.layer.type));
-    expect(groupIdx).toEqual([0, 1, 2, 2, 2, 3]);
+    expect(groupIdx).toEqual([0, 1, 2, 3]);
     expect(groupOfType('event')).toBe(ENTITY_GROUP);
     expect(groupOfType('collision')).toBe(MAP_GROUP);
+  });
+  it('content cycling Items -> Statuses -> Quests -> Items, no visibility', () => {
+    expect(cycleInGroup(CONTENT_GROUP, 'items')).toBe('status');
+    expect(cycleInGroup(CONTENT_GROUP, 'status')).toBe('rules');
+    expect(cycleInGroup(CONTENT_GROUP, 'rules')).toBe('items');
+    expect(cycleInGroup(CONTENT_GROUP, 'items', true)).toBe('rules');
+    expect(groupOfType('status')).toBe(CONTENT_GROUP);
+    expect(CONTENT_GROUP.hasVisibility).toBe(false);
   });
   it('normalises event rectangles', () => {
     expect(normalizeTileRect({ x: 5, y: 7 }, { x: 2, y: 3 }, 20, 20)).toEqual({ x: 2, y: 3, width: 4, height: 5 });

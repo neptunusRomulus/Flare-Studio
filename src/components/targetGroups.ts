@@ -4,13 +4,15 @@
  */
 import { MAP_TARGETS, MAP_TARGET_LABEL, MAP_TAB_HELP } from '@/components/mapTargets';
 
-export type TargetGroupId = 'map' | 'entities';
+export type TargetGroupId = 'map' | 'entities' | 'content';
 export type TargetGroup = {
   id: TargetGroupId;
   label: string;
   targets: string[];
   labels: Record<string, string>;
   help: string;
+  /** false: not map layers; mini icons only select the target (no visibility/opacity). */
+  hasVisibility?: boolean;
 };
 
 export const MAP_GROUP: TargetGroup = { id: 'map', label: 'Map', targets: MAP_TARGETS, labels: MAP_TARGET_LABEL, help: MAP_TAB_HELP };
@@ -21,7 +23,15 @@ export const ENTITY_GROUP: TargetGroup = {
   labels: { npc: 'NPC', enemy: 'Enemy', event: 'Event' },
   help: 'Press Tab to switch between NPC, Enemy and Event while the Entities layer is selected.',
 };
-export const TARGET_GROUPS: TargetGroup[] = [MAP_GROUP, ENTITY_GROUP];
+export const CONTENT_GROUP: TargetGroup = {
+  id: 'content',
+  label: 'Content',
+  targets: ['items', 'status', 'rules'],
+  labels: { items: 'Items', status: 'Statuses', rules: 'Quests' },
+  help: 'Press Tab to switch between Items, Statuses and Quests while the Content layer is selected.',
+  hasVisibility: false,
+};
+export const TARGET_GROUPS: TargetGroup[] = [MAP_GROUP, ENTITY_GROUP, CONTENT_GROUP];
 
 export function groupOfType(t: string | null | undefined): TargetGroup | null {
   return (t && TARGET_GROUPS.find(g => g.targets.includes(t))) || null;
@@ -63,7 +73,7 @@ export function collapseTargetGroups<L extends { type?: string }>(layers: L[]): 
   return out;
 }
 
-const last: Record<string, string> = { map: 'background', entities: 'npc' };
+const last: Record<string, string> = { map: 'background', entities: 'npc', content: 'items' };
 export function rememberGroupTarget(g: TargetGroup, t: string): void { last[g.id] = t; }
 export function lastGroupTarget(g: TargetGroup): string { return last[g.id] ?? g.targets[0]; }
 

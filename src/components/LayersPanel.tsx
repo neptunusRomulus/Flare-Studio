@@ -3,6 +3,8 @@ import { Button } from '@/components/ui/button';
 import Tooltip from '@/components/ui/tooltip';
 import type { TileLayer } from '@/types';
 import { groupLayers, layerGroupIndex } from '@/components/layerGroups';
+import { collapseMapLayers } from '@/components/mapTargets';
+import MapLayerRow from '@/components/MapLayerRow';
 import {
   Eye,
   EyeOff,
@@ -69,20 +71,40 @@ const LayersPanel: React.FC<Props> = ({
         {/* Active badge removed — using console log in useEffect instead */}
         <div className="h-auto overflow-hidden flex flex-col justify-center w-full">
           <div className="space-y-0.5 h-auto overflow-y-visible flex flex-col justify-center w-full">
-            {groupLayers(layers.filter(layer => layer.type !== 'actions')).map((layer, idx, arr) => {
-              const groupBreak = idx > 0 && layerGroupIndex(arr[idx - 1].type) !== layerGroupIndex(layer.type);
+            {collapseMapLayers(groupLayers(layers.filter(layer => layer.type !== 'actions'))).map((entry, idx, arr) => {
+              const entryType = (e: typeof entry) => (e.kind === 'map' ? e.targets[0]?.type : e.layer.type);
+              const groupBreak = idx > 0 && layerGroupIndex(entryType(arr[idx - 1])) !== layerGroupIndex(entryType(entry));
+              const separator = groupBreak ? (
+                // Parent uses space-y-0.5 (margin-top on siblings), which overrides child margins.
+                // Padding gives 10px above; 8px below + next row's 2px space-y = 10px.
+                <div aria-hidden className="flex-shrink-0" style={{ marginTop: 0, paddingTop: 10, paddingBottom: 8 }}>
+                  <div className="mx-2 h-px bg-primary/50" />
+                </div>
+              ) : null;
+              if (entry.kind === 'map') {
+                return (
+                  <React.Fragment key="map-layer">
+                    {separator}
+                    <MapLayerRow
+                      targets={entry.targets}
+                      activeLayerId={activeLayerId}
+                      leftCollapsed={leftCollapsed}
+                      onSelect={handleSetActiveLayer}
+                      onToggleVisibility={handleToggleLayerVisibility}
+                      onTransparencyChange={handleLayerTransparencyChange}
+                      showTooltipWithDelay={showTooltipWithDelay}
+                      hideTooltip={hideTooltip}
+                    />
+                  </React.Fragment>
+                );
+              }
+              const layer = entry.layer;
               const isActive = activeLayerId === layer.id;
               const isHovered = hoveredLayerId === layer.id;
               const visible = layersPanelExpanded || isActive;
               return (
                 <React.Fragment key={layer.id}>
-                {groupBreak && (
-                  // Parent uses space-y-0.5 (margin-top on siblings), which overrides child margins.
-                  // Padding gives 10px above; 8px below + next row's 2px space-y = 10px.
-                  <div aria-hidden className="flex-shrink-0" style={{ marginTop: 0, paddingTop: 10, paddingBottom: 8 }}>
-                    <div className="mx-2 h-px bg-primary/50" />
-                  </div>
-                )}
+                {separator}
                 <div
                   className={`block w-full max-w-xs px-2 py-1 rounded transition-all text-xs transform-gpu ${
                     isActive

@@ -1,4 +1,5 @@
 import React from 'react';
+import MapTargetSwitch from '@/components/MapTargetSwitch';
 import TilesetPalette from '@/components/TilesetPalette';
 import BrushToolbar from '@/components/BrushToolbar';
 import type { TileLayer } from '@/types';
@@ -14,6 +15,8 @@ type Props = {
   brushTool: 'none' | 'move' | 'merge' | 'separate' | 'remove';
   isCollisionLayer: boolean;
   fitToWidth?: boolean;
+  mapLayers?: TileLayer[];
+  onSelectLayer?: (id: number) => void;
   _brushToolbarExpanded?: boolean;
   _showBrushToolbarTemporarily?: () => void;
   _setBrushToolbarNode?: (n: HTMLDivElement | null) => void;
@@ -45,6 +48,8 @@ const TilesetPanel: React.FC<Props> = ({
   brushTool,
   isCollisionLayer,
   fitToWidth,
+  mapLayers,
+  onSelectLayer,
   _brushToolbarExpanded,
   _showBrushToolbarTemporarily,
   _setBrushToolbarNode,
@@ -72,6 +77,10 @@ const TilesetPanel: React.FC<Props> = ({
   return (
     <>
       <TilesetPalette editor={editor} activeLayer={activeLayer} tabTick={tabTick} setTabTick={setTabTick} brushTool={brushTool} stampsState={stampsState} fitToWidth={fitToWidth} />
+
+      {mapLayers && onSelectLayer && (
+        <MapTargetSwitch layers={mapLayers} activeLayer={activeLayer} onSelectLayer={onSelectLayer} />
+      )}
 
       <BrushToolbar
         editor={editor}

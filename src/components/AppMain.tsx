@@ -337,7 +337,7 @@ export default function AppMain() {
 
         <EditorArea topBarProps={topBarProps} canvasCtx={canvasCtx} bottomToolbarProps={bottomToolbarProps} isDarkMode={isDarkMode} />
 
-        <PaletteDock {...tileset} open={showPanels && isDrawingLayer(tileset.activeLayer?.type)} currentProjectPath={controls?.currentProjectPath} />
+        <PaletteDock {...tileset} mapLayers={layersObj?.layers} onSelectLayer={layersObj?.handleSetActiveLayer} open={showPanels && isDrawingLayer(tileset.activeLayer?.type)} currentProjectPath={controls?.currentProjectPath} />
 
         <EngineSettingsDialog
           open={showSettings}

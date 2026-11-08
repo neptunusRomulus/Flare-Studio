@@ -9,6 +9,7 @@
   ObjectInstance,
   PaintMode
 } from '../types';
+import { MAP_TARGET_CURSOR } from '@/components/mapTargets';
 import { SharedSlotMap, slotGroup, mergeSharedSlotLists } from './sharedSlots';
 import { classifyWheel, pinchFactor, panForZoomAt } from './wheelNav';
 import { findSlotForCellKey, mergeLegacySlotData, clearSlotCells, type SlotLike } from './slotCells';
@@ -3558,8 +3559,9 @@ export class TileMapEditor {
       
       this.ctx.restore();
     } else {
-      // Default blue hover outline
-      this.ctx.strokeStyle = '#007acc';
+      // Hover outline: per drawing target colour (Map layer), blue elsewhere
+      const t = activeLayer?.type;
+      this.ctx.strokeStyle = t && t in MAP_TARGET_CURSOR ? MAP_TARGET_CURSOR[t as keyof typeof MAP_TARGET_CURSOR] : '#007acc';
       this.ctx.lineWidth = Math.max(1, Math.min(3, 2 / this.zoom)); // Scale line width inversely with zoom, but constrain to 1-3px
       
       this.ctx.beginPath();

@@ -1,0 +1,74 @@
+/**
+ * NPC save without data loss: Studio's modeled NPC fields are merged into the
+ * existing npcs/*.txt (if any) instead of replacing it, so keys, sections and
+ * dialog components Studio does not model stay as they are.
+ */
+import { mergeNpcFile, statusStockFromEntries } from '@/adapters/flare/flareAdapter.cjs';
+
+type Props = Record<string, unknown> | undefined;
+
+const text = (v: unknown): string => (Array.isArray(v) ? String(v[0] ?? '') : v == null ? '' : String(v));
+
+/** Property -> Flare key for plain string fields edited in the NPC dialog. */
+export const NPC_STRING_FIELDS: Record<string, string> = {
+  constant_stock: 'constant_stock',
+  random_stock: 'random_stock',
+  random_stock_count: 'random_stock_count',
+  vendor_requires_status: 'vendor_requires_status',
+  vendor_requires_not_status: 'vendor_requires_not_status',
+  direction: 'direction',
+  show_on_minimap: 'show_on_minimap',
+};
+/** Repeatable keys entered as a comma/newline list (one Flare line per value). */
+export const NPC_LIST_FIELDS: Record<string, string> = {
+  vox_intro: 'vox_intro',
+};
+
+export type NpcFileUpdate = { fields: Record<string, string | boolean>; dialogueTrees?: unknown[] };
+
+/**
+ * Only fields the NPC object actually holds are authoritative ("" clears the key);
+ * fields it doesn't hold keep the file's value.
+ */
+export function npcFileUpdate(name: string, props: Props, resolved: { animations?: string; portrait?: string }): NpcFileUpdate {
+  const p = props || {};
+  const fields: Record<string, string | boolean> = { name };
+  if ('talker' in p || 'vendor' in p || 'questGiver' in p) {
+    fields.talker = text(p.talker) === 'true' || text(p.vendor) === 'true' || text(p.questGiver) === 'true';
+  }
+  if ('vendor' in p) fields.vendor = text(p.vendor) === 'true';
+  if (resolved.animations) fields.animations = resolved.animations;
+  if (resolved.portrait) fields.portrait = resolved.portrait;
+  for (const [prop, key] of Object.entries(NPC_STRING_FIELDS)) if (prop in p) fields[key] = text(p[prop]).trim();
+  for (const [prop, key] of Object.entries(NPC_LIST_FIELDS)) {
+    if (prop in p) fields[key] = text(p[prop]).split(/[,\n]/).map(s => s.trim()).filter(Boolean).join('\n');
+  }
+  // Only a non-empty status stock replaces the file's (an untouched/empty editor value must not wipe it)
+  const stock = 'status_stock_entries' in p ? statusStockFromEntries(p.status_stock_entries) : [];
+  if (stock.length) fields.status_stock = stock.join('\n');
+  const update: NpcFileUpdate = { fields };
+  if ('dialogueTrees' in p) {
+    try {
+      const raw = p.dialogueTrees;
+      const parsed = typeof raw === 'string' ? JSON.parse(raw || '[]') : raw;
+      if (Array.isArray(parsed)) update.dialogueTrees = parsed;
+    } catch { /* unreadable trees: keep the file's dialogs */ }
+  }
+  return update;
+}
+
+/** File content to write: merged into the existing file text (or a fresh file when there is none). */
+export function npcFileContent(existing: string | null | undefined, update: NpcFileUpdate): string {
+  return mergeNpcFile(existing || '', update);
+}
+
+/** Project-relative NPC file name (inside npcs/) from the spawn filename. */
+export function npcFileBase(filename: string): string {
+  return filename.replace(/\\/g, '/').replace(/^npcs\//, '');
+}
+
+/** True when an animations/npcs/*.txt is Studio's own one-sprite file for this image (safe to regenerate). */
+export function isStudioNpcAnimation(text: string, imageFileName: string): boolean {
+  const first = text.replace(/\r/g, '').split('\n').map(l => l.trim()).find(l => l && !l.startsWith('#'));
+  return first === `image=images/npcs/${imageFileName}`;
+}

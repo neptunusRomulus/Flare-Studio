@@ -1,0 +1,105 @@
+name=Udana, Metalworker
+
+portrait=images/portraits/female07.png
+
+# animation info
+animations=animations/npcs/peasant_woman2.txt
+
+# shop info
+vendor=true
+constant_stock=8,9,7,11
+status_stock=emp_perdition_trader1,96,97,98,99,100,106,107,109
+status_stock=emp_perdition_trader2,204,205,206,207,208,214,215,217
+status_stock=emp_perdition_trader3,311,312,313,314,315,321,322,324
+status_stock=emp_krolan_finish,1105:5
+random_stock=loot/udana_magic.txt
+random_stock_count=16,24
+
+# voiceover files
+vox_intro=soundfx/npcs/female_merchant_01.ogg
+vox_intro=soundfx/npcs/female_merchant_02.ogg
+vox_intro=soundfx/npcs/female_merchant_03.ogg
+vox_intro=soundfx/npcs/female_merchant_04.ogg
+
+talker=true
+
+[dialog]
+topic=Talk
+requires_not_status=emp_krolan_init
+requires_not_status=emp_krolan_finish
+her=Greetings stranger. It's not often that we have people come here from the west.
+her=I see that you're carrying a weapon. Would you be interested in helping us?
+you=Go on.
+her=One of our encampment's residents, Krolan, works in the nearby mines. He supplies me with various gems that I craft into jewelery.
+her=Krolan has not returned in some time, and I am starting to think the worst.
+her=Could you please travel to the mines and look for Krolan? I will find some way to reward you for your trouble.
+set_status=emp_krolan_init
+msg=Quest added.
+
+# no emerald
+[dialog]
+topic=Krolan
+requires_status=emp_krolan_init
+requires_not_item=1001:1
+her=Please hurry to find Krolan. The Perdition Mines are located near the Salted Field.
+
+# emerald obtained, but no key
+[dialog]
+topic=Krolan
+requires_status=emp_krolan_init
+requires_not_item=1000:1
+requires_item=1001:1
+her=Please hurry to find Krolan. The Perdition Mines are located near the Salted Field.
+
+# both key and emerald obtained
+[dialog]
+topic=Krolan
+requires_status=emp_krolan_init
+requires_status=emp_krolan_emerald
+requires_item=1000:1,1001:1
+you=I have found Krolan, but he was no longer of this world.
+her=This is terrible news. Our camp is already small, so this is a devastating loss.
+you=If it's any solace, I have his key and this emerald. Mementos to remember him by.
+her=The key is enough of a memento. For your invaluable help, I can at least make you a ring with this emerald.
+remove_item=1000
+remove_item=1001
+reward_xp=100
+reward_item=37,1
+set_status=emp_krolan_finish
+unset_status=emp_krolan_init
+unset_status=emp_krolan_key
+unset_status=emp_krolan_emerald
+
+[dialog]
+topic=Perdition Harbor Cave
+requires_status=emp_krolan_finish
+requires_not_status=emp_il_entrance_key
+you=Can you tell me about the nearby cave?
+her=It was a mining operation. Krolan was a part of the crew.
+her=Not long into their dig, they encountered ruins. Ruins unlike any of the structures in this region.
+her=Amongst these ruins, the crew found an incredible glowing mineral: Mastite.
+her=When the Empyrean caught wind of this discovery, they promptly took control of the operation.
+you=So why is it blocked off now? Did the Empyrean strip it clean?
+her=The further the excavation team dug, the more apparent it became that something was unusual about the ruins. North would become south, west would become east. They were losing workers.
+her=The Empyrean shut down the operation. Instead, they made an effort to mine other nearby areas in hope of finding a more stable source of Mastite. You've already seen the futile end to that story.
+you=If the Empyrean gave up on the ruins, there may still be some value in exploring it. Is there any way I can get inside?
+her=It's risky, but you proven that you're able to handle yourself. And maybe if we can gain our own supply of Mastite, we'll have some leverage against the Empyrean.
+her=Here. I made a copy of the key you'll need after one of the Empyrean guards dropped it. Please be careful. I'm not sure I'm ready to be exposed to any more death.
+reward_item=1105:1
+set_status=emp_il_entrance_key
+
+[dialog]
+topic=Perdition Harbor Cave
+requires_status=emp_il_entrance_key
+her=It was a mining operation. Krolan was a part of the crew.
+her=Not long into their dig, they encountered ruins. Ruins unlike any of the structures in this region.
+her=Amongst these ruins, the crew found an incredible glowing mineral: Mastite.
+her=When the Empyrean caught wind of this discovery, they promptly took control of the operation.
+her=The further the excavation team dug, the more apparent it became that something was unusual about the ruins. North would become south, west would become east. They were losing workers.
+her=The Empyrean shut down the operation. Instead, they made an effort to mine other nearby areas in hope of finding a more stable source of Mastite. You've already seen the futile end to that story.
+
+[dialog]
+topic=Talk
+requires_status=emp_krolan_finish
+her=Thank you again for your help.
+

@@ -158,7 +158,8 @@ function exportProject(project) {
     const id = slugFileName(enemy.name || "enemy");
     index.enemies.push(id);
     const enemyPath = enemy.sourcePath || `enemies/${id}.txt`;
-    const exported = serializers.exportEnemyFile(enemy);
+    // Imported files are written back as they were (INCLUDE, repeated keys, sections)
+    const exported = typeof enemy._raw === "string" ? serializers.normalizeEnemyText(enemy._raw) : serializers.exportEnemyFile(enemy);
     for (const message of exported.warnings) warnings.push(issue("warning", message, enemyPath));
     files.push({ path: enemyPath, content: exported.text });
     files.push({ path: `content/enemies/${id}.json`, content: `${JSON.stringify(enemy, null, 2)}\n` });
@@ -316,7 +317,7 @@ function migrateFiles(files, projectName) {
     }
     if (normalized.startsWith("enemies/") && normalized.endsWith(".txt")) {
       const base = normalized.split("/").pop().replace(/\.txt$/i, "");
-      const enemy = { name: base, sourcePath: normalized };
+      const enemy = { name: base, sourcePath: normalized, _raw: fileText };
       const render = [];
       const slots = [];
       for (const section of parseDocument(fileText)) {
@@ -395,6 +396,8 @@ module.exports = {
   exportNpcFile: serializers.exportNpcFile,
   exportDialogueTrees: serializers.exportDialogueTrees,
   importNpcText: serializers.importNpcText,
+  mergeNpcFile: serializers.mergeNpcFile,
+  statusStockFromEntries: serializers.statusStockFromEntries,
   importMapText: serializers.importMapText,
   formatCurrency: serializers.formatCurrency,
   tilePixelOffset: serializers.tilePixelOffset,

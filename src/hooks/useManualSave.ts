@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type React from 'react';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 import type { FlareNPC } from '@/types';
-import { serializeNpcFile } from '@/utils/flareNpcUtils';
+import { npcFileUpdate, npcFileContent, npcFileBase, isStudioNpcAnimation } from '@/utils/npcFileUpdate';
 import { useSaveQueue } from '@/context/SaveQueueContext';
 import { useRetryStrategy } from '@/context/RetryStrategyContext';
 import { useConflictResolution } from '@/context/ConflictResolutionContext';
@@ -418,8 +418,17 @@ export default function useManualSave(args: {
                   if (tilesetSource) {
                     const tilesetFilename = tilesetSource.replace(/\\/g, '/').split('/').pop() || '';
                     if (tilesetFilename) {
-                      // The NPC .txt will point to the animation definition file
-                      gfxRelative = `animations/npcs/${sanitizedName}.txt`;
+                      // The NPC .txt will point to the animation definition file.
+                      // Never overwrite a hand-made (multi-animation) file at that path: use our own name instead.
+                      let animBase = sanitizedName;
+                      try {
+                        const api = (window as unknown as { electronAPI?: { readFile?: (p: string) => Promise<string | null> } }).electronAPI;
+                        if (api?.readFile && currentProjectPath) {
+                          const existingAnim = await api.readFile(`${currentProjectPath.replace(/\\/g, '/')}/animations/npcs/${sanitizedName}.txt`);
+                          if (existingAnim && !isStudioNpcAnimation(existingAnim, tilesetFilename)) animBase = `${sanitizedName}_studio`;
+                        }
+                      } catch { /* no existing file */ }
+                      gfxRelative = `animations/npcs/${animBase}.txt`;
 
                       // Check if the original source still exists; if not, fall back to the
                       // already-exported copy inside the project folder (Fix #4 / #5).
@@ -454,7 +463,7 @@ export default function useManualSave(args: {
                       // Pass stored anim_* properties from the NPC Edit Dialog UI
                       const animProps = propertyRecord(npc.properties);
                       npcAnimationFiles.push({
-                        filename: `${sanitizedName}.txt`,
+                        filename: `${animBase}.txt`,
                         content: buildAnimationFileContent(`images/npcs/${tilesetFilename}`, dims, animProps)
                       });
                     }
@@ -500,7 +509,15 @@ export default function useManualSave(args: {
                     },
                   };
 
-                  npcFiles.push({ filename: `${sanitizedName}.txt`, content: serializeNpcFile(flareNpc) });
+                  // Merge into the existing NPC file so keys/sections/dialog order Studio doesn't model survive
+                  const npcBase = npcFileBase(flareNpc.filename);
+                  let existingNpcText: string | null = null;
+                  try {
+                    const api = (window as unknown as { electronAPI?: { readFile?: (p: string) => Promise<string | null> } }).electronAPI;
+                    if (api?.readFile && currentProjectPath) existingNpcText = await api.readFile(`${currentProjectPath.replace(/\\/g, '/')}/npcs/${npcBase}`);
+                  } catch { /* new file */ }
+                  const npcUpdate = npcFileUpdate(npcName, npc.properties as Record<string, unknown> | undefined, { animations: gfxRelative, portrait: portraitRelative });
+                  npcFiles.push({ filename: npcBase, content: npcFileContent(existingNpcText, npcUpdate) });
 
                   // Warn when an NPC has no sprite — it will be invisible in Flare
                   if (!flareNpc.gfx) {

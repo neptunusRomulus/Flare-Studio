@@ -328,60 +328,251 @@ function exportEnemyFile(enemy) {
   return { text: `${lines.join("\n").trim()}\n`, warnings };
 }
 
+/**
+ * Enemy file as saved from Studio's enemy editor: written back line by line, so INCLUDE/APPEND
+ * lines, repeated keys (stat=, power=, sfx_*=), unknown keys and sections all survive.
+ * Only fixes: gfx -> animations, bare render layer ids -> "0,id", and keys that are not
+ * StatBlock keys (gold, wander_radius, waypoints, script) are dropped with a warning.
+ */
 function normalizeEnemyText(content) {
-  const { parseDocument } = require("./fileParser.cjs");
-  const sections = parseDocument(content);
-  const enemy = {};
-  const render = [];
-  const slots = [];
-  for (const section of sections) {
-    if (section.name === "render_layers") {
-      for (const entry of section.entries) if (entry.key === "layer") render.push(entry.value);
-      continue;
+  const warnings = [];
+  const out = [];
+  let section = "";
+  for (const raw of String(content || "").replace(/\r/g, "").split("\n")) {
+    const line = raw.trim();
+    if (!line || line.startsWith("#") || line === "APPEND" || line.startsWith("INCLUDE ")) { out.push(line); continue; }
+    const m = line.match(/^\[([^\]]+)\]$/);
+    if (m) { section = m[1].trim(); out.push(line); continue; }
+    const eq = line.indexOf("=");
+    if (eq <= 0) { out.push(line); continue; }
+    const key = line.slice(0, eq).trim();
+    const value = line.slice(eq + 1).trim();
+    if (!section) {
+      if (key === "gfx") { out.push(`animations=${value}`); warnings.push("Replaced deprecated gfx with animations."); continue; }
+      if (["gold", "wander_radius", "waypoints", "script"].includes(key)) {
+        if (value) warnings.push(`Dropped ${key} from the enemy file; it is not a StatBlock key.`);
+        continue;
+      }
     }
-    if (section.name === "animation_slots") {
-      for (const entry of section.entries) if (entry.key === "slot") slots.push(entry.value);
-      continue;
-    }
-    for (const entry of section.entries) {
-      if (entry.key === "render_layers") render.push(entry.value);
-      else if (entry.key === "animation_slots") slots.push(entry.value);
-      else enemy[entry.key] = entry.value;
-    }
+    if (section === "render_layers" && key === "layer" && !value.includes(",")) { out.push(`layer=0,${value}`); continue; }
+    out.push(`${key}=${value}`);
   }
-  if (render.length) enemy.render_layers = render;
-  if (slots.length) enemy.animation_slots = slots;
-  return exportEnemyFile(enemy);
+  return { text: `${out.join("\n").replace(/\n{3,}/g, "\n\n").trim()}\n`, warnings };
+}
+
+const REQ_TYPE_BY_KEY = {
+  requires_status: "status", requires_not_status: "not_status",
+  requires_item: "item", requires_not_item: "not_item",
+  requires_level: "level", requires_not_level: "not_level",
+  requires_currency: "currency", requires_not_currency: "not_currency",
+  requires_class: "class", requires_not_class: "not_class",
+};
+const REWARD_TYPE_BY_KEY = {
+  reward_xp: "xp", reward_currency: "gold", remove_currency: "remove_gold",
+  reward_item: "item", remove_item: "remove_item", restore: "restore", msg: "msg",
+};
+const EFFECT_TYPE_BY_KEY = {
+  set_status: "set_status", unset_status: "unset_status", intermap: "teleport",
+  spawn: "spawn", cutscene: "cutscene", soundfx: "sound", npc: "npc",
+};
+const DIALOG_META_KEYS = ["id", "topic", "group", "response_only"];
+const LINE_PREFIX_KEYS = new Set(["voice", "portrait_him", "portrait_her", "portrait_you", "portrait"]);
+const LINE_KEYS = new Set(["him", "her", "you"]);
+
+function dialogCategory(key) {
+  if (DIALOG_META_KEYS.includes(key)) return "meta";
+  if (REQ_TYPE_BY_KEY[key]) return "req";
+  if (key === "response") return "response";
+  if (LINE_PREFIX_KEYS.has(key)) return "prefix";
+  if (LINE_KEYS.has(key)) return "line";
+  if (REWARD_TYPE_BY_KEY[key]) return "reward";
+  if (EFFECT_TYPE_BY_KEY[key]) return "effect";
+  return "pass";
+}
+
+/** Flare value(s) of a field: true -> "true", false/empty -> [], arrays and newline lists -> one value per line. */
+function fieldValues(value) {
+  if (value == null || value === false || value === "") return [];
+  if (value === true) return ["true"];
+  return linesOf(value).flatMap((v) => String(v).split("\n")).map((v) => v.trim()).filter(Boolean);
+}
+
+function dialogLineEntries(line) {
+  const out = [];
+  if (!line || (!line.text && !line.keepEmpty)) return out;
+  if (line.voice) out.push(`voice=${line.voice}`);
+  if (line.portrait) {
+    const key = line.portraitKey || (line.speaker === "player" ? "portrait_you" : "portrait_him");
+    out.push(`${key}=${line.portrait}`);
+  }
+  const textKey = line.speaker === "player" ? "you" : (line.key === "her" ? "her" : "him");
+  out.push(`${textKey}=${line.text}`);
+  return out;
+}
+
+function dialogItemEntries(category, item) {
+  if (!item) return [];
+  if (category === "req") {
+    if (!item.value) return [];
+    const key = requirementKey(item.type);
+    return key ? [`${key}=${key.includes("currency") && item.raw !== item.value ? formatCurrency(item.value) : item.value}`] : [];
+  }
+  if (category === "response") return item ? [`response=${item}`] : [];
+  if (category === "effect") {
+    if (!item.value) return [];
+    const key = worldEffectKey(item.type);
+    return key ? [`${key}=${item.value}`] : [];
+  }
+  if (category === "reward") {
+    const r = item;
+    const cur = (v) => (r.raw !== undefined && r.raw === v ? r.raw : formatCurrency(v));
+    if (r.type === "xp" && r.value) return [`reward_xp=${cur(r.value)}`];
+    if (r.type === "gold" && r.value) return [`reward_currency=${cur(r.value)}`];
+    if (r.type === "remove_gold" && r.value) return [`remove_currency=${cur(r.value)}`];
+    if (r.type === "item" && r.value) {
+      const value = String(r.value);
+      if (r.raw !== undefined && r.raw === r.value) return [`reward_item=${r.raw}`];
+      return [value.includes(":") || value.includes(",") ? `reward_item=${value}` : `reward_item=${value}:${r.quantity || 1}`];
+    }
+    if (r.type === "remove_item" && r.value) return [`remove_item=${r.value}`];
+    if (r.type === "restore") return [`restore=${r.value || "all"}`];
+    if (r.type === "msg" && r.value) return [`msg=${r.value}`];
+    return [];
+  }
+  if (category === "pass") {
+    if (!item || !item.key || item.value == null || item.value === "") return [];
+    return [`${item.key}=${item.value}`];
+  }
+  return [];
+}
+
+function dialogMetaValue(tree, key) {
+  if (key === "id") return tree.dialogueId || tree.id || "";
+  if (key === "topic") return tree.topic || "";
+  if (key === "group") return tree.group || "";
+  if (key === "response_only") return tree.responseOnly ? "true" : "";
+  return "";
+}
+
+const LIST_OF = {
+  req: (t) => t.requirements || [],
+  response: (t) => t.responses || [],
+  line: (t) => t.dialogues || [],
+  reward: (t) => t.rewards || [],
+  effect: (t) => t.worldEffects || [],
+  pass: (t) => t.passthrough || [],
+};
+
+/**
+ * One [dialog] block. With `components` (the original entries, in file order) every
+ * item is written back at its original position, so Flare's in-order execution of
+ * lines, portraits, statuses and rewards is unchanged; new items are added at the end
+ * (requirements/meta first, responses before the first line).
+ */
+function exportDialogBlock(tree) {
+  const out = []; // { cat, lines }
+  const used = { req: 0, response: 0, line: 0, reward: 0, effect: 0, pass: 0 };
+  const metaDone = new Set();
+  const prefixDone = { voice: false, portrait: false };
+  for (const c of tree.components || []) {
+    if (c.raw) { out.push({ cat: "raw", lines: [c.raw] }); continue; }
+    const cat = dialogCategory(c.key);
+    if (cat === "prefix") {
+      // voice/portrait belong to the next line: write them where they were
+      const next = LIST_OF.line(tree)[used.line];
+      if (!next) continue;
+      if (c.key === "voice" && next.voice && !prefixDone.voice) { out.push({ cat, lines: [`voice=${next.voice}`] }); prefixDone.voice = true; }
+      else if (c.key !== "voice" && next.portrait && !prefixDone.portrait) {
+        out.push({ cat, lines: [`${next.portraitKey || c.key}=${next.portrait}`] });
+        prefixDone.portrait = true;
+      }
+      continue;
+    }
+    if (cat === "meta") {
+      if (metaDone.has(c.key)) continue;
+      metaDone.add(c.key);
+      const v = dialogMetaValue(tree, c.key);
+      if (v) out.push({ cat, lines: [`${c.key}=${v}`] });
+      continue;
+    }
+    const item = LIST_OF[cat](tree)[used[cat]++];
+    let lines;
+    if (cat === "line") {
+      lines = dialogLineEntries(item && { ...item, voice: prefixDone.voice ? undefined : item.voice, portrait: prefixDone.portrait ? undefined : item.portrait });
+      prefixDone.voice = false;
+      prefixDone.portrait = false;
+    } else lines = dialogItemEntries(cat, item);
+    if (lines.length) out.push({ cat, lines });
+  }
+  const head = [];
+  for (const key of DIALOG_META_KEYS) {
+    if (metaDone.has(key)) continue;
+    const v = dialogMetaValue(tree, key);
+    if (v) head.push({ cat: "meta", lines: [`${key}=${v}`] });
+  }
+  for (const r of LIST_OF.req(tree).slice(used.req)) head.push({ cat: "req", lines: dialogItemEntries("req", r) });
+  const responses = LIST_OF.response(tree).slice(used.response).map((r) => ({ cat: "response", lines: dialogItemEntries("response", r) }));
+  const firstLine = out.findIndex((e) => e.cat === "line");
+  if (firstLine >= 0) out.splice(firstLine, 0, ...responses); else out.push(...responses);
+  for (const l of LIST_OF.line(tree).slice(used.line)) out.push({ cat: "line", lines: dialogLineEntries(l) });
+  for (const cat of ["effect", "reward", "pass"]) {
+    for (const it of LIST_OF[cat](tree).slice(used[cat])) out.push({ cat, lines: dialogItemEntries(cat, it) });
+  }
+  const body = [...head, ...out].flatMap((e) => e.lines).filter(Boolean);
+  return body.length ? ["[dialog]", ...body].join("\n") : "";
+}
+
+function exportDialogueTrees(trees) {
+  return (trees || []).map(exportDialogBlock).filter(Boolean).join("\n\n");
 }
 
 function exportNpcFile(npc) {
   const source = npc || {};
   const lines = [];
   const fields = { ...source, ...(source.customProperties || {}) };
-  delete fields.customProperties;
-  delete fields.dialogueTrees;
-  delete fields.waypoints;
-  delete fields.wander_radius;
-  delete fields.sourcePath;
-  delete fields.raw;
-  if (!fields.status_stock && fields.status_stock_entries) {
+  for (const k of ["customProperties", "dialogueTrees", "waypoints", "wander_radius", "sourcePath", "raw", "_rawMain", "_rawSections"]) delete fields[k];
+  if (fields.status_stock === undefined && fields.status_stock_entries) {
     const stocks = statusStockFromEntries(fields.status_stock_entries);
     if (stocks.length) fields.status_stock = stocks;
   }
   delete fields.status_stock_entries;
   if (fields.gfx && !fields.animations) fields.animations = fields.gfx;
   delete fields.gfx;
-  for (const key of NPC_KEYS) {
-    if (key === "portrait") continue;
-    if (fields[key] == null || fields[key] === "" || fields[key] === false) continue;
-    let value = fields[key] === true ? "true" : fields[key];
-    if (key.includes("currency")) {
-      value = formatCurrency(value);
-      if (!value) continue;
+  const valuesOf = (key) => {
+    const vals = fieldValues(fields[key]);
+    return key.includes("currency") ? vals.map((v) => formatCurrency(v)).filter(Boolean) : vals;
+  };
+  const rawMain = Array.isArray(source._rawMain) ? source._rawMain : null;
+  const done = new Set();
+  if (rawMain) {
+    // Original main section, in order; a key is rewritten only when Studio changed its value.
+    const rawJoined = {};
+    // gfx is the old name of animations: compare and rewrite it as animations
+    const fieldKey = (k) => (k === "gfx" ? "animations" : k);
+    for (const e of rawMain) if (!e.raw) (rawJoined[fieldKey(e.key)] = rawJoined[fieldKey(e.key)] || []).push(e.value);
+    for (const e of rawMain) {
+      if (e.raw) { lines.push(e.raw); continue; }
+      const k = fieldKey(e.key);
+      if (done.has(k)) continue;
+      const changed = k in fields && fieldValues(fields[k]).join("\n") !== rawJoined[k].join("\n");
+      if (changed) {
+        for (const v of valuesOf(k)) lines.push(`${k}=${v}`);
+        done.add(k);
+      } else {
+        lines.push(`${e.key}=${e.value}`);
+      }
     }
-    pushKey(lines, key, value);
+    for (const k of Object.keys(rawJoined)) done.add(k);
   }
-  if (fields.portrait) pushKey(lines, "portrait", fields.portrait);
+  for (const key of NPC_KEYS) {
+    if (done.has(key)) continue;
+    if (key === "portrait") continue;
+    for (const v of valuesOf(key)) lines.push(`${key}=${v}`);
+  }
+  if (!done.has("portrait") && fields.portrait) pushKey(lines, "portrait", fields.portrait);
+  for (const section of source._rawSections || []) {
+    lines.push("", `[${section.name}]`, ...section.entries.map((e) => e.raw || `${e.key}=${e.value}`));
+  }
   const trees = readDialogueTrees(source);
   if (trees.length) {
     lines.push("");
@@ -400,59 +591,6 @@ function readDialogueTrees(npc) {
   } catch {
     return [];
   }
-}
-
-function exportDialogueTrees(trees) {
-  const blocks = [];
-  for (const tree of trees) {
-    const dialog = ["[dialog]"];
-    if (tree.dialogueId || tree.id) dialog.push(`id=${tree.dialogueId || tree.id}`);
-    if (tree.topic) dialog.push(`topic=${tree.topic}`);
-    if (tree.group) dialog.push(`group=${tree.group}`);
-    if (tree.responseOnly) dialog.push(`response_only=true`);
-    for (const req of tree.requirements || []) {
-      if (!req || !req.value) continue;
-      const key = requirementKey(req.type);
-      if (key) pushKey(dialog, key, key.includes("currency") ? formatCurrency(req.value) : req.value);
-    }
-    for (const responseId of tree.responses || []) {
-      if (responseId) dialog.push(`response=${responseId}`);
-    }
-    for (const line of tree.dialogues || []) {
-      if (!line || !line.text) continue;
-      if (line.voice) dialog.push(`voice=${line.voice}`);
-      if (line.portrait) dialog.push(`portrait_him=${line.portrait}`);
-      dialog.push(`${line.speaker === "npc" ? "him" : "you"}=${line.text}`);
-    }
-    for (const effect of tree.worldEffects || []) {
-      if (!effect || !effect.value) continue;
-      const key = worldEffectKey(effect.type);
-      if (key) dialog.push(`${key}=${effect.value}`);
-    }
-    for (const reward of tree.rewards || []) {
-      if (!reward) continue;
-      if (reward.type === "xp" && reward.value) dialog.push(`reward_xp=${formatCurrency(reward.value)}`);
-      if (reward.type === "gold" && reward.value) dialog.push(`reward_currency=${formatCurrency(reward.value)}`);
-      if (reward.type === "remove_gold" && reward.value) dialog.push(`remove_currency=${formatCurrency(reward.value)}`);
-      if (reward.type === "item" && reward.value) {
-        const value = String(reward.value);
-        dialog.push(
-          value.includes(":") || value.includes(",")
-            ? `reward_item=${value}`
-            : `reward_item=${value}:${reward.quantity || 1}`
-        );
-      }
-      if (reward.type === "remove_item" && reward.value) dialog.push(`remove_item=${reward.value}`);
-      if (reward.type === "restore") dialog.push(`restore=${reward.value || "all"}`);
-      if (reward.type === "msg" && reward.value) dialog.push(`msg=${reward.value}`);
-    }
-    for (const entry of tree.passthrough || []) {
-      if (!entry || !entry.key || entry.value == null || entry.value === "") continue;
-      if (DIALOG_KEYS.has(entry.key) || EVENT_KEYS.has(entry.key)) pushKey(dialog, entry.key, entry.value);
-    }
-    if (dialog.length > 1) blocks.push(dialog.join("\n"));
-  }
-  return blocks.join("\n\n");
 }
 
 function requirementKey(type) {
@@ -484,60 +622,106 @@ function worldEffectKey(type) {
   return map[type] || "";
 }
 
+function importDialogTree(entries) {
+  const tree = { dialogues: [], requirements: [], responses: [], rewards: [], worldEffects: [], passthrough: [], components: [] };
+  let pendingVoice = "";
+  let pending = null; // { key, value }
+  for (const entry of entries) {
+    tree.components.push(entry.raw ? { raw: entry.raw } : { key: entry.key, value: entry.value });
+    if (entry.raw) continue;
+    const cat = dialogCategory(entry.key);
+    if (entry.key === "id") tree.dialogueId = entry.value;
+    else if (entry.key === "topic") tree.topic = entry.value;
+    else if (entry.key === "group") tree.group = entry.value;
+    else if (entry.key === "response_only") tree.responseOnly = entry.value === "true";
+    else if (cat === "response") tree.responses.push(entry.value);
+    else if (entry.key === "voice") pendingVoice = entry.value;
+    else if (cat === "prefix") pending = { key: entry.key, value: entry.value };
+    else if (cat === "line") {
+      tree.dialogues.push({
+        speaker: entry.key === "you" ? "player" : "npc",
+        ...(entry.key === "her" ? { key: "her" } : {}),
+        text: entry.value,
+        ...(entry.value ? {} : { keepEmpty: true }),
+        ...(pendingVoice ? { voice: pendingVoice } : {}),
+        ...(pending ? { portrait: pending.value, portraitKey: pending.key } : {}),
+      });
+      pendingVoice = "";
+      pending = null;
+    } else if (cat === "req") tree.requirements.push({ type: REQ_TYPE_BY_KEY[entry.key], value: entry.value, raw: entry.value });
+    else if (cat === "reward") tree.rewards.push({ type: REWARD_TYPE_BY_KEY[entry.key], value: entry.value, raw: entry.value });
+    else if (cat === "effect") tree.worldEffects.push({ type: EFFECT_TYPE_BY_KEY[entry.key], value: entry.value });
+    else tree.passthrough.push({ key: entry.key, value: entry.value });
+  }
+  // A voice/portrait with no following line stays as raw data at the end.
+  if (pendingVoice) tree.passthrough.push({ key: "voice", value: pendingVoice });
+  if (pending) tree.passthrough.push(pending);
+  return tree;
+}
+
+/**
+ * NPC file -> object. Every main-section key is kept (repeated keys as newline lists),
+ * plus the original order (_rawMain), INCLUDE/APPEND lines, other sections ([stats],
+ * [visual_effect]) as raw data, and each [dialog]'s entries in order (components).
+ */
 function importNpcText(content) {
-  const { parseDocument } = require("./fileParser.cjs");
-  const npc = { customProperties: {} };
+  const npc = { customProperties: {}, _rawMain: [], _rawSections: [] };
+  // Own pass (not parseDocument) so INCLUDE/APPEND lines keep their position.
+  const sections = [{ name: "", entries: [] }];
+  for (const raw of String(content || "").replace(/\r/g, "").split("\n")) {
+    const line = raw.trim();
+    if (!line || line.startsWith("#")) continue;
+    if (line === "APPEND" || line.startsWith("INCLUDE ")) { sections[sections.length - 1].entries.push({ raw: line }); continue; }
+    const m = line.match(/^\[([^\]]+)\]$/);
+    if (m) { sections.push({ name: m[1].trim(), entries: [] }); continue; }
+    const eq = line.indexOf("=");
+    if (eq <= 0) continue;
+    sections[sections.length - 1].entries.push({ key: line.slice(0, eq).trim(), value: line.slice(eq + 1).trim() });
+  }
   const trees = [];
-  for (const section of parseDocument(content)) {
+  for (const section of sections) {
     if (section.name === "dialog") {
-      const tree = {
-        dialogues: [],
-        requirements: [],
-        responses: [],
-        rewards: [],
-        worldEffects: [],
-        passthrough: [],
-      };
-      let pendingVoice = "";
-      let pendingPortrait = "";
-      for (const entry of section.entries) {
-        if (entry.key === "id") tree.dialogueId = entry.value;
-        else if (entry.key === "topic") tree.topic = entry.value;
-        else if (entry.key === "group") tree.group = entry.value;
-        else if (entry.key === "response_only") tree.responseOnly = entry.value === "true";
-        else if (entry.key === "response") tree.responses.push(entry.value);
-        else if (entry.key === "voice") pendingVoice = entry.value;
-        else if (entry.key === "portrait_him" || entry.key === "portrait") pendingPortrait = entry.value;
-        else if (entry.key === "him" || entry.key === "her" || entry.key === "you") {
-          tree.dialogues.push({
-            speaker: entry.key === "you" ? "player" : "npc",
-            text: entry.value,
-            ...(pendingVoice ? { voice: pendingVoice } : {}),
-            ...(pendingPortrait ? { portrait: pendingPortrait } : {}),
-          });
-          pendingVoice = "";
-          pendingPortrait = "";
-        } else if (entry.key === "reward_currency") tree.rewards.push({ type: "gold", value: entry.value });
-        else if (entry.key === "reward_xp") tree.rewards.push({ type: "xp", value: entry.value });
-        else if (entry.key === "remove_currency") tree.rewards.push({ type: "remove_gold", value: entry.value });
-        else if (entry.key === "reward_item") tree.rewards.push({ type: "item", value: entry.value });
-        else if (entry.key === "remove_item") tree.rewards.push({ type: "remove_item", value: entry.value });
-        else if (entry.key === "restore") tree.rewards.push({ type: "restore", value: entry.value });
-        else if (entry.key === "msg") tree.rewards.push({ type: "msg", value: entry.value });
-        else tree.passthrough.push({ key: entry.key, value: entry.value });
-      }
-      trees.push(tree);
+      trees.push(importDialogTree(section.entries));
       continue;
     }
     if (!section.name || section.name === "npc") {
       for (const entry of section.entries) {
-        if (entry.key === "waypoints" || entry.key === "wander_radius") continue;
-        npc[entry.key] = entry.value;
+        npc._rawMain.push(entry);
+        if (entry.raw || entry.key === "waypoints" || entry.key === "wander_radius") continue;
+        npc[entry.key] = npc[entry.key] === undefined ? entry.value : `${npc[entry.key]}\n${entry.value}`;
       }
+      continue;
     }
+    npc._rawSections.push({ name: section.name, entries: section.entries });
   }
+  if (!npc._rawSections.length) delete npc._rawSections;
   if (trees.length) npc.customProperties.dialogueTrees = trees;
   return npc;
+}
+
+/**
+ * Write Studio's NPC fields into an existing NPC file without losing anything Studio
+ * does not model. `fields`: authoritative values ("" removes the key). `dialogueTrees`:
+ * Studio's trees (undefined keeps the file's dialogs as they are).
+ */
+function mergeNpcFile(existingText, update) {
+  const base = importNpcText(existingText || "");
+  const fields = (update && update.fields) || {};
+  for (const [key, value] of Object.entries(fields)) {
+    if (value === undefined) continue;
+    base[key] = value;
+  }
+  if (update && update.dialogueTrees !== undefined) {
+    const old = base.customProperties.dialogueTrees || [];
+    const trees = (update.dialogueTrees || []).map((tree, index) => {
+      if (!tree || tree.components) return tree;
+      const id = tree.dialogueId || tree.id;
+      const match = id ? old.find((t) => t.dialogueId === id) : (old[index] && !old[index].dialogueId ? old[index] : null);
+      return match ? { ...tree, components: match.components } : tree;
+    });
+    base.customProperties.dialogueTrees = trees;
+  }
+  return exportNpcFile(base);
 }
 
 function importMapText(content) {
@@ -647,6 +831,8 @@ module.exports = {
   exportNpcFile,
   exportDialogueTrees,
   importNpcText,
+  mergeNpcFile,
+  statusStockFromEntries,
   importMapText,
   formatCurrency,
   tilePixelOffset,

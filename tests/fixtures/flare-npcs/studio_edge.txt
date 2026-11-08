@@ -1,0 +1,42 @@
+INCLUDE npcs/base/guard.txt
+name=Edge Case
+animations=animations/npcs/guild_man.txt
+talker=true
+vendor=true
+constant_stock=1,2,3
+constant_stock=4:2,5
+status_stock=quest_done,10,11
+vox_intro=soundfx/npcs/a.ogg
+vox_intro=soundfx/npcs/b.ogg
+show_on_minimap=false
+vendor_ratio_buy=1.5
+craft_constant_stock=20,21
+vendor_tab_enabled=craft,true
+vendor_gamble_buy=true
+
+[stats]
+speed=3
+stat=hp,50
+
+[visual_effect]
+id=glow
+animation=animations/effects/glow.txt
+render_above=true
+requires_status=lit
+
+[dialog]
+id=intro
+topic=Hello
+requires_status=met
+requires_not_status=angry
+voice=soundfx/npcs/v1.ogg
+portrait_her=images/portraits/edge.png
+her=Welcome, traveler.
+set_status=greeted
+portrait_you=images/portraits/hero.png
+you=Hi.
+reward_xp=10
+allow_movement=false
+response=more
+him=Anything else?
+take_a_party=true

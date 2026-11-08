@@ -22,6 +22,8 @@ export function exportEnemyFile(enemy: Record<string, unknown>): { text: string;
 export function normalizeEnemyText(content: string): { text: string; warnings: string[] };
 export function exportNpcFile(npc: Record<string, unknown>): string;
 export function importNpcText(content: string): Record<string, unknown>;
+export function mergeNpcFile(existingText: string, update: { fields?: Record<string, unknown>; dialogueTrees?: unknown[] }): string;
+export function statusStockFromEntries(raw: unknown): string[];
 export function importMapText(content: string): Record<string, unknown>;
 export function withAppend(content: string): string;
 export function validateText(

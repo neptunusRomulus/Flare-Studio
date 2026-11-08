@@ -3,7 +3,7 @@ import type { MapObject, FlareNPC } from '@/types';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 import { buildSpawnContent, computeIntermapTarget, STARTING_MAP_INVALID_NAMES } from '@/editor/mapSpawnUtils';
 import { legacyMapFileName, slugFileName } from '../adapters/flare/flareAdapter.cjs';
-import { serializeNpcFile } from '@/utils/flareNpcUtils';
+import { npcFileUpdate, npcFileContent, npcFileBase } from '@/utils/npcFileUpdate';
 import { askConfirm } from '@/components/ui/inline-confirm';
 
 type ProjectIOOptions = {
@@ -254,8 +254,15 @@ const useProjectIO = ({
               },
             };
 
-            const content = serializeNpcFile(flareNpc);
-            npcFiles.push({ filename, content });
+            // Merge into the existing NPC file (keeps keys/sections/dialog order Studio doesn't model)
+            const npcBase = npcFileBase(flareNpc.filename);
+            let existingNpcText: string | null = null;
+            try { existingNpcText = (await window.electronAPI?.readFile?.(`${currentProjectPath.replace(/\\/g, '/')}/npcs/${npcBase}`)) ?? null; } catch { /* new file */ }
+            const gfx = flareNpc.gfx && !flareNpc.gfx.startsWith('data:') && !/^([a-z]:|\/)/i.test(flareNpc.gfx) ? flareNpc.gfx : undefined;
+            const portrait = flareNpc.portrait && !flareNpc.portrait.startsWith('data:') && !/^([a-z]:|\/)/i.test(flareNpc.portrait) ? flareNpc.portrait : undefined;
+            const content = npcFileContent(existingNpcText, npcFileUpdate(npcName, npc.properties as Record<string, unknown> | undefined, { animations: gfx, portrait }));
+            void filename;
+            npcFiles.push({ filename: npcBase, content });
           }
         } catch (npcErr) {
           console.warn('Failed to collect NPC files for export:', npcErr);

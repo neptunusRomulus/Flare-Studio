@@ -103,10 +103,6 @@ test('NPC creation and NPC editing work from the actor sidebar', async () => {
     const editDialogTitle = window.getByText(/Edit NPC/i).first();
     await expect(editDialogTitle).toBeVisible({ timeout: 15000 });
 
-    const identityButton = window.getByRole('button', { name: 'Identity' }).first();
-    await expect(identityButton).toBeVisible({ timeout: 15000 });
-    await identityButton.click();
-
     const editNameInput = window.locator('input[placeholder="NPC name"]').first();
     await expect(editNameInput).toBeVisible({ timeout: 15000 });
     await editNameInput.fill('Test NPC Edited');

@@ -69,7 +69,7 @@ const ObjectManagementDialog = ({
   editor,
   syncMapObjects,
   canUseTilesetDialog,
-  handleEditingTilesetBrowse: _handleEditingTilesetBrowse,
+  handleEditingTilesetBrowse,
   handleEditingPortraitBrowse,
   handleAutoDetectAnim,
   handleOpenVendorStockDialog,
@@ -334,6 +334,7 @@ const ObjectManagementDialog = ({
             getEditingObjectProperty={getEditingObjectProperty}
             editor={editor}
             canUseTilesetDialog={canUseTilesetDialog}
+            handleEditingTilesetBrowse={handleEditingTilesetBrowse}
             handleEditingPortraitBrowse={handleEditingPortraitBrowse}
             handleAutoDetectAnim={handleAutoDetectAnim}
             handleOpenVendorSettingsDialog={handleOpenVendorSettingsDialog}

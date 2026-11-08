@@ -17,7 +17,7 @@ const MinimapToggle = ({ checked, onChange }: MinimapToggleProps) => (
     />
     <div className="flex items-center gap-1">
       <label className="text-xs text-muted-foreground">Show on Minimap</label>
-      <Tooltip content="If true, this NPC will be shown on the minimap. The default is true.">
+      <Tooltip content="show_on_minimap — If true, this NPC will be shown on the minimap. The default is true.">
         <HelpCircle className="w-3 h-3 text-muted-foreground" />
       </Tooltip>
     </div>

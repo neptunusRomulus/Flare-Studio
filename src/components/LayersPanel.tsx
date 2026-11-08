@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import Tooltip from '@/components/ui/tooltip';
 import type { TileLayer } from '@/types';
+import { groupLayers, layerGroupIndex } from '@/components/layerGroups';
 import {
   Eye,
   EyeOff,
@@ -68,13 +69,15 @@ const LayersPanel: React.FC<Props> = ({
         {/* Active badge removed — using console log in useEffect instead */}
         <div className="h-auto overflow-hidden flex flex-col justify-center w-full">
           <div className="space-y-0.5 h-auto overflow-y-visible flex flex-col justify-center w-full">
-            {layers.filter(layer => layer.type !== 'actions').map((layer) => {
+            {groupLayers(layers.filter(layer => layer.type !== 'actions')).map((layer, idx, arr) => {
+              const groupBreak = idx > 0 && layerGroupIndex(arr[idx - 1].type) !== layerGroupIndex(layer.type);
               const isActive = activeLayerId === layer.id;
               const isHovered = hoveredLayerId === layer.id;
               const visible = layersPanelExpanded || isActive;
               return (
+                <React.Fragment key={layer.id}>
+                {groupBreak && <div aria-hidden className="mx-2 my-1 h-px bg-border" />}
                 <div
-                  key={layer.id}
                   className={`block w-full max-w-xs px-2 py-1 rounded transition-all text-xs transform-gpu ${
                     isActive
                       ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-400'
@@ -210,6 +213,7 @@ const LayersPanel: React.FC<Props> = ({
                     </div>
                   </div>
                 </div>
+                </React.Fragment>
               );
             })}
           </div>

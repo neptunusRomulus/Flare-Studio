@@ -2,10 +2,10 @@ import React from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import Tooltip from '@/components/ui/tooltip';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
-import { Check, Save, X } from 'lucide-react';
+import { Check, HelpCircle, Save, X } from 'lucide-react';
 import type { ItemSummary } from '@/utils/items';
-import type { MapObject } from '@/types';
 
 type NpcQuestSettingsDialogProps = {
   isOpen: boolean;
@@ -55,7 +55,7 @@ const NpcQuestSettingsDialog = ({
       >
         <div className="flex items-center gap-2">
           <Check className="w-5 h-5 text-amber-500" />
-          <h3 className="font-semibold">Quest Settings</h3>
+          <h3 className="font-semibold">Edit quests</h3>
         </div>
         <Button
           variant="ghost"
@@ -70,7 +70,12 @@ const NpcQuestSettingsDialog = ({
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-sm font-medium mb-1">Requires Status</label>
+            <label className="flex items-center gap-1 text-sm font-medium mb-1">
+              Needed status
+              <Tooltip content="questRequiresStatus — Status the player must have to get this quest.">
+                <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
+              </Tooltip>
+            </label>
             <Input
               className="h-10 text-sm"
               value={getEditingObjectProperty('questRequiresStatus', '')}
@@ -79,7 +84,12 @@ const NpcQuestSettingsDialog = ({
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Set Status On Accept</label>
+            <label className="flex items-center gap-1 text-sm font-medium mb-1">
+              Status when accepted
+              <Tooltip content="questSetStatus — Status set when the player accepts the quest.">
+                <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
+              </Tooltip>
+            </label>
             <Input
               className="h-10 text-sm"
               value={getEditingObjectProperty('questSetStatus', '')}
@@ -90,27 +100,35 @@ const NpcQuestSettingsDialog = ({
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">Quest Loot</label>
+          <label className="flex items-center gap-1 text-sm font-medium mb-1">
+            Quest loot line
+            <Tooltip content="quest_loot — Format: status,not_status,item_id (one line per entry).">
+              <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
+            </Tooltip>
+          </label>
           <Input
             className="h-10 text-sm"
             value={getEditingObjectProperty('quest_loot', '')}
             onChange={(e) => updateEditingObjectProperty('quest_loot', e.target.value || null)}
             placeholder="status,not_status,item_id"
           />
-          <p className="text-xs text-muted-foreground mt-1">Format: status,not_status,item_id (one line per entry).</p>
         </div>
 
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium">Quest Reward Item</p>
-              <p className="text-xs text-muted-foreground">Select an item created in the Items layer.</p>
+            <label className="flex items-center gap-1 text-sm font-medium">
+              Reward item
+              <Tooltip content="Pick an item from the Items layer to fill the item_id part of quest_loot.">
+                <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
+              </Tooltip>
+            </label>
+            <div className="text-xs text-muted-foreground">
+              Selected: #{Number.isFinite(currentSelectedItemId) ? currentSelectedItemId : 'none'}
             </div>
-            <div className="text-xs text-muted-foreground">Selected: #{Number.isFinite(currentSelectedItemId) ? currentSelectedItemId : 'none'}</div>
           </div>
 
           {itemsList.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No items available. Create items in the Items layer to use them as quest rewards.</p>
+            <p className="text-sm text-muted-foreground">No items yet — create some in the Items layer.</p>
           ) : (
             <div className="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
               {itemsList.map((item) => {

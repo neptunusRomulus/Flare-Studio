@@ -10,15 +10,15 @@ type DirectionFieldProps = {
 };
 
 const directions = [
-  { value: '7', label: 'NW', icon: ArrowUpLeft },
-  { value: '0', label: 'N', icon: ArrowUp },
-  { value: '1', label: 'NE', icon: ArrowUpRight },
-  { value: '6', label: 'W', icon: ArrowLeft },
-  { value: 'center', label: '', icon: null },
-  { value: '2', label: 'E', icon: ArrowRight },
-  { value: '5', label: 'SW', icon: ArrowDownLeft },
-  { value: '4', label: 'S', icon: ArrowDown },
-  { value: '3', label: 'SE', icon: ArrowDownRight },
+  { value: '7', label: 'NW', facing: 'Facing northwest', icon: ArrowUpLeft },
+  { value: '0', label: 'N', facing: 'Facing north', icon: ArrowUp },
+  { value: '1', label: 'NE', facing: 'Facing northeast', icon: ArrowUpRight },
+  { value: '6', label: 'W', facing: 'Facing west', icon: ArrowLeft },
+  { value: 'center', label: '', facing: '', icon: null },
+  { value: '2', label: 'E', facing: 'Facing east', icon: ArrowRight },
+  { value: '5', label: 'SW', facing: 'Facing southwest', icon: ArrowDownLeft },
+  { value: '4', label: 'S', facing: 'Facing south', icon: ArrowDown },
+  { value: '3', label: 'SE', facing: 'Facing southeast', icon: ArrowDownRight },
 ] as const;
 
 const DirectionField = ({
@@ -48,20 +48,21 @@ const DirectionField = ({
         const Icon = dir.icon!;
         const isSelected = value === dir.value;
         return (
-          <button
-            key={dir.value}
-            type="button"
-            onClick={() => onChange(isSelected ? null : dir.value)}
-            className={`flex flex-col items-center justify-center w-9 h-9 gap-0.5 rounded text-[9px] font-medium transition-colors ${
-              isSelected
-                ? 'bg-orange-500/20 text-orange-600 dark:text-orange-400 border border-orange-500/50'
-                : 'bg-muted/50 text-muted-foreground border border-transparent hover:bg-muted'
-            }`}
-            title={dir.label}
-          >
-            <Icon className="w-3.5 h-3.5" />
-            <span>{dir.label}</span>
-          </button>
+          <Tooltip key={dir.value} content={dir.facing}>
+            <button
+              type="button"
+              onClick={() => onChange(isSelected ? null : dir.value)}
+              aria-label={dir.facing}
+              className={`flex flex-col items-center justify-center w-9 h-9 gap-0.5 rounded text-[9px] font-medium transition-colors ${
+                isSelected
+                  ? 'bg-orange-500/20 text-orange-600 dark:text-orange-400 border border-orange-500/50'
+                  : 'bg-muted/50 text-muted-foreground border border-transparent hover:bg-muted'
+              }`}
+            >
+              <Icon className="w-3.5 h-3.5" />
+              <span>{dir.label}</span>
+            </button>
+          </Tooltip>
         );
       })}
     </div>

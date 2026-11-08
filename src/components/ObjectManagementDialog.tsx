@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import PositionField from '@/components/PositionField';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
@@ -90,6 +90,23 @@ const ObjectManagementDialog = ({
   setShowDeleteEnemyConfirm
 }: ObjectManagementDialogProps) => {
   const isOpen = showObjectDialog && !!editingObject;
+  const [objectBaseline, setObjectBaseline] = useState('');
+  const baselineReadyRef = useRef(false);
+
+  useEffect(() => {
+    if (isOpen && editingObject && !baselineReadyRef.current) {
+      setObjectBaseline(JSON.stringify(editingObject));
+      baselineReadyRef.current = true;
+    }
+    if (!isOpen) {
+      baselineReadyRef.current = false;
+      setObjectBaseline('');
+    }
+  }, [isOpen, editingObject]);
+
+  const objectDialogDirty = Boolean(
+    isOpen && objectBaseline && editingObject && JSON.stringify(editingObject) !== objectBaseline,
+  );
 
   const {
     position,
@@ -446,7 +463,14 @@ const ObjectManagementDialog = ({
           )}
         </div>
         
-        <div className="flex gap-2">
+        <div className="relative flex gap-2">
+          {objectDialogDirty && (
+            <span
+              className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-gray-400"
+              aria-hidden
+              title="Unsaved changes"
+            />
+          )}
           <Button size="icon" onClick={handleObjectDialogSave} aria-label="Save">
             <Save className="w-4 h-4" />
           </Button>

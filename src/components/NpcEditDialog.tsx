@@ -70,9 +70,8 @@ const countAnimChanges = (get: (key: string, fallback?: string) => string, custo
   return n;
 };
 
-const countOtherChanges = (properties: Record<string, unknown> | undefined, get: (key: string, fallback?: string) => string) => {
+const countOtherChanges = (_properties: Record<string, unknown> | undefined, get: (key: string, fallback?: string) => string) => {
   let n = 0;
-  if (properties && 'spawn_direction' in properties) n += 1;
   if (get('show_on_minimap', 'true') === 'false') n += 1;
   return n;
 };
@@ -227,168 +226,164 @@ const NpcEditDialog = ({
     });
   };
 
-  const roleActionClass = (enabled: boolean) =>
-    `h-7 px-2 text-xs rounded-md border border-border bg-background hover:bg-muted ${
-      enabled ? '' : 'opacity-40 pointer-events-none'
+  const hasAnyRole = isTalker || isVendor || isQuestGiver;
+
+  const toggleRole = (key: 'talker' | 'vendor' | 'questGiver') => {
+    const newProps = { ...(editingObject.properties || {}) };
+    if (newProps[key] === 'true') delete newProps[key];
+    else newProps[key] = 'true';
+    setEditingObject({ ...editingObject, properties: newProps });
+  };
+
+  const roleCardClass = (active: boolean, activeTone: string) =>
+    `flex flex-col items-stretch rounded-md border p-2.5 text-left transition-colors min-h-[4.5rem] ${
+      active
+        ? `${activeTone} border-current/40`
+        : 'bg-muted/30 text-muted-foreground border-border hover:bg-muted/50'
     }`;
 
   return (
     <>
-      <div className="flex gap-3 items-start border border-border rounded-md p-3 bg-muted/20">
-        <div className="shrink-0">
-          {showAnimPreview ? (
-            <AnimationPreview
-              tilesetPath={tilesetSourcePath || tilesetPath}
-              direction={parseInt(getEditingObjectProperty('direction', '0'), 10) || 0}
-              properties={{
-                anim_render_width: getEditingObjectProperty('anim_render_width', ''),
-                anim_render_height: getEditingObjectProperty('anim_render_height', ''),
-                anim_render_offset_x: getEditingObjectProperty('anim_render_offset_x', ''),
-                anim_render_offset_y: getEditingObjectProperty('anim_render_offset_y', ''),
-                anim_frames: getEditingObjectProperty('anim_frames', ''),
-                anim_duration: getEditingObjectProperty('anim_duration', ''),
-                anim_type: getEditingObjectProperty('anim_type', ''),
-                anim_blend_mode: getEditingObjectProperty('anim_blend_mode', ''),
-                anim_alpha_mod: getEditingObjectProperty('anim_alpha_mod', ''),
-                anim_color_mod: getEditingObjectProperty('anim_color_mod', ''),
-                anim_image_width: getEditingObjectProperty('anim_image_width', ''),
-                anim_image_height: getEditingObjectProperty('anim_image_height', ''),
-              }}
+      <section className="space-y-3">
+        <h4 className="text-sm font-semibold">Who</h4>
+        <div className="flex gap-3 items-start border border-border rounded-md p-3 bg-muted/20">
+          <div className="shrink-0">
+            {showAnimPreview ? (
+              <AnimationPreview
+                tilesetPath={tilesetSourcePath || tilesetPath}
+                direction={parseInt(getEditingObjectProperty('direction', '0'), 10) || 0}
+                properties={{
+                  anim_render_width: getEditingObjectProperty('anim_render_width', ''),
+                  anim_render_height: getEditingObjectProperty('anim_render_height', ''),
+                  anim_render_offset_x: getEditingObjectProperty('anim_render_offset_x', ''),
+                  anim_render_offset_y: getEditingObjectProperty('anim_render_offset_y', ''),
+                  anim_frames: getEditingObjectProperty('anim_frames', ''),
+                  anim_duration: getEditingObjectProperty('anim_duration', ''),
+                  anim_type: getEditingObjectProperty('anim_type', ''),
+                  anim_blend_mode: getEditingObjectProperty('anim_blend_mode', ''),
+                  anim_alpha_mod: getEditingObjectProperty('anim_alpha_mod', ''),
+                  anim_color_mod: getEditingObjectProperty('anim_color_mod', ''),
+                  anim_image_width: getEditingObjectProperty('anim_image_width', ''),
+                  anim_image_height: getEditingObjectProperty('anim_image_height', ''),
+                }}
+              />
+            ) : (
+              <NpcAssetThumb imagePath={previewSpritePath} alt="Sprite" className="h-20 w-20" />
+            )}
+          </div>
+          <NpcAssetThumb imagePath={previewPortraitPath || (portraitPath.startsWith('data:') ? portraitPath : null)} alt="Portrait" className="h-20 w-20 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <NameField
+              value={editingObject.name || ''}
+              onChange={(value) => setEditingObject({ ...editingObject, name: value })}
+              placeholder="NPC name"
             />
-          ) : (
-            <NpcAssetThumb imagePath={previewSpritePath} alt="Sprite" className="h-20 w-20" />
-          )}
-        </div>
-        <NpcAssetThumb imagePath={previewPortraitPath || (portraitPath.startsWith('data:') ? portraitPath : null)} alt="Portrait" className="h-20 w-20 shrink-0" />
-        <div className="flex-1 min-w-0 space-y-2">
-          <NameField
-            value={editingObject.name || ''}
-            onChange={(value) => setEditingObject({ ...editingObject, name: value })}
-            placeholder="NPC name"
-          />
-          <div className="w-24">
-            <PositionField x={editingObject.x} y={editingObject.y} onChangeX={setPositionX} onChangeY={setPositionY} />
           </div>
         </div>
-      </div>
 
-      <NpcAppearanceSection
-        projectPath={projectPath}
-        selectedAnimation={tilesetPath}
-        selectedPortrait={portraitPath}
-        stanceDirection={getEditingObjectProperty('direction', '')}
-        canUseTilesetDialog={canUseTilesetDialog}
-        hasTilesetPath={Boolean(tilesetPath)}
-        onSelectLook={applyPropertyBag}
-        onSelectPortrait={applyPropertyBag}
-        onStanceChange={(value) => updateEditingObjectProperty('direction', value)}
-        onImportTileset={() => { void handleEditingTilesetBrowse(); }}
-        onAutoDetect={() => { void handleAutoDetectAnim(); }}
-        onBrowsePortrait={() => { void handleEditingPortraitBrowse(); }}
-      />
+        <NpcAppearanceSection
+          projectPath={projectPath}
+          selectedAnimation={tilesetPath}
+          selectedPortrait={portraitPath}
+          stanceDirection={getEditingObjectProperty('direction', '')}
+          canUseTilesetDialog={canUseTilesetDialog}
+          hasTilesetPath={Boolean(tilesetPath)}
+          onSelectLook={applyPropertyBag}
+          onSelectPortrait={applyPropertyBag}
+          onStanceChange={(value) => updateEditingObjectProperty('direction', value)}
+          onImportTileset={() => { void handleEditingTilesetBrowse(); }}
+          onAutoDetect={() => { void handleAutoDetectAnim(); }}
+          onBrowsePortrait={() => { void handleEditingPortraitBrowse(); }}
+        />
+      </section>
 
-      <div className="space-y-3 border border-border rounded-md p-3 bg-muted/20">
+      <section className="space-y-2">
         <div className="flex items-center gap-1">
-          <h4 className="text-sm font-semibold">Roles</h4>
-          <Tooltip content="Select the special roles for this NPC.">
+          <h4 className="text-sm font-semibold">What it does</h4>
+          <Tooltip content="Turning a role off hides its editor but keeps the data. Turn it back on to edit again.">
             <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
           </Tooltip>
         </div>
-        <div className="flex flex-wrap gap-2 items-center">
-          <div className="flex items-center gap-1">
-            <Tooltip content="Allows this NPC to be talked to.">
-              <button
-                type="button"
-                onClick={() => {
-                  const newProps = { ...editingObject.properties };
-                  if (newProps.talker === 'true') delete newProps.talker;
-                  else newProps.talker = 'true';
-                  setEditingObject({ ...editingObject, properties: newProps });
-                }}
-                className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
-                  editingObject.properties?.talker === 'true'
-                    ? 'bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/50'
-                    : 'bg-muted/50 text-muted-foreground border border-transparent hover:bg-muted'
-                }`}
-              >
-                <MessagesSquare className="w-3 h-3 mr-1 inline-block" />
-                Talker
+        <div className="grid grid-cols-3 gap-2">
+          <div className="min-h-[6.25rem] flex flex-col">
+            <Tooltip content="talker — Player can talk to this NPC. Turning off keeps dialogue data.">
+              <button type="button" onClick={() => toggleRole('talker')} className={roleCardClass(isTalker, 'bg-blue-500/15 text-blue-600 dark:text-blue-400')}>
+                <MessagesSquare className="w-5 h-5 mb-1" />
+                <span className="text-sm font-semibold">Talks</span>
               </button>
             </Tooltip>
-            <button
-              type="button"
-              onClick={() => isTalker && setShowDialogueTreeDialog(true)}
-              aria-label="Edit dialogue"
-              disabled={!isTalker}
-              className={roleActionClass(isTalker)}
-            >
-              Edit dialogue
-            </button>
+            <div className="h-8 mt-1.5 flex items-center">
+              {isTalker && (
+                <button
+                  type="button"
+                  onClick={() => setShowDialogueTreeDialog(true)}
+                  className="h-7 w-full px-2 text-xs rounded-md border border-border bg-background hover:bg-muted"
+                >
+                  Edit what they say
+                </button>
+              )}
+            </div>
           </div>
 
-          <div className="flex items-center gap-1">
-            <Tooltip content="Allows this NPC to buy/sell items.">
-              <button
-                type="button"
-                onClick={() => {
-                  const newProps = { ...editingObject.properties };
-                  if (newProps.vendor === 'true') delete newProps.vendor;
-                  else newProps.vendor = 'true';
-                  setEditingObject({ ...editingObject, properties: newProps });
-                }}
-                className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
-                  editingObject.properties?.vendor === 'true'
-                    ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/50'
-                    : 'bg-muted/50 text-muted-foreground border border-transparent hover:bg-muted'
-                }`}
-              >
-                <HandCoins className="w-3 h-3 mr-1 inline-block" />
-                Vendor
+          <div className="min-h-[6.25rem] flex flex-col">
+            <Tooltip content="vendor — Player can buy and sell here. Turning off keeps stock and prices.">
+              <button type="button" onClick={() => toggleRole('vendor')} className={roleCardClass(isVendor, 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400')}>
+                <HandCoins className="w-5 h-5 mb-1" />
+                <span className="text-sm font-semibold">Sells</span>
               </button>
             </Tooltip>
-            <button
-              type="button"
-              onClick={() => isVendor && handleOpenVendorSettingsDialog()}
-              aria-label="Vendor settings"
-              disabled={!isVendor}
-              className={roleActionClass(isVendor)}
-            >
-              Vendor settings
-            </button>
+            <div className="h-8 mt-1.5 flex items-center">
+              {isVendor && (
+                <button
+                  type="button"
+                  onClick={() => handleOpenVendorSettingsDialog()}
+                  className="h-7 w-full px-2 text-xs rounded-md border border-border bg-background hover:bg-muted"
+                >
+                  Edit what they sell
+                </button>
+              )}
+            </div>
           </div>
 
-          <div className="flex items-center gap-1">
-            <Tooltip content="Allows this NPC to give quests.">
-              <button
-                type="button"
-                onClick={() => {
-                  const newProps = { ...editingObject.properties };
-                  if (newProps.questGiver === 'true') delete newProps.questGiver;
-                  else newProps.questGiver = 'true';
-                  setEditingObject({ ...editingObject, properties: newProps });
-                }}
-                className={`px-2 py-0.5 rounded-full text-xs font-medium transition-colors ${
-                  editingObject.properties?.questGiver === 'true'
-                    ? 'bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/50'
-                    : 'bg-muted/50 text-muted-foreground border border-transparent hover:bg-muted'
-                }`}
-              >
-                <MessageCircleQuestionMark className="w-3 h-3 mr-1 inline-block" />
-                Quest
+          <div className="min-h-[6.25rem] flex flex-col">
+            <Tooltip content="questGiver — Player can get quests here. Turning off keeps quest settings.">
+              <button type="button" onClick={() => toggleRole('questGiver')} className={roleCardClass(isQuestGiver, 'bg-amber-500/15 text-amber-600 dark:text-amber-400')}>
+                <MessageCircleQuestionMark className="w-5 h-5 mb-1" />
+                <span className="text-sm font-semibold">Gives quests</span>
               </button>
             </Tooltip>
-            <button
-              type="button"
-              onClick={() => isQuestGiver && handleOpenQuestSettingsDialog()}
-              aria-label="Quest settings"
-              disabled={!isQuestGiver}
-              className={roleActionClass(isQuestGiver)}
-            >
-              Quest settings
-            </button>
+            <div className="h-8 mt-1.5 flex items-center">
+              {isQuestGiver && (
+                <button
+                  type="button"
+                  onClick={() => handleOpenQuestSettingsDialog()}
+                  className="h-7 w-full px-2 text-xs rounded-md border border-border bg-background hover:bg-muted"
+                >
+                  Edit quests
+                </button>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+        {!hasAnyRole && (
+          <p className="text-xs text-muted-foreground/70">Just stands there</p>
+        )}
+      </section>
+
+      <section className="space-y-2 border border-border rounded-md p-3 bg-muted/20">
+        <h4 className="text-sm font-semibold">Where on the map</h4>
+        <div className="flex flex-wrap gap-6 items-start">
+          <div className="w-28">
+            <PositionField x={editingObject.x} y={editingObject.y} onChangeX={setPositionX} onChangeY={setPositionY} />
+          </div>
+          <DirectionField
+            value={getEditingObjectProperty('spawn_direction', '')}
+            onChange={(value) => updateEditingObjectProperty('spawn_direction', value)}
+            label="Facing on map"
+            tooltip="spawn_direction — Which way they face when they appear"
+          />
+        </div>
+      </section>
 
       <div className="border border-border rounded-md bg-muted/20">
         <button
@@ -584,18 +579,10 @@ const NpcEditDialog = ({
             </NpcAdvancedSubSection>
 
             <NpcAdvancedSubSection title="Other" changedCount={otherChanged}>
-              <div className="space-y-3">
-                <DirectionField
-                  value={getEditingObjectProperty('spawn_direction', '')}
-                  onChange={(value) => updateEditingObjectProperty('spawn_direction', value)}
-                  label="Facing on map"
-                  tooltip="spawn_direction — Direction that NPC will initially face"
-                />
-                <MinimapToggle
-                  checked={getEditingObjectProperty('show_on_minimap', 'true') === 'true'}
-                  onChange={(checked) => updateEditingObjectBoolean('show_on_minimap', checked)}
-                />
-              </div>
+              <MinimapToggle
+                checked={getEditingObjectProperty('show_on_minimap', 'true') === 'true'}
+                onChange={(checked) => updateEditingObjectBoolean('show_on_minimap', checked)}
+              />
             </NpcAdvancedSubSection>
           </div>
         )}

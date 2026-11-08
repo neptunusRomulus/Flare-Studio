@@ -57,39 +57,37 @@ describe('template actor references', () => {
 });
 
 describe('template actor plan', () => {
-  it('maps NPC looks and enemy bases to unplaced Entities', () => {
+  it('maps enemy bases to unplaced Entities and leaves NPC looks for the picker', () => {
     const plan = planTemplateActors(listing);
     expect(plan.map(p => [p.type, p.name, p.category])).toEqual([
-      ['npc', 'Peasant Man 1', undefined],
       ['enemy', 'Goblin Elite', 'goblin_elite'],
       ['enemy', 'Goblin', 'goblin'],
       ['enemy', 'Labyrinth Antlion', 'il_antlion'],
     ]);
-    expect(plan[0].properties.tilesetPath).toBe('animations/npcs/peasant_man1.txt');
-    expect(plan[2].file).toEqual({ rel: 'enemies/goblin.txt', content: enemyFileFromBase('enemies/base/goblin.txt', 'goblin') });
-    expect(plan[2].file?.content).toContain('INCLUDE enemies/base/goblin.txt\nname=Goblin\ncategories=goblin');
+    expect(plan.every((p) => p.type === 'enemy')).toBe(true);
+    expect(plan[1].file).toEqual({ rel: 'enemies/goblin.txt', content: enemyFileFromBase('enemies/base/goblin.txt', 'goblin') });
+    expect(plan[1].file?.content).toContain('INCLUDE enemies/base/goblin.txt\nname=Goblin\ncategories=goblin');
     // full definitions are kept raw (repeated stat= lines survive)
-    expect(plan[3].file?.content).toBe(listing.enemies[3].raw);
+    expect(plan[2].file?.content).toBe(listing.enemies[3].raw);
   });
-  it('dedupes by import key / NPC look and keeps existing files', () => {
+  it('dedupes by import key and keeps existing files', () => {
     const plan = planTemplateActors(listing);
     const existing: Parameters<typeof dedupeActors>[1] = [
-      { type: 'npc' as const, name: 'x', properties: { tilesetPath: 'animations/npcs/peasant_man1.txt' } },
       { type: 'enemy' as const, name: 'y', properties: { importKey: 'fantasycore:enemy:il_antlion' } },
     ];
     const { keep, skipped } = dedupeActors(plan, existing, new Set(['enemies/goblin.txt']));
-    expect(skipped).toBe(2);
+    expect(skipped).toBe(1);
     expect(keep.map(k => k.name)).toEqual(['Goblin Elite', 'Goblin']);
     expect(keep[1].file).toBeUndefined();
     expect(keep[0].file?.rel).toBe('enemies/goblin_elite.txt');
-    expect(dedupeActors([...plan, ...plan], [], new Set()).keep).toHaveLength(4);
+    expect(dedupeActors([...plan, ...plan], [], new Set()).keep).toHaveLength(3);
   });
   it('titles keys', () => {
     expect(titleFromKey('goblin_elite_runner')).toBe('Goblin Elite Runner');
     expect(titleFromKey('female01')).toBe('Female 01');
   });
   it('overlay shows the step label', () => {
-    const s = progressLoading(beginLoading({ tokens: [] }, 'template', 0), 'template', 1, 3, 'Loading NPCs and enemies…');
-    expect(loadingLabel(s)).toBe('Loading NPCs and enemies…');
+    const s = progressLoading(beginLoading({ tokens: [] }, 'template', 0), 'template', 1, 3, 'Loading enemies…');
+    expect(loadingLabel(s)).toBe('Loading enemies…');
   });
 });

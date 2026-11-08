@@ -1,6 +1,9 @@
 /**
- * "Start with template": bring fantasycore's NPC looks and enemy definitions into the
- * new project as (unplaced) Entities, next to the tileset import.
+ * "Start with template": bring fantasycore enemy definitions into the new project as
+ * (unplaced) Entities, next to the tileset import.
+ *
+ * NPC looks (animations/npcs/*.txt) are listed for the Edit NPC appearance picker only;
+ * they are not turned into project NPC entities.
  *
  * Paths stay mod-relative ("animations/npcs/knight.txt", "enemies/base/goblin.txt"):
  * projects require fantasycore, so Flare resolves them at Play/export without copies.
@@ -56,19 +59,10 @@ export function enemyFileFromBase(baseRel: string, key: string): string {
   ].join('\n');
 }
 
-/** Entities to create for a template listing (pure). */
+/** Entities to create for a template listing (pure). NPC looks are picker assets only. */
 export function planTemplateActors(listing: TemplateActorListing): PlannedActor[] {
   const mod = listing.mod || 'fantasycore';
   const out: PlannedActor[] = [];
-  for (const look of listing.npcLooks) {
-    out.push({
-      type: 'npc',
-      importKey: `${mod}:npc:${look.key}`,
-      name: titleFromKey(look.key),
-      // tilesetPath that is mod-relative is written as gfx= on export (useManualSave)
-      properties: { tilesetPath: look.animation, ...(look.image ? { templateImage: look.image } : {}) },
-    });
-  }
   for (const e of listing.enemies) {
     // Bases without their own look (e.g. beacon.txt, a shared behaviour block) are not enemies.
     if (e.isBase && !firstValue(e.raw, 'animations')) continue;
@@ -103,19 +97,17 @@ export function planTemplateActors(listing: TemplateActorListing): PlannedActor[
   return out;
 }
 
-/** Drop planned entities already in the project (same import key, or same NPC/enemy file). */
+/** Drop planned entities already in the project (same import key or enemy file). */
 export function dedupeActors(planned: PlannedActor[], existing: Array<Pick<MapObject, 'type' | 'properties' | 'name'>>, existingFiles: Set<string>) {
   const keys = new Set<string>();
-  const npcFiles = new Set<string>();
   for (const o of existing) {
     const p = (o.properties || {}) as Record<string, unknown>;
     if (typeof p.importKey === 'string') keys.add(p.importKey);
-    if (o.type === 'npc' && typeof p.tilesetPath === 'string') npcFiles.add(p.tilesetPath);
   }
   const keep: PlannedActor[] = [];
   let skipped = 0;
   for (const a of planned) {
-    if (keys.has(a.importKey) || (a.type === 'npc' && npcFiles.has(a.properties.tilesetPath))) { skipped++; continue; }
+    if (keys.has(a.importKey)) { skipped++; continue; }
     keys.add(a.importKey);
     keep.push(a.file && existingFiles.has(a.file.rel) ? { ...a, file: undefined } : a);
   }
@@ -141,7 +133,7 @@ export async function importTemplateActors(
   const listing = await api.listTemplateActors(flarePath);
   if (!listing.ok) return result;
   result.missing = listing.missing;
-  // NPC definition files (npcs/*.txt) have dialog sections Studio's NPC model can't hold yet: report, don't convert.
+  // fantasycore npcs/*.txt stay in the mod (picker uses animations/npcs looks); report paths only.
   result.rawOnly = listing.npcs.map(n => n.file);
   const root = projectPath.replace(/\\/g, '/').replace(/\/$/, '');
   const existingFiles = new Set<string>();

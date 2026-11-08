@@ -109,22 +109,9 @@ export default function useActorManagement({
       if (isStationary) roleProperties.stationary = 'true';
     }
 
-    // Use location from dialog state
-    const actorX = actorDialogState.locationX ?? 0;
-    const actorY = actorDialogState.locationY ?? 0;
-
-    // For NPCs, auto-place at next free diagonal cell if coordinates are 0,0
-    let spawnX = actorX;
-    let spawnY = actorY;
-    if (actorDialogState.type === 'npc') {
-      const existingObjects = editor.getMapObjects();
-      let candidate = 0;
-      while (existingObjects.some(o => o.type === 'npc' && o.x === candidate && o.y === candidate)) {
-        candidate++;
-      }
-      spawnX = candidate;
-      spawnY = candidate;
-    }
+    // Add creates the definition only (unplaced, -1,-1); placing it on the map creates the instance position
+    const spawnX = -1;
+    const spawnY = -1;
 
     const newObject: MapObject = editor.addMapObject(actorDialogState.type as 'npc' | 'enemy', spawnX, spawnY, 1, 1);
     editor.updateMapObject(newObject.id, {

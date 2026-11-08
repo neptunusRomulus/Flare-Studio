@@ -221,9 +221,9 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
       }
     }
 
-    // Use location from dialog state
-    const actorX = actorDialogState.locationX ?? 0;
-    const actorY = actorDialogState.locationY ?? 0;
+    // Add creates the definition only (unplaced, -1,-1); placing it on the map creates the instance position
+    const actorX = -1;
+    const actorY = -1;
 
     let newObject: MapObject | null = null;
     try {

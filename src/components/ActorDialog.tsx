@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Tooltip from '@/components/ui/tooltip';
-import { Edit2, MapPin, Save, X } from 'lucide-react';
+import { Edit2, Save, X } from 'lucide-react';
 import { ENEMY_ROLE_OPTIONS, NPC_ROLE_OPTIONS } from '@/editor/actorRoles';
 import type { ActorDialogState, ActorRoleKey } from '@/editor/actorRoles';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
@@ -135,32 +135,6 @@ const ActorDialog = ({
             })()}
           </div>
 
-          <div>
-            <label className="flex items-center gap-1 text-sm font-medium mb-1">
-              <MapPin className="w-3.5 h-3.5" /> Location Coordinates
-            </label>
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <label className="block text-xs text-muted-foreground mb-0.5">X</label>
-                <Input
-                  type="number"
-                  value={actorDialogState.locationX}
-                  onChange={(event) => onFieldChange('locationX', event.target.value)}
-                  placeholder="0"
-                />
-              </div>
-              <div className="flex-1">
-                <label className="block text-xs text-muted-foreground mb-0.5">Y</label>
-                <Input
-                  type="number"
-                  value={actorDialogState.locationY}
-                  onChange={(event) => onFieldChange('locationY', event.target.value)}
-                  placeholder="0"
-                />
-              </div>
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">Map tile coordinates where the actor will be placed.</p>
-          </div>
 
           {actorDialogError && (
             <div className="text-sm text-red-500">

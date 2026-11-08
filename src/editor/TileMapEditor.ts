@@ -9,6 +9,7 @@
   ObjectInstance,
   PaintMode
 } from '../types';
+import { placedOfType } from './entityPlacementRules';
 import { MAP_TARGET_CURSOR } from '@/components/mapTargets';
 import { SharedSlotMap, slotGroup, mergeSharedSlotLists } from './sharedSlots';
 import { classifyWheel, pinchFactor, panForZoomAt } from './wheelNav';
@@ -8392,9 +8393,9 @@ export class TileMapEditor {
       ...mapHeaderForExport(this.getMapPresentation()),
       tilesetImages,
       layers,
-      events: this.objects.filter(object => object.type === 'event').map(object => this.eventRecord(object)),
-      enemies: this.objects.filter(object => object.type === 'enemy').map(object => this.enemyRecord(object)),
-      npcs: this.objects.filter(object => object.type === 'npc').map(object => this.npcRecord(object)),
+      events: placedOfType(this.objects, 'event').map(object => this.eventRecord(object)),
+      enemies: placedOfType(this.objects, 'enemy').map(object => this.enemyRecord(object)),
+      npcs: placedOfType(this.objects, 'npc').map(object => this.npcRecord(object)),
       knownEnemyCategories: this.getEnemyCategories(),
     });
     if (exported.errors.length > 0) {

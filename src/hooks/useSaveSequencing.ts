@@ -217,7 +217,8 @@ export default function useSaveSequencing(
 
     // Check for invalid positions
     for (const obj of objects) {
-      if (obj.x < 0 || obj.y < 0) {
+      // -1,-1 is an unplaced dock entity (not written to the map)
+      if ((obj.x < 0 || obj.y < 0) && !(obj.x === -1 && obj.y === -1)) {
         errors.push(`${obj.type} #${obj.id} has invalid position: (${obj.x}, ${obj.y})`);
       }
     }

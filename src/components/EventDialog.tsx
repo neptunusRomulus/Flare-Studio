@@ -181,10 +181,11 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
     const props: Record<string, string | string[]> = {};
 
     if (flareActivate) props.activate = flareActivate;
-    if (['Trigger', 'Leave'].includes(eventData.timing.activeActivation || '')) {
+    const placed = coordinates.x >= 0 && coordinates.y >= 0;
+    if (placed && ['Trigger', 'Leave'].includes(eventData.timing.activeActivation || '')) {
       props.location = `${coordinates.x},${coordinates.y},${size.width},${size.height}`;
     }
-    if (['Interact', 'Trigger'].includes(eventData.timing.activeActivation || '')) {
+    if (placed && ['Interact', 'Trigger'].includes(eventData.timing.activeActivation || '')) {
       props.hotspot = `${hotspot.x},${hotspot.y},${hotspot.width},${hotspot.height}`;
     }
     if (eventData.timing.cooldown > 0) props.cooldown = `${eventData.timing.cooldown}ms`;
@@ -301,17 +302,18 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
       });
     } else if (typeof editor.addMapObject === 'function') {
       // Create new event
-      const newObject = editor.addMapObject('event', coordinates.x, coordinates.y, size.width, size.height);
+      // New events start unplaced; dragging an area on the map sets location/hotspot
+      const newObject = editor.addMapObject('event', -1, -1, 1, 1);
       if (newObject && typeof editor.updateMapObject === 'function') {
         editor.updateMapObject(newObject.id, {
           name: eventData.name || 'Event',
           description: eventData.description || '',
           type: 'event',
           activate: flareActivate,
-          x: coordinates.x,
-          y: coordinates.y,
-          width: size.width,
-          height: size.height,
+          x: -1,
+          y: -1,
+          width: 1,
+          height: 1,
           properties: props
         });
       }
@@ -850,6 +852,8 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                 )}
 
                 <div className="space-y-4 border-b border-border/50 pb-4">
+                {/* Area/hotspot belong to the map instance: set by placing (dragging an area) on the map, edited here afterwards */}
+                {isEditing && (<>
                 {/* Location and Size */}
                 <div className={`space-y-2 transition-opacity ${!isLocEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
                   <div className="flex items-center gap-2">
@@ -1041,6 +1045,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                     </div>
                   </div>
                 </div>
+                </>)}
 
                 {/* Cooldown */}
                 <div className="space-y-2">

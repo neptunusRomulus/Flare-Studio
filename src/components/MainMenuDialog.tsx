@@ -9,6 +9,7 @@ import {
   RotateCcw,
   Package,
   RefreshCw,
+  Settings,
   Loader2
 } from 'lucide-react';
 
@@ -25,6 +26,10 @@ type MainMenuDialogProps = {
   onRestart: () => void;
   onExport: () => void;
   onCheckUpdates: () => void;
+  /** Engine Settings entry (omitted when not provided). */
+  onOpenSettings?: () => void;
+  /** 'below' opens under the anchor (title bar); default 'above'. */
+  placement?: 'above' | 'below';
 };
 
 const MainMenuDialog: React.FC<MainMenuDialogProps> = ({
@@ -38,6 +43,8 @@ const MainMenuDialog: React.FC<MainMenuDialogProps> = ({
   onShowHelp,
   onSaveAsCopy,
   onRestart,
+  onOpenSettings,
+  placement = 'above',
   onExport,
   onCheckUpdates
 }) => {
@@ -133,6 +140,7 @@ const MainMenuDialog: React.FC<MainMenuDialogProps> = ({
       disabled: !hasProject
     },
     { label: '', icon: null, onClick: () => {}, separator: true },
+    ...(onOpenSettings ? [{ label: 'Engine Settings', icon: <Settings className="w-3 h-3" />, onClick: onOpenSettings }] : []),
     {
       label: 'Help & Documentation',
       icon: <HelpCircle className="w-3 h-3" />,
@@ -165,7 +173,7 @@ const MainMenuDialog: React.FC<MainMenuDialogProps> = ({
         left: anchorPos.left,
         top: anchorPos.top,
         position: 'fixed',
-        transform: 'translateY(-100%)'
+        transform: placement === 'above' ? 'translateY(-100%)' : 'none'
       }}
       className="w-44 bg-background border border-border rounded-md shadow-lg z-[9999] py-0.5"
     >

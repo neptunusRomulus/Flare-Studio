@@ -9,6 +9,7 @@ import WelcomeScreen from '../components/WelcomeScreen';
 import AppShell from '@/components/AppShell';
 import MainLayerSwitch from '@/components/MainLayerSwitch';
 import DockFooter from '@/components/DockFooter';
+import AppControls from '@/components/AppControls';
 import SidebarGameSettingsArea from '@/components/SidebarGameSettingsArea';
 import PaletteDock from '@/components/PaletteDock';
 import { shouldShowPanels } from '@/hooks/preMapEditor';
@@ -250,6 +251,7 @@ export default function AppMain() {
   // Merge flare engine state into titleBarProps
   const enhancedTitleBarProps = useMemo(() => ({
     ...titleBarProps,
+    appMenu: showPanels && controls ? <AppControls {...enhancedControls} iconUrl={titleBarProps?.flareIconUrl} /> : undefined,
     flareEngine: {
       isRunning: flareEngine.isRunning,
       lastError: flareEngine.lastError,
@@ -259,7 +261,7 @@ export default function AppMain() {
       onLaunch: flareEngine.launch,
       onConfigurePath: flareEngine.configureFlarePath,
     },
-  }), [titleBarProps, flareEngine.isRunning, flareEngine.lastError, flareEngine.launch, flareEngine.flarePath, flareEngine.configureFlarePath, controls?.currentProjectPath, hasMap]);
+  }), [titleBarProps, flareEngine.isRunning, flareEngine.lastError, flareEngine.launch, flareEngine.flarePath, flareEngine.configureFlarePath, controls?.currentProjectPath, hasMap, showPanels, controls, enhancedControls]);
 
   if (showWelcome) {
     return (
@@ -288,7 +290,7 @@ export default function AppMain() {
           open={showPanels}
           layerVisibility={layerVisibility}
           header={<MainLayerSwitch layers={layersObj?.layers ?? []} activeLayer={tileset.activeLayer} onSelectLayer={layersObj?.handleSetActiveLayer ?? (() => {})} />}
-          footer={<DockFooter exportStatus={exportStatus} controls={enhancedControls} />}
+          footer={<DockFooter exportStatus={exportStatus} />}
           currentProjectPath={controls?.currentProjectPath}
           content={groupOfType(tileset.activeLayer?.type) === ENTITY_GROUP ? (
             <EntityDock

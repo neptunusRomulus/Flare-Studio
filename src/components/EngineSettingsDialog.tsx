@@ -235,7 +235,7 @@ const EngineSettingsDialog = ({
                   storageSizeKB={undoStorageSizeKB}
                 />
               ) : (
-                <p className="text-sm text-muted-foreground">Save manually using the Save button in the sidebar or Ctrl+S.</p>
+                <p className="text-sm text-muted-foreground">Save manually using the Save button in the title bar or Ctrl+S.</p>
               )}
             </div>
           )}

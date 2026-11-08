@@ -24,6 +24,8 @@ type TitleBarProps = {
   onMaximize: () => void;
   onClose: () => void;
   flareIconUrl?: string | null;
+  /** Replaces the plain logo: Flare icon as the app menu button + Save button. */
+  appMenu?: React.ReactNode;
   // Flare engine play button
   flareEngine?: {
     isRunning: boolean;
@@ -49,14 +51,15 @@ const TitleBar = ({
   onMaximize,
   onClose,
   flareIconUrl,
+  appMenu,
   flareEngine
 }: TitleBarProps) => (
   <div className="bg-gray-100 dark:bg-neutral-900 text-orange-600 dark:text-orange-400 flex justify-between items-center px-4 py-1 select-none drag-region border-b border-gray-200 dark:border-neutral-700 min-h-0">
     <div className="flex items-center gap-3 min-w-0 flex-shrink-0">
       <div className="flex items-center gap-1">
-        {flareIconUrl ? (
+        {appMenu ?? (flareIconUrl ? (
           <img src={flareIconUrl} alt="Flare Studio Logo" className="w-4 h-6" />
-        ) : null}
+        ) : null)}
         <span className="text-sm font-semibold text-orange-600 dark:text-orange-400 whitespace-nowrap">Flare Studio</span>
       </div>
       <div className="flex items-center gap-2 text-xs mx-4 min-w-[90px]">

@@ -9,6 +9,7 @@
   ObjectInstance,
   PaintMode
 } from '../types';
+import { findSlotForCellKey, mergeLegacySlotData, clearSlotCells, type SlotLike } from './slotCells';
 import { parseTilesetDefTiles, tileDrawTopLeft } from './tilesetDef';
 import { assignExportOffsets } from './tilesetIds';
 import { TileDetector } from './tileDetection';
@@ -791,7 +792,7 @@ export class TileMapEditor {
   private spacePressed: boolean = false;
 
   // History system for undo/redo
-  private history: Array<{ layers: TileLayer[], objects: MapObject[] }> = [];
+  private history: Array<{ layers: TileLayer[], objects: MapObject[], cellKeys?: Array<[string, Array<string | null>]> }> = [];
   private historyIndex: number = -1;
   private maxHistorySize: number = 50;
   private isApplyingHistory: boolean = false;
@@ -3060,7 +3061,7 @@ export class TileMapEditor {
           let layerTileDataForCell = this.layerTileData.get(layer.type) || activeTabDetectedTiles || new Map();
 
           if (cellTilesetKey) {
-            const tab = tabs.find(t => t.tileset && t.tileset.fileName === cellTilesetKey);
+            const tab = this.findTabForCellKey(tabs, cellTilesetKey);
             if (tab && tab.tileset) {
               tilesetForCell = {
                 image: tab.tileset.image ?? null,
@@ -7138,10 +7139,8 @@ export class TileMapEditor {
       const currentActiveTab = tabs?.find(t => t.id === currentActiveTabId);
       const layer = this.tileLayers.find(l => l.type === layerType);
       
-      if (currentActiveTab && layer) {
-        // Save the current layer's painting data to the current active tab
-        currentActiveTab.data = [...layer.data];
-      }
+      // Slots share one layer grid; each cell remembers its slot via layerCellTilesetKey.
+      void currentActiveTab; void layer;
     }
 
     // Now switch to the new tab
@@ -7153,14 +7152,7 @@ export class TileMapEditor {
       const tab = tabs.find(t => t.id === tabId);
       const layer = this.tileLayers.find(l => l.type === layerType);
       
-      if (tab && layer) {
-        // Restore the tab's painting data to the layer
-        if (tab.data) {
-          layer.data = [...tab.data];
-        } else {
-          layer.data = new Array(this.mapWidth * this.mapHeight).fill(0);
-        }
-      }
+      void layer;
       
       // Check if tab has tileset metadata (may be loading or already loaded)
       if (tab && tab.tileset) {
@@ -7493,14 +7485,11 @@ export class TileMapEditor {
       // Remap any painted cells that referenced the removed tab's tileset
       try {
         const removedTilesetFile = removed[0] && removed[0].tileset ? removed[0].tileset.fileName : null;
+        const layerForRemoval = this.tileLayers.find(l => l.type === layerType);
         if (removedTilesetFile) {
           const arr = this.layerCellTilesetKey.get(layerType) || new Array(this.mapWidth * this.mapHeight).fill(null);
-          for (let i = 0; i < arr.length; i++) {
-            if (arr[i] === removedTilesetFile) {
-              // Clear cell reference - painting remains but will fallback to layer default or be treated as empty
-              arr[i] = null;
-            }
-          }
+          // Cells painted with the deleted slot are erased (never silently remapped to another slot)
+          if (layerForRemoval) clearSlotCells(layerForRemoval.data, arr, removed as unknown as SlotLike[], k => this.normalizeTilesetKey(k));
           this.layerCellTilesetKey.set(layerType, arr);
         }
       } catch (_e) { void _e; }
@@ -8040,6 +8029,22 @@ export class TileMapEditor {
     }
     const fallback = this.getLayerTilesetOrFallback(layerType);
     return fallback?.fileName ?? null;
+  }
+
+  private findTabForCellKey<T extends { tileset?: { fileName?: string | null } | null }>(tabs: T[], key: string | null): T | undefined {
+    return findSlotForCellKey(tabs, key, k => this.normalizeTilesetKey(k));
+  }
+
+  /** Merge legacy per-slot data arrays (pre shared-grid format) into the layer grid. */
+  private migrateLegacySlotData(): void {
+    const size = this.mapWidth * this.mapHeight;
+    for (const [layerType, tabs] of this.layerTabs.entries()) {
+      const layer = this.tileLayers.find(l => l.type === layerType);
+      if (!layer || !tabs || tabs.length === 0) continue;
+      let keys = this.layerCellTilesetKey.get(layerType);
+      if (!keys || keys.length !== size) { keys = new Array(size).fill(null); this.layerCellTilesetKey.set(layerType, keys); }
+      mergeLegacySlotData(layer.data, keys, tabs as unknown as SlotLike[], this.layerActiveTabId.get(layerType));
+    }
   }
 
   private buildObjectLayerExportState(layer: TileLayer): { data: number[]; cellTilesetKeys: Array<string | null> } {
@@ -8695,7 +8700,8 @@ export class TileMapEditor {
         ...layer,
         data: [...layer.data]
       })),
-      objects: this.objects.map(obj => ({ ...obj }))
+      objects: this.objects.map(obj => ({ ...obj })),
+      cellKeys: Array.from(this.layerCellTilesetKey.entries()).map(([k, v]) => [k, [...v]] as [string, Array<string | null>])
     };
 
     // Remove any history beyond current index
@@ -8753,6 +8759,9 @@ export class TileMapEditor {
       
       // Restore layers
       this.tileLayers = this.deepCopyLayers(state.layers);
+      if (state.cellKeys) {
+        this.layerCellTilesetKey = new Map(state.cellKeys.map(([k, v]) => [k, [...v]]));
+      }
       
       // Restore objects
       this.objects = this.deepCopyObjects(state.objects);
@@ -9440,6 +9449,12 @@ export class TileMapEditor {
       if (Object.keys(tabsObj).length > 0) {
         projectData.layerTabs = tabsObj;
       } else { void 0; }
+      // Per-cell slot reference (tileset fileName) so paintings from different slots survive reload
+      const cellKeysObj: Record<string, Array<string | null>> = {};
+      for (const [k, v] of this.layerCellTilesetKey.entries()) {
+        if (v.some(x => x)) cellKeysObj[k] = [...v];
+      }
+      (projectData as unknown as { layerCellTilesetKeys?: Record<string, Array<string | null>> }).layerCellTilesetKeys = cellKeysObj;
 
       // Save active tab ids (skip collision layer - it should never have tabs)
       const activeObj: Record<string, number> = {};
@@ -11014,12 +11029,24 @@ export class TileMapEditor {
         this.createDefaultLayers();
       }
 
+      // Restore per-cell slot references
+      try {
+        const savedKeys = (projectData as unknown as { layerCellTilesetKeys?: Record<string, Array<string | null>> }).layerCellTilesetKeys;
+        if (savedKeys) {
+          const size = this.mapWidth * this.mapHeight;
+          for (const [k, v] of Object.entries(savedKeys)) {
+            if (Array.isArray(v) && v.length === size) this.layerCellTilesetKey.set(k, [...v]);
+          }
+        }
+      } catch (_e) { void _e; }
       // Ensure per-layer cell tileset key arrays exist after loading layers
       for (const l of this.tileLayers) {
         if (!this.layerCellTilesetKey.has(l.type)) {
           this.layerCellTilesetKey.set(l.type, new Array(this.mapWidth * this.mapHeight).fill(null));
         }
       }
+
+      try { this.migrateLegacySlotData(); } catch (_e) { void _e; }
 
       // Ensure layer tabs exist for background and object layers (for backward compatibility
       // with projects saved before tabs were added to the project data format)

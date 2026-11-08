@@ -76,7 +76,7 @@ const LayersPanel: React.FC<Props> = ({
               const visible = layersPanelExpanded || isActive;
               return (
                 <React.Fragment key={layer.id}>
-                {groupBreak && <div aria-hidden className="mx-2 my-1.5 h-px bg-border" />}
+                {groupBreak && <div aria-hidden className="mx-2 my-[10px] h-px bg-primary/50" />}
                 <div
                   className={`block w-full max-w-xs px-2 py-1 rounded transition-all text-xs transform-gpu ${
                     isActive

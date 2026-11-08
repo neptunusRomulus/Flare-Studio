@@ -12,6 +12,7 @@ import type { DialogueLine, DialogueRequirement, DialogueReward, DialogueWorldEf
 import { InlineConfirm } from '@/components/ui/inline-confirm';
 import { AnchoredConfirm } from '@/components/ui/inline-confirm';
 import { DIALOGUE_RECIPES, buildRecipeTree } from '@/editor/dialogueRecipes';
+import { boardWarningCount, buildDialogueBoard } from '@/editor/dialogueBoard';
 
 /** Generate a short unique dialogue ID like "dlg_a3f9" */
 function generateDialogueId(): string {
@@ -347,6 +348,7 @@ const DialogueTreeDialog = ({
   const [recipeMenuOpen, setRecipeMenuOpen] = useState(false);
   const [effectMenuOpen, setEffectMenuOpen] = useState(false);
   const [effectQuery, setEffectQuery] = useState('');
+  const [boardView, setBoardView] = useState(false);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { controls } = useAppContext() as any;
@@ -435,7 +437,6 @@ const DialogueTreeDialog = ({
   const lootCount = activeTree ? lootCountOf(activeTree) : { min: '', max: '' };
   const groundLootCount = activeTree ? groundLootCountOf(activeTree) : { min: '', max: '' };
 
-  // Searchable effect palette: same list as the per-row dropdown, in the same groups.
   const filteredEffects = useMemo(() => {
     const query = effectQuery.trim().toLowerCase();
     const all = EFFECT_GROUPS.flatMap((group) =>
@@ -446,6 +447,9 @@ const DialogueTreeDialog = ({
       `${option.label} ${option.value} ${option.group}`.toLowerCase().includes(query),
     );
   }, [effectQuery]);
+
+  const board = useMemo(() => buildDialogueBoard(dialogueTrees), [dialogueTrees]);
+  const boardWarnings = boardWarningCount(board);
 
   // Collect all dialogueIds for response dropdown
   const allDialogueIds = useMemo(() => {
@@ -510,6 +514,82 @@ const DialogueTreeDialog = ({
                         }
           }}
         />
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
+            {dialogueTrees.length} topics{boardWarnings > 0 ? ` · ${boardWarnings} warnings` : ''}
+          </span>
+          <div className="flex rounded-md border border-border overflow-hidden">
+            <button
+              type="button"
+              className={`px-1.5 py-0.5 text-[10px] ${boardView ? 'text-muted-foreground hover:bg-muted' : 'bg-muted font-semibold'}`}
+              onClick={() => setBoardView(false)}
+            >
+              List
+            </button>
+            <button
+              type="button"
+              className={`px-1.5 py-0.5 text-[10px] ${boardView ? 'bg-muted font-semibold' : 'text-muted-foreground hover:bg-muted'}`}
+              onClick={() => setBoardView(true)}
+            >
+              Board
+            </button>
+          </div>
+        </div>
+        {boardView && (
+          <div className="flex-1 space-y-1.5 overflow-y-auto minimal-scroll pr-0.5">
+            {board.map((card) => (
+              <button
+                key={`board-${card.index}`}
+                type="button"
+                onClick={() => {
+                  setActiveDialogueTab(card.index);
+                  setEditingIdIndex(null);
+                }}
+                className={`w-full rounded-md border p-2 text-left transition-colors ${
+                  activeDialogueTab === card.index
+                    ? 'border-blue-500/50 bg-blue-500/10'
+                    : 'border-border hover:bg-muted/50'
+                }`}
+              >
+                <div className="flex items-center gap-1">
+                  <span className="text-xs font-semibold truncate flex-1">{card.topic}</span>
+                  {card.responseOnly && <EyeOff className="w-3 h-3 text-amber-500 shrink-0" />}
+                  {card.warnings.length > 0 && (
+                    <Tooltip content={card.warnings.join(' · ')}>
+                      <span className="shrink-0 rounded bg-destructive/15 px-1 text-[9px] text-destructive cursor-help">
+                        {card.warnings.length}
+                      </span>
+                    </Tooltip>
+                  )}
+                </div>
+                <div className="flex items-center gap-1 text-[9px] text-muted-foreground mt-0.5">
+                  <span className="font-mono truncate">{card.dialogueId || 'no id'}</span>
+                  <span className="ml-auto shrink-0">{card.lineCount} lines</span>
+                </div>
+                {card.links.length > 0 && (
+                  <div className="flex flex-wrap gap-1 mt-1">
+                    {card.links.map((link) => (
+                      <span
+                        key={`${card.index}-${link.dialogueId}`}
+                        className={`rounded px-1 text-[9px] truncate max-w-full ${
+                          link.label
+                            ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400'
+                            : 'bg-destructive/15 text-destructive'
+                        }`}
+                      >
+                        {link.label || `missing ${link.dialogueId}`}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {card.orphan && (
+                  <div className="text-[9px] text-muted-foreground mt-1">Not linked from another topic</div>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+        {!boardView && (
         <div className="flex-1 space-y-1 overflow-y-auto minimal-scroll">
           {dialogueTrees.map((tree, index) => {
             const hasResponses = (tree.responses || []).length > 0;
@@ -556,12 +636,12 @@ const DialogueTreeDialog = ({
             </button>
             );
           })}
-          <Button
-            variant="outline"
-            size="sm"
-            className="mt-1 w-full gap-1"
-            onClick={() => setRecipeMenuOpen((open) => !open)}
-          >
+        <Button
+          variant="outline"
+          size="sm"
+          className="mt-1 w-full gap-1"
+          onClick={() => setRecipeMenuOpen((open) => !open)}
+        >
             <Sparkles className="w-3.5 h-3.5" />
             Recipe
             {recipeMenuOpen ? <ChevronUp className="w-3 h-3 ml-auto" /> : <ChevronDown className="w-3 h-3 ml-auto" />}
@@ -616,6 +696,7 @@ const DialogueTreeDialog = ({
             Add
           </Button>
         </div>
+        )}
       </div>
       
       {/* Tab content */}

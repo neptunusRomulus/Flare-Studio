@@ -1,6 +1,6 @@
 import React from 'react';
 import type { TileLayer } from '@/types';
-import MapTargetSwitch from '@/components/MapTargetSwitch';
+import MapTargetSwitch, { type LayerVisibilityControls } from '@/components/MapTargetSwitch';
 import SidebarActorArea from '@/components/SidebarActorArea';
 import SidebarEventArea from '@/components/SidebarEventArea';
 import { ENTITY_GROUP } from '@/components/targetGroups';
@@ -12,10 +12,11 @@ type Props = {
   onSelectLayer: (id: number) => void;
   actors: Omit<React.ComponentProps<typeof SidebarActorArea>, 'leftCollapsed'>;
   events: Omit<React.ComponentProps<typeof SidebarEventArea>, 'leftCollapsed'>;
+  visibility?: LayerVisibilityControls;
 };
 
 /** Right dock content for the Entities layer: existing lists on top + target switch below (same as Map dock) NPC/Enemy/Event lists. */
-const EntityDock: React.FC<Props> = ({ layers, activeLayer, onSelectLayer, actors, events }) => {
+const EntityDock: React.FC<Props> = ({ layers, activeLayer, onSelectLayer, actors, events, visibility }) => {
   const type = activeLayer?.type;
   // Switching target (or leaving Entities) cancels a pending click-to-place
   React.useEffect(() => { entityPlacement.clear(); return () => entityPlacement.clear(); }, [type]);
@@ -28,7 +29,7 @@ const EntityDock: React.FC<Props> = ({ layers, activeLayer, onSelectLayer, actor
         {type === 'event' && <SidebarEventArea {...events} isEventLayer leftCollapsed={false} />}
       </div>
       {/* Same layout as the Map dock: content on top, target switch below */}
-      <MapTargetSwitch group={ENTITY_GROUP} layers={layers} activeLayer={activeLayer} onSelectLayer={onSelectLayer} />
+      <MapTargetSwitch group={ENTITY_GROUP} layers={layers} activeLayer={activeLayer} onSelectLayer={onSelectLayer} visibility={visibility} />
     </div>
   );
 };

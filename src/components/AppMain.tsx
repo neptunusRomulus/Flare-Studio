@@ -7,10 +7,11 @@ import { loadingOverlay } from '@/components/loadingOverlayStore';
 import { useAppContext } from '../context/AppContext';
 import WelcomeScreen from '../components/WelcomeScreen';
 import AppShell from '@/components/AppShell';
-import AppSidebar from '@/components/AppSidebar';
+import MainLayerSwitch from '@/components/MainLayerSwitch';
+import DockFooter from '@/components/DockFooter';
+import SidebarGameSettingsArea from '@/components/SidebarGameSettingsArea';
 import PaletteDock from '@/components/PaletteDock';
 import { shouldShowPanels } from '@/hooks/preMapEditor';
-import { isDrawingLayer } from '@/components/paletteLayout';
 import EngineSettingsDialog from '@/components/EngineSettingsDialog';
 import MapSettingsDialog from '@/components/MapSettingsDialog';
 import EventDialog from '@/components/EventDialog';
@@ -166,53 +167,6 @@ export default function AppMain() {
   const { handleManualSave, isManuallySaving } = useManualSaveSetup(editor, controls?.currentProjectPath, undefined, onAfterSave);
 
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [leftSidebarWidth, setLeftSidebarWidth] = useState<number>(() => {
-    if (typeof window === 'undefined') return 224;
-    try {
-      const saved = localStorage.getItem('leftSidebarWidth');
-      if (!saved) return 224;
-      const parsed = Number(saved);
-      if (Number.isFinite(parsed)) {
-        return Math.min(520, Math.max(200, parsed));
-      }
-    } catch {
-      // ignore
-    }
-    return 224;
-  });
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    try {
-      localStorage.setItem('leftSidebarWidth', leftSidebarWidth.toString());
-    } catch {
-      // ignore
-    }
-  }, [leftSidebarWidth]);
-
-  const handleSidebarResizeMouseDown = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-
-    const startX = event.clientX;
-    const startWidth = leftSidebarWidth;
-    document.body.style.cursor = 'col-resize';
-
-    const handleMouseMove = (moveEvent: MouseEvent) => {
-      const nextWidth = Math.min(520, Math.max(200, startWidth + moveEvent.clientX - startX));
-      setLeftSidebarWidth(nextWidth);
-    };
-
-    const handleMouseUp = () => {
-      document.body.style.cursor = '';
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-  }, [leftSidebarWidth]);
-
   useEffect(() => {
     if (!editor) return;
     editor.setSaveStatusCallback((status: string) => {
@@ -228,6 +182,12 @@ export default function AppMain() {
   }), [controls, handleManualSave, isManuallySaving, hasUnsavedChanges]);
 
   const hasMap = canvasCtx.mapInitialized;
+
+  // Per-layer visibility (corner eye) / opacity (wheel) on the Map and Entities sub-switch buttons
+  const layerVisibility = useMemo(() => layersObj ? {
+    onToggleVisibility: layersObj.handleToggleLayerVisibility,
+    onTransparencyChange: layersObj.handleLayerTransparencyChange,
+  } : undefined, [layersObj]);
 
   // Flare engine launcher
   const flareEngineSave = useCallback(async () => { await handleManualSave(); }, [handleManualSave]);
@@ -319,32 +279,16 @@ export default function AppMain() {
       />
 
       <main className="flex flex-1 min-h-0">
-        {showPanels && (
-          <AppSidebar
-            leftCollapsed={leftCollapsed}
-            sidebarWidth={leftSidebarWidth}
-            onSidebarResizeMouseDown={handleSidebarResizeMouseDown}
-            actors={actors}            statuses={statuses}            rules={rules}
-            items={items}
-            events={events}
-            gameSettings={gameSettings}
-            tileset={{
-              ...tileset,
-              currentProjectPath: controls?.currentProjectPath
-            }}
-            layers={layersObj}
-            exportStatus={exportStatus}
-            controls={enhancedControls}
-          />
-        )}
-
         <EditorArea topBarProps={topBarProps} canvasCtx={canvasCtx} bottomToolbarProps={bottomToolbarProps} isDarkMode={isDarkMode} />
 
         <PaletteDock
           {...tileset}
           mapLayers={layersObj?.layers}
           onSelectLayer={layersObj?.handleSetActiveLayer}
-          open={showPanels && (isDrawingLayer(tileset.activeLayer?.type) || groupOfType(tileset.activeLayer?.type) === ENTITY_GROUP || groupOfType(tileset.activeLayer?.type) === CONTENT_GROUP)}
+          open={showPanels}
+          layerVisibility={layerVisibility}
+          header={<MainLayerSwitch layers={layersObj?.layers ?? []} activeLayer={tileset.activeLayer} onSelectLayer={layersObj?.handleSetActiveLayer ?? (() => {})} />}
+          footer={<DockFooter exportStatus={exportStatus} controls={enhancedControls} />}
           currentProjectPath={controls?.currentProjectPath}
           content={groupOfType(tileset.activeLayer?.type) === ENTITY_GROUP ? (
             <EntityDock
@@ -353,6 +297,7 @@ export default function AppMain() {
               onSelectLayer={layersObj?.handleSetActiveLayer ?? (() => {})}
               actors={{ ...actors, isNpcLayer: false, isEnemyLayer: false }}
               events={{ ...events, isEventLayer: true }}
+              visibility={layerVisibility}
             />
           ) : groupOfType(tileset.activeLayer?.type) === CONTENT_GROUP ? (
             <ContentDock
@@ -363,7 +308,9 @@ export default function AppMain() {
               statuses={{ handleOpenStatusDialog: statuses?.handleOpenStatusDialog ?? (() => {}) }}
               rules={{ rulesList: rules.rulesList, handleAddRule: rules.handleAddRule, handleEditRule: rules.handleEditRule }}
             />
-          ) : undefined}
+          ) : tileset.activeLayer?.type === 'gameSettings' ? (
+            <SidebarGameSettingsArea />
+          ) : !tileset.activeLayer ? null : undefined}
         />
 
         <EngineSettingsDialog

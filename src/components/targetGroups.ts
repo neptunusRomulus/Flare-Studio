@@ -84,3 +84,28 @@ export function normalizeTileRect(a: { x: number; y: number }, b: { x: number; y
   const y1 = clamp(Math.min(a.y, b.y), mapH), y2 = clamp(Math.max(a.y, b.y), mapH);
   return { x: x1, y: y1, width: x2 - x1 + 1, height: y2 - y1 + 1 };
 }
+
+/** Main layers shown at the top of the right dock. */
+export const MAIN_LAYERS: Array<{ id: string; label: string }> = [
+  { id: 'map', label: 'Map' },
+  { id: 'entities', label: 'Entities' },
+  { id: 'content', label: 'Content' },
+  { id: 'gameSettings', label: 'Game Settings' },
+];
+
+/** Main layer of a real layer type (unknown non-group types count as Map, like the old sidebar grouping). */
+export function mainLayerOf(type: string | null | undefined): string | null {
+  if (!type) return null;
+  if (type === 'gameSettings') return 'gameSettings';
+  return groupOfType(type)?.id ?? 'map';
+}
+
+/** Real layer id to activate for a main layer: the group's last-used target, else its first existing target. */
+export function mainLayerTargetId(main: string, layers: Array<{ id: number; type: string }>): number | null {
+  if (main === 'gameSettings') return layers.find(l => l.type === 'gameSettings')?.id ?? null;
+  const g = TARGET_GROUPS.find(x => x.id === main);
+  if (!g) return null;
+  const want = lastGroupTarget(g);
+  const l = layers.find(x => x.type === want) ?? g.targets.map(t => layers.find(x => x.type === t)).find(Boolean);
+  return l ? l.id : null;
+}

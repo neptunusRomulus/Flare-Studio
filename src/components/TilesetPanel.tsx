@@ -1,5 +1,5 @@
 import React from 'react';
-import MapTargetSwitch from '@/components/MapTargetSwitch';
+import MapTargetSwitch, { type LayerVisibilityControls } from '@/components/MapTargetSwitch';
 import TilesetPalette from '@/components/TilesetPalette';
 import BrushToolbar from '@/components/BrushToolbar';
 import type { TileLayer } from '@/types';
@@ -16,6 +16,7 @@ type Props = {
   isCollisionLayer: boolean;
   fitToWidth?: boolean;
   mapLayers?: TileLayer[];
+  layerVisibility?: LayerVisibilityControls;
   onSelectLayer?: (id: number) => void;
   _brushToolbarExpanded?: boolean;
   _showBrushToolbarTemporarily?: () => void;
@@ -49,6 +50,7 @@ const TilesetPanel: React.FC<Props> = ({
   isCollisionLayer,
   fitToWidth,
   mapLayers,
+  layerVisibility,
   onSelectLayer,
   _brushToolbarExpanded,
   _showBrushToolbarTemporarily,
@@ -79,7 +81,7 @@ const TilesetPanel: React.FC<Props> = ({
       <TilesetPalette editor={editor} activeLayer={activeLayer} tabTick={tabTick} setTabTick={setTabTick} brushTool={brushTool} stampsState={stampsState} fitToWidth={fitToWidth} />
 
       {mapLayers && onSelectLayer && (
-        <MapTargetSwitch layers={mapLayers} activeLayer={activeLayer} onSelectLayer={onSelectLayer} />
+        <MapTargetSwitch layers={mapLayers} activeLayer={activeLayer} onSelectLayer={onSelectLayer} visibility={layerVisibility} />
       )}
 
       <BrushToolbar

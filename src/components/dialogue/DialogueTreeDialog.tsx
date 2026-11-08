@@ -132,6 +132,12 @@ const buildTeleportValue = (map: string, x: number, y: number) => {
   return `maps/${normalizedMap}.txt,${x},${y}`;
 };
 
+const parseIntramap = (value: string) => {
+  const [x = '0', y = '0'] = String(value || '').split(',');
+  return { x: parseInt(x, 10) || 0, y: parseInt(y, 10) || 0 };
+};
+const buildIntramap = (x: number, y: number) => `${x},${y}`;
+
 type AllowMovementTree = { passthrough?: Array<{ key: string; value: string }> };
 /** Flare default: movement allowed unless allow_movement=false. */
 function allowMovementOf(tree: AllowMovementTree): boolean {
@@ -144,6 +150,40 @@ function withAllowMovement(tree: AllowMovementTree, allowed: boolean): Array<{ k
   if (has) return list.map((p) => (p.key === 'allow_movement' ? { ...p, value: String(allowed) } : p));
   return allowed ? list : [...list, { key: 'allow_movement', value: 'false' }];
 }
+
+/** take_a_party: NPC joins the player's party while this dialog runs (Flare key). */
+function takePartyOf(tree: AllowMovementTree): boolean {
+  const entry = [...(tree.passthrough || [])].reverse().find((p) => p.key === 'take_a_party');
+  return !!entry && /^(true|1)$/i.test(entry.value.trim());
+}
+function withTakeParty(tree: AllowMovementTree, joins: boolean): Array<{ key: string; value: string }> {
+  const list = tree.passthrough || [];
+  const has = list.some((p) => p.key === 'take_a_party');
+  if (has) return list.map((p) => (p.key === 'take_a_party' ? { ...p, value: String(joins) } : p));
+  return joins ? [...list, { key: 'take_a_party', value: 'true' }] : list;
+}
+
+/** reward_loot_count is node-wide in Flare (first one wins); kept in passthrough so its position survives. */
+function lootCountOf(tree: AllowMovementTree): { min: string; max: string } {
+  const entry = [...(tree.passthrough || [])].reverse().find((p) => p.key === 'reward_loot_count');
+  if (!entry) return { min: '', max: '' };
+  const [min = '', max = ''] = String(entry.value).split(',');
+  return { min: min.trim(), max: max.trim() };
+}
+function withLootCount(tree: AllowMovementTree, min: string, max: string): Array<{ key: string; value: string }> {
+  const list = tree.passthrough || [];
+  const value = min.trim() ? (max.trim() ? `${min.trim()},${max.trim()}` : min.trim()) : '';
+  const has = list.some((p) => p.key === 'reward_loot_count');
+  if (!value) return list.filter((p) => p.key !== 'reward_loot_count');
+  if (has) return list.map((p) => (p.key === 'reward_loot_count' ? { ...p, value } : p));
+  return [...list, { key: 'reward_loot_count', value }];
+}
+
+const parseRespec = (value: string) => {
+  const [mode = 'stats', ignoreDefaults = ''] = String(value || '').split(',');
+  return { mode: mode.trim() || 'stats', ignoreDefaults: /^(true|1)$/i.test(ignoreDefaults.trim()) };
+};
+const buildRespec = (mode: string, ignoreDefaults: boolean) => `${mode}${ignoreDefaults ? ',true' : ''}`;
 
 const DialogueTreeDialog = ({
   showDialogueTreeDialog,
@@ -233,7 +273,32 @@ const DialogueTreeDialog = ({
     setDialogueTrees(newTrees);
   }, [dialogueTrees, setDialogueTrees]);
 
+  const setWorldEffect = useCallback((index: number, updates: Partial<DialogueWorldEffect>) => {
+    const newTrees = [...dialogueTrees];
+    const newWfs = [...(newTrees[activeDialogueTab].worldEffects || [])];
+    newWfs[index] = { ...newWfs[index], ...updates };
+    newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], worldEffects: newWfs };
+    setDialogueTrees(newTrees);
+  }, [dialogueTrees, activeDialogueTab, setDialogueTrees]);
+
   const activeTree = dialogueTrees[activeDialogueTab];
+
+  // Visual effect ids defined in the NPC's [visual_effect] sections (edited property first).
+  const visualEffectIds = useMemo(() => {
+    try {
+      const raw = editingObject?.properties?.npc_visual_effects;
+      const text = Array.isArray(raw) ? raw[0] : raw;
+      const parsed = JSON.parse(String(text || '[]'));
+      if (!Array.isArray(parsed)) return [] as string[];
+      return parsed
+        .map((fx: unknown) => (Array.isArray(fx) ? (fx.find((e) => e && typeof e === 'object' && (e as { key?: string }).key === 'id') as { value?: string } | undefined)?.value : ''))
+        .filter((id: unknown): id is string => typeof id === 'string' && id.length > 0);
+    } catch {
+      return [] as string[];
+    }
+  }, [editingObject]);
+
+  const lootCount = activeTree ? lootCountOf(activeTree) : { min: '', max: '' };
 
   // Collect all dialogueIds for response dropdown
   const allDialogueIds = useMemo(() => {
@@ -493,6 +558,18 @@ const DialogueTreeDialog = ({
               />
               <Tooltip content="allow_movement: when off, the player can't move while this dialog is open.">
                 <span className="text-xs text-muted-foreground">Allow Movement</span>
+              </Tooltip>
+            </div>
+
+            {/* take_a_party (passthrough keeps the original line position) */}
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={takePartyOf(activeTree)}
+                onCheckedChange={(checked) => updateTree(activeDialogueTab, { passthrough: withTakeParty(activeTree, checked) })}
+                className="scale-75"
+              />
+              <Tooltip content="take_a_party: the NPC joins or leaves the player's party while this dialog runs.">
+                <span className="text-xs text-muted-foreground">Take a Party</span>
               </Tooltip>
             </div>
 
@@ -907,6 +984,7 @@ const DialogueTreeDialog = ({
                         <option value="remove_item">Take Item</option>
                         <option value="restore">Restore HP/MP</option>
                         <option value="msg">Notification</option>
+                        <option value="loot">Random loot</option>
                       </select>
                       <Input
                         value={rew.value}
@@ -921,6 +999,7 @@ const DialogueTreeDialog = ({
                           rew.type === 'item' || rew.type === 'remove_item' ? 'Item ID...' :
                           rew.type === 'restore' ? 'hp/mp/all' :
                           rew.type === 'msg' ? 'e.g. Quest added.' :
+                          rew.type === 'loot' ? 'Loot table or inline loot' :
                           'Amount...'
                         }
                         className="h-7 text-xs flex-1"
@@ -941,6 +1020,33 @@ const DialogueTreeDialog = ({
                             }}
                             className="h-7 w-14 text-xs"
                           />
+                        </>
+                      )}
+                      {rew.type === 'loot' && (
+                        <>
+                          <span className="text-xs text-muted-foreground">×</span>
+                          <Input
+                            type="number"
+                            min={1}
+                            value={lootCount.min}
+                            placeholder="1"
+                            onChange={(e) => updateTree(activeDialogueTab, { passthrough: withLootCount(activeTree, e.target.value, lootCount.max) })}
+                            className="h-7 w-14 text-xs"
+                            aria-label="Minimum random loot"
+                          />
+                          <span className="text-xs text-muted-foreground">–</span>
+                          <Input
+                            type="number"
+                            min={1}
+                            value={lootCount.max}
+                            placeholder="max"
+                            onChange={(e) => updateTree(activeDialogueTab, { passthrough: withLootCount(activeTree, lootCount.min || '1', e.target.value) })}
+                            className="h-7 w-14 text-xs"
+                            aria-label="Maximum random loot"
+                          />
+                          <Tooltip content="reward_loot_count — minimum and optional maximum amount of random items. In Flare the first count line applies to all reward_loot lines in this dialog.">
+                            <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                          </Tooltip>
                         </>
                       )}
                       <Button
@@ -998,26 +1104,35 @@ const DialogueTreeDialog = ({
               {activeTree._wfExpanded && (
                 <div className="px-3 pb-3 space-y-2">
                   <p className="text-xs text-muted-foreground">What happens in the world after this?</p>
+                  <datalist id="dialogue-visual-effect-ids">
+                    {visualEffectIds.map((id) => <option key={id} value={id} />)}
+                  </datalist>
                   {(activeTree.worldEffects || []).map((wf, wfIndex) => (
                     <div key={wf.id} className="flex gap-2 items-center p-2 rounded-md bg-purple-500/10 border-l-2 border-l-purple-500/50">
                       <select
                         value={wf.type}
                         onChange={(e) => {
-                          const newTrees = [...dialogueTrees];
-                          const newWfs = [...(newTrees[activeDialogueTab].worldEffects || [])];
-                          newWfs[wfIndex] = { ...newWfs[wfIndex], type: e.target.value as DialogueWorldEffect['type'] };
-                          newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], worldEffects: newWfs };
-                          setDialogueTrees(newTrees);
+                          const nextType = e.target.value as DialogueWorldEffect['type'];
+                          const defaultValue = nextType === 'stash' || nextType === 'save_game' ? 'true' : nextType === 'respec' ? 'stats' : '';
+                          setWorldEffect(wfIndex, { type: nextType, value: defaultValue });
                         }}
                         className="h-8 px-2 py-1 rounded-md border text-[11px] bg-background min-w-[110px] cursor-pointer"
                       >
                         <option value="set_status">Set Status</option>
                         <option value="unset_status">Clear Status</option>
                         <option value="teleport">Teleport</option>
+                        <option value="intramap">Teleport in Map</option>
                         <option value="spawn">Spawn Enemy</option>
                         <option value="cutscene">Cutscene</option>
                         <option value="sound">Play Sound</option>
+                        <option value="music">Change Music</option>
                         <option value="npc">NPC Dialog</option>
+                        <option value="stash">Open Stash</option>
+                        <option value="book">Open Book</option>
+                        <option value="respec">Respec</option>
+                        <option value="save_game">Save Game</option>
+                        <option value="script">Run Script</option>
+                        <option value="visual_effect">Visual Effect</option>
                       </select>
                       {wf.type === 'teleport' ? (
                         <div className="flex gap-2 flex-1 items-center">
@@ -1086,21 +1201,97 @@ const DialogueTreeDialog = ({
                             </div>
                           </div>
                         </div>
+                      ) : wf.type === 'intramap' ? (
+                        <div className="flex gap-2 flex-1 items-center">
+                          <label className="text-[10px] text-muted-foreground">X</label>
+                          <Input
+                            type="number"
+                            value={parseIntramap(wf.value).x}
+                            onChange={(e) => setWorldEffect(wfIndex, { value: buildIntramap(parseInt(e.target.value, 10) || 0, parseIntramap(wf.value).y) })}
+                            className="h-7 w-20 text-xs"
+                          />
+                          <label className="text-[10px] text-muted-foreground">Y</label>
+                          <Input
+                            type="number"
+                            value={parseIntramap(wf.value).y}
+                            onChange={(e) => setWorldEffect(wfIndex, { value: buildIntramap(parseIntramap(wf.value).x, parseInt(e.target.value, 10) || 0) })}
+                            className="h-7 w-20 text-xs"
+                          />
+                          <Tooltip content="intramap — teleports the player within the current map (X, Y).">
+                            <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                          </Tooltip>
+                        </div>
+                      ) : wf.type === 'stash' ? (
+                        <div className="flex gap-2 flex-1 items-center">
+                          <select
+                            value={wf.value === 'false' ? 'false' : 'true'}
+                            onChange={(e) => setWorldEffect(wfIndex, { value: e.target.value })}
+                            className="h-8 px-2 py-1 rounded-md border text-[11px] bg-background cursor-pointer"
+                          >
+                            <option value="true">Open stash</option>
+                            <option value="false">Close stash</option>
+                          </select>
+                          <Tooltip content="stash — opens the player's stash menu during this dialog.">
+                            <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                          </Tooltip>
+                        </div>
+                      ) : wf.type === 'save_game' ? (
+                        <div className="flex gap-2 flex-1 items-center">
+                          <select
+                            value={wf.value === 'true' ? 'true' : 'false'}
+                            onChange={(e) => setWorldEffect(wfIndex, { value: e.target.value })}
+                            className="h-8 px-2 py-1 rounded-md border text-[11px] bg-background cursor-pointer"
+                          >
+                            <option value="true">Save game</option>
+                            <option value="false">Do not save</option>
+                          </select>
+                          <Tooltip content="save_game — saves the game and sets the respawn position here.">
+                            <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                          </Tooltip>
+                        </div>
+                      ) : wf.type === 'respec' ? (
+                        <div className="flex gap-2 flex-1 items-center">
+                          <select
+                            value={parseRespec(wf.value).mode}
+                            onChange={(e) => setWorldEffect(wfIndex, { value: buildRespec(e.target.value, parseRespec(wf.value).ignoreDefaults) })}
+                            className="h-8 px-2 py-1 rounded-md border text-[11px] bg-background cursor-pointer"
+                          >
+                            <option value="stats">Stats</option>
+                            <option value="powers">Powers</option>
+                            <option value="xp">XP</option>
+                          </select>
+                          <label className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                            <input
+                              type="checkbox"
+                              checked={parseRespec(wf.value).ignoreDefaults}
+                              onChange={(e) => setWorldEffect(wfIndex, { value: buildRespec(parseRespec(wf.value).mode, e.target.checked) })}
+                            />
+                            Engine defaults
+                          </label>
+                          <Tooltip content="respec — resets XP, stats or powers. Resetting stats also resets powers; resetting XP also resets stats.">
+                            <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                          </Tooltip>
+                        </div>
+                      ) : wf.type === 'visual_effect' ? (
+                        <Input
+                          list="dialogue-visual-effect-ids"
+                          value={wf.value}
+                          onChange={(e) => setWorldEffect(wfIndex, { value: e.target.value })}
+                          placeholder="Effect ID"
+                          className="h-7 text-xs flex-1"
+                        />
                       ) : (
                         <Input
                           value={wf.value}
-                          onChange={(e) => {
-                            const newTrees = [...dialogueTrees];
-                            const newWfs = [...(newTrees[activeDialogueTab].worldEffects || [])];
-                            newWfs[wfIndex] = { ...newWfs[wfIndex], value: e.target.value };
-                            newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], worldEffects: newWfs };
-                            setDialogueTrees(newTrees);
-                          }}
+                          onChange={(e) => setWorldEffect(wfIndex, { value: e.target.value })}
                           placeholder={
                             wf.type === 'set_status' || wf.type === 'unset_status' ? 'Status tag...' :
                             wf.type === 'spawn' ? 'Enemy category' :
                             wf.type === 'cutscene' ? 'Cutscene file...' :
                             wf.type === 'sound' ? 'Sound file...' :
+                            wf.type === 'music' ? 'Music file...' :
+                            wf.type === 'book' ? "Book file or 'close'" :
+                            wf.type === 'script' ? 'Event file...' :
                             wf.type === 'npc' ? 'NPC file...' : 'Value...'
                           }
                           className="h-7 text-xs flex-1"

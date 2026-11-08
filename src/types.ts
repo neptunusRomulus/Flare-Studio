@@ -256,14 +256,16 @@ export interface DialogueLine {
 
 export interface DialogueReward {
   id?: string;
-  type: 'xp' | 'gold' | 'item' | 'remove_gold' | 'remove_item' | 'restore' | 'msg';
+  type: 'xp' | 'gold' | 'item' | 'remove_gold' | 'remove_item' | 'restore' | 'msg' | 'loot';
   value: string;
   quantity?: number;
 }
 
 export interface DialogueWorldEffect {
   id?: string;
-  type: 'set_status' | 'unset_status' | 'teleport' | 'spawn' | 'cutscene' | 'sound' | 'npc';
+  type:
+    | 'set_status' | 'unset_status' | 'teleport' | 'spawn' | 'cutscene' | 'sound' | 'npc'
+    | 'intramap' | 'music' | 'stash' | 'book' | 'respec' | 'save_game' | 'script' | 'visual_effect';
   value: string;
 }
 

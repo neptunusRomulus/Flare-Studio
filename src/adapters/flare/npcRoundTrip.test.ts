@@ -70,6 +70,55 @@ describe('NPC file round trip (flare-game samples)', () => {
     const out = exportNpcFile({ name: 'N', customProperties: { dialogueTrees: [{ dialogueId: 'a', topic: 'T', requirements: [{ type: 'status', value: 's' }], responses: ['b'], dialogues: [{ speaker: 'npc', text: 'Hi' }], rewards: [], worldEffects: [{ type: 'set_status', value: 'x' }] }] } });
     expect(canon(out).dialogs[0].lines).toEqual(['id=a', 'topic=T', 'requires_status=s', 'response=b', 'him=Hi', 'set_status=x']);
   });
+
+  it('Flare 1.15 dialog actions survive import + export in file order', () => {
+    const text = [
+      'name=Quest NPC',
+      'talker=true',
+      '',
+      '[dialog]',
+      'id=q1',
+      'topic=Quest',
+      'reward_loot=loot/chest.txt',
+      'reward_loot_count=2,4',
+      'intramap=5,6',
+      'music=soundfx/music/village.ogg',
+      'stash=true',
+      'book=books/lore.txt',
+      'respec=stats,true',
+      'save_game=true',
+      'script=events/reward.txt',
+      'visual_effect=glow',
+      'take_a_party=true',
+      'him=Hello',
+    ].join('\n');
+    const npc = importNpcText(text);
+    expect(lines(exportNpcFile(npc))).toEqual(lines(text));
+
+    const tree = npc.customProperties.dialogueTrees[0];
+    expect(tree.rewards).toContainEqual(expect.objectContaining({ type: 'loot', value: 'loot/chest.txt' }));
+    expect(tree.worldEffects.map((e: { type: string }) => e.type)).toEqual([
+      'intramap', 'music', 'stash', 'book', 'respec', 'save_game', 'script', 'visual_effect',
+    ]);
+    expect(tree.passthrough).toContainEqual({ key: 'reward_loot_count', value: '2,4' });
+    expect(tree.passthrough).toContainEqual({ key: 'take_a_party', value: 'true' });
+  });
+
+  it('new loot and world actions get a sensible order', () => {
+    const out = exportNpcFile({
+      name: 'N',
+      customProperties: {
+        dialogueTrees: [{
+          dialogueId: 'a',
+          topic: 'T',
+          dialogues: [{ speaker: 'npc', text: 'Hi' }],
+          rewards: [{ type: 'loot', value: 'loot/x.txt' }],
+          worldEffects: [{ type: 'intramap', value: '3,4' }, { type: 'stash', value: 'true' }],
+        }],
+      },
+    });
+    expect(canon(out).dialogs[0].lines).toEqual(['id=a', 'topic=T', 'him=Hi', 'intramap=3,4', 'stash=true', 'reward_loot=loot/x.txt']);
+  });
 });
 
 const { normalizeEnemyText } = require('./serializers.cjs');

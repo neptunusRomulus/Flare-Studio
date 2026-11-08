@@ -370,10 +370,13 @@ const REQ_TYPE_BY_KEY = {
 const REWARD_TYPE_BY_KEY = {
   reward_xp: "xp", reward_currency: "gold", remove_currency: "remove_gold",
   reward_item: "item", remove_item: "remove_item", restore: "restore", msg: "msg",
+  reward_loot: "loot",
 };
 const EFFECT_TYPE_BY_KEY = {
   set_status: "set_status", unset_status: "unset_status", intermap: "teleport",
   spawn: "spawn", cutscene: "cutscene", soundfx: "sound", npc: "npc",
+  intramap: "intramap", music: "music", stash: "stash", book: "book",
+  respec: "respec", save_game: "save_game", script: "script", visual_effect: "visual_effect",
 };
 const DIALOG_META_KEYS = ["id", "topic", "group", "response_only"];
 const LINE_PREFIX_KEYS = new Set(["voice", "portrait_him", "portrait_her", "portrait_you", "portrait"]);
@@ -437,6 +440,7 @@ function dialogItemEntries(category, item) {
     if (r.type === "remove_item" && r.value) return [`remove_item=${r.value}`];
     if (r.type === "restore") return [`restore=${r.value || "all"}`];
     if (r.type === "msg" && r.value) return [`msg=${r.value}`];
+    if (r.type === "loot" && r.value) return [`reward_loot=${r.value}`];
     return [];
   }
   if (category === "pass") {
@@ -618,6 +622,14 @@ function worldEffectKey(type) {
     cutscene: "cutscene",
     sound: "soundfx",
     npc: "npc",
+    intramap: "intramap",
+    music: "music",
+    stash: "stash",
+    book: "book",
+    respec: "respec",
+    save_game: "save_game",
+    script: "script",
+    visual_effect: "visual_effect",
   };
   return map[type] || "";
 }

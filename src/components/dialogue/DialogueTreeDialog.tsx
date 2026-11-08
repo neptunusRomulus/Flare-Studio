@@ -4,13 +4,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { AlignLeft, ArrowLeft, ArrowRight, ChevronDown, ChevronUp, Coins, Eye, EyeOff, Fingerprint, Gift, HelpCircle, Image, Link2, MessageSquare, Package, Plus, Save, Shield, Tag, User, Volume2, X, Zap } from 'lucide-react';
+import { AlignLeft, ArrowLeft, ArrowRight, ChevronDown, ChevronUp, Coins, Eye, EyeOff, Fingerprint, Gift, HelpCircle, Image, Link2, MessageSquare, Package, Plus, Save, Shield, Sparkles, Tag, User, Volume2, X, Zap } from 'lucide-react';
 import Tooltip from '@/components/ui/tooltip';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 import { useAppContext } from '@/context/AppContext';
 import type { DialogueLine, DialogueRequirement, DialogueReward, DialogueWorldEffect, DialogueTree, MapObject } from '@/types';
 import { InlineConfirm } from '@/components/ui/inline-confirm';
 import { AnchoredConfirm } from '@/components/ui/inline-confirm';
+import { DIALOGUE_RECIPES, buildRecipeTree } from '@/editor/dialogueRecipes';
 
 /** Generate a short unique dialogue ID like "dlg_a3f9" */
 function generateDialogueId(): string {
@@ -340,6 +341,7 @@ const DialogueTreeDialog = ({
   const [editingIdIndex, setEditingIdIndex] = useState<number | null>(null);
   const [pendingIdValue, setPendingIdValue] = useState('');
   const [idConfirmShown, setIdConfirmShown] = useState(false);
+  const [recipeMenuOpen, setRecipeMenuOpen] = useState(false);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { controls } = useAppContext() as any;
@@ -537,6 +539,41 @@ const DialogueTreeDialog = ({
             </button>
             );
           })}
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-1 w-full gap-1"
+            onClick={() => setRecipeMenuOpen((open) => !open)}
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            Recipe
+            {recipeMenuOpen ? <ChevronUp className="w-3 h-3 ml-auto" /> : <ChevronDown className="w-3 h-3 ml-auto" />}
+          </Button>
+          {recipeMenuOpen && (
+            <div className="mt-1 rounded-md border border-border bg-background">
+              {DIALOGUE_RECIPES.map((recipe) => (
+                <Tooltip key={recipe.id} content={recipe.description}>
+                  <button
+                    type="button"
+                    className="w-full px-2.5 py-1.5 text-left text-xs hover:bg-muted"
+                    onClick={() => {
+                      const tree = buildRecipeTree(
+                        recipe,
+                        dialogueTrees,
+                        () => String(Date.now()),
+                        generateDialogueId,
+                      );
+                      setDialogueTrees([...dialogueTrees, tree]);
+                      setActiveDialogueTab(dialogueTrees.length);
+                      setRecipeMenuOpen(false);
+                    }}
+                  >
+                    {recipe.label}
+                  </button>
+                </Tooltip>
+              ))}
+            </div>
+          )}
           <Button
             variant="outline"
             size="sm"

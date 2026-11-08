@@ -13,6 +13,14 @@ import NpcPropertyList from '@/components/NpcPropertyList';
 import { getStoredFlarePath } from '@/flare/flarePathStore';
 import { isAnimationDefinitionFilePath, isImageFilePath } from '@/utils/animationUtils';
 import { isCustomTilesetAppearance } from '@/editor/npcPropertyCards';
+import {
+  dialogueSummary,
+  dialogueSummaryText,
+  questSummary,
+  questSummaryText,
+  vendorSummary,
+  vendorSummaryText,
+} from '@/editor/roleSummary';
 
 export type NpcEditDialogProps = {
   editingObject: MapObject;
@@ -59,6 +67,13 @@ const NpcEditDialog = ({
   const projectPath = editor?.getCurrentProjectPath() ?? null;
   const customTileset = isCustomTilesetAppearance(tilesetPath, tilesetSourcePath);
   const showAnimPreview = Boolean(customTileset && getEditingObjectProperty('anim_render_width', ''));
+
+  const roleProps = editingObject?.properties as Record<string, unknown> | undefined;
+  const roleLines = {
+    dialogue: dialogueSummaryText(dialogueSummary(roleProps)),
+    vendor: vendorSummaryText(vendorSummary(roleProps)),
+    quest: questSummaryText(questSummary(roleProps)),
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -162,7 +177,7 @@ const NpcEditDialog = ({
   };
 
   const roleCardClass = (active: boolean, activeTone: string) =>
-    `flex flex-col items-stretch rounded-md border p-2.5 text-left transition-colors min-h-[4.5rem] ${
+    `flex flex-col items-stretch rounded-md border p-2.5 text-left transition-colors min-h-[5.5rem] ${
       active
         ? `${activeTone} border-current/40`
         : 'bg-muted/30 text-muted-foreground border-border hover:bg-muted/50'
@@ -235,6 +250,7 @@ const NpcEditDialog = ({
               <button type="button" onClick={() => toggleRole('talker')} className={roleCardClass(isTalker, 'bg-blue-500/15 text-blue-600 dark:text-blue-400')}>
                 <MessagesSquare className="w-5 h-5 mb-1" />
                 <span className="text-sm font-semibold">Talker</span>
+                <span className="text-[10px] leading-tight mt-0.5 truncate opacity-80">{roleLines.dialogue}</span>
               </button>
             </Tooltip>
             <div className="h-8 mt-1.5 flex items-center">
@@ -244,7 +260,7 @@ const NpcEditDialog = ({
                   onClick={() => setShowDialogueTreeDialog(true)}
                   className="h-7 w-full px-2 text-xs rounded-md border border-border bg-background hover:bg-muted"
                 >
-                  Edit dialogue
+                  Open
                 </button>
               )}
             </div>
@@ -255,6 +271,7 @@ const NpcEditDialog = ({
               <button type="button" onClick={() => toggleRole('vendor')} className={roleCardClass(isVendor, 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400')}>
                 <HandCoins className="w-5 h-5 mb-1" />
                 <span className="text-sm font-semibold">Vendor</span>
+                <span className="text-[10px] leading-tight mt-0.5 truncate opacity-80">{roleLines.vendor}</span>
               </button>
             </Tooltip>
             <div className="h-8 mt-1.5 flex items-center">
@@ -264,7 +281,7 @@ const NpcEditDialog = ({
                   onClick={() => handleOpenVendorSettingsDialog()}
                   className="h-7 w-full px-2 text-xs rounded-md border border-border bg-background hover:bg-muted"
                 >
-                  Vendor settings
+                  Open
                 </button>
               )}
             </div>
@@ -275,6 +292,7 @@ const NpcEditDialog = ({
               <button type="button" onClick={() => toggleRole('questGiver')} className={roleCardClass(isQuestGiver, 'bg-amber-500/15 text-amber-600 dark:text-amber-400')}>
                 <MessageCircleQuestionMark className="w-5 h-5 mb-1" />
                 <span className="text-sm font-semibold">Quest</span>
+                <span className="text-[10px] leading-tight mt-0.5 truncate opacity-80">{roleLines.quest}</span>
               </button>
             </Tooltip>
             <div className="h-8 mt-1.5 flex items-center">
@@ -284,7 +302,7 @@ const NpcEditDialog = ({
                   onClick={() => handleOpenQuestSettingsDialog()}
                   className="h-7 w-full px-2 text-xs rounded-md border border-border bg-background hover:bg-muted"
                 >
-                  Quest settings
+                  Open
                 </button>
               )}
             </div>

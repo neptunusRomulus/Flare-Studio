@@ -9,6 +9,7 @@ import { parseRandomStockCount } from '@/utils/parsers';
 import { Gift, HandCoins, HelpCircle, Hammer, Package, Save, Sparkles, ChevronDown, X } from 'lucide-react';
 import type { ItemSummary } from '@/utils/items';
 import { parseVendorTabs, formatVendorTabs, type VendorTab } from '@/utils/npcFileUpdate';
+import NpcVendorShelves from '@/components/NpcVendorShelves';
 
 /** Flare 1.15 NPC.cpp craft keys; repeatable ones take one value per line. */
 const CRAFT_FIELDS = [
@@ -26,6 +27,7 @@ type NpcVendorSettingsDialogProps = {
   onOpenRandomDialog?: () => void;
   onCreateVendorStockGroup: (stockType: 'constant' | 'status' | 'random', selectedGroupId: string | null, npcName: string) => Promise<ItemSummary | null>;
   itemsList: ItemSummary[];
+  properties?: Record<string, unknown>;
   getEditingObjectProperty: (key: string, fallback?: string) => string;
   updateEditingObjectProperty: (key: string, value: string | null) => void;
 };
@@ -36,6 +38,7 @@ const NpcVendorSettingsDialog = ({
   onClose,
   onCreateVendorStockGroup,
   itemsList,
+  properties,
   getEditingObjectProperty,
   updateEditingObjectProperty,
 }: NpcVendorSettingsDialogProps) => {
@@ -231,6 +234,11 @@ const NpcVendorSettingsDialog = ({
           </button>
           {vendorStockExpanded && (
             <div className="px-3 pb-3 space-y-3">
+              <NpcVendorShelves
+                properties={properties}
+                itemsList={itemsList}
+                updateProperty={updateEditingObjectProperty}
+              />
               {vendorStockSections.map((section) => (
                 <div key={section.title} className="rounded-xl border border-border bg-muted/30 p-3">
                   <div className="space-y-4">

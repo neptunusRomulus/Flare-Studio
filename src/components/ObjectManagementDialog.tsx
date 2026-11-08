@@ -499,6 +499,7 @@ const ObjectManagementDialog = ({
           onOpenRandomDialog={handleOpenVendorRandomDialog}
           onCreateVendorStockGroup={handleCreateVendorStockGroup}
           itemsList={itemsList}
+          properties={editingObject?.properties as Record<string, unknown> | undefined}
           getEditingObjectProperty={getEditingObjectProperty}
           updateEditingObjectProperty={updateEditingObjectProperty}
         />

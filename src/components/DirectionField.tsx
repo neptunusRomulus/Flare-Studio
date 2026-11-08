@@ -28,14 +28,16 @@ const DirectionField = ({
   tooltip,
 }: DirectionFieldProps) => (
   <div>
-    <div className="flex items-center gap-1 mb-1">
-      <label className="text-xs text-muted-foreground">{label}</label>
-      {tooltip && (
-        <Tooltip content={tooltip}>
-          <HelpCircle className="w-3 h-3 text-muted-foreground" />
-        </Tooltip>
-      )}
-    </div>
+    {(label || tooltip) && (
+      <div className="flex items-center gap-1 mb-1">
+        {label ? <label className="text-xs text-muted-foreground">{label}</label> : null}
+        {tooltip && (
+          <Tooltip content={tooltip}>
+            <HelpCircle className="w-3 h-3 text-muted-foreground" />
+          </Tooltip>
+        )}
+      </div>
+    )}
     <div className="grid grid-cols-3 gap-1 w-[fit-content]">
       {directions.map((dir) => {
         if (dir.value === 'center') {

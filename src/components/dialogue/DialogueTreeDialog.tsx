@@ -29,6 +29,8 @@ const REQ_CONFIG: Record<DialogueRequirement['type'], { label: string; placehold
   not_currency: { label: 'Max Currency', placeholder: 'e.g. 500' },
   class: { label: 'Has Class', placeholder: 'e.g. warrior' },
   not_class: { label: 'Has Not Class', placeholder: 'e.g. ranger' },
+  tile: { label: 'Has Tile', placeholder: 'layer,x,y,tile_id' },
+  not_tile: { label: 'Has Not Tile', placeholder: 'layer,x,y,tile_id' },
 };
 
 /** Visual branching panel: shows arrow connections between nodes */
@@ -179,11 +181,136 @@ function withLootCount(tree: AllowMovementTree, min: string, max: string): Array
   return [...list, { key: 'reward_loot_count', value }];
 }
 
+/** loot_count is node-wide like reward_loot_count, but counts dropped loot (loot=). */
+function groundLootCountOf(tree: AllowMovementTree): { min: string; max: string } {
+  const entry = [...(tree.passthrough || [])].reverse().find((p) => p.key === 'loot_count');
+  if (!entry) return { min: '', max: '' };
+  const [min = '', max = ''] = String(entry.value).split(',');
+  return { min: min.trim(), max: max.trim() };
+}
+function withGroundLootCount(tree: AllowMovementTree, min: string, max: string): Array<{ key: string; value: string }> {
+  const list = tree.passthrough || [];
+  const value = min.trim() ? (max.trim() ? `${min.trim()},${max.trim()}` : min.trim()) : '';
+  const has = list.some((p) => p.key === 'loot_count');
+  if (!value) return list.filter((p) => p.key !== 'loot_count');
+  if (has) return list.map((p) => (p.key === 'loot_count' ? { ...p, value } : p));
+  return [...list, { key: 'loot_count', value }];
+}
+
 const parseRespec = (value: string) => {
   const [mode = 'stats', ignoreDefaults = ''] = String(value || '').split(',');
   return { mode: mode.trim() || 'stats', ignoreDefaults: /^(true|1)$/i.test(ignoreDefaults.trim()) };
 };
 const buildRespec = (mode: string, ignoreDefaults: boolean) => `${mode}${ignoreDefaults ? ',true' : ''}`;
+
+/** mapmod: "layer x,y,tile_id"; mapmod_toggle adds a second tile id. */
+const parseMapmod = (value: string) => {
+  const [layer = '', coords = ''] = String(value || '').trim().split(/\s+/);
+  const [x = '0', y = '0', tile = '0', tileB = '0'] = coords.split(',');
+  return { layer, x, y, tile, tileB };
+};
+const buildMapmod = (layer: string, x: string, y: string, tile: string, tileB?: string) => {
+  const name = layer.trim();
+  if (!name) return '';
+  const coords = [x, y, tile].map((v) => (v.trim() === '' ? '0' : v.trim())).join(',');
+  return `${name} ${coords}${tileB === undefined ? '' : `,${tileB.trim() === '' ? '0' : tileB.trim()}`}`;
+};
+
+/** power_path: "src_x,src_y,hero" or "src_x,src_y,dest_x,dest_y". */
+const parsePowerPath = (value: string) => {
+  const parts = String(value || '').split(',').map((p) => p.trim());
+  const isHero = (parts[2] || '').toLowerCase() === 'hero';
+  return {
+    srcX: parts[0] || '',
+    srcY: parts[1] || '',
+    target: isHero ? ('hero' as const) : ('point' as const),
+    destX: isHero ? '' : parts[2] || '',
+    destY: isHero ? '' : parts[3] || '',
+  };
+};
+const buildPowerPath = (path: ReturnType<typeof parsePowerPath>) =>
+  `${path.srcX || 0},${path.srcY || 0},${path.target === 'hero' ? 'hero' : `${path.destX || 0},${path.destY || 0}`}`;
+
+const parsePair = (value: string) => {
+  const [a = '', b = ''] = String(value || '').split(',');
+  return { a: a.trim(), b: b.trim() };
+};
+const buildPair = (a: string, b: string) => (a.trim() ? (b.trim() ? `${a.trim()},${b.trim()}` : a.trim()) : '');
+
+/** spawn_level / power_level: "mode", "mode,multiplier" or "mode,multiplier,stat". */
+const LEVEL_MODES = [
+  { value: 'default', label: 'Default' },
+  { value: 'fixed', label: 'Fixed level' },
+  { value: 'source_level', label: 'Source level ×' },
+  { value: 'hero_level', label: 'Hero level ×' },
+  { value: 'source_stat', label: 'Source stat ×' },
+  { value: 'hero_stat', label: 'Hero stat ×' },
+] as const;
+const parseLevelValue = (value: string) => {
+  const [mode = 'default', multiplier = '', stat = ''] = String(value || '').split(',').map((p) => p.trim());
+  return { mode: LEVEL_MODES.some((m) => m.value === mode) ? mode : 'default', multiplier, stat };
+};
+const buildLevelValue = (mode: string, multiplier: string, stat: string) => {
+  if (mode === 'default') return 'default';
+  const mult = multiplier.trim() || '1';
+  return mode.endsWith('_stat') ? `${mode},${mult},${stat.trim()}` : `${mode},${mult}`;
+};
+
+const EFFECT_GROUPS: Array<{ label: string; options: Array<{ value: DialogueWorldEffect['type']; label: string }> }> = [
+  {
+    label: 'Player',
+    options: [
+      { value: 'set_status', label: 'Set Status' },
+      { value: 'unset_status', label: 'Clear Status' },
+      { value: 'respec', label: 'Respec' },
+      { value: 'save_game', label: 'Save Game' },
+      { value: 'stash', label: 'Open Stash' },
+    ],
+  },
+  {
+    label: 'Travel',
+    options: [
+      { value: 'teleport', label: 'Teleport to Map' },
+      { value: 'intermap_random', label: 'Teleport to Random Map' },
+      { value: 'intermap_id', label: 'Spawn Point ID' },
+      { value: 'intramap', label: 'Teleport in Map' },
+    ],
+  },
+  {
+    label: 'World',
+    options: [
+      { value: 'spawn', label: 'Spawn Enemy' },
+      { value: 'spawn_level', label: 'Spawned Enemy Level' },
+      { value: 'cutscene', label: 'Cutscene' },
+      { value: 'sound', label: 'Play Sound' },
+      { value: 'music', label: 'Change Music' },
+      { value: 'shakycam', label: 'Shake Camera' },
+      { value: 'npc', label: 'NPC Dialog' },
+      { value: 'book', label: 'Open Book' },
+      { value: 'script', label: 'Run Script' },
+      { value: 'visual_effect', label: 'Visual Effect' },
+      { value: 'chance_exec', label: 'Chance to Run' },
+    ],
+  },
+  {
+    label: 'Map & Loot',
+    options: [
+      { value: 'mapmod', label: 'Change Map Tile' },
+      { value: 'mapmod_toggle', label: 'Toggle Map Tile' },
+      { value: 'loot', label: 'Drop Loot' },
+    ],
+  },
+  {
+    label: 'Powers',
+    options: [
+      { value: 'power', label: 'Cast Power' },
+      { value: 'power_path', label: 'Power Path' },
+      { value: 'power_damage', label: 'Power Damage' },
+      { value: 'power_stats', label: 'Power Stats File' },
+      { value: 'power_level', label: 'Power Level' },
+    ],
+  },
+];
 
 const DialogueTreeDialog = ({
   showDialogueTreeDialog,
@@ -299,6 +426,7 @@ const DialogueTreeDialog = ({
   }, [editingObject]);
 
   const lootCount = activeTree ? lootCountOf(activeTree) : { min: '', max: '' };
+  const groundLootCount = activeTree ? groundLootCountOf(activeTree) : { min: '', max: '' };
 
   // Collect all dialogueIds for response dropdown
   const allDialogueIds = useMemo(() => {
@@ -701,6 +829,10 @@ const DialogueTreeDialog = ({
                           <optgroup label="Class">
                             <option value="class">Has Class</option>
                             <option value="not_class">Has Not Class</option>
+                          </optgroup>
+                          <optgroup label="Map">
+                            <option value="tile">Has Tile</option>
+                            <option value="not_tile">Has Not Tile</option>
                           </optgroup>
                         </select>
                         <Input
@@ -1113,26 +1245,22 @@ const DialogueTreeDialog = ({
                         value={wf.type}
                         onChange={(e) => {
                           const nextType = e.target.value as DialogueWorldEffect['type'];
-                          const defaultValue = nextType === 'stash' || nextType === 'save_game' ? 'true' : nextType === 'respec' ? 'stats' : '';
+                          const defaultValue =
+                            nextType === 'stash' || nextType === 'save_game' ? 'true'
+                            : nextType === 'respec' ? 'stats'
+                            : nextType === 'spawn_level' || nextType === 'power_level' ? 'default'
+                            : '';
                           setWorldEffect(wfIndex, { type: nextType, value: defaultValue });
                         }}
                         className="h-8 px-2 py-1 rounded-md border text-[11px] bg-background min-w-[110px] cursor-pointer"
                       >
-                        <option value="set_status">Set Status</option>
-                        <option value="unset_status">Clear Status</option>
-                        <option value="teleport">Teleport</option>
-                        <option value="intramap">Teleport in Map</option>
-                        <option value="spawn">Spawn Enemy</option>
-                        <option value="cutscene">Cutscene</option>
-                        <option value="sound">Play Sound</option>
-                        <option value="music">Change Music</option>
-                        <option value="npc">NPC Dialog</option>
-                        <option value="stash">Open Stash</option>
-                        <option value="book">Open Book</option>
-                        <option value="respec">Respec</option>
-                        <option value="save_game">Save Game</option>
-                        <option value="script">Run Script</option>
-                        <option value="visual_effect">Visual Effect</option>
+                        {EFFECT_GROUPS.map((group) => (
+                          <optgroup key={group.label} label={group.label}>
+                            {group.options.map((option) => (
+                              <option key={option.value} value={option.value}>{option.label}</option>
+                            ))}
+                          </optgroup>
+                        ))}
                       </select>
                       {wf.type === 'teleport' ? (
                         <div className="flex gap-2 flex-1 items-center">
@@ -1280,6 +1408,256 @@ const DialogueTreeDialog = ({
                           placeholder="Effect ID"
                           className="h-7 text-xs flex-1"
                         />
+                      ) : wf.type === 'intermap_id' ? (
+                        <div className="flex gap-2 flex-1 items-center">
+                          <Input
+                            value={wf.value}
+                            onChange={(e) => setWorldEffect(wfIndex, { value: e.target.value })}
+                            placeholder="Spawn point ID"
+                            className="h-7 text-xs flex-1"
+                          />
+                          <Tooltip content="intermap_id — names this spot so other intermap events can spawn the player here.">
+                            <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                          </Tooltip>
+                        </div>
+                      ) : wf.type === 'intermap_random' ? (
+                        <div className="flex gap-2 flex-1 items-center">
+                          <Input
+                            value={wf.value}
+                            onChange={(e) => setWorldEffect(wfIndex, { value: e.target.value })}
+                            placeholder="Map list file (maps/lists/...)"
+                            className="h-7 text-xs flex-1"
+                          />
+                          <Tooltip content="intermap_random — teleports the player to a random map from a map list file.">
+                            <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                          </Tooltip>
+                        </div>
+                      ) : wf.type === 'mapmod' || wf.type === 'mapmod_toggle' ? (
+                        <div className="flex gap-1.5 flex-1 items-center">
+                          <Input
+                            value={parseMapmod(wf.value).layer}
+                            onChange={(e) => {
+                              const m = parseMapmod(wf.value);
+                              setWorldEffect(wfIndex, { value: buildMapmod(e.target.value, m.x, m.y, m.tile, wf.type === 'mapmod_toggle' ? m.tileB : undefined) });
+                            }}
+                            placeholder="layer"
+                            className="h-7 w-24 text-xs"
+                          />
+                          {(['x', 'y', 'tile'] as const).map((part) => (
+                            <Input
+                              key={part}
+                              type="number"
+                              value={parseMapmod(wf.value)[part]}
+                              onChange={(e) => {
+                                const m = parseMapmod(wf.value);
+                                setWorldEffect(wfIndex, { value: buildMapmod(m.layer, part === 'x' ? e.target.value : m.x, part === 'y' ? e.target.value : m.y, part === 'tile' ? e.target.value : m.tile, wf.type === 'mapmod_toggle' ? m.tileB : undefined) });
+                              }}
+                              placeholder={part === 'tile' ? 'tile' : part.toUpperCase()}
+                              className="h-7 w-14 text-xs"
+                              aria-label={part}
+                            />
+                          ))}
+                          {wf.type === 'mapmod_toggle' && (
+                            <Input
+                              type="number"
+                              value={parseMapmod(wf.value).tileB}
+                              onChange={(e) => {
+                                const m = parseMapmod(wf.value);
+                                setWorldEffect(wfIndex, { value: buildMapmod(m.layer, m.x, m.y, m.tile, e.target.value) });
+                              }}
+                              placeholder="alt tile"
+                              className="h-7 w-16 text-xs"
+                              aria-label="Alternate tile"
+                            />
+                          )}
+                          <Tooltip content={wf.type === 'mapmod_toggle' ? 'mapmod_toggle — layer x,y,tile_a,tile_b: flips between two tiles each time.' : 'mapmod — layer x,y,tile_id: paints one map tile.'}>
+                            <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                          </Tooltip>
+                        </div>
+                      ) : wf.type === 'loot' ? (
+                        <div className="flex gap-1.5 flex-1 items-center">
+                          <Input
+                            value={wf.value}
+                            onChange={(e) => setWorldEffect(wfIndex, { value: e.target.value })}
+                            placeholder="Loot table or inline loot"
+                            className="h-7 text-xs flex-1"
+                          />
+                          <Input
+                            type="number"
+                            min={1}
+                            value={groundLootCount.min}
+                            placeholder="1"
+                            onChange={(e) => updateTree(activeDialogueTab, { passthrough: withGroundLootCount(activeTree, e.target.value, groundLootCount.max) })}
+                            className="h-7 w-14 text-xs"
+                            aria-label="Minimum dropped loot"
+                          />
+                          <span className="text-xs text-muted-foreground">–</span>
+                          <Input
+                            type="number"
+                            min={1}
+                            value={groundLootCount.max}
+                            placeholder="max"
+                            onChange={(e) => updateTree(activeDialogueTab, { passthrough: withGroundLootCount(activeTree, groundLootCount.min || '1', e.target.value) })}
+                            className="h-7 w-14 text-xs"
+                            aria-label="Maximum dropped loot"
+                          />
+                          <Tooltip content="loot + loot_count — drops items on the ground near the player (reward_loot puts them in the inventory instead).">
+                            <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                          </Tooltip>
+                        </div>
+                      ) : wf.type === 'shakycam' ? (
+                        <div className="flex gap-2 flex-1 items-center">
+                          <Input
+                            type="number"
+                            step="0.1"
+                            min={0}
+                            value={wf.value}
+                            onChange={(e) => setWorldEffect(wfIndex, { value: e.target.value })}
+                            placeholder="Amplitude"
+                            className="h-7 w-24 text-xs"
+                          />
+                          <Tooltip content="shakycam — shakes the camera; the value is the amplitude.">
+                            <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                          </Tooltip>
+                        </div>
+                      ) : wf.type === 'chance_exec' ? (
+                        <div className="flex gap-2 flex-1 items-center">
+                          <Input
+                            type="number"
+                            min={0}
+                            max={100}
+                            value={wf.value}
+                            onChange={(e) => setWorldEffect(wfIndex, { value: e.target.value })}
+                            placeholder="0–100"
+                            className="h-7 w-24 text-xs"
+                          />
+                          <span className="text-xs text-muted-foreground">%</span>
+                          <Tooltip content="chance_exec — percentage chance that the actions in this dialog node run.">
+                            <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                          </Tooltip>
+                        </div>
+                      ) : wf.type === 'power' ? (
+                        <div className="flex gap-2 flex-1 items-center">
+                          <Input
+                            type="number"
+                            min={0}
+                            value={wf.value}
+                            onChange={(e) => setWorldEffect(wfIndex, { value: e.target.value })}
+                            placeholder="Power ID"
+                            className="h-7 w-24 text-xs"
+                          />
+                          <Tooltip content="power — casts the power from this dialog at the NPC. Add power_path, power_damage, power_stats or power_level rows to shape it.">
+                            <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                          </Tooltip>
+                        </div>
+                      ) : wf.type === 'power_path' ? (
+                        <div className="flex gap-1.5 flex-1 items-center">
+                          {(() => {
+                            const path = parsePowerPath(wf.value);
+                            const write = (next: Partial<typeof path>) => setWorldEffect(wfIndex, { value: buildPowerPath({ ...path, ...next }) });
+                            return (
+                              <>
+                                <Input type="number" value={path.srcX} onChange={(e) => write({ srcX: e.target.value })} placeholder="src X" className="h-7 w-16 text-xs" aria-label="Source X" />
+                                <Input type="number" value={path.srcY} onChange={(e) => write({ srcY: e.target.value })} placeholder="src Y" className="h-7 w-16 text-xs" aria-label="Source Y" />
+                                <select
+                                  value={path.target}
+                                  onChange={(e) => write({ target: e.target.value === 'hero' ? 'hero' : 'point' })}
+                                  className="h-8 px-2 rounded-md border text-[11px] bg-background cursor-pointer"
+                                  aria-label="Path target"
+                                >
+                                  <option value="point">To point</option>
+                                  <option value="hero">To hero</option>
+                                </select>
+                                {path.target === 'point' && (
+                                  <>
+                                    <Input type="number" value={path.destX} onChange={(e) => write({ destX: e.target.value })} placeholder="X" className="h-7 w-16 text-xs" aria-label="Destination X" />
+                                    <Input type="number" value={path.destY} onChange={(e) => write({ destY: e.target.value })} placeholder="Y" className="h-7 w-16 text-xs" aria-label="Destination Y" />
+                                  </>
+                                )}
+                                <Tooltip content="power_path — source X/Y then either the hero or a destination tile.">
+                                  <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                                </Tooltip>
+                              </>
+                            );
+                          })()}
+                        </div>
+                      ) : wf.type === 'power_damage' ? (
+                        <div className="flex gap-1.5 flex-1 items-center">
+                          <Input
+                            type="number"
+                            value={parsePair(wf.value).a}
+                            onChange={(e) => setWorldEffect(wfIndex, { value: buildPair(e.target.value, parsePair(wf.value).b) })}
+                            placeholder="min"
+                            className="h-7 w-20 text-xs"
+                          />
+                          <span className="text-xs text-muted-foreground">–</span>
+                          <Input
+                            type="number"
+                            value={parsePair(wf.value).b}
+                            onChange={(e) => setWorldEffect(wfIndex, { value: buildPair(parsePair(wf.value).a, e.target.value) })}
+                            placeholder="max"
+                            className="h-7 w-20 text-xs"
+                          />
+                          <Tooltip content="power_damage — min and max damage of the cast power.">
+                            <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                          </Tooltip>
+                        </div>
+                      ) : wf.type === 'power_stats' ? (
+                        <div className="flex gap-2 flex-1 items-center">
+                          <Input
+                            value={wf.value}
+                            onChange={(e) => setWorldEffect(wfIndex, { value: e.target.value })}
+                            placeholder="Stat file for the spawner"
+                            className="h-7 text-xs flex-1"
+                          />
+                          <Tooltip content="power_stats — stat file the power spawner uses.">
+                            <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                          </Tooltip>
+                        </div>
+                      ) : wf.type === 'power_level' || wf.type === 'spawn_level' ? (
+                        <div className="flex gap-1.5 flex-1 items-center">
+                          {(() => {
+                            const level = parseLevelValue(wf.value);
+                            const write = (next: Partial<typeof level>) => setWorldEffect(wfIndex, { value: buildLevelValue(next.mode ?? level.mode, next.multiplier ?? level.multiplier, next.stat ?? level.stat) });
+                            return (
+                              <>
+                                <select
+                                  value={level.mode}
+                                  onChange={(e) => write({ mode: e.target.value })}
+                                  className="h-8 px-2 rounded-md border text-[11px] bg-background cursor-pointer"
+                                  aria-label="Level mode"
+                                >
+                                  {LEVEL_MODES.map((mode) => (
+                                    <option key={mode.value} value={mode.value}>{mode.label}</option>
+                                  ))}
+                                </select>
+                                {level.mode !== 'default' && (
+                                  <Input
+                                    type="number"
+                                    step="0.1"
+                                    value={level.multiplier}
+                                    onChange={(e) => write({ multiplier: e.target.value })}
+                                    placeholder="×"
+                                    className="h-7 w-16 text-xs"
+                                    aria-label="Multiplier"
+                                  />
+                                )}
+                                {level.mode.endsWith('_stat') && (
+                                  <Input
+                                    value={level.stat}
+                                    onChange={(e) => write({ stat: e.target.value })}
+                                    placeholder="stat id"
+                                    className="h-7 w-24 text-xs"
+                                    aria-label="Primary stat"
+                                  />
+                                )}
+                                <Tooltip content={wf.type === 'spawn_level' ? 'spawn_level — level of the enemies spawned by this dialog.' : 'power_level — level of this dialog power\'s spawner.'}>
+                                  <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                                </Tooltip>
+                              </>
+                            );
+                          })()}
+                        </div>
                       ) : (
                         <Input
                           value={wf.value}

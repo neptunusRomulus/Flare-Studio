@@ -366,6 +366,7 @@ const REQ_TYPE_BY_KEY = {
   requires_level: "level", requires_not_level: "not_level",
   requires_currency: "currency", requires_not_currency: "not_currency",
   requires_class: "class", requires_not_class: "not_class",
+  requires_tile: "tile", requires_not_tile: "not_tile",
 };
 const REWARD_TYPE_BY_KEY = {
   reward_xp: "xp", reward_currency: "gold", remove_currency: "remove_gold",
@@ -377,6 +378,11 @@ const EFFECT_TYPE_BY_KEY = {
   spawn: "spawn", cutscene: "cutscene", soundfx: "sound", npc: "npc",
   intramap: "intramap", music: "music", stash: "stash", book: "book",
   respec: "respec", save_game: "save_game", script: "script", visual_effect: "visual_effect",
+  intermap_id: "intermap_id", intermap_random: "intermap_random",
+  mapmod: "mapmod", mapmod_toggle: "mapmod_toggle", loot: "loot", shakycam: "shakycam",
+  power: "power", power_path: "power_path", power_damage: "power_damage",
+  power_stats: "power_stats", power_level: "power_level",
+  spawn_level: "spawn_level", chance_exec: "chance_exec",
 };
 const DIALOG_META_KEYS = ["id", "topic", "group", "response_only"];
 const LINE_PREFIX_KEYS = new Set(["voice", "portrait_him", "portrait_her", "portrait_you", "portrait"]);
@@ -609,6 +615,8 @@ function requirementKey(type) {
     not_currency: "requires_not_currency",
     class: "requires_class",
     not_class: "requires_not_class",
+    tile: "requires_tile",
+    not_tile: "requires_not_tile",
   };
   return map[type] || (DIALOG_KEYS.has(type) ? type : "");
 }
@@ -630,6 +638,19 @@ function worldEffectKey(type) {
     save_game: "save_game",
     script: "script",
     visual_effect: "visual_effect",
+    intermap_id: "intermap_id",
+    intermap_random: "intermap_random",
+    mapmod: "mapmod",
+    mapmod_toggle: "mapmod_toggle",
+    loot: "loot",
+    shakycam: "shakycam",
+    power: "power",
+    power_path: "power_path",
+    power_damage: "power_damage",
+    power_stats: "power_stats",
+    power_level: "power_level",
+    spawn_level: "spawn_level",
+    chance_exec: "chance_exec",
   };
   return map[type] || "";
 }

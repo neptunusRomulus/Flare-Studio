@@ -237,7 +237,9 @@ export interface FlareNPCExportResult {
 
 export interface DialogueRequirement {
   id: string;
-  type: 'status' | 'not_status' | 'item' | 'not_item' | 'level' | 'not_level' | 'currency' | 'not_currency' | 'class' | 'not_class';
+  type:
+    | 'status' | 'not_status' | 'item' | 'not_item' | 'level' | 'not_level'
+    | 'currency' | 'not_currency' | 'class' | 'not_class' | 'tile' | 'not_tile';
   value: string;
 }
 
@@ -265,7 +267,10 @@ export interface DialogueWorldEffect {
   id?: string;
   type:
     | 'set_status' | 'unset_status' | 'teleport' | 'spawn' | 'cutscene' | 'sound' | 'npc'
-    | 'intramap' | 'music' | 'stash' | 'book' | 'respec' | 'save_game' | 'script' | 'visual_effect';
+    | 'intramap' | 'music' | 'stash' | 'book' | 'respec' | 'save_game' | 'script' | 'visual_effect'
+    | 'intermap_id' | 'intermap_random' | 'mapmod' | 'mapmod_toggle' | 'loot' | 'shakycam'
+    | 'power' | 'power_path' | 'power_damage' | 'power_stats' | 'power_level'
+    | 'spawn_level' | 'chance_exec';
   value: string;
 }
 

@@ -119,6 +119,71 @@ describe('NPC file round trip (flare-game samples)', () => {
     });
     expect(canon(out).dialogs[0].lines).toEqual(['id=a', 'topic=T', 'him=Hi', 'intramap=3,4', 'stash=true', 'reward_loot=loot/x.txt']);
   });
+
+  it('event-manager actions and tile requirements survive import + export', () => {
+    const text = [
+      'name=Event NPC',
+      'talker=true',
+      '',
+      '[dialog]',
+      'id=e1',
+      'topic=Event',
+      'requires_tile=background,3,4,12',
+      'requires_not_tile=foreground,1,1,7',
+      'intermap_id=mill_door',
+      'intermap_random=maps/lists/caves.txt',
+      'mapmod=background 3,4,12',
+      'mapmod_toggle=foreground 1,1,7,8',
+      'loot=loot/chest.txt',
+      'loot_count=1,3',
+      'shakycam=1.5',
+      'chance_exec=50',
+      'power=7',
+      'power_path=2,3,hero',
+      'power_damage=5,9',
+      'power_stats=stats/spawner.txt',
+      'power_level=hero_stat,1.2,will',
+      'spawn_level=fixed,3',
+      'spawn=goblin,4,5',
+      'him=Boom',
+    ].join('\n');
+    const npc = importNpcText(text);
+    expect(lines(exportNpcFile(npc))).toEqual(lines(text));
+
+    const tree = npc.customProperties.dialogueTrees[0];
+    expect(tree.requirements).toEqual([
+      expect.objectContaining({ type: 'tile', value: 'background,3,4,12' }),
+      expect.objectContaining({ type: 'not_tile', value: 'foreground,1,1,7' }),
+    ]);
+    expect(tree.worldEffects.map((e: { type: string }) => e.type)).toEqual([
+      'intermap_id', 'intermap_random', 'mapmod', 'mapmod_toggle', 'loot', 'shakycam', 'chance_exec',
+      'power', 'power_path', 'power_damage', 'power_stats', 'power_level', 'spawn_level', 'spawn',
+    ]);
+    expect(tree.passthrough).toContainEqual({ key: 'loot_count', value: '1,3' });
+  });
+
+  it('new event actions get a sensible order', () => {
+    const out = exportNpcFile({
+      name: 'N',
+      customProperties: {
+        dialogueTrees: [{
+          dialogueId: 'a',
+          topic: 'T',
+          requirements: [{ type: 'tile', value: 'background,1,1,2' }],
+          dialogues: [{ speaker: 'npc', text: 'Hi' }],
+          worldEffects: [
+            { type: 'shakycam', value: '2' },
+            { type: 'mapmod', value: 'background 1,1,2' },
+            { type: 'loot', value: 'loot/x.txt' },
+          ],
+        }],
+      },
+    });
+    expect(canon(out).dialogs[0].lines).toEqual([
+      'id=a', 'topic=T', 'requires_tile=background,1,1,2', 'him=Hi',
+      'shakycam=2', 'mapmod=background 1,1,2', 'loot=loot/x.txt',
+    ]);
+  });
 });
 
 const { normalizeEnemyText } = require('./serializers.cjs');

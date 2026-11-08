@@ -713,6 +713,23 @@ function mergeNpcFile(existingText, update) {
     if (value === undefined) continue;
     base[key] = value;
   }
+  // sections: { name: [[{key, value}], ...] } replaces every section of that name (in place of the first);
+  // raw lines (comments/INCLUDE) of the replaced sections are kept at the top of the first one.
+  for (const [name, list] of Object.entries((update && update.sections) || {})) {
+    if (!Array.isArray(list)) continue;
+    const all = base._rawSections || [];
+    const at = all.findIndex((sec) => sec.name === name);
+    const raws = all.filter((sec) => sec.name === name).flatMap((sec) => sec.entries.filter((e) => e.raw));
+    const fresh = list
+      .map((entries) => (entries || []).filter((e) => e && e.key && String(e.key).trim()).map((e) => ({ key: String(e.key).trim(), value: String(e.value == null ? "" : e.value).trim() })))
+      .filter((entries) => entries.length)
+      .map((entries, i) => ({ name, entries: i === 0 ? [...raws, ...entries] : entries }));
+    if (!fresh.length && raws.length) fresh.push({ name, entries: raws });
+    const rest = all.filter((sec) => sec.name !== name);
+    const insertAt = at < 0 ? rest.length : all.slice(0, at).filter((sec) => sec.name !== name).length;
+    rest.splice(insertAt, 0, ...fresh);
+    base._rawSections = rest;
+  }
   if (update && update.dialogueTrees !== undefined) {
     const old = base.customProperties.dialogueTrees || [];
     const trees = (update.dialogueTrees || []).map((tree, index) => {

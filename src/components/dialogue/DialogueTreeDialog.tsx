@@ -132,6 +132,19 @@ const buildTeleportValue = (map: string, x: number, y: number) => {
   return `maps/${normalizedMap}.txt,${x},${y}`;
 };
 
+type AllowMovementTree = { passthrough?: Array<{ key: string; value: string }> };
+/** Flare default: movement allowed unless allow_movement=false. */
+function allowMovementOf(tree: AllowMovementTree): boolean {
+  const entry = [...(tree.passthrough || [])].reverse().find((p) => p.key === 'allow_movement');
+  return !entry || !/^(false|0)$/i.test(entry.value.trim());
+}
+function withAllowMovement(tree: AllowMovementTree, allowed: boolean): Array<{ key: string; value: string }> {
+  const list = tree.passthrough || [];
+  const has = list.some((p) => p.key === 'allow_movement');
+  if (has) return list.map((p) => (p.key === 'allow_movement' ? { ...p, value: String(allowed) } : p));
+  return allowed ? list : [...list, { key: 'allow_movement', value: 'false' }];
+}
+
 const DialogueTreeDialog = ({
   showDialogueTreeDialog,
   dialogueTrees = [],
@@ -471,6 +484,18 @@ const DialogueTreeDialog = ({
               </span>
             </div>
 
+            {/* allow_movement (kept in passthrough so its file position is unchanged) */}
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={allowMovementOf(activeTree)}
+                onCheckedChange={(checked) => updateTree(activeDialogueTab, { passthrough: withAllowMovement(activeTree, checked) })}
+                className="scale-75"
+              />
+              <Tooltip content="allow_movement: when off, the player can't move while this dialog is open.">
+                <span className="text-xs text-muted-foreground">Allow Movement</span>
+              </Tooltip>
+            </div>
+
             {/* Response Links (outgoing) */}
             <div className="border rounded-md">
               <button
@@ -670,12 +695,17 @@ const DialogueTreeDialog = ({
                   {activeTree.dialogues.map((dlg, dlgIndex) => (
                     <div key={dlg.id} className="space-y-1">
                       <div className="flex gap-2 items-start">
+                        <Tooltip content="Click to cycle: NPC (him=), NPC (her=), Player (you=). him and her behave the same in Flare.">
                         <button
                           type="button"
                           onClick={() => {
                             const newTrees = [...dialogueTrees];
                             const newDlgs = [...newTrees[activeDialogueTab].dialogues];
-                            newDlgs[dlgIndex] = { ...newDlgs[dlgIndex], speaker: dlg.speaker === 'npc' ? 'player' : 'npc' };
+                            const cur = newDlgs[dlgIndex];
+                            const { key: _k, ...rest } = cur;
+                            newDlgs[dlgIndex] = cur.speaker === 'player'
+                              ? { ...rest, speaker: 'npc' }
+                              : cur.key === 'her' ? { ...rest, speaker: 'player' } : { ...rest, speaker: 'npc', key: 'her' };
                             newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], dialogues: newDlgs };
                             setDialogueTrees(newTrees);
                           }}
@@ -685,8 +715,9 @@ const DialogueTreeDialog = ({
                               : 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/50'
                           }`}
                         >
-                          {dlg.speaker === 'npc' ? 'NPC' : 'Player'}
+                          {dlg.speaker === 'npc' ? (dlg.key === 'her' ? 'NPC·her' : 'NPC') : 'Player'}
                         </button>
+                        </Tooltip>
                         <Input
                           value={dlg.text}
                           onChange={(e) => {
@@ -732,7 +763,24 @@ const DialogueTreeDialog = ({
                             />
                           </div>
                           <div className="flex items-center gap-1 flex-1">
-                            <Image className="w-3 h-3 text-muted-foreground shrink-0" />
+                            <Tooltip content="Portrait side: NPC (portrait_him/her) or Player (portrait_you). Applies from this line on.">
+                              <button
+                                type="button"
+                                className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground hover:text-foreground shrink-0"
+                                onClick={() => {
+                                  const newTrees = [...dialogueTrees];
+                                  const newDlgs = [...newTrees[activeDialogueTab].dialogues];
+                                  const cur = newDlgs[dlgIndex];
+                                  const isYou = (cur.portraitKey || (cur.speaker === 'player' ? 'portrait_you' : 'portrait_him')) === 'portrait_you';
+                                  newDlgs[dlgIndex] = { ...cur, portraitKey: isYou ? (cur.key === 'her' ? 'portrait_her' : 'portrait_him') : 'portrait_you' };
+                                  newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], dialogues: newDlgs };
+                                  setDialogueTrees(newTrees);
+                                }}
+                              >
+                                <Image className="w-3 h-3" />
+                                {(dlg.portraitKey || (dlg.speaker === 'player' ? 'portrait_you' : 'portrait_him')) === 'portrait_you' ? 'You' : 'NPC'}
+                              </button>
+                            </Tooltip>
                             <Input
                               value={dlg.portrait || ''}
                               onChange={(e) => {
@@ -1120,6 +1168,8 @@ const DialogueTreeDialog = ({
           if (editingObject) {
             // Clean up expanded state before saving, only save valid trees
             const cleanTrees = validTrees.map(tree => ({
+              // fields Studio doesn't edit (passthrough, components, ...) ride along
+              ...Object.fromEntries(Object.entries(tree).filter(([k]) => !k.startsWith('_'))),
               id: tree.id,
               dialogueId: tree.dialogueId || '',
               topic: tree.topic,
@@ -1127,7 +1177,8 @@ const DialogueTreeDialog = ({
               responseOnly: tree.responseOnly || false,
               responses: (tree.responses || []).filter(Boolean),
               requirements: tree.requirements.filter(r => r.value.trim()),
-              dialogues: tree.dialogues.filter(d => d.text.trim()).map(d => ({
+              dialogues: tree.dialogues.filter(d => d.text.trim() || d.keepEmpty).map(d => ({
+                ...d,
                 id: d.id,
                 speaker: d.speaker,
                 text: d.text,

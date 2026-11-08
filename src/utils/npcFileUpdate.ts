@@ -3,7 +3,7 @@
  * existing npcs/*.txt (if any) instead of replacing it, so keys, sections and
  * dialog components Studio does not model stay as they are.
  */
-import { mergeNpcFile, statusStockFromEntries } from '@/adapters/flare/flareAdapter.cjs';
+import { mergeNpcFile, statusStockFromEntries, importNpcText } from '@/adapters/flare/flareAdapter.cjs';
 
 type Props = Record<string, unknown> | undefined;
 
@@ -54,7 +54,32 @@ export const NPC_LIST_FIELDS: Record<string, string> = {
   vox_intro: 'vox_intro',
 };
 
-export type NpcFileUpdate = { fields: Record<string, string | boolean>; dialogueTrees?: unknown[] };
+export type KeyValue = { key: string; value: string };
+export type NpcFileUpdate = { fields: Record<string, string | boolean>; dialogueTrees?: unknown[]; sections?: Record<string, KeyValue[][]> };
+
+/** Object property (JSON) -> NPC file section; present property replaces all sections of that name. */
+export const NPC_SECTION_FIELDS: Record<string, string> = {
+  npc_stats: 'stats',
+  npc_visual_effects: 'visual_effect',
+};
+
+/** Parse a section property: JSON list of sections, each a list of {key, value}. */
+export function parseSectionProperty(value: unknown): KeyValue[][] {
+  try {
+    const parsed = typeof value === 'string' ? JSON.parse(value || '[]') : value;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(Array.isArray).map((entries: unknown[]) => entries
+      .filter((e): e is KeyValue => !!e && typeof e === 'object' && 'key' in e)
+      .map(e => ({ key: String(e.key ?? ''), value: String(e.value ?? '') })));
+  } catch { return []; }
+}
+
+/** Sections of that name in an NPC file (raw lines like comments/INCLUDE left out; the merge keeps them). */
+export function sectionsFromNpcText(textContent: string, name: string): KeyValue[][] {
+  const npc = importNpcText(textContent || '') as { _rawSections?: Array<{ name: string; entries: Array<{ key?: string; value?: string; raw?: string }> }> };
+  return (npc._rawSections || []).filter(sec => sec.name === name)
+    .map(sec => sec.entries.filter(e => !e.raw && e.key).map(e => ({ key: String(e.key), value: String(e.value ?? '') })));
+}
 
 /**
  * Only fields the NPC object actually holds are authoritative ("" clears the key);
@@ -80,6 +105,9 @@ export function npcFileUpdate(name: string, props: Props, resolved: { animations
   const stock = 'status_stock_entries' in p ? statusStockFromEntries(p.status_stock_entries) : [];
   if (stock.length) fields.status_stock = stock.join('\n');
   const update: NpcFileUpdate = { fields };
+  for (const [prop, section] of Object.entries(NPC_SECTION_FIELDS)) {
+    if (prop in p) (update.sections ||= {})[section] = parseSectionProperty(p[prop]);
+  }
   if ('dialogueTrees' in p) {
     try {
       const raw = p.dialogueTrees;

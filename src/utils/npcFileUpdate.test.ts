@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { npcFileUpdate, npcFileContent, npcFileBase, isStudioNpcAnimation } from './npcFileUpdate';
-import { parseVendorTabs, formatVendorTabs } from './npcFileUpdate';
+import { parseVendorTabs, formatVendorTabs, sectionsFromNpcText } from './npcFileUpdate';
 
 const existing = 'name=Old\nanimations=animations/npcs/guill.txt\nvendor=true\nconstant_stock=1,2\nconstant_stock=3\nvox_intro=a.ogg\nvendor_ratio_buy=2\n\n[stats]\nspeed=2\n\n[dialog]\nid=a\nher=Hi\nset_status=x\nyou=Bye\n';
 
@@ -55,5 +55,35 @@ describe('vendor fields', () => {
     expect(parseVendorTabs('')).toEqual({ buy: true, sell: true, craft: false });
     expect(parseVendorTabs('craft,true\nbuy,false')).toEqual({ buy: false, sell: true, craft: true });
     expect(formatVendorTabs({ buy: true, sell: true, craft: false })).toBe('');
+  });
+});
+
+describe('NPC sections', () => {
+  const file = 'name=A\n\n[stats]\n# keep\nspeed=2\nstat=hp,10\n\n[visual_effect]\nid=glow\nanimation=a.txt\n\n[visual_effect]\nid=old\nanimation=b.txt\n\n[dialog]\nid=d\nhim=Hi\n';
+  it('reads sections from a file', () => {
+    expect(sectionsFromNpcText(file, 'visual_effect').map(s => s[0].value)).toEqual(['glow', 'old']);
+    expect(sectionsFromNpcText(file, 'stats')).toEqual([[{ key: 'speed', value: '2' }, { key: 'stat', value: 'hp,10' }]]);
+  });
+  it('a present property replaces the sections in place; comments stay; absent keeps the file', () => {
+    const out = npcFileContent(file, npcFileUpdate('A', {
+      npc_stats: JSON.stringify([[{ key: 'speed', value: '3' }, { key: 'stat', value: 'hp,10' }, { key: 'stat', value: 'mp,5' }]]),
+      npc_visual_effects: JSON.stringify([[{ key: 'id', value: 'glow' }, { key: 'animation', value: 'a.txt' }, { key: 'automatic', value: 'true' }]]),
+    }, {}));
+    expect(out).toBe('name=A\n\n[stats]\n# keep\nspeed=3\nstat=hp,10\nstat=mp,5\n\n[visual_effect]\nid=glow\nanimation=a.txt\nautomatic=true\n\n[dialog]\nid=d\nhim=Hi\n');
+    expect(npcFileContent(file, npcFileUpdate('A', {}, {}))).toContain('id=old');
+  });
+});
+
+describe('dialog polish', () => {
+  it('writes her lines, per-line portrait keys and allow_movement', () => {
+    const trees = [{ id: '1', dialogueId: 'd', topic: 'T', responses: [], requirements: [], rewards: [], worldEffects: [],
+      passthrough: [{ key: 'allow_movement', value: 'false' }],
+      dialogues: [
+        { id: 'a', speaker: 'npc', key: 'her', text: 'Hi', portrait: 'images/p.png', portraitKey: 'portrait_her' },
+        { id: 'b', speaker: 'npc', text: 'Look', portrait: 'images/me.png', portraitKey: 'portrait_you' },
+        { id: 'c', speaker: 'player', text: 'Ok' },
+      ] }];
+    const out = npcFileContent(null, npcFileUpdate('N', { talker: 'true', dialogueTrees: JSON.stringify(trees) }, {}));
+    expect(out).toContain('portrait_her=images/p.png\nher=Hi\nportrait_you=images/me.png\nhim=Look\nyou=Ok\nallow_movement=false');
   });
 });

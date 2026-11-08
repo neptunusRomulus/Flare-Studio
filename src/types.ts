@@ -247,6 +247,11 @@ export interface DialogueLine {
   text: string;
   voice?: string;
   portrait?: string;
+  /** Flare line key for NPC lines: him (default) or her */
+  key?: 'her';
+  /** Flare key of the per-line portrait: portrait_him/portrait_her (NPC side) or portrait_you (player side) */
+  portraitKey?: 'portrait_him' | 'portrait_her' | 'portrait_you' | 'portrait';
+  keepEmpty?: boolean;
 }
 
 export interface DialogueReward {
@@ -273,6 +278,8 @@ export interface DialogueTree {
   dialogues: DialogueLine[];
   rewards: DialogueReward[];
   worldEffects: DialogueWorldEffect[];
+  /** [dialog] keys Studio doesn't model (allow_movement, visual_effect, ...), in file order */
+  passthrough?: Array<{ key: string; value: string }>;
   _reqExpanded?: boolean;
   _dlgExpanded?: boolean;
   _rewExpanded?: boolean;

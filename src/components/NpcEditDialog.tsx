@@ -13,6 +13,7 @@ import PositionField from '@/components/PositionField';
 import DirectionField from '@/components/DirectionField';
 import MinimapToggle from '@/components/MinimapToggle';
 import SpawnFieldOverlay from '@/components/SpawnFieldOverlay';
+import NpcAdvancedSection from '@/components/NpcAdvancedSection';
 
 export type NpcEditDialogProps = {
   editingObject: MapObject;
@@ -772,6 +773,12 @@ const NpcEditDialog = ({
           </div>
         )}
       </div>
+      <NpcAdvancedSection
+        npcFilename={getEditingObjectProperty('npcFilename', '')}
+        projectPath={editor?.getCurrentProjectPath() ?? null}
+        getEditingObjectProperty={getEditingObjectProperty}
+        updateEditingObjectProperty={updateEditingObjectProperty}
+      />
     </>
   );
 };

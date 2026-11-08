@@ -203,7 +203,7 @@ const NpcAppearanceSection = ({
               value={stanceDirection}
               onChange={onStanceChange}
               label="Stance direction"
-              tooltip="direction — The direction to use for this NPC's stance animation"
+              tooltip="direction — The direction to use for this NPC's stance animation. Facing on the map is set separately in Properties."
             />
           </div>
         )}

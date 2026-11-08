@@ -115,4 +115,24 @@ describe('npcPropertyCards add/remove and catalog search', () => {
     expect(filterPropertyCatalog('', present).some((e) => e.kind === 'minimap')).toBe(false);
     expect(filterPropertyCatalog('', present).some((e) => e.kind === 'status')).toBe(true);
   });
+
+  it('facing uses the map direction key and migrates the legacy key', () => {
+    expect(patchAddProperty('facing', {})).toEqual({ map_direction: '0' });
+    const cards = listNpcPropertyCards({ properties: { map_direction: '2', spawn_direction: '5' } });
+    const facing = cards.find((c) => c.kind === 'facing');
+    expect(facing?.values.direction).toBe('2');
+    expect(patchRemoveCard(facing!, { map_direction: '2' })).toEqual({ map_direction: null, spawn_direction: null });
+    // legacy projects still show their facing value
+    const legacy = listNpcPropertyCards({ properties: { spawn_direction: '3' } });
+    expect(legacy.find((c) => c.kind === 'facing')?.values.direction).toBe('3');
+  });
+
+  it('waypoints card per route point and a wander radius card', () => {
+    const props = { waypoints: '1,1\n2,2', wander_radius: '3' };
+    const cards = listNpcPropertyCards({ properties: props });
+    expect(cards.filter((c) => c.kind === 'waypoints').map((c) => c.values.point)).toEqual(['1,1', '2,2']);
+    expect(cards.find((c) => c.kind === 'wander_radius')?.values.radius).toBe('3');
+    expect(patchAddProperty('waypoints', { waypoints: '1,1' })).toEqual({ waypoints: '1,1\n' });
+    expect(patchRemoveCard(cards.find((c) => c.kind === 'wander_radius')!, props)).toEqual({ wander_radius: null });
+  });
 });

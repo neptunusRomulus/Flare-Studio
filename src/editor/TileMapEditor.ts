@@ -8255,6 +8255,11 @@ export class TileMapEditor {
 
   private npcRecord(npc: MapObject): Record<string, unknown> {
     const record: Record<string, unknown> = { ...(npc.properties || {}) };
+    // map_direction is Studio's separate "facing on map"; Flare's map key is direction.
+    const mapDirection = record.map_direction;
+    delete record.map_direction;
+    delete record.spawn_direction;
+    if (mapDirection != null && mapDirection !== '') record.direction = mapDirection;
     if (!record.location) record.location = `${npc.x},${npc.y},${npc.width},${npc.height}`;
     const named = npc.properties?.npcFilename;
     const filename = typeof named === 'string' && named.trim()
@@ -8335,7 +8340,8 @@ export class TileMapEditor {
       const properties: Record<string, string | string[]> = {};
       for (const [key, value] of Object.entries(fields)) {
         if (value == null || value === '') continue;
-        properties[key] = value;
+        // A map NPC's direction is its initial facing; keep it apart from the NPC file's stance direction.
+        properties[type === 'npc' && key === 'direction' ? 'map_direction' : key] = value;
       }
       const object: MapObject = {
         id: this.nextObjectId++,

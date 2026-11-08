@@ -12,6 +12,7 @@ import {
   listNpcPropertyCards,
   patchAddProperty,
   patchListValue,
+  patchLineValue,
   patchPolarity,
   patchRemoveCard,
   resolveStatsAndEffects,
@@ -302,8 +303,34 @@ const NpcPropertyList = ({ editingObject, get, setProp, applyPatch, projectPath 
             <span className="w-full">Facing on map</span>
             <DirectionField
               value={card.values.direction}
-              onChange={(value) => setProp('spawn_direction', value)}
+              onChange={(value) => setProp('map_direction', value)}
               label=""
+            />
+          </CardShell>
+        );
+      case 'waypoints':
+        return (
+          <CardShell key={card.id} tip={tipText} onRemove={() => remove(card)}>
+            <span>Waypoint</span>
+            <Input
+              className={`${inlineInput} min-w-[5rem] max-w-[10rem] text-left`}
+              value={card.values.point}
+              placeholder="x,y"
+              onChange={(e) => applyPatch(patchLineValue('waypoints', card.index, e.target.value, editingObject.properties))}
+            />
+          </CardShell>
+        );
+      case 'wander_radius':
+        return (
+          <CardShell key={card.id} tip={tipText} onRemove={() => remove(card)}>
+            <span>Wander radius</span>
+            <Input
+              type="number"
+              min={0}
+              className={`${inlineInput} min-w-[4rem] max-w-[6rem]`}
+              value={card.values.radius}
+              placeholder="tiles"
+              onChange={(e) => setProp('wander_radius', e.target.value)}
             />
           </CardShell>
         );

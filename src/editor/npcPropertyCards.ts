@@ -15,6 +15,8 @@ export type NpcPropertyKind =
   | 'item'
   | 'class'
   | 'facing'
+  | 'waypoints'
+  | 'wander_radius'
   | 'minimap'
   | 'intro_voice'
   | 'custom_animation'
@@ -98,9 +100,27 @@ export const PROPERTY_CATALOG: PropertyCatalogEntry[] = [
     kind: 'facing',
     category: 'map',
     label: 'Facing on map',
-    flareKey: 'spawn_direction',
-    description: 'Which way the NPC faces when it appears on the map.',
+    flareKey: 'direction (map [npc] block)',
+    description: 'Which way the NPC faces when it appears on the map. Independent of the stance animation.',
     synonyms: ['facing', 'direction', 'spawn', 'yüz', 'spawn_direction'],
+    singleton: true,
+  },
+  {
+    kind: 'waypoints',
+    category: 'map',
+    label: 'Walking route',
+    flareKey: 'waypoints (map [npc] block)',
+    description: 'Tiles the NPC walks between, in order. A route turns off random wandering.',
+    synonyms: ['waypoints', 'route', 'walk', 'patrol', 'rota', 'yürüme'],
+    multi: true,
+  },
+  {
+    kind: 'wander_radius',
+    category: 'map',
+    label: 'Wander radius',
+    flareKey: 'wander_radius (map [npc] block)',
+    description: 'How many tiles the NPC wanders around at random. Turns off a walking route.',
+    synonyms: ['wander', 'radius', 'random walk', 'dolaşma'],
     singleton: true,
   },
   {
@@ -158,6 +178,13 @@ export const isCustomTilesetAppearance = (tilesetPath: string, tilesetSourcePath
 const splitMulti = (raw: string): string[] =>
   String(raw || '')
     .split(/\n|,/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+/** One value per line only: waypoints are "x,y" pairs and must not split on commas. */
+const splitLines = (raw: string): string[] =>
+  String(raw || '')
+    .split('\n')
     .map((s) => s.trim())
     .filter(Boolean);
 
@@ -265,13 +292,26 @@ export function listNpcPropertyCards(input: {
     });
   });
 
-  if (hasProp(p, 'spawn_direction') && propText(p, 'spawn_direction') !== '') {
+  const facing =
+    (hasProp(p, 'map_direction') && propText(p, 'map_direction')) ||
+    (hasProp(p, 'spawn_direction') ? propText(p, 'spawn_direction') : '');
+  if (facing !== '') {
     push({
       kind: 'facing',
       category: 'map',
       index: 0,
-      values: { direction: propText(p, 'spawn_direction') },
+      values: { direction: facing },
     });
+  }
+
+  const route = hasProp(p, 'waypoints') ? splitLines(propText(p, 'waypoints')) : [];
+  if (hasProp(p, 'waypoints') && route.length === 0) route.push('');
+  route.forEach((value, index) => {
+    push({ kind: 'waypoints', category: 'map', index, values: { point: value } });
+  });
+
+  if (hasProp(p, 'wander_radius') && propText(p, 'wander_radius') !== '') {
+    push({ kind: 'wander_radius', category: 'map', index: 0, values: { radius: propText(p, 'wander_radius') } });
   }
 
   if (propText(p, 'show_on_minimap') === 'false') {
@@ -354,7 +394,7 @@ export function cardsFromNpcText(text: string): NpcPropertyCard[] {
     'requires_item', 'requires_not_item',
     'requires_item_quantity', 'requires_not_item_quantity',
     'requires_class', 'requires_not_class',
-    'spawn_direction', 'show_on_minimap', 'vox_intro',
+    'map_direction', 'spawn_direction', 'waypoints', 'wander_radius', 'show_on_minimap', 'vox_intro',
     'tilesetPath', 'tilesetSourcePath',
     'anim_render_width', 'anim_render_height', 'anim_frames', 'anim_duration',
   ]) {
@@ -406,7 +446,13 @@ export function patchAddProperty(
       return { requires_class: [...cur, ''].join('\n') };
     }
     case 'facing':
-      return { spawn_direction: '0' };
+      return { map_direction: '0' };
+    case 'waypoints': {
+      const cur = splitLines(propText(p, 'waypoints'));
+      return { waypoints: [...cur, ''].join('\n') };
+    }
+    case 'wander_radius':
+      return { wander_radius: '1' };
     case 'minimap':
       return { show_on_minimap: 'false' };
     case 'intro_voice': {
@@ -467,7 +513,14 @@ export function patchRemoveCard(
       return { [key]: next.length ? next.join('\n') : null };
     }
     case 'facing':
-      return { spawn_direction: null };
+      return { map_direction: null, spawn_direction: null };
+    case 'waypoints': {
+      const list = splitLines(propText(p, 'waypoints'));
+      const next = list.filter((_, j) => j !== card.index);
+      return { waypoints: next.length ? next.join('\n') : null };
+    }
+    case 'wander_radius':
+      return { wander_radius: null };
     case 'minimap':
       return { show_on_minimap: null };
     case 'intro_voice': {
@@ -517,6 +570,20 @@ export function patchListValue(
   const cleaned = list.map((s) => s.trim());
   // keep empty slots so the card remains until ✕
   return { [key]: cleaned.join('\n') };
+}
+
+/** Same as patchListValue but only newlines split entries (waypoint "x,y" pairs). */
+export function patchLineValue(
+  key: string,
+  index: number,
+  nextValue: string,
+  properties: Record<string, unknown> | undefined,
+): Record<string, string | null> {
+  const raw = propText(properties, key);
+  const list = raw ? splitLines(raw) : [];
+  while (list.length <= index) list.push('');
+  list[index] = nextValue;
+  return { [key]: list.map((s) => s.trim()).join('\n') };
 }
 
 /** Move a status/item/class value between have and have_not keys. */

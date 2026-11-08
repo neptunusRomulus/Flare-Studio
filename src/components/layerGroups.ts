@@ -1,6 +1,6 @@
 /** Sidebar layer groups, in display order. Unknown map layer types join the drawing group. */
 const GROUPS: string[][] = [
-  ['background', 'collision', 'object'],
+  ['collision', 'object', 'background'],
   ['npc', 'enemy', 'event'],
   ['items', 'status', 'rules'],
   ['gameSettings'],

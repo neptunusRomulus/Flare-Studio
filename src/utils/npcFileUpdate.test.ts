@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { npcFileUpdate, npcFileContent, npcFileBase, isStudioNpcAnimation } from './npcFileUpdate';
+import { parseVendorTabs, formatVendorTabs } from './npcFileUpdate';
 
 const existing = 'name=Old\nanimations=animations/npcs/guill.txt\nvendor=true\nconstant_stock=1,2\nconstant_stock=3\nvox_intro=a.ogg\nvendor_ratio_buy=2\n\n[stats]\nspeed=2\n\n[dialog]\nid=a\nher=Hi\nset_status=x\nyou=Bye\n';
 
@@ -31,5 +32,28 @@ describe('NPC save merge', () => {
     expect(npcFileBase('npcs/guill.txt')).toBe('guill.txt');
     expect(isStudioNpcAnimation('image=images/npcs/a.png\n\n[stance]\n', 'a.png')).toBe(true);
     expect(isStudioNpcAnimation('# hand made\nimage=images/npcs/b.png\n', 'a.png')).toBe(false);
+  });
+});
+
+describe('vendor fields', () => {
+  it('writes ratios, craft stock, tabs and gamble flags; repeatable keys one line each', () => {
+    const out = npcFileContent('name=V\nvendor=true\nvendor_ratio_buy=2\ncraft_random_stock=loot/a.txt\n', npcFileUpdate('V', {
+      vendor: 'true', vendor_ratio_buy: '', vendor_ratio_sell: '0.5',
+      craft_constant_stock: '1001,1002', craft_status_stock: 's1,1003\ns2,1004',
+      craft_random_stock_count: '1,3', vendor_tab_enabled: formatVendorTabs({ buy: true, sell: false, craft: true }),
+      vendor_gamble_buy: 'true', vendor_gamble_craft: '',
+    }, {}));
+    expect(out).not.toContain('vendor_ratio_buy');
+    expect(out).toContain('craft_random_stock=loot/a.txt');
+    expect(out).toContain('vendor_ratio_sell=0.5');
+    expect(out).toContain('craft_status_stock=s1,1003\ncraft_status_stock=s2,1004');
+    expect(out).toContain('vendor_tab_enabled=sell,false\nvendor_tab_enabled=craft,true');
+    expect(out).toContain('vendor_gamble_buy=true');
+    expect(out).not.toContain('vendor_gamble_craft');
+  });
+  it('vendor tabs parse with engine defaults', () => {
+    expect(parseVendorTabs('')).toEqual({ buy: true, sell: true, craft: false });
+    expect(parseVendorTabs('craft,true\nbuy,false')).toEqual({ buy: false, sell: true, craft: true });
+    expect(formatVendorTabs({ buy: true, sell: true, craft: false })).toBe('');
   });
 });

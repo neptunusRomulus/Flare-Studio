@@ -18,7 +18,37 @@ export const NPC_STRING_FIELDS: Record<string, string> = {
   vendor_requires_not_status: 'vendor_requires_not_status',
   direction: 'direction',
   show_on_minimap: 'show_on_minimap',
+  vendor_ratio_buy: 'vendor_ratio_buy',
+  vendor_ratio_sell: 'vendor_ratio_sell',
+  vendor_ratio_sell_old: 'vendor_ratio_sell_old',
+  craft_constant_stock: 'craft_constant_stock',
+  craft_random_stock_count: 'craft_random_stock_count',
+  vendor_gamble_buy: 'vendor_gamble_buy',
+  vendor_gamble_craft: 'vendor_gamble_craft',
 };
+/** Repeatable keys whose values contain commas: one Flare line per text line. */
+export const NPC_LINE_FIELDS: Record<string, string> = {
+  craft_status_stock: 'craft_status_stock',
+  craft_random_stock: 'craft_random_stock',
+  vendor_tab_enabled: 'vendor_tab_enabled',
+};
+
+export type VendorTab = 'buy' | 'sell' | 'craft';
+export const VENDOR_TAB_DEFAULTS: Record<VendorTab, boolean> = { buy: true, sell: true, craft: false };
+/** vendor_tab_enabled lines -> tab states (later lines win, as in NPC.cpp). */
+export function parseVendorTabs(value: string): Record<VendorTab, boolean> {
+  const tabs = { ...VENDOR_TAB_DEFAULTS };
+  for (const line of String(value || '').split('\n')) {
+    const [tab, enabled] = line.split(',').map(s => s.trim().toLowerCase());
+    if (tab === 'buy' || tab === 'sell' || tab === 'craft') tabs[tab] = enabled === 'true' || enabled === '1';
+  }
+  return tabs;
+}
+/** Only tabs that differ from the engine default are written. */
+export function formatVendorTabs(tabs: Record<VendorTab, boolean>): string {
+  return (Object.keys(VENDOR_TAB_DEFAULTS) as VendorTab[])
+    .filter(tab => tabs[tab] !== VENDOR_TAB_DEFAULTS[tab]).map(tab => `${tab},${tabs[tab]}`).join('\n');
+}
 /** Repeatable keys entered as a comma/newline list (one Flare line per value). */
 export const NPC_LIST_FIELDS: Record<string, string> = {
   vox_intro: 'vox_intro',
@@ -42,6 +72,9 @@ export function npcFileUpdate(name: string, props: Props, resolved: { animations
   for (const [prop, key] of Object.entries(NPC_STRING_FIELDS)) if (prop in p) fields[key] = text(p[prop]).trim();
   for (const [prop, key] of Object.entries(NPC_LIST_FIELDS)) {
     if (prop in p) fields[key] = text(p[prop]).split(/[,\n]/).map(s => s.trim()).filter(Boolean).join('\n');
+  }
+  for (const [prop, key] of Object.entries(NPC_LINE_FIELDS)) {
+    if (prop in p) fields[key] = text(p[prop]).split('\n').map(s => s.trim()).filter(Boolean).join('\n');
   }
   // Only a non-empty status stock replaces the file's (an untouched/empty editor value must not wipe it)
   const stock = 'status_stock_entries' in p ? statusStockFromEntries(p.status_stock_entries) : [];

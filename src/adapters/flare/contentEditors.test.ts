@@ -17,6 +17,7 @@ import {
   importEngineText,
   importQuestText,
   mergePowerText,
+  mergeQuestText,
   validateText,
 } from './flareAdapter.cjs';
 import { clipboardFromTiles, pasteTileGrid } from '../../editor/tileClipboard';
@@ -62,6 +63,49 @@ describe('content editor exports', () => {
     expect(validateText('quests', text, 'quests/find_the_key.txt')).toEqual([]);
     const imported = importQuestText(text) as { itemRequirements: Array<{ itemId: string; itemQuantity: number }> };
     expect(imported.itemRequirements[0]).toMatchObject({ itemId: 'gold_key', itemQuantity: 2 });
+  });
+
+  it('merges quest journal fields without dropping hand-written content', () => {
+    const existing = [
+      '# my notes',
+      'name=Old Name',
+      'complete_status=old_done',
+      '',
+      '[quest]',
+      'requires_status=old_started',
+      'requires_item=gold_key:2',
+      'quest_text=Old text.',
+      'custom_key=keep me',
+      '',
+      '[quest]',
+      'requires_status=second',
+      'quest_text=Second step.',
+    ].join('\n');
+    const merged = mergeQuestText(existing, {
+      name: 'New Name',
+      complete_status: 'new_done',
+      requires_status: 'new_started',
+      quest_text: 'New text.',
+    });
+    const lines = merged.split('\n');
+    expect(lines).toContain('# my notes');
+    expect(lines).toContain('name=New Name');
+    expect(lines).toContain('complete_status=new_done');
+    expect(lines).toContain('requires_status=new_started');
+    expect(lines).toContain('quest_text=New text.');
+    expect(lines).toContain('requires_item=gold_key:2');
+    expect(lines).toContain('custom_key=keep me');
+    expect(lines.filter((line) => line === 'quest_text=Second step.')).toHaveLength(1);
+    expect(merged.indexOf('[quest]')).toBeLessThan(merged.indexOf('custom_key=keep me'));
+  });
+
+  it('creates a quest section for a new journal entry', () => {
+    expect(mergeQuestText('', { name: 'Fresh', complete_status: 'done', quest_text: 'Do it.' }))
+      .toBe(exportQuestFile({ name: 'Fresh', complete_status: 'done', quest_text: 'Do it.' }));
+    const merged = mergeQuestText('APPEND\n', { name: 'Fresh', quest_text: 'Do it.' });
+    expect(merged.startsWith('APPEND\n')).toBe(true);
+    expect(merged).toContain('[quest]');
+    expect(merged).toContain('quest_text=Do it.');
   });
 
   it('writes powers/effects.txt, item types, qualities and sets', () => {

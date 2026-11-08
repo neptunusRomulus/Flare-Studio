@@ -200,6 +200,67 @@ function importQuestText(content) {
   return quest;
 }
 
+/** Index range of a [section] inside an importEngineText document (start = section line, end = next section). */
+function sectionRange(doc, sectionName) {
+  const start = doc.findIndex((entry) => entry && entry.kind === "section" && entry.name === sectionName);
+  if (start < 0) return null;
+  let end = start + 1;
+  while (end < doc.length && !(doc[end] && doc[end].kind === "section")) end += 1;
+  return { start, end };
+}
+
+function headerEnd(doc) {
+  const firstSection = doc.findIndex((entry) => entry && entry.kind === "section");
+  return firstSection < 0 ? doc.length : firstSection;
+}
+
+/** Update a key in a range, or insert it after the last key of that range. Empty values leave the file untouched. */
+function setDocKey(doc, start, end, key, value) {
+  if (!value) return;
+  let lastKey = -1;
+  for (let i = start; i < end; i += 1) {
+    const entry = doc[i];
+    if (!entry || entry.kind !== "key") continue;
+    if (entry.key === key) {
+      entry.value = value;
+      return;
+    }
+    lastKey = i;
+  }
+  doc.splice(lastKey >= 0 ? lastKey + 1 : start, 0, { kind: "key", key, value });
+}
+
+/**
+ * Merge quest journal fields into an existing quests/<id>.txt.
+ * Keeps comments, unknown keys, repeats and section order; only name/complete_status,
+ * requires_status and quest_text are touched. Falls back to exportQuestFile for new files.
+ */
+function mergeQuestText(existingText, quest) {
+  const source = quest || {};
+  const text = String(existingText || "");
+  if (!text.trim()) return exportQuestFile(source);
+
+  const doc = importEngineText(text);
+  let headerStart = 0;
+  const endOfHeader = headerEnd(doc);
+  while (headerStart < endOfHeader && !(doc[headerStart] && doc[headerStart].kind === "key")) headerStart += 1;
+  setDocKey(doc, headerStart, endOfHeader, "name", safeString(source.name));
+  setDocKey(doc, headerStart, headerEnd(doc), "complete_status", safeString(source.complete_status));
+
+  const range = sectionRange(doc, "quest");
+  if (range) {
+    setDocKey(doc, range.start + 1, range.end, "requires_status", safeString(source.requires_status));
+    setDocKey(doc, range.start + 1, range.end, "quest_text", safeString(source.quest_text));
+  } else if (source.requires_status || source.quest_text) {
+    doc.push({ kind: "blank" });
+    doc.push({ kind: "section", name: "quest" });
+    if (source.requires_status) doc.push({ kind: "key", key: "requires_status", value: safeString(source.requires_status) });
+    if (source.quest_text) doc.push({ kind: "key", key: "quest_text", value: safeString(source.quest_text) });
+  }
+
+  return exportEngineText(doc);
+}
+
 const EFFECT_KEYS = [
   "id",
   "type",
@@ -560,6 +621,7 @@ module.exports = {
   importLootText,
   exportQuestFile,
   importQuestText,
+  mergeQuestText,
   exportEffectFile,
   importEffectText,
   mergeEffectText,

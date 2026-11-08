@@ -42,6 +42,7 @@ type ObjectManagementDialogProps = {
   handleOpenQuestSettingsDialog: () => void;
   handleCloseQuestSettingsDialog: () => void;
   showQuestSettingsDialog: boolean;
+  dialogueTrees: DialogueTree[];
   setDialogueTrees: (trees: DialogueTree[]) => void;
   setActiveDialogueTab: (idx: number) => void;
   setShowDialogueTreeDialog: (v: boolean) => void;
@@ -83,6 +84,8 @@ const ObjectManagementDialog = ({
   handleOpenQuestSettingsDialog,
   handleCloseQuestSettingsDialog,
   showQuestSettingsDialog,
+  dialogueTrees,
+  setDialogueTrees,
   setShowDialogueTreeDialog,
   showDeleteNpcConfirm,
   setShowDeleteNpcConfirm,
@@ -504,6 +507,10 @@ const ObjectManagementDialog = ({
           isOpen={showQuestSettingsDialog}
           onClose={handleCloseQuestSettingsDialog}
           itemsList={itemsList}
+          npcName={editingObject?.name || ''}
+          projectPath={editor?.getCurrentProjectPath() ?? null}
+          dialogueTrees={dialogueTrees}
+          setDialogueTrees={setDialogueTrees}
           getEditingObjectProperty={getEditingObjectProperty}
           updateEditingObjectProperty={updateEditingObjectProperty}
         />

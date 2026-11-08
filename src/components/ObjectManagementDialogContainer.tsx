@@ -32,6 +32,7 @@ type ObjMgmtCtx = {
   handleOpenQuestSettingsDialog?: () => void;
   handleCloseQuestSettingsDialog?: () => void;
   showQuestSettingsDialog?: boolean;
+  dialogueTrees?: DialogueTree[];
   setDialogueTrees?: (t: DialogueTree[]) => void;
   setActiveDialogueTab?: (id: number) => void;
   setShowDialogueTreeDialog?: (v: boolean) => void;
@@ -71,6 +72,7 @@ export default function ObjectManagementDialogContainer({ ctx }: { ctx: unknown 
       handleOpenQuestSettingsDialog={c.handleOpenQuestSettingsDialog ?? (() => {})}
       handleCloseQuestSettingsDialog={c.handleCloseQuestSettingsDialog ?? (() => {})}
       showQuestSettingsDialog={!!c.showQuestSettingsDialog}
+      dialogueTrees={c.dialogueTrees ?? []}
       setDialogueTrees={(trees) => (c.setDialogueTrees ? c.setDialogueTrees(trees) : undefined)}
       setActiveDialogueTab={(idx) => (c.setActiveDialogueTab ? c.setActiveDialogueTab(idx) : undefined)}
       setShowDialogueTreeDialog={(v) => (c.setShowDialogueTreeDialog ? c.setShowDialogueTreeDialog(v) : undefined)}

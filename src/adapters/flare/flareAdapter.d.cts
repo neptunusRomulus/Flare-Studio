@@ -58,6 +58,7 @@ export function exportLootFile(data: object): string;
 export function importLootText(content: string): Record<string, unknown>;
 export function exportQuestFile(quest: object): string;
 export function importQuestText(content: string): Record<string, unknown>;
+export function mergeQuestText(existingText: string, quest: object): string;
 export function exportEffectFile(effects: Array<Record<string, unknown>>): string;
 export function importEffectText(content: string): Array<Record<string, unknown>>;
 export function mergeEffectText(existingText: string, effects: object[]): string;

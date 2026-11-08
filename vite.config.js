@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync } from 'fs'
+import { readFileSync, readdirSync, statSync } from 'fs'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import esbuild from 'esbuild'
@@ -32,6 +32,7 @@ function adapterExportNames(source) {
 // builds already convert this file through Rollup.
 function flareAdapterDevEsm() {
   let cached = null
+  let cachedStamp = ''
   const adapterDir = resolve(__dirname, 'src/adapters/flare')
   return {
     name: 'flare-adapter-dev-esm',
@@ -40,10 +41,15 @@ function flareAdapterDevEsm() {
     async load(id) {
       const clean = id.split('?')[0].replace(/\\/g, '/')
       if (!clean.endsWith('/src/adapters/flare/flareAdapter.cjs')) return null
-      for (const file of readdirSync(adapterDir)) {
-        if (file.endsWith('.cjs')) this.addWatchFile(resolve(adapterDir, file))
-      }
-      if (!cached) {
+      const files = readdirSync(adapterDir).filter((file) => file.endsWith('.cjs'))
+      for (const file of files) this.addWatchFile(resolve(adapterDir, file))
+      // Rebuild when any adapter file changes, so a dev page never gets the
+      // previous export list (e.g. importing a function added a minute ago).
+      const stamp = files
+        .map((file) => `${file}:${statSync(resolve(adapterDir, file)).mtimeMs}`)
+        .join('|')
+      if (!cached || cachedStamp !== stamp) {
+        cachedStamp = stamp
         cached = esbuild.build({
           entryPoints: [adapterEntry],
           bundle: true,

@@ -1175,7 +1175,12 @@ export class TileMapEditor {
     
     // Use ResizeObserver for more accurate container size tracking
     if (window.ResizeObserver) {
-      this.resizeObserver = new ResizeObserver(() => this.resizeCanvas());
+      // Coalesce to one resize per animation frame (dock slide animations resize the container every frame)
+      let rafId = 0;
+      this.resizeObserver = new ResizeObserver(() => {
+        if (rafId) return;
+        rafId = requestAnimationFrame(() => { rafId = 0; this.resizeCanvas(); });
+      });
       if (this.mapCanvas.parentElement) {
         this.resizeObserver.observe(this.mapCanvas.parentElement);
       }

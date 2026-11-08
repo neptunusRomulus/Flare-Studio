@@ -19,16 +19,16 @@ function generateDialogueId(): string {
 
 /** Requirement type config for labels/placeholders */
 const REQ_CONFIG: Record<DialogueRequirement['type'], { label: string; placeholder: string }> = {
-  status: { label: 'Has status', placeholder: 'e.g. quest_started' },
-  not_status: { label: 'Does not have status', placeholder: 'e.g. quest_completed' },
-  item: { label: 'Has item', placeholder: 'Item ID:qty (e.g. 1002:1)' },
-  not_item: { label: 'Does not have item', placeholder: 'Item ID:qty (e.g. 1002:1)' },
-  level: { label: 'Min level', placeholder: 'e.g. 5' },
-  not_level: { label: 'Max level', placeholder: 'e.g. 10' },
-  currency: { label: 'Min currency', placeholder: 'e.g. 100' },
-  not_currency: { label: 'Max currency', placeholder: 'e.g. 500' },
-  class: { label: 'Has class', placeholder: 'e.g. warrior' },
-  not_class: { label: 'Does not have class', placeholder: 'e.g. ranger' },
+  status: { label: 'Has Status', placeholder: 'e.g. quest_started' },
+  not_status: { label: 'Missing Status', placeholder: 'e.g. quest_completed' },
+  item: { label: 'Has Item', placeholder: 'Item ID:qty (e.g. 1002:1)' },
+  not_item: { label: 'Has Not Item', placeholder: 'Item ID:qty (e.g. 1002:1)' },
+  level: { label: 'Min Level', placeholder: 'e.g. 5' },
+  not_level: { label: 'Max Level', placeholder: 'e.g. 10' },
+  currency: { label: 'Min Currency', placeholder: 'e.g. 100' },
+  not_currency: { label: 'Max Currency', placeholder: 'e.g. 500' },
+  class: { label: 'Has Class', placeholder: 'e.g. warrior' },
+  not_class: { label: 'Has Not Class', placeholder: 'e.g. ranger' },
 };
 
 /** Visual branching panel: shows arrow connections between nodes */
@@ -265,7 +265,7 @@ const DialogueTreeDialog = ({
       >
         <div className="flex items-center gap-2">
           <MessageSquare className="w-5 h-5 text-blue-500" />
-          <h3 className="font-semibold">What they say</h3>
+          <h3 className="font-semibold">Dialogue Trees</h3>
         </div>
         <Button
           variant="ghost"
@@ -379,22 +379,22 @@ const DialogueTreeDialog = ({
             <div className="flex gap-3">
               <div className="flex-1">
                 <div className="flex items-center gap-1">
-                  <label className="text-xs text-muted-foreground font-medium">Conversation title</label>
-                  <Tooltip content="topic — Name shown when the player picks what to talk about.">
+                  <label className="text-xs text-muted-foreground font-medium">Topic</label>
+                  <Tooltip content="topic — The name of this dialog topic. Displayed to the player when picking a dialog tree.">
                     <HelpCircle className="w-3 h-3 text-muted-foreground" />
                   </Tooltip>
                 </div>
                 <Input
                   value={activeTree.topic}
                   onChange={(e) => updateTree(activeDialogueTab, { topic: e.target.value })}
-                  placeholder="What is this about?"
+                  placeholder="Enter dialogue topic..."
                   className="h-8"
                 />
               </div>
               <div className="w-20">
                 <div className="flex items-center gap-1">
                   <label className="text-xs text-muted-foreground font-medium">Group</label>
-                  <Tooltip content="group — Dialogs in the same group: only one is shown at random. Leave empty for no grouping.">
+                  <Tooltip content="group — Dialogs in the same group are selected randomly (only one is shown). Leave empty for no grouping.">
                     <HelpCircle className="w-3 h-3 text-muted-foreground" />
                   </Tooltip>
                 </div>
@@ -408,9 +408,9 @@ const DialogueTreeDialog = ({
               <div className="w-36">
                 <div className="flex items-center gap-1">
                   <label className="text-xs text-muted-foreground font-medium flex items-center gap-1">
-                    <Fingerprint className="w-3 h-3" /> Link ID
+                    <Fingerprint className="w-3 h-3" /> ID
                   </label>
-                  <Tooltip content="id — Unique name other replies can jump to.">
+                  <Tooltip content="id — A unique identifier used to reference this dialog node. Other nodes can link to it via response connections.">
                     <HelpCircle className="w-3 h-3 text-muted-foreground" />
                   </Tooltip>
                 </div>
@@ -606,24 +606,24 @@ const DialogueTreeDialog = ({
                           className="h-8 px-2 py-1 rounded border text-[11px] bg-background cursor-pointer hover:border-primary/50 transition-colors min-w-[130px]"
                         >
                           <optgroup label="Status">
-                            <option value="status">Has status</option>
-                            <option value="not_status">Does not have status</option>
+                            <option value="status">Has Status</option>
+                            <option value="not_status">Missing Status</option>
                           </optgroup>
                           <optgroup label="Items">
-                            <option value="item">Has item</option>
-                            <option value="not_item">Does not have item</option>
+                            <option value="item">Has Item</option>
+                            <option value="not_item">Has Not Item</option>
                           </optgroup>
                           <optgroup label="Level">
-                            <option value="level">Min level</option>
-                            <option value="not_level">Max level</option>
+                            <option value="level">Min Level</option>
+                            <option value="not_level">Max Level</option>
                           </optgroup>
                           <optgroup label="Currency">
-                            <option value="currency">Min currency</option>
-                            <option value="not_currency">Max currency</option>
+                            <option value="currency">Min Currency</option>
+                            <option value="not_currency">Max Currency</option>
                           </optgroup>
                           <optgroup label="Class">
-                            <option value="class">Has class</option>
-                            <option value="not_class">Does not have class</option>
+                            <option value="class">Has Class</option>
+                            <option value="not_class">Has Not Class</option>
                           </optgroup>
                         </select>
                         <Input
@@ -1011,8 +1011,8 @@ const DialogueTreeDialog = ({
                         }}
                         className="h-8 px-2 py-1 rounded-md border text-[11px] bg-background min-w-[110px] cursor-pointer"
                       >
-                        <option value="set_status">Give status</option>
-                        <option value="unset_status">Remove status</option>
+                        <option value="set_status">Set Status</option>
+                        <option value="unset_status">Clear Status</option>
                         <option value="teleport">Teleport</option>
                         <option value="spawn">Spawn Enemy</option>
                         <option value="cutscene">Cutscene</option>

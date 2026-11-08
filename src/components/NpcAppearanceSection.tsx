@@ -202,8 +202,8 @@ const NpcAppearanceSection = ({
             <DirectionField
               value={stanceDirection}
               onChange={onStanceChange}
-              label="Standing pose"
-              tooltip="direction — Which way the idle sprite faces"
+              label="Stance direction"
+              tooltip="direction — The direction to use for this NPC's stance animation"
             />
           </div>
         )}

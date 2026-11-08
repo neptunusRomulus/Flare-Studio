@@ -154,8 +154,6 @@ const NpcEditDialog = ({
     });
   };
 
-  const hasAnyRole = isTalker || isVendor || isQuestGiver;
-
   const toggleRole = (key: 'talker' | 'vendor' | 'questGiver') => {
     const newProps = { ...(editingObject.properties || {}) };
     if (newProps[key] === 'true') delete newProps[key];
@@ -173,7 +171,6 @@ const NpcEditDialog = ({
   return (
     <>
       <section className="space-y-3">
-        <h4 className="text-sm font-semibold">Who</h4>
         <div className="flex gap-3 items-start border border-border rounded-md p-3 bg-muted/20">
           <div className="shrink-0">
             {showAnimPreview ? (
@@ -227,8 +224,8 @@ const NpcEditDialog = ({
 
       <section className="space-y-2">
         <div className="flex items-center gap-1">
-          <h4 className="text-sm font-semibold">What it does</h4>
-          <Tooltip content="Turning a role off hides its editor but keeps the data. Turn it back on to edit again.">
+          <h4 className="text-sm font-semibold">Roles</h4>
+          <Tooltip content="talker / vendor / questGiver — Turning a role off hides its editor but keeps the data. Turn it back on to edit again.">
             <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
           </Tooltip>
         </div>
@@ -237,7 +234,7 @@ const NpcEditDialog = ({
             <Tooltip content="talker — Player can talk to this NPC. Turning off keeps dialogue data.">
               <button type="button" onClick={() => toggleRole('talker')} className={roleCardClass(isTalker, 'bg-blue-500/15 text-blue-600 dark:text-blue-400')}>
                 <MessagesSquare className="w-5 h-5 mb-1" />
-                <span className="text-sm font-semibold">Talks</span>
+                <span className="text-sm font-semibold">Talker</span>
               </button>
             </Tooltip>
             <div className="h-8 mt-1.5 flex items-center">
@@ -247,7 +244,7 @@ const NpcEditDialog = ({
                   onClick={() => setShowDialogueTreeDialog(true)}
                   className="h-7 w-full px-2 text-xs rounded-md border border-border bg-background hover:bg-muted"
                 >
-                  Edit what they say
+                  Edit dialogue
                 </button>
               )}
             </div>
@@ -257,7 +254,7 @@ const NpcEditDialog = ({
             <Tooltip content="vendor — Player can buy and sell here. Turning off keeps stock and prices.">
               <button type="button" onClick={() => toggleRole('vendor')} className={roleCardClass(isVendor, 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400')}>
                 <HandCoins className="w-5 h-5 mb-1" />
-                <span className="text-sm font-semibold">Sells</span>
+                <span className="text-sm font-semibold">Vendor</span>
               </button>
             </Tooltip>
             <div className="h-8 mt-1.5 flex items-center">
@@ -267,7 +264,7 @@ const NpcEditDialog = ({
                   onClick={() => handleOpenVendorSettingsDialog()}
                   className="h-7 w-full px-2 text-xs rounded-md border border-border bg-background hover:bg-muted"
                 >
-                  Edit what they sell
+                  Vendor settings
                 </button>
               )}
             </div>
@@ -277,7 +274,7 @@ const NpcEditDialog = ({
             <Tooltip content="questGiver — Player can get quests here. Turning off keeps quest settings.">
               <button type="button" onClick={() => toggleRole('questGiver')} className={roleCardClass(isQuestGiver, 'bg-amber-500/15 text-amber-600 dark:text-amber-400')}>
                 <MessageCircleQuestionMark className="w-5 h-5 mb-1" />
-                <span className="text-sm font-semibold">Gives quests</span>
+                <span className="text-sm font-semibold">Quest</span>
               </button>
             </Tooltip>
             <div className="h-8 mt-1.5 flex items-center">
@@ -287,19 +284,15 @@ const NpcEditDialog = ({
                   onClick={() => handleOpenQuestSettingsDialog()}
                   className="h-7 w-full px-2 text-xs rounded-md border border-border bg-background hover:bg-muted"
                 >
-                  Edit quests
+                  Quest settings
                 </button>
               )}
             </div>
           </div>
         </div>
-        {!hasAnyRole && (
-          <p className="text-xs text-muted-foreground/70">Just stands there</p>
-        )}
       </section>
 
       <section className="space-y-2 border border-border rounded-md p-3 bg-muted/20">
-        <h4 className="text-sm font-semibold">Where on the map</h4>
         <div className="w-28">
           <PositionField x={editingObject.x} y={editingObject.y} onChangeX={setPositionX} onChangeY={setPositionY} />
         </div>

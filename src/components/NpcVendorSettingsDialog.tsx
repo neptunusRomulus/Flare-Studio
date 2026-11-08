@@ -12,10 +12,10 @@ import { parseVendorTabs, formatVendorTabs, type VendorTab } from '@/utils/npcFi
 
 /** Flare 1.15 NPC.cpp craft keys; repeatable ones take one value per line. */
 const CRAFT_FIELDS = [
-  { key: 'craft_constant_stock', label: 'Always craftable', placeholder: '1001,1002', multiline: false, tooltip: 'craft_constant_stock — Item IDs this vendor can always craft.' },
-  { key: 'craft_status_stock', label: 'Craft after status', placeholder: 'status,1001,1002 (one per line)', multiline: true, tooltip: 'craft_status_stock — Status, then item IDs craftable once that status is set. One line each.' },
-  { key: 'craft_random_stock', label: 'Sometimes craftable', placeholder: 'loot table or inline loot (one per line)', multiline: true, tooltip: 'craft_random_stock — Loot table or inline loot for random craft items. One line each.' },
-  { key: 'craft_random_stock_count', label: 'How many craft rolls', placeholder: 'min,max', multiline: false, tooltip: 'craft_random_stock_count — Min and optional max random craft items.' },
+  { key: 'craft_constant_stock', label: 'Craft Stock', placeholder: '1001,1002', multiline: false, tooltip: 'craft_constant_stock — Item IDs this vendor can craft.' },
+  { key: 'craft_status_stock', label: 'Craft Status Stock', placeholder: 'status,1001,1002 (one per line)', multiline: true, tooltip: 'craft_status_stock — Status, then item IDs craftable once the status is set. One line each.' },
+  { key: 'craft_random_stock', label: 'Craft Random Stock', placeholder: 'loot table or inline loot (one per line)', multiline: true, tooltip: 'craft_random_stock — Loot table file or inline loot for random craft items. One line each.' },
+  { key: 'craft_random_stock_count', label: 'Craft Random Count', placeholder: 'min,max', multiline: false, tooltip: 'craft_random_stock_count — Min and optional max random craft items.' },
 ];
 
 type NpcVendorSettingsDialogProps = {
@@ -105,30 +105,30 @@ const NpcVendorSettingsDialog = ({
 
   const vendorStockSections = [
     {
-      title: 'Always in stock',
+      title: 'Always Available',
       value: constantStockGroup,
       onSelect: handleSelectConstantStockGroup,
       stockType: 'constant' as const,
       propertyKey: 'constant_stock_group' as const,
-      tooltip: 'constant_stock — Items this vendor always sells.',
+      tooltip: 'constant_stock — Items that vendor always sells.',
       buttonTooltip: 'Use an item group or create a new one.',
     },
     {
-      title: 'Unlocked by status',
+      title: 'Unlockable',
       value: statusStockGroup,
       onSelect: handleSelectStatusStockGroup,
       stockType: 'status' as const,
       propertyKey: 'status_stock_group' as const,
-      tooltip: 'status_stock — Items that appear after a campaign status is set.',
+      tooltip: 'status_stock — Items that vendor sells after a certain status change.',
       buttonTooltip: 'Use an item group or create a new one.',
     },
     {
-      title: 'Sometimes in stock',
+      title: 'Random',
       value: randomStockGroup,
       onSelect: handleSelectRandomStockGroup,
       stockType: 'random' as const,
       propertyKey: 'random_stock_group' as const,
-      tooltip: 'random_stock — Items sold at random. Needs a min and max count.',
+      tooltip: 'random_stock — Items that the vendor sells randomly. Requires min. and max. number of items.',
       buttonTooltip: 'Use an item group or create a new one.',
     },
   ] as const;
@@ -156,7 +156,7 @@ const NpcVendorSettingsDialog = ({
       >
         <div className="flex items-center gap-2">
           <Gift className="w-5 h-5 text-emerald-500" />
-          <h3 className="font-semibold">What they sell</h3>
+          <h3 className="font-semibold">Vendor Settings</h3>
         </div>
         <Button
           variant="ghost"
@@ -177,7 +177,7 @@ const NpcVendorSettingsDialog = ({
           >
             <span className="flex items-center gap-2">
               <HandCoins className="w-4 h-4 text-emerald-500" />
-              Who can shop here
+              Vendor Requirements
             </span>
             <ChevronDown className={`w-4 h-4 transition-transform ${vendorRequirementsExpanded ? 'rotate-180' : ''}`} />
           </button>
@@ -186,8 +186,8 @@ const NpcVendorSettingsDialog = ({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="flex items-center gap-2 text-sm font-medium mb-1">
-                    Must have status
-                    <Tooltip content="vendor_requires_status — Player needs these statuses to use this shop.">
+                    Vendor Requires Status
+                    <Tooltip content="vendor_requires_status — The player must have these statuses in order to use this NPC as a vendor.">
                       <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
                     </Tooltip>
                   </label>
@@ -200,8 +200,8 @@ const NpcVendorSettingsDialog = ({
                 </div>
                 <div>
                   <label className="flex items-center gap-2 text-sm font-medium mb-1">
-                    Must not have status
-                    <Tooltip content="vendor_requires_not_status — Player must not have these statuses to use this shop.">
+                    Vendor Requires Not Status
+                    <Tooltip content="vendor_requires_not_status — The player must not have these statuses in order to use this NPC as a vendor.">
                       <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
                     </Tooltip>
                   </label>
@@ -225,7 +225,7 @@ const NpcVendorSettingsDialog = ({
           >
             <span className="flex items-center gap-2">
               <Package className="w-4 h-4 text-cyan-500" />
-              Stock
+              Vendor Stock
             </span>
             <ChevronDown className={`w-4 h-4 transition-transform ${vendorStockExpanded ? 'rotate-180' : ''}`} />
           </button>
@@ -305,7 +305,7 @@ const NpcVendorSettingsDialog = ({
           >
             <span className="flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-violet-500" />
-              Prices
+              Vendor Pricing
             </span>
             <ChevronDown className={`w-4 h-4 transition-transform ${vendorPricingExpanded ? 'rotate-180' : ''}`} />
           </button>
@@ -314,8 +314,8 @@ const NpcVendorSettingsDialog = ({
               <div className="grid gap-3">
                 <div className="grid gap-2">
                   <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-                    <span>How cheap they buy</span>
-                    <Tooltip content="vendor_ratio_buy — Multiplier when the vendor buys from the player.">
+                    <span>Buy Ratio</span>
+                    <Tooltip content="vendor_ratio_buy — Multiplier for item prices for the vendor.">
                       <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
                     </Tooltip>
                   </div>
@@ -326,7 +326,7 @@ const NpcVendorSettingsDialog = ({
                       inputMode="decimal"
                       className="h-9 w-32 rounded-md px-2 text-xs"
                       value={useGlobalVendorRatioBuy ? '' : rawVendorRatioBuy}
-                      placeholder="1.0"
+                      placeholder="Buy Ratio"
                       disabled={useGlobalVendorRatioBuy}
                       onChange={(e) => updateEditingObjectProperty('vendor_ratio_buy', e.target.value.trim() === '' ? '' : e.target.value)}
                     />
@@ -343,15 +343,15 @@ const NpcVendorSettingsDialog = ({
                         }}
                         className="h-4 w-4 rounded border-border"
                       />
-                      Use game default
+                      Use global settings
                     </label>
                   </div>
                 </div>
 
                 <div className="grid gap-2">
                   <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-                    <span>How expensive they sell</span>
-                    <Tooltip content="vendor_ratio_sell — Multiplier when the vendor sells to the player.">
+                    <span>Sell Ratio</span>
+                    <Tooltip content="vendor_ratio_sell — Multiplier for item prices for the vendor.">
                       <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
                     </Tooltip>
                   </div>
@@ -362,7 +362,7 @@ const NpcVendorSettingsDialog = ({
                       inputMode="decimal"
                       className="h-9 w-32 rounded-md px-2 text-xs"
                       value={useGlobalVendorRatioSell ? '' : rawVendorRatioSell}
-                      placeholder="0.25"
+                      placeholder="Sell Ratio"
                       disabled={useGlobalVendorRatioSell}
                       onChange={(e) => updateEditingObjectProperty('vendor_ratio_sell', e.target.value.trim() === '' ? '' : e.target.value)}
                     />
@@ -379,15 +379,15 @@ const NpcVendorSettingsDialog = ({
                         }}
                         className="h-4 w-4 rounded border-border"
                       />
-                      Use game default
+                      Use global settings
                     </label>
                   </div>
                 </div>
 
                 <div className="grid gap-2">
                   <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-                    <span>Buy-back price later</span>
-                    <Tooltip content="vendor_ratio_sell_old — Price multiplier for items you sold before, after leaving and returning.">
+                    <span>Buy Back Ratio</span>
+                    <Tooltip content="vendor_ratio_sell_old — Multiplier for items you sold previously, after you leave the shop and come back.">
                       <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
                     </Tooltip>
                   </div>
@@ -398,7 +398,7 @@ const NpcVendorSettingsDialog = ({
                       inputMode="decimal"
                       className="h-9 w-32 rounded-md px-2 text-xs"
                       value={useGlobalVendorRatioSellOld ? '' : rawVendorRatioSellOld}
-                      placeholder="0.0"
+                      placeholder="Buy Back Ratio"
                       disabled={useGlobalVendorRatioSellOld}
                       onChange={(e) => updateEditingObjectProperty('vendor_ratio_sell_old', e.target.value.trim() === '' ? '' : e.target.value)}
                     />
@@ -415,7 +415,7 @@ const NpcVendorSettingsDialog = ({
                         }}
                         className="h-4 w-4 rounded border-border"
                       />
-                      Use game default
+                      Use global settings
                     </label>
                   </div>
                 </div>
@@ -432,35 +432,28 @@ const NpcVendorSettingsDialog = ({
           >
             <span className="flex items-center gap-2">
               <Hammer className="w-4 h-4 text-amber-500" />
-              Crafting &amp; shop tabs
+              Crafting &amp; Tabs
             </span>
             <ChevronDown className={`w-4 h-4 transition-transform ${vendorCraftExpanded ? 'rotate-180' : ''}`} />
           </button>
           {vendorCraftExpanded && (
             <div className="px-3 pb-3 space-y-3">
               <div className="flex flex-wrap items-center gap-4 text-xs">
-                {([
-                  { tab: 'buy' as VendorTab, label: 'Buy tab' },
-                  { tab: 'sell' as VendorTab, label: 'Sell tab' },
-                  { tab: 'craft' as VendorTab, label: 'Craft tab' },
-                ]).map(({ tab, label }) => (
-                  <label key={tab} className="inline-flex items-center gap-1.5">
+                {(['buy', 'sell', 'craft'] as VendorTab[]).map((tab) => (
+                  <label key={tab} className="inline-flex items-center gap-1.5 capitalize">
                     <input
                       type="checkbox"
                       className="h-3.5 w-3.5"
                       checked={vendorTabs[tab]}
                       onChange={(e) => updateEditingObjectProperty('vendor_tab_enabled', formatVendorTabs({ ...vendorTabs, [tab]: e.target.checked }))}
                     />
-                    {label}
+                    {tab}
                   </label>
                 ))}
-                <Tooltip content="vendor_tab_enabled — Buy and Sell are on by default; Craft is off.">
+                <Tooltip content="vendor_tab_enabled — Buy and Sell are on by default, Craft is off.">
                   <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
                 </Tooltip>
-                {([
-                  { key: 'vendor_gamble_buy' as const, label: 'Mystery buy' },
-                  { key: 'vendor_gamble_craft' as const, label: 'Mystery craft' },
-                ]).map(({ key, label }) => (
+                {(['vendor_gamble_buy', 'vendor_gamble_craft'] as const).map((key) => (
                   <label key={key} className="inline-flex items-center gap-1.5">
                     <input
                       type="checkbox"
@@ -468,10 +461,10 @@ const NpcVendorSettingsDialog = ({
                       checked={getEditingObjectProperty(key, '') === 'true'}
                       onChange={(e) => updateEditingObjectProperty(key, e.target.checked ? 'true' : '')}
                     />
-                    {label}
+                    {key === 'vendor_gamble_buy' ? 'Gamble Buy' : 'Gamble Craft'}
                   </label>
                 ))}
-                <Tooltip content="vendor_gamble_buy / vendor_gamble_craft — Hide damage, absorb and bonuses of randomized items until purchase.">
+                <Tooltip content="vendor_gamble_buy / vendor_gamble_craft — Hide damage, absorb and bonuses of randomized items on that tab until purchase.">
                   <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
                 </Tooltip>
               </div>

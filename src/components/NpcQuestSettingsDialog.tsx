@@ -55,7 +55,7 @@ const NpcQuestSettingsDialog = ({
       >
         <div className="flex items-center gap-2">
           <Check className="w-5 h-5 text-amber-500" />
-          <h3 className="font-semibold">Edit quests</h3>
+          <h3 className="font-semibold">Quest Settings</h3>
         </div>
         <Button
           variant="ghost"
@@ -71,7 +71,7 @@ const NpcQuestSettingsDialog = ({
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="flex items-center gap-1 text-sm font-medium mb-1">
-              Needed status
+              Requires Status
               <Tooltip content="questRequiresStatus — Status the player must have to get this quest.">
                 <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
               </Tooltip>
@@ -85,7 +85,7 @@ const NpcQuestSettingsDialog = ({
           </div>
           <div>
             <label className="flex items-center gap-1 text-sm font-medium mb-1">
-              Status when accepted
+              Set Status On Accept
               <Tooltip content="questSetStatus — Status set when the player accepts the quest.">
                 <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
               </Tooltip>
@@ -101,7 +101,7 @@ const NpcQuestSettingsDialog = ({
 
         <div>
           <label className="flex items-center gap-1 text-sm font-medium mb-1">
-            Quest loot line
+            Quest Loot
             <Tooltip content="quest_loot — Format: status,not_status,item_id (one line per entry).">
               <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
             </Tooltip>
@@ -117,7 +117,7 @@ const NpcQuestSettingsDialog = ({
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <label className="flex items-center gap-1 text-sm font-medium">
-              Reward item
+              Quest Reward Item
               <Tooltip content="Pick an item from the Items layer to fill the item_id part of quest_loot.">
                 <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
               </Tooltip>
@@ -128,7 +128,7 @@ const NpcQuestSettingsDialog = ({
           </div>
 
           {itemsList.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No items yet — create some in the Items layer.</p>
+            <p className="text-sm text-muted-foreground">No items available. Create items in the Items layer to use them as quest rewards.</p>
           ) : (
             <div className="grid grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
               {itemsList.map((item) => {

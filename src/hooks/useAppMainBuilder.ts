@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { shouldCreatePreMapEditor } from '@/hooks/preMapEditor';
 import useDialogsCtx from './useDialogsCtx';
 import buildConfirmDialogProps from './buildConfirmDialogProps';
 import useAppMainState, { AssetOriginPreset, ImportReviewData } from './useAppMainState';
@@ -316,6 +317,37 @@ export default function useAppMainBuilder() {
 
     void createEditorWithConfig();
   }, [pendingMapConfig, editor, canvasRef, appShowWelcome, setupAutoSave, mapConfig, updateLayersList, syncMapObjects, setEditor, setPendingMapConfig, toolbarState, appState, currentProjectPath]);
+  // Empty project (no maps): create a blank editor so the sidebar + palette dock render before the first map.
+  useEffect(() => {
+    if (!shouldCreatePreMapEditor({
+      hasEditor: !!editor,
+      canvasMounted: !!canvasRef?.current,
+      showWelcome: !!appShowWelcome,
+      isOpeningProject: !!appState.isOpeningProject,
+      hasPendingMapConfig: !!pendingMapConfig,
+      mapInitialized: !!mapConfig.mapInitialized,
+      projectPath: currentProjectPath,
+    })) return;
+    try {
+      const blank = new TileMapEditor(canvasRef.current!);
+      blank.setDarkMode(Boolean(isDarkMode));
+      if (currentProjectPath) blank.setCurrentProjectPath(currentProjectPath);
+      blank.resetForNewProject();
+      blank.setMapSize(0, 0);
+      try { setupAutoSave(blank); } catch (err) { console.warn('Failed to setup autosave:', err); }
+      setEditor(blank);
+      const blankLayers = typeof blank.getLayers === 'function' ? blank.getLayers() : [];
+      try { appState.setLayers([...blankLayers]); } catch (e) { void e; }
+      const bg = blankLayers.find(l => l.type === 'background');
+      if (bg) {
+        try { blank.setActiveLayer(bg.id); } catch (e) { void e; }
+        try { appState.setActiveLayerId?.(bg.id); } catch (e) { void e; }
+      }
+    } catch (error) {
+      console.error('Failed to create pre-map editor:', error);
+    }
+  }, [editor, canvasRef, appShowWelcome, appState, pendingMapConfig, mapConfig.mapInitialized, currentProjectPath, isDarkMode, setupAutoSave, setEditor]);
+
   const { handleUndo, handleRedo, handleZoomIn, handleZoomOut, handleResetZoom } = useUndoRedoZoom({ editor, updateLayersList, syncMapObjects });
 
   const { tooltip, showTooltipWithDelay, hideTooltip } = useTooltip({ toolbarRef: toolbarState.toolbarContainerRef, canvasRef });

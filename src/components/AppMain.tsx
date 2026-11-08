@@ -4,6 +4,7 @@ import WelcomeScreen from '../components/WelcomeScreen';
 import AppShell from '@/components/AppShell';
 import AppSidebar from '@/components/AppSidebar';
 import PaletteDock from '@/components/PaletteDock';
+import { shouldShowPanels } from '@/hooks/preMapEditor';
 import { isDrawingLayer } from '@/components/paletteLayout';
 import EngineSettingsDialog from '@/components/EngineSettingsDialog';
 import MapSettingsDialog from '@/components/MapSettingsDialog';
@@ -233,7 +234,7 @@ export default function AppMain() {
 
   // Sidebars + palette dock are available as soon as a project's editor exists, even before the first map.
   const templateProjectPath: string | null = controls?.currentProjectPath ?? null;
-  const showPanels = hasMap || (!!editor && !!templateProjectPath);
+  const showPanels = shouldShowPanels({ hasMap, hasEditor: !!editor, projectPath: templateProjectPath });
 
   // Before the first map: select Background so the palette dock shows (scratch and template alike).
   const preMapInitEditorRef = useRef<unknown>(null);

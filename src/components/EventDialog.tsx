@@ -402,6 +402,8 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
       script: '',
     },
   });
+  const eventPlaced = eventData.positioning.coordinates.x >= 0 && eventData.positioning.coordinates.y >= 0;
+
 
   // Dragging and resizing state
   const {
@@ -853,7 +855,15 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
 
                 <div className="space-y-4 border-b border-border/50 pb-4">
                 {/* Area/hotspot belong to the map instance: set by placing (dragging an area) on the map, edited here afterwards */}
-                {isEditing && (<>
+                {isEditing && !eventPlaced && (
+                  <div className="flex items-center gap-2 h-7">
+                    <label className="text-xs font-medium text-foreground/80">Location</label>
+                    <Tooltip content="Place it from the Entities dock: click its pin, then drag an area on the map.">
+                      <span className="text-xs text-muted-foreground italic cursor-help">Not placed</span>
+                    </Tooltip>
+                  </div>
+                )}
+                {isEditing && eventPlaced && (<>
                 {/* Location and Size */}
                 <div className={`space-y-2 transition-opacity ${!isLocEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
                   <div className="flex items-center gap-2">

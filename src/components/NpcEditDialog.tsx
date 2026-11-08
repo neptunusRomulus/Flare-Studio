@@ -77,7 +77,6 @@ const NpcEditDialog = ({
                 />
               </div>
               <div className="w-24">
-                <label className="text-xs text-muted-foreground">Position</label>
                 <PositionField
                   x={editingObject.x}
                   y={editingObject.y}

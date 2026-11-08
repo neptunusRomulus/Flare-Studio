@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import PositionField from '@/components/PositionField';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -206,23 +207,13 @@ const ObjectManagementDialog = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs text-muted-foreground">Location</label>
-                  <div className="flex items-center gap-1 mt-1">
-                    <Input
-                      type="number"
-                      value={editingObject.x}
-                      onChange={(e) => setEditingObject({ ...editingObject, x: Number(e.target.value) })}
-                      className="h-8 w-20 px-1 text-center"
-                    />
-                    <span className="text-muted-foreground text-xs"> , </span>
-                    <Input
-                      type="number"
-                      value={editingObject.y}
-                      onChange={(e) => setEditingObject({ ...editingObject, y: Number(e.target.value) })}
-                      className="h-8 w-20 px-1 text-center"
-                    />
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">Map location coordinates for the enemy spawn.</p>
+                  <PositionField
+                    label="Location"
+                    x={editingObject.x}
+                    y={editingObject.y}
+                    onChangeX={(x) => setEditingObject({ ...editingObject, x })}
+                    onChangeY={(y) => setEditingObject({ ...editingObject, y })}
+                  />
                 </div>
                 <div>
                   <label className="text-xs text-muted-foreground">Size</label>

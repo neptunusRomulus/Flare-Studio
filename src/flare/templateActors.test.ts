@@ -16,6 +16,7 @@ const listing: TemplateActorListing = {
   npcs: [],
   enemies: [
     { key: 'beacon', file: 'enemies/base/beacon.txt', raw: 'speed=0\n', isBase: true },
+    { key: 'goblin_elite', file: 'enemies/base/goblin_elite.txt', raw: 'INCLUDE enemies/base/goblin.txt\nanimations=animations/enemies/goblin_elite.txt\n', isBase: true },
     { key: 'goblin', file: 'enemies/base/goblin.txt', raw: 'INCLUDE enemies/base/beacon.txt\nanimations=animations/enemies/goblin.txt\n', isBase: true },
     { key: 'il_antlion', file: 'enemies/il_antlion.txt', raw: 'name=Labyrinth Antlion\ncategories=il_antlion,il_common\nstat=hp,60\nstat=accuracy,80\n', isBase: false },
   ],
@@ -56,14 +57,15 @@ describe('template actor plan', () => {
     const plan = planTemplateActors(listing);
     expect(plan.map(p => [p.type, p.name, p.category])).toEqual([
       ['npc', 'Peasant Man 1', undefined],
+      ['enemy', 'Goblin Elite', 'goblin_elite'],
       ['enemy', 'Goblin', 'goblin'],
       ['enemy', 'Labyrinth Antlion', 'il_antlion'],
     ]);
     expect(plan[0].properties.tilesetPath).toBe('animations/npcs/peasant_man1.txt');
-    expect(plan[1].file).toEqual({ rel: 'enemies/goblin.txt', content: enemyFileFromBase('enemies/base/goblin.txt', 'goblin') });
-    expect(plan[1].file?.content).toContain('INCLUDE enemies/base/goblin.txt\nname=Goblin\ncategories=goblin');
+    expect(plan[2].file).toEqual({ rel: 'enemies/goblin.txt', content: enemyFileFromBase('enemies/base/goblin.txt', 'goblin') });
+    expect(plan[2].file?.content).toContain('INCLUDE enemies/base/goblin.txt\nname=Goblin\ncategories=goblin');
     // full definitions are kept raw (repeated stat= lines survive)
-    expect(plan[2].file?.content).toBe(listing.enemies[2].raw);
+    expect(plan[3].file?.content).toBe(listing.enemies[3].raw);
   });
   it('dedupes by import key / NPC look and keeps existing files', () => {
     const plan = planTemplateActors(listing);
@@ -73,9 +75,10 @@ describe('template actor plan', () => {
     ];
     const { keep, skipped } = dedupeActors(plan, existing, new Set(['enemies/goblin.txt']));
     expect(skipped).toBe(2);
-    expect(keep.map(k => k.name)).toEqual(['Goblin']);
-    expect(keep[0].file).toBeUndefined();
-    expect(dedupeActors([...plan, ...plan], [], new Set()).keep).toHaveLength(3);
+    expect(keep.map(k => k.name)).toEqual(['Goblin Elite', 'Goblin']);
+    expect(keep[1].file).toBeUndefined();
+    expect(keep[0].file?.rel).toBe('enemies/goblin_elite.txt');
+    expect(dedupeActors([...plan, ...plan], [], new Set()).keep).toHaveLength(4);
   });
   it('titles keys', () => {
     expect(titleFromKey('goblin_elite_runner')).toBe('Goblin Elite Runner');

@@ -67,11 +67,9 @@ export function planTemplateActors(listing: TemplateActorListing): PlannedActor[
       properties: { tilesetPath: look.animation, ...(look.image ? { templateImage: look.image } : {}) },
     });
   }
-  // Bases that other enemy files INCLUDE (e.g. beacon.txt) are shared building blocks, not enemies.
-  const included = new Set<string>();
-  for (const e of listing.enemies) for (const m of e.raw.matchAll(/^\s*INCLUDE\s+(\S+)/gm)) included.add(m[1]);
   for (const e of listing.enemies) {
-    if (e.isBase && included.has(e.file)) continue;
+    // Bases without their own look (e.g. beacon.txt, a shared behaviour block) are not enemies.
+    if (e.isBase && !firstValue(e.raw, 'animations')) continue;
     if (e.isBase) {
       const rel = `enemies/${e.key}.txt`;
       out.push({

@@ -670,7 +670,9 @@ function importNpcText(content) {
   const sections = [{ name: "", entries: [] }];
   for (const raw of String(content || "").replace(/\r/g, "").split("\n")) {
     const line = raw.trim();
-    if (!line || line.startsWith("#")) continue;
+    if (!line) continue;
+    // Comments ride along as raw entries so a merge keeps them in place
+    if (line.startsWith("#")) { sections[sections.length - 1].entries.push({ raw: line }); continue; }
     if (line === "APPEND" || line.startsWith("INCLUDE ")) { sections[sections.length - 1].entries.push({ raw: line }); continue; }
     const m = line.match(/^\[([^\]]+)\]$/);
     if (m) { sections.push({ name: m[1].trim(), entries: [] }); continue; }

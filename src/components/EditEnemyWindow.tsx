@@ -30,6 +30,8 @@ interface EditEnemyWindowProps {
   onCloseDecision?: (decision: 'save' | 'discard' | 'cancel') => void;
 }
 
+const ENEMY_FILE_UNSUPPORTED_KEYS = ['gold', 'wander_radius', 'waypoints', 'script'];
+
 export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, projectPath = '', inline = false, showCloseConfirm = false, onCloseDecision }: EditEnemyWindowProps) {
   const { toast } = useToast();
   const itemsHook = useItems({ currentProjectPath: projectPath || null, toast, normalizeItemsForState });
@@ -119,14 +121,11 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
     if (level !== undefined && level !== null) lines.push(`level=${level}`);
     if (rarity) lines.push(`rarity=${rarity}`);
     if (xp) lines.push(`xp=${xp}`);
-    if (gold) lines.push(`gold=${gold}`);
     
     // Core Stats (Standard key=value)
     if (speed) lines.push(`speed=${speed}`);
     if (cooldown) lines.push(`cooldown=${cooldown}`);
     if (turnDelay) lines.push(`turn_delay=${turnDelay}`);
-    if (wanderRadius) lines.push(`wander_radius=${wanderRadius}`);
-    if (waypoints) lines.push(`waypoints=${waypoints}`);
     if (waypointPause) lines.push(`waypoint_pause=${waypointPause}`);
     
     // Core Stats (stat=id,value)
@@ -186,7 +185,6 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
     if (passivePowers) lines.push(`passive_powers=${passivePowers}`);
     if (cooldownHit) lines.push(`cooldown_hit=${cooldownHit}`);
     if (powerFilter) lines.push(`power_filter=${powerFilter}`);
-    if (script) lines.push(`script=${script}`);
 
     // Loot
     if (loot) lines.push(`loot=${loot}`);
@@ -196,7 +194,18 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
     if (questLoot) lines.push(`quest_loot=${questLoot}`);
     if (defeatStatus) lines.push(`defeat_status=${defeatStatus}`);
 
-    const customLines = (customPropsRaw || '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    // Flare 1.15 StatBlock does not read these keys; wander_radius/waypoints belong on the map spawn
+    const notSaved = new Set<string>();
+    if (gold) notSaved.add('gold');
+    if (wanderRadius) notSaved.add('wander_radius');
+    if (waypoints) notSaved.add('waypoints');
+    if (script) notSaved.add('script');
+    const customLines = (customPropsRaw || '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
+      .filter((line) => {
+        const key = line.split('=')[0].trim();
+        if (ENEMY_FILE_UNSUPPORTED_KEYS.includes(key)) { notSaved.add(key); return false; }
+        return true;
+      });
     lines.push(...customLines);
 
     const content = lines.join('\n') + '\n';
@@ -212,6 +221,13 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
           description: `Enemy saved to enemies/${filename}`,
           variant: 'default',
         });
+        if (notSaved.size > 0) {
+          toast({
+            title: 'Some fields were not saved',
+            description: `${[...notSaved].join(', ')}: not enemy file keys in Flare 1.15. Set wander radius and waypoints on the map spawn.`,
+            variant: 'destructive',
+          });
+        }
       }
     } catch (e) {
       console.error('Failed to save enemy file:', e);
@@ -736,14 +752,14 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
     threatRange: 'The first value is the engage radius; the second optional value is the stop distance, defaulting to double the first.',
     fleeRange: 'The radius at which the creature begins fleeing. Defaults to half of the threat range.',
     turnDelay: 'Duration it takes for this creature to turn and face its target in ms or s.',
-    wanderRadius: 'Radius this creature will wander when not in combat.',
+    wanderRadius: 'Map spawn only in Flare 1.15; not saved to the enemy file.',
     chancePursue: 'Percentage chance the creature will chase its target.',
     chanceFlee: 'Percentage chance the creature will run away from its target.',
     isFacing: 'Creature can turn to face its target.',
     isFlying: 'Creature can move over gaps and water.',
     isIntangible: 'Creature can move through walls.',
     xp: 'XP awarded upon death.',
-    gold: 'Base gold rewarded when this enemy is defeated.',
+    gold: 'Not read by Flare 1.15; not saved to the enemy file. Use loot with currency instead.',
     itemFind: 'Chance to find items on this enemy.',
     currencyFind: 'Chance to find currency on this enemy.',
     loot: 'Possible loot that can be dropped on death.',

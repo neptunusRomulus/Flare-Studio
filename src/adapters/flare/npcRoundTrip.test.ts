@@ -102,3 +102,11 @@ describe('enemy preset save keeps INCLUDE and repeated keys', () => {
     expect(lines(normalizeEnemyText(base).text)).toEqual(lines(base));
   });
 });
+
+describe('NPC comments', () => {
+  it('merge keeps comments in place', () => {
+    const text = '# header\nname=A\n# talk\ntalker=true\n\n[stats]\n# s\nspeed=2\n\n[dialog]\nid=x\n# c\nhim=Hi\n';
+    const out = mergeNpcFile(text, { fields: { name: 'B' } });
+    expect(out).toBe('# header\nname=B\n# talk\ntalker=true\n\n[stats]\n# s\nspeed=2\n\n[dialog]\nid=x\n# c\nhim=Hi\n');
+  });
+});

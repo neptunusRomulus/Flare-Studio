@@ -83,7 +83,7 @@ const MapTargetSwitch: React.FC<Props> = ({ group = MAP_GROUP, layers, activeLay
   });
 
   return (
-    <div className="flex items-center justify-center gap-1.5 pt-2">
+    <div className="flex items-center justify-center gap-1.5 pb-2">
       <SlidingSwitch items={items} selected={current} onSelect={select} ariaLabel={group.label} />
       <Tooltip content={group.help}>
         <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" aria-hidden />

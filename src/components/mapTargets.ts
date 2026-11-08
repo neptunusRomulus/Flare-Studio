@@ -10,7 +10,7 @@ export const MAP_TARGET_CURSOR: Record<MapTarget, string> = {
   collision: '#ffffff',
 };
 
-export const MAP_TAB_HELP = 'Press Tab to switch between Ground, Object and Collision while the Map layer is selected.';
+export const MAP_TAB_HELP = 'Tab: switch Ground, Object and Collision. Shift+Tab: switch main layers.';
 
 export function isMapTarget(t: string | null | undefined): t is MapTarget {
   return !!t && (MAP_TARGETS as string[]).includes(t);

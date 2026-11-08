@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { CONTENT_GROUP, ENTITY_GROUP, MAP_GROUP, collapseTargetGroups, cycleInGroup, groupOfType, normalizeTileRect, tabTargetFor } from './targetGroups';
+import { CONTENT_GROUP, ENTITY_GROUP, MAP_GROUP, collapseTargetGroups, cycleInGroup, groupOfType, normalizeTileRect, tabTargetFor, mainTabTargetFor } from './targetGroups';
 import { groupLayers, layerGroupIndex } from './layerGroups';
 
 const div = { tagName: 'DIV', closest: () => null };
@@ -14,11 +14,24 @@ describe('target groups', () => {
   it('Tab stays inside the active group', () => {
     expect(tabTargetFor({ key: 'Tab' }, 'enemy', div)).toBe('event');
     expect(tabTargetFor({ key: 'Tab' }, 'object', div)).toBe('collision');
-    expect(tabTargetFor({ key: 'Tab', shiftKey: true }, 'npc', div)).toBe('event');
+    expect(tabTargetFor({ key: 'Tab', shiftKey: true }, 'npc', div)).toBeNull();
     expect(tabTargetFor({ key: 'Tab' }, 'gameSettings', div)).toBeNull();
     expect(tabTargetFor({ key: 'Tab' }, 'rules', div)).toBe('items');
     expect(tabTargetFor({ key: 'Tab' }, 'npc', { tagName: 'TEXTAREA' })).toBeNull();
     expect(tabTargetFor({ key: 'Tab' }, 'npc', { tagName: 'DIV', closest: () => ({}) })).toBeNull();
+  });
+  it('Shift+Tab cycles main layers Map -> Entities -> Content -> Game Settings -> Map', () => {
+    const all = ['map', 'entities', 'content', 'gameSettings'];
+    const sh = { key: 'Tab', shiftKey: true };
+    expect(mainTabTargetFor(sh, 'collision', div, all)).toBe('entities');
+    expect(mainTabTargetFor(sh, 'event', div, all)).toBe('content');
+    expect(mainTabTargetFor(sh, 'status', div, all)).toBe('gameSettings');
+    expect(mainTabTargetFor(sh, 'gameSettings', div, all)).toBe('map');
+    expect(mainTabTargetFor(sh, 'items', div, ['map', 'entities', 'content'])).toBe('map');
+    expect(mainTabTargetFor({ key: 'Tab' }, 'npc', div, all)).toBeNull();
+    expect(mainTabTargetFor(sh, 'npc', { tagName: 'INPUT' }, all)).toBeNull();
+    expect(mainTabTargetFor(sh, 'npc', { tagName: 'DIV', closest: () => ({}) }, all)).toBeNull();
+    expect(MAP_GROUP.help).toBe('Tab: switch Ground, Object and Collision. Shift+Tab: switch main layers.');
   });
   it('sidebar: [Map] | [Entities] | [Items, Statuses, Quests] | [Game Settings]', () => {
     const types = ['gameSettings', 'rules', 'event', 'status', 'items', 'enemy', 'npc', 'object', 'collision', 'background'];

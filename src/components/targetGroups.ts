@@ -21,14 +21,14 @@ export const ENTITY_GROUP: TargetGroup = {
   label: 'Entities',
   targets: ['npc', 'enemy', 'event'],
   labels: { npc: 'NPC', enemy: 'Enemy', event: 'Event' },
-  help: 'Press Tab to switch between NPC, Enemy and Event while the Entities layer is selected.',
+  help: 'Tab: switch NPC, Enemy and Event. Shift+Tab: switch main layers.',
 };
 export const CONTENT_GROUP: TargetGroup = {
   id: 'content',
   label: 'Content',
   targets: ['items', 'status', 'rules'],
   labels: { items: 'Items', status: 'Statuses', rules: 'Quests' },
-  help: 'Press Tab to switch between Items, Statuses and Quests while the Content layer is selected.',
+  help: 'Tab: switch Items, Statuses and Quests. Shift+Tab: switch main layers.',
   hasVisibility: false,
 };
 export const TARGET_GROUPS: TargetGroup[] = [MAP_GROUP, ENTITY_GROUP, CONTENT_GROUP];
@@ -43,18 +43,34 @@ export function cycleInGroup(g: TargetGroup, cur: string, reverse = false): stri
   return g.targets[(i + (reverse ? n - 1 : 1)) % n];
 }
 
-/** Tab cycles targets only inside the group of the active layer, never from text fields/dialogs. */
-export function tabTargetFor(e: { key: string; shiftKey?: boolean; ctrlKey?: boolean; altKey?: boolean; metaKey?: boolean }, activeType: string | null | undefined,
-  target: { tagName?: string; isContentEditable?: boolean; closest?: (s: string) => unknown } | null): string | null {
-  if (e.key !== 'Tab' || e.ctrlKey || e.altKey || e.metaKey) return null;
-  const g = groupOfType(activeType);
-  if (!g || !activeType) return null;
+type TabKey = { key: string; shiftKey?: boolean; ctrlKey?: boolean; altKey?: boolean; metaKey?: boolean };
+type TabTarget = { tagName?: string; isContentEditable?: boolean; closest?: (s: string) => unknown } | null;
+
+/** Tab/Shift+Tab are ours only outside text fields and dialogs, without Ctrl/Alt/Meta. */
+function tabAllowed(e: TabKey, target: TabTarget): boolean {
+  if (e.key !== 'Tab' || e.ctrlKey || e.altKey || e.metaKey) return false;
   if (target) {
     const tag = (target.tagName || '').toUpperCase();
-    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable) return null;
-    if (typeof target.closest === 'function' && target.closest('[role="dialog"],[role="alertdialog"]')) return null;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable) return false;
+    if (typeof target.closest === 'function' && target.closest('[role="dialog"],[role="alertdialog"]')) return false;
   }
-  return cycleInGroup(g, activeType, !!e.shiftKey);
+  return true;
+}
+
+/** Tab (forward only) cycles targets inside the group of the active layer. Shift+Tab is for main layers. */
+export function tabTargetFor(e: TabKey, activeType: string | null | undefined, target: TabTarget): string | null {
+  if (e.shiftKey || !tabAllowed(e, target)) return null;
+  const g = groupOfType(activeType);
+  if (!g || !activeType) return null;
+  return cycleInGroup(g, activeType, false);
+}
+
+/** Shift+Tab cycles main layers Map → Entities → Content → Game Settings → Map (skipping unavailable ones). */
+export function mainTabTargetFor(e: TabKey, activeType: string | null | undefined, target: TabTarget, available: string[]): string | null {
+  if (!e.shiftKey || !tabAllowed(e, target) || available.length === 0) return null;
+  const cur = mainLayerOf(activeType);
+  const i = cur ? available.indexOf(cur) : -1;
+  return available[(i + 1) % available.length];
 }
 
 export type SidebarEntry<L> = { kind: 'layer'; layer: L } | { kind: 'group'; group: TargetGroup; targets: L[] };

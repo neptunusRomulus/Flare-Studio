@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import type { TileLayer } from '@/types';
 import SlidingSwitch from '@/components/SlidingSwitch';
 import { GROUP_ICON } from '@/components/targetIcons';
-import { mainLayerOf, mainLayerTargetId, MAIN_LAYERS } from '@/components/targetGroups';
+import { mainLayerOf, mainLayerTargetId, mainTabTargetFor, MAIN_LAYERS } from '@/components/targetGroups';
 
 type Props = { layers: TileLayer[]; activeLayer: TileLayer | null; onSelectLayer: (id: number) => void };
 
@@ -13,6 +13,16 @@ const MainLayerSwitch: React.FC<Props> = ({ layers, activeLayer, onSelectLayer }
     const id = mainLayerTargetId(key, layers);
     if (id !== null) onSelectLayer(id);
   };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const next = mainTabTargetFor(e, activeLayer?.type, e.target as HTMLElement | null, available.map(m => m.id));
+      if (!next) return;
+      e.preventDefault();
+      select(next);
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  });
   return (
     <div className="flex items-center justify-center pb-2">
       <SlidingSwitch

@@ -22,14 +22,14 @@ const EntityDock: React.FC<Props> = ({ layers, activeLayer, onSelectLayer, actor
   React.useEffect(() => { entityPlacement.clear(); return () => entityPlacement.clear(); }, [type]);
   return (
     <div className="flex flex-col flex-1 min-h-0">
+      {/* Sub-switch right under the main switch (tree-like); list fills the space below */}
+      <MapTargetSwitch group={ENTITY_GROUP} layers={layers} activeLayer={activeLayer} onSelectLayer={onSelectLayer} visibility={visibility} />
       <div className="flex flex-col flex-1 min-h-0 overflow-y-auto">
         {(type === 'npc' || type === 'enemy') && (
           <SidebarActorArea {...actors} isNpcLayer={type === 'npc'} isEnemyLayer={type === 'enemy'} leftCollapsed={false} />
         )}
         {type === 'event' && <SidebarEventArea {...events} isEventLayer leftCollapsed={false} />}
       </div>
-      {/* Same layout as the Map dock: content on top, target switch below */}
-      <MapTargetSwitch group={ENTITY_GROUP} layers={layers} activeLayer={activeLayer} onSelectLayer={onSelectLayer} visibility={visibility} />
     </div>
   );
 };

@@ -78,11 +78,11 @@ const TilesetPanel: React.FC<Props> = ({
 
   return (
     <>
-      <TilesetPalette editor={editor} activeLayer={activeLayer} tabTick={tabTick} setTabTick={setTabTick} brushTool={brushTool} stampsState={stampsState} fitToWidth={fitToWidth} />
-
       {mapLayers && onSelectLayer && (
         <MapTargetSwitch layers={mapLayers} activeLayer={activeLayer} onSelectLayer={onSelectLayer} visibility={layerVisibility} />
       )}
+
+      <TilesetPalette editor={editor} activeLayer={activeLayer} tabTick={tabTick} setTabTick={setTabTick} brushTool={brushTool} stampsState={stampsState} fitToWidth={fitToWidth} />
 
       <BrushToolbar
         editor={editor}

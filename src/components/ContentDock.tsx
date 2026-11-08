@@ -20,13 +20,13 @@ const ContentDock: React.FC<Props> = ({ layers, activeLayer, onSelectLayer, item
   const type = activeLayer?.type;
   return (
     <div className="flex flex-col flex-1 min-h-0">
+      {/* Sub-switch right under the main switch (tree-like); list fills the space below */}
+      <MapTargetSwitch group={CONTENT_GROUP} layers={layers} activeLayer={activeLayer} onSelectLayer={onSelectLayer} />
       <div className="flex flex-col flex-1 min-h-0 overflow-y-auto">
         {type === 'items' && <SidebarItemsArea {...items} />}
         {type === 'status' && <SidebarStatusesArea {...statuses} />}
         {type === 'rules' && <SidebarRulesArea {...rules} />}
       </div>
-      {/* Same layout as the Map dock: content on top, target switch below */}
-      <MapTargetSwitch group={CONTENT_GROUP} layers={layers} activeLayer={activeLayer} onSelectLayer={onSelectLayer} />
     </div>
   );
 };

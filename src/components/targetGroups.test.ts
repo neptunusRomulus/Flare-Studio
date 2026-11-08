@@ -1,0 +1,37 @@
+import { describe, it, expect } from 'vitest';
+import { ENTITY_GROUP, MAP_GROUP, collapseTargetGroups, cycleInGroup, groupOfType, normalizeTileRect, tabTargetFor } from './targetGroups';
+import { groupLayers, layerGroupIndex } from './layerGroups';
+
+const div = { tagName: 'DIV', closest: () => null };
+
+describe('target groups', () => {
+  it('entity cycling NPC -> Enemy -> Event -> NPC and reverse', () => {
+    expect(cycleInGroup(ENTITY_GROUP, 'npc')).toBe('enemy');
+    expect(cycleInGroup(ENTITY_GROUP, 'enemy')).toBe('event');
+    expect(cycleInGroup(ENTITY_GROUP, 'event')).toBe('npc');
+    expect(cycleInGroup(ENTITY_GROUP, 'npc', true)).toBe('event');
+  });
+  it('Tab stays inside the active group', () => {
+    expect(tabTargetFor({ key: 'Tab' }, 'enemy', div)).toBe('event');
+    expect(tabTargetFor({ key: 'Tab' }, 'object', div)).toBe('collision');
+    expect(tabTargetFor({ key: 'Tab', shiftKey: true }, 'npc', div)).toBe('event');
+    expect(tabTargetFor({ key: 'Tab' }, 'items', div)).toBeNull();
+    expect(tabTargetFor({ key: 'Tab' }, 'npc', { tagName: 'TEXTAREA' })).toBeNull();
+    expect(tabTargetFor({ key: 'Tab' }, 'npc', { tagName: 'DIV', closest: () => ({}) })).toBeNull();
+  });
+  it('sidebar: [Map] | [Entities] | [Items, Statuses, Quests] | [Game Settings]', () => {
+    const types = ['gameSettings', 'rules', 'event', 'status', 'items', 'enemy', 'npc', 'object', 'collision', 'background'];
+    const entries = collapseTargetGroups(groupLayers(types.map((type, id) => ({ id, type }))));
+    const names = entries.map(e => e.kind === 'group' ? e.group.label : e.layer.type);
+    expect(names).toEqual(['Map', 'Entities', 'items', 'status', 'rules', 'gameSettings']);
+    const groupIdx = entries.map(e => layerGroupIndex(e.kind === 'group' ? e.targets[0].type : e.layer.type));
+    expect(groupIdx).toEqual([0, 1, 2, 2, 2, 3]);
+    expect(groupOfType('event')).toBe(ENTITY_GROUP);
+    expect(groupOfType('collision')).toBe(MAP_GROUP);
+  });
+  it('normalises event rectangles', () => {
+    expect(normalizeTileRect({ x: 5, y: 7 }, { x: 2, y: 3 }, 20, 20)).toEqual({ x: 2, y: 3, width: 4, height: 5 });
+    expect(normalizeTileRect({ x: 4, y: 4 }, { x: 4, y: 4 }, 20, 20)).toEqual({ x: 4, y: 4, width: 1, height: 1 });
+    expect(normalizeTileRect({ x: -3, y: 2 }, { x: 25, y: 2 }, 20, 10)).toEqual({ x: 0, y: 2, width: 20, height: 1 });
+  });
+});

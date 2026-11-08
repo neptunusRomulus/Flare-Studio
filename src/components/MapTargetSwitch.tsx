@@ -2,41 +2,50 @@ import React, { useEffect } from 'react';
 import Tooltip from '@/components/ui/tooltip';
 import { HelpCircle } from 'lucide-react';
 import type { TileLayer } from '@/types';
-import { MAP_TARGETS, MAP_TARGET_LABEL, MAP_TAB_HELP, isMapTarget, nextTarget, rememberTarget, shouldHandleTabKey, type MapTarget } from '@/components/mapTargets';
-import { MAP_TARGET_ICON } from '@/components/MapLayerRow';
+import { MAP_GROUP, groupOfType, rememberGroupTarget, tabTargetFor, type TargetGroup } from '@/components/targetGroups';
+import { rememberTarget, isMapTarget } from '@/components/mapTargets';
+import { TARGET_ICON } from '@/components/MapLayerRow';
 
 const BTN = 28; // px, square buttons
 const GAP = 4;
 
 type Props = {
+  group?: TargetGroup;
   layers: TileLayer[];
   activeLayer: TileLayer | null;
   onSelectLayer: (id: number) => void;
 };
 
 /** Ground / Object / Collision switch with a sliding orange highlighter; Tab cycles targets. */
-const MapTargetSwitch: React.FC<Props> = ({ layers, activeLayer, onSelectLayer }) => {
-  const current: MapTarget | null = isMapTarget(activeLayer?.type) ? activeLayer!.type as MapTarget : null;
-  const select = (t: MapTarget) => {
+const MapTargetSwitch: React.FC<Props> = ({ group = MAP_GROUP, layers, activeLayer, onSelectLayer }) => {
+  const current: string | null = activeLayer && group.targets.includes(activeLayer.type) ? activeLayer.type : null;
+  const select = (t: string) => {
     const l = layers.find(x => x.type === t);
     if (!l) return;
-    rememberTarget(t);
+    rememberGroupTarget(group, t);
+    if (isMapTarget(t)) rememberTarget(t);
     onSelectLayer(l.id);
   };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (!shouldHandleTabKey(e, activeLayer?.type, e.target as HTMLElement | null)) return;
+      if (groupOfType(activeLayer?.type) !== group) return;
+      const next = tabTargetFor(e, activeLayer?.type, e.target as HTMLElement | null);
+      if (!next) return;
       e.preventDefault();
-      select(nextTarget(activeLayer!.type as MapTarget, e.shiftKey));
+      select(next);
     };
     window.addEventListener('keydown', onKey, true);
     return () => window.removeEventListener('keydown', onKey, true);
   });
 
-  useEffect(() => { if (current) rememberTarget(current); }, [current]);
+  useEffect(() => {
+    if (!current) return;
+    rememberGroupTarget(group, current);
+    if (isMapTarget(current)) rememberTarget(current);
+  }, [current, group]);
 
-  const idx = current ? MAP_TARGETS.indexOf(current) : -1;
+  const idx = current ? group.targets.indexOf(current) : -1;
   let reduce = false;
   try { reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { /* ignore */ }
 
@@ -54,14 +63,14 @@ const MapTargetSwitch: React.FC<Props> = ({ layers, activeLayer, onSelectLayer }
             transition: reduce ? 'none' : 'transform 180ms ease, opacity 180ms ease',
           }}
         />
-        {MAP_TARGETS.map(t => {
-          const Icon = MAP_TARGET_ICON[t];
+        {group.targets.map(t => {
+          const Icon = TARGET_ICON[t];
           const selected = t === current;
           return (
-            <Tooltip key={t} content={MAP_TARGET_LABEL[t]} side="bottom">
+            <Tooltip key={t} content={group.labels[t]} side="bottom">
               <button
                 type="button"
-                aria-label={MAP_TARGET_LABEL[t]}
+                aria-label={group.labels[t]}
                 aria-pressed={selected}
                 onClick={() => select(t)}
                 className={`relative z-10 inline-flex items-center justify-center rounded ${selected ? 'text-primary-foreground' : 'text-gray-400 dark:text-gray-500 hover:text-gray-500'}`}
@@ -73,7 +82,7 @@ const MapTargetSwitch: React.FC<Props> = ({ layers, activeLayer, onSelectLayer }
           );
         })}
       </div>
-      <Tooltip content={MAP_TAB_HELP}>
+      <Tooltip content={group.help}>
         <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" aria-hidden />
       </Tooltip>
     </div>

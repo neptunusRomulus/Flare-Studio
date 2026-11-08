@@ -1,7 +1,5 @@
 import React from 'react';
 import SidebarLayout from '@/components/SidebarLayout';
-import SidebarActorArea from '@/components/SidebarActorArea';
-import SidebarEventArea from '@/components/SidebarEventArea';
 import SidebarRulesArea from '@/components/SidebarRulesArea';
 import SidebarStatusesArea from '@/components/SidebarStatusesArea';
 import SidebarItemsArea from '@/components/SidebarItemsArea';
@@ -145,40 +143,7 @@ export default function AppSidebar(p: SidebarProps) {
   return (
     <SidebarLayout leftCollapsed={p.leftCollapsed} width={p.sidebarWidth} onResizeMouseDown={p.onSidebarResizeMouseDown}>
       <section className="flex flex-col flex-1 min-h-0">
-        {(p.actors.isNpcLayer || p.actors.isEnemyLayer) && (
-          <SidebarActorArea
-            isNpcLayer={p.actors.isNpcLayer}
-            isEnemyLayer={p.actors.isEnemyLayer}
-            actorEntries={p.actors.actorEntries}
-            leftCollapsed={p.leftCollapsed}
-            draggingNpcId={p.actors.draggingNpcId}
-            handleEditObject={p.actors.handleEditObject}
-            handleEditEnemyTemplate={p.actors.handleEditEnemyTemplate}
-            handleDuplicateObject={p.actors.handleDuplicateObject}
-            handleDeleteObject={p.actors.handleDeleteObject}
-            handleNpcDragStart={p.actors.handleNpcDragStart}
-            handleNpcDragEnd={p.actors.handleNpcDragEnd}
-            handleReorderActors={p.actors.handleReorderActors}
-            handleOpenActorDialog={p.actors.handleOpenActorDialog}
-          />
-        )}
-
-        {p.events.isEventLayer && (
-          <SidebarEventArea
-            isEventLayer={p.events.isEventLayer}
-            eventEntries={p.events.eventEntries}
-            leftCollapsed={p.leftCollapsed}
-            draggingEventId={p.events.draggingEventId}
-            handleEditEvent={p.events.handleEditEvent}
-            handleDuplicateEvent={p.events.handleDuplicateEvent}
-            handleDeleteEvent={p.events.handleDeleteEvent}
-            setEventHoverTooltip={p.events.setEventHoverTooltip}
-            handleEventDragStart={p.events.handleEventDragStart}
-            handleEventDragEnd={p.events.handleEventDragEnd}
-            handleReorderEvents={p.events.handleReorderEvents}
-            handleOpenEventDialog={p.events.handleOpenEventDialog}
-          />
-        )}
+        {/* NPC / Enemy / Event lists live in the right dock (Entities layer) */}
 
         {p.statuses?.isStatusesLayer && (
           <SidebarStatusesArea handleOpenStatusDialog={p.statuses?.handleOpenStatusDialog ?? (() => {})} />

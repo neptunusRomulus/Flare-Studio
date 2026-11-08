@@ -1,16 +1,24 @@
 import React from 'react';
 import Tooltip from '@/components/ui/tooltip';
-import { Image as MapImage, Box, Grid, Map as MapIcon, Mouse } from 'lucide-react';
+import { Image as MapImage, Box, Grid, Map as MapIcon, Mouse, Users, Locate, Clock, Shapes } from 'lucide-react';
 import type { TileLayer } from '@/types';
-import { MAP_TARGET_LABEL, getLastTarget, isMapTarget, type MapTarget } from '@/components/mapTargets';
+import { MAP_GROUP, lastGroupTarget, type TargetGroup } from '@/components/targetGroups';
 
-export const MAP_TARGET_ICON: Record<MapTarget, React.ComponentType<{ className?: string }>> = {
+type IconC = React.ComponentType<{ className?: string }>;
+/** Icons per target layer type (same icons the old individual rows used). */
+export const TARGET_ICON: Record<string, IconC> = {
   background: MapImage,
   object: Box,
   collision: Grid,
+  npc: Users,
+  enemy: Locate,
+  event: Clock,
 };
+export const MAP_TARGET_ICON = TARGET_ICON;
+export const GROUP_ICON: Record<string, IconC> = { map: MapIcon, entities: Shapes };
 
 type Props = {
+  group?: TargetGroup;
   targets: TileLayer[];
   activeLayerId: number | null;
   leftCollapsed: boolean;
@@ -22,17 +30,17 @@ type Props = {
 };
 
 /** Single "Map" sidebar entry; its three mini toggles keep per-layer visibility (click) and opacity (wheel). */
-const MapLayerRow: React.FC<Props> = ({ targets, activeLayerId, leftCollapsed, onSelect, onToggleVisibility, onTransparencyChange, showTooltipWithDelay, hideTooltip }) => {
+const MapLayerRow: React.FC<Props> = ({ group = MAP_GROUP, targets, activeLayerId, leftCollapsed, onSelect, onToggleVisibility, onTransparencyChange, showTooltipWithDelay, hideTooltip }) => {
   const active = targets.some(t => t.id === activeLayerId);
   const select = () => {
-    const want = getLastTarget();
+    const want = lastGroupTarget(group);
     const layer = targets.find(t => t.type === want) ?? targets[0];
     if (layer) onSelect(layer.id);
   };
   const tip = (l: TileLayer, transparency: number) => (
     <div className="flex items-center gap-1 text-xs">
       <Mouse className="w-3 h-3" />
-      {MAP_TARGET_LABEL[l.type as MapTarget]}: {l.visible ? 'visible' : 'hidden'} · opacity {Math.round((1 - transparency) * 100)}%
+      {group.labels[l.type] ?? l.name}: {l.visible ? 'visible' : 'hidden'} · opacity {Math.round((1 - transparency) * 100)}%
     </div>
   );
   return (
@@ -49,13 +57,12 @@ const MapLayerRow: React.FC<Props> = ({ targets, activeLayerId, leftCollapsed, o
       >
         <div className={`flex items-center gap-1 ${active ? 'opacity-100' : 'opacity-80'}`} onClick={(e) => e.stopPropagation()}>
           {targets.map(l => {
-            if (!isMapTarget(l.type)) return null;
-            const Icon = MAP_TARGET_ICON[l.type];
+            const Icon = TARGET_ICON[l.type] ?? MapIcon;
             return (
               <button
                 key={l.id}
                 type="button"
-                aria-label={`${MAP_TARGET_LABEL[l.type]} visibility`}
+                aria-label={`${group.labels[l.type] ?? l.name} visibility`}
                 className="w-5 h-5 inline-flex items-center justify-center rounded hover:bg-gray-200 dark:hover:bg-gray-700"
                 style={{ opacity: l.visible ? Math.max(0.35, 1 - (l.transparency || 0)) : 1 }}
                 onClick={() => onToggleVisibility(l.id)}
@@ -75,10 +82,10 @@ const MapLayerRow: React.FC<Props> = ({ targets, activeLayerId, leftCollapsed, o
             );
           })}
         </div>
-        <Tooltip content="Map">
-          <span className="flex items-center"><MapIcon className="w-4 h-4" /></span>
+        <Tooltip content={group.label}>
+          <span className="flex items-center">{React.createElement(GROUP_ICON[group.id] ?? MapIcon, { className: 'w-4 h-4' })}</span>
         </Tooltip>
-        <span className={leftCollapsed ? 'sr-only text-xs font-medium' : 'text-xs font-medium truncate'}>Map</span>
+        <span className={leftCollapsed ? 'sr-only text-xs font-medium' : 'text-xs font-medium truncate'}>{group.label}</span>
       </div>
     </div>
   );

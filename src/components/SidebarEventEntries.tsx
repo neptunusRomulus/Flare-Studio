@@ -2,6 +2,7 @@ import type { DragEvent } from 'react';
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import Tooltip from '@/components/ui/tooltip';
+import { entityPlacement } from '@/components/entityPlacement';
 import { GripVertical, HelpCircle, Plus, MousePointerClick, MapPinPlus, MapPinMinus, LogIn, LogOut, SquareCheckBig, Repeat2 } from 'lucide-react';
 import type { MapObject } from '@/types';
 import ElementContextMenu from '@/components/ElementContextMenu';
@@ -60,6 +61,7 @@ const SidebarEventEntries = ({
   onReorderEvents,
   onAddEvent
 }: EventEntriesPanelProps) => {
+  const armed = React.useSyncExternalStore(entityPlacement.subscribe, entityPlacement.get, entityPlacement.get);
   const { getItemDragProps, reorderClass } = useListReorder(
     eventEntries,
     (e) => e.id,
@@ -128,13 +130,14 @@ const SidebarEventEntries = ({
                         </div>
                       )}
                     </div>
-                    <Tooltip content="Drag and drop to place event on map">
+                    <Tooltip content="Drag to the map, or click then drag an area on the map to place event">
                       <div
                         draggable
                         onDragStart={(dragEvent) => onDragStart(dragEvent, event.id)}
                         onDragEnd={onDragEnd}
-                        className="w-8 h-8 flex items-center justify-center cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
-                        onClick={(clickEvent) => clickEvent.stopPropagation()}
+                        className={`w-8 h-8 flex items-center justify-center cursor-grab active:cursor-grabbing transition-colors flex-shrink-0 rounded ${armed?.id === event.id ? 'text-primary ring-1 ring-primary' : 'text-muted-foreground hover:text-foreground'}`}
+                        onClick={(clickEvent) => { clickEvent.stopPropagation(); entityPlacement.toggle({ id: event.id, type: 'event' }); }}
+                          data-armed={armed?.id === event.id ? 'true' : undefined}
                       >
                         <GripVertical className="w-5 h-5" />
                       </div>

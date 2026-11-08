@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import Tooltip from '@/components/ui/tooltip';
 import type { TileLayer } from '@/types';
 import { groupLayers, layerGroupIndex } from '@/components/layerGroups';
-import { collapseMapLayers } from '@/components/mapTargets';
+import { collapseTargetGroups } from '@/components/targetGroups';
 import MapLayerRow from '@/components/MapLayerRow';
 import {
   Eye,
@@ -71,8 +71,8 @@ const LayersPanel: React.FC<Props> = ({
         {/* Active badge removed — using console log in useEffect instead */}
         <div className="h-auto overflow-hidden flex flex-col justify-center w-full">
           <div className="space-y-0.5 h-auto overflow-y-visible flex flex-col justify-center w-full">
-            {collapseMapLayers(groupLayers(layers.filter(layer => layer.type !== 'actions'))).map((entry, idx, arr) => {
-              const entryType = (e: typeof entry) => (e.kind === 'map' ? e.targets[0]?.type : e.layer.type);
+            {collapseTargetGroups(groupLayers(layers.filter(layer => layer.type !== 'actions'))).map((entry, idx, arr) => {
+              const entryType = (e: typeof entry) => (e.kind === 'group' ? e.targets[0]?.type : e.layer.type);
               const groupBreak = idx > 0 && layerGroupIndex(entryType(arr[idx - 1])) !== layerGroupIndex(entryType(entry));
               const separator = groupBreak ? (
                 // Parent uses space-y-0.5 (margin-top on siblings), which overrides child margins.
@@ -81,11 +81,12 @@ const LayersPanel: React.FC<Props> = ({
                   <div className="mx-2 h-px bg-primary/50" />
                 </div>
               ) : null;
-              if (entry.kind === 'map') {
+              if (entry.kind === 'group') {
                 return (
-                  <React.Fragment key="map-layer">
+                  <React.Fragment key={`group-${entry.group.id}`}>
                     {separator}
                     <MapLayerRow
+                      group={entry.group}
                       targets={entry.targets}
                       activeLayerId={activeLayerId}
                       leftCollapsed={leftCollapsed}

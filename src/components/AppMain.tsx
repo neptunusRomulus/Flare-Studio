@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import EntityDock from '@/components/EntityDock';
+import { groupOfType, ENTITY_GROUP } from '@/components/targetGroups';
 import LoadingOverlay from '@/components/LoadingOverlay';
 import { loadingOverlay } from '@/components/loadingOverlayStore';
 import { useAppContext } from '../context/AppContext';
@@ -337,7 +339,22 @@ export default function AppMain() {
 
         <EditorArea topBarProps={topBarProps} canvasCtx={canvasCtx} bottomToolbarProps={bottomToolbarProps} isDarkMode={isDarkMode} />
 
-        <PaletteDock {...tileset} mapLayers={layersObj?.layers} onSelectLayer={layersObj?.handleSetActiveLayer} open={showPanels && isDrawingLayer(tileset.activeLayer?.type)} currentProjectPath={controls?.currentProjectPath} />
+        <PaletteDock
+          {...tileset}
+          mapLayers={layersObj?.layers}
+          onSelectLayer={layersObj?.handleSetActiveLayer}
+          open={showPanels && (isDrawingLayer(tileset.activeLayer?.type) || groupOfType(tileset.activeLayer?.type) === ENTITY_GROUP)}
+          currentProjectPath={controls?.currentProjectPath}
+          content={groupOfType(tileset.activeLayer?.type) === ENTITY_GROUP ? (
+            <EntityDock
+              layers={layersObj?.layers ?? []}
+              activeLayer={tileset.activeLayer}
+              onSelectLayer={layersObj?.handleSetActiveLayer ?? (() => {})}
+              actors={{ ...actors, isNpcLayer: false, isEnemyLayer: false }}
+              events={{ ...events, isEventLayer: true }}
+            />
+          ) : undefined}
+        />
 
         <EngineSettingsDialog
           open={showSettings}

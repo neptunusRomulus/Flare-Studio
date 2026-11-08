@@ -2,6 +2,7 @@ import type { DragEvent } from 'react';
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import Tooltip from '@/components/ui/tooltip';
+import { entityPlacement } from '@/components/entityPlacement';
 import { GripVertical, HelpCircle, Plus } from 'lucide-react';
 import type { MapObject } from '@/types';
 import { propertyText } from '@/editor/propertyText';
@@ -43,6 +44,7 @@ const SidebarActorEntries = ({
   onAddNpc,
   onAddEnemy
 }: ActorEntriesPanelProps) => {
+  const armed = React.useSyncExternalStore(entityPlacement.subscribe, entityPlacement.get, entityPlacement.get);
   const { getItemDragProps, reorderClass } = useListReorder(
     actorEntries,
     (a) => a.id,
@@ -185,13 +187,14 @@ const SidebarActorEntries = ({
                       )}
                     </div>
                     {(isNpcLayer || isEnemyLayer) && (
-                      <Tooltip content={isNpcLayer ? 'Drag and drop to place NPC on map' : 'Drag and drop to place enemy on map'}>
+                      <Tooltip content={isNpcLayer ? 'Drag to the map, or click then click the map to place NPC' : 'Drag to the map, or click then click the map to place enemy'}>
                         <div
                           draggable
                           onDragStart={(event) => onDragStart(event, actor.id)}
                           onDragEnd={onDragEnd}
-                          className="w-8 h-8 flex items-center justify-center cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground transition-colors flex-shrink-0"
-                          onClick={(event) => event.stopPropagation()}
+                          className={`w-8 h-8 flex items-center justify-center cursor-grab active:cursor-grabbing transition-colors flex-shrink-0 rounded ${armed?.id === actor.id ? 'text-primary ring-1 ring-primary' : 'text-muted-foreground hover:text-foreground'}`}
+                          onClick={(event) => { event.stopPropagation(); entityPlacement.toggle({ id: actor.id, type: (isNpcLayer ? 'npc' : 'enemy') }); }}
+                          data-armed={armed?.id === actor.id ? 'true' : undefined}
                         >
                           <GripVertical className="w-5 h-5" />
                         </div>

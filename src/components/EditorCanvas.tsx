@@ -1,4 +1,6 @@
 import React from 'react';
+import { entityPlacement } from '@/components/entityPlacement';
+import { normalizeTileRect } from '@/components/targetGroups';
 import CanvasTips from '@/components/CanvasTips';
 import MapInitOverlay from '@/components/MapInitOverlay';
 import MapHoverDisplay from '@/components/MapHoverDisplay';
@@ -237,10 +239,60 @@ export default function EditorCanvas(props: Props) {
     };
   }, [editorRef, contextMenu]);
 
+  const armedEntity = React.useSyncExternalStore(entityPlacement.subscribe, entityPlacement.get, entityPlacement.get);
+  const eventAreaStartRef = React.useRef<{ x: number; y: number } | null>(null);
+  const tileAtClient = (clientX: number, clientY: number): { x: number; y: number } | null => {
+    const canvas = canvasRef.current;
+    if (!canvas || !editorRef.current) return null;
+    const rect = canvas.getBoundingClientRect();
+    const t = editorRef.current.screenToTile(clientX - rect.left, clientY - rect.top);
+    if (!t || t.x < 0 || t.y < 0 || t.x >= mapWidth || t.y >= mapHeight) return null;
+    return t;
+  };
+  React.useEffect(() => {
+    if (!armedEntity) return;
+    const onKey = (ev: KeyboardEvent) => { if (ev.key === 'Escape') entityPlacement.clear(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [armedEntity]);
+
   return (
     <div
       ref={canvasAreaRef}
-      className={`bg-gray-100 flex-1 min-h-0 flex overflow-hidden relative ${draggingNpcId || draggingEventId ? 'ring-2 ring-orange-500 ring-inset' : ''}`}
+      className={`bg-gray-100 flex-1 min-h-0 flex overflow-hidden relative ${draggingNpcId || draggingEventId || armedEntity ? 'ring-2 ring-orange-500 ring-inset' : ''}`}
+      style={armedEntity ? { cursor: 'crosshair' } : undefined}
+      onMouseDownCapture={(e) => {
+        // Click-to-place from the Entities dock (runs before the editor's own canvas handlers)
+        const armed = entityPlacement.get();
+        if (!armed || e.button !== 0 || !editorRef.current || !canvasRef.current) return;
+        if (e.target !== canvasRef.current) return;
+        const tile = tileAtClient(e.clientX, e.clientY);
+        e.stopPropagation();
+        e.preventDefault();
+        if (!tile) return;
+        if (armed.type === 'event') {
+          eventAreaStartRef.current = tile;
+          return;
+        }
+        if (armed.type === 'npc') {
+          const conflict = editorRef.current.getMapObjects().find(o => o.type === 'npc' && o.id !== armed.id && o.x === tile.x && o.y === tile.y);
+          if (conflict) return;
+        }
+        handlePlaceActorOnMap(armed.id, tile.x, tile.y);
+        entityPlacement.clear();
+      }}
+      onMouseUpCapture={(e) => {
+        const armed = entityPlacement.get();
+        const start = eventAreaStartRef.current;
+        if (!armed || armed.type !== 'event' || !start || !editorRef.current) return;
+        eventAreaStartRef.current = null;
+        e.stopPropagation();
+        const end = tileAtClient(e.clientX, e.clientY) ?? start;
+        const rect = normalizeTileRect(start, end, mapWidth, mapHeight);
+        editorRef.current.updateMapObject(armed.id, { width: rect.width, height: rect.height });
+        handlePlaceEventOnMap(String(armed.id), rect.x, rect.y);
+        entityPlacement.clear();
+      }}
       onMouseMove={(e) => {
         setCursorScreenPos({ x: e.clientX, y: e.clientY });
         lastCursorPosRef.current = { x: e.clientX, y: e.clientY };

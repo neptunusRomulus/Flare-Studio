@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import TilesetPanel from '@/components/TilesetPanel';
 import { clampPanelWidth, PALETTE_PANEL_DEFAULT, PALETTE_PANEL_KEY } from '@/components/paletteLayout';
 
-type Props = React.ComponentProps<typeof TilesetPanel> & { open: boolean };
+type Props = React.ComponentProps<typeof TilesetPanel> & { open: boolean; content?: React.ReactNode };
 
 export const DOCK_ANIM_MS = 200; // matches left sidebar (duration-200)
 
@@ -20,7 +20,7 @@ function readWidth(): number {
 }
 
 /** Right-side dock holding the tileset palette + brush toolbar on drawing layers. */
-const PaletteDock: React.FC<Props> = ({ open, ...props }) => {
+const PaletteDock: React.FC<Props> = ({ open, content, ...props }) => {
   const [width, setWidth] = useState<number>(readWidth);
   // Initial mount: no animation (also avoids a slide behind the loading overlay)
   const [rendered, setRendered] = useState(open);
@@ -96,7 +96,7 @@ const PaletteDock: React.FC<Props> = ({ open, ...props }) => {
         onPointerCancel={onPointerUp}
       />
       <div className="flex flex-col flex-1 min-h-0 p-2">
-        <TilesetPanel {...props} fitToWidth />
+        {content ?? <TilesetPanel {...props} fitToWidth />}
       </div>
     </aside>
     </div>

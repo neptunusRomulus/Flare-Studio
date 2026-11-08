@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import WelcomeScreen from '../components/WelcomeScreen';
 import AppShell from '@/components/AppShell';
@@ -19,7 +19,7 @@ import SessionRecoveryDialog from '@/components/SessionRecoveryDialog';
 import useCrashRecovery from '@/hooks/useCrashRecovery';
 import useManualSaveSetup from '@/hooks/useManualSaveSetup';
 import useFlareEngine from '@/hooks/useFlareEngine';
-import { takeTemplateImport } from '@/flare/projectTemplate';
+import { takeTemplateImport, markPreMapSlots } from '@/flare/projectTemplate';
 import { importTemplateTilesets, type TilesetImportEditor } from '@/editor/importTileset';
 import { toast } from '@/hooks/use-toast';
 
@@ -231,15 +231,29 @@ export default function AppMain() {
     onBeforeLaunch: flareEngineSave,
   });
 
-  // "Start with template": import fantasycore tilesets once the new project's editor is ready.
+  // Sidebars + palette dock are available as soon as a project's editor exists, even before the first map.
   const templateProjectPath: string | null = controls?.currentProjectPath ?? null;
+  const showPanels = hasMap || (!!editor && !!templateProjectPath);
+
+  // Before the first map: select Background so the palette dock shows (scratch and template alike).
+  const preMapInitEditorRef = useRef<unknown>(null);
   useEffect(() => {
-    if (!editor || !hasMap || !templateProjectPath) return;
+    if (!editor || hasMap || !templateProjectPath || preMapInitEditorRef.current === editor) return;
+    preMapInitEditorRef.current = editor;
+    const layers = typeof editor.getLayers === 'function' ? editor.getLayers() : [];
+    const background = layers.find((l: { type: string }) => l.type === 'background');
+    if (background) { try { void layersObj?.handleSetActiveLayer?.(background.id); } catch { /* ignore */ } }
+  }, [editor, hasMap, templateProjectPath, layersObj]);
+
+  // "Start with template": import fantasycore tilesets as soon as the new project's editor is ready (no map needed).
+  useEffect(() => {
+    if (!editor || !templateProjectPath) return;
     const layers = typeof editor.getLayers === 'function' ? editor.getLayers() : [];
     const background = layers.find((l: { type: string }) => l.type === 'background');
     if (!background) return;
     const flarePath = takeTemplateImport(templateProjectPath);
     if (!flarePath) return;
+    if (!hasMap) markPreMapSlots(editor);
     void (async () => {
       const result = await importTemplateTilesets(editor as TilesetImportEditor, flarePath, templateProjectPath);
       try { await layersObj?.handleSetActiveLayer?.(background.id); } catch { /* ignore */ }
@@ -285,11 +299,11 @@ export default function AppMain() {
     <div className="h-screen bg-background text-foreground flex flex-col overflow-hidden">
       <AppShell
         titleBarProps={enhancedTitleBarProps}
-        sidebarToggleProps={{ show: showSidebarToggle && hasMap, leftCollapsed, onToggle: handleSidebarToggle }}
+        sidebarToggleProps={{ show: showSidebarToggle && showPanels, leftCollapsed, onToggle: handleSidebarToggle }}
       />
 
       <main className="flex flex-1 min-h-0">
-        {hasMap && (
+        {showPanels && (
           <AppSidebar
             leftCollapsed={leftCollapsed}
             sidebarWidth={leftSidebarWidth}
@@ -310,7 +324,7 @@ export default function AppMain() {
 
         <EditorArea topBarProps={topBarProps} canvasCtx={canvasCtx} bottomToolbarProps={bottomToolbarProps} isDarkMode={isDarkMode} />
 
-        {hasMap && isDrawingLayer(tileset.activeLayer?.type) && (
+        {showPanels && isDrawingLayer(tileset.activeLayer?.type) && (
           <PaletteDock {...tileset} currentProjectPath={controls?.currentProjectPath} />
         )}
 

@@ -143,7 +143,8 @@ export default function useProjectLoader(params: Params) {
         setNewMapWidth((prev: number) => (typeof prev === 'number' && prev > 0 ? prev : 20));
         setNewMapHeight((prev: number) => (typeof prev === 'number' && prev > 0 ? prev : 15));
         setShowWelcome(false);
-        setShowCreateMapDialog(true);
+        // Empty project: show the editor with the "Create a map" button; the dialog opens only on click.
+        setShowCreateMapDialog(false);
         return;
       }
 

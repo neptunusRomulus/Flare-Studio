@@ -10,6 +10,15 @@ export function queueTemplateImport(projectPath: string, flarePath: string): voi
   pending = { projectPath, flarePath };
 }
 
+// Editors that received template slots before any map existed: creating the first map keeps them.
+const preMapEditors = new WeakSet<object>();
+export function markPreMapSlots(editor: object): void { preMapEditors.add(editor); }
+export function consumePreMapSlots(editor: object | null | undefined): boolean {
+  if (!editor || !preMapEditors.has(editor)) return false;
+  preMapEditors.delete(editor);
+  return true;
+}
+
 /** Returns the Flare path to import from when this project has a queued template, and clears it. */
 export function takeTemplateImport(projectPath: string | null | undefined): string | null {
   if (!pending || !projectPath || pending.projectPath !== projectPath) return null;

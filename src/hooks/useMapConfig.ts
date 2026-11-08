@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { consumePreMapSlots } from '@/flare/projectTemplate';
 import type { RefObject } from 'react';
 import type { EditorProjectData } from '@/editor/TileMapEditor';
 import { TileMapEditor } from '@/editor/TileMapEditor';
@@ -333,7 +334,10 @@ const useMapConfig = ({
 
         targetEditor.projectName = resolvedName;
 
-        targetEditor.resetForNewProject();
+        // First map of a fresh project keeps slots imported before the map existed (template).
+        if (!consumePreMapSlots(targetEditor)) {
+          targetEditor.resetForNewProject();
+        }
         targetEditor.setMapName(resolvedName);
         targetEditor.setMapSize(width, height);
         targetEditor.setDarkMode(isDarkMode);

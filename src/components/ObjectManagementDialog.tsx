@@ -106,6 +106,12 @@ const ObjectManagementDialog = ({
   const baselineReadyRef = useRef(false);
 
   useEffect(() => {
+    if (!isOpen) {
+      setRoleCenterTab(null);
+    }
+  }, [isOpen, editingObject?.id]);
+
+  useEffect(() => {
     if (isOpen && editingObject && !baselineReadyRef.current) {
       setObjectBaseline(JSON.stringify(editingObject));
       baselineReadyRef.current = true;

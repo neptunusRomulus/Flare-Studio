@@ -1,3 +1,4 @@
+import { loadingOverlay } from '@/components/loadingOverlayStore';
 /**
  * "Start with template": the Welcome screen queues the import for the new
  * project; AppMain runs it once that project's editor is ready.
@@ -8,6 +9,7 @@ let pending: { projectPath: string; flarePath: string } | null = null;
 
 export function queueTemplateImport(projectPath: string, flarePath: string): void {
   pending = { projectPath, flarePath };
+  loadingOverlay.begin('template');
 }
 
 // Editors that received template slots before any map existed: creating the first map keeps them.

@@ -154,6 +154,7 @@ export async function importTemplateTilesets(
   flarePath: string,
   projectPath?: string,
   layerType = 'background',
+  onProgress?: (done: number, total: number) => void,
 ): Promise<TemplateImportResult> {
   const result: TemplateImportResult = { imported: [], skipped: [], failed: [], misfit: [] };
   const api = typeof window !== 'undefined' ? window.electronAPI : undefined;
@@ -161,7 +162,12 @@ export async function importTemplateTilesets(
   const listing = await api.listTemplateTilesets(flarePath);
   if (!listing.ok) return result;
   let firstTab: number | null = null;
-  for (const entry of orderTemplateTilesets(listing.files)) {
+  const ordered = orderTemplateTilesets(listing.files);
+  let done = 0;
+  onProgress?.(0, ordered.length);
+  for (const entry of ordered) {
+    if (done > 0) onProgress?.(done, ordered.length);
+    done++;
     const tabId = nextEmptyTab(editor, layerType);
     if (tabId === null) {
       result.skipped.push(entry.name);

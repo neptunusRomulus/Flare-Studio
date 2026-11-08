@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { loadingOverlay } from '@/components/loadingOverlayStore';
 import { isProjectEmptyAfterDelete } from '@/hooks/mapDelete';
 import { markPreMapSlots } from '@/flare/projectTemplate';
 import { shouldCreatePreMapEditor } from '@/hooks/preMapEditor';
@@ -319,6 +320,14 @@ export default function useAppMainBuilder() {
 
     void createEditorWithConfig();
   }, [pendingMapConfig, editor, canvasRef, appShowWelcome, setupAutoSave, mapConfig, updateLayersList, syncMapObjects, setEditor, setPendingMapConfig, toolbarState, appState, currentProjectPath]);
+  // Loading overlay while a project opens / its map config loads into the editor
+  const projectLoading = !!appState.isOpeningProject || !!pendingMapConfig;
+  useEffect(() => {
+    if (projectLoading) loadingOverlay.begin('project');
+    else loadingOverlay.end('project');
+  }, [projectLoading]);
+  useEffect(() => () => loadingOverlay.end('project'), []);
+
   // Empty project (no maps): create a blank editor so the sidebar + palette dock render before the first map.
   useEffect(() => {
     if (!shouldCreatePreMapEditor({

@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import LoadingOverlay from '@/components/LoadingOverlay';
+import { loadingOverlay } from '@/components/loadingOverlayStore';
 import { useAppContext } from '../context/AppContext';
 import WelcomeScreen from '../components/WelcomeScreen';
 import AppShell from '@/components/AppShell';
@@ -256,7 +258,17 @@ export default function AppMain() {
     if (!flarePath) return;
     if (!hasMap) markPreMapSlots(editor);
     void (async () => {
-      const result = await importTemplateTilesets(editor as TilesetImportEditor, flarePath, templateProjectPath);
+      let result: Awaited<ReturnType<typeof importTemplateTilesets>>;
+      try {
+        loadingOverlay.begin('template');
+        result = await importTemplateTilesets(editor as TilesetImportEditor, flarePath, templateProjectPath, 'background',
+          (done, total) => loadingOverlay.progress('template', done, total));
+      } catch (err) {
+        console.warn('[Template] import failed', err);
+        result = { imported: [], skipped: [], failed: [], misfit: [] };
+      } finally {
+        loadingOverlay.end('template');
+      }
       try { await layersObj?.handleSetActiveLayer?.(background.id); } catch { /* ignore */ }
       try { tileset?.setTabTick?.((t: number) => (t || 0) + 1); } catch { /* ignore */ }
       if (result.imported.length > 0) {
@@ -367,6 +379,7 @@ export default function AppMain() {
 
         <ConflictDialog />
       </main>
+      <LoadingOverlay />
 
       <Toaster />
 

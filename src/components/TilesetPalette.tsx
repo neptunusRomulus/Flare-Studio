@@ -3,6 +3,8 @@ import type { TileLayer } from '@/types';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 import usePreferences from '@/hooks/usePreferences';
 import { Check, X, FlipHorizontal2, FlipVertical2 } from 'lucide-react';
+import { fitZoom } from '@/components/paletteLayout';
+import { classifyWheel } from '@/editor/wheelNav';
 
 type TilesetPaletteProps = {
   editor: TileMapEditor | null;
@@ -14,6 +16,7 @@ type TilesetPaletteProps = {
   zoom?: number;
   setZoom?: React.Dispatch<React.SetStateAction<number>>;
   onSelectionChange?: (hasSelection: boolean, clearFn: () => void) => void;
+  fitToWidth?: boolean;
 };
 
 // Selection state for multi-tile selection
@@ -47,7 +50,8 @@ const TilesetPalette = ({
   stampsState: _stampsState,
   zoom: externalZoom,
   setZoom: externalSetZoom,
-  onSelectionChange
+  onSelectionChange,
+  fitToWidth
 }: TilesetPaletteProps) => {
   void _stampsState;
 
@@ -540,6 +544,16 @@ const TilesetPalette = ({
     return () => ro.disconnect();
   }, [wrapperRef]);
 
+  // Docked palette: fit the tileset to the panel width once per image (user zoom is kept afterwards)
+  const fittedKeyRef = useRef<string>('');
+  useEffect(() => {
+    if (!fitToWidth || !tilesetImage || imageSize.width <= 0 || wrapperSize.width <= 0) return;
+    const key = `${tilesetImage.src}|${imageSize.width}`;
+    if (fittedKeyRef.current === key) return;
+    fittedKeyRef.current = key;
+    setZoom(fitZoom(wrapperSize.width, imageSize.width, MIN_ZOOM, MAX_ZOOM));
+  }, [fitToWidth, tilesetImage, imageSize.width, wrapperSize.width, setZoom]);
+
   // Keyboard handlers for spacebar to enable panning
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -824,6 +838,11 @@ const TilesetPalette = ({
     const onWheel = (evt: WheelEvent) => {
       // Prevent default scrolling in the tileset area and use for zooming
       evt.preventDefault();
+      if (classifyWheel(evt) === 'pan') {
+        wrapper.scrollLeft += evt.deltaX;
+        wrapper.scrollTop += evt.deltaY;
+        return;
+      }
       const delta = -evt.deltaY;
       const scaleFactor = delta > 0 ? 1.1 : 0.9;
       setZoom(prev => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, prev * scaleFactor)));

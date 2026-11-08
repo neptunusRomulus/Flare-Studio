@@ -7,6 +7,7 @@ import SidebarStatusesArea from '@/components/SidebarStatusesArea';
 import SidebarItemsArea from '@/components/SidebarItemsArea';
 import SidebarGameSettingsArea from '@/components/SidebarGameSettingsArea';
 import TilesetPanel from '@/components/sidebar/TilesetPanel';
+import { isDrawingLayer } from '@/components/paletteLayout';
 import SidebarLayersArea from '@/components/SidebarLayersArea';
 import SidebarControlsArea, { ControlsProps } from '@/components/SidebarControlsArea';
 import type { MapObject, TileLayer } from '@/types';
@@ -201,7 +202,7 @@ export default function AppSidebar(p: SidebarProps) {
 
         {p.gameSettings?.isGameSettingsLayer && <SidebarGameSettingsArea />}
 
-        {!p.actors.isNpcLayer && !p.actors.isEnemyLayer && !p.events.isEventLayer && !p.items.isItemsLayer && !p.rules.isRulesLayer && !p.statuses?.isStatusesLayer && !p.gameSettings?.isGameSettingsLayer && (
+        {!p.actors.isNpcLayer && !p.actors.isEnemyLayer && !p.events.isEventLayer && !p.items.isItemsLayer && !p.rules.isRulesLayer && !p.statuses?.isStatusesLayer && !p.gameSettings?.isGameSettingsLayer && !isDrawingLayer(p.tileset.activeLayer?.type) && (
           <>  
           <TilesetPanel
             editor={p.tileset.editor}

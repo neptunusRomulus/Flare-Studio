@@ -3,6 +3,8 @@ import { useAppContext } from '../context/AppContext';
 import WelcomeScreen from '../components/WelcomeScreen';
 import AppShell from '@/components/AppShell';
 import AppSidebar from '@/components/AppSidebar';
+import PaletteDock from '@/components/PaletteDock';
+import { isDrawingLayer } from '@/components/paletteLayout';
 import EngineSettingsDialog from '@/components/EngineSettingsDialog';
 import MapSettingsDialog from '@/components/MapSettingsDialog';
 import EventDialog from '@/components/EventDialog';
@@ -307,6 +309,10 @@ export default function AppMain() {
         )}
 
         <EditorArea topBarProps={topBarProps} canvasCtx={canvasCtx} bottomToolbarProps={bottomToolbarProps} isDarkMode={isDarkMode} />
+
+        {hasMap && isDrawingLayer(tileset.activeLayer?.type) && (
+          <PaletteDock {...tileset} currentProjectPath={controls?.currentProjectPath} />
+        )}
 
         <EngineSettingsDialog
           open={showSettings}

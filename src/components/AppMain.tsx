@@ -29,6 +29,7 @@ import useManualSaveSetup from '@/hooks/useManualSaveSetup';
 import useFlareEngine from '@/hooks/useFlareEngine';
 import { takeTemplateImport, markPreMapSlots } from '@/flare/projectTemplate';
 import { importTemplateTilesets, type TilesetImportEditor } from '@/editor/importTileset';
+import { importTemplateActors, type ActorImportResult } from '@/flare/templateActors';
 import { toast } from '@/hooks/use-toast';
 
 export default function AppMain() {
@@ -226,10 +227,20 @@ export default function AppMain() {
       try {
         loadingOverlay.begin('template');
         result = await importTemplateTilesets(editor as TilesetImportEditor, flarePath, templateProjectPath, 'background',
-          (done, total) => loadingOverlay.progress('template', done, total));
+          (done, total) => loadingOverlay.progress('template', done, total, 'Loading tilesets…'));
       } catch (err) {
         console.warn('[Template] import failed', err);
         result = { imported: [], skipped: [], failed: [], misfit: [] };
+      }
+      let actors: ActorImportResult | null = null;
+      try {
+        loadingOverlay.progress('template', 0, 0, 'Loading NPCs and enemies…');
+        actors = await importTemplateActors(editor, flarePath, templateProjectPath,
+          (done, total) => loadingOverlay.progress('template', done, total, 'Loading NPCs and enemies…'));
+        if (actors.missing.length) console.warn('[Template] Missing referenced files:', actors.missing);
+        if (actors.rawOnly.length) console.warn('[Template] NPC definition files not converted (kept in the mod):', actors.rawOnly);
+      } catch (err) {
+        console.warn('[Template] NPC/enemy import failed', err);
       } finally {
         loadingOverlay.end('template');
       }
@@ -240,6 +251,7 @@ export default function AppMain() {
           result.skipped.length > 0 ? `${result.skipped.length} skipped (slot limit)` : '',
           result.failed.length > 0 ? `${result.failed.length} failed` : '',
           result.misfit.length > 0 ? `${result.misfit.length} don't fit the tile size` : '',
+          actors && (actors.npcs || actors.enemies) ? `${actors.npcs} NPCs, ${actors.enemies} enemies added` : '',
         ].filter(Boolean).join(', ');
         toast({ title: 'Template tilesets imported', description: notes || undefined });
       } else {

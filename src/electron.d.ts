@@ -153,6 +153,7 @@ declare global {
       openExternal: (url: string) => Promise<boolean>;
       /** Flare tilesetdef for a PNG: its own mod first, then the engine's mods by file name. */
       findTilesetDef?: (imagePath: string, flarePath?: string | null) => Promise<{ path: string; text: string } | null>;
+      listTemplateActors?: (flarePath: string) => Promise<import('@/flare/templateActors').TemplateActorListing>;
       listTemplateTilesets: (flarePath: string) => Promise<{
         ok: boolean;
         error?: string;

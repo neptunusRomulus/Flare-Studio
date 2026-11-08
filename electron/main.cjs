@@ -12,6 +12,7 @@ const { validateSerializedFlareData, loadFlareDataSchema } = require("./flareDat
 const flareLaunch = require("./flareLaunch.cjs");
 const flareInstaller = require("./flareInstaller.cjs");
 const flareTemplate = require("./flareTemplate.cjs");
+const flareActorTemplate = require("./flareActorTemplate.cjs");
 const tilesetDefLookup = require("./tilesetDefLookup.cjs");
 const flareAdapter = require("../src/adapters/flare/flareAdapter.cjs");
 /** Map file base name; same slug Play and the adapter use. */
@@ -3168,6 +3169,15 @@ ipcMainLocal.handle("cancel-install-flare", async (_event, variant) => {
   if (!controller) return false;
   controller.abort();
   return true;
+});
+
+// "Start with template": NPC looks and enemy definitions in the installed Flare's fantasycore (read-only).
+ipcMainLocal.handle("list-template-actors", async (_event, flarePath) => {
+  try {
+    return flareActorTemplate.listTemplateActors(typeof flarePath === "string" ? flarePath : "");
+  } catch (err) {
+    return { ok: false, error: err.message, npcLooks: [], npcs: [], enemies: [], missing: [] };
+  }
 });
 
 // "Start with template": PNGs in the installed Flare's fantasycore/images/tilesets.

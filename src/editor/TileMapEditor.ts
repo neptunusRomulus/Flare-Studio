@@ -9,6 +9,7 @@
   ObjectInstance,
   PaintMode
 } from '../types';
+import { classifyWheel, pinchFactor, panForZoomAt } from './wheelNav';
 import { findSlotForCellKey, mergeLegacySlotData, clearSlotCells, type SlotLike } from './slotCells';
 import { parseTilesetDefTiles, tileDrawTopLeft } from './tilesetDef';
 import { assignExportOffsets } from './tilesetIds';
@@ -790,6 +791,7 @@ export class TileMapEditor {
   private lastPanX: number = 0;
   private lastPanY: number = 0;
   private spacePressed: boolean = false;
+  private isMiddlePanning: boolean = false;
 
   // History system for undo/redo
   private history: Array<{ layers: TileLayer[], objects: MapObject[], cellKeys?: Array<[string, Array<string | null>]> }> = [];
@@ -1548,6 +1550,17 @@ export class TileMapEditor {
     const x = event.clientX - rect.left;
     const y = event.clientY - rect.top;
 
+    // Middle-button drag pans (no Space needed)
+    if (event.button === 1) {
+      event.preventDefault();
+      this.isPanning = true;
+      this.isMiddlePanning = true;
+      this.lastPanX = x;
+      this.lastPanY = y;
+      this.mapCanvas.style.cursor = 'grabbing';
+      return;
+    }
+
     // Ignore clicks on the minimap
     if (this.showMinimap && this.lastMiniMapBounds) {
       const { x: mapX, y: mapY, w, h } = this.lastMiniMapBounds;
@@ -1742,7 +1755,7 @@ export class TileMapEditor {
       this.lastMinimapPanY = y;
       this.draw();
       return;
-    } else if (this.isPanning && this.spacePressed) {
+    } else if (this.isPanning && (this.spacePressed || this.isMiddlePanning)) {
       // Handle panning
       const deltaX = x - this.lastPanX;
       const deltaY = y - this.lastPanY;
@@ -1792,6 +1805,12 @@ export class TileMapEditor {
   }
 
   private handleMouseUp(): void {
+    if (this.isMiddlePanning) {
+      this.isMiddlePanning = false;
+      this.isPanning = false;
+      this.mapCanvas.style.cursor = this.spacePressed ? 'grab' : '';
+      return;
+    }
     const wasClick = !this.hasMovedSinceClick;
 
     if (this.isResizingMinimap) {
@@ -1847,6 +1866,10 @@ export class TileMapEditor {
     this.isMouseDown = false;
     this.isPanning = false;
     this.isMinimapPanning = false;
+    if (this.isMiddlePanning) {
+      this.isMiddlePanning = false;
+      this.mapCanvas.style.cursor = this.spacePressed ? 'grab' : '';
+    }
   }
 
   private handleMouseLeave(): void {
@@ -1861,6 +1884,11 @@ export class TileMapEditor {
     this.draggingEventObjectId = null;
     this.isMinimapPanning = false;
     this.isResizingMinimap = false;
+    if (this.isMiddlePanning) {
+      this.isMiddlePanning = false;
+      this.isPanning = false;
+      this.mapCanvas.style.cursor = '';
+    }
     this.draw();
   }
 
@@ -1887,6 +1915,7 @@ export class TileMapEditor {
     const rect = this.mapCanvas.getBoundingClientRect();
     const cursorX = event.clientX - rect.left;
     const cursorY = event.clientY - rect.top;
+    const wheelKind = classifyWheel(event);
 
     // Check if hovering over minimap
     if (this.showMinimap && this.lastMiniMapBounds) {
@@ -1900,6 +1929,17 @@ export class TileMapEditor {
       }
     }
     
+    // Touchpad two-finger scroll pans the canvas
+    if (wheelKind === 'pan') {
+      this.setPan(-event.deltaX / this.zoom, -event.deltaY / this.zoom);
+      return;
+    }
+    // Pinch (ctrl+wheel) zooms smoothly around the cursor
+    if (wheelKind === 'pinch') {
+      this.zoomAtCursor(this.zoom * pinchFactor(event.deltaY), cursorX, cursorY);
+      return;
+    }
+
     // Check if hovering over a cell with multiple events – scroll to cycle
     if (this.hoverX >= 0 && this.hoverY >= 0) {
       const eventsAtHover = this.objects.filter(
@@ -2824,6 +2864,14 @@ export class TileMapEditor {
   public setZoom(newZoom: number): void {
     this.zoom = Math.max(0.1, Math.min(5, newZoom)); // Clamp between 0.1x and 5x
     this.draw();
+  }
+
+  private zoomAtCursor(newZoom: number, cursorX: number, cursorY: number): void {
+    const oldZoom = this.zoom;
+    const z = Math.max(0.1, Math.min(5, newZoom));
+    this.panX = panForZoomAt(this.panX, cursorX, oldZoom, z);
+    this.panY = panForZoomAt(this.panY, cursorY, oldZoom, z);
+    this.setZoom(z);
   }
 
   public getZoom(): number {

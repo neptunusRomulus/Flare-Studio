@@ -33,9 +33,7 @@ export type NpcEditDialogProps = {
   handleEditingTilesetBrowse: () => Promise<void> | void;
   handleEditingPortraitBrowse: () => Promise<void> | void;
   handleAutoDetectAnim: () => Promise<void> | void;
-  handleOpenVendorSettingsDialog: () => void;
-  handleOpenQuestSettingsDialog: () => void;
-  setShowDialogueTreeDialog: (v: boolean) => void;
+  onOpenRoleCenter: (tab: 'dialogue' | 'vendor' | 'quest') => void;
   itemsList: ItemSummary[];
 };
 
@@ -50,9 +48,7 @@ const NpcEditDialog = ({
   handleEditingTilesetBrowse,
   handleEditingPortraitBrowse,
   handleAutoDetectAnim,
-  handleOpenVendorSettingsDialog,
-  handleOpenQuestSettingsDialog,
-  setShowDialogueTreeDialog,
+  onOpenRoleCenter,
 }: NpcEditDialogProps) => {
   const [previewSpritePath, setPreviewSpritePath] = useState<string | null>(null);
   const [previewPortraitPath, setPreviewPortraitPath] = useState<string | null>(null);
@@ -257,7 +253,7 @@ const NpcEditDialog = ({
               {isTalker && (
                 <button
                   type="button"
-                  onClick={() => setShowDialogueTreeDialog(true)}
+                  onClick={() => onOpenRoleCenter('dialogue')}
                   className="h-7 w-full px-2 text-xs rounded-md border border-border bg-background hover:bg-muted"
                 >
                   Open
@@ -278,7 +274,7 @@ const NpcEditDialog = ({
               {isVendor && (
                 <button
                   type="button"
-                  onClick={() => handleOpenVendorSettingsDialog()}
+                  onClick={() => onOpenRoleCenter('vendor')}
                   className="h-7 w-full px-2 text-xs rounded-md border border-border bg-background hover:bg-muted"
                 >
                   Open
@@ -299,7 +295,7 @@ const NpcEditDialog = ({
               {isQuestGiver && (
                 <button
                   type="button"
-                  onClick={() => handleOpenQuestSettingsDialog()}
+                  onClick={() => onOpenRoleCenter('quest')}
                   className="h-7 w-full px-2 text-xs rounded-md border border-border bg-background hover:bg-muted"
                 >
                   Open

@@ -35,6 +35,9 @@ type ObjMgmtCtx = {
   dialogueTrees?: DialogueTree[];
   setDialogueTrees?: (t: DialogueTree[]) => void;
   setActiveDialogueTab?: (id: number) => void;
+  activeDialogueTab?: number;
+  dialogueTabToDelete?: number | null;
+  setDialogueTabToDelete?: (index: number | null) => void;
   setShowDialogueTreeDialog?: (v: boolean) => void;
   showDeleteNpcConfirm?: boolean;
   setShowDeleteNpcConfirm?: (v: boolean) => void;
@@ -75,6 +78,9 @@ export default function ObjectManagementDialogContainer({ ctx }: { ctx: unknown 
       dialogueTrees={c.dialogueTrees ?? []}
       setDialogueTrees={(trees) => (c.setDialogueTrees ? c.setDialogueTrees(trees) : undefined)}
       setActiveDialogueTab={(idx) => (c.setActiveDialogueTab ? c.setActiveDialogueTab(idx) : undefined)}
+      activeDialogueTab={c.activeDialogueTab ?? 0}
+      dialogueTabToDelete={c.dialogueTabToDelete ?? null}
+      setDialogueTabToDelete={(index) => (c.setDialogueTabToDelete ? c.setDialogueTabToDelete(index) : undefined)}
       setShowDialogueTreeDialog={(v) => (c.setShowDialogueTreeDialog ? c.setShowDialogueTreeDialog(v) : undefined)}
       showDeleteNpcConfirm={!!c.showDeleteNpcConfirm}
       setShowDeleteNpcConfirm={(v) => (c.setShowDeleteNpcConfirm ? c.setShowDeleteNpcConfirm(v) : undefined)}

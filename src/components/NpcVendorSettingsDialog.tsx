@@ -28,6 +28,7 @@ type NpcVendorSettingsDialogProps = {
   onCreateVendorStockGroup: (stockType: 'constant' | 'status' | 'random', selectedGroupId: string | null, npcName: string) => Promise<ItemSummary | null>;
   itemsList: ItemSummary[];
   properties?: Record<string, unknown>;
+  embedded?: boolean;
   getEditingObjectProperty: (key: string, fallback?: string) => string;
   updateEditingObjectProperty: (key: string, value: string | null) => void;
 };
@@ -39,6 +40,7 @@ const NpcVendorSettingsDialog = ({
   onCreateVendorStockGroup,
   itemsList,
   properties,
+  embedded = false,
   getEditingObjectProperty,
   updateEditingObjectProperty,
 }: NpcVendorSettingsDialogProps) => {
@@ -136,13 +138,13 @@ const NpcVendorSettingsDialog = ({
     },
   ] as const;
 
-  if (!isOpen) return null;
+  if (!isOpen && !embedded) return null;
 
   return (
     <div
       ref={dialogRef}
-      className="bg-background border border-border/70 rounded-lg flex flex-col shadow-xl"
-      style={{
+      className={embedded ? 'flex flex-col w-full h-full min-h-0' : 'bg-background border border-border/70 rounded-lg flex flex-col shadow-xl'}
+      style={embedded ? { pointerEvents: 'auto' } : {
         position: 'fixed',
         left: `${position.x}px`,
         top: `${position.y}px`,
@@ -153,6 +155,7 @@ const NpcVendorSettingsDialog = ({
       }}
       onClick={(e) => e.stopPropagation()}
     >
+      {!embedded && (
       <div
         className="flex items-center justify-between px-4 py-3 border-b border-border cursor-move select-none"
         onMouseDown={handleHeaderMouseDown}
@@ -170,6 +173,7 @@ const NpcVendorSettingsDialog = ({
           <X className="w-4 h-4 text-muted-foreground" />
         </Button>
       </div>
+      )}
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         <div className="rounded-xl border border-border bg-muted/50 overflow-hidden">
@@ -507,6 +511,7 @@ const NpcVendorSettingsDialog = ({
         </div>
       </div>
 
+      {!embedded && (
       <div className="flex justify-end border-t border-border p-4">
         <Button
           variant="ghost"
@@ -518,7 +523,9 @@ const NpcVendorSettingsDialog = ({
           <Save className="w-4 h-4" />
         </Button>
       </div>
+      )}
 
+      {!embedded && (
       <div
         onMouseDown={handleResizeMouseDown}
         className="absolute bottom-0 right-0 w-5 h-5 cursor-se-resize opacity-40 hover:opacity-100 transition-opacity flex items-end justify-end"
@@ -526,6 +533,7 @@ const NpcVendorSettingsDialog = ({
       >
         <div className="w-1.5 h-1.5 bg-foreground/40 rounded-sm m-1" />
       </div>
+      )}
     </div>
   );
 };

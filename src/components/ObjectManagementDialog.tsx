@@ -11,6 +11,7 @@ import EventEditDialog from '@/components/EventEditDialog';
 import NpcInstanceEditDialog from '@/components/NpcInstanceEditDialog';
 import NpcQuestSettingsDialog from '@/components/NpcQuestSettingsDialog';
 import NpcVendorSettingsDialog from '@/components/NpcVendorSettingsDialog';
+import NpcRoleCenterDialog, { type RoleCenterTab } from '@/components/NpcRoleCenterDialog';
 import type { DialogueTree, MapObject } from '@/types';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 import { InlineConfirm } from '@/components/ui/inline-confirm';
@@ -45,6 +46,9 @@ type ObjectManagementDialogProps = {
   dialogueTrees: DialogueTree[];
   setDialogueTrees: (trees: DialogueTree[]) => void;
   setActiveDialogueTab: (idx: number) => void;
+  activeDialogueTab?: number;
+  dialogueTabToDelete?: number | null;
+  setDialogueTabToDelete?: (index: number | null) => void;
   setShowDialogueTreeDialog: (v: boolean) => void;
   showDeleteNpcConfirm: boolean;
   setShowDeleteNpcConfirm: (v: boolean) => void;
@@ -86,6 +90,10 @@ const ObjectManagementDialog = ({
   showQuestSettingsDialog,
   dialogueTrees,
   setDialogueTrees,
+  setActiveDialogueTab,
+  activeDialogueTab = 0,
+  dialogueTabToDelete = null,
+  setDialogueTabToDelete = () => {},
   setShowDialogueTreeDialog,
   showDeleteNpcConfirm,
   setShowDeleteNpcConfirm,
@@ -93,6 +101,7 @@ const ObjectManagementDialog = ({
   setShowDeleteEnemyConfirm
 }: ObjectManagementDialogProps) => {
   const isOpen = showObjectDialog && !!editingObject;
+  const [roleCenterTab, setRoleCenterTab] = useState<RoleCenterTab | null>(null);
   const [objectBaseline, setObjectBaseline] = useState('');
   const baselineReadyRef = useRef(false);
 
@@ -357,9 +366,7 @@ const ObjectManagementDialog = ({
             handleEditingTilesetBrowse={handleEditingTilesetBrowse}
             handleEditingPortraitBrowse={handleEditingPortraitBrowse}
             handleAutoDetectAnim={handleAutoDetectAnim}
-            handleOpenVendorSettingsDialog={handleOpenVendorSettingsDialog}
-            handleOpenQuestSettingsDialog={handleOpenQuestSettingsDialog}
-            setShowDialogueTreeDialog={setShowDialogueTreeDialog}
+            onOpenRoleCenter={(tab) => setRoleCenterTab(tab)}
             itemsList={itemsList}
           />
         )}
@@ -512,6 +519,23 @@ const ObjectManagementDialog = ({
           projectPath={editor?.getCurrentProjectPath() ?? null}
           dialogueTrees={dialogueTrees}
           setDialogueTrees={setDialogueTrees}
+          getEditingObjectProperty={getEditingObjectProperty}
+          updateEditingObjectProperty={updateEditingObjectProperty}
+        />
+
+        <NpcRoleCenterDialog
+          tab={roleCenterTab}
+          onTabChange={setRoleCenterTab}
+          editingObject={editingObject}
+          itemsList={itemsList}
+          projectPath={editor?.getCurrentProjectPath() ?? null}
+          dialogueTrees={dialogueTrees}
+          setDialogueTrees={setDialogueTrees}
+          activeDialogueTab={activeDialogueTab}
+          setActiveDialogueTab={setActiveDialogueTab}
+          dialogueTabToDelete={dialogueTabToDelete}
+          setDialogueTabToDelete={setDialogueTabToDelete}
+          onCreateVendorStockGroup={handleCreateVendorStockGroup}
           getEditingObjectProperty={getEditingObjectProperty}
           updateEditingObjectProperty={updateEditingObjectProperty}
         />

@@ -325,6 +325,7 @@ const DialogueTreeDialog = ({
   editingObject,
   updateEditingObjectProperty,
   projectMaps = [],
+  embedded = false,
 }: {
   showDialogueTreeDialog: boolean;
   dialogueTrees?: DialogueTree[];
@@ -337,6 +338,8 @@ const DialogueTreeDialog = ({
   editingObject: MapObject | null;
   updateEditingObjectProperty: (key: string, value: string | null) => void;
   projectMaps?: string[];
+  /** Render inside the role center instead of a floating window. */
+  embedded?: boolean;
 }) => {
   const [editingIdIndex, setEditingIdIndex] = useState<number | null>(null);
   const [pendingIdValue, setPendingIdValue] = useState('');
@@ -451,13 +454,11 @@ const DialogueTreeDialog = ({
       .filter(t => t.dialogueId);
   }, [dialogueTrees]);
 
-  return (
-<>
-  {!showDialogueTreeDialog ? null : createPortal(
+  const frame = (
     <div
       ref={dialogRef}
-      className="bg-background border border-border/70 rounded-lg flex flex-col shadow-xl"
-      style={{
+      className={embedded ? 'flex flex-col w-full h-full min-h-0' : 'bg-background border border-border/70 rounded-lg flex flex-col shadow-xl'}
+      style={embedded ? { pointerEvents: 'auto' } : {
         position: 'fixed',
         left: `${position.x}px`,
         top: `${position.y}px`,
@@ -468,6 +469,7 @@ const DialogueTreeDialog = ({
       }}
       onClick={(e) => e.stopPropagation()}
     >
+      {!embedded && (
       <div
         className="flex items-center justify-between px-4 py-3 border-b border-border cursor-move select-none"
         onMouseDown={handleHeaderMouseDown}
@@ -485,6 +487,7 @@ const DialogueTreeDialog = ({
           <X className="w-4 h-4 text-muted-foreground" />
         </Button>
       </div>
+      )}
     
     <div className="flex-1 flex gap-4 overflow-hidden p-4">
       {/* Tab sidebar */}
@@ -1874,7 +1877,7 @@ const DialogueTreeDialog = ({
             }));
             updateEditingObjectProperty('dialogueTrees', JSON.stringify(cleanTrees));
           }
-          onClose();
+          if (!embedded) onClose();
         }}
       >
         <Save className="w-4 h-4" />
@@ -1882,6 +1885,7 @@ const DialogueTreeDialog = ({
     </div>
 
     {/* Resize handle */}
+    {!embedded && (
     <div
       onMouseDown={handleResizeMouseDown}
       className="absolute bottom-0 right-0 w-5 h-5 cursor-se-resize opacity-40 hover:opacity-100 transition-opacity flex items-end justify-end"
@@ -1889,10 +1893,15 @@ const DialogueTreeDialog = ({
     >
       <div className="w-1.5 h-1.5 bg-foreground/40 rounded-sm m-1" />
     </div>
-  </div>,
-  document.body
-  )}
-</>
+    )}
+  </div>
+  );
+
+  if (embedded) return frame;
+  return (
+    <>
+      {!showDialogueTreeDialog ? null : createPortal(frame, document.body)}
+    </>
   );
 };
 

@@ -9,6 +9,7 @@
   ObjectInstance,
   PaintMode
 } from '../types';
+import { SharedSlotMap, slotGroup, mergeSharedSlotLists } from './sharedSlots';
 import { classifyWheel, pinchFactor, panForZoomAt } from './wheelNav';
 import { findSlotForCellKey, mergeLegacySlotData, clearSlotCells, type SlotLike } from './slotCells';
 import { parseTilesetDefTiles, tileDrawTopLeft } from './tilesetDef';
@@ -635,10 +636,10 @@ export class TileMapEditor {
     tileset?: LayerTilesetEntry;
     detectedTiles?: Map<number, { sourceX: number; sourceY: number; width: number; height: number; originX?: number; originY?: number }>;
     brushes?: Array<{ image: HTMLImageElement; fileName: string; width: number; height: number }>;
-  }>> = new Map();
+  }>> = new SharedSlotMap();
 
-  // Active tab id per layer type
-  private layerActiveTabId: Map<string, number> = new Map();
+  // Active tab id per slot group (Background + Object share one)
+  private layerActiveTabId: Map<string, number> = new SharedSlotMap();
   
   // Per-layer detected tile data
   private layerTileData: Map<string, Map<number, {
@@ -1418,7 +1419,7 @@ export class TileMapEditor {
         const id = this.createLayerTab('object');
         this.setActiveLayerTab('object', id);
       }
-      if (hasBackground) {
+      if (hasBackground && !this.layerTabs.has('background')) {
         const id = this.createLayerTab('background');
         this.setActiveLayerTab('background', id);
       }
@@ -7541,8 +7542,13 @@ export class TileMapEditor {
         const layerForRemoval = this.tileLayers.find(l => l.type === layerType);
         if (removedTilesetFile) {
           const arr = this.layerCellTilesetKey.get(layerType) || new Array(this.mapWidth * this.mapHeight).fill(null);
-          // Cells painted with the deleted slot are erased (never silently remapped to another slot)
+          // Cells painted with the deleted slot are erased on every layer sharing the slot list
           if (layerForRemoval) clearSlotCells(layerForRemoval.data, arr, removed as unknown as SlotLike[], k => this.normalizeTilesetKey(k));
+          for (const other of this.tileLayers) {
+            if (other.type === layerType || slotGroup(other.type) !== slotGroup(layerType)) continue;
+            const okeys = this.layerCellTilesetKey.get(other.type);
+            if (okeys) clearSlotCells(other.data, okeys, removed as unknown as SlotLike[], k => this.normalizeTilesetKey(k));
+          }
           this.layerCellTilesetKey.set(layerType, arr);
         }
       } catch (_e) { void _e; }
@@ -8198,7 +8204,7 @@ export class TileMapEditor {
             const resolvedCellLayerType = tilesetLayerByKey.get(effectiveTilesetKey)
               || (normalizedCellKey ? tilesetLayerByKey.get(normalizedCellKey) : undefined)
               || null;
-            if (resolvedCellLayerType && resolvedCellLayerType !== layerType && layerTileset?.fileName) {
+            if (resolvedCellLayerType && slotGroup(resolvedCellLayerType) !== slotGroup(layerType) && layerTileset?.fileName) {
               effectiveTilesetKey = layerTileset.fileName;
             }
           }
@@ -9108,6 +9114,8 @@ export class TileMapEditor {
       if (data.layerTabs && typeof data.layerTabs === 'object') {
         this.layerTabs.clear();
         for (const [layerType, tabs] of Object.entries(data.layerTabs as Record<string, unknown>)) {
+          // Shared Background/Object list: an old separate object list must not overwrite background's
+          if (slotGroup(layerType) !== layerType && (data.layerTabs as Record<string, unknown>)[slotGroup(layerType)]) continue;
           if (Array.isArray(tabs)) {
             this.layerTabs.set(layerType, tabs.map(tab => ({
               id: (tab as { id: number }).id,
@@ -10710,6 +10718,17 @@ export class TileMapEditor {
       this.layerActiveTabId.clear();
       this._preloadedTilesetImages.clear();
       try {
+        // Migrate per-layer slot lists (old format) into the shared Background/Object list
+        try {
+          type RawTabs = Parameters<typeof mergeSharedSlotLists>[0];
+          const merged = mergeSharedSlotLists(
+            projectData.layerTabs as unknown as RawTabs,
+            projectData.layerActiveTabId as Record<string, number> | undefined,
+            k => this.normalizeTilesetKey(k),
+          );
+          (projectData as unknown as { layerTabs?: unknown }).layerTabs = merged.layerTabs;
+          (projectData as unknown as { layerActiveTabId?: unknown }).layerActiveTabId = merged.active;
+        } catch (_e) { void _e; }
         if (projectData.layerTabs && typeof projectData.layerTabs === 'object') {
           let maxTabId = this.nextLayerTabId || 1;
           for (const [layerType, tabs] of Object.entries(projectData.layerTabs)) {

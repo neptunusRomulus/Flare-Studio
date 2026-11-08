@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { validateAndSanitizeObject } from '../editor/objectValidation';
-import { serializeNpcToFlare } from '../utils/flareNpcUtils';
+import { npcFileUpdate, npcFileContent as mergedNpcFileContent, npcFileBase, isStudioNpcAnimation } from '../utils/npcFileUpdate';
 import {
   buildAnimationFileContent,
   buildSafeNpcAnimationFilename,
@@ -9,7 +9,7 @@ import {
   isAnimationDefinitionFilePath,
   isImageFilePath,
 } from '../utils/animationUtils';
-import type { MapObject, FlareNPC } from '../types';
+import type { MapObject } from '../types';
 import { propertyText } from '../editor/propertyText';
 
 type Params = {
@@ -36,8 +36,6 @@ export default function useObjectDialogHandlers({ editingObject, setEditingObjec
       const existingFilename = sanitized.npcFilename || propertyText(editingObject.properties?.npcFilename);
       if (existingFilename) {
         try {
-          const parsedDirection = sanitized.direction ? Math.max(0, Math.min(7, parseInt(sanitized.direction, 10))) as FlareNPC['direction'] : undefined;
-          const parsedWander = sanitized.wander_radius ? parseInt(sanitized.wander_radius, 10) : undefined;
 
           const animProps = getAnimationProps(sanitized);
           let gfxPath = sanitized.tilesetPath || undefined;
@@ -56,7 +54,15 @@ export default function useObjectDialogHandlers({ editingObject, setEditingObjec
             const animationFolder = `${currentProjectPath.replace(/\\/g, '/')}/animations/npcs`;
             await window.electronAPI.createFolderIfNotExists(animationFolder);
             const safeBaseName = buildSafeNpcAnimationFilename(sanitized.name || existingFilename.replace(/^npcs\//, '') || `npc_${editingObject.id}`);
-            const animationFileName = `${safeBaseName}.txt`;
+            let animationFileName = `${safeBaseName}.txt`;
+            // Never overwrite a hand-made (multi-animation) file: use Studio's own name instead
+            try {
+              const api = window.electronAPI as unknown as { readFile?: (p: string) => Promise<string | null> };
+              const current = api?.readFile ? await api.readFile(`${animationFolder}/${animationFileName}`) : null;
+              const imageName = resolvedTilesetPath.split('/').pop() || '';
+              const firstLine = current?.replace(/\r/g, '').split('\n').map((l) => l.trim()).find((l) => l && !l.startsWith('#'));
+              if (current && firstLine !== `image=${resolvedTilesetPath}` && !isStudioNpcAnimation(current, imageName)) animationFileName = animationFileName.replace(/\.txt$/, '_studio.txt');
+            } catch { /* no existing file */ }
             const animationFilePath = `${animationFolder}/${animationFileName}`;
             const animationFileContent = buildAnimationFileContent(resolvedTilesetPath, animProps);
             const animationSaved = await window.electronAPI.writeFile(animationFilePath, animationFileContent);
@@ -68,55 +74,19 @@ export default function useObjectDialogHandlers({ editingObject, setEditingObjec
             }
           }
 
-          const npcFull: FlareNPC = {
-            id: editingObject.id,
-            x: editingObject.x,
-            y: editingObject.y,
-            filename: existingFilename,
-            name: sanitized.name || '',
-            talker: sanitized.talker === 'true',
-            vendor: sanitized.vendor === 'true',
-            gfx: gfxPath,
-            portrait: sanitized.portraitPath || undefined,
-            direction: parsedDirection,
-            waypoints: sanitized.waypoints || undefined,
-            wander_radius: parsedWander,
-            constant_stock: sanitized.constant_stock || undefined,
-            random_stock: sanitized.random_stock || undefined,
-            random_stock_count: sanitized.random_stock_count || undefined,
-            vendor_requires_status: sanitized.vendor_requires_status || undefined,
-            vendor_requires_not_status: sanitized.vendor_requires_not_status || undefined,
-            customProperties: {}
-          };
-
-          const excludedKeys = new Set([
-            'npcFilename',
-            'name',
-            'talker',
-            'vendor',
-            'tilesetPath',
-            'tilesetSourcePath',
-            'portraitPath',
-            'portraitSourcePath',
-            'direction',
-            'waypoints',
-            'wander_radius',
-            'constant_stock',
-            'random_stock',
-            'random_stock_count',
-            'vendor_requires_status',
-            'vendor_requires_not_status',
-            ...Object.keys(animProps)
-          ]);
-
-          for (const [key, value] of Object.entries(sanitized)) {
-            if (!excludedKeys.has(key)) {
-              npcFull.customProperties![key] = String(value || '');
-            }
-          }
-
-          const { npcFileContent } = serializeNpcToFlare(npcFull);
-          const npcFilenameClean = existingFilename.replace(/^npcs\//, '');
+          // Merge into the existing NPC file (keys/sections/dialog order Studio doesn't model survive)
+          const npcFilenameClean = npcFileBase(existingFilename);
+          let existingNpcText: string | null = null;
+          try {
+            const api = window.electronAPI as unknown as { readFile?: (p: string) => Promise<string | null> };
+            if (api?.readFile) existingNpcText = await api.readFile(`${currentProjectPath.replace(/\\/g, '/')}/npcs/${npcFilenameClean}`);
+          } catch { /* new file */ }
+          const relative = (p?: string) => (p && !p.startsWith('data:') && !/^[a-zA-Z]:|^\//.test(p) ? p.replace(/\\/g, '/') : undefined);
+          const npcUpdate = npcFileUpdate(sanitized.name || '', editingObject.properties as Record<string, unknown> | undefined, {
+            animations: relative(gfxPath),
+            portrait: relative(sanitized.portraitPath),
+          });
+          const npcFileContent = mergedNpcFileContent(existingNpcText, npcUpdate);
           await window.electronAPI.writeNpcFile(currentProjectPath, npcFilenameClean, npcFileContent);
         } catch (error) {
           console.error('Failed to save NPC file:', error);

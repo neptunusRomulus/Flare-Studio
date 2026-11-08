@@ -126,6 +126,40 @@ describe('FlareAdapter golden files', () => {
     expect(text).not.toContain('portrait=');
   });
 
+  it('map [npc] block writes engine keys: direction, one-line waypoints, spawn requirements', () => {
+    const exported = exportMapText({
+      width: 1,
+      height: 1,
+      heroX: 0,
+      heroY: 0,
+      layers: [],
+      events: [],
+      enemies: [],
+      npcs: [
+        {
+          filename: 'npcs/guard.txt',
+          location: '2,2,1,1',
+          direction: '3',
+          waypoints: '1,1,2,2',
+          requires_status: 'village_saved',
+          requires_not_status: 'dead',
+        },
+      ],
+    });
+    const npcBlock = exported.text.split('[npc]')[1].split('\n\n')[0];
+    expect(npcBlock).toContain('direction=3');
+    expect(npcBlock).toContain('waypoints=1,1,2,2');
+    expect(npcBlock).toContain('requires_status=village_saved');
+    expect(npcBlock).toContain('requires_not_status=dead');
+    expect(npcBlock).not.toContain('spawn_direction');
+    // reading the map back keeps the same keys
+    const again = importMapText(exported.text) as { npcs?: Array<Record<string, string>> };
+    const npc = (again.npcs || [])[0];
+    expect(npc.direction).toBe('3');
+    expect(npc.waypoints).toBe('1,1,2,2');
+    expect(exportMapText(again).text).toBe(exported.text);
+  });
+
   it('exports the tile offset derived from MapRenderer centerTile', () => {
     expect(tilePixelOffset(32, 32, 32)).toEqual({ offsetX: 32, offsetY: 16 });
     const text = exportTilesetText({

@@ -132,7 +132,8 @@ describe('npcPropertyCards add/remove and catalog search', () => {
     const cards = listNpcPropertyCards({ properties: props });
     expect(cards.filter((c) => c.kind === 'waypoints').map((c) => c.values.point)).toEqual(['1,1', '2,2']);
     expect(cards.find((c) => c.kind === 'wander_radius')?.values.radius).toBe('3');
-    expect(patchAddProperty('waypoints', { waypoints: '1,1' })).toEqual({ waypoints: '1,1\n' });
+    expect(patchAddProperty('waypoints', { waypoints: '1,1' })).toEqual({ waypoints: '1,1\n', wander_radius: null });
+    expect(patchAddProperty('wander_radius', { waypoints: '1,1' })).toEqual({ wander_radius: '1', waypoints: null });
     expect(patchRemoveCard(cards.find((c) => c.kind === 'wander_radius')!, props)).toEqual({ wander_radius: null });
   });
 });

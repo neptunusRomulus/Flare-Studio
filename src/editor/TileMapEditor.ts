@@ -8260,6 +8260,14 @@ export class TileMapEditor {
     delete record.map_direction;
     delete record.spawn_direction;
     if (mapDirection != null && mapDirection !== '') record.direction = mapDirection;
+    // Studio keeps one waypoint per line; Flare reads "x1,y1,x2,y2" from a single line.
+    if (typeof record.waypoints === 'string' && record.waypoints) {
+      record.waypoints = record.waypoints
+        .split('\n')
+        .map(part => part.trim())
+        .filter(Boolean)
+        .join(',');
+    }
     if (!record.location) record.location = `${npc.x},${npc.y},${npc.width},${npc.height}`;
     const named = npc.properties?.npcFilename;
     const filename = typeof named === 'string' && named.trim()
@@ -8341,7 +8349,16 @@ export class TileMapEditor {
       for (const [key, value] of Object.entries(fields)) {
         if (value == null || value === '') continue;
         // A map NPC's direction is its initial facing; keep it apart from the NPC file's stance direction.
-        properties[type === 'npc' && key === 'direction' ? 'map_direction' : key] = value;
+        if (type === 'npc' && key === 'direction') { properties.map_direction = value; continue; }
+        // Flare stores all waypoints on one line ("x1,y1,x2,y2"); Studio edits one per line.
+        if (type === 'npc' && key === 'waypoints' && typeof value === 'string') {
+          const nums = value.split(',').map(part => part.trim()).filter(Boolean);
+          const pairs: string[] = [];
+          for (let i = 0; i + 1 < nums.length; i += 2) pairs.push(`${nums[i]},${nums[i + 1]}`);
+          if (pairs.length) properties.waypoints = pairs.join('\n');
+          continue;
+        }
+        properties[key] = value;
       }
       const object: MapObject = {
         id: this.nextObjectId++,

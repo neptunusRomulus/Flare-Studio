@@ -110,7 +110,7 @@ export const PROPERTY_CATALOG: PropertyCatalogEntry[] = [
     category: 'map',
     label: 'Walking route',
     flareKey: 'waypoints (map [npc] block)',
-    description: 'Tiles the NPC walks between, in order. A route turns off random wandering.',
+    description: 'Tiles the NPC walks between, in order. A route turns off random wandering (wander_radius).',
     synonyms: ['waypoints', 'route', 'walk', 'patrol', 'rota', 'yürüme'],
     multi: true,
   },
@@ -119,7 +119,7 @@ export const PROPERTY_CATALOG: PropertyCatalogEntry[] = [
     category: 'map',
     label: 'Wander radius',
     flareKey: 'wander_radius (map [npc] block)',
-    description: 'How many tiles the NPC wanders around at random. Turns off a walking route.',
+    description: 'How many tiles the NPC wanders around at random. Turns off a walking route (waypoints).',
     synonyms: ['wander', 'radius', 'random walk', 'dolaşma'],
     singleton: true,
   },
@@ -449,10 +449,12 @@ export function patchAddProperty(
       return { map_direction: '0' };
     case 'waypoints': {
       const cur = splitLines(propText(p, 'waypoints'));
-      return { waypoints: [...cur, ''].join('\n') };
+      // Flare: a walking route replaces random wandering, so the radius is dropped.
+      return { waypoints: [...cur, ''].join('\n'), wander_radius: null };
     }
     case 'wander_radius':
-      return { wander_radius: '1' };
+      // Flare: random wandering replaces a fixed route.
+      return { wander_radius: '1', waypoints: null };
     case 'minimap':
       return { show_on_minimap: 'false' };
     case 'intro_voice': {

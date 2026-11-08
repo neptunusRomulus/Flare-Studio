@@ -316,7 +316,7 @@ const NpcPropertyList = ({ editingObject, get, setProp, applyPatch, projectPath 
               className={`${inlineInput} min-w-[5rem] max-w-[10rem] text-left`}
               value={card.values.point}
               placeholder="x,y"
-              onChange={(e) => applyPatch(patchLineValue('waypoints', card.index, e.target.value, editingObject.properties))}
+              onChange={(e) => applyPatch({ ...patchLineValue('waypoints', card.index, e.target.value, editingObject.properties), wander_radius: null })}
             />
           </CardShell>
         );
@@ -330,7 +330,7 @@ const NpcPropertyList = ({ editingObject, get, setProp, applyPatch, projectPath 
               className={`${inlineInput} min-w-[4rem] max-w-[6rem]`}
               value={card.values.radius}
               placeholder="tiles"
-              onChange={(e) => setProp('wander_radius', e.target.value)}
+              onChange={(e) => applyPatch({ wander_radius: e.target.value, waypoints: null })}
             />
           </CardShell>
         );
@@ -486,6 +486,34 @@ const NpcPropertyList = ({ editingObject, get, setProp, applyPatch, projectPath 
               value={card.values.duration}
               placeholder="2s"
               onChange={(e) => updateEffect(card.index, 'duration', e.target.value)}
+            />
+            <label className="inline-flex items-center gap-1">
+              <input
+                type="checkbox"
+                checked={/^(true|1)$/i.test(card.values.automatic || '')}
+                onChange={(e) => updateEffect(card.index, 'automatic', e.target.checked ? 'true' : '')}
+              />
+              automatic
+            </label>
+            <label className="inline-flex items-center gap-1">
+              <input
+                type="checkbox"
+                checked={!/^(false|0)$/i.test(card.values.render_above || '')}
+                onChange={(e) => updateEffect(card.index, 'render_above', e.target.checked ? 'true' : 'false')}
+              />
+              above
+            </label>
+            <Input
+              className={`${inlineInput} min-w-[6rem] max-w-[12rem] text-left`}
+              value={card.values.requires_status}
+              placeholder="requires status"
+              onChange={(e) => updateEffect(card.index, 'requires_status', e.target.value)}
+            />
+            <Input
+              className={`${inlineInput} min-w-[6rem] max-w-[12rem] text-left`}
+              value={card.values.requires_not_status}
+              placeholder="requires not status"
+              onChange={(e) => updateEffect(card.index, 'requires_not_status', e.target.value)}
             />
           </CardShell>
         );

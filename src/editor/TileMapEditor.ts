@@ -10468,6 +10468,32 @@ export class TileMapEditor {
   }
 
   // Reset editor for a new project - clears all data and crash backup file
+  /**
+   * The project's last map was deleted: drop all map content (cells, objects, hero, history, crash backup)
+   * but keep the layers and tileset slots so a new map can be painted with the same tilesets.
+   */
+  public clearMapKeepSlots(): void {
+    if (this.autoSaveTimeout) { clearTimeout(this.autoSaveTimeout); this.autoSaveTimeout = null; }
+    this.clearCrashBackup();
+    this.mapName = 'Untitled Map';
+    this.objects = [];
+    this.nextObjectId = 1;
+    this.selectedObjectId = null;
+    this.notifyObjectsChanged();
+    this.placedSpriteObjects.clear();
+    this.heroX = 0;
+    this.heroY = 0;
+    this.isDraggingHero = false;
+    this.selection = { active: false, startX: -1, startY: -1, endX: -1, endY: -1, tiles: [] };
+    this.isSelecting = false;
+    this.setMapSize(0, 0);
+    this.history = [];
+    this.historyIndex = -1;
+    this.hasUnsavedChanges = false;
+    this.updateSaveStatus('saved');
+    this.draw();
+  }
+
   public resetForNewProject(): void {
     // Clear project crash backup to prevent loading old data
     this.clearCrashBackup();

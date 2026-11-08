@@ -1,4 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { isProjectEmptyAfterDelete } from '@/hooks/mapDelete';
+import { markPreMapSlots } from '@/flare/projectTemplate';
 import { shouldCreatePreMapEditor } from '@/hooks/preMapEditor';
 import useDialogsCtx from './useDialogsCtx';
 import buildConfirmDialogProps from './buildConfirmDialogProps';
@@ -730,11 +732,33 @@ export default function useAppMainBuilder() {
   const handleDeleteMap = useCallback(async (): Promise<boolean> => {
     if (!currentProjectPath || !mapConfig.mapName) return false;
     try {
-      const result = await window.electronAPI?.deleteMap?.(currentProjectPath, mapConfig.mapName);
+      const deletedName = mapConfig.mapName;
+      const result = await window.electronAPI?.deleteMap?.(currentProjectPath, deletedName);
       if (result?.success) {
         // Clear spawn.txt reference if this was the starting map
         if (mapConfig.isStartingMap) {
           mapConfig.updateStartingMap(false);
+        }
+        let listed: string[] = [];
+        try { listed = (await window.electronAPI?.listMaps?.(currentProjectPath)) ?? []; } catch { listed = ['?']; }
+        if (isProjectEmptyAfterDelete(listed, deletedName)) {
+          // Last map gone: same empty state as a fresh project; keep project path, layers and tileset slots.
+          try { editor?.clearMapKeepSlots?.(); } catch (e) { console.warn('clearMapKeepSlots failed', e); }
+          try { void window.electronAPI?.clearCrashBackup?.(currentProjectPath); } catch { /* ignore */ }
+          if (editor) markPreMapSlots(editor);
+          if (activeTabId) {
+            setTabs((prev: EditorTab[]) => prev.filter(t => t.id !== activeTabId));
+            setActiveTabId(null);
+          }
+          mapConfig.setMapInitialized(false);
+          mapConfig.setMapName('');
+          mapConfig.setMapWidth(0);
+          mapConfig.setMapHeight(0);
+          mapConfig.setShowCreateMapDialog(false);
+          appState.setMapObjects?.([]);
+          try { appState.setLayers(editor ? [...editor.getLayers()] : []); } catch { /* ignore */ }
+          try { appState.setTabTick((t: number) => (t || 0) + 1); } catch { /* ignore */ }
+          return true;
         }
         if (activeTabId) closeEditorTab(activeTabId);
         return true;
@@ -744,7 +768,7 @@ export default function useAppMainBuilder() {
       console.warn('handleDeleteMap failed', e);
       return false;
     }
-  }, [currentProjectPath, mapConfig, activeTabId, closeEditorTab]);
+  }, [currentProjectPath, mapConfig, activeTabId, closeEditorTab, editor, setTabs, setActiveTabId, appState]);
 
   function buildAppMainCtxFromSidebar(assembledSidebar: AssembledSidebar): Record<string, unknown> {
     const sb = (assembledSidebar ?? {}) as Record<string, unknown>;

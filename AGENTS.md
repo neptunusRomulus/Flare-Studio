@@ -1,7 +1,7 @@
 # AGENTS.md — rules for AI agents working on Flare Studio
 
 ## Project
-- Flare Studio: Electron + React + TypeScript plug-and-play editor/IDE for the Flare engine (target: **Flare 1.15**).
+- Flare Studio: Electron + React + TypeScript plug-and-play editor/IDE for the Flare engine. Target: **flare-engine master** (`f9a17a26`, 2026-10-29, engine version **1.15.86**). See `src/flare/engineTarget.ts`. The official v1.15 tag is older and lacks craft/vendor-tab/visual-effect keys.
 - Goal: expose every engine feature, but keep the UI simple for beginners (progressive disclosure; no Unity/Unreal-style clutter). Features may be relocated, never removed.
 - Long term: a multi-genre engine with CLI/MCP control.
 
@@ -39,24 +39,16 @@
   - `src/utils/npcFileUpdate.ts` (Studio object → NPC file update) + `src/utils/npcFileUpdate.test.ts`
   - `src/adapters/flare/npcRoundTrip.test.ts`, fixtures in `tests/fixtures/flare-npcs/`
 - Never overwrite hand-made animation files (Studio writes `<name>_studio.txt` instead).
-- Enemy files: `gold`, `wander_radius`, `waypoints`, `script` are not Flare 1.15 enemy keys (map-spawn or none); they are dropped with a visible toast.
+- Enemy files: `gold`, `wander_radius`, `waypoints`, `script` are not StatBlock keys (map-spawn or none); they are dropped with a visible toast.
 
 ## Known open issues
-- Existing NPC file values (vendor fields, ratios, vox) are not loaded into the editor UI (untouched fields keep the file's values).
-- NPC editor › Animation › "Import Tileset" sets the portrait instead of the sprite.
-- A fresh NPC has no default sprite (likely invisible in-game).
-- Deleting a dialog line shifts later dialog items by slot.
 - Enemy editor holds only one INCLUDE.
 - Blank lines inside NPC file sections are lost.
 - Imported NPCs show no thumbnail.
 - GID readout updates only on the next mouse move after toggling Debug Mode.
+- Multi-stage quest journals (more than the first `[quest]` block) are deferred; existing later blocks must be preserved on merge.
 
-## Next planned work: simplify Edit NPC
-- Top preview card with Name.
-- Appearance picker from fantasycore thumbnails, with a default sprite.
-- Roles Talker/Vendor/Quest with descriptive buttons (e.g. "Edit dialogue") instead of generic "Settings".
-- Collapsed "Advanced" for animation technicals, spawn requirements, vox, Stats & Effects, minimap.
-- Hide Waypoints/Wander Radius placeholders.
-- Rename the two Direction fields to "Stance direction" and "Facing on map".
-- Plain labels instead of raw Flare keys (raw key in the tooltip); move inline help text to tooltips; remove the black "+ Add" overlays.
+## Edit NPC
+- Name and appearance (fantasycore picker, default sprite) are on the first screen. Roles use on/off switches; a reserved gear opens the Role center (Dialogue / Shop / Quest).
+- Properties list shows only what is set; new keys go through the searchable Add property palette (synonym search). Raw Flare keys belong in Tooltips only.
 - No engine feature may be removed, only relocated.

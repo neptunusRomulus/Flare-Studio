@@ -1,5 +1,7 @@
 import type { DragEvent } from 'react';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import NpcAssetThumb from '@/components/NpcAssetThumb';
+import { npcListThumbPath, resolveNpcPreviewPaths } from '@/flare/npcPreviewPaths';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,7 +9,7 @@ import Tooltip from '@/components/ui/tooltip';
 import { entityPlacement } from '@/components/entityPlacement';
 import { AlertTriangle, Check, GripVertical, HelpCircle, Plus, User, X } from 'lucide-react';
 import type { MapObject } from '@/types';
-import { propertyText } from '@/editor/propertyText';
+import { propertyRecord, propertyText } from '@/editor/propertyText';
 import { ENEMY_ROLE_META_LOOKUP } from '@/editor/actorRoles';
 import { checkNpcDraftName } from '@/editor/npcDraft';
 import { npcFileForActor, npcInstanceCounts, npcInstancesForFile } from '@/editor/npcInstances';
@@ -39,6 +41,30 @@ type ActorEntriesPanelProps = {
   /** Current map name; its live objects are used instead of the saved map file. */
   mapName?: string;
 };
+
+function NpcListThumb({ actor, projectPath }: { actor: MapObject; projectPath?: string | null }) {
+  const [imagePath, setImagePath] = useState<string | null>(null);
+  const props = propertyRecord(actor.properties);
+  const portraitPath = propertyText(props.portraitPath);
+  const tilesetPath = propertyText(props.tilesetPath);
+  const templateImage = propertyText(props.templateImage);
+  const tilesetSourcePath = propertyText(props.tilesetSourcePath);
+
+  useEffect(() => {
+    let cancelled = false;
+    void resolveNpcPreviewPaths({
+      tilesetPath, templateImage, tilesetSourcePath, portraitPath, projectPath,
+    }).then((preview) => {
+      if (!cancelled) setImagePath(npcListThumbPath(preview));
+    });
+    return () => { cancelled = true; };
+  }, [tilesetPath, templateImage, tilesetSourcePath, portraitPath, projectPath]);
+
+  if (!imagePath) {
+    return <HelpCircle className="w-5 h-5 text-muted-foreground" />;
+  }
+  return <NpcAssetThumb imagePath={imagePath} alt={actor.name || 'NPC'} className="h-full w-full" />;
+}
 
 const SidebarActorEntries = ({
   isNpcLayer,
@@ -267,7 +293,6 @@ const SidebarActorEntries = ({
                 stationary: actor.properties?.stationary === 'true' || actor.properties?.stationary === '1'
               };
               const hasEnemyRole = Object.values(enemyRoles).some(Boolean);
-              const portraitPath = propertyText(actor.properties?.portraitPath) || undefined;
               const isPlacedOnMap = actor.x >= 0 && actor.y >= 0;
               const instanceCount = instanceCounts.get(npcFileForActor(actor)) ?? 0;
 
@@ -303,19 +328,9 @@ const SidebarActorEntries = ({
                       isPlacedOnMap ? 'border-border' : 'border-dashed border-muted-foreground/40'
                     }`}
                     >
-                      {portraitPath ? (
-                        <img
-                          src={portraitPath}
-                          alt={actor.name || 'NPC portrait'}
-                          draggable={false}
-                          className={`w-full h-full object-cover ${!isPlacedOnMap ? 'opacity-50' : ''}`}
-                          onError={(event) => {
-                            event.currentTarget.style.display = 'none';
-                            event.currentTarget.nextElementSibling?.classList.remove('hidden');
-                          }}
-                        />
-                      ) : null}
-                      <HelpCircle className={`w-5 h-5 text-muted-foreground ${portraitPath ? 'hidden' : ''}`} />
+                      <div className={`w-full h-full ${!isPlacedOnMap ? 'opacity-50' : ''}`} draggable={false}>
+                        <NpcListThumb actor={actor} projectPath={projectPath} />
+                      </div>
                     </div>
                     <div className="space-y-1 text-sm flex-1 min-w-0">
                       <div className="font-medium text-foreground truncate">

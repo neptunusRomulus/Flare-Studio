@@ -11,8 +11,7 @@ import PositionField from '@/components/PositionField';
 import NpcAppearanceSection from '@/components/NpcAppearanceSection';
 import NpcAssetThumb from '@/components/NpcAssetThumb';
 import NpcPropertyList from '@/components/NpcPropertyList';
-import { getStoredFlarePath } from '@/flare/flarePathStore';
-import { isAnimationDefinitionFilePath, isImageFilePath } from '@/utils/animationUtils';
+import { resolveNpcPreviewPaths } from '@/flare/npcPreviewPaths';
 import { isCustomTilesetAppearance } from '@/editor/npcPropertyCards';
 import {
   dialogueSummary,
@@ -75,54 +74,9 @@ const NpcEditDialog = ({
   useEffect(() => {
     let cancelled = false;
     const resolve = async () => {
-      const api = window.electronAPI;
-      const root = projectPath?.replace(/\\/g, '/').replace(/\/$/, '') || '';
-      let sprite: string | null = null;
-      if (tilesetSourcePath) sprite = tilesetSourcePath;
-      else if (tilesetPath && isImageFilePath(tilesetPath)) {
-        sprite = /^([a-zA-Z]:|\/)/.test(tilesetPath) ? tilesetPath : (root ? `${root}/${tilesetPath}` : tilesetPath);
-      } else if (templateImage) {
-        const flarePath = getStoredFlarePath();
-        if (flarePath && api?.listTemplateActors) {
-          try {
-            const listing = await api.listTemplateActors(flarePath);
-            const match = listing.npcLooks?.find((l) => l.animation === tilesetPath || l.image === templateImage);
-            sprite = match?.imagePath || (listing.modDir && templateImage ? `${listing.modDir.replace(/\\/g, '/')}/${templateImage}` : null);
-          } catch {
-            sprite = null;
-          }
-        }
-      } else if (tilesetPath && isAnimationDefinitionFilePath(tilesetPath) && api?.listTemplateActors) {
-        const flarePath = getStoredFlarePath();
-        if (flarePath) {
-          try {
-            const listing = await api.listTemplateActors(flarePath);
-            sprite = listing.npcLooks?.find((l) => l.animation === tilesetPath)?.imagePath || null;
-          } catch {
-            sprite = null;
-          }
-        }
-      }
-
-      let portrait: string | null = null;
-      if (portraitPath.startsWith('data:')) portrait = portraitPath;
-      else if (portraitPath && /^([a-zA-Z]:|\/)/.test(portraitPath)) portrait = portraitPath;
-      else if (portraitPath) {
-        if (root && api?.fileExists && await api.fileExists(`${root}/${portraitPath}`)) portrait = `${root}/${portraitPath}`;
-        else {
-          const flarePath = getStoredFlarePath();
-          if (flarePath && api?.listTemplateActors) {
-            try {
-              const listing = await api.listTemplateActors(flarePath);
-              portrait = listing.portraits?.find((p) => p.path === portraitPath)?.imagePath
-                || (listing.modDir ? `${listing.modDir.replace(/\\/g, '/')}/${portraitPath}` : null);
-            } catch {
-              portrait = null;
-            }
-          }
-        }
-      }
-
+      const { sprite, portrait } = await resolveNpcPreviewPaths({
+        tilesetPath, templateImage, tilesetSourcePath, portraitPath, projectPath,
+      });
       if (!cancelled) {
         setPreviewSpritePath(sprite);
         setPreviewPortraitPath(portrait);

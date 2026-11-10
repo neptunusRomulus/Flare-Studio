@@ -383,6 +383,10 @@ const EFFECT_TYPE_BY_KEY = {
   power: "power", power_path: "power_path", power_damage: "power_damage",
   power_stats: "power_stats", power_level: "power_level",
   spawn_level: "spawn_level", chance_exec: "chance_exec",
+  random_status: "random_status", repeat: "repeat", tooltip: "tooltip",
+  show_on_minimap: "show_on_minimap", parallax_layers: "parallax_layers",
+  procgen_filename: "procgen_filename", procgen_link: "procgen_link",
+  procgen_door_level: "procgen_door_level",
 };
 const DIALOG_META_KEYS = ["id", "topic", "group", "response_only"];
 const LINE_PREFIX_KEYS = new Set(["voice", "portrait_him", "portrait_her", "portrait_you", "portrait"]);
@@ -540,7 +544,7 @@ function exportNpcFile(npc) {
   const source = npc || {};
   const lines = [];
   const fields = { ...source, ...(source.customProperties || {}) };
-  for (const k of ["customProperties", "dialogueTrees", "waypoints", "wander_radius", "sourcePath", "raw", "_rawMain", "_rawSections"]) delete fields[k];
+  for (const k of ["customProperties", "dialogueTrees", "waypoints", "wander_radius", "sourcePath", "raw", "_rawMain", "_rawSections", "npc_includes", "status_stock_entries", "npc_stats", "npc_visual_effects", "tilesetPath", "portraitPath", "npcFilename"]) delete fields[k];
   if (fields.status_stock === undefined && fields.status_stock_entries) {
     const stocks = statusStockFromEntries(fields.status_stock_entries);
     if (stocks.length) fields.status_stock = stocks;
@@ -651,6 +655,14 @@ function worldEffectKey(type) {
     power_level: "power_level",
     spawn_level: "spawn_level",
     chance_exec: "chance_exec",
+    random_status: "random_status",
+    repeat: "repeat",
+    tooltip: "tooltip",
+    show_on_minimap: "show_on_minimap",
+    parallax_layers: "parallax_layers",
+    procgen_filename: "procgen_filename",
+    procgen_link: "procgen_link",
+    procgen_door_level: "procgen_door_level",
   };
   return map[type] || "";
 }
@@ -762,6 +774,17 @@ function mergeNpcFile(existingText, update) {
     const insertAt = at < 0 ? rest.length : all.slice(0, at).filter((sec) => sec.name !== name).length;
     rest.splice(insertAt, 0, ...fresh);
     base._rawSections = rest;
+  }
+  // includes: authoritative list of INCLUDE paths (empty removes them). Positions of the first INCLUDE are kept.
+  if (update && update.includes !== undefined) {
+    const paths = (update.includes || []).map((p) => String(p || "").trim()).filter(Boolean);
+    const raw = base._rawMain || [];
+    const first = raw.findIndex((e) => e.raw && String(e.raw).startsWith("INCLUDE "));
+    const without = raw.filter((e) => !(e.raw && String(e.raw).startsWith("INCLUDE ")));
+    const inc = paths.map((path) => ({ raw: `INCLUDE ${path}` }));
+    const at = first < 0 ? 0 : raw.slice(0, first).filter((e) => !(e.raw && String(e.raw).startsWith("INCLUDE "))).length;
+    without.splice(at, 0, ...inc);
+    base._rawMain = without;
   }
   if (update && update.dialogueTrees !== undefined) {
     const old = base.customProperties.dialogueTrees || [];

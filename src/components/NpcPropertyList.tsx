@@ -3,7 +3,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Tooltip from '@/components/ui/tooltip';
 import DirectionField from '@/components/DirectionField';
-import { HelpCircle, Plus, X } from 'lucide-react';
+import { FolderOpen, HelpCircle, Plus, X } from 'lucide-react';
 import type { MapObject } from '@/types';
 import { sectionsFromNpcText, type KeyValue } from '@/utils/npcFileUpdate';
 import {
@@ -78,6 +78,22 @@ const PolaritySelect = ({
 
 const NpcPropertyList = ({ editingObject, get, setProp, applyPatch, projectPath }: Props) => {
   const [menuOpen, setMenuOpen] = useState(false);
+
+  const browseInclude = async (index: number) => {
+    const api = window.electronAPI as typeof window.electronAPI & {
+      selectProjectFile?: (opts: { projectPath?: string | null; title?: string; filters?: Array<{ name: string; extensions: string[] }> }) => Promise<string | null>;
+    };
+    if (!api?.selectProjectFile) return;
+    const selected = await api.selectProjectFile({
+      projectPath,
+      title: 'Choose a shared NPC file',
+      filters: [
+        { name: 'NPC or text files', extensions: ['txt'] },
+        { name: 'All files', extensions: ['*'] },
+      ],
+    });
+    if (selected) applyPatch(patchLineValue('npc_includes', index, selected, editingObject.properties));
+  };
   const [query, setQuery] = useState('');
   const [animMore, setAnimMore] = useState(false);
   const [fileStats, setFileStats] = useState<KeyValue[] | undefined>();
@@ -350,6 +366,26 @@ const NpcPropertyList = ({ editingObject, get, setProp, applyPatch, projectPath 
               placeholder="sound.ogg"
               onChange={(e) => applyPatch(patchListValue('vox_intro', card.index, e.target.value, editingObject.properties))}
             />
+          </CardShell>
+        );
+      case 'include':
+        return (
+          <CardShell key={card.id} tip={tipText} onRemove={() => remove(card)}>
+            <span>Shared file:</span>
+            <Input
+              className={`${inlineInput} min-w-[8rem] max-w-[16rem] text-left`}
+              value={card.values.file}
+              placeholder="npcs/base/common.txt"
+              onChange={(e) => applyPatch(patchLineValue('npc_includes', card.index, e.target.value, editingObject.properties))}
+            />
+            <button
+              type="button"
+              className="h-6 w-6 shrink-0 flex items-center justify-center rounded hover:bg-muted"
+              aria-label="Choose file"
+              onClick={() => { void browseInclude(card.index); }}
+            >
+              <FolderOpen className="w-3.5 h-3.5" />
+            </button>
           </CardShell>
         );
       case 'custom_animation':

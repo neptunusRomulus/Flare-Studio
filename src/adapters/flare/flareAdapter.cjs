@@ -406,6 +406,7 @@ module.exports = {
   exportQuestFile: content.exportQuestFile,
   importQuestText: content.importQuestText,
   mergeQuestText: content.mergeQuestText,
+  firstQuestStep: content.firstQuestStep,
   exportEffectFile: content.exportEffectFile,
   importEffectText: content.importEffectText,
   mergeEffectText: content.mergeEffectText,

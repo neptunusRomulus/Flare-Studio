@@ -6,6 +6,7 @@ import { validateAndSanitizeObject } from '@/editor/objectValidation';
 import { propertyText } from '@/editor/propertyText';
 import { askConfirm } from '@/components/ui/inline-confirm';
 import { resolveDefaultNpcAppearance } from '@/flare/npcAppearance';
+import { hydrateNpcObject, npcFilePath } from '@/utils/npcFileHydrate';
 
 /**
  * Load an image from an absolute file path via Electron and return its pixel dimensions.
@@ -100,7 +101,7 @@ type UseObjectEditingOptions = {
 };
 
 const useObjectEditing = (opts?: UseObjectEditingOptions) => {
-  const { editor = null, syncMapObjects, createTabFor, switchToTab } = opts || {};
+  const { editor = null, syncMapObjects, createTabFor, switchToTab, currentProjectPath } = opts || {};
 
   const [showObjectDialog, setShowObjectDialog] = useState(false);
   const [showEnemyEditor, setShowEnemyEditor] = useState(false);
@@ -360,10 +361,21 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
     return newObject.id;
   }, [editor, syncMapObjects]);
 
-  const handleEditObject = useCallback((objectId: number) => {
+  const handleEditObject = useCallback(async (objectId: number) => {
     const objects = editor && typeof editor.getMapObjects === 'function' ? editor.getMapObjects() : mapObjects;
-    const obj = objects?.find(o => o.id === objectId) || null;
+    let obj = objects?.find(o => o.id === objectId) || null;
     if (!obj) return;
+
+    if (obj.type === 'npc' && currentProjectPath) {
+      try {
+        const api = window.electronAPI;
+        const filePath = npcFilePath(currentProjectPath, obj);
+        const text = api?.readFile ? await api.readFile(filePath) : '';
+        if (text) obj = hydrateNpcObject(obj, text);
+      } catch (err) {
+        console.warn('Could not load NPC file into the editor', err);
+      }
+    }
 
     setEditingObject(obj);
     setShowEnemyEditor(false);
@@ -378,7 +390,7 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
       setActiveDialogueTab(0);
       setDialogueTabToDelete(null);
     }
-  }, [editor, mapObjects]);
+  }, [editor, mapObjects, currentProjectPath]);
 
   const handleEditEnemyTemplate = useCallback((objectId: number) => {
     const objects = editor && typeof editor.getMapObjects === 'function' ? editor.getMapObjects() : mapObjects;

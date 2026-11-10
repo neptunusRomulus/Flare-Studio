@@ -3,6 +3,7 @@
  * Labels are user language; Flare keys stay in tooltips only.
  */
 import { importNpcText } from '@/adapters/flare/flareAdapter.cjs';
+import { includesFromNpcText } from '@/utils/npcFileHydrate';
 import { parseSectionProperty, sectionsFromNpcText, type KeyValue } from '@/utils/npcFileUpdate';
 import { isImageFilePath } from '@/utils/animationUtils';
 
@@ -19,6 +20,7 @@ export type NpcPropertyKind =
   | 'wander_radius'
   | 'minimap'
   | 'intro_voice'
+  | 'include'
   | 'custom_animation'
   | 'stat'
   | 'visual_effect';
@@ -139,6 +141,15 @@ export const PROPERTY_CATALOG: PropertyCatalogEntry[] = [
     flareKey: 'vox_intro',
     description: 'Sound played when first talking to this NPC.',
     synonyms: ['voice', 'sound', 'audio', 'vox', 'intro', 'ses'],
+    multi: true,
+  },
+  {
+    kind: 'include',
+    category: 'look',
+    label: 'Shared file',
+    flareKey: 'INCLUDE',
+    description: 'Pull in another NPC file (you can add more than one).',
+    synonyms: ['include', 'shared', 'base', 'template', 'INCLUDE'],
     multi: true,
   },
   {
@@ -324,6 +335,12 @@ export function listNpcPropertyCards(input: {
     push({ kind: 'intro_voice', category: 'audio', index, values: { file: value } });
   });
 
+  const includes = hasProp(p, 'npc_includes') ? splitLines(propText(p, 'npc_includes')) : [];
+  if (hasProp(p, 'npc_includes') && includes.length === 0) includes.push('');
+  includes.forEach((value, index) => {
+    push({ kind: 'include', category: 'look', index, values: { file: value } });
+  });
+
   const custom = input.customTileset ?? isCustomTilesetAppearance(propText(p, 'tilesetPath'), propText(p, 'tilesetSourcePath'));
   if (custom) {
     push({
@@ -400,6 +417,8 @@ export function cardsFromNpcText(text: string): NpcPropertyCard[] {
   ]) {
     if (npc[key] !== undefined) properties[key] = npc[key];
   }
+  const includes = includesFromNpcText(text);
+  if (includes.length) properties.npc_includes = includes.join('\n');
   // animations= path is not a custom tileset image
   const fileStats = sectionsFromNpcText(text, 'stats').flat();
   const fileEffects = sectionsFromNpcText(text, 'visual_effect');
@@ -460,6 +479,10 @@ export function patchAddProperty(
     case 'intro_voice': {
       const cur = splitMulti(propText(p, 'vox_intro'));
       return { vox_intro: [...cur, ''].join('\n') };
+    }
+    case 'include': {
+      const cur = splitLines(propText(p, 'npc_includes'));
+      return { npc_includes: [...cur, ''].join('\n') };
     }
     case 'custom_animation':
       return {};
@@ -529,6 +552,11 @@ export function patchRemoveCard(
       const list = splitMulti(propText(p, 'vox_intro'));
       const next = list.filter((_, j) => j !== card.index);
       return { vox_intro: next.length ? next.join('\n') : null };
+    }
+    case 'include': {
+      const list = splitLines(propText(p, 'npc_includes'));
+      const next = list.filter((_, j) => j !== card.index);
+      return { npc_includes: next.length ? next.join('\n') : null };
     }
     case 'custom_animation':
       return {

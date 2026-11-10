@@ -34,6 +34,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   closeAfterSave: () => ipcRenderer.send("close-after-save"),
   selectDirectory: () => ipcRenderer.invoke("select-directory"),
   selectTilesetFile: () => ipcRenderer.invoke("select-tileset-file"),
+  selectProjectFile: (options) => ipcRenderer.invoke("select-project-file", options),
   createMapProject: (config) =>
     ipcRenderer.invoke("create-map-project", config),
   openMapProject: (projectPath, mapName) =>

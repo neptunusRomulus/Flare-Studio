@@ -55,7 +55,7 @@ export const NPC_LIST_FIELDS: Record<string, string> = {
 };
 
 export type KeyValue = { key: string; value: string };
-export type NpcFileUpdate = { fields: Record<string, string | boolean>; dialogueTrees?: unknown[]; sections?: Record<string, KeyValue[][]> };
+export type NpcFileUpdate = { fields: Record<string, string | boolean>; dialogueTrees?: unknown[]; sections?: Record<string, KeyValue[][]>; includes?: string[] };
 
 /** Object property (JSON) -> NPC file section; present property replaces all sections of that name. */
 export const NPC_SECTION_FIELDS: Record<string, string> = {
@@ -107,6 +107,9 @@ export function npcFileUpdate(name: string, props: Props, resolved: { animations
   const update: NpcFileUpdate = { fields };
   for (const [prop, section] of Object.entries(NPC_SECTION_FIELDS)) {
     if (prop in p) (update.sections ||= {})[section] = parseSectionProperty(p[prop]);
+  }
+  if ('npc_includes' in p) {
+    update.includes = text(p.npc_includes).split('\n').map(s => s.trim()).filter(Boolean);
   }
   if ('dialogueTrees' in p) {
     try {

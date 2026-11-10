@@ -93,6 +93,17 @@ describe('npcPropertyCards add/remove and catalog search', () => {
     expect(byVoice.some((e) => e.kind === 'intro_voice')).toBe(true);
     const byMinimap = filterPropertyCatalog('minimap', []);
     expect(byMinimap.some((e) => e.kind === 'minimap')).toBe(true);
+    expect(filterPropertyCatalog('include', []).some((e) => e.kind === 'include')).toBe(true);
+  });
+
+  it('abasi.txt lists every INCLUDE as a shared-file card', () => {
+    const text = fs.readFileSync(path.join(FIXTURES, 'abasi.txt'), 'utf8');
+    const cards = cardsFromNpcText(text);
+    expect(cards.filter((c) => c.kind === 'include').map((c) => c.values.file)).toEqual([
+      'npcs/base/abasi/common.txt',
+      'npcs/base/abasi/quest_intro1.txt',
+      'npcs/base/abasi/quest_common.txt',
+    ]);
   });
 
   it('custom animation card only when tileset is an imported image', () => {

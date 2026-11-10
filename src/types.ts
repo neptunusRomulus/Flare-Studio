@@ -270,7 +270,9 @@ export interface DialogueWorldEffect {
     | 'intramap' | 'music' | 'stash' | 'book' | 'respec' | 'save_game' | 'script' | 'visual_effect'
     | 'intermap_id' | 'intermap_random' | 'mapmod' | 'mapmod_toggle' | 'loot' | 'shakycam'
     | 'power' | 'power_path' | 'power_damage' | 'power_stats' | 'power_level'
-    | 'spawn_level' | 'chance_exec';
+    | 'spawn_level' | 'chance_exec'
+    | 'random_status' | 'repeat' | 'tooltip' | 'show_on_minimap'
+    | 'parallax_layers' | 'procgen_filename' | 'procgen_link' | 'procgen_door_level';
   value: string;
 }
 

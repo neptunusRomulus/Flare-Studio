@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { npcFileUpdate, npcFileContent, npcFileBase, isStudioNpcAnimation } from './npcFileUpdate';
 import { parseVendorTabs, formatVendorTabs, sectionsFromNpcText } from './npcFileUpdate';
+import { mergeNpcFile } from '@/adapters/flare/flareAdapter.cjs';
 
 const existing = 'name=Old\nanimations=animations/npcs/guill.txt\nvendor=true\nconstant_stock=1,2\nconstant_stock=3\nvox_intro=a.ogg\nvendor_ratio_buy=2\n\n[stats]\nspeed=2\n\n[dialog]\nid=a\nher=Hi\nset_status=x\nyou=Bye\n';
 
@@ -85,5 +86,48 @@ describe('dialog polish', () => {
       ] }];
     const out = npcFileContent(null, npcFileUpdate('N', { talker: 'true', dialogueTrees: JSON.stringify(trees) }, {}));
     expect(out).toContain('portrait_her=images/p.png\nher=Hi\nportrait_you=images/me.png\nhim=Look\nyou=Ok\nallow_movement=false');
+  });
+});
+
+describe('INCLUDE merge', () => {
+  it('rewrites INCLUDE paths and keeps comments around them', () => {
+    const existing = '# note\nINCLUDE npcs/base/a.txt\nname=Guard\nINCLUDE npcs/base/b.txt\n';
+    const text = mergeNpcFile(existing, { fields: { name: 'Guard' }, includes: ['npcs/base/a.txt', 'npcs/base/c.txt'] });
+    expect(text).toContain('# note');
+    expect(text).toContain('INCLUDE npcs/base/a.txt');
+    expect(text).toContain('INCLUDE npcs/base/c.txt');
+    expect(text).not.toContain('INCLUDE npcs/base/b.txt');
+    expect(text.indexOf('# note')).toBeLessThan(text.indexOf('INCLUDE npcs/base/a.txt'));
+  });
+
+  it('can add the first INCLUDE and remove all of them', () => {
+    const added = mergeNpcFile('name=Guard\n', { fields: { name: 'Guard' }, includes: ['npcs/base/x.txt'] });
+    expect(added).toContain('INCLUDE npcs/base/x.txt');
+    const cleared = mergeNpcFile(added, { fields: { name: 'Guard' }, includes: [] });
+    expect(cleared).not.toContain('INCLUDE');
+  });
+});
+
+describe('dialog event keys', () => {
+  it('keeps random_status and other dialog component keys on merge', () => {
+    const existing = '[dialog]\nid=a\nhim=Hi\nrandom_status=clear\nrandom_status=append,foo\nrepeat=true\n';
+    const trees = [
+      {
+        dialogueId: 'a',
+        dialogues: [{ speaker: 'npc', text: 'Hi' }],
+        worldEffects: [
+          { type: 'random_status', value: 'clear' },
+          { type: 'random_status', value: 'append,foo' },
+          { type: 'repeat', value: 'true' },
+          { type: 'shakycam', value: '500ms' },
+        ],
+        components: [],
+      },
+    ];
+    const out = mergeNpcFile(existing, { fields: { name: 'X' }, dialogueTrees: trees });
+    expect(out).toContain('random_status=clear');
+    expect(out).toContain('random_status=append,foo');
+    expect(out).toContain('repeat=true');
+    expect(out).toContain('shakycam=500ms');
   });
 });

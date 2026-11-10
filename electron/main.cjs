@@ -655,6 +655,26 @@ ipcMainLocal.handle("select-directory", async () => {
   return null;
 });
 
+ipcMainLocal.handle("select-project-file", async (_event, options = {}) => {
+  const projectPath = options.projectPath || undefined;
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: options.title || "Select a file",
+    defaultPath: projectPath,
+    properties: ["openFile"],
+    filters: options.filters || [
+      { name: "Text files", extensions: ["txt"] },
+      { name: "All files", extensions: ["*"] },
+    ],
+  });
+  if (result.canceled || !result.filePaths.length) return null;
+  const abs = result.filePaths[0];
+  if (projectPath) {
+    const rel = path.relative(projectPath, abs);
+    if (rel && !rel.startsWith("..") && !path.isAbsolute(rel)) return rel.replace(/\\/g, "/");
+  }
+  return abs.replace(/\\/g, "/");
+});
+
 ipcMainLocal.handle("select-tileset-file", async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     properties: ["openFile"],

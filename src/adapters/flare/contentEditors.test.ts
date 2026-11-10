@@ -99,6 +99,51 @@ describe('content editor exports', () => {
     expect(merged.indexOf('[quest]')).toBeLessThan(merged.indexOf('custom_key=keep me'));
   });
 
+  it('writes first-stage journal requires and show_status without touching later stages', () => {
+    const existing = [
+      'name=Old Name',
+      'complete_status=old_done',
+      '',
+      '[quest]',
+      'requires_status=old_started',
+      'requires_item=gold_key:2',
+      'quest_text=Old text.',
+      '',
+      '[quest]',
+      'requires_status=second',
+      'requires_level=10',
+      'quest_text=Second step.',
+    ].join('\n');
+    const merged = mergeQuestText(existing, {
+      name: 'Old Name',
+      complete_status: 'old_done',
+      requires_status: 'old_started',
+      quest_text: 'Old text.',
+      requires_level: '3',
+      requires_not_class: 'mage',
+      requires_currency: '50',
+      show_status: 'show_this',
+    });
+    expect(merged).toContain('requires_level=3');
+    expect(merged).toContain('requires_not_class=mage');
+    expect(merged).toContain('requires_currency=50');
+    expect(merged).toContain('show_status=show_this');
+    expect(merged).toContain('requires_item=gold_key:2');
+    expect(merged).toContain('requires_status=second');
+    expect(merged).toContain('requires_level=10');
+    expect(merged).toContain('quest_text=Second step.');
+    expect(merged.indexOf('requires_level=3')).toBeLessThan(merged.indexOf('requires_status=second'));
+    const cleared = mergeQuestText(merged, {
+      name: 'Old Name',
+      complete_status: 'old_done',
+      requires_status: 'old_started',
+      quest_text: 'Old text.',
+      requires_level: '',
+    });
+    expect(cleared).not.toContain('requires_level=3');
+    expect(cleared).toContain('requires_level=10');
+  });
+
   it('creates a quest section for a new journal entry', () => {
     expect(mergeQuestText('', { name: 'Fresh', complete_status: 'done', quest_text: 'Do it.' }))
       .toBe(exportQuestFile({ name: 'Fresh', complete_status: 'done', quest_text: 'Do it.' }));

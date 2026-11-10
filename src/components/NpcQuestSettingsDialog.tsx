@@ -9,6 +9,7 @@ import { toast } from '@/hooks/use-toast';
 import { Check, HelpCircle, Plus, Save, Trash2, X } from 'lucide-react';
 import type { DialogueTree } from '@/types';
 import type { ItemSummary } from '@/utils/items';
+import ResizeHandle from '@/components/ResizeHandle';
 import {
   buildQuestFlowTrees,
   questAcceptDialogueId,
@@ -18,7 +19,7 @@ import {
   type QuestFlowInput,
   type QuestTurnInMode,
 } from '@/editor/questFlow';
-import { canonicalJson, contentSlug, mergeQuestText } from '@/adapters/flare/flareAdapter.cjs';
+import { canonicalJson, contentSlug, firstQuestStep, mergeQuestText } from '@/adapters/flare/flareAdapter.cjs';
 import { projectRoot, writeProjectFiles } from '@/editor/projectFiles';
 
 type NpcQuestSettingsDialogProps = {
@@ -59,7 +60,20 @@ const NpcQuestSettingsDialog = ({
   } = useDraggableResizable({ id: 'npc_quest_settings_dialog', initialWidth: 720, initialHeight: 600, minWidth: 580, minHeight: 460 });
 
   const [flow, setFlow] = useState<QuestFlowInput>(() => questFlowFromLegacy('', {}));
+  const emptyJournal = {
+    requires_not_status: '',
+    requires_level: '',
+    requires_not_level: '',
+    requires_item: '',
+    requires_not_item: '',
+    requires_class: '',
+    requires_not_class: '',
+    requires_currency: '',
+    requires_not_currency: '',
+    show_status: '',
+  };
   const [journalText, setJournalText] = useState('');
+  const [journalExtras, setJournalExtras] = useState(emptyJournal);
   const [writeJournal, setWriteJournal] = useState(true);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -88,10 +102,36 @@ const NpcQuestSettingsDialog = ({
       items: next.items?.length ? next.items : fallback.items,
     });
     setJournalText('');
+    setJournalExtras(emptyJournal);
     setWriteJournal(true);
     setConfirmRemove(false);
     setSaving(false);
-  }, [isOpen, embedded, dialogueTrees, npcName, getEditingObjectProperty]);
+
+    const loadJournal = async () => {
+      const questId = contentSlug(next.questId || npcName || 'quest', 'quest');
+      if (!projectPath || !questId) return;
+      const api = window.electronAPI;
+      if (!api?.readFile) return;
+      const root = projectRoot(projectPath);
+      const existingText = (await api.readFile(`${root}/quests/${questId}.txt`)) || '';
+      if (!existingText.trim()) return;
+      const step = firstQuestStep(existingText);
+      setJournalText(step.quest_text || '');
+      setJournalExtras({
+        requires_not_status: step.requires_not_status || '',
+        requires_level: step.requires_level || '',
+        requires_not_level: step.requires_not_level || '',
+        requires_item: step.requires_item || '',
+        requires_not_item: step.requires_not_item || '',
+        requires_class: step.requires_class || '',
+        requires_not_class: step.requires_not_class || '',
+        requires_currency: step.requires_currency || '',
+        requires_not_currency: step.requires_not_currency || '',
+        show_status: step.show_status || '',
+      });
+    };
+    void loadJournal();
+  }, [isOpen, embedded, dialogueTrees, npcName, getEditingObjectProperty, projectPath]);
 
   if (!isOpen && !embedded) return null;
 
@@ -118,6 +158,7 @@ const NpcQuestSettingsDialog = ({
       complete_status: input.completeStatus,
       requires_status: input.acceptStatus,
       quest_text: journalText.trim() || (existingText.trim() ? '' : input.questName),
+      ...journalExtras,
     };
     const text = mergeQuestText(existingText, journal);
 
@@ -470,6 +511,30 @@ const NpcQuestSettingsDialog = ({
             placeholder="Quest log text (leave empty to keep the file's text)"
             disabled={!writeJournal}
           />
+          <div className="grid grid-cols-2 gap-2">
+            {([
+              ['requires_level', 'Player level', 'requires_level — Show this stage at these player levels.'],
+              ['requires_not_level', 'Hide at level', 'requires_not_level — Hide this stage at these player levels.'],
+              ['requires_item', 'Needs item', 'requires_item — Item id, or id:quantity.'],
+              ['requires_not_item', 'Must not have item', 'requires_not_item — Hidden if the player has this item.'],
+              ['requires_class', 'Class', 'requires_class — Only this hero class sees this stage.'],
+              ['requires_not_class', 'Not class', 'requires_not_class — Hidden for this hero class.'],
+              ['requires_currency', 'Currency', 'requires_currency — Minimum currency (and optional max).'],
+              ['requires_not_currency', 'Hide at currency', 'requires_not_currency — Hidden in this currency range.'],
+              ['requires_not_status', 'Must not have status', 'requires_not_status — Hidden if this status is set.'],
+              ['show_status', 'Also show status', 'show_status — Also show this stage when this status is set.'],
+            ] as Array<[keyof typeof emptyJournal, string, string]>).map(([key, label, tip]) => (
+              <div key={key}>
+                {fieldLabel(label, tip)}
+                <Input
+                  className="h-7 text-xs"
+                  value={journalExtras[key]}
+                  onChange={(e) => setJournalExtras((prev) => ({ ...prev, [key]: e.target.value }))}
+                  disabled={!writeJournal}
+                />
+              </div>
+            ))}
+          </div>
         </section>
       </div>
 
@@ -497,13 +562,7 @@ const NpcQuestSettingsDialog = ({
       </div>
 
       {!embedded && (
-      <div
-        onMouseDown={handleResizeMouseDown}
-        className="absolute bottom-0 right-0 w-5 h-5 cursor-se-resize opacity-40 hover:opacity-100 transition-opacity flex items-end justify-end"
-        title="Drag to resize"
-      >
-        <div className="w-1.5 h-1.5 bg-foreground/40 rounded-sm m-1" />
-      </div>
+      <ResizeHandle onMouseDown={handleResizeMouseDown} />
       )}
     </div>
   );

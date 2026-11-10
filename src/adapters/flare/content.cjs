@@ -122,6 +122,7 @@ const QUEST_STEP_KEYS = [
   "requires_class",
   "requires_not_class",
   "quest_text",
+  "show_status",
 ];
 
 function itemRequirementList(requirements, type) {
@@ -214,9 +215,15 @@ function headerEnd(doc) {
   return firstSection < 0 ? doc.length : firstSection;
 }
 
-/** Update a key in a range, or insert it after the last key of that range. Empty values leave the file untouched. */
-function setDocKey(doc, start, end, key, value) {
-  if (!value) return;
+/** Update a key in a range, or insert it after the last key of that range. Empty values leave the file untouched unless removeIfEmpty. */
+function setDocKey(doc, start, end, key, value, removeIfEmpty) {
+  if (!value) {
+    if (removeIfEmpty) {
+      const at = doc.findIndex((entry, i) => i >= start && i < end && entry && entry.kind === "key" && entry.key === key);
+      if (at >= 0) doc.splice(at, 1);
+    }
+    return;
+  }
   let lastKey = -1;
   for (let i = start; i < end; i += 1) {
     const entry = doc[i];
@@ -232,8 +239,8 @@ function setDocKey(doc, start, end, key, value) {
 
 /**
  * Merge quest journal fields into an existing quests/<id>.txt.
- * Keeps comments, unknown keys, repeats and section order; only name/complete_status,
- * requires_status and quest_text are touched. Falls back to exportQuestFile for new files.
+ * Keeps comments, unknown keys, repeats and later [quest] blocks. Only the header and the first
+ * [quest] section are updated (multi-stage journals are edited later).
  */
 function mergeQuestText(existingText, quest) {
   const source = quest || {};
@@ -248,17 +255,53 @@ function mergeQuestText(existingText, quest) {
   setDocKey(doc, headerStart, headerEnd(doc), "complete_status", safeString(source.complete_status));
 
   const range = sectionRange(doc, "quest");
+  const hasStep = QUEST_STEP_KEYS.some((key) => safeString(source[key]));
   if (range) {
-    setDocKey(doc, range.start + 1, range.end, "requires_status", safeString(source.requires_status));
-    setDocKey(doc, range.start + 1, range.end, "quest_text", safeString(source.quest_text));
-  } else if (source.requires_status || source.quest_text) {
+    for (const key of QUEST_STEP_KEYS) {
+      const provided = source[key] !== undefined;
+      const value = safeString(source[key]);
+      const canClear = key !== "requires_status" && key !== "quest_text";
+      if (!provided && (canClear || !value)) continue;
+      setDocKey(doc, range.start + 1, range.end, key, value, canClear && provided);
+    }
+  } else if (hasStep) {
     doc.push({ kind: "blank" });
     doc.push({ kind: "section", name: "quest" });
-    if (source.requires_status) doc.push({ kind: "key", key: "requires_status", value: safeString(source.requires_status) });
-    if (source.quest_text) doc.push({ kind: "key", key: "quest_text", value: safeString(source.quest_text) });
+    for (const key of QUEST_STEP_KEYS) {
+      const value = safeString(source[key]);
+      if (value) doc.push({ kind: "key", key, value });
+    }
   }
 
   return exportEngineText(doc);
+}
+
+/** Keys of the first [quest] section only (later stages are left to a future editor). */
+function firstQuestStep(content) {
+  const quest = importQuestText(content || "");
+  // importQuestText currently walks every section and last-write-wins; re-read the first block only.
+  const out = { name: quest.name || "", complete_status: quest.complete_status || "" };
+  let inStep = false;
+  let seen = false;
+  for (const rawLine of String(content || "").split(/\r?\n/)) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#")) continue;
+    if (line.toLowerCase() === "[quest]") {
+      if (seen) break;
+      inStep = true;
+      seen = true;
+      continue;
+    }
+    if (line.startsWith("[") && line.endsWith("]")) {
+      if (inStep) break;
+      continue;
+    }
+    if (!inStep) continue;
+    const eq = line.indexOf("=");
+    if (eq < 0) continue;
+    out[line.slice(0, eq).trim()] = line.slice(eq + 1).trim();
+  }
+  return out;
 }
 
 const EFFECT_KEYS = [
@@ -622,6 +665,7 @@ module.exports = {
   exportQuestFile,
   importQuestText,
   mergeQuestText,
+  firstQuestStep,
   exportEffectFile,
   importEffectText,
   mergeEffectText,

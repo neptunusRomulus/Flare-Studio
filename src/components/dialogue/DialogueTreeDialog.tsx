@@ -9,10 +9,12 @@ import Tooltip from '@/components/ui/tooltip';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 import { useAppContext } from '@/context/AppContext';
 import type { DialogueLine, DialogueRequirement, DialogueReward, DialogueWorldEffect, DialogueTree, MapObject } from '@/types';
+import { removeDialogueLine } from '@/editor/dialogueLines';
 import { InlineConfirm } from '@/components/ui/inline-confirm';
 import { AnchoredConfirm } from '@/components/ui/inline-confirm';
 import { DIALOGUE_RECIPES, buildRecipeTree } from '@/editor/dialogueRecipes';
 import { boardWarningCount, buildDialogueBoard } from '@/editor/dialogueBoard';
+import ResizeHandle from '@/components/ResizeHandle';
 
 /** Generate a short unique dialogue ID like "dlg_a3f9" */
 function generateDialogueId(): string {
@@ -264,6 +266,7 @@ const EFFECT_GROUPS: Array<{ label: string; options: Array<{ value: DialogueWorl
     options: [
       { value: 'set_status', label: 'Set Status' },
       { value: 'unset_status', label: 'Clear Status' },
+      { value: 'random_status', label: 'Random Status' },
       { value: 'respec', label: 'Respec' },
       { value: 'save_game', label: 'Save Game' },
       { value: 'stash', label: 'Open Stash' },
@@ -292,6 +295,13 @@ const EFFECT_GROUPS: Array<{ label: string; options: Array<{ value: DialogueWorl
       { value: 'script', label: 'Run Script' },
       { value: 'visual_effect', label: 'Visual Effect' },
       { value: 'chance_exec', label: 'Chance to Run' },
+      { value: 'repeat', label: 'Repeat' },
+      { value: 'tooltip', label: 'Hover text' },
+      { value: 'show_on_minimap', label: 'Minimap mark' },
+      { value: 'parallax_layers', label: 'Parallax file' },
+      { value: 'procgen_filename', label: 'Generated map rules' },
+      { value: 'procgen_link', label: 'Generated map link' },
+      { value: 'procgen_door_level', label: 'Generated door level' },
     ],
   },
   {
@@ -313,6 +323,12 @@ const EFFECT_GROUPS: Array<{ label: string; options: Array<{ value: DialogueWorl
     ],
   },
 ];
+
+function defaultNpcPortrait(object: MapObject | null): string {
+  const value = String(object?.properties?.portraitPath || object?.properties?.portrait || '');
+  if (!value || value.startsWith('data:')) return '';
+  return value;
+}
 
 const DialogueTreeDialog = ({
   showDialogueTreeDialog,
@@ -853,7 +869,9 @@ const DialogueTreeDialog = ({
               </button>
               {(activeTree as any)._respExpanded && (
                 <div className="px-3 pb-3 space-y-2">
-                  <p className="text-xs text-muted-foreground">After this dialog text, show these as clickable player choices:</p>
+                  <Tooltip content="After the lines above, these appear as the player's clickable choices.">
+                    <p className="text-xs text-muted-foreground">Player choices</p>
+                  </Tooltip>
                   {(activeTree.responses || []).map((respId, respIndex) => (
                     <div key={respIndex} className="flex gap-2 items-center bg-blue-500/5 border-l-2 border-l-blue-500/50 rounded-md p-2">
                       <ArrowRight className="w-3 h-3 text-blue-400 shrink-0" />
@@ -928,7 +946,9 @@ const DialogueTreeDialog = ({
               {activeTree._reqExpanded && (
                 <div className="px-3 pb-3 space-y-2">
                   {activeTree.requirements.length === 0 && (
-                    <p className="text-xs text-muted-foreground py-1">Everyone can see this dialogue. Add conditions to restrict it.</p>
+                    <Tooltip content="With no conditions, everyone can see this topic. Add a condition to restrict it.">
+                      <p className="text-xs text-muted-foreground py-1">Open to everyone</p>
+                    </Tooltip>
                   )}
                   {activeTree.requirements.map((req, reqIndex) => {
                     const config = REQ_CONFIG[req.type] || REQ_CONFIG.status;
@@ -1080,8 +1100,7 @@ const DialogueTreeDialog = ({
                           className="h-7 w-7 p-0 shrink-0"
                           onClick={() => {
                             const newTrees = [...dialogueTrees];
-                            const newDlgs = dialogueTrees[activeDialogueTab].dialogues.filter((_, i) => i !== dlgIndex);
-                            newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], dialogues: newDlgs };
+                            newTrees[activeDialogueTab] = removeDialogueLine(newTrees[activeDialogueTab], dlgIndex);
                             setDialogueTrees(newTrees);
                           }}
                         >
@@ -1177,7 +1196,13 @@ const DialogueTreeDialog = ({
                       className="h-7 text-xs gap-1 flex-1"
                       onClick={() => {
                         const newTrees = [...dialogueTrees];
-                        const newDlg: DialogueLine = { id: String(Date.now()), speaker: 'npc', text: '' };
+                        const portrait = defaultNpcPortrait(editingObject);
+                        const newDlg: DialogueLine = {
+                          id: String(Date.now()),
+                          speaker: 'npc',
+                          text: '',
+                          ...(portrait ? { portrait, portraitKey: 'portrait_him' as const } : {}),
+                        };
                         newTrees[activeDialogueTab] = {
                           ...newTrees[activeDialogueTab],
                           dialogues: [...newTrees[activeDialogueTab].dialogues, newDlg]
@@ -1227,7 +1252,9 @@ const DialogueTreeDialog = ({
               </button>
               {activeTree._rewExpanded && (
                 <div className="px-3 pb-3 space-y-2">
-                  <p className="text-xs text-muted-foreground">What does the player gain or lose?</p>
+                  <Tooltip content="Items, currency, XP, or messages the player gains or loses.">
+                    <p className="text-xs text-muted-foreground">Rewards</p>
+                  </Tooltip>
                   {(activeTree.rewards || []).map((rew, rewIndex) => (
                     <div key={rew.id} className={`flex gap-2 items-center p-2 rounded-md ${
                       rew.type === 'msg' ? 'bg-sky-500/10 border-l-2 border-l-sky-500/50' :
@@ -1416,9 +1443,10 @@ const DialogueTreeDialog = ({
                         onChange={(e) => {
                           const nextType = e.target.value as DialogueWorldEffect['type'];
                           const defaultValue =
-                            nextType === 'stash' || nextType === 'save_game' ? 'true'
+                            nextType === 'stash' || nextType === 'save_game' || nextType === 'repeat' || nextType === 'show_on_minimap' ? 'true'
                             : nextType === 'respec' ? 'stats'
                             : nextType === 'spawn_level' || nextType === 'power_level' ? 'default'
+                            : nextType === 'random_status' ? 'clear'
                             : '';
                           setWorldEffect(wfIndex, { type: nextType, value: defaultValue });
                         }}
@@ -1683,10 +1711,81 @@ const DialogueTreeDialog = ({
                             min={0}
                             value={wf.value}
                             onChange={(e) => setWorldEffect(wfIndex, { value: e.target.value })}
-                            placeholder="Amplitude"
+                            placeholder="Duration"
                             className="h-7 w-24 text-xs"
                           />
-                          <Tooltip content="shakycam — shakes the camera; the value is the amplitude.">
+                          <Tooltip content="shakycam — how long the camera shakes (milliseconds, or seconds with s).">
+                            <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                          </Tooltip>
+                        </div>
+                      ) : wf.type === 'random_status' ? (
+                        <div className="flex gap-2 flex-1 items-center">
+                          {(() => {
+                            const [mode = 'append', ...rest] = String(wf.value || '').split(',').map((p) => p.trim());
+                            const action = ['append', 'clear', 'roll', 'set', 'unset'].includes(mode) ? mode : 'append';
+                            const write = (nextMode: string, list: string) => setWorldEffect(wfIndex, { value: nextMode === 'append' && list ? `${nextMode},${list}` : nextMode });
+                            return (
+                              <>
+                                <select
+                                  value={action}
+                                  onChange={(e) => write(e.target.value, rest.join(','))}
+                                  className="h-8 px-2 rounded-md border text-[11px] bg-background cursor-pointer"
+                                  aria-label="Random status action"
+                                >
+                                  <option value="append">Add to pool</option>
+                                  <option value="clear">Clear pool</option>
+                                  <option value="roll">Pick one</option>
+                                  <option value="set">Set picked</option>
+                                  <option value="unset">Clear picked</option>
+                                </select>
+                                {action === 'append' && (
+                                  <Input
+                                    value={rest.join(',')}
+                                    onChange={(e) => write('append', e.target.value)}
+                                    placeholder="status ids"
+                                    className="h-7 flex-1 text-xs"
+                                  />
+                                )}
+                                <Tooltip content="random_status — add statuses to a pool, pick one, then set or clear it. Clear the pool when finished.">
+                                  <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                                </Tooltip>
+                              </>
+                            );
+                          })()}
+                        </div>
+                      ) : wf.type === 'repeat' ? (
+                        <div className="flex gap-2 flex-1 items-center">
+                          <Input
+                            value={wf.value}
+                            onChange={(e) => setWorldEffect(wfIndex, { value: e.target.value })}
+                            placeholder="true"
+                            className="h-7 w-24 text-xs"
+                          />
+                          <Tooltip content="repeat — whether this dialog can run more than once.">
+                            <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                          </Tooltip>
+                        </div>
+                      ) : wf.type === 'tooltip' ? (
+                        <div className="flex gap-2 flex-1 items-center">
+                          <Input
+                            value={wf.value}
+                            onChange={(e) => setWorldEffect(wfIndex, { value: e.target.value })}
+                            placeholder="Hover text"
+                            className="h-7 flex-1 text-xs"
+                          />
+                          <Tooltip content="tooltip — text shown when the player hovers this event.">
+                            <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
+                          </Tooltip>
+                        </div>
+                      ) : ['show_on_minimap', 'parallax_layers', 'procgen_filename', 'procgen_link', 'procgen_door_level'].includes(wf.type) ? (
+                        <div className="flex gap-2 flex-1 items-center">
+                          <Input
+                            value={wf.value}
+                            onChange={(e) => setWorldEffect(wfIndex, { value: e.target.value })}
+                            placeholder={wf.type === 'show_on_minimap' ? 'true or false' : 'value'}
+                            className="h-7 flex-1 text-xs"
+                          />
+                          <Tooltip content={`${wf.type} — event action the engine also accepts in a dialog.`}>
                             <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
                           </Tooltip>
                         </div>
@@ -1889,9 +1988,10 @@ const DialogueTreeDialog = ({
                               className="w-full px-3 py-1.5 text-left text-xs hover:bg-muted"
                               onClick={() => {
                                 const defaultValue =
-                                  option.value === 'stash' || option.value === 'save_game' ? 'true'
+                                  option.value === 'stash' || option.value === 'save_game' || option.value === 'repeat' || option.value === 'show_on_minimap' ? 'true'
                                   : option.value === 'respec' ? 'stats'
                                   : option.value === 'spawn_level' || option.value === 'power_level' ? 'default'
+                                  : option.value === 'random_status' ? 'clear'
                                   : '';
                                 const list = [...(activeTree.worldEffects || []), { id: String(Date.now()), type: option.value, value: defaultValue } as DialogueWorldEffect];
                                 updateTree(activeDialogueTab, { worldEffects: list });
@@ -1967,13 +2067,7 @@ const DialogueTreeDialog = ({
 
     {/* Resize handle */}
     {!embedded && (
-    <div
-      onMouseDown={handleResizeMouseDown}
-      className="absolute bottom-0 right-0 w-5 h-5 cursor-se-resize opacity-40 hover:opacity-100 transition-opacity flex items-end justify-end"
-      title="Drag to resize"
-    >
-      <div className="w-1.5 h-1.5 bg-foreground/40 rounded-sm m-1" />
-    </div>
+    <ResizeHandle onMouseDown={handleResizeMouseDown} />
     )}
   </div>
   );

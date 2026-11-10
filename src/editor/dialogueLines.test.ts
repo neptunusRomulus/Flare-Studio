@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createRequire } from 'module';
-import { removeDialogueLine } from './dialogueLines';
+import { removeDialogueLine, reorderDialogueLines } from './dialogueLines';
 
 const require = createRequire(import.meta.url);
 const { importNpcText, exportNpcFile } = require('../adapters/flare/serializers.cjs');
@@ -31,5 +31,21 @@ describe('removeDialogueLine', () => {
     expect(out).toContain('voice=a.ogg\nyou=Ok');
     expect(out).not.toContain('portrait_her');
     expect(out).not.toContain('her=Hi');
+  });
+});
+
+describe('reorderDialogueLines', () => {
+  it('moves only the spoken line span and leaves effects between lines in place', () => {
+    const text = '[dialog]\nid=a\nhim=Hello\nset_status=x\nyou=Bye\nreward_xp=10\n';
+    const npc = importNpcText(text);
+    const tree = npc.customProperties.dialogueTrees[0];
+    const next = reorderDialogueLines(tree, 0, 1);
+    expect(next.dialogues.map((d: { text: string }) => d.text)).toEqual(['Bye', 'Hello']);
+    const out = exportNpcFile({ ...npc, customProperties: { dialogueTrees: [next] } });
+    expect(out).toContain('set_status=x');
+    expect(out).toContain('reward_xp=10');
+    expect(out.indexOf('you=Bye')).toBeLessThan(out.indexOf('him=Hello'));
+    expect(out.indexOf('set_status=x')).toBeLessThan(out.indexOf('him=Hello'));
+    expect(out.indexOf('you=Bye')).toBeLessThan(out.indexOf('reward_xp=10'));
   });
 });

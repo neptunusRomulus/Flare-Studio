@@ -218,6 +218,7 @@ const NpcRoleCenterDialog = ({
               embedded
               showDialogueTreeDialog
               visibleDialogueIds={visibleDialogueIds}
+              selectedMoment={[...moments, assignment.other].find((moment) => moment.id === (selectedMomentId || OTHER_MOMENT_ID)) || assignment.other}
               dialogueTrees={dialogueTrees}
               setDialogueTrees={setDialogueTrees as React.Dispatch<React.SetStateAction<DialogueTree[]>>}
               activeDialogueTab={activeDialogueTab}

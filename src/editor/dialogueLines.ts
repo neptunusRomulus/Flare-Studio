@@ -52,3 +52,37 @@ export function removeDialogueLine<T extends DialogTreeLike>(tree: T, lineIndex:
   if (!span) return { ...tree, dialogues };
   return { ...tree, dialogues, components: [...components.slice(0, span.start), ...components.slice(span.end)] };
 }
+
+
+/** Reorder spoken lines; only the line's own component span moves, other entries stay put. */
+export function reorderDialogueLines<T extends DialogTreeLike>(tree: T, fromIndex: number, toIndex: number): T {
+  const dialogues = [...(tree.dialogues || [])];
+  if (
+    fromIndex === toIndex
+    || fromIndex < 0
+    || toIndex < 0
+    || fromIndex >= dialogues.length
+    || toIndex >= dialogues.length
+  ) {
+    return tree;
+  }
+  const [moved] = dialogues.splice(fromIndex, 1);
+  dialogues.splice(toIndex, 0, moved);
+  const components = tree.components;
+  if (!components || !components.length) return { ...tree, dialogues };
+
+  const fromSpan = lineComponentSpan(components, fromIndex);
+  const toSpan = lineComponentSpan(components, toIndex);
+  if (!fromSpan || !toSpan) return { ...tree, dialogues };
+
+  const slice = components.slice(fromSpan.start, fromSpan.end);
+  const without = [...components.slice(0, fromSpan.start), ...components.slice(fromSpan.end)];
+  let insertAt: number;
+  if (fromIndex < toIndex) {
+    const shifted = toSpan.end - (fromSpan.end - fromSpan.start);
+    insertAt = shifted;
+  } else {
+    insertAt = toSpan.start;
+  }
+  return { ...tree, dialogues, components: [...without.slice(0, insertAt), ...slice, ...without.slice(insertAt)] };
+}

@@ -15,6 +15,8 @@ import { AnchoredConfirm } from '@/components/ui/inline-confirm';
 import { DIALOGUE_RECIPES, buildRecipeTree } from '@/editor/dialogueRecipes';
 import { boardWarningCount, buildDialogueBoard } from '@/editor/dialogueBoard';
 import ResizeHandle from '@/components/ResizeHandle';
+import MomentChatView from '@/components/dialogue/MomentChatView';
+import { otherMoment, type RoleMoment } from '@/editor/roleMoments';
 
 /** Generate a short unique dialogue ID like "dlg_a3f9" */
 function generateDialogueId(): string {
@@ -344,6 +346,7 @@ const DialogueTreeDialog = ({
   projectMaps = [],
   embedded = false,
   visibleDialogueIds,
+  selectedMoment,
 }: {
   showDialogueTreeDialog: boolean;
   dialogueTrees?: DialogueTree[];
@@ -360,6 +363,7 @@ const DialogueTreeDialog = ({
   embedded?: boolean;
   /** When set, List/Board only show these topic ids. Other topics stay in the data. */
   visibleDialogueIds?: string[] | null;
+  selectedMoment?: RoleMoment | null;
 }) => {
   const [editingIdIndex, setEditingIdIndex] = useState<number | null>(null);
   const [pendingIdValue, setPendingIdValue] = useState('');
@@ -368,6 +372,7 @@ const DialogueTreeDialog = ({
   const [effectMenuOpen, setEffectMenuOpen] = useState(false);
   const [effectQuery, setEffectQuery] = useState('');
   const [boardView, setBoardView] = useState(false);
+  const [viewMode, setViewMode] = useState<'chat' | 'list' | 'board'>(embedded ? 'chat' : 'list');
   const visibleIndexSet = useMemo(() => {
     if (!visibleDialogueIds) return null;
     const ids = new Set(visibleDialogueIds);
@@ -531,6 +536,24 @@ const DialogueTreeDialog = ({
       )}
     
     <div className="flex-1 flex gap-4 overflow-hidden p-4">
+      {viewMode === 'chat' ? (
+        <div className="flex-1 flex flex-col min-h-0 min-w-0 gap-2">
+          <div className="flex justify-end">
+            <div className="flex rounded-md border border-border overflow-hidden">
+              <button type="button" className="px-1.5 py-0.5 text-[10px] bg-muted font-semibold" onClick={() => setViewMode('chat')}>Chat</button>
+              <button type="button" className="px-1.5 py-0.5 text-[10px] text-muted-foreground hover:bg-muted" onClick={() => setViewMode('list')}>List</button>
+              <button type="button" className="px-1.5 py-0.5 text-[10px] text-muted-foreground hover:bg-muted" onClick={() => setViewMode('board')}>Board</button>
+            </div>
+          </div>
+          <MomentChatView
+            trees={dialogueTrees}
+            visibleTrees={dialogueTrees.filter((tree, index) => !visibleIndexSet || visibleIndexSet.has(index))}
+            setTrees={(next) => setDialogueTrees(next)}
+            moment={selectedMoment || otherMoment()}
+          />
+        </div>
+      ) : (
+      <>
       {/* Tab sidebar */}
       <div className="w-52 flex flex-col border-r pr-4">
         <AnchoredConfirm
@@ -558,21 +581,28 @@ const DialogueTreeDialog = ({
           <div className="flex rounded-md border border-border overflow-hidden">
             <button
               type="button"
-              className={`px-1.5 py-0.5 text-[10px] ${boardView ? 'text-muted-foreground hover:bg-muted' : 'bg-muted font-semibold'}`}
-              onClick={() => setBoardView(false)}
+              className="px-1.5 py-0.5 text-[10px] text-muted-foreground hover:bg-muted"
+              onClick={() => setViewMode('chat')}
+            >
+              Chat
+            </button>
+            <button
+              type="button"
+              className={`px-1.5 py-0.5 text-[10px] ${viewMode === 'list' ? 'bg-muted font-semibold' : 'text-muted-foreground hover:bg-muted'}`}
+              onClick={() => setViewMode('list')}
             >
               List
             </button>
             <button
               type="button"
-              className={`px-1.5 py-0.5 text-[10px] ${boardView ? 'bg-muted font-semibold' : 'text-muted-foreground hover:bg-muted'}`}
-              onClick={() => setBoardView(true)}
+              className={`px-1.5 py-0.5 text-[10px] ${viewMode === 'board' ? 'bg-muted font-semibold' : 'text-muted-foreground hover:bg-muted'}`}
+              onClick={() => setViewMode('board')}
             >
               Board
             </button>
           </div>
         </div>
-        {boardView && (
+        {viewMode === 'board' && (
           <div className="flex-1 space-y-1.5 overflow-y-auto minimal-scroll pr-0.5">
             {board.map((card) => (
               <button
@@ -626,7 +656,7 @@ const DialogueTreeDialog = ({
             ))}
           </div>
         )}
-        {!boardView && (
+        {viewMode === 'list' && (
         <div className="flex-1 space-y-1 overflow-y-auto minimal-scroll">
           {dialogueTrees.map((tree, index) => {
             if (visibleIndexSet && !visibleIndexSet.has(index)) return null;
@@ -2034,6 +2064,8 @@ const DialogueTreeDialog = ({
           </div>
         )}
       </div>
+      </>
+      )}
     </div>
     
     <div className="flex justify-end gap-2 px-4 py-3 border-t border-border">

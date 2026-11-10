@@ -234,7 +234,7 @@ const NpcEditDialog = ({
             <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
           </Tooltip>
         </div>
-        <div className="space-y-1.5">
+        <div className="grid grid-cols-3 gap-1.5">
           {([
             {
               key: 'talker' as const,
@@ -267,30 +267,36 @@ const NpcEditDialog = ({
               tab: 'quest' as const,
             },
           ]).map((role) => (
-            <div key={role.key} className="flex items-center gap-2 rounded-md border border-border bg-muted/20 px-2.5 py-2">
-              <Tooltip content={role.tip}>
-                <span className="text-muted-foreground">{role.icon}</span>
-              </Tooltip>
-              <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium leading-none">{role.label}</div>
-                {role.summary ? <div className="text-[10px] text-muted-foreground truncate mt-0.5">{role.summary}</div> : null}
+            <div key={role.key} className="min-w-0 rounded-md border border-border bg-muted/20 px-2 py-1.5">
+              <div className="flex items-center gap-1.5">
+                <Tooltip content={role.tip}>
+                  <span className="text-muted-foreground">{role.icon}</span>
+                </Tooltip>
+                <span className="text-sm font-medium leading-none truncate flex-1 min-w-0">{role.label}</span>
+                <Switch
+                  checked={role.active}
+                  onCheckedChange={(on) => setRole(role.key, on)}
+                  aria-label={role.label}
+                />
+                <div className="h-6 w-6 shrink-0 flex items-center justify-center">
+                  {role.active ? (
+                    <Tooltip content={role.settingsTip}>
+                      <button
+                        type="button"
+                        className="h-6 w-6 flex items-center justify-center rounded-md hover:bg-muted"
+                        aria-label={role.settingsTip}
+                        onClick={() => onOpenRoleCenter(role.tab)}
+                      >
+                        <Settings className="w-3.5 h-3.5" />
+                      </button>
+                    </Tooltip>
+                  ) : null}
+                </div>
               </div>
-              <Switch
-                checked={role.active}
-                onCheckedChange={(on) => setRole(role.key, on)}
-                aria-label={role.label}
-              />
-              <div className="h-7 w-7 shrink-0 flex items-center justify-center">
-                {role.active ? (
-                  <Tooltip content={role.settingsTip}>
-                    <button
-                      type="button"
-                      className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted"
-                      aria-label={role.settingsTip}
-                      onClick={() => onOpenRoleCenter(role.tab)}
-                    >
-                      <Settings className="w-3.5 h-3.5" />
-                    </button>
+              <div className="h-3.5 mt-1">
+                {role.summary ? (
+                  <Tooltip content={role.summary}>
+                    <div className="text-[10px] leading-[14px] text-muted-foreground truncate">{role.summary}</div>
                   </Tooltip>
                 ) : null}
               </div>

@@ -5,7 +5,16 @@ import { InlineConfirm } from '@/components/ui/inline-confirm';
 import useListReorder from '@/hooks/useListReorder';
 import { removeDialogueLine, reorderDialogueLines } from '@/editor/dialogueLines';
 import { applyMomentToTopic, type RoleMoment } from '@/editor/roleMoments';
-import type { DialogueLine, DialogueTree } from '@/types';
+import type { DialogueLine, DialogueReward, DialogueTree, DialogueWorldEffect } from '@/types';
+import SearchablePalette from '@/components/ui/searchable-palette';
+import Tooltip from '@/components/ui/tooltip';
+import {
+  actionChipLabel,
+  actionChipTooltip,
+  chipsFromActions,
+  DIALOG_ACTION_CATALOG,
+  type DialogActionChip,
+} from '@/editor/dialogActionChips';
 
 type Props = {
   trees: DialogueTree[];
@@ -64,6 +73,98 @@ const Bubble = ({
           </button>
         </InlineConfirm>
       </div>
+    </div>
+  );
+};
+
+
+const ActionChip = ({
+  chip,
+  onChange,
+  onRemove,
+}: {
+  chip: DialogActionChip;
+  onChange: (chip: DialogActionChip) => void;
+  onRemove: () => void;
+}) => {
+  const [editing, setEditing] = useState(!chip.value && chip.type !== 'restore' && chip.type !== 'stash' && chip.type !== 'save_game');
+  const needsValue = !['stash', 'save_game'].includes(chip.type);
+  return (
+    <Tooltip content={actionChipTooltip(chip)}>
+      <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[11px]">
+        {editing && needsValue ? (
+          <input
+            autoFocus
+            className="h-5 w-24 bg-transparent text-[11px] outline-none"
+            value={chip.value}
+            onChange={(e) => onChange({ ...chip, value: e.target.value })}
+            onBlur={() => setEditing(false)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') setEditing(false);
+            }}
+          />
+        ) : (
+          <button type="button" onClick={() => setEditing(true)}>
+            {actionChipLabel(chip)}
+          </button>
+        )}
+        <button type="button" aria-label="Remove" className="text-muted-foreground hover:text-foreground" onClick={onRemove}>
+          <X className="w-3 h-3" />
+        </button>
+      </span>
+    </Tooltip>
+  );
+};
+
+const ActionChips = ({
+  tree,
+  onPatch,
+}: {
+  tree: DialogueTree;
+  onPatch: (next: DialogueTree) => void;
+}) => {
+  const chips = chipsFromActions(tree.rewards, tree.worldEffects);
+  const catalog = DIALOG_ACTION_CATALOG.map((entry) => ({
+    id: entry.id,
+    label: entry.label,
+    tooltip: `${entry.flareKey} — ${entry.description}`,
+    searchText: `${entry.label} ${entry.flareKey} ${entry.description} ${entry.type}`,
+  }));
+
+  const writeChip = (chip: DialogActionChip) => {
+    if (chip.group === 'reward') {
+      const rewards = [...(tree.rewards || [])];
+      rewards[chip.index] = { ...(rewards[chip.index] || {}), id: chip.id, type: chip.type as DialogueReward['type'], value: chip.value, quantity: chip.quantity };
+      onPatch({ ...tree, rewards });
+    } else {
+      const worldEffects = [...(tree.worldEffects || [])];
+      worldEffects[chip.index] = { ...(worldEffects[chip.index] || {}), id: chip.id, type: chip.type as DialogueWorldEffect['type'], value: chip.value };
+      onPatch({ ...tree, worldEffects });
+    }
+  };
+
+  const removeChip = (chip: DialogActionChip) => {
+    if (chip.group === 'reward') onPatch({ ...tree, rewards: (tree.rewards || []).filter((_, i) => i !== chip.index) });
+    else onPatch({ ...tree, worldEffects: (tree.worldEffects || []).filter((_, i) => i !== chip.index) });
+  };
+
+  const addFromCatalog = (id: string) => {
+    const entry = DIALOG_ACTION_CATALOG.find((item) => item.id === id);
+    if (!entry) return;
+    if (entry.group === 'reward') {
+      onPatch({ ...tree, rewards: [...(tree.rewards || []), { id: `reward-${Date.now()}`, type: entry.type as DialogueReward['type'], value: '' }] });
+    } else {
+      const value = entry.type === 'stash' || entry.type === 'save_game' ? 'true' : '';
+      onPatch({ ...tree, worldEffects: [...(tree.worldEffects || []), { id: `effect-${Date.now()}`, type: entry.type as DialogueWorldEffect['type'], value }] });
+    }
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {chips.map((chip) => (
+        <ActionChip key={`${chip.group}-${chip.index}-${chip.id}`} chip={chip} onChange={writeChip} onRemove={() => removeChip(chip)} />
+      ))}
+      <SearchablePalette buttonLabel="Add property" entries={catalog} onSelect={addFromCatalog} />
     </div>
   );
 };
@@ -140,6 +241,7 @@ const TopicThread = ({
           ))}
         </div>
       )}
+      <ActionChips tree={tree} onPatch={onPatch} />
       <div className="flex items-center gap-1.5 pt-1">
         <Button type="button" size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => addLine('npc')}>
           <Plus className="w-3 h-3" />

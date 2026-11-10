@@ -17,6 +17,11 @@
 - Renderer-only changes (`src/**`): Ctrl+R.
 - `electron/main.cjs`, `preload.js`, `electron/*.cjs`, and `src/adapters/flare/serializers.cjs` / `flareAdapter.cjs` (also loaded by the main process): full restart of `npm run electron-dev`.
 
+## Product philosophy
+- Studio shows the user's concepts, not Flare's data model. Talker, Static and Vendor are Studio inventions, mapped onto Flare keys on save.
+- Editors are organized around the user's questions, with plain labels. Raw Flare keys belong only in Tooltips.
+- Beginners first: no Unity/Unreal clutter. Every engine feature is still reachable, through progressive disclosure.
+
 ## UI rules
 - Minimal design. Explanations only in the app Tooltip (`src/components/ui/tooltip.tsx`); no inline help text.
 - Confirmations with `InlineConfirm` (`src/components/ui/inline-confirm.tsx`); never OS dialogs or modals.
@@ -34,19 +39,15 @@
 
 ## Data safety
 - Saving merges into existing Flare files: keep unknown keys, repeated keys, INCLUDE/APPEND lines, comments, section and `[dialog]` order.
-- NPC files must round-trip byte-for-byte against flare-game fixtures; keep these tests passing:
-  - `src/adapters/flare/serializers.cjs` (`importNpcText`, `exportNpcFile`, `mergeNpcFile`, `normalizeEnemyText`)
+- NPC and enemy files must round-trip byte-for-byte against flare-game fixtures (including blank lines and multiple INCLUDE lines); keep these tests passing:
+  - `src/adapters/flare/serializers.cjs` (`importNpcText`, `exportNpcFile`, `mergeNpcFile`, `normalizeEnemyText`, `applyEnemyFileUpdates`)
   - `src/utils/npcFileUpdate.ts` (Studio object → NPC file update) + `src/utils/npcFileUpdate.test.ts`
-  - `src/adapters/flare/npcRoundTrip.test.ts`, fixtures in `tests/fixtures/flare-npcs/`
+  - `src/adapters/flare/npcRoundTrip.test.ts`, fixtures in `tests/fixtures/flare-npcs/` and `tests/fixtures/flare-enemies/`
 - Never overwrite hand-made animation files (Studio writes `<name>_studio.txt` instead).
 - Enemy files: `gold`, `wander_radius`, `waypoints`, `script` are not StatBlock keys (map-spawn or none); they are dropped with a visible toast.
 
 ## Known open issues
-- Enemy editor holds only one INCLUDE.
-- Blank lines inside NPC file sections are lost.
-- Imported NPCs show no thumbnail.
-- GID readout updates only on the next mouse move after toggling Debug Mode.
-- Multi-stage quest journals (more than the first `[quest]` block) are deferred; existing later blocks must be preserved on merge.
+- Multi-stage quest journals (more than the first `[quest]` block) are still not editable in the Quest tab; existing later blocks must be preserved on merge. (Approved next: step cards, then Role center Moments + Play.)
 
 ## Edit NPC
 - Name and appearance (fantasycore picker, default sprite) are on the first screen. Roles use on/off switches; a reserved gear opens the Role center (Dialogue / Shop / Quest).

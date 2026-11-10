@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { MessageSquare, HandCoins, MessageCircleQuestionMark, X } from 'lucide-react';
+import { MessageSquare, HandCoins, MessageCircleQuestionMark, Play, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 import type { DialogueTree, MapObject } from '@/types';
@@ -20,6 +20,7 @@ import { stepsFromImported, type QuestStep } from '@/editor/questSteps';
 import { importQuestText, contentSlug } from '@/adapters/flare/flareAdapter.cjs';
 import { projectRoot } from '@/editor/projectFiles';
 import MomentsStrip from '@/components/MomentsStrip';
+import DialogPlayPanel from '@/components/dialogue/DialogPlayPanel';
 import ResizeHandle from '@/components/ResizeHandle';
 
 export type RoleCenterTab = 'dialogue' | 'vendor' | 'quest';
@@ -77,12 +78,14 @@ const NpcRoleCenterDialog = ({
   const [customMoments, setCustomMoments] = useState<RoleMoment[]>([]);
   const [journalSteps, setJournalSteps] = useState<QuestStep[]>([]);
   const [selectedMomentId, setSelectedMomentId] = useState<string>('');
+  const [playing, setPlaying] = useState(false);
   const npcKey = editingObject?.id || editingObject?.name || '';
 
   useEffect(() => {
     setCustomMoments([]);
     setJournalSteps([]);
     setSelectedMomentId('');
+    setPlaying(false);
   }, [npcKey]);
 
   const questFlow = useMemo(() => readQuestFlowTrees(dialogueTrees), [dialogueTrees]);
@@ -170,9 +173,15 @@ const NpcRoleCenterDialog = ({
         <div className="flex items-center gap-2">
           <span className="font-semibold">{editingObject?.name || 'NPC'} roles</span>
         </div>
-        <Button variant="ghost" size="sm" className="w-6 h-6 p-0 hover:bg-transparent" onClick={() => onTabChange(null)}>
-          <X className="w-4 h-4 text-muted-foreground" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="sm" className="h-7 px-2 gap-1 text-xs" onClick={() => setPlaying((value) => !value)}>
+            <Play className="w-3.5 h-3.5" />
+            {playing ? 'Stop' : 'Play'}
+          </Button>
+          <Button variant="ghost" size="sm" className="w-6 h-6 p-0 hover:bg-transparent" onClick={() => onTabChange(null)}>
+            <X className="w-4 h-4 text-muted-foreground" />
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-1 min-h-0">
@@ -213,7 +222,9 @@ const NpcRoleCenterDialog = ({
               setSelectedMomentId(added.id);
             }}
           />
-          {tab === 'dialogue' && (
+          {playing ? (
+            <DialogPlayPanel trees={dialogueTrees} onClose={() => setPlaying(false)} />
+          ) : tab === 'dialogue' ? (
             <DialogueTreeDialog
               embedded
               showDialogueTreeDialog
@@ -230,8 +241,7 @@ const NpcRoleCenterDialog = ({
               updateEditingObjectProperty={updateEditingObjectProperty}
               projectMaps={projectMaps}
             />
-          )}
-          {tab === 'vendor' && (
+          ) : tab === 'vendor' ? (
             <NpcVendorSettingsDialog
               embedded
               isOpen
@@ -242,8 +252,7 @@ const NpcRoleCenterDialog = ({
               getEditingObjectProperty={getEditingObjectProperty}
               updateEditingObjectProperty={updateEditingObjectProperty}
             />
-          )}
-          {tab === 'quest' && (
+          ) : (
             <NpcQuestSettingsDialog
               embedded
               isOpen

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { TileMapEditor } from '../editor/TileMapEditor';
 import type { TileMapEditor as TileMapEditorType } from '../editor/TileMapEditor';
 import type { MapObject } from '@/types';
+import { deleteMapNpcInstanceAction, nearestFreeTile, npcOccupiedTiles } from '@/editor/mapNpcActions';
 
 export type HeroEditData = {
   currentX: number;
@@ -131,6 +132,31 @@ export function useEditorState(optsRef: React.RefObject<Partial<UseEditorStateOp
   const handleUnplaceActorFromMap = useCallback((objectId: number) => {
     if (!editor) return;
     editor.updateMapObject(objectId, { x: -1, y: -1 });
+    syncMapObjectsWrapper();
+  }, [editor, syncMapObjectsWrapper]);
+
+  const handleDeleteMapNpcInstance = useCallback((objectId: number) => {
+    if (!editor) return;
+    const objects = editor.getMapObjects();
+    const action = deleteMapNpcInstanceAction(objects, objectId);
+    if (action === 'remove') editor.removeMapObject(objectId);
+    else if (action === 'unplace') editor.updateMapObject(objectId, { x: -1, y: -1 });
+    syncMapObjectsWrapper();
+  }, [editor, syncMapObjectsWrapper]);
+
+  const handleDuplicateMapNpcInstance = useCallback((objectId: number) => {
+    if (!editor) return;
+    const objects = editor.getMapObjects();
+    const source = objects.find((obj: MapObject) => obj.id === objectId);
+    if (!source || source.type !== 'npc' || source.x < 0 || source.y < 0) return;
+    const occupied = npcOccupiedTiles(objects);
+    const tile = nearestFreeTile(source.x, source.y, occupied, editor.getMapWidth(), editor.getMapHeight());
+    if (!tile) return;
+    const newObject = editor.addMapObject('npc', tile.x, tile.y, source.width ?? 1, source.height ?? 1);
+    if (newObject) {
+      const { id: _id, x: _x, y: _y, ...copyData } = source;
+      editor.updateMapObject(newObject.id, { ...copyData, name: source.name, x: tile.x, y: tile.y });
+    }
     syncMapObjectsWrapper();
   }, [editor, syncMapObjectsWrapper]);
 
@@ -278,6 +304,8 @@ export function useEditorState(optsRef: React.RefObject<Partial<UseEditorStateOp
     ,
     handlePlaceActorOnMap,
     handleUnplaceActorFromMap,
+    handleDeleteMapNpcInstance,
+    handleDuplicateMapNpcInstance,
     handlePlaceEventOnMap,
     handleFillSelection,
     handleClearSelection,

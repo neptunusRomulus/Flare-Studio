@@ -40,6 +40,8 @@ type UseEditorCanvasDeps = {
   npcDeletePopup: NpcDeletePopup;
   setNpcDeletePopup: (p: NpcDeletePopup) => void;
   handleUnplaceActorFromMap: (objectId: number) => void;
+  handleDeleteMapNpcInstance: (objectId: number) => void;
+  handleDuplicateMapNpcInstance: (objectId: number) => void;
   npcHoverTooltip: { x: number; y: number } | null;
   uiHelpers: UiHelpers;
   stampsState: StampsState;
@@ -114,6 +116,8 @@ export default function useEditorCanvasCtx(deps: UseEditorCanvasDeps) {
     npcDeletePopup: deps.npcDeletePopup,
     setNpcDeletePopup: deps.setNpcDeletePopup,
     handleUnplaceActorFromMap: deps.handleUnplaceActorFromMap,
+    handleDeleteMapNpcInstance: deps.handleDeleteMapNpcInstance,
+    handleDuplicateMapNpcInstance: deps.handleDuplicateMapNpcInstance,
     npcHoverTooltip: deps.npcHoverTooltip,
     uiHelpers: deps.uiHelpers,
     stampsState: deps.stampsState,

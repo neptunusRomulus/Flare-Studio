@@ -43,6 +43,8 @@ type EditorContext = {
   npcDeletePopup: { npcId: number; screenX: number; screenY: number } | null;
   setNpcDeletePopup: (v: { npcId: number; screenX: number; screenY: number } | null) => void;
   handleUnplaceActorFromMap: (objectId: number) => void;
+  handleDeleteMapNpcInstance: (objectId: number) => void;
+  handleDuplicateMapNpcInstance: (objectId: number) => void;
   npcHoverTooltip: { x: number; y: number } | null;
   uiHelpers?: {
     showTooltipWithDelay: (text: React.ReactNode, target: HTMLElement) => void;
@@ -95,6 +97,8 @@ export default function EditorCanvas(props: Props) {
     npcDeletePopup,
     setNpcDeletePopup,
     handleUnplaceActorFromMap,
+    handleDeleteMapNpcInstance,
+    handleDuplicateMapNpcInstance,
     npcHoverTooltip,
     hasSelection,
     selectionCount,
@@ -562,7 +566,7 @@ export default function EditorCanvas(props: Props) {
         debugMode={!!editorRef.current?.getDebugMode?.()}
         left={(() => { const b = editorRef.current?.getLastMiniMapBounds?.(); return b ? b.x + b.w + 12 : 16; })()} />
 
-      <NpcDeletePopup npcDeletePopup={npcDeletePopup} onConfirm={handleUnplaceActorFromMap} onCancel={() => setNpcDeletePopup(null)} />
+      <NpcDeletePopup npcDeletePopup={npcDeletePopup} onConfirm={handleDeleteMapNpcInstance} onDuplicate={handleDuplicateMapNpcInstance} onCancel={() => setNpcDeletePopup(null)} />
 
       <NpcHoverTooltip npcHoverTooltip={npcHoverTooltip} />
 

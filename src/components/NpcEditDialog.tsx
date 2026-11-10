@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import Tooltip from '@/components/ui/tooltip';
+import { Switch } from '@/components/ui/switch';
 import AnimationPreview from '@/components/AnimationPreview';
-import { HandCoins, HelpCircle, MessagesSquare, MessageCircleQuestionMark } from 'lucide-react';
+import { HandCoins, HelpCircle, MessagesSquare, MessageCircleQuestionMark, Settings } from 'lucide-react';
 import type { MapObject } from '@/types';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 import type { ItemSummary } from '@/utils/items';
@@ -165,19 +166,12 @@ const NpcEditDialog = ({
     });
   };
 
-  const toggleRole = (key: 'talker' | 'vendor' | 'questGiver') => {
+  const setRole = (key: 'talker' | 'vendor' | 'questGiver', on: boolean) => {
     const newProps = { ...(editingObject.properties || {}) };
-    if (newProps[key] === 'true') delete newProps[key];
-    else newProps[key] = 'true';
+    if (on) newProps[key] = 'true';
+    else delete newProps[key];
     setEditingObject({ ...editingObject, properties: newProps });
   };
-
-  const roleCardClass = (active: boolean, activeTone: string) =>
-    `flex flex-col items-stretch rounded-md border p-2.5 text-left transition-colors min-h-[5.5rem] ${
-      active
-        ? `${activeTone} border-current/40`
-        : 'bg-muted/30 text-muted-foreground border-border hover:bg-muted/50'
-    }`;
 
   return (
     <>
@@ -240,69 +234,68 @@ const NpcEditDialog = ({
             <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
           </Tooltip>
         </div>
-        <div className="grid grid-cols-3 gap-2">
-          <div className="min-h-[6.25rem] flex flex-col">
-            <Tooltip content="talker — Player can talk to this NPC. Turning off keeps dialogue data.">
-              <button type="button" onClick={() => toggleRole('talker')} className={roleCardClass(isTalker, 'bg-blue-500/15 text-blue-600 dark:text-blue-400')}>
-                <MessagesSquare className="w-5 h-5 mb-1" />
-                <span className="text-sm font-semibold">Talker</span>
-                <span className="text-[10px] leading-tight mt-0.5 truncate opacity-80">{roleLines.dialogue}</span>
-              </button>
-            </Tooltip>
-            <div className="h-8 mt-1.5 flex items-center">
-              {isTalker && (
-                <button
-                  type="button"
-                  onClick={() => onOpenRoleCenter('dialogue')}
-                  className="h-7 w-full px-2 text-xs rounded-md border border-border bg-background hover:bg-muted"
-                >
-                  Open
-                </button>
-              )}
+        <div className="space-y-1.5">
+          {([
+            {
+              key: 'talker' as const,
+              active: isTalker,
+              icon: <MessagesSquare className="w-4 h-4 shrink-0" />,
+              label: 'Talker',
+              summary: roleLines.dialogue,
+              tip: 'talker — Player can talk to this NPC. Turning off keeps dialogue data.',
+              settingsTip: 'Dialogue settings',
+              tab: 'dialogue' as const,
+            },
+            {
+              key: 'vendor' as const,
+              active: isVendor,
+              icon: <HandCoins className="w-4 h-4 shrink-0" />,
+              label: 'Vendor',
+              summary: roleLines.vendor,
+              tip: 'vendor — Player can buy and sell here. Turning off keeps stock and prices.',
+              settingsTip: 'Shop settings',
+              tab: 'vendor' as const,
+            },
+            {
+              key: 'questGiver' as const,
+              active: isQuestGiver,
+              icon: <MessageCircleQuestionMark className="w-4 h-4 shrink-0" />,
+              label: 'Quest',
+              summary: roleLines.quest,
+              tip: 'questGiver — Player can get quests here. Turning off keeps quest settings.',
+              settingsTip: 'Quest settings',
+              tab: 'quest' as const,
+            },
+          ]).map((role) => (
+            <div key={role.key} className="flex items-center gap-2 rounded-md border border-border bg-muted/20 px-2.5 py-2">
+              <Tooltip content={role.tip}>
+                <span className="text-muted-foreground">{role.icon}</span>
+              </Tooltip>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium leading-none">{role.label}</div>
+                {role.summary ? <div className="text-[10px] text-muted-foreground truncate mt-0.5">{role.summary}</div> : null}
+              </div>
+              <Switch
+                checked={role.active}
+                onCheckedChange={(on) => setRole(role.key, on)}
+                aria-label={role.label}
+              />
+              <div className="h-7 w-7 shrink-0 flex items-center justify-center">
+                {role.active ? (
+                  <Tooltip content={role.settingsTip}>
+                    <button
+                      type="button"
+                      className="h-7 w-7 flex items-center justify-center rounded-md hover:bg-muted"
+                      aria-label={role.settingsTip}
+                      onClick={() => onOpenRoleCenter(role.tab)}
+                    >
+                      <Settings className="w-3.5 h-3.5" />
+                    </button>
+                  </Tooltip>
+                ) : null}
+              </div>
             </div>
-          </div>
-
-          <div className="min-h-[6.25rem] flex flex-col">
-            <Tooltip content="vendor — Player can buy and sell here. Turning off keeps stock and prices.">
-              <button type="button" onClick={() => toggleRole('vendor')} className={roleCardClass(isVendor, 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400')}>
-                <HandCoins className="w-5 h-5 mb-1" />
-                <span className="text-sm font-semibold">Vendor</span>
-                <span className="text-[10px] leading-tight mt-0.5 truncate opacity-80">{roleLines.vendor}</span>
-              </button>
-            </Tooltip>
-            <div className="h-8 mt-1.5 flex items-center">
-              {isVendor && (
-                <button
-                  type="button"
-                  onClick={() => onOpenRoleCenter('vendor')}
-                  className="h-7 w-full px-2 text-xs rounded-md border border-border bg-background hover:bg-muted"
-                >
-                  Open
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div className="min-h-[6.25rem] flex flex-col">
-            <Tooltip content="questGiver — Player can get quests here. Turning off keeps quest settings.">
-              <button type="button" onClick={() => toggleRole('questGiver')} className={roleCardClass(isQuestGiver, 'bg-amber-500/15 text-amber-600 dark:text-amber-400')}>
-                <MessageCircleQuestionMark className="w-5 h-5 mb-1" />
-                <span className="text-sm font-semibold">Quest</span>
-                <span className="text-[10px] leading-tight mt-0.5 truncate opacity-80">{roleLines.quest}</span>
-              </button>
-            </Tooltip>
-            <div className="h-8 mt-1.5 flex items-center">
-              {isQuestGiver && (
-                <button
-                  type="button"
-                  onClick={() => onOpenRoleCenter('quest')}
-                  className="h-7 w-full px-2 text-xs rounded-md border border-border bg-background hover:bg-muted"
-                >
-                  Open
-                </button>
-              )}
-            </div>
-          </div>
+          ))}
         </div>
       </section>
 

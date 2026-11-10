@@ -29,11 +29,22 @@ const files = fs.readdirSync(FIXTURES).filter(f => f.endsWith('.txt'));
 const lines = (t: string) => t.replace(/\r/g, '').split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
 
 describe('NPC file round trip (flare-game samples)', () => {
-  it.each(files)('%s survives import + export unchanged', (file) => {
-    const text = fs.readFileSync(path.join(FIXTURES, file), 'utf8');
-    expect(canon(exportNpcFile(importNpcText(text)))).toEqual(canon(text));
-    // strict: same lines in the same order (comments/blank lines aside)
-    expect(lines(exportNpcFile(importNpcText(text)))).toEqual(lines(text));
+  const withLf = (text: string) => {
+    const t = text.replace(/\r/g, '');
+    return t.endsWith('\n') ? t : `${t}\n`;
+  };
+
+  it.each(files)('%s survives import + export byte-for-byte, including blank lines', (file) => {
+    const text = withLf(fs.readFileSync(path.join(FIXTURES, file), 'utf8'));
+    const out = exportNpcFile(importNpcText(text));
+    expect(canon(out)).toEqual(canon(text));
+    expect(lines(out)).toEqual(lines(text));
+    expect(out).toBe(text);
+  });
+
+  it.each(files)('%s merge with no field changes is byte-identical', (file) => {
+    const text = withLf(fs.readFileSync(path.join(FIXTURES, file), 'utf8'));
+    expect(mergeNpcFile(text, {})).toBe(text);
   });
 
   it('merging unchanged Studio fields keeps the file as is', () => {
@@ -188,6 +199,8 @@ describe('NPC file round trip (flare-game samples)', () => {
 
 const { normalizeEnemyText, includesFromEnemyText, applyEnemyFileUpdates } = require('./serializers.cjs');
 
+const ENEMY_FIXTURES = path.resolve(__dirname, '../../../tests/fixtures/flare-enemies');
+
 describe('enemy preset save keeps INCLUDE and repeated keys', () => {
   const text = [
     'INCLUDE enemies/base/goblin.txt',
@@ -217,6 +230,20 @@ describe('enemy preset save keeps INCLUDE and repeated keys', () => {
   });
 });
 
+
+describe('enemy file blank-line round trip (flare-game samples)', () => {
+  const files = fs.readdirSync(ENEMY_FIXTURES).filter((f: string) => f.endsWith('.txt'));
+  const withLf = (text: string) => {
+    const t = text.replace(/\r/g, '');
+    return t.endsWith('\n') ? t : `${t}\n`;
+  };
+  it.each(files)('%s normalizeEnemyText is byte-identical, including inner blank lines', (file: string) => {
+    const text = withLf(fs.readFileSync(path.join(ENEMY_FIXTURES, file), 'utf8'));
+    const { text: out, warnings } = normalizeEnemyText(text);
+    expect(warnings).toEqual([]);
+    expect(out).toBe(text);
+  });
+});
 
 describe('applyEnemyFileUpdates (Save as preset)', () => {
   const src = [

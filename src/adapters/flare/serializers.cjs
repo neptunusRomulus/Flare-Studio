@@ -328,6 +328,22 @@ function exportEnemyFile(enemy) {
   return { text: `${lines.join("\n").trim()}\n`, warnings };
 }
 
+function isRawEntry(entry) {
+  return !!(entry && Object.prototype.hasOwnProperty.call(entry, "raw"));
+}
+
+/** Split a Flare text file into lines, dropping the empty segment created by a trailing newline. */
+function splitFileLines(content) {
+  const raw = String(content || "").replace(/\r/g, "");
+  const lines = raw.split("\n");
+  if (lines.length && lines[lines.length - 1] === "") lines.pop();
+  return lines;
+}
+
+function joinFileLines(lines) {
+  return `${lines.join("\n")}\n`;
+}
+
 /**
  * Enemy file as saved from Studio's enemy editor: written back line by line, so INCLUDE/APPEND
  * lines, repeated keys (stat=, power=, sfx_*=), unknown keys and sections all survive.
@@ -338,9 +354,10 @@ function normalizeEnemyText(content) {
   const warnings = [];
   const out = [];
   let section = "";
-  for (const raw of String(content || "").replace(/\r/g, "").split("\n")) {
+  for (const raw of splitFileLines(content)) {
     const line = raw.trim();
-    if (!line || line.startsWith("#") || line === "APPEND" || line.startsWith("INCLUDE ")) { out.push(line); continue; }
+    if (!line) { out.push(raw); continue; }
+    if (line.startsWith("#") || line === "APPEND" || line.startsWith("INCLUDE ")) { out.push(line); continue; }
     const m = line.match(/^\[([^\]]+)\]$/);
     if (m) { section = m[1].trim(); out.push(line); continue; }
     const eq = line.indexOf("=");
@@ -357,7 +374,7 @@ function normalizeEnemyText(content) {
     if (section === "render_layers" && key === "layer" && !value.includes(",")) { out.push(`layer=0,${value}`); continue; }
     out.push(`${key}=${value}`);
   }
-  return { text: `${out.join("\n").replace(/\n{3,}/g, "\n\n").trim()}\n`, warnings };
+  return { text: joinFileLines(out), warnings };
 }
 
 /** INCLUDE paths in an enemy file, in file order. */
@@ -576,7 +593,7 @@ function exportDialogBlock(tree) {
   const metaDone = new Set();
   const prefixDone = { voice: false, portrait: false };
   for (const c of tree.components || []) {
-    if (c.raw) { out.push({ cat: "raw", lines: [c.raw] }); continue; }
+    if (isRawEntry(c)) { out.push({ cat: "raw", lines: [c.raw] }); continue; }
     const cat = dialogCategory(c.key);
     if (cat === "prefix") {
       // voice/portrait belong to the next line: write them where they were
@@ -619,12 +636,14 @@ function exportDialogBlock(tree) {
   for (const cat of ["effect", "reward", "pass"]) {
     for (const it of LIST_OF[cat](tree).slice(used[cat])) out.push({ cat, lines: dialogItemEntries(cat, it) });
   }
-  const body = [...head, ...out].flatMap((e) => e.lines).filter(Boolean);
+  const body = [...head, ...out].flatMap((e) => e.lines).filter((line) => line != null);
   return body.length ? ["[dialog]", ...body].join("\n") : "";
 }
 
 function exportDialogueTrees(trees) {
-  return (trees || []).map(exportDialogBlock).filter(Boolean).join("\n\n");
+  const blocks = (trees || []).map(exportDialogBlock).filter(Boolean);
+  const allHaveComponents = (trees || []).every((t) => t && t.components);
+  return blocks.join(allHaveComponents ? "\n" : "\n\n");
 }
 
 function exportNpcFile(npc) {
@@ -650,9 +669,9 @@ function exportNpcFile(npc) {
     const rawJoined = {};
     // gfx is the old name of animations: compare and rewrite it as animations
     const fieldKey = (k) => (k === "gfx" ? "animations" : k);
-    for (const e of rawMain) if (!e.raw) (rawJoined[fieldKey(e.key)] = rawJoined[fieldKey(e.key)] || []).push(e.value);
+    for (const e of rawMain) if (!isRawEntry(e)) (rawJoined[fieldKey(e.key)] = rawJoined[fieldKey(e.key)] || []).push(e.value);
     for (const e of rawMain) {
-      if (e.raw) { lines.push(e.raw); continue; }
+      if (isRawEntry(e)) { lines.push(e.raw); continue; }
       const k = fieldKey(e.key);
       if (done.has(k)) continue;
       const changed = k in fields && fieldValues(fields[k]).join("\n") !== rawJoined[k].join("\n");
@@ -665,21 +684,28 @@ function exportNpcFile(npc) {
     }
     for (const k of Object.keys(rawJoined)) done.add(k);
   }
+  // New keys belong with the main section, not after the blank line that precedes [stats]/[dialog].
+  const trailingBlanks = [];
+  if (rawMain) {
+    while (lines.length && String(lines[lines.length - 1]).trim() === "") trailingBlanks.unshift(lines.pop());
+  }
   for (const key of NPC_KEYS) {
     if (done.has(key)) continue;
     if (key === "portrait") continue;
     for (const v of valuesOf(key)) lines.push(`${key}=${v}`);
   }
   if (!done.has("portrait") && fields.portrait) pushKey(lines, "portrait", fields.portrait);
+  lines.push(...trailingBlanks);
   for (const section of source._rawSections || []) {
-    lines.push("", `[${section.name}]`, ...section.entries.map((e) => e.raw || `${e.key}=${e.value}`));
+    if (!rawMain) lines.push("");
+    lines.push(`[${section.name}]`, ...section.entries.map((e) => (isRawEntry(e) ? e.raw : `${e.key}=${e.value}`)));
   }
   const trees = readDialogueTrees(source);
   if (trees.length) {
-    lines.push("");
+    if (!rawMain) lines.push("");
     lines.push(exportDialogueTrees(trees));
   }
-  return `${lines.join("\n").replace(/\n{3,}/g, "\n\n").trim()}\n`;
+  return joinFileLines(lines);
 }
 
 function readDialogueTrees(npc) {
@@ -759,8 +785,8 @@ function importDialogTree(entries) {
   let pendingVoice = "";
   let pending = null; // { key, value }
   for (const entry of entries) {
-    tree.components.push(entry.raw ? { raw: entry.raw } : { key: entry.key, value: entry.value });
-    if (entry.raw) continue;
+    tree.components.push(isRawEntry(entry) ? { raw: entry.raw } : { key: entry.key, value: entry.value });
+    if (isRawEntry(entry)) continue;
     const cat = dialogCategory(entry.key);
     if (entry.key === "id") tree.dialogueId = entry.value;
     else if (entry.key === "topic") tree.topic = entry.value;
@@ -800,9 +826,9 @@ function importNpcText(content) {
   const npc = { customProperties: {}, _rawMain: [], _rawSections: [] };
   // Own pass (not parseDocument) so INCLUDE/APPEND lines keep their position.
   const sections = [{ name: "", entries: [] }];
-  for (const raw of String(content || "").replace(/\r/g, "").split("\n")) {
+  for (const raw of splitFileLines(content)) {
     const line = raw.trim();
-    if (!line) continue;
+    if (!line) { sections[sections.length - 1].entries.push({ raw }); continue; }
     // Comments ride along as raw entries so a merge keeps them in place
     if (line.startsWith("#")) { sections[sections.length - 1].entries.push({ raw: line }); continue; }
     if (line === "APPEND" || line.startsWith("INCLUDE ")) { sections[sections.length - 1].entries.push({ raw: line }); continue; }
@@ -821,7 +847,7 @@ function importNpcText(content) {
     if (!section.name || section.name === "npc") {
       for (const entry of section.entries) {
         npc._rawMain.push(entry);
-        if (entry.raw || entry.key === "waypoints" || entry.key === "wander_radius") continue;
+        if (isRawEntry(entry) || entry.key === "waypoints" || entry.key === "wander_radius") continue;
         npc[entry.key] = npc[entry.key] === undefined ? entry.value : `${npc[entry.key]}\n${entry.value}`;
       }
       continue;
@@ -846,17 +872,27 @@ function mergeNpcFile(existingText, update) {
     base[key] = value;
   }
   // sections: { name: [[{key, value}], ...] } replaces every section of that name (in place of the first);
-  // raw lines (comments/INCLUDE) of the replaced sections are kept at the top of the first one.
+  // comments/INCLUDE stay at the top of the first one; trailing blank lines stay at the end (section spacing).
   for (const [name, list] of Object.entries((update && update.sections) || {})) {
     if (!Array.isArray(list)) continue;
     const all = base._rawSections || [];
     const at = all.findIndex((sec) => sec.name === name);
-    const raws = all.filter((sec) => sec.name === name).flatMap((sec) => sec.entries.filter((e) => e.raw));
+    const named = all.filter((sec) => sec.name === name);
+    const raws = named.flatMap((sec) => sec.entries.filter((e) => isRawEntry(e) && String(e.raw).trim() !== ""));
+    const trailing = [];
+    const last = named[named.length - 1];
+    if (last) {
+      for (let i = last.entries.length - 1; i >= 0; i -= 1) {
+        const e = last.entries[i];
+        if (isRawEntry(e) && String(e.raw).trim() === "") trailing.unshift(e);
+        else break;
+      }
+    }
     const fresh = list
       .map((entries) => (entries || []).filter((e) => e && e.key && String(e.key).trim()).map((e) => ({ key: String(e.key).trim(), value: String(e.value == null ? "" : e.value).trim() })))
       .filter((entries) => entries.length)
-      .map((entries, i) => ({ name, entries: i === 0 ? [...raws, ...entries] : entries }));
-    if (!fresh.length && raws.length) fresh.push({ name, entries: raws });
+      .map((entries, i) => ({ name, entries: i === 0 ? [...raws, ...entries, ...trailing] : entries }));
+    if (!fresh.length && (raws.length || trailing.length)) fresh.push({ name, entries: [...raws, ...trailing] });
     const rest = all.filter((sec) => sec.name !== name);
     const insertAt = at < 0 ? rest.length : all.slice(0, at).filter((sec) => sec.name !== name).length;
     rest.splice(insertAt, 0, ...fresh);

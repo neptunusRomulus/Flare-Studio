@@ -1,0 +1,53 @@
+INCLUDE enemies/base/goblin.txt
+
+name=Labyrinth Goblin
+level=1
+categories=il_goblin,il_common
+rarity=common
+xp=2
+xp_scaling=enemies/xp_scaling/il.txt
+
+# combat stats
+stat=hp,40
+
+# TODO speed_per_level?
+speed=2.8
+
+turn_delay=400ms
+chance_pursue=10
+
+stat=accuracy,75
+stat=avoidance,15
+stat=poise,5
+
+stat=dmg_melee_min,15
+stat=dmg_melee_max,30
+stat=dmg_ranged_min,15
+stat=dmg_ranged_max,30
+stat=absorb_min,1
+stat=absorb_max,4
+
+cooldown=1600ms
+
+# level-scaled stats
+stat_per_level=hp,20
+stat_per_level=accuracy,5
+stat_per_level=avoidance,5
+stat_per_level=poise,3
+stat_per_level=dmg_melee_min,15
+stat_per_level=dmg_melee_max,15
+stat_per_level=dmg_ranged_min,15
+stat_per_level=dmg_ranged_max,15
+
+# loot
+loot=loot/il_common.txt
+
+# Ranged units behaviour, see docs/ranged_behavior.txt
+chance_pursue=2
+chance_flee=20
+flee_duration=3s
+flee_cooldown=1s
+flee_range=6
+threat_range=10
+power=melee,164,5
+power=ranged,165,40

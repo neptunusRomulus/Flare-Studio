@@ -1,3 +1,4 @@
+import Tooltip from '@/components/ui/tooltip';
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { Badge } from '@/components/ui/badge';
@@ -5,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 import { Loader2, MapPin, X } from 'lucide-react';
 import type { NpcInstance } from '@/editor/npcInstances';
+import ResizeHandle from '@/components/ResizeHandle';
 
 type NpcInstancesDialogProps = {
   isOpen: boolean;
@@ -58,8 +60,9 @@ const NpcInstancesDialog = ({ isOpen, onClose, npcName, instances, loading = fal
       </div>
 
       <div className="px-4 pt-3 pb-2 border-b border-border/60">
-        <div className="text-sm font-medium text-foreground truncate">{npcName || 'NPC'}</div>
-        <div className="text-[11px] text-muted-foreground">Number of NPC instances total</div>
+        <Tooltip content="How many times this NPC is placed on maps, with each map and tile.">
+          <div className="text-sm font-medium text-foreground truncate cursor-help">{npcName || 'NPC'}</div>
+        </Tooltip>
       </div>
 
       <div className="flex-1 overflow-y-auto p-2">
@@ -92,13 +95,7 @@ const NpcInstancesDialog = ({ isOpen, onClose, npcName, instances, loading = fal
         )}
       </div>
 
-      <div
-        onMouseDown={handleResizeMouseDown}
-        className="absolute bottom-0 right-0 w-5 h-5 cursor-se-resize opacity-40 hover:opacity-100 transition-opacity flex items-end justify-end"
-        title="Drag to resize"
-      >
-        <div className="w-1.5 h-1.5 bg-foreground/40 rounded-sm m-1" />
-      </div>
+      <ResizeHandle onMouseDown={handleResizeMouseDown} />
     </div>
   );
 

@@ -10,6 +10,7 @@ import { Gift, HandCoins, HelpCircle, Hammer, Package, Save, Sparkles, ChevronDo
 import type { ItemSummary } from '@/utils/items';
 import { parseVendorTabs, formatVendorTabs, type VendorTab } from '@/utils/npcFileUpdate';
 import NpcVendorShelves from '@/components/NpcVendorShelves';
+import ResizeHandle from '@/components/ResizeHandle';
 
 /** Flare 1.15 NPC.cpp craft keys; repeatable ones take one value per line. */
 const CRAFT_FIELDS = [
@@ -526,13 +527,7 @@ const NpcVendorSettingsDialog = ({
       )}
 
       {!embedded && (
-      <div
-        onMouseDown={handleResizeMouseDown}
-        className="absolute bottom-0 right-0 w-5 h-5 cursor-se-resize opacity-40 hover:opacity-100 transition-opacity flex items-end justify-end"
-        title="Drag to resize"
-      >
-        <div className="w-1.5 h-1.5 bg-foreground/40 rounded-sm m-1" />
-      </div>
+      <ResizeHandle onMouseDown={handleResizeMouseDown} />
       )}
     </div>
   );

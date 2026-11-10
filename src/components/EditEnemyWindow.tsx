@@ -14,6 +14,7 @@ import useItems from '@/hooks/useItems';
 import { normalizeItemsForState } from '@/utils/items';
 import { Slider } from '@/components/ui/slider';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
+import ResizeHandle from '@/components/ResizeHandle';
 
 type TabKey = 'identity' | 'visual' | 'audio' | 'stats' | 'behavior' | 'loot' | 'quest' | 'combat' | 'flags' | 'skills';
 
@@ -1467,13 +1468,7 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
       </div>
 
       {/* Resize handle */}
-      <div
-        onMouseDown={handleResizeMouseDown}
-        className="absolute bottom-0 right-0 w-5 h-5 cursor-se-resize opacity-40 hover:opacity-100 transition-opacity flex items-end justify-end"
-        title="Drag to resize"
-      >
-        <div className="w-1.5 h-1.5 bg-foreground/40 rounded-sm m-1" />
-      </div>
+      <ResizeHandle onMouseDown={handleResizeMouseDown} />
     </div>,
     document.body
   );

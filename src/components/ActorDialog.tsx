@@ -7,6 +7,7 @@ import { Edit2, Save, X } from 'lucide-react';
 import { ENEMY_ROLE_OPTIONS, NPC_ROLE_OPTIONS } from '@/editor/actorRoles';
 import type { ActorDialogState, ActorRoleKey } from '@/editor/actorRoles';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
+import ResizeHandle from '@/components/ResizeHandle';
 
 type ActorDialogProps = {
   actorDialogState: ActorDialogState | null;
@@ -163,13 +164,7 @@ const ActorDialog = ({
       </div>
 
       {/* Resize handle */}
-      <div
-        onMouseDown={handleResizeMouseDown}
-        className="absolute bottom-0 right-0 w-5 h-5 cursor-se-resize opacity-40 hover:opacity-100 transition-opacity flex items-end justify-end"
-        title="Drag to resize"
-      >
-        <div className="w-1.5 h-1.5 bg-foreground/40 rounded-sm m-1" />
-      </div>
+      <ResizeHandle onMouseDown={handleResizeMouseDown} />
     </div>
   );
 

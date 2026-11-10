@@ -227,7 +227,7 @@ export const RewardsPanel: React.FC<RewardsPanelProps> = ({
       {expanded && (
         <div className="px-3 pb-3 space-y-2">
           <p className="text-xs text-muted-foreground">
-            What does the player gain or lose?
+            Rewards
           </p>
 
           {rewards.length === 0 ? (

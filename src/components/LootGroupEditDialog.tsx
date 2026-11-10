@@ -6,6 +6,7 @@ import { Sheet, Save, X, Tag, Layers, Shield, Check, HelpCircle, Search, Chevron
 import Tooltip from '@/components/ui/tooltip';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 import type { ItemSummary } from '@/utils/items';
+import ResizeHandle from '@/components/ResizeHandle';
 
 type LootGroupEditDialogProps = {
   open: boolean;
@@ -414,13 +415,7 @@ function LootGroupEditDialog(props: LootGroupEditDialogProps) {
         </div>
 
         {/* Resize handle */}
-        <div
-          onMouseDown={handleResizeMouseDown}
-          className="absolute bottom-0 right-0 w-5 h-5 cursor-se-resize opacity-40 hover:opacity-100 transition-opacity flex items-end justify-end"
-          title="Drag to resize"
-        >
-          <div className="w-1.5 h-1.5 bg-foreground/40 rounded-sm m-1" />
-        </div>
+        <ResizeHandle onMouseDown={handleResizeMouseDown} />
 
         {/* Footer: Save icon-only button with tooltip */}
         <div className="flex justify-end px-6 pb-4">

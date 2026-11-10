@@ -9,6 +9,7 @@ import type { TileMapEditor } from '@/editor/TileMapEditor';
 import { emptyMapPresentation, type MapPresentation } from '@/editor/studioDrafts';
 import { MapPresentationFields } from '@/components/studio/studioEditors';
 import { AnchoredConfirm } from '@/components/ui/inline-confirm';
+import ResizeHandle from '@/components/ResizeHandle';
 
 type MapSettingsDialogProps = {
   open: boolean;
@@ -183,13 +184,7 @@ const MapSettingsDialog = ({
         </div>
 
         {/* Resize handle */}
-        <div
-          onMouseDown={handleResizeMouseDown}
-          className="absolute bottom-0 right-0 w-5 h-5 cursor-se-resize opacity-40 hover:opacity-100 transition-opacity flex items-end justify-end"
-          title="Drag to resize"
-        >
-          <div className="w-1.5 h-1.5 bg-foreground/40 rounded-sm m-1" />
-        </div>
+        <ResizeHandle onMouseDown={handleResizeMouseDown} />
       </div>
       <AnchoredConfirm open={showDeleteConfirm} onCancel={() => setShowDeleteConfirm(false)} onConfirm={handleConfirmDelete} />
     </>

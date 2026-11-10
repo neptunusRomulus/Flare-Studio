@@ -122,7 +122,9 @@ const NpcVendorShelves = ({ properties, itemsList, updateProperty }: Props) => {
   const filled = shelves.filter((shelf) => shelf.items.length > 0 || shelf.tables.length > 0);
   if (filled.length === 0) {
     return (
-      <p className="text-xs text-muted-foreground px-1">No stock yet. Add items with the shelf buttons below.</p>
+      <Tooltip content="Use the shelf buttons below to add items this vendor sells.">
+        <p className="text-xs text-muted-foreground px-1">No stock yet</p>
+      </Tooltip>
     );
   }
 

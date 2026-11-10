@@ -8,6 +8,7 @@ import Tooltip from '@/components/ui/tooltip';
 import { useAppContext } from '@/context/AppContext';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 import { ACTIVATION_COLORS } from '@/editor/eventActivationColors';
+import ResizeHandle from '@/components/ResizeHandle';
 
 type EventActivation = 'Trigger' | 'Interact' | 'Load' | 'Leave' | 'MapExit' | 'MapClear' | 'Loop';
 
@@ -2031,13 +2032,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
         </div>
 
         {/* Resize handle */}
-        <div
-          onMouseDown={handleResizeMouseDown}
-          className="absolute bottom-0 right-0 w-5 h-5 cursor-se-resize opacity-40 hover:opacity-100 transition-opacity flex items-end justify-end"
-          title="Drag to resize"
-        >
-          <div className="w-1.5 h-1.5 bg-foreground/40 rounded-sm m-1" />
-        </div>
+        <ResizeHandle onMouseDown={handleResizeMouseDown} />
       </div>
     </>
   );

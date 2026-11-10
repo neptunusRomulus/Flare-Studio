@@ -163,7 +163,9 @@ const NpcAppearanceSection = ({
                 ))}
               </div>
             ) : (
-              <p className="text-xs text-muted-foreground">No NPC animations found. Import a tileset or install Flare with fantasycore.</p>
+              <Tooltip content="Import a tileset, or install Flare with fantasycore, to see looks here.">
+                <p className="text-xs text-muted-foreground">No looks yet</p>
+              </Tooltip>
             )}
 
             <div className="flex gap-2 items-center flex-wrap">
@@ -238,7 +240,9 @@ const NpcAppearanceSection = ({
                 ))}
               </div>
             ) : (
-              <p className="text-xs text-muted-foreground">No portraits found in fantasycore or the project.</p>
+              <Tooltip content="Add portraits to fantasycore or the project to pick one here.">
+                <p className="text-xs text-muted-foreground">No portraits yet</p>
+              </Tooltip>
             )}
             <div className="relative inline-flex">
               <Button

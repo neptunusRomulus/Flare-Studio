@@ -2691,84 +2691,14 @@ ipcMainLocal.handle("write-item-file", async (event, filePath, itemData) => {
     const itemIdMatch = hashPart.match(/^item_(\d+)$/);
     const targetId = itemIdMatch ? parseInt(itemIdMatch[1], 10) : (itemData.id != null ? itemData.id : null);
 
-    // Read existing items
-    const existingItems = parseItemsInCategoryFile(categoryFilePath);
-    const idx = existingItems.findIndex(i => i.id === targetId);
-
-    // Preserve role/resource metadata
-    const normalizedRole = (typeof itemData.role === "string" ? itemData.role : "").toLowerCase() || "unspecified";
-    const normalizedResourceSubtype = (typeof itemData.resourceSubtype === "string" ? itemData.resourceSubtype : "").toLowerCase();
-
-    if (idx >= 0) {
-      // Update existing item — merge current editor state, preserving unknown fields
-      const existing = existingItems[idx];
-      existingItems[idx] = {
-        ...existing,
-        ...itemData,
-        id: itemData.id ?? existing.id,
-        name: itemData.name ?? existing.name,
-        _role: normalizedRole,
-        ...(normalizedResourceSubtype ? { _resourceSubtype: normalizedResourceSubtype } : existing._resourceSubtype ? { _resourceSubtype: existing._resourceSubtype } : {}),
-      };
-    } else {
-      // Item not found — create new
-      existingItems.push({
-        id: itemData.id ?? (existingItems.length > 0 ? Math.max(...existingItems.map(i => i.id)) + 1 : 1),
-        name: itemData.name || "Unnamed Item",
-        _role: normalizedRole,
-        ...(normalizedResourceSubtype ? { _resourceSubtype: normalizedResourceSubtype } : {}),
-        ...(itemData.flavor ? { flavor: itemData.flavor } : {}),
-        ...(itemData.level ? { level: itemData.level } : {}),
-        ...(itemData.icon ? { icon: itemData.icon } : {}),
-        ...(itemData.quality ? { quality: itemData.quality } : {}),
-        ...(itemData.price != null ? { price: itemData.price } : {}),
-        ...(itemData.price_sell != null ? { price_sell: itemData.price_sell } : {}),
-        ...(itemData.max_quantity && itemData.max_quantity > 1 ? { max_quantity: itemData.max_quantity } : {}),
-        ...(itemData.quest_item ? { quest_item: "true" } : {}),
-        ...(itemData.no_stash && itemData.no_stash !== "ignore" ? { no_stash: itemData.no_stash } : {}),
-        ...(itemData.item_type ? { item_type: itemData.item_type } : {}),
-        ...(itemData.equip_flags ? { equip_flags: itemData.equip_flags } : {}),
-        ...(itemData.requires_level && itemData.requires_level > 0 ? { requires_level: itemData.requires_level } : {}),
-        ...(itemData.requires_stat ? { requires_stat: itemData.requires_stat } : {}),
-        ...(itemData.requires_class ? { requires_class: itemData.requires_class } : {}),
-        ...(itemData.disable_slots ? { disable_slots: itemData.disable_slots } : {}),
-        ...(itemData.gfx ? { gfx: itemData.gfx } : {}),
-        ...(itemData.bonus ? { bonus: itemData.bonus } : {}),
-        ...(itemData.bonus_power_level ? { bonus_power_level: itemData.bonus_power_level } : {}),
-        ...(itemData.dmg ? { dmg: itemData.dmg } : {}),
-        ...(itemData.abs ? { abs: itemData.abs } : {}),
-        ...(itemData.power ? { power: itemData.power } : {}),
-        ...(itemData.power_desc ? { power_desc: itemData.power_desc } : {}),
-        ...(itemData.replace_power ? { replace_power: itemData.replace_power } : {}),
-        ...(itemData.book ? { book: itemData.book } : {}),
-        ...(itemData.book_is_readable ? { book_is_readable: "true" } : {}),
-        ...(itemData.script ? { script: itemData.script } : {}),
-        ...(itemData.soundfx ? { soundfx: itemData.soundfx } : {}),
-        ...(itemData.stepfx ? { stepfx: itemData.stepfx } : {}),
-        ...(itemData.loot_animation ? { loot_animation: itemData.loot_animation } : {}),
-        ...(itemData.randomizer_def ? { randomizer_def: itemData.randomizer_def } : {}),
-        ...(itemData.price_per_level != null ? { price_per_level: itemData.price_per_level } : {}),
-        ...(itemData.type ? { type: itemData.type } : {}),
-        ...(itemData.speed ? { speed: itemData.speed } : {}),
-        ...(itemData.radius ? { radius: itemData.radius } : {}),
-        ...(itemData.trait_elemental ? { trait_elemental: itemData.trait_elemental } : {}),
-        ...(itemData.wall_power ? { wall_power: itemData.wall_power } : {}),
-        ...(itemData.use_hazard ? { use_hazard: "true" } : {}),
-        ...(itemData.post_power ? { post_power: itemData.post_power } : {}),
-        ...(itemData.post_effect ? { post_effect: itemData.post_effect } : {}),
-        ...(itemData.requires_hpmp_state ? { requires_hpmp_state: itemData.requires_hpmp_state } : {}),
-        ...(itemData.requires_item ? { requires_item: itemData.requires_item } : {}),
-        ...(itemData.new_state ? { new_state: itemData.new_state } : {}),
-        ...(itemData.modifier_damage ? { modifier_damage: itemData.modifier_damage } : {}),
-        ...(itemData.lifespan ? { lifespan: itemData.lifespan } : {}),
-        ...(itemData.face ? { face: "true" } : {}),
-        ...(itemData.loot_drops_max && itemData.loot_drops_max > 1 ? { loot_drops_max: itemData.loot_drops_max } : {}),
-        ...(itemData.pickup_status ? { pickup_status: itemData.pickup_status } : {}),
-      });
-    }
-
-    writeCategoryFile(categoryFilePath, existingItems);
+    const existingText = fs.readFileSync(categoryFilePath, "utf8");
+    const payload = { ...itemData, id: itemData.id != null ? itemData.id : targetId };
+    const merged = flareAdapter.mergeItemText(existingText, payload);
+    fs.writeFileSync(categoryFilePath, merged, "utf8");
+    const rendered = flareAdapter.exportItemFile([payload], { append: false });
+    mergePowerFile(projectPathFromItemFile(categoryFilePath), rendered.powers);
     console.log("Item saved:", targetId, "@", categoryFilePath);
+
     return { success: true };
   } catch (error) {
     console.error("Error writing item file:", error);

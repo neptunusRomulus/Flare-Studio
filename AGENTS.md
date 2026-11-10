@@ -43,7 +43,7 @@
   - `src/adapters/flare/serializers.cjs` (`importNpcText`, `exportNpcFile`, `mergeNpcFile`, `normalizeEnemyText`, `applyEnemyFileUpdates`)
   - `src/utils/npcFileUpdate.ts` (Studio object → NPC file update) + `src/utils/npcFileUpdate.test.ts`
   - `src/adapters/flare/npcRoundTrip.test.ts`, fixtures in `tests/fixtures/flare-npcs/` and `tests/fixtures/flare-enemies/`
-  - `src/adapters/flare/content.cjs` (`importQuestText`, `exportQuestFile`, `mergeQuestText`), `src/editor/questSteps.ts`, fixtures in `tests/fixtures/flare-quests/`
+  - `src/adapters/flare/content.cjs` (`importQuestText`, `exportQuestFile`, `mergeQuestText`, `mergeLootText`, `mergeItemText`), `src/editor/questSteps.ts`, fixtures in `tests/fixtures/flare-quests/`, `tests/fixtures/flare-loot/`, `tests/fixtures/flare-items/`
 - Never overwrite hand-made animation files (Studio writes `<name>_studio.txt` instead).
 - Enemy files: `gold`, `wander_radius`, `waypoints`, `script` are not StatBlock keys (map-spawn or none); they are dropped with a visible toast.
 

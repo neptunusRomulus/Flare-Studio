@@ -1,0 +1,4 @@
+# Purpose: keep trailing space
+	# chance_pursue=%chance%
+INCLUDE enemies/base/goblin.txt
+name=Comment Goblin

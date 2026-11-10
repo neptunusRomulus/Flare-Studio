@@ -15,9 +15,14 @@ import {
   exportProcgenRules,
   exportQuestFile,
   importEngineText,
+  importLootText,
+  importMapText,
   importQuestText,
+  mergeItemText,
+  mergeLootText,
   mergePowerText,
   mergeQuestText,
+  normalizeEnemyText,
   validateText,
 } from './flareAdapter.cjs';
 import { clipboardFromTiles, pasteTileGrid } from '../../editor/tileClipboard';
@@ -212,6 +217,58 @@ describe('content editor exports', () => {
     expect(merged.startsWith('APPEND\n')).toBe(true);
     expect(merged).toContain('[quest]');
     expect(merged).toContain('quest_text=Do it.');
+  });
+
+  it('keeps repeated requires_* lines on real empyrean journals', () => {
+    const journal = readFileSync(new URL('../../../tests/fixtures/flare-quests/0020_journal.txt', import.meta.url), 'utf8');
+    const imported = importQuestText(journal) as { steps: Array<Record<string, unknown>> };
+    expect(imported.steps).toHaveLength(3);
+    expect(imported.steps[0].requires_not_status).toBe('emp_journal_found,emp_journal_later');
+    expect(imported.steps[1].requires_status).toBe('emp_journal_init,emp_journal_later');
+    expect(mergeQuestText(journal, imported)).toBe(journal);
+
+    const empyrean = readFileSync(new URL('../../../tests/fixtures/flare-quests/0000_empyrean.txt', import.meta.url), 'utf8');
+    const main = importQuestText(empyrean) as { steps: Array<Record<string, unknown>> };
+    expect(main.steps[4].requires_status).toBe('emp_main_gravebloom,emp_main_info1');
+    expect(mergeQuestText(empyrean, main)).toBe(empyrean);
+  });
+
+  it('round-trips shorthand loot tables and INCLUDE lines', () => {
+    const chest = readFileSync(new URL('../../../tests/fixtures/flare-loot/chest_level_1.txt', import.meta.url), 'utf8');
+    const imported = importLootText(chest);
+    expect(imported.loot).toEqual([{ loot: 'currency,100,20,40' }]);
+    expect(imported.includes).toEqual(['loot/chest_common.txt', 'loot/level_1.txt']);
+    expect(mergeLootText(chest, imported)).toBe(chest);
+
+    const common = readFileSync(new URL('../../../tests/fixtures/flare-loot/chest_common.txt', import.meta.url), 'utf8');
+    expect(mergeLootText(common, importLootText(common))).toBe(common);
+  });
+
+  it('merges one item without dropping INCLUDE, comments or later items', () => {
+    const text = readFileSync(new URL('../../../tests/fixtures/flare-items/level_12_unique.txt', import.meta.url), 'utf8');
+    const merged = mergeItemText(text, { id: 305, name: 'Lost Totem' });
+    expect(merged).toBe(text);
+    const renamed = mergeItemText(text, { id: 305, name: 'Relic Totem' });
+    expect(renamed).toContain('name=Relic Totem');
+    expect(renamed).toContain('INCLUDE items/base/misc/spellbook.txt');
+    expect(renamed).toContain('# Mog Caverens');
+    expect(renamed).toContain('name=Mog\'s Axe');
+  });
+
+  it('keeps mid-map layers after object when exporting a map', () => {
+    const text = readFileSync(new URL('../../../tests/fixtures/flare-maps/snow_layers.txt', import.meta.url), 'utf8');
+    const imported = importMapText(text) as { layers: Array<{ type: string; rows: number[][] }> };
+    const exported = exportMapText(imported);
+    const again = importMapText(exported.text) as { layers: Array<{ type: string }> };
+    expect(imported.layers.map((layer) => layer.type)).toEqual(['background', 'object', 'snowtop', 'collision']);
+    expect(again.layers.map((layer) => layer.type)).toEqual(['background', 'object', 'snowtop', 'collision']);
+  });
+
+  it('preserves indented enemy comments when normalizing', () => {
+    const text = readFileSync(new URL('../../../tests/fixtures/flare-enemies/indented_comments.txt', import.meta.url), 'utf8');
+    const normalized = normalizeEnemyText(text);
+    expect(normalized.text).toBe(text);
+    expect(normalized.warnings).toEqual([]);
   });
 
   it('writes powers/effects.txt, item types, qualities and sets', () => {

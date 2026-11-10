@@ -38,15 +38,14 @@ function pushKey(lines, key, value) {
 function ensureObjectAndCollision(layers) {
   const list = (layers || []).filter((layer) => layer && layer.type && !EDITOR_LAYER_TYPES.has(String(layer.type).toLowerCase()));
   const types = new Set(list.map((layer) => layer.type));
-  if (!types.has("object")) list.push({ type: "object", rows: [] });
+  if (!types.has("object")) {
+    const collisionAt = list.findIndex((layer) => layer.type === "collision");
+    const objectLayer = { type: "object", rows: [] };
+    if (collisionAt >= 0) list.splice(collisionAt, 0, objectLayer);
+    else list.push(objectLayer);
+  }
   if (!types.has("collision")) list.push({ type: "collision", rows: [] });
-  const rank = (type) => {
-    if (type === "background") return 0;
-    if (type === "object") return 2;
-    if (type === "collision") return 3;
-    return 1;
-  };
-  return list.sort((a, b) => rank(a.type) - rank(b.type));
+  return list;
 }
 
 function blankRows(width, height) {
@@ -357,7 +356,7 @@ function normalizeEnemyText(content) {
   for (const raw of splitFileLines(content)) {
     const line = raw.trim();
     if (!line) { out.push(raw); continue; }
-    if (line.startsWith("#") || line === "APPEND" || line.startsWith("INCLUDE ")) { out.push(line); continue; }
+    if (line.startsWith("#") || line === "APPEND" || line.startsWith("INCLUDE ")) { out.push(raw); continue; }
     const m = line.match(/^\[([^\]]+)\]$/);
     if (m) { section = m[1].trim(); out.push(line); continue; }
     const eq = line.indexOf("=");

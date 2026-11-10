@@ -43,12 +43,22 @@ function exportLootFile(data) {
   if (name) lines.push(`name=${name}`);
   // Studio-only. The engine ignores it; the editor round-trips it.
   if (description) lines.push(`description=${description}`);
+  if (Array.isArray(source.includes)) {
+    for (const include of source.includes) {
+      if (include) lines.push(`INCLUDE ${include}`);
+    }
+  }
 
   const appendLootEntry = (entry) => {
     const rawStatusLoot = safeString(entry.status_loot);
     if (rawStatusLoot) {
       lines.push(`status_loot=${rawStatusLoot}`);
       lines.push("");
+      return;
+    }
+    const shorthand = safeString(entry.loot);
+    if (shorthand) {
+      lines.push(`loot=${shorthand}`);
       return;
     }
     const lootId = safeString(entry["loot.id"]);
@@ -84,6 +94,11 @@ function importLootText(content) {
   for (const rawLine of String(content || "").split(/\r?\n/)) {
     const line = rawLine.trim();
     if (!line || line.startsWith("#") || line.startsWith(";")) continue;
+    if (line.toUpperCase().startsWith("INCLUDE ")) {
+      if (!Array.isArray(data.includes)) data.includes = [];
+      data.includes.push(line.slice(8).trim());
+      continue;
+    }
     if (line.toLowerCase() === "[loot]") {
       currentEntry = {};
       lootEntries.push(currentEntry);
@@ -96,6 +111,7 @@ function importLootText(content) {
     if (!currentEntry) {
       if (key === "name" || key === "id" || key === "description") data[key] = value;
       else if (key === "status_loot") lootEntries.push({ status_loot: value });
+      else if (key === "loot") lootEntries.push({ loot: value });
       continue;
     }
     if (key === "id") currentEntry["loot.id"] = value;
@@ -200,10 +216,14 @@ function parseQuestSections(content) {
     const key = line.slice(0, eq).trim();
     const value = line.slice(eq + 1).trim();
     if (!current) {
-      if (key === "name" || key === "complete_status") header[key] = value;
+      if (key === "name" || key === "complete_status") {
+        header[key] = header[key] ? `${header[key]},${value}` : value;
+      }
       continue;
     }
-    if (QUEST_STEP_KEYS.includes(key)) current[key] = value;
+    if (QUEST_STEP_KEYS.includes(key)) {
+      current[key] = current[key] ? `${current[key]},${value}` : value;
+    }
   }
   if (current) steps.push(current);
   return { header, steps };
@@ -307,6 +327,66 @@ function setDocKey(doc, start, end, key, value, removeIfEmpty) {
   doc.splice(lastKey >= 0 ? lastKey + 1 : start, 0, { kind: "key", key, value });
 }
 
+const QUEST_LIST_KEYS = new Set([
+  "requires_status",
+  "requires_not_status",
+  "requires_item",
+  "requires_not_item",
+  "requires_class",
+  "requires_not_class",
+  "complete_status",
+]);
+
+function splitListValue(value) {
+  return safeString(value).split(",").map((part) => part.trim()).filter(Boolean);
+}
+
+function listValuesEqual(left, right) {
+  const a = splitListValue(left);
+  const b = splitListValue(right);
+  return a.length === b.length && a.every((part, i) => part === b[i]);
+}
+
+function existingListValue(doc, start, end, key) {
+  const parts = [];
+  for (let i = start; i < end; i += 1) {
+    const entry = doc[i];
+    if (entry && entry.kind === "key" && entry.key === key) parts.push(entry.value);
+  }
+  return parts.join(",");
+}
+
+/** Update a list-valued key. Repeated lines stay if the joined values already match. */
+function setDocListKey(doc, start, end, key, value, removeIfEmpty) {
+  const wanted = splitListValue(value);
+  if (!wanted.length) {
+    if (removeIfEmpty) {
+      for (let i = end - 1; i >= start; i -= 1) {
+        if (doc[i] && doc[i].kind === "key" && doc[i].key === key) doc.splice(i, 1);
+      }
+    }
+    return;
+  }
+  if (listValuesEqual(existingListValue(doc, start, end, key), value)) return;
+  const indices = [];
+  for (let i = start; i < end; i += 1) {
+    if (doc[i] && doc[i].kind === "key" && doc[i].key === key) indices.push(i);
+  }
+  if (!indices.length) {
+    setDocKey(doc, start, end, key, wanted.join(","));
+    return;
+  }
+  if (indices.length === 1) {
+    doc[indices[0]].value = wanted.join(",");
+    return;
+  }
+  doc[indices[0]] = { kind: "key", key, value: wanted[0] };
+  for (let j = indices.length - 1; j >= 1; j -= 1) doc.splice(indices[j], 1);
+  for (let j = 1; j < wanted.length; j += 1) {
+    doc.splice(indices[0] + j, 0, { kind: "key", key, value: wanted[j] });
+  }
+}
+
 function collectQuestBlocks(doc) {
   const first = doc.findIndex((entry) => entry && entry.kind === "section" && String(entry.name).toLowerCase() === "quest");
   if (first < 0) return { header: doc.map((entry) => (entry && typeof entry === "object" ? { ...entry } : entry)), blocks: [] };
@@ -326,7 +406,9 @@ function applyStepToBlock(block, step) {
   const next = block && block.length ? block.map((entry) => (entry && typeof entry === "object" ? { ...entry } : entry)) : [{ kind: "section", name: "quest" }];
   if (!next[0] || next[0].kind !== "section") next.unshift({ kind: "section", name: "quest" });
   for (const key of QUEST_STEP_KEYS) {
-    setDocKey(next, 1, next.length, key, stepKeyValue(step, key), true);
+    const value = stepKeyValue(step, key);
+    if (QUEST_LIST_KEYS.has(key)) setDocListKey(next, 1, next.length, key, value, true);
+    else setDocKey(next, 1, next.length, key, value, true);
   }
   return next;
 }
@@ -347,7 +429,7 @@ function mergeQuestSteps(doc, source) {
   const endOfHeader = header.length;
   while (headerStart < endOfHeader && !(header[headerStart] && header[headerStart].kind === "key")) headerStart += 1;
   setDocKey(header, headerStart, header.length, "name", safeString(source.name));
-  setDocKey(header, headerStart, header.length, "complete_status", safeString(source.complete_status));
+  setDocListKey(header, headerStart, header.length, "complete_status", safeString(source.complete_status));
 
   const steps = normalizeQuestSteps(source);
   const used = new Set();
@@ -394,7 +476,7 @@ function mergeQuestText(existingText, quest) {
   const endOfHeader = headerEnd(doc);
   while (headerStart < endOfHeader && !(doc[headerStart] && doc[headerStart].kind === "key")) headerStart += 1;
   setDocKey(doc, headerStart, headerEnd(doc), "name", safeString(source.name));
-  setDocKey(doc, headerStart, headerEnd(doc), "complete_status", safeString(source.complete_status));
+  setDocListKey(doc, headerStart, headerEnd(doc), "complete_status", safeString(source.complete_status));
 
   const range = sectionRange(doc, "quest");
   const hasStep = QUEST_STEP_KEYS.some((key) => safeString(source[key]));
@@ -404,7 +486,8 @@ function mergeQuestText(existingText, quest) {
       const value = safeString(source[key]);
       const canClear = key !== "requires_status" && key !== "quest_text";
       if (!provided && (canClear || !value)) continue;
-      setDocKey(doc, range.start + 1, range.end, key, value, canClear && provided);
+      if (QUEST_LIST_KEYS.has(key)) setDocListKey(doc, range.start + 1, range.end, key, value, canClear && provided);
+      else setDocKey(doc, range.start + 1, range.end, key, value, canClear && provided);
     }
   } else if (hasStep) {
     doc.push({ kind: "blank" });
@@ -784,12 +867,123 @@ function contentSlug(value, fallback) {
   return slugFileName(safeString(value) || fallback || "entry");
 }
 
+function updateExistingDocKey(doc, start, end, key, value) {
+  const at = doc.findIndex((entry, i) => i >= start && i < end && entry && entry.kind === "key" && entry.key === key);
+  if (at >= 0) doc[at].value = value == null ? "" : String(value);
+}
+
+function mergeLootText(existingText, data) {
+  const text = String(existingText || "").replace(/\r/g, "");
+  if (!text.trim()) return exportLootFile(data || {});
+  const doc = importEngineText(text);
+  const source = data || {};
+  const end = headerEnd(doc);
+  if (source.id != null && String(source.id).trim() !== "") updateExistingDocKey(doc, 0, end, "id", source.id);
+  if (source.name != null && String(source.name).trim() !== "") updateExistingDocKey(doc, 0, end, "name", source.name);
+  if (source.description !== undefined) updateExistingDocKey(doc, 0, end, "description", source.description);
+  if (Array.isArray(source.includes)) {
+    const paths = source.includes.map((item) => String(item || "").trim()).filter(Boolean);
+    const existing = [];
+    for (const entry of doc) {
+      if (entry && entry.kind === "raw" && String(entry.text || "").toUpperCase().startsWith("INCLUDE ")) {
+        existing.push(String(entry.text).slice(8).trim());
+      }
+    }
+    const same = existing.length === paths.length && existing.every((path, i) => path === paths[i]);
+    if (!same) {
+      const first = doc.findIndex((entry) => entry && entry.kind === "raw" && String(entry.text || "").toUpperCase().startsWith("INCLUDE "));
+      const without = doc.filter((entry) => !(entry && entry.kind === "raw" && String(entry.text || "").toUpperCase().startsWith("INCLUDE ")));
+      const inc = paths.map((path) => ({ kind: "raw", text: `INCLUDE ${path}` }));
+      const at = first < 0 ? without.length : without.findIndex((_, i) => i === first - (doc.length - without.length - inc.length + paths.length));
+      const insertAt = first < 0 ? without.length : Math.max(0, first - (doc.filter((entry, i) => i < first && entry && entry.kind === "raw" && String(entry.text || "").toUpperCase().startsWith("INCLUDE ")).length));
+      without.splice(insertAt, 0, ...inc);
+      return exportEngineText(without);
+    }
+  }
+  return exportEngineText(doc);
+}
+
+function collectNamedBlocks(doc, sectionName) {
+  const name = String(sectionName).toLowerCase();
+  const first = doc.findIndex((entry) => entry && entry.kind === "section" && String(entry.name).toLowerCase() === name);
+  if (first < 0) {
+    return { header: doc.map((entry) => (entry && typeof entry === "object" ? { ...entry } : entry)), blocks: [] };
+  }
+  const header = doc.slice(0, first).map((entry) => (entry && typeof entry === "object" ? { ...entry } : entry));
+  const starts = [];
+  for (let i = first; i < doc.length; i += 1) {
+    if (doc[i] && doc[i].kind === "section" && String(doc[i].name).toLowerCase() === name) starts.push(i);
+  }
+  const blocks = starts.map((start, index) => {
+    const end = index + 1 < starts.length ? starts[index + 1] : doc.length;
+    return doc.slice(start, end).map((entry) => (entry && typeof entry === "object" ? { ...entry } : entry));
+  });
+  return { header, blocks };
+}
+
+function blockId(block) {
+  for (const entry of block || []) {
+    if (entry && entry.kind === "key" && entry.key === "id") return String(entry.value);
+  }
+  return "";
+}
+
+function applyItemToBlock(block, item) {
+  const { ITEM_KEYS } = require("./attributeKeys.cjs");
+  const next = (block && block.length ? block : [{ kind: "section", name: "item" }]).map((entry) => (entry && typeof entry === "object" ? { ...entry } : entry));
+  if (!next[0] || next[0].kind !== "section") next.unshift({ kind: "section", name: "item" });
+  const source = item || {};
+  for (const key of ITEM_KEYS) {
+    if (!Object.prototype.hasOwnProperty.call(source, key)) continue;
+    const raw = source[key];
+    if (Array.isArray(raw)) setDocListKey(next, 1, next.length, key, raw.join(","), true);
+    else setDocKey(next, 1, next.length, key, raw === true ? "true" : raw == null ? "" : String(raw), true);
+  }
+  return next;
+}
+
+function newItemBlock(item) {
+  const { ITEM_KEYS } = require("./attributeKeys.cjs");
+  const block = [{ kind: "section", name: "item" }];
+  const source = item || {};
+  for (const key of ITEM_KEYS) {
+    if (!Object.prototype.hasOwnProperty.call(source, key)) continue;
+    const raw = source[key];
+    if (raw == null || raw === "" || raw === false) continue;
+    const value = Array.isArray(raw) ? raw.join(",") : raw === true ? "true" : String(raw);
+    if (value) block.push({ kind: "key", key, value });
+  }
+  block.push({ kind: "blank" });
+  return block;
+}
+
+function mergeItemText(existingText, item) {
+  const text = String(existingText || "").replace(/\r/g, "");
+  const source = item || {};
+  if (!text.trim()) return serializers.exportItemFile([source], { append: true }).text;
+  const doc = importEngineText(text);
+  const { header, blocks } = collectNamedBlocks(doc, "item");
+  const id = source.id != null ? String(source.id) : "";
+  let found = false;
+  const outBlocks = blocks.map((block) => {
+    if (found || !id || blockId(block) !== id) return block;
+    found = true;
+    return applyItemToBlock(block, source);
+  });
+  if (!found && id) outBlocks.push(newItemBlock(source));
+  const out = header.slice();
+  for (const block of outBlocks) out.push(...block);
+  return exportEngineText(out);
+}
+
 module.exports = {
   exportLootFile,
   importLootText,
+  mergeLootText,
   exportQuestFile,
   importQuestText,
   mergeQuestText,
+  mergeItemText,
   firstQuestStep,
   exportEffectFile,
   importEffectText,

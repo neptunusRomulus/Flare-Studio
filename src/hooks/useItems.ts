@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { ItemRole, ItemResourceSubtype } from '../editor/itemRoles';
 import type { RawItem, ItemSummary } from '@/utils/items';
-import { canonicalJson, exportLootFile, importLootText, slugFileName } from '../adapters/flare/flareAdapter.cjs';
-import { writeProjectFiles } from '../editor/projectFiles';
+import { canonicalJson, exportLootFile, importLootText, mergeLootText, slugFileName } from '../adapters/flare/flareAdapter.cjs';
+import { loadConfigDocument, writeProjectFiles } from '../editor/projectFiles';
 
 const safeString = (value: unknown) => {
   if (typeof value === 'string') return value;
@@ -12,7 +12,9 @@ const safeString = (value: unknown) => {
 
 const normalizePathForJoin = (input: string) => input.replace(/\\/g, '/');
 
-export const serializeLootGroupText = (data: Record<string, unknown>) => exportLootFile(data);
+export const serializeLootGroupText = (data: Record<string, unknown>, existingText?: string) => (
+  existingText ? mergeLootText(existingText, data) : exportLootFile(data)
+);
 
 export const parseLootGroupText = (content: string) => importLootText(content) as Record<string, unknown>;
 
@@ -469,7 +471,8 @@ export default function useItems({ currentProjectPath, toast, normalizeItemsForS
         id: normalizedId,
         name: safeString(lootGroupEditingData.name ?? lootGroupEditingItem.name),
       };
-      const content = serializeLootGroupText(payload);
+      const existing = await loadConfigDocument(normalizedProjectPath, `loot/${normalizedId}.txt`);
+      const content = serializeLootGroupText(payload, existing);
       const saved = await writeProjectFiles(normalizedProjectPath, [
         { path: `loot/${normalizedId}.txt`, content },
         { path: `content/loot/${normalizedId}.json`, content: canonicalJson('loot', payload) },

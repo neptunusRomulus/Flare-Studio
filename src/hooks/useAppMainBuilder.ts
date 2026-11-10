@@ -62,6 +62,8 @@ export default function useAppMainBuilder() {
     setCurrentProjectPath,
     showActiveGid,
     setShowActiveGid,
+    debugMode,
+    setDebugMode,
     showImportReview,
     setShowImportReview,
     importReviewOriginPreset,
@@ -781,6 +783,11 @@ export default function useAppMainBuilder() {
     }
   }, [currentProjectPath, mapConfig, activeTabId, closeEditorTab, editor, setTabs, setActiveTabId, appState]);
 
+  useEffect(() => {
+    if (!editor) return;
+    if (editor.getDebugMode() !== debugMode) editor.toggleDebugMode();
+  }, [editor, debugMode]);
+
   function buildAppMainCtxFromSidebar(assembledSidebar: AssembledSidebar): Record<string, unknown> {
     const sb = (assembledSidebar ?? {}) as Record<string, unknown>;
 
@@ -969,6 +976,8 @@ export default function useAppMainBuilder() {
       syncMapObjectsWrapper: syncMapObjects,
       showActiveGid,
       setShowActiveGid,
+      debugMode,
+      setDebugMode,
       setShowSidebarToggle,
       showCreateMapDialog: mapConfig.showCreateMapDialog,
       setShowCreateMapDialog: mapConfig.setShowCreateMapDialog,
@@ -1043,6 +1052,7 @@ export default function useAppMainBuilder() {
         isPreparingNewMap: mapConfig.isPreparingNewMap,
         hoverCoords: toolbarState.hoverCoords,
         showActiveGid: showActiveGid,
+        debugMode,
         activeGidValue: toolbarState.activeGidValue,
         hoverGidValue: toolbarState.hoverGidValue,
         npcDeletePopup: appState.npcDeletePopup,

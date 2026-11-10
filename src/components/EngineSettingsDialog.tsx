@@ -19,6 +19,8 @@ type EngineSettingsDialogProps = {
   editor: TileMapEditor | null;
   showActiveGid: boolean;
   setShowActiveGid: Dispatch<SetStateAction<boolean>>;
+  debugMode: boolean;
+  setDebugMode: Dispatch<SetStateAction<boolean>>;
   showSidebarToggle: boolean;
   setShowSidebarToggle: Dispatch<SetStateAction<boolean>>;
   undoPersistenceEnabled?: boolean;
@@ -35,6 +37,8 @@ const EngineSettingsDialog = ({
   editor,
   showActiveGid,
   setShowActiveGid,
+  debugMode,
+  setDebugMode,
   showSidebarToggle,
   setShowSidebarToggle,
   undoPersistenceEnabled = false,
@@ -145,18 +149,17 @@ const EngineSettingsDialog = ({
                   <span className="text-sm">Disabled</span>
                   <button
                     onClick={() => {
-                      if (editor) {
-                        editor.toggleDebugMode();
-                        setForceRender(prev => prev + 1);
-                      }
+                      const next = !debugMode;
+                      if (editor && editor.getDebugMode() !== next) editor.toggleDebugMode();
+                      setDebugMode(next);
                     }}
                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      editor?.getDebugMode() ? 'bg-orange-600' : 'bg-gray-200'
+                      debugMode ? 'bg-orange-600' : 'bg-gray-200'
                     }`}
                   >
                     <span
                       className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        editor?.getDebugMode() ? 'translate-x-6' : 'translate-x-1'
+                        debugMode ? 'translate-x-6' : 'translate-x-1'
                       }`} />
                     <span className="sr-only">Toggle debug mode</span>
                   </button>

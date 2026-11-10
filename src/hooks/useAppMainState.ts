@@ -121,6 +121,7 @@ export default function useAppMainState() {
   const helpState = useHelpState();
 
   const [showActiveGid, setShowActiveGid] = useState<boolean>(true);
+  const [debugMode, setDebugMode] = useState<boolean>(false);
   const [currentProjectPath, setCurrentProjectPath] = useState<string | null>(null);
 
   const [showImportReview, setShowImportReview] = useState<boolean>(false);
@@ -251,6 +252,8 @@ export default function useAppMainState() {
     currentProjectPath,
     setCurrentProjectPath,
     showActiveGid,
+    debugMode,
+    setDebugMode,
     setShowActiveGid,
     showImportReview,
     setShowImportReview,

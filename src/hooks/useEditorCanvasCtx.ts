@@ -35,6 +35,7 @@ type UseEditorCanvasDeps = {
   isPreparingNewMap: boolean;
   hoverCoords: { x: number; y: number } | null;
   showActiveGid: boolean;
+  debugMode: boolean;
   activeGidValue: string;
   hoverGidValue: string;
   npcDeletePopup: NpcDeletePopup;
@@ -111,6 +112,7 @@ export default function useEditorCanvasCtx(deps: UseEditorCanvasDeps) {
     isPreparingNewMap: deps.isPreparingNewMap,
     hoverCoords: deps.hoverCoords,
     showActiveGid: deps.showActiveGid,
+    debugMode: deps.debugMode,
     activeGidValue: deps.activeGidValue,
     hoverGidValue: deps.hoverGidValue,
     npcDeletePopup: deps.npcDeletePopup,

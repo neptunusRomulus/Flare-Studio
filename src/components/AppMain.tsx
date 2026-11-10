@@ -61,6 +61,8 @@ export default function AppMain() {
     editor,
     showActiveGid,
     setShowActiveGid,
+    debugMode,
+    setDebugMode,
     setShowSidebarToggle,
     showMapSettingsOnly,
     handleCloseMapSettings,
@@ -337,6 +339,8 @@ export default function AppMain() {
           editor={editor}
           showActiveGid={showActiveGid}
           setShowActiveGid={setShowActiveGid}
+          debugMode={debugMode}
+          setDebugMode={setDebugMode}
           showSidebarToggle={showSidebarToggle}
           setShowSidebarToggle={setShowSidebarToggle}
         />

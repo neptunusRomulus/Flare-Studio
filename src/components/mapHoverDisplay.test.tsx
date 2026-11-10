@@ -15,4 +15,11 @@ describe('GID readout', () => {
     expect(html).toContain('(3, 4) GID: 17');
     expect(html).toContain('left:172px');
   });
+
+  it('updates immediately when debugMode changes, without a new mouse move', () => {
+    const hidden = renderToStaticMarkup(<MapHoverDisplay {...base} debugMode={false} />);
+    const shown = renderToStaticMarkup(<MapHoverDisplay {...base} debugMode />);
+    expect(hidden).toBe('');
+    expect(shown).toContain('GID: 17');
+  });
 });

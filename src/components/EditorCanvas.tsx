@@ -39,6 +39,7 @@ type EditorContext = {
   isPreparingNewMap: boolean;
   hoverCoords: { x: number; y: number } | null;
   showActiveGid: boolean;
+  debugMode: boolean;
   activeGidValue: string;
   hoverGidValue: string;
   npcDeletePopup: { npcId: number; screenX: number; screenY: number } | null;
@@ -93,6 +94,7 @@ export default function EditorCanvas(props: Props) {
     isPreparingNewMap,
     hoverCoords,
     showActiveGid,
+    debugMode,
     activeGidValue,
     hoverGidValue,
     npcDeletePopup,
@@ -554,7 +556,7 @@ export default function EditorCanvas(props: Props) {
       <MapInitOverlay mapInitialized={mapInitialized} handleOpenCreateMapDialog={handleOpenCreateMapDialog} isPreparingNewMap={isPreparingNewMap} />
 
       <MapHoverDisplay hoverCoords={hoverCoords} showActiveGid={showActiveGid} activeGidValue={activeGidValue} hoverGidValue={hoverGidValue} isEnemyTabActive={isEnemyTabActive}
-        debugMode={!!editorRef.current?.getDebugMode?.()}
+        debugMode={debugMode}
         left={(() => { const b = editorRef.current?.getLastMiniMapBounds?.(); return b ? b.x + b.w + 12 : 16; })()} />
 
       <NpcDeletePopup npcDeletePopup={npcDeletePopup} onConfirm={handleDeleteMapNpcInstance} onDuplicate={handleDuplicateMapNpcInstance} onCancel={() => setNpcDeletePopup(null)} />

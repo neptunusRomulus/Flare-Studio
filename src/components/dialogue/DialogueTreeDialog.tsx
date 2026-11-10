@@ -343,6 +343,7 @@ const DialogueTreeDialog = ({
   updateEditingObjectProperty,
   projectMaps = [],
   embedded = false,
+  visibleDialogueIds,
 }: {
   showDialogueTreeDialog: boolean;
   dialogueTrees?: DialogueTree[];
@@ -357,6 +358,8 @@ const DialogueTreeDialog = ({
   projectMaps?: string[];
   /** Render inside the role center instead of a floating window. */
   embedded?: boolean;
+  /** When set, List/Board only show these topic ids. Other topics stay in the data. */
+  visibleDialogueIds?: string[] | null;
 }) => {
   const [editingIdIndex, setEditingIdIndex] = useState<number | null>(null);
   const [pendingIdValue, setPendingIdValue] = useState('');
@@ -365,6 +368,16 @@ const DialogueTreeDialog = ({
   const [effectMenuOpen, setEffectMenuOpen] = useState(false);
   const [effectQuery, setEffectQuery] = useState('');
   const [boardView, setBoardView] = useState(false);
+  const visibleIndexSet = useMemo(() => {
+    if (!visibleDialogueIds) return null;
+    const ids = new Set(visibleDialogueIds);
+    return new Set(dialogueTrees.map((tree, index) => (ids.has(tree.dialogueId) || ids.has(tree.id) ? index : -1)).filter((index) => index >= 0));
+  }, [dialogueTrees, visibleDialogueIds]);
+  useEffect(() => {
+    if (!visibleIndexSet || visibleIndexSet.has(activeDialogueTab)) return;
+    const first = [...visibleIndexSet][0];
+    if (typeof first === 'number') setActiveDialogueTab(first);
+  }, [visibleIndexSet, activeDialogueTab, setActiveDialogueTab]);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { controls } = useAppContext() as any;
@@ -468,7 +481,11 @@ const DialogueTreeDialog = ({
     );
   }, [effectQuery]);
 
-  const board = useMemo(() => buildDialogueBoard(dialogueTrees), [dialogueTrees]);
+  const board = useMemo(() => {
+    const cards = buildDialogueBoard(dialogueTrees);
+    if (!visibleIndexSet) return cards;
+    return cards.filter((card) => visibleIndexSet.has(card.index));
+  }, [dialogueTrees, visibleIndexSet]);
   const boardWarnings = boardWarningCount(board);
 
   // Collect all dialogueIds for response dropdown
@@ -536,7 +553,7 @@ const DialogueTreeDialog = ({
         />
         <div className="flex items-center justify-between mb-1.5">
           <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
-            {dialogueTrees.length} topics{boardWarnings > 0 ? ` · ${boardWarnings} warnings` : ''}
+            {(visibleIndexSet ? visibleIndexSet.size : dialogueTrees.length)} topics{boardWarnings > 0 ? ` · ${boardWarnings} warnings` : ''}
           </span>
           <div className="flex rounded-md border border-border overflow-hidden">
             <button
@@ -612,6 +629,7 @@ const DialogueTreeDialog = ({
         {!boardView && (
         <div className="flex-1 space-y-1 overflow-y-auto minimal-scroll">
           {dialogueTrees.map((tree, index) => {
+            if (visibleIndexSet && !visibleIndexSet.has(index)) return null;
             const hasResponses = (tree.responses || []).length > 0;
             const isResponseOnly = tree.responseOnly;
             const isResponseTarget = dialogueTrees.some(t => (t.responses || []).includes(tree.dialogueId));

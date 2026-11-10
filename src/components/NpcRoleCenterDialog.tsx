@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { MessageSquare, HandCoins, MessageCircleQuestionMark, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
@@ -8,6 +8,18 @@ import DialogueTreeDialog from '@/components/dialogue/DialogueTreeDialog';
 import NpcVendorSettingsDialog from '@/components/NpcVendorSettingsDialog';
 import NpcQuestSettingsDialog from '@/components/NpcQuestSettingsDialog';
 import { dialogueSummary, questSummary, vendorSummary } from '@/editor/roleSummary';
+import { readQuestFlowTrees } from '@/editor/questFlow';
+import {
+  addCustomMoment,
+  assignTopicsToMoments,
+  buildMoments,
+  OTHER_MOMENT_ID,
+  type RoleMoment,
+} from '@/editor/roleMoments';
+import { stepsFromImported, type QuestStep } from '@/editor/questSteps';
+import { importQuestText, contentSlug } from '@/adapters/flare/flareAdapter.cjs';
+import { projectRoot } from '@/editor/projectFiles';
+import MomentsStrip from '@/components/MomentsStrip';
 import ResizeHandle from '@/components/ResizeHandle';
 
 export type RoleCenterTab = 'dialogue' | 'vendor' | 'quest';
@@ -61,6 +73,71 @@ const NpcRoleCenterDialog = ({
     handleHeaderMouseDown,
     handleResizeMouseDown,
   } = useDraggableResizable({ id: 'npc_role_center_dialog', initialWidth: 900, initialHeight: 660, minWidth: 720, minHeight: 520 });
+
+  const [customMoments, setCustomMoments] = useState<RoleMoment[]>([]);
+  const [journalSteps, setJournalSteps] = useState<QuestStep[]>([]);
+  const [selectedMomentId, setSelectedMomentId] = useState<string>('');
+  const npcKey = editingObject?.id || editingObject?.name || '';
+
+  useEffect(() => {
+    setCustomMoments([]);
+    setJournalSteps([]);
+    setSelectedMomentId('');
+  }, [npcKey]);
+
+  const questFlow = useMemo(() => readQuestFlowTrees(dialogueTrees), [dialogueTrees]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const questId = questFlow?.questId;
+    if (!projectPath || !questId) {
+      setJournalSteps([]);
+      return;
+    }
+    const api = window.electronAPI;
+    if (!api?.readFile) return;
+    const root = projectRoot(projectPath);
+    const file = `${root}/quests/${contentSlug(questId, 'quest')}.txt`;
+    void api.readFile(file).then((text) => {
+      if (cancelled) return;
+      if (!text) {
+        setJournalSteps([]);
+        return;
+      }
+      const parsed = importQuestText(text) as { steps?: unknown[] };
+      setJournalSteps(stepsFromImported(parsed.steps));
+    }).catch(() => {
+      if (!cancelled) setJournalSteps([]);
+    });
+    return () => { cancelled = true; };
+  }, [projectPath, questFlow?.questId]);
+
+  const moments = useMemo(
+    () => buildMoments({ npcName: editingObject?.name || 'npc', quest: questFlow, steps: journalSteps, custom: customMoments }),
+    [editingObject?.name, questFlow, journalSteps, customMoments],
+  );
+  const assignment = useMemo(() => assignTopicsToMoments(dialogueTrees, moments), [dialogueTrees, moments]);
+  const allMomentCards = useMemo(() => [...moments, assignment.other], [moments, assignment.other]);
+
+  useEffect(() => {
+    if (selectedMomentId && (allMomentCards.some((moment) => moment.id === selectedMomentId))) return;
+    setSelectedMomentId(moments[0]?.id || OTHER_MOMENT_ID);
+  }, [allMomentCards, moments, selectedMomentId]);
+
+  const topicCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const moment of allMomentCards) {
+      counts[moment.id] = dialogueTrees.filter((tree) => assignment.topicMoment[tree.dialogueId || tree.id] === moment.id).length;
+    }
+    return counts;
+  }, [allMomentCards, assignment, dialogueTrees]);
+
+  const visibleDialogueIds = useMemo(() => {
+    const id = selectedMomentId || OTHER_MOMENT_ID;
+    return dialogueTrees
+      .filter((tree) => assignment.topicMoment[tree.dialogueId || tree.id] === id)
+      .map((tree) => tree.dialogueId || tree.id);
+  }, [assignment, dialogueTrees, selectedMomentId]);
 
   if (!tab) return null;
 
@@ -122,11 +199,25 @@ const NpcRoleCenterDialog = ({
           })}
         </div>
 
-        <div className="flex-1 min-w-0 min-h-0 p-3">
+        <div className="flex-1 min-w-0 min-h-0 p-3 flex flex-col gap-2">
+          <MomentsStrip
+            moments={moments}
+            other={assignment.other}
+            selectedId={selectedMomentId || OTHER_MOMENT_ID}
+            topicCounts={topicCounts}
+            onSelect={setSelectedMomentId}
+            onAdd={() => {
+              const next = addCustomMoment(moments, editingObject?.name || 'npc');
+              const added = next[next.length - 1];
+              setCustomMoments((prev) => [...prev, added]);
+              setSelectedMomentId(added.id);
+            }}
+          />
           {tab === 'dialogue' && (
             <DialogueTreeDialog
               embedded
               showDialogueTreeDialog
+              visibleDialogueIds={visibleDialogueIds}
               dialogueTrees={dialogueTrees}
               setDialogueTrees={setDialogueTrees as React.Dispatch<React.SetStateAction<DialogueTree[]>>}
               activeDialogueTab={activeDialogueTab}

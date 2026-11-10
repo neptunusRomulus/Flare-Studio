@@ -1,5 +1,6 @@
 import type { DragEvent } from 'react';
 import React from 'react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Tooltip from '@/components/ui/tooltip';
@@ -9,9 +10,12 @@ import type { MapObject } from '@/types';
 import { propertyText } from '@/editor/propertyText';
 import { ENEMY_ROLE_META_LOOKUP } from '@/editor/actorRoles';
 import { checkNpcDraftName } from '@/editor/npcDraft';
+import { npcFileForActor, npcInstanceCounts, npcInstancesForFile } from '@/editor/npcInstances';
 import ElementContextMenu from '@/components/ElementContextMenu';
 import ListItemTooltip from '@/components/ListItemTooltip';
+import NpcInstancesDialog from '@/components/NpcInstancesDialog';
 import useListReorder from '@/hooks/useListReorder';
+import useNpcInstances from '@/hooks/useNpcInstances';
 
 type ActorEntriesPanelProps = {
   isNpcLayer: boolean;
@@ -30,6 +34,10 @@ type ActorEntriesPanelProps = {
   onAddEnemy: () => void;
   /** Creates an NPC from the inline draft row and returns its id (null on failure). */
   onCreateActorShell?: (name: string, type?: 'npc' | 'enemy') => Promise<number | null>;
+  /** Project root, needed to count this NPC's instances across all maps. */
+  projectPath?: string | null;
+  /** Current map name; its live objects are used instead of the saved map file. */
+  mapName?: string;
 };
 
 const SidebarActorEntries = ({
@@ -48,12 +56,25 @@ const SidebarActorEntries = ({
   onAddNpc,
   onAddEnemy,
   onCreateActorShell,
+  projectPath = null,
+  mapName = '',
 }: ActorEntriesPanelProps) => {
   const armed = React.useSyncExternalStore(entityPlacement.subscribe, entityPlacement.get, entityPlacement.get);
   const { getItemDragProps, getItemDropProps, startReorder, endReorder, reorderClass } = useListReorder(
     actorEntries,
     (a) => a.id,
     onReorderActors,
+  );
+  const { instances, loading: instancesLoading, refresh: refreshInstances } = useNpcInstances({
+    projectPath,
+    currentMapName: mapName,
+    objects: isNpcLayer ? actorEntries : [],
+  });
+  const instanceCounts = React.useMemo(() => npcInstanceCounts(instances), [instances]);
+  const [instancesNpc, setInstancesNpc] = React.useState<MapObject | null>(null);
+  const instanceList = React.useMemo(
+    () => (instancesNpc ? npcInstancesForFile(instances, npcFileForActor(instancesNpc)) : []),
+    [instancesNpc, instances],
   );
 
   // "+ NPC" opens a draft row instead of a dialog: name first, roles later in Edit NPC.
@@ -248,6 +269,7 @@ const SidebarActorEntries = ({
               const hasEnemyRole = Object.values(enemyRoles).some(Boolean);
               const portraitPath = propertyText(actor.properties?.portraitPath) || undefined;
               const isPlacedOnMap = actor.x >= 0 && actor.y >= 0;
+              const instanceCount = instanceCounts.get(npcFileForActor(actor)) ?? 0;
 
               return (
                 <ListItemTooltip key={actor.id} item={{ id: actor.id, name: actor.name || `${actor.type === 'npc' ? 'NPC' : 'Enemy'} #${actor.id}` }}>
@@ -369,6 +391,33 @@ const SidebarActorEntries = ({
                         </div>
                       )}
                     </div>
+                    {isNpcLayer && !leftCollapsed && (
+                      <Tooltip content="Number of NPC instances total" side="left">
+                        <button
+                          type="button"
+                          aria-label={`${instanceCount} NPC instances total`}
+                          className="shrink-0 cursor-pointer rounded-full focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                          draggable={false}
+                          onDragStart={(event) => event.preventDefault()}
+                          onMouseDown={(event) => event.stopPropagation()}
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            setInstancesNpc(actor);
+                            refreshInstances();
+                          }}
+                        >
+                          <Badge
+                            variant="secondary"
+                            className={`h-5 min-w-5 justify-center px-1.5 text-[10px] font-semibold ${
+                              instanceCount === 0 ? 'text-muted-foreground' : ''
+                            }`}
+                          >
+                            {instanceCount}
+                          </Badge>
+                        </button>
+                      </Tooltip>
+                    )}
                     {(isNpcLayer || isEnemyLayer) && (
                       <Tooltip content={isNpcLayer ? 'Drag to reorder. Click to arm placement, then click the map.' : 'Drag to the map, or click then click the map to place enemy'}>
                         <div
@@ -408,6 +457,13 @@ const SidebarActorEntries = ({
         )}
       </div>
     )}
+    <NpcInstancesDialog
+      isOpen={instancesNpc !== null}
+      onClose={() => setInstancesNpc(null)}
+      npcName={instancesNpc?.name || ''}
+      instances={instanceList}
+      loading={instancesLoading}
+    />
   </>
   );
 };

@@ -312,6 +312,8 @@ export default function AppMain() {
               actors={{ ...actors, isNpcLayer: false, isEnemyLayer: false }}
               events={{ ...events, isEventLayer: true }}
               visibility={layerVisibility}
+              projectPath={controls?.currentProjectPath}
+              mapName={mapName}
             />
           ) : groupOfType(tileset.activeLayer?.type) === CONTENT_GROUP ? (
             <ContentDock

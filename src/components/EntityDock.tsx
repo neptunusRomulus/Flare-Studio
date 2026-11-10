@@ -13,10 +13,12 @@ type Props = {
   actors: Omit<React.ComponentProps<typeof SidebarActorArea>, 'leftCollapsed'>;
   events: Omit<React.ComponentProps<typeof SidebarEventArea>, 'leftCollapsed'>;
   visibility?: LayerVisibilityControls;
+  projectPath?: string | null;
+  mapName?: string;
 };
 
 /** Right dock content for the Entities layer: existing lists on top + target switch below (same as Map dock) NPC/Enemy/Event lists. */
-const EntityDock: React.FC<Props> = ({ layers, activeLayer, onSelectLayer, actors, events, visibility }) => {
+const EntityDock: React.FC<Props> = ({ layers, activeLayer, onSelectLayer, actors, events, visibility, projectPath, mapName }) => {
   const type = activeLayer?.type;
   // Switching target (or leaving Entities) cancels a pending click-to-place
   React.useEffect(() => { entityPlacement.clear(); return () => entityPlacement.clear(); }, [type]);
@@ -26,7 +28,7 @@ const EntityDock: React.FC<Props> = ({ layers, activeLayer, onSelectLayer, actor
       <MapTargetSwitch group={ENTITY_GROUP} layers={layers} activeLayer={activeLayer} onSelectLayer={onSelectLayer} visibility={visibility} />
       <div className="flex flex-col flex-1 min-h-0 overflow-y-auto">
         {(type === 'npc' || type === 'enemy') && (
-          <SidebarActorArea {...actors} isNpcLayer={type === 'npc'} isEnemyLayer={type === 'enemy'} leftCollapsed={false} />
+          <SidebarActorArea {...actors} isNpcLayer={type === 'npc'} isEnemyLayer={type === 'enemy'} leftCollapsed={false} projectPath={projectPath} mapName={mapName} />
         )}
         {type === 'event' && <SidebarEventArea {...events} isEventLayer leftCollapsed={false} />}
       </div>

@@ -39,15 +39,16 @@
 
 ## Data safety
 - Saving merges into existing Flare files: keep unknown keys, repeated keys, INCLUDE/APPEND lines, comments, section and `[dialog]` order.
-- NPC and enemy files must round-trip byte-for-byte against flare-game fixtures (including blank lines and multiple INCLUDE lines); keep these tests passing:
+- NPC, enemy, and multi-stage quest files must round-trip byte-for-byte against flare-game fixtures (including blank lines, unknown keys, comments, and multiple INCLUDE or `[quest]` blocks); keep these tests passing:
   - `src/adapters/flare/serializers.cjs` (`importNpcText`, `exportNpcFile`, `mergeNpcFile`, `normalizeEnemyText`, `applyEnemyFileUpdates`)
   - `src/utils/npcFileUpdate.ts` (Studio object → NPC file update) + `src/utils/npcFileUpdate.test.ts`
   - `src/adapters/flare/npcRoundTrip.test.ts`, fixtures in `tests/fixtures/flare-npcs/` and `tests/fixtures/flare-enemies/`
+  - `src/adapters/flare/content.cjs` (`importQuestText`, `exportQuestFile`, `mergeQuestText`), `src/editor/questSteps.ts`, fixtures in `tests/fixtures/flare-quests/`
 - Never overwrite hand-made animation files (Studio writes `<name>_studio.txt` instead).
 - Enemy files: `gold`, `wander_radius`, `waypoints`, `script` are not StatBlock keys (map-spawn or none); they are dropped with a visible toast.
 
 ## Known open issues
-- Multi-stage quest journals (more than the first `[quest]` block) are still not editable in the Quest tab; existing later blocks must be preserved on merge. (Approved next: step cards, then Role center Moments + Play.)
+- Role center Moments + Play is the approved next step after multi-stage quest journals (step cards are in the Quest tab and hook into the NPC Quest role's accept / turn-in statuses).
 
 ## Edit NPC
 - Name and appearance (fantasycore picker, default sprite) are on the first screen. Roles use on/off switches; a reserved gear opens the Role center (Dialogue / Shop / Quest).

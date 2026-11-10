@@ -1,25 +1,5 @@
 import React from 'react';
-import QuestEditDialog from '@/components/QuestEditDialog';
-
-type QuestDraft = {
-  name: string;
-  complete_status: string;
-  quest_text: string;
-  requires_status: string;
-  requires_not_status: string;
-  requires_level: string;
-  requires_not_level: string;
-  requires_currency: string;
-  requires_not_currency: string;
-  itemRequirements: {
-    id: string;
-    type: 'requires_item' | 'requires_not_item';
-    itemId: string;
-    itemQuantity: number;
-  }[];
-  requires_class: string;
-  requires_not_class: string;
-};
+import QuestEditDialog, { type QuestDraft } from '@/components/QuestEditDialog';
 
 type QuestDialogCtx = {
   showQuestDialog?: boolean;
@@ -43,7 +23,8 @@ export default function QuestEditDialogContainer({ ctx }: { ctx: unknown }) {
     requires_not_currency: '',
     itemRequirements: [],
     requires_class: '',
-    requires_not_class: ''
+    requires_not_class: '',
+    steps: [],
   };
 
   return (

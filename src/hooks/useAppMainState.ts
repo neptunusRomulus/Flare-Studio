@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { canonicalJson, contentSlug, exportQuestFile, importQuestText } from '../adapters/flare/flareAdapter.cjs';
+import { canonicalJson, contentSlug, importQuestText, mergeQuestText } from '../adapters/flare/flareAdapter.cjs';
 import { projectRoot, writeProjectFiles } from '../editor/projectFiles';
 import useEditorRefs from './useEditorRefs';
 import useEditorSetup from './useEditorSetup';
@@ -13,6 +13,7 @@ import useItems from './useItems';
 import useVendorState from './useVendorState';
 import { normalizeItemsForState } from '@/utils/items';
 import { toast } from '@/hooks/use-toast';
+import { completeStatusKey, createFirstStep, flattenFirstStep, stepsFromImported, type QuestStep } from '@/editor/questSteps';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 
 export type ImportReviewData = {
@@ -46,6 +47,7 @@ export type QuestItemRequirement = {
 };
 
 export type QuestDraft = {
+  id?: string;
   name: string;
   complete_status: string;
   quest_text: string;
@@ -59,6 +61,7 @@ export type QuestDraft = {
   requires_class: string;
   requires_not_class: string;
   start_type?: 'player' | 'game';
+  steps?: QuestStep[];
 };
 
 export type StoredQuest = QuestDraft & {
@@ -79,7 +82,8 @@ const emptyQuestDraft = (): QuestDraft => ({
   requires_not_currency: '',
   itemRequirements: [],
   requires_class: '',
-  requires_not_class: ''
+  requires_not_class: '',
+  steps: [],
 });
 
 function storedQuestFromRecord(value: Record<string, unknown>, fallbackId: string): StoredQuest {
@@ -104,7 +108,8 @@ function storedQuestFromRecord(value: Record<string, unknown>, fallbackId: strin
     itemRequirements,
     id: typeof value.id === 'string' && value.id ? value.id : fallbackId,
     startType,
-    triggerId: typeof value.triggerId === 'string' ? value.triggerId : ''
+    triggerId: typeof value.triggerId === 'string' ? value.triggerId : '',
+    steps: Array.isArray(value.steps) ? stepsFromImported(value.steps) : undefined,
   };
 }
 
@@ -161,9 +166,11 @@ export default function useAppMainState() {
     setQuestDraft({
       ...emptyQuestDraft(),
       ...existingRule,
+      id: existingRule.id,
       name: existingRule.name,
       start_type: existingRule.startType,
-      itemRequirements: existingRule.itemRequirements || []
+      itemRequirements: existingRule.itemRequirements || [],
+      steps: existingRule.steps || [],
     });
     setShowQuestDialog(true);
   }, [rulesList]);
@@ -175,6 +182,18 @@ export default function useAppMainState() {
     const load = async () => {
       const loaded: StoredQuest[] = [];
       const seen = new Set<string>();
+      const applyJournal = (record: StoredQuest, journalText: string | null): StoredQuest => {
+        if (!journalText) return record;
+        const parsed = importQuestText(journalText) as Record<string, unknown>;
+        const steps = stepsFromImported(parsed.steps);
+        return {
+          ...record,
+          name: typeof parsed.name === 'string' && parsed.name ? parsed.name : record.name,
+          complete_status: typeof parsed.complete_status === 'string' ? parsed.complete_status : record.complete_status,
+          ...flattenFirstStep(steps),
+          steps,
+        };
+      };
       const jsonEntries = await window.electronAPI.readDir(`${root}/content/quests`);
       for (const entry of jsonEntries || []) {
         if (entry.isDirectory || !entry.name.endsWith('.json')) continue;
@@ -182,7 +201,8 @@ export default function useAppMainState() {
         if (!text) continue;
         try {
           const id = entry.name.replace(/\.json$/, '');
-          loaded.push(storedQuestFromRecord(JSON.parse(text) as Record<string, unknown>, id));
+          const journal = await window.electronAPI.readFile(`${root}/quests/${id}.txt`);
+          loaded.push(applyJournal(storedQuestFromRecord(JSON.parse(text) as Record<string, unknown>, id), journal));
           seen.add(id);
         } catch {
           /* skip a broken quest document */
@@ -196,7 +216,7 @@ export default function useAppMainState() {
         const text = await window.electronAPI.readFile(`${root}/quests/${entry.name}`);
         if (!text) continue;
         const parsed = importQuestText(text) as Record<string, unknown>;
-        loaded.push(storedQuestFromRecord({ ...parsed, id }, id));
+        loaded.push(storedQuestFromRecord({ ...parsed, id, steps: parsed.steps }, id));
       }
       if (!cancelled && loaded.length > 0) setRulesList(loaded);
     };
@@ -211,14 +231,22 @@ export default function useAppMainState() {
     const existing = rulesList.find((rule) => rule.id === editingQuestId);
     const id = existing?.id || contentSlug(nextName, 'quest');
     const startType = questDraft.start_type || existing?.startType || 'player';
+    const complete = questDraft.complete_status.trim() || completeStatusKey(id);
+    const steps = (questDraft.steps && questDraft.steps.length)
+      ? questDraft.steps
+      : [createFirstStep({ questId: id, acceptStatus: questDraft.requires_status, completeStatus: complete }, questDraft.quest_text || nextName)];
+    const first = flattenFirstStep(steps);
     const stored: StoredQuest = {
       ...questDraft,
+      ...first,
       id,
       name: nextName,
+      complete_status: complete,
       startType,
       start_type: startType,
       triggerId: existing?.triggerId || '',
-      itemRequirements: questDraft.itemRequirements || []
+      itemRequirements: questDraft.itemRequirements || [],
+      steps,
     };
     setRulesList((prev) => {
       if (existing) return prev.map((rule) => (rule.id === existing.id ? stored : rule));
@@ -230,15 +258,19 @@ export default function useAppMainState() {
     setQuestDraft(emptyQuestDraft());
 
     if (!currentProjectPath) return;
-    const text = exportQuestFile(stored);
-    void writeProjectFiles(currentProjectPath, [
-      { path: `quests/${id}.txt`, content: text },
-      { path: `content/quests/${id}.json`, content: canonicalJson('quest', stored) }
-    ]).then((saved) => {
+    const root = projectRoot(currentProjectPath);
+    const rel = `quests/${id}.txt`;
+    void (async () => {
+      const existingText = window.electronAPI?.readFile ? ((await window.electronAPI.readFile(`${root}/${rel}`)) || '') : '';
+      const text = mergeQuestText(existingText, { name: nextName, complete_status: complete, steps });
+      const saved = await writeProjectFiles(currentProjectPath, [
+        { path: rel, content: text },
+        { path: `content/quests/${id}.json`, content: canonicalJson('quest', stored) },
+      ]);
       if (!saved) {
         toast({ title: 'Quest save failed', description: 'Could not write the quests folder.', variant: 'destructive' });
       }
-    });
+    })();
   }, [currentProjectPath, editingQuestId, questDraft, rulesList]);
 
   return {

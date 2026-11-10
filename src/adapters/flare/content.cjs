@@ -134,33 +134,6 @@ function itemRequirementList(requirements, type) {
     });
 }
 
-function exportQuestFile(quest) {
-  const source = quest || {};
-  const lines = [];
-  if (source.name) lines.push(`name=${source.name}`);
-  if (source.complete_status) lines.push(`complete_status=${source.complete_status}`);
-  lines.push("");
-  lines.push("[quest]");
-  const requirements = source.itemRequirements;
-  const needs = itemRequirementList(requirements, "requires_item");
-  const blocked = itemRequirementList(requirements, "requires_not_item");
-  for (const key of QUEST_STEP_KEYS) {
-    if (key === "requires_item") {
-      const value = needs.length ? needs.join(",") : safeString(source.requires_item);
-      if (value) lines.push(`requires_item=${value}`);
-      continue;
-    }
-    if (key === "requires_not_item") {
-      const value = blocked.length ? blocked.join(",") : safeString(source.requires_not_item);
-      if (value) lines.push(`requires_not_item=${value}`);
-      continue;
-    }
-    const value = safeString(source[key]);
-    if (value) lines.push(`${key}=${value}`);
-  }
-  return finish(lines);
-}
-
 function parseRequirementToken(token, type) {
   const [itemId, qty] = String(token).split(":");
   return {
@@ -171,39 +144,136 @@ function parseRequirementToken(token, type) {
   };
 }
 
-function importQuestText(content) {
-  const quest = { itemRequirements: [] };
-  let inStep = false;
+function itemRequirementsFromStep(step) {
+  const list = [];
+  for (const type of ["requires_item", "requires_not_item"]) {
+    const raw = safeString(step && step[type]);
+    for (const token of raw.split(",").map((part) => part.trim()).filter(Boolean)) {
+      list.push(parseRequirementToken(token, type));
+    }
+  }
+  return list;
+}
+
+function stepKeyValue(step, key) {
+  if (!step) return "";
+  if (key === "requires_item") {
+    const fromList = itemRequirementList(step.itemRequirements, "requires_item");
+    if (fromList.length) return fromList.join(",");
+  }
+  if (key === "requires_not_item") {
+    const fromList = itemRequirementList(step.itemRequirements, "requires_not_item");
+    if (fromList.length) return fromList.join(",");
+  }
+  return safeString(step[key]);
+}
+
+function emptyQuestStepFields() {
+  const step = {};
+  for (const key of QUEST_STEP_KEYS) step[key] = "";
+  return step;
+}
+
+function parseQuestSections(content) {
+  const header = {};
+  const steps = [];
+  let current = null;
+  let blockIndex = -1;
   for (const rawLine of String(content || "").split(/\r?\n/)) {
     const line = rawLine.trim();
     if (!line || line.startsWith("#")) continue;
     if (line.toLowerCase() === "[quest]") {
-      inStep = true;
+      if (current) steps.push(current);
+      blockIndex += 1;
+      current = { ...emptyQuestStepFields(), blockIndex };
+      continue;
+    }
+    if (line.startsWith("[") && line.endsWith("]")) {
+      if (current) {
+        steps.push(current);
+        current = null;
+      }
       continue;
     }
     const eq = line.indexOf("=");
     if (eq < 0) continue;
     const key = line.slice(0, eq).trim();
     const value = line.slice(eq + 1).trim();
-    if (!inStep) {
-      if (key === "name" || key === "complete_status") quest[key] = value;
+    if (!current) {
+      if (key === "name" || key === "complete_status") header[key] = value;
       continue;
     }
-    if (key === "requires_item" || key === "requires_not_item") {
-      const type = key;
-      for (const token of value.split(",").map((part) => part.trim()).filter(Boolean)) {
-        quest.itemRequirements.push(parseRequirementToken(token, type));
-      }
-      continue;
-    }
-    if (QUEST_STEP_KEYS.includes(key)) quest[key] = value;
+    if (QUEST_STEP_KEYS.includes(key)) current[key] = value;
+  }
+  if (current) steps.push(current);
+  return { header, steps };
+}
+
+function flattenFirstStep(quest, step) {
+  if (!step) return quest;
+  for (const key of QUEST_STEP_KEYS) {
+    if (quest[key] === undefined) quest[key] = safeString(step[key]);
+  }
+  if (!Array.isArray(quest.itemRequirements) || !quest.itemRequirements.length) {
+    quest.itemRequirements = itemRequirementsFromStep(step);
   }
   return quest;
 }
 
+function normalizeQuestSteps(quest) {
+  const source = quest || {};
+  if (Array.isArray(source.steps)) {
+    return source.steps.map((step, index) => {
+      const next = { ...emptyQuestStepFields(), ...(step || {}) };
+      if (!Number.isInteger(next.blockIndex)) {
+        if (Number.isInteger(step && step.blockIndex)) next.blockIndex = step.blockIndex;
+        else next.blockIndex = index;
+      }
+      return next;
+    });
+  }
+  const hasFlat = QUEST_STEP_KEYS.some((key) => safeString(source[key]))
+    || (Array.isArray(source.itemRequirements) && source.itemRequirements.length);
+  if (!hasFlat) return [];
+  return [{ ...emptyQuestStepFields(), ...source, blockIndex: 0 }];
+}
+
+function writeQuestStepLines(lines, step) {
+  lines.push("[quest]");
+  for (const key of QUEST_STEP_KEYS) {
+    const value = stepKeyValue(step, key);
+    if (value) lines.push(`${key}=${value}`);
+  }
+}
+
+function exportQuestFile(quest) {
+  const source = quest || {};
+  const lines = [];
+  if (source.name) lines.push(`name=${source.name}`);
+  if (source.complete_status) lines.push(`complete_status=${source.complete_status}`);
+  const steps = normalizeQuestSteps(source);
+  if (steps.length) lines.push("");
+  steps.forEach((step, index) => {
+    if (index > 0) lines.push("");
+    writeQuestStepLines(lines, step);
+  });
+  return finish(lines);
+}
+
+function importQuestText(content) {
+  const parsed = parseQuestSections(content);
+  const quest = {
+    name: parsed.header.name || "",
+    complete_status: parsed.header.complete_status || "",
+    itemRequirements: [],
+    steps: parsed.steps,
+  };
+  return flattenFirstStep(quest, parsed.steps[0]);
+}
+
 /** Index range of a [section] inside an importEngineText document (start = section line, end = next section). */
 function sectionRange(doc, sectionName) {
-  const start = doc.findIndex((entry) => entry && entry.kind === "section" && entry.name === sectionName);
+  const start = doc.findIndex((entry) => entry && entry.kind === "section" && String(entry.name).toLowerCase() === sectionName);
   if (start < 0) return null;
   let end = start + 1;
   while (end < doc.length && !(doc[end] && doc[end].kind === "section")) end += 1;
@@ -237,10 +307,78 @@ function setDocKey(doc, start, end, key, value, removeIfEmpty) {
   doc.splice(lastKey >= 0 ? lastKey + 1 : start, 0, { kind: "key", key, value });
 }
 
+function collectQuestBlocks(doc) {
+  const first = doc.findIndex((entry) => entry && entry.kind === "section" && String(entry.name).toLowerCase() === "quest");
+  if (first < 0) return { header: doc.map((entry) => (entry && typeof entry === "object" ? { ...entry } : entry)), blocks: [] };
+  const header = doc.slice(0, first).map((entry) => (entry && typeof entry === "object" ? { ...entry } : entry));
+  const starts = [];
+  for (let i = first; i < doc.length; i += 1) {
+    if (doc[i] && doc[i].kind === "section" && String(doc[i].name).toLowerCase() === "quest") starts.push(i);
+  }
+  const blocks = starts.map((start, index) => {
+    const end = index + 1 < starts.length ? starts[index + 1] : doc.length;
+    return doc.slice(start, end).map((entry) => (entry && typeof entry === "object" ? { ...entry } : entry));
+  });
+  return { header, blocks };
+}
+
+function applyStepToBlock(block, step) {
+  const next = block && block.length ? block.map((entry) => (entry && typeof entry === "object" ? { ...entry } : entry)) : [{ kind: "section", name: "quest" }];
+  if (!next[0] || next[0].kind !== "section") next.unshift({ kind: "section", name: "quest" });
+  for (const key of QUEST_STEP_KEYS) {
+    setDocKey(next, 1, next.length, key, stepKeyValue(step, key), true);
+  }
+  return next;
+}
+
+function newQuestBlock(step) {
+  const block = [{ kind: "section", name: "quest" }];
+  for (const key of QUEST_STEP_KEYS) {
+    const value = stepKeyValue(step, key);
+    if (value) block.push({ kind: "key", key, value });
+  }
+  block.push({ kind: "blank" });
+  return block;
+}
+
+function mergeQuestSteps(doc, source) {
+  const { header, blocks } = collectQuestBlocks(doc);
+  let headerStart = 0;
+  const endOfHeader = header.length;
+  while (headerStart < endOfHeader && !(header[headerStart] && header[headerStart].kind === "key")) headerStart += 1;
+  setDocKey(header, headerStart, header.length, "name", safeString(source.name));
+  setDocKey(header, headerStart, header.length, "complete_status", safeString(source.complete_status));
+
+  const steps = normalizeQuestSteps(source);
+  const used = new Set();
+  const outBlocks = steps.map((step, index) => {
+    const claimed = Number.isInteger(step.blockIndex) ? step.blockIndex : index;
+    if (claimed >= 0 && claimed < blocks.length && !used.has(claimed)) {
+      used.add(claimed);
+      return applyStepToBlock(blocks[claimed], step);
+    }
+    return newQuestBlock(step);
+  });
+
+  const out = header.slice();
+  if (outBlocks.length && out.length && out[out.length - 1] && out[out.length - 1].kind !== "blank") {
+    // keep original header spacing when it already had a blank before the first [quest]
+  }
+  for (let i = 0; i < outBlocks.length; i += 1) {
+    const block = outBlocks[i];
+    if (i > 0 && block[0] && block[0].kind !== "blank" && out.length && out[out.length - 1] && out[out.length - 1].kind !== "blank") {
+      // original blocks already include a trailing blank when the source file had one
+    }
+    out.push(...block);
+  }
+  return out;
+}
+
 /**
  * Merge quest journal fields into an existing quests/<id>.txt.
- * Keeps comments, unknown keys, repeats and later [quest] blocks. Only the header and the first
- * [quest] section are updated (multi-stage journals are edited later).
+ * Keeps comments, unknown keys, repeats and later [quest] blocks. When `quest.steps`
+ * is provided, every [quest] block is updated (or reordered) to match; otherwise only
+ * the header and the first [quest] section are updated.
  */
 function mergeQuestText(existingText, quest) {
   const source = quest || {};
@@ -248,10 +386,14 @@ function mergeQuestText(existingText, quest) {
   if (!text.trim()) return exportQuestFile(source);
 
   const doc = importEngineText(text);
+  if (Array.isArray(source.steps)) {
+    return exportEngineText(mergeQuestSteps(doc, source));
+  }
+
   let headerStart = 0;
   const endOfHeader = headerEnd(doc);
   while (headerStart < endOfHeader && !(doc[headerStart] && doc[headerStart].kind === "key")) headerStart += 1;
-  setDocKey(doc, headerStart, endOfHeader, "name", safeString(source.name));
+  setDocKey(doc, headerStart, headerEnd(doc), "name", safeString(source.name));
   setDocKey(doc, headerStart, headerEnd(doc), "complete_status", safeString(source.complete_status));
 
   const range = sectionRange(doc, "quest");
@@ -276,32 +418,15 @@ function mergeQuestText(existingText, quest) {
   return exportEngineText(doc);
 }
 
-/** Keys of the first [quest] section only (later stages are left to a future editor). */
+/** Keys of the first [quest] section only. */
 function firstQuestStep(content) {
-  const quest = importQuestText(content || "");
-  // importQuestText currently walks every section and last-write-wins; re-read the first block only.
-  const out = { name: quest.name || "", complete_status: quest.complete_status || "" };
-  let inStep = false;
-  let seen = false;
-  for (const rawLine of String(content || "").split(/\r?\n/)) {
-    const line = rawLine.trim();
-    if (!line || line.startsWith("#")) continue;
-    if (line.toLowerCase() === "[quest]") {
-      if (seen) break;
-      inStep = true;
-      seen = true;
-      continue;
-    }
-    if (line.startsWith("[") && line.endsWith("]")) {
-      if (inStep) break;
-      continue;
-    }
-    if (!inStep) continue;
-    const eq = line.indexOf("=");
-    if (eq < 0) continue;
-    out[line.slice(0, eq).trim()] = line.slice(eq + 1).trim();
-  }
-  return out;
+  const parsed = parseQuestSections(content);
+  const step = parsed.steps[0] || emptyQuestStepFields();
+  return {
+    name: parsed.header.name || "",
+    complete_status: parsed.header.complete_status || "",
+    ...step,
+  };
 }
 
 const EFFECT_KEYS = [

@@ -1,9 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Tooltip from '@/components/ui/tooltip';
 import DirectionField from '@/components/DirectionField';
-import { FolderOpen, HelpCircle, Plus, X } from 'lucide-react';
+import { FolderOpen, HelpCircle, X } from 'lucide-react';
+import SearchablePalette from '@/components/ui/searchable-palette';
 import type { MapObject } from '@/types';
 import { sectionsFromNpcText, type KeyValue } from '@/utils/npcFileUpdate';
 import {
@@ -77,8 +78,6 @@ const PolaritySelect = ({
 );
 
 const NpcPropertyList = ({ editingObject, get, setProp, applyPatch, projectPath }: Props) => {
-  const [menuOpen, setMenuOpen] = useState(false);
-
   const browseInclude = async (index: number) => {
     const api = window.electronAPI as typeof window.electronAPI & {
       selectProjectFile?: (opts: { projectPath?: string | null; title?: string; filters?: Array<{ name: string; extensions: string[] }> }) => Promise<string | null>;
@@ -94,12 +93,9 @@ const NpcPropertyList = ({ editingObject, get, setProp, applyPatch, projectPath 
     });
     if (selected) applyPatch(patchLineValue('npc_includes', index, selected, editingObject.properties));
   };
-  const [query, setQuery] = useState('');
   const [animMore, setAnimMore] = useState(false);
   const [fileStats, setFileStats] = useState<KeyValue[] | undefined>();
   const [fileEffects, setFileEffects] = useState<KeyValue[][] | undefined>();
-  const menuRef = useRef<HTMLDivElement | null>(null);
-  const inputRef = useRef<HTMLInputElement | null>(null);
 
   const tilesetPath = get('tilesetPath', '');
   const tilesetSourcePath = get('tilesetSourcePath', '');
@@ -140,25 +136,9 @@ const NpcPropertyList = ({ editingObject, get, setProp, applyPatch, projectPath 
   );
 
   const catalog = useMemo(
-    () => filterPropertyCatalog(query, cards, { customTileset }),
-    [query, cards, customTileset],
+    () => filterPropertyCatalog('', cards, { customTileset }),
+    [cards, customTileset],
   );
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    const onDoc = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-        setQuery('');
-      }
-    };
-    document.addEventListener('mousedown', onDoc);
-    return () => document.removeEventListener('mousedown', onDoc);
-  }, [menuOpen]);
-
-  useEffect(() => {
-    if (menuOpen) inputRef.current?.focus();
-  }, [menuOpen]);
 
   const remove = (card: NpcPropertyCard) => {
     applyPatch(patchRemoveCard(card, editingObject.properties, fileStats, fileEffects));
@@ -166,8 +146,6 @@ const NpcPropertyList = ({ editingObject, get, setProp, applyPatch, projectPath 
 
   const add = (entry: PropertyCatalogEntry) => {
     applyPatch(patchAddProperty(entry.kind, editingObject.properties));
-    setMenuOpen(false);
-    setQuery('');
   };
 
   const writeStats = (next: KeyValue[]) => setProp('npc_stats', JSON.stringify([next]));
@@ -564,44 +542,18 @@ const NpcPropertyList = ({ editingObject, get, setProp, applyPatch, projectPath 
       <div className="space-y-1.5">
         {cards.map(renderCard)}
       </div>
-      <div className="relative" ref={menuRef}>
-        <button
-          type="button"
-          className="h-7 px-2 text-xs rounded-md border border-dashed border-border text-muted-foreground hover:bg-muted/50 hover:text-foreground inline-flex items-center gap-1"
-          onClick={() => setMenuOpen((v) => !v)}
-        >
-          <Plus className="w-3.5 h-3.5" />
-          Add property
-        </button>
-        {menuOpen && (
-          <div className="absolute z-30 mt-1 w-72 rounded-md border border-border bg-background shadow-md overflow-hidden">
-            <Input
-              ref={inputRef}
-              className="h-8 text-xs rounded-none border-0 border-b border-border"
-              placeholder="Search properties…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-            <div className="max-h-56 overflow-y-auto py-1">
-              {catalog.length === 0 ? (
-                <p className="px-3 py-2 text-xs text-muted-foreground">No matches</p>
-              ) : (
-                catalog.map((entry) => (
-                  <Tooltip key={entry.kind} content={`${entry.flareKey} — ${entry.description}`}>
-                    <button
-                      type="button"
-                      className="w-full px-3 py-1.5 text-left text-xs hover:bg-muted"
-                      onClick={() => add(entry)}
-                    >
-                      {entry.label}
-                    </button>
-                  </Tooltip>
-                ))
-              )}
-            </div>
-          </div>
-        )}
-      </div>
+      <SearchablePalette
+        entries={catalog.map((entry) => ({
+          id: entry.kind,
+          label: entry.label,
+          tooltip: `${entry.flareKey} — ${entry.description}`,
+          searchText: [entry.label, entry.flareKey, entry.description, ...(entry.synonyms || [])].join(' '),
+        }))}
+        onSelect={(id) => {
+          const entry = catalog.find((item) => item.kind === id);
+          if (entry) add(entry);
+        }}
+      />
     </section>
   );
 };

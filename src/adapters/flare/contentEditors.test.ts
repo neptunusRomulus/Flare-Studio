@@ -144,6 +144,67 @@ describe('content editor exports', () => {
     expect(cleared).toContain('requires_level=10');
   });
 
+
+  it('imports every [quest] block as a step and round-trips a real multi-stage journal unchanged', () => {
+    const text = readFileSync(new URL('../../../tests/fixtures/flare-quests/0010_krolan.txt', import.meta.url), 'utf8');
+    const imported = importQuestText(text) as { name: string; complete_status: string; quest_text: string; steps: Array<Record<string, unknown>> };
+    expect(imported.name).toBe("Krolan's Missing");
+    expect(imported.complete_status).toBe('emp_krolan_finish');
+    expect(imported.steps).toHaveLength(3);
+    expect(imported.steps[0].quest_text).toBe('Travel to the Perdition Mines and look for Krolan.');
+    expect(imported.steps[1].requires_status).toBe('emp_krolan_key');
+    expect(imported.steps[2].requires_not_status).toBe('emp_krolan_finish');
+    expect(imported.quest_text).toBe(imported.steps[0].quest_text);
+    expect(mergeQuestText(text, imported)).toBe(text);
+    expect(exportQuestFile(imported).split('[quest]')).toHaveLength(4);
+  });
+
+  it('round-trips alchemy (items, trailing blank) and keeps unknown keys, comments and blanks', () => {
+    const alchemy = readFileSync(new URL('../../../tests/fixtures/flare-quests/0011_alchemy.txt', import.meta.url), 'utf8');
+    const imported = importQuestText(alchemy) as { steps: Array<Record<string, unknown>> };
+    expect(imported.steps).toHaveLength(5);
+    expect(imported.steps[4].requires_item).toBe('751:1,752:1,754:1');
+    expect(mergeQuestText(alchemy, imported)).toBe(alchemy);
+
+    const annotated = readFileSync(new URL('../../../tests/fixtures/flare-quests/krolan_annotated.txt', import.meta.url), 'utf8');
+    const parsed = importQuestText(annotated) as { steps: Array<Record<string, unknown>> };
+    const unchanged = mergeQuestText(annotated, parsed);
+    expect(unchanged).toBe(annotated);
+    expect(unchanged).toContain('# authored note');
+    expect(unchanged).toContain('custom_header=keep');
+    expect(unchanged).toContain('# first stage');
+    expect(unchanged).toContain('custom_key=keep me');
+
+    const reordered = {
+      ...parsed,
+      steps: [parsed.steps[2], parsed.steps[0], parsed.steps[1]],
+    };
+    const moved = mergeQuestText(annotated, reordered);
+    expect(moved.indexOf('Return to Udana')).toBeLessThan(moved.indexOf('Travel to the Perdition Mines'));
+    expect(moved).toContain('custom_key=keep me');
+    expect(moved).toContain('# first stage');
+    expect(moved).toContain('custom_header=keep');
+
+    const trimmed = {
+      ...parsed,
+      steps: [parsed.steps[0], parsed.steps[1]],
+    };
+    const dropped = mergeQuestText(annotated, trimmed);
+    expect(dropped).not.toContain('Return to Udana');
+    expect(dropped).toContain('Use Krolan');
+    expect(dropped).toContain('custom_key=keep me');
+
+    const added = mergeQuestText(annotated, {
+      ...parsed,
+      steps: [
+        ...parsed.steps,
+        { quest_text: 'A fourth step.', requires_status: 'emp_krolan_finish', requires_not_status: 'emp_krolan_epilogue' },
+      ],
+    });
+    expect(added).toContain('quest_text=A fourth step.');
+    expect(added).toContain('custom_key=keep me');
+  });
+
   it('creates a quest section for a new journal entry', () => {
     expect(mergeQuestText('', { name: 'Fresh', complete_status: 'done', quest_text: 'Do it.' }))
       .toBe(exportQuestFile({ name: 'Fresh', complete_status: 'done', quest_text: 'Do it.' }));

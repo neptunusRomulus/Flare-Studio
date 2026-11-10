@@ -48,7 +48,7 @@
 - Enemy files: `gold`, `wander_radius`, `waypoints`, `script` are not StatBlock keys (map-spawn or none); they are dropped with a visible toast.
 
 ## Known open issues
-- Role center Moments + Play is the approved next step after multi-stage quest journals (step cards are in the Quest tab and hook into the NPC Quest role's accept / turn-in statuses).
+- Multi-stage quest journals are edited as step cards; the Role center uses Moments (including Play and a shop-open indicator). List and Board stay behind a toggle.
 
 ## Edit NPC
 - Name and appearance (fantasycore picker, default sprite) are on the first screen. Roles use on/off switches; a reserved gear opens the Role center (Dialogue / Shop / Quest).

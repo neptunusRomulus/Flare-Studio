@@ -7,6 +7,7 @@ import {
   buildMoments,
   matchMoment,
   OTHER_MOMENT_ID,
+  shopOpenInMoment,
   topicsForMoment,
 } from './roleMoments';
 import { stepsFromImported } from './questSteps';
@@ -84,5 +85,17 @@ describe('role moments mapping', () => {
     expect(added.requiresStatus).toEqual(['udana_moment_1']);
     const written = applyMomentToTopic(tree('new-talk', []), added);
     expect(matchMoment(written.requirements, next).id).toBe(added.id);
+  });
+
+  it('marks which moments the shop is open in from vendor requires', () => {
+    const first = moments.find((moment) => moment.source === 'first-meeting')!;
+    const given = moments.find((moment) => moment.source === 'quest-given')!;
+    const done = moments.find((moment) => moment.source === 'quest-done')!;
+    const vendor = { requiresStatus: 'emp_krolan_init', requiresNotStatus: 'emp_krolan_finish' };
+    expect(shopOpenInMoment(first, vendor)).toBe(false);
+    expect(shopOpenInMoment(given, vendor)).toBe(true);
+    expect(shopOpenInMoment(done, vendor)).toBe(false);
+    expect(shopOpenInMoment(first, {})).toBe(true);
+    expect(shopOpenInMoment({ ...first, isOther: true, source: 'other' }, {})).toBe(false);
   });
 });

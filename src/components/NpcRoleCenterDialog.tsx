@@ -14,6 +14,7 @@ import {
   assignTopicsToMoments,
   buildMoments,
   OTHER_MOMENT_ID,
+  shopOpenInMoment,
   type RoleMoment,
 } from '@/editor/roleMoments';
 import { stepsFromImported, type QuestStep } from '@/editor/questSteps';
@@ -142,7 +143,17 @@ const NpcRoleCenterDialog = ({
       .map((tree) => tree.dialogueId || tree.id);
   }, [assignment, dialogueTrees, selectedMomentId]);
 
+  const vendorRequires = {
+    requiresStatus: getEditingObjectProperty('vendor_requires_status', ''),
+    requiresNotStatus: getEditingObjectProperty('vendor_requires_not_status', ''),
+  };
+  const shopOpen = getEditingObjectProperty('vendor', '') === 'true' || Boolean(vendorRequires.requiresStatus || vendorRequires.requiresNotStatus);
+  const shopBadges = shopOpen
+    ? Object.fromEntries(moments.filter((moment) => shopOpenInMoment(moment, vendorRequires)).map((moment) => [moment.id, 'Shop open']))
+    : undefined;
+
   if (!tab) return null;
+
 
   const roleProps = editingObject?.properties as Record<string, unknown> | undefined;
   const counts: Record<RoleCenterTab, string> = {
@@ -215,6 +226,7 @@ const NpcRoleCenterDialog = ({
             selectedId={selectedMomentId || OTHER_MOMENT_ID}
             topicCounts={topicCounts}
             onSelect={setSelectedMomentId}
+            badges={tab === 'vendor' ? shopBadges : undefined}
             onAdd={() => {
               const next = addCustomMoment(moments, editingObject?.name || 'npc');
               const added = next[next.length - 1];

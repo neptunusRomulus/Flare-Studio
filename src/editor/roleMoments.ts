@@ -270,3 +270,23 @@ export function addCustomMoment(moments: RoleMoment[], npcName: string, title?: 
   };
   return [...moments, moment];
 }
+
+
+function splitCsv(value: string): string[] {
+  return unique(String(value || '').split(','));
+}
+
+/** Whether the shop is open in this moment, given vendor_requires_status / vendor_requires_not_status. */
+export function shopOpenInMoment(
+  moment: RoleMoment,
+  vendor: { requiresStatus?: string; requiresNotStatus?: string },
+): boolean {
+  if (moment.isOther) return false;
+  const need = splitCsv(vendor.requiresStatus || '');
+  const needNot = splitCsv(vendor.requiresNotStatus || '');
+  const on = new Set(moment.requiresStatus);
+  const off = new Set(moment.requiresNotStatus);
+  if (need.some((status) => off.has(status) || !on.has(status))) return false;
+  if (needNot.some((status) => on.has(status))) return false;
+  return true;
+}

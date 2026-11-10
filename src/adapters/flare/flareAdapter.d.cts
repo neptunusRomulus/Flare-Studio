@@ -20,6 +20,16 @@ export function exportItemFile(
 export function exportPowerFile(powers: Array<Record<string, unknown>>): string;
 export function exportEnemyFile(enemy: Record<string, unknown>): { text: string; warnings: string[] };
 export function normalizeEnemyText(content: string): { text: string; warnings: string[] };
+export function includesFromEnemyText(content: string): string[];
+export function applyEnemyFileUpdates(
+  content: string,
+  update?: {
+    includes?: string[];
+    fields?: Record<string, string | number | null | undefined>;
+    lines?: string[];
+    header?: string;
+  }
+): { text: string; warnings: string[] };
 export function exportNpcFile(npc: Record<string, unknown>): string;
 export function importNpcText(content: string): Record<string, unknown>;
 export function mergeNpcFile(existingText: string, update: { fields?: Record<string, unknown>; dialogueTrees?: unknown[]; sections?: Record<string, Array<Array<{ key: string; value: string }>>>; includes?: string[] }): string;

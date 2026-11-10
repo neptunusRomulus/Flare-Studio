@@ -393,6 +393,8 @@ module.exports = {
   exportPowerFile: serializers.exportPowerFile,
   exportEnemyFile: serializers.exportEnemyFile,
   normalizeEnemyText: serializers.normalizeEnemyText,
+  includesFromEnemyText: serializers.includesFromEnemyText,
+  applyEnemyFileUpdates: serializers.applyEnemyFileUpdates,
   exportNpcFile: serializers.exportNpcFile,
   exportDialogueTrees: serializers.exportDialogueTrees,
   importNpcText: serializers.importNpcText,

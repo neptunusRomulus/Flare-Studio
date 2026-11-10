@@ -360,6 +360,93 @@ function normalizeEnemyText(content) {
   return { text: `${out.join("\n").replace(/\n{3,}/g, "\n\n").trim()}\n`, warnings };
 }
 
+/** INCLUDE paths in an enemy file, in file order. */
+function includesFromEnemyText(content) {
+  const paths = [];
+  for (const raw of String(content || "").replace(/\r/g, "").split("\n")) {
+    const line = raw.trim();
+    if (line.startsWith("INCLUDE ")) paths.push(line.slice(8).trim());
+  }
+  return paths.filter(Boolean);
+}
+
+/**
+ * Update an existing enemy file in place: replace the INCLUDE list and unique keys,
+ * keep comments, unknown keys, and repeated keys (stat=, power=, sfx_*=).
+ * Used by "Save as preset" so it does not rebuild the file from the form alone.
+ * `fields` values update keys that appear at most once; repeated keys are left as they are.
+ * When `content` is empty, builds a new file from `includes`, optional `header`, `lines`, and `fields`.
+ */
+function applyEnemyFileUpdates(content, update) {
+  const includes = update && update.includes !== undefined
+    ? (update.includes || []).map((p) => String(p || "").trim()).filter(Boolean)
+    : undefined;
+  const fields = (update && update.fields) || {};
+  const extraLines = (update && update.lines) || null;
+  const raw = String(content || "").replace(/\r/g, "");
+  if (!raw.trim()) {
+    const lines = [];
+    if (update && update.header) lines.push(String(update.header));
+    if (includes) for (const p of includes) lines.push(`INCLUDE ${p}`);
+    if (extraLines && extraLines.length) lines.push(...extraLines);
+    else {
+      for (const [key, value] of Object.entries(fields)) {
+        if (value == null || value === "") continue;
+        for (const part of String(value).split(/\r?\n/)) {
+          const v = part.trim();
+          if (!v) continue;
+          lines.push(v.includes("=") ? v : `${key}=${v}`);
+        }
+      }
+    }
+    return normalizeEnemyText(`${lines.join("\n")}\n`);
+  }
+
+  const keyCount = Object.create(null);
+  for (const rawLine of raw.split("\n")) {
+    const line = rawLine.trim();
+    if (!line || line.startsWith("#") || line === "APPEND" || line.startsWith("INCLUDE ") || /^\[/.test(line)) continue;
+    const eq = line.indexOf("=");
+    if (eq <= 0) continue;
+    const key = line.slice(0, eq).trim();
+    keyCount[key] = (keyCount[key] || 0) + 1;
+  }
+  const keepRepeats = new Set(Object.keys(keyCount).filter((k) => keyCount[k] > 1));
+
+  const out = [];
+  let includeAt = -1;
+  const replaced = new Set();
+  for (const rawLine of raw.split("\n")) {
+    const line = rawLine.trim();
+    if (line.startsWith("INCLUDE ")) {
+      if (includeAt < 0) includeAt = out.length;
+      continue;
+    }
+    const eq = line.indexOf("=");
+    if (line && !line.startsWith("#") && line !== "APPEND" && !/^\[/.test(line) && eq > 0) {
+      const key = line.slice(0, eq).trim();
+      if (Object.prototype.hasOwnProperty.call(fields, key) && !keepRepeats.has(key)) {
+        if (replaced.has(key)) continue;
+        replaced.add(key);
+        const value = fields[key];
+        if (value == null || value === "") continue;
+        out.push(`${key}=${value}`);
+        continue;
+      }
+    }
+    out.push(rawLine);
+  }
+  const incLines = (includes !== undefined ? includes : includesFromEnemyText(raw)).map((p) => `INCLUDE ${p}`);
+  const at = includeAt < 0 ? 0 : includeAt;
+  out.splice(at, 0, ...incLines);
+  for (const [key, value] of Object.entries(fields)) {
+    if (replaced.has(key) || keepRepeats.has(key)) continue;
+    if (value == null || value === "") continue;
+    out.push(`${key}=${value}`);
+  }
+  return normalizeEnemyText(out.join("\n"));
+}
+
 const REQ_TYPE_BY_KEY = {
   requires_status: "status", requires_not_status: "not_status",
   requires_item: "item", requires_not_item: "not_item",
@@ -903,6 +990,8 @@ module.exports = {
   exportPowerFile,
   exportEnemyFile,
   normalizeEnemyText,
+  includesFromEnemyText,
+  applyEnemyFileUpdates,
   exportNpcFile,
   exportDialogueTrees,
   importNpcText,

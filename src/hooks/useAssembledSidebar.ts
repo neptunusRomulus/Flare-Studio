@@ -30,6 +30,7 @@ export default function useAssembledSidebar(params: unknown) {
     handleNpcDragStart: actorsData?.['handleNpcDragStart'] as any | undefined,
     handleNpcDragEnd: actorsData?.['handleNpcDragEnd'] as any | undefined,
     handleOpenActorDialog: actorsData?.['handleOpenActorDialog'] as any | undefined,
+    handleCreateActorShell: actorsData?.['handleCreateActorShell'] as any | undefined,
     isRulesLayer: rulesData?.['isRulesLayer'] as boolean | undefined,
     rulesList: rulesData?.['rulesList'] as any | undefined,
     handleAddRule: rulesData?.['handleAddRule'] as any | undefined,

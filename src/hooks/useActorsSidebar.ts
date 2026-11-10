@@ -18,6 +18,7 @@ export type ActorsSidebarParams = {
   handleNpcDragStart: (e: React.DragEvent, actorId: number) => void;
   handleNpcDragEnd: () => void;
   handleOpenActorDialog: (type: 'npc' | 'enemy') => void;
+  handleCreateActorShell?: (name: string, type?: 'npc' | 'enemy') => Promise<number | null>;
 
   isRulesLayer: boolean;
   rulesList: RulesListItem[];
@@ -63,6 +64,7 @@ export default function useActorsSidebar(params?: Partial<ActorsSidebarParams>) 
   const noopTooltipWithDelay = (_text: React.ReactNode, _target: HTMLElement) => {};
   const noopHoverTooltip = (_p: { x: number; y: number } | null) => {};
   const noopActorDialog = (_type: 'npc' | 'enemy') => {};
+  const noopCreateActorShell = async (_name: string, _type?: 'npc' | 'enemy'): Promise<number | null> => null;
   const noopItemEdit = (_item: unknown) => {};
   const defaultParams: ActorsSidebarParams = {
     isNpcLayer: false,
@@ -78,6 +80,7 @@ export default function useActorsSidebar(params?: Partial<ActorsSidebarParams>) 
     handleNpcDragStart: noopDrag,
     handleNpcDragEnd: noopNode,
     handleOpenActorDialog: noopActorDialog,
+    handleCreateActorShell: noopCreateActorShell,
     isRulesLayer: false,
     rulesList: [],
     handleAddRule: noopNode,
@@ -116,7 +119,8 @@ export default function useActorsSidebar(params?: Partial<ActorsSidebarParams>) 
     handleReorderActors: p.handleReorderActors,
     handleNpcDragStart: p.handleNpcDragStart,
     handleNpcDragEnd: p.handleNpcDragEnd,
-    handleOpenActorDialog: p.handleOpenActorDialog
+    handleOpenActorDialog: p.handleOpenActorDialog,
+    handleCreateActorShell: p.handleCreateActorShell ?? noopCreateActorShell
   };
 
   const rules = { isRulesLayer: p.isRulesLayer, rulesList: p.rulesList, handleAddRule: p.handleAddRule, handleEditRule: p.handleEditRule };

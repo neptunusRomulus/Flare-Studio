@@ -202,6 +202,7 @@ export default function useAppMainSidebarDeps(args: AppMainSidebarDepsInput) {
         handleNpcDragStart,
         handleNpcDragEnd,
         handleOpenActorDialog: objectEditing.handleOpenActorDialog,
+        handleCreateActorShell: objectEditing.handleCreateActorShell,
       },
       events: {
         isEventLayer: activeLayer?.type === 'event',

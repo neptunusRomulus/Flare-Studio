@@ -77,18 +77,15 @@ test('actor can be placed on the map canvas by dragging from the NPC sidebar', a
     await expect(addNpcButton).toBeVisible({ timeout: 15000 });
     await addNpcButton.click();
 
-    const dialogHeading = window.getByRole('heading', { name: /Add NPC/i });
-    await expect(dialogHeading).toBeVisible({ timeout: 15000 });
-
-    const nameInput = window.getByPlaceholder('Village Elder');
+    // Inline draft row: type the name, tick to create, then drag the new entry to the map.
+    const nameInput = window.getByLabel('New NPC name');
     await expect(nameInput).toBeVisible({ timeout: 15000 });
     await nameInput.fill('Drag NPC Test');
 
-    const dialogRoot = window.locator('div', { has: dialogHeading }).first();
-    const saveButton = dialogRoot.locator('button:has(svg.lucide-save)').first();
-    await expect(saveButton).toBeVisible({ timeout: 5000 });
-    await saveButton.click();
-    await expect(dialogRoot).toHaveCount(0, { timeout: 15000 });
+    const createButton = window.getByRole('button', { name: 'Create NPC' });
+    await expect(createButton).toBeVisible({ timeout: 5000 });
+    await createButton.click();
+    await expect(nameInput).toHaveCount(0, { timeout: 15000 });
 
     const npcEntry = window.locator('div.w-full.box-border.rounded-md', { hasText: 'Drag NPC Test' }).first();
     await expect(npcEntry).toBeVisible({ timeout: 15000 });

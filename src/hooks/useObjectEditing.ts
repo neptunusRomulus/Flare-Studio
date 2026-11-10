@@ -322,6 +322,44 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
     }
   }, [actorDialogState, editor, syncMapObjects, createTabFor, switchToTab, mapObjects, handleCloseActorDialog]);
 
+  /**
+   * Creates an NPC from just a name (sidebar "+ NPC" shell): no roles, unplaced, with the
+   * default appearance so it is visible in-game once placed. Returns the new object id.
+   */
+  const handleCreateActorShell = useCallback(async (name: string, type: 'npc' | 'enemy' = 'npc'): Promise<number | null> => {
+    const trimmed = String(name || '').trim();
+    if (!trimmed || !editor || typeof editor.addMapObject !== 'function') return null;
+
+    const appearance: Record<string, string> = type === 'npc' ? await resolveDefaultNpcAppearance() : {};
+    let newObject: MapObject | null = null;
+    try {
+      newObject = editor.addMapObject(type, -1, -1, 1, 1);
+      if (newObject && typeof editor.updateMapObject === 'function') {
+        editor.updateMapObject(newObject.id, {
+          name: trimmed,
+          x: -1,
+          y: -1,
+          type,
+          category: type === 'npc' ? 'npc' : '',
+          wander_radius: 0,
+          properties: { ...(newObject.properties || {}), ...appearance },
+        });
+      }
+    } catch (err) {
+      console.error('Failed to create actor shell:', err);
+      newObject = null;
+    }
+    if (!newObject) return null;
+
+    if (typeof syncMapObjects === 'function') syncMapObjects();
+    try {
+      if (typeof editor.triggerAutoSave === 'function') editor.triggerAutoSave(true);
+    } catch (e) {
+      console.warn('triggerAutoSave failed', e);
+    }
+    return newObject.id;
+  }, [editor, syncMapObjects]);
+
   const handleEditObject = useCallback((objectId: number) => {
     const objects = editor && typeof editor.getMapObjects === 'function' ? editor.getMapObjects() : mapObjects;
     const obj = objects?.find(o => o.id === objectId) || null;
@@ -553,6 +591,7 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
     handleActorTilesetBrowse,
     handleActorPortraitBrowse,
     handleActorSubmit,
+    handleCreateActorShell,
     handleEditObject,
     handleEditEnemyTemplate,
     handleUpdateObject,

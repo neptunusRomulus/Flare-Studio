@@ -16,6 +16,7 @@ type Props = {
   handleNpcDragEnd: () => void;
   handleReorderActors: (fromIndex: number, toIndex: number) => void;
   handleOpenActorDialog: (type: 'npc' | 'enemy') => void;
+  handleCreateActorShell?: (name: string, type?: 'npc' | 'enemy') => Promise<number | null>;
 };
 
 const SidebarActorArea: React.FC<Props> = ({
@@ -31,7 +32,8 @@ const SidebarActorArea: React.FC<Props> = ({
   handleNpcDragStart,
   handleNpcDragEnd,
   handleReorderActors,
-  handleOpenActorDialog
+  handleOpenActorDialog,
+  handleCreateActorShell
 }) => {
   return (
     <SidebarActorEntries
@@ -49,6 +51,7 @@ const SidebarActorArea: React.FC<Props> = ({
       onReorderActors={handleReorderActors}
       onAddNpc={() => handleOpenActorDialog('npc')}
       onAddEnemy={() => handleOpenActorDialog('enemy')}
+      onCreateActorShell={handleCreateActorShell}
     />
   );
 };

@@ -78,18 +78,15 @@ test('NPC creation and NPC editing work from the actor sidebar', async () => {
     await expect(addNpcButton).toBeVisible({ timeout: 15000 });
     await addNpcButton.click();
 
-    const dialogHeading = window.getByRole('heading', { name: /Add NPC/i });
-    await expect(dialogHeading).toBeVisible({ timeout: 15000 });
-
-    const nameInput = window.getByPlaceholder('Village Elder');
+    // "+ NPC" opens an inline draft row in the list; typing a name and pressing the tick creates it.
+    const nameInput = window.getByLabel('New NPC name');
     await expect(nameInput).toBeVisible({ timeout: 15000 });
     await nameInput.fill('Test NPC');
 
-    const dialogRoot = window.locator('div', { has: dialogHeading }).filter({ has: window.locator('svg.lucide-save') }).first();
-    const saveButton = dialogRoot.locator('button', { has: window.locator('svg.lucide-save') }).first();
-    await expect(saveButton).toBeVisible({ timeout: 5000 });
-    await saveButton.click();
-    await expect(dialogRoot).toHaveCount(0, { timeout: 15000 });
+    const createButton = window.getByRole('button', { name: 'Create NPC' });
+    await expect(createButton).toBeVisible({ timeout: 5000 });
+    await createButton.click();
+    await expect(nameInput).toHaveCount(0, { timeout: 15000 });
 
     const expandSidebarButton = window.getByRole('button', { name: /Show sidebar/i });
     if (await expandSidebarButton.count() > 0) {

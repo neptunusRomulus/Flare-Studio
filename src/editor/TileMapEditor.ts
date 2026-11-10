@@ -20,6 +20,7 @@ import { assignExportOffsets } from './tilesetIds';
 import { TileDetector } from './tileDetection';
 import { exportMapText, importMapText, slugFileName, tilePixelOffset } from '../adapters/flare/flareAdapter.cjs';
 import { clipboardFromTiles, pasteTileGrid, type TileClipboard } from './tileClipboard';
+import { stampFromSelection } from './stampTiles';
 import { mapHeaderForExport, type MapPresentation } from './studioDrafts';
 
 interface LayerTilesetEntry {
@@ -6096,41 +6097,16 @@ export class TileMapEditor {
       return false;
     }
 
-    // Calculate bounds
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (const tile of this.selection.tiles) {
-      minX = Math.min(minX, tile.x);
-      minY = Math.min(minY, tile.y);
-      maxX = Math.max(maxX, tile.x);
-      maxY = Math.max(maxY, tile.y);
-    }
-
-    const width = maxX - minX + 1;
-    const height = maxY - minY + 1;
-
-    // Create stamp tiles with relative positions
-    const stampTiles: import('../types').StampTile[] = [];
-    
-    // Use current active layer for stamps
     const currentLayerId = this.activeLayerId || 0;
-    
-    for (const tile of this.selection.tiles) {
-      if (tile.gid > 0) {
-        stampTiles.push({
-          tileId: tile.gid,
-          layerId: currentLayerId,
-          x: tile.x - minX,
-          y: tile.y - minY
-        });
-      }
-    }
+    const built = stampFromSelection(this.selection.tiles, currentLayerId);
+    if (!built) return false;
 
     const stamp: import('../types').Stamp = {
       id: Date.now().toString(),
       name,
-      width,
-      height,
-      tiles: stampTiles
+      width: built.width,
+      height: built.height,
+      tiles: built.tiles
     };
 
     this.stamps.set(stamp.id, stamp);

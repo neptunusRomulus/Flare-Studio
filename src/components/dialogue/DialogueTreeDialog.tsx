@@ -372,6 +372,9 @@ const DialogueTreeDialog = ({
 
   // Fetch project maps locally
   const [localMaps, setLocalMaps] = useState<string[]>([]);
+  // Depend on the map names, not the array identity: the `projectMaps = []` default (and
+  // parents that rebuild the list) give a new array every render, which re-ran listMaps forever.
+  const projectMapsKey = projectMaps.join('\n');
   useEffect(() => {
     if (!showDialogueTreeDialog) return;
     
@@ -394,7 +397,8 @@ const DialogueTreeDialog = ({
     }
 
     return () => { cancelled = true; };
-  }, [showDialogueTreeDialog, projectMaps, currentProjectPath]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showDialogueTreeDialog, projectMapsKey, currentProjectPath]);
 
 
   const {

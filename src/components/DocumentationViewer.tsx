@@ -460,7 +460,8 @@ The save queue manages all file operations to prevent conflicts and ensure data 
 
 | Shortcut | Action |
 |----------|--------|
-| Mouse Wheel | Zoom in/out |
+| Mouse Wheel | Zoom the map |
+| Ctrl+Wheel or pinch | Zoom the map |
 | Middle Click + Drag | Pan map |
 | Hover + Wheel | Adjust layer transparency |
 | Right Click | Cancel current tool |
@@ -491,7 +492,9 @@ The save queue manages all file operations to prevent conflicts and ensure data 
 | F | Fullscreen |
 | H | Show help |
 | G | Show grid |
-| Ctrl+0 | Reset zoom |
+| Toolbar zoom buttons | Zoom the map / reset map zoom |
+| Ctrl+Plus / Ctrl+Minus | Interface size |
+| Ctrl+0 | Reset interface size |
 
 ## Tips
 

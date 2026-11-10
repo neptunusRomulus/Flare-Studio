@@ -7,6 +7,7 @@ const {
   ipcMain: ipcMainLocal,
 } = require("electron");
 const path = require("path");
+const displaySettings = require("./displaySettings.cjs");
 const fs = require("fs");
 const { validateSerializedFlareData, loadFlareDataSchema } = require("./flareDataValidator.cjs");
 const flareLaunch = require("./flareLaunch.cjs");
@@ -256,6 +257,11 @@ function createWindow() {
     icon: getPlatformIcon(),
     title: "Isometric Tile Map Editor",
   });
+
+  displaySettings.applyInterfaceZoom(
+    mainWindow.webContents,
+    displaySettings.readDisplaySettings().interfaceScale,
+  );
 
   // Load the app
   if (isDev) {
@@ -653,6 +659,23 @@ ipcMainLocal.handle("select-directory", async () => {
     return result.filePaths[0];
   }
   return null;
+});
+
+ipcMainLocal.handle("get-display-settings", async () => displaySettings.readDisplaySettings());
+
+ipcMainLocal.handle("set-display-settings", async (_event, settings) => displaySettings.writeDisplaySettings(settings));
+
+ipcMainLocal.handle("set-zoom-factor", async (_event, factor) => {
+  if (!mainWindow || !mainWindow.webContents) return false;
+  const n = Number(factor);
+  if (!Number.isFinite(n)) return false;
+  try {
+    mainWindow.webContents.setZoomFactor(Math.min(2, Math.max(0.75, n)));
+    return true;
+  } catch (error) {
+    console.error("set-zoom-factor failed:", error);
+    return false;
+  }
 });
 
 ipcMainLocal.handle("select-project-file", async (_event, options = {}) => {
@@ -1712,9 +1735,63 @@ function createMenu() {
         { role: "forcereload" },
         { role: "toggledevtools" },
         { type: "separator" },
-        { role: "resetzoom" },
-        { role: "zoomin" },
-        { role: "zoomout" },
+        {
+          label: "Interface larger",
+          accelerator: "CmdOrCtrl+Plus",
+          click: () => {
+            if (mainWindow) mainWindow.webContents.send("interface-scale", "in");
+          },
+        },
+        {
+          label: "Interface larger",
+          accelerator: "CmdOrCtrl+=",
+          visible: false,
+          acceleratorWorksWhenHidden: true,
+          click: () => {
+            if (mainWindow) mainWindow.webContents.send("interface-scale", "in");
+          },
+        },
+        {
+          label: "Interface larger",
+          accelerator: "CmdOrCtrl+Shift+=",
+          visible: false,
+          acceleratorWorksWhenHidden: true,
+          click: () => {
+            if (mainWindow) mainWindow.webContents.send("interface-scale", "in");
+          },
+        },
+        {
+          label: "Interface larger",
+          accelerator: "CmdOrCtrl+NumAdd",
+          visible: false,
+          acceleratorWorksWhenHidden: true,
+          click: () => {
+            if (mainWindow) mainWindow.webContents.send("interface-scale", "in");
+          },
+        },
+        {
+          label: "Interface smaller",
+          accelerator: "CmdOrCtrl+-",
+          click: () => {
+            if (mainWindow) mainWindow.webContents.send("interface-scale", "out");
+          },
+        },
+        {
+          label: "Interface smaller",
+          accelerator: "CmdOrCtrl+NumSub",
+          visible: false,
+          acceleratorWorksWhenHidden: true,
+          click: () => {
+            if (mainWindow) mainWindow.webContents.send("interface-scale", "out");
+          },
+        },
+        {
+          label: "Reset interface size",
+          accelerator: "CmdOrCtrl+0",
+          click: () => {
+            if (mainWindow) mainWindow.webContents.send("interface-scale", "reset");
+          },
+        },
         { type: "separator" },
         { role: "togglefullscreen" },
       ],

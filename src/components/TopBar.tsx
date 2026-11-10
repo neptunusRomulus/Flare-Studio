@@ -56,17 +56,17 @@ const TopBar: React.FC<Props> = ({
             <Redo2 className="w-4 h-4" />
           </Button>
         </Tooltip>
-        <Tooltip content="Zoom In" side="bottom">
+        <Tooltip content="Zoom the map in (wheel)" side="bottom">
           <Button size="sm" variant="outline" className="w-8 h-8 p-0 rounded-full" onClick={handleZoomIn}>
             <ZoomIn className="w-4 h-4" />
           </Button>
         </Tooltip>
-        <Tooltip content="Zoom Out" side="bottom">
+        <Tooltip content="Zoom the map out (wheel)" side="bottom">
           <Button size="sm" variant="outline" className="w-8 h-8 p-0 rounded-full" onClick={handleZoomOut}>
             <ZoomOut className="w-4 h-4" />
           </Button>
         </Tooltip>
-        <Tooltip content="Reset View" side="bottom">
+        <Tooltip content="Reset map zoom" side="bottom">
           <Button size="sm" variant="outline" className="w-8 h-8 p-0 rounded-full" onClick={handleResetZoom}>
             <RotateCcw className="w-4 h-4" />
           </Button>

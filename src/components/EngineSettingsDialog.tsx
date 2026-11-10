@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { Moon, Sun, Target, X, Save, Settings, Eye, PanelLeft, History } from 'lucide-react';
+import { Moon, Sun, Target, X, Save, Settings, Eye, PanelLeft, History, HelpCircle } from 'lucide-react';
 import Tooltip from '@/components/ui/tooltip';
 import UndoPersistencePanel from '@/components/UndoPersistencePanel';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
@@ -7,6 +7,7 @@ import { useState, type Dispatch, type SetStateAction } from 'react';
 import { createPortal } from 'react-dom';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 import ResizeHandle from '@/components/ResizeHandle';
+import { useDisplayScale } from '@/hooks/useInterfaceScale';
 
 type SettingsTab = 'general' | 'save' | 'display';
 
@@ -43,6 +44,7 @@ const EngineSettingsDialog = ({
 }: EngineSettingsDialogProps) => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const [, setForceRender] = useState(0);
+  const { interfaceScale, textScale, setInterfaceScale, setTextScale, stepInterfaceScale, resetInterfaceScale } = useDisplayScale();
   const {
     position,
     size,
@@ -244,6 +246,58 @@ const EngineSettingsDialog = ({
           {/* Display Tab */}
           {activeTab === 'display' && (
             <div className="space-y-4">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-1 min-w-0">
+                    <label className="text-sm font-medium">Interface size</label>
+                    <Tooltip content="Scales the whole window. Ctrl + / Ctrl - to change, Ctrl 0 to reset.">
+                      <HelpCircle className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                    </Tooltip>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button type="button" className="h-7 w-7 rounded-md border border-border text-sm hover:bg-muted" aria-label="Smaller interface" onClick={() => stepInterfaceScale(-1)}>−</button>
+                    <span className="w-12 text-center text-sm tabular-nums">{interfaceScale}%</span>
+                    <button type="button" className="h-7 w-7 rounded-md border border-border text-sm hover:bg-muted" aria-label="Larger interface" onClick={() => stepInterfaceScale(1)}>+</button>
+                    {interfaceScale !== 100 && (
+                      <button type="button" className="h-7 px-2 rounded-md text-xs text-muted-foreground hover:bg-muted" onClick={resetInterfaceScale}>Reset</button>
+                    )}
+                  </div>
+                </div>
+                <input
+                  type="range"
+                  min={75}
+                  max={200}
+                  step={10}
+                  value={interfaceScale}
+                  onChange={(e) => setInterfaceScale(Number(e.target.value))}
+                  className="w-full accent-primary"
+                  aria-label="Interface size"
+                />
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-1 min-w-0">
+                    <label className="text-sm font-medium">Text size</label>
+                    <Tooltip content="Scales text only, on top of interface size.">
+                      <HelpCircle className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                    </Tooltip>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button type="button" className="h-7 w-7 rounded-md border border-border text-sm hover:bg-muted" aria-label="Smaller text" onClick={() => setTextScale(textScale - 10)}>−</button>
+                    <span className="w-12 text-center text-sm tabular-nums">{textScale}%</span>
+                    <button type="button" className="h-7 w-7 rounded-md border border-border text-sm hover:bg-muted" aria-label="Larger text" onClick={() => setTextScale(textScale + 10)}>+</button>
+                  </div>
+                </div>
+                <input
+                  type="range"
+                  min={75}
+                  max={200}
+                  step={10}
+                  value={textScale}
+                  onChange={(e) => setTextScale(Number(e.target.value))}
+                  className="w-full accent-primary"
+                  aria-label="Text size"
+                />
+              </div>
+
               <div>
                 <label className="block text-sm font-medium mb-2">Active GID Indicator</label>
                 <div className="flex items-center gap-2">

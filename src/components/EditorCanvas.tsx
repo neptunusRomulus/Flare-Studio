@@ -14,6 +14,7 @@ import {
   CellContextMenuItem,
   useContextMenu,
 } from '@/components/contextMenu';
+import { clientToCanvas } from '@/editor/canvasCoords';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 
 type BottomToolbarProps = React.ComponentProps<typeof BottomToolbar>;
@@ -248,8 +249,8 @@ export default function EditorCanvas(props: Props) {
   const tileAtClient = (clientX: number, clientY: number): { x: number; y: number } | null => {
     const canvas = canvasRef.current;
     if (!canvas || !editorRef.current) return null;
-    const rect = canvas.getBoundingClientRect();
-    const t = editorRef.current.screenToTile(clientX - rect.left, clientY - rect.top);
+    const { x, y } = clientToCanvas(clientX, clientY, canvas);
+    const t = editorRef.current.screenToTile(x, y);
     if (!t || t.x < 0 || t.y < 0 || t.x >= mapWidth || t.y >= mapHeight) return null;
     return t;
   };
@@ -303,9 +304,7 @@ export default function EditorCanvas(props: Props) {
         
         // Compute tile coordinates from cursor position
         if (editorRef.current && canvasRef.current) {
-          const rect = canvasRef.current.getBoundingClientRect();
-          const canvasX = e.clientX - rect.left;
-          const canvasY = e.clientY - rect.top;
+          const { x: canvasX, y: canvasY } = clientToCanvas(e.clientX, e.clientY, canvasRef.current);
           
           let minimapCellX = -1;
           let minimapCellY = -1;
@@ -419,9 +418,7 @@ export default function EditorCanvas(props: Props) {
           
           // Try to start panning if clicking on minimap
           if (editorRef.current && canvasRef.current) {
-            const rect = canvasRef.current.getBoundingClientRect();
-            const canvasX = e.clientX - rect.left;
-            const canvasY = e.clientY - rect.top;
+            const { x: canvasX, y: canvasY } = clientToCanvas(e.clientX, e.clientY, canvasRef.current);
             const minimapBounds = editorRef.current.getLastMiniMapBounds();
             
             if (minimapBounds && 
@@ -464,9 +461,7 @@ export default function EditorCanvas(props: Props) {
       }}
       onDragOver={(e) => {
         if (editor && canvasRef.current) {
-          const rect = canvasRef.current.getBoundingClientRect();
-          const canvasX = e.clientX - rect.left;
-          const canvasY = e.clientY - rect.top;
+          const { x: canvasX, y: canvasY } = clientToCanvas(e.clientX, e.clientY, canvasRef.current);
 
           const canvasEditor = editorRef.current;
           if (draggingNpcId) {
@@ -514,9 +509,7 @@ export default function EditorCanvas(props: Props) {
         if (npcIdStr) {
           const npcId = parseInt(npcIdStr, 10);
           if (!isNaN(npcId)) {
-            const rect = canvas.getBoundingClientRect();
-            const canvasX = e.clientX - rect.left;
-            const canvasY = e.clientY - rect.top;
+            const { x: canvasX, y: canvasY } = clientToCanvas(e.clientX, e.clientY, canvas);
             const mapCoords = editorRef.current.screenToTile(canvasX, canvasY);
             if (mapCoords && mapCoords.x >= 0 && mapCoords.x < mapWidth && mapCoords.y >= 0 && mapCoords.y < mapHeight) {
               // NPC pawns cannot occupy the same cell as another NPC
@@ -535,9 +528,7 @@ export default function EditorCanvas(props: Props) {
         // Handle Event drop
         const eventIdStr = e.dataTransfer.getData('event-id');
         if (eventIdStr) {
-          const rect = canvas.getBoundingClientRect();
-          const canvasX = e.clientX - rect.left;
-          const canvasY = e.clientY - rect.top;
+          const { x: canvasX, y: canvasY } = clientToCanvas(e.clientX, e.clientY, canvas);
           const mapCoords = editorRef.current.screenToTile(canvasX, canvasY);
           if (mapCoords && mapCoords.x >= 0 && mapCoords.x < mapWidth && mapCoords.y >= 0 && mapCoords.y < mapHeight) {
             handlePlaceEventOnMap(eventIdStr, mapCoords.x, mapCoords.y);

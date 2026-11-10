@@ -11,6 +11,7 @@ import { AppProvider } from './context/AppContext';
 import AppMain from './components/AppMain';
 import { InlineConfirmHost } from './components/ui/inline-confirm';
 import useAppController from './hooks/useAppController';
+import useInterfaceScale from './hooks/useInterfaceScale';
 
 function sidebarRecord(value: unknown): Record<string, unknown> {
   if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
@@ -42,6 +43,7 @@ function AppMainWrapper({
 }
 
 export default function App() {
+  useInterfaceScale();
   const { toolbarValue, sidebarDeps, buildAppMainCtxFromSidebar } = useAppController();
 
   return (

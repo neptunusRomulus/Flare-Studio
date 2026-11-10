@@ -52,6 +52,10 @@ declare global {
       selectDirectory: () => Promise<string | null>;
       selectTilesetFile: () => Promise<string | null>;
       selectProjectFile: (options?: { projectPath?: string | null; title?: string; filters?: Array<{ name: string; extensions: string[] }> }) => Promise<string | null>;
+      getDisplaySettings: () => Promise<{ interfaceScale: number; textScale: number }>;
+      setDisplaySettings: (settings: { interfaceScale: number; textScale: number }) => Promise<{ interfaceScale: number; textScale: number }>;
+      setZoomFactor: (factor: number) => Promise<boolean>;
+      onInterfaceScaleMenu: (callback: (kind: 'in' | 'out' | 'reset') => void) => () => void;
       createMapProject: (config: MapConfig) => Promise<{ success: boolean; projectPath?: string; error?: string }>;
       openMapProject: (projectPath: string, mapName?: string) => Promise<EditorProjectData | null>;
       saveMapProject: (projectPath: string, mapData: ProjectMapData) => Promise<boolean>;

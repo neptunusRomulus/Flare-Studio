@@ -12,7 +12,8 @@
 import { placedOfType } from './entityPlacementRules';
 import { MAP_TARGET_CURSOR } from '@/components/mapTargets';
 import { SharedSlotMap, slotGroup, mergeSharedSlotLists } from './sharedSlots';
-import { classifyWheel, pinchFactor, panForZoomAt } from './wheelNav';
+import { classifyWheel, pinchFactor, panForZoomAt } from './wheelNav'
+import { canvasToClient, clientToCanvas } from './canvasCoords';
 import { findSlotForCellKey, mergeLegacySlotData, clearSlotCells, type SlotLike } from './slotCells';
 import { parseTilesetDefTiles, tileDrawTopLeft } from './tilesetDef';
 import { assignExportOffsets } from './tilesetIds';
@@ -1247,31 +1248,23 @@ export class TileMapEditor {
     }
   }
 
+  private eventToCanvas(event: { clientX: number; clientY: number }): { x: number; y: number } {
+    return clientToCanvas(event.clientX, event.clientY, this.mapCanvas);
+  }
+
   private resizeCanvas(): void {
     const container = this.mapCanvas.parentElement;
-    if (container) {
-      const rect = container.getBoundingClientRect();
-      // Ensure we don't exceed container bounds, with minimum fallback dimensions
-      const width = Math.max(400, Math.floor(rect.width));
-      const height = Math.max(300, Math.floor(rect.height));
-      
-      // Only update if dimensions actually changed to avoid unnecessary redraws
-      if (this.mapCanvas.width !== width || this.mapCanvas.height !== height) {
-        this.mapCanvas.width = width;
-        this.mapCanvas.height = height;
-        
-        // Redraw after resize
-        this.draw();
-      }
-    } else {
-      // Fallback if no container is found
-      const width = 400;
-      const height = 300;
-      if (this.mapCanvas.width !== width || this.mapCanvas.height !== height) {
-        this.mapCanvas.width = width;
-        this.mapCanvas.height = height;
-        this.draw();
-      }
+    const cssW = Math.max(400, Math.floor(container ? container.clientWidth : 400));
+    const cssH = Math.max(300, Math.floor(container ? container.clientHeight : 300));
+    const dpr = (typeof window !== 'undefined' && window.devicePixelRatio) ? window.devicePixelRatio : 1;
+    const width = Math.max(1, Math.round(cssW * dpr));
+    const height = Math.max(1, Math.round(cssH * dpr));
+    this.mapCanvas.style.width = `${cssW}px`;
+    this.mapCanvas.style.height = `${cssH}px`;
+    if (this.mapCanvas.width !== width || this.mapCanvas.height !== height) {
+      this.mapCanvas.width = width;
+      this.mapCanvas.height = height;
+      this.draw();
     }
   }
 
@@ -1554,9 +1547,7 @@ export class TileMapEditor {
     this.clickStartY = event.clientY;
     this.hasMovedSinceClick = false;
 
-    const rect = this.mapCanvas.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
+    const { x, y } = this.eventToCanvas(event);
 
     // Middle-button drag pans (no Space needed)
     if (event.button === 1) {
@@ -1617,10 +1608,7 @@ export class TileMapEditor {
             this.isMouseDown = false;
             // Get screen position of the actor for popup placement
             const actorScreenPos = this.mapToScreen(actorAtPosition.x, actorAtPosition.y);
-            // Convert to canvas-relative screen coordinates
-            const canvasRect = this.mapCanvas.getBoundingClientRect();
-            const screenX = canvasRect.left + actorScreenPos.x;
-            const screenY = canvasRect.top + actorScreenPos.y;
+            const { x: screenX, y: screenY } = canvasToClient(actorScreenPos.x, actorScreenPos.y, this.mapCanvas);
             this.npcRightClickCallback(actorAtPosition.id, screenX, screenY);
             return;
           }
@@ -1711,9 +1699,7 @@ export class TileMapEditor {
       }
     }
 
-    const rect = this.mapCanvas.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
+    const { x, y } = this.eventToCanvas(event);
 
     if (this.isResizingMinimap) {
       this.mapCanvas.style.cursor = 'nwse-resize';
@@ -1920,9 +1906,7 @@ export class TileMapEditor {
   private handleWheel(event: WheelEvent): void {
     event.preventDefault();
 
-    const rect = this.mapCanvas.getBoundingClientRect();
-    const cursorX = event.clientX - rect.left;
-    const cursorY = event.clientY - rect.top;
+    const { x: cursorX, y: cursorY } = this.eventToCanvas(event);
     const wheelKind = classifyWheel(event);
 
     // Check if hovering over minimap
@@ -10276,11 +10260,10 @@ export class TileMapEditor {
     `;
 
     // Position tooltip near mouse cursor
-    const rect = this.mapCanvas.getBoundingClientRect();
     const screenPos = this.mapToScreen(this.hoverX, this.hoverY);
-    
-    tooltip.style.left = `${rect.left + screenPos.x + 20}px`;
-    tooltip.style.top = `${rect.top + screenPos.y - 10}px`;
+    const tipPos = canvasToClient(screenPos.x, screenPos.y, this.mapCanvas);
+    tooltip.style.left = `${tipPos.x + 20}px`;
+    tooltip.style.top = `${tipPos.y - 10}px`;
     tooltip.style.display = 'block';
   }
 
@@ -10326,10 +10309,10 @@ export class TileMapEditor {
         </div>
     `;
 
-    const rect = this.mapCanvas.getBoundingClientRect();
     const screenPos = this.mapToScreen(this.hoverX, this.hoverY);
-    tooltip.style.left = `${rect.left + screenPos.x + 20}px`;
-    tooltip.style.top = `${rect.top + screenPos.y - 10}px`;
+    const tipPos = canvasToClient(screenPos.x, screenPos.y, this.mapCanvas);
+    tooltip.style.left = `${tipPos.x + 20}px`;
+    tooltip.style.top = `${tipPos.y - 10}px`;
     tooltip.style.display = 'block';
   }
 
@@ -10381,11 +10364,10 @@ export class TileMapEditor {
     `;
 
     // Position tooltip near mouse cursor
-    const rect = this.mapCanvas.getBoundingClientRect();
     const screenPos = this.mapToScreen(this.hoverX, this.hoverY);
-    
-    tooltip.style.left = `${rect.left + screenPos.x + 20}px`;
-    tooltip.style.top = `${rect.top + screenPos.y - 10}px`;
+    const tipPos = canvasToClient(screenPos.x, screenPos.y, this.mapCanvas);
+    tooltip.style.left = `${tipPos.x + 20}px`;
+    tooltip.style.top = `${tipPos.y - 10}px`;
     tooltip.style.display = 'block';
   }
 

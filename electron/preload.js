@@ -160,4 +160,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
   openExternal: (url) => ipcRenderer.invoke("open-external", url),
   onFlareEngineExited: (callback) =>
     ipcRenderer.on("flare-engine-exited", (_event, payload) => callback && callback(payload)),
+  getDisplaySettings: () => ipcRenderer.invoke("get-display-settings"),
+  setDisplaySettings: (settings) => ipcRenderer.invoke("set-display-settings", settings),
+  setZoomFactor: (factor) => ipcRenderer.invoke("set-zoom-factor", factor),
+  onInterfaceScaleMenu: (callback) => {
+    const listener = (_event, kind) => callback && callback(kind);
+    ipcRenderer.on("interface-scale", listener);
+    return () => ipcRenderer.removeListener("interface-scale", listener);
+  },
 });

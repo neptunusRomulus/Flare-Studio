@@ -42,9 +42,6 @@ export default function AppMain() {
     handleOpenMap,
     isDarkMode,
     titleBarProps,
-    showSidebarToggle,
-    leftCollapsed,
-    handleSidebarToggle,
     actors,
     statuses = { isStatusesLayer: false, handleOpenStatusDialog: () => {} },
     rules,
@@ -63,7 +60,6 @@ export default function AppMain() {
     setShowActiveGid,
     debugMode,
     setDebugMode,
-    setShowSidebarToggle,
     showMapSettingsOnly,
     handleCloseMapSettings,
     handleDeleteMap,
@@ -291,7 +287,6 @@ export default function AppMain() {
     <div className="h-screen bg-background text-foreground flex flex-col overflow-hidden">
       <AppShell
         titleBarProps={enhancedTitleBarProps}
-        sidebarToggleProps={{ show: showSidebarToggle && showPanels, leftCollapsed, onToggle: handleSidebarToggle }}
       />
 
       <main className="flex flex-1 min-h-0">
@@ -341,8 +336,6 @@ export default function AppMain() {
           setShowActiveGid={setShowActiveGid}
           debugMode={debugMode}
           setDebugMode={setDebugMode}
-          showSidebarToggle={showSidebarToggle}
-          setShowSidebarToggle={setShowSidebarToggle}
         />
 
         <MapSettingsDialog

@@ -55,7 +55,6 @@ export default function useSidebarProps(params: any) {
     showTooltipWithDelay: p.showTooltipWithDelay,
     hideTooltip: p.hideTooltip,
     uiHelpers: p.uiHelpers,
-    leftCollapsed: p.leftCollapsed
   };
 
   const exportStatus = { isExporting: p.isExporting, exportProgress: p.exportProgress, isSaving: p.isManuallySaving, saveProgress: p.saveProgress };

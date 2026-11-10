@@ -172,7 +172,6 @@ export default function useAppMainSidebarDeps(args: AppMainSidebarDepsInput) {
         : 0;
 
     return {
-      leftCollapsed: appState.leftCollapsed,
       actors: {
         isNpcLayer: showNpcActorArea,
         isEnemyLayer: showEnemyActorArea,
@@ -327,7 +326,6 @@ export default function useAppMainSidebarDeps(args: AppMainSidebarDepsInput) {
         showTooltipWithDelay,
         hideTooltip,
         uiHelpers,
-        leftCollapsed: appState.leftCollapsed
       }
     };
   }, [
@@ -343,7 +341,6 @@ export default function useAppMainSidebarDeps(args: AppMainSidebarDepsInput) {
     showTooltipWithDelay,
     hideTooltip,
     uiHelpers,
-    appState.leftCollapsed,
     isNpcLayer,
     isEnemyLayer,
     appState.mapObjects,

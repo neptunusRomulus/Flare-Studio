@@ -5,7 +5,6 @@ import type { MapObject } from '@/types';
 type Props = {
   isEventLayer: boolean;
   eventEntries: MapObject[];
-  leftCollapsed: boolean;
   draggingEventId: number | null;
   handleEditEvent: (id: number) => void;
   handleDuplicateEvent: (id: number) => void;
@@ -20,7 +19,6 @@ type Props = {
 const SidebarEventArea: React.FC<Props> = ({
   isEventLayer,
   eventEntries,
-  leftCollapsed,
   draggingEventId,
   handleEditEvent,
   handleDuplicateEvent,
@@ -35,7 +33,6 @@ const SidebarEventArea: React.FC<Props> = ({
     <SidebarEventEntries
       isEventLayer={isEventLayer}
       eventEntries={eventEntries}
-      leftCollapsed={leftCollapsed}
       draggingEventId={draggingEventId}
       onEditEvent={handleEditEvent}
       onDuplicateEvent={handleDuplicateEvent}

@@ -50,7 +50,6 @@ export type ActorsSidebarParams = {
     canvasRef?: React.RefObject<HTMLCanvasElement>;
     tooltip?: unknown;
   };
-  leftCollapsed: boolean;
 };
 
 export default function useActorsSidebar(params?: Partial<ActorsSidebarParams>) {
@@ -103,7 +102,6 @@ export default function useActorsSidebar(params?: Partial<ActorsSidebarParams>) 
     showTooltipWithDelay: noopTooltipWithDelay,
     hideTooltip: noopNode,
     uiHelpers: undefined,
-    leftCollapsed: false
   };
   const p: ActorsSidebarParams = { ...defaultParams, ...(params ?? {}) };
 
@@ -147,7 +145,6 @@ export default function useActorsSidebar(params?: Partial<ActorsSidebarParams>) 
     showTooltipWithDelay: p.showTooltipWithDelay,
     hideTooltip: p.hideTooltip,
     uiHelpers: p.uiHelpers,
-    leftCollapsed: p.leftCollapsed
   };
 
   return { actors, rules, items, layersObj } as const;

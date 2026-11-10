@@ -92,7 +92,7 @@ export default function useAppMainBuilder() {
     handleSaveQuest
   } = useAppMainState();
 
-  const { isDarkMode, setIsDarkMode, showSidebarToggle, setShowSidebarToggle } = preferences;
+  const { isDarkMode, setIsDarkMode } = preferences;
   const { itemsList, expandedItemCategories, setExpandedItemCategories, handleOpenItemEdit, handleOpenItemDialog } = itemsHook;
 
   const dialogsCtx = useDialogsCtx({
@@ -853,7 +853,6 @@ export default function useAppMainBuilder() {
       showTooltipWithDelay: () => {},
       hideTooltip: () => {},
       uiHelpers: undefined,
-      leftCollapsed: false
     };
 
     const defaultTileset = {
@@ -927,9 +926,6 @@ export default function useAppMainBuilder() {
         },
         flareIconUrl: `${import.meta.env.BASE_URL}flare-studio-ico.png`
       },
-      showSidebarToggle,
-      leftCollapsed: appState.leftCollapsed,
-      handleSidebarToggle: () => {},
       actors: sb['actors'] ?? defaultActors,
       rules: sb['rules'] ?? defaultRules,
       statuses: sb['statuses'] ?? defaultStatuses,
@@ -954,7 +950,6 @@ export default function useAppMainBuilder() {
         showTooltipWithDelay: defaultLayers.showTooltipWithDelay,
         hideTooltip: defaultLayers.hideTooltip,
         uiHelpers: defaultLayers.uiHelpers,
-        leftCollapsed: appState.leftCollapsed
       },
       exportStatus: (sb['maps'] as Record<string, unknown> | undefined)?.['exportStatus'] ?? { isExporting: false, exportProgress: 0 },
       controls: (() => {
@@ -978,7 +973,6 @@ export default function useAppMainBuilder() {
       setShowActiveGid,
       debugMode,
       setDebugMode,
-      setShowSidebarToggle,
       showCreateMapDialog: mapConfig.showCreateMapDialog,
       setShowCreateMapDialog: mapConfig.setShowCreateMapDialog,
       newMapName: mapConfig.newMapName,
@@ -1067,8 +1061,6 @@ export default function useAppMainBuilder() {
         handleFillSelection: handleFillSelection ?? (() => {}),
         handleDeleteSelection: handleDeleteSelection ?? (() => {}),
         handleClearSelection: handleClearSelection ?? (() => {}),
-        leftTransitioning: appState.leftTransitioning,
-
         // bottom toolbar wiring
         bottomToolbarExpanded: toolbarState.bottomToolbarExpanded,
         setBottomToolbarNode: toolbarState.setBottomToolbarNode,

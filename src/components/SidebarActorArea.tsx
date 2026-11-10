@@ -6,7 +6,6 @@ type Props = {
   isNpcLayer: boolean;
   isEnemyLayer: boolean;
   actorEntries: MapObject[];
-  leftCollapsed: boolean;
   draggingNpcId: number | null;
   handleEditObject: (id: number) => void;
   handleEditEnemyTemplate: (id: number) => void;
@@ -25,7 +24,6 @@ const SidebarActorArea: React.FC<Props> = ({
   isNpcLayer,
   isEnemyLayer,
   actorEntries,
-  leftCollapsed,
   draggingNpcId,
   handleEditObject,
   handleEditEnemyTemplate,
@@ -44,7 +42,6 @@ const SidebarActorArea: React.FC<Props> = ({
       isNpcLayer={isNpcLayer}
       isEnemyLayer={isEnemyLayer}
       actorEntries={actorEntries}
-      leftCollapsed={leftCollapsed}
       draggingNpcId={draggingNpcId}
       onEditObject={handleEditObject}
       onEditEnemyTemplate={handleEditEnemyTemplate}

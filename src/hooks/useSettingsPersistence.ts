@@ -23,13 +23,11 @@ export interface UISettings {
   // Panel expansion states
   panelStates: {
     layersPanelExpanded?: boolean;
-    leftCollapsed?: boolean;
   };
 
   // Preferences
   preferences: {
     isDarkMode?: boolean;
-    showSidebarToggle?: boolean;
   };
 
   // Viewport settings (per-project)

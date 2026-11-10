@@ -23,7 +23,6 @@ type ActorEntriesPanelProps = {
   isNpcLayer: boolean;
   isEnemyLayer: boolean;
   actorEntries: MapObject[];
-  leftCollapsed: boolean;
   draggingNpcId: number | null;
   onEditObject: (actorId: number) => void;
   onEditEnemyTemplate: (actorId: number) => void;
@@ -70,7 +69,6 @@ const SidebarActorEntries = ({
   isNpcLayer,
   isEnemyLayer,
   actorEntries,
-  leftCollapsed,
   draggingNpcId,
   onEditObject,
   onEditEnemyTemplate,
@@ -334,10 +332,9 @@ const SidebarActorEntries = ({
                     </div>
                     <div className="space-y-1 text-sm flex-1 min-w-0">
                       <div className="font-medium text-foreground truncate">
-                        <span className={leftCollapsed ? 'sr-only' : ''}>{actor.name || `${actor.type === 'npc' ? 'NPC' : 'Enemy'} #${actor.id}`}</span>
-                        {!actor.name && leftCollapsed && <span className="text-xs text-muted-foreground">#{actor.id}</span>}
+                        <span>{actor.name || `${actor.type === 'npc' ? 'NPC' : 'Enemy'} #${actor.id}`}</span>
                       </div>
-                      {isNpcLayer && !leftCollapsed && (
+                      {isNpcLayer && (
                         <div className="flex flex-wrap gap-1 mt-1">
                           {isTalker && (
                             <span className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/30">
@@ -361,7 +358,7 @@ const SidebarActorEntries = ({
                           )}
                         </div>
                       )}
-                      {isEnemyLayer && !leftCollapsed && (
+                      {isEnemyLayer && (
                         <div className="flex flex-wrap gap-1 mt-1">
                           {enemyRoles.melee && (
                             <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium border ${ENEMY_ROLE_META_LOOKUP.isMelee.badgeClass}`}>
@@ -406,7 +403,7 @@ const SidebarActorEntries = ({
                         </div>
                       )}
                     </div>
-                    {isNpcLayer && !leftCollapsed && (
+                    {isNpcLayer && (
                       <Tooltip content="Number of NPC instances total" side="left">
                         <button
                           type="button"

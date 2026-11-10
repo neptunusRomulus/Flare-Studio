@@ -6,8 +6,6 @@ export default function useAppState() {
   const [showWelcome, setShowWelcome] = useState(true);
   const [activeGid, setActiveGid] = useState<string>('(none)');
   const [showActiveGid, setShowActiveGid] = useState<boolean>(true);
-  const [leftCollapsed, setLeftCollapsed] = useState<boolean>(false);
-  const [leftTransitioning, setLeftTransitioning] = useState<boolean>(false);
   const [layers, setLayers] = useState<TileLayer[]>([]);
   const [activeLayerId, setActiveLayerId] = useState<number | null>(null);
   const [showAddLayerDropdown, setShowAddLayerDropdown] = useState(false);
@@ -42,10 +40,6 @@ export default function useAppState() {
     setActiveGid,
     showActiveGid,
     setShowActiveGid,
-    leftCollapsed,
-    setLeftCollapsed,
-    leftTransitioning,
-    setLeftTransitioning,
     layers,
     setLayers,
     activeLayerId,

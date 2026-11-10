@@ -33,7 +33,6 @@ const FLARE_TO_ACTIVATION: Record<string, string> = {
 type EventEntriesPanelProps = {
   isEventLayer: boolean;
   eventEntries: MapObject[];
-  leftCollapsed: boolean;
   draggingEventId: number | null;
   onEditEvent: (eventId: number) => void;
   onDuplicateEvent: (eventId: number) => void;
@@ -49,7 +48,6 @@ type EventEntriesPanelProps = {
 const SidebarEventEntries = ({
   isEventLayer,
   eventEntries,
-  leftCollapsed,
   draggingEventId,
   onEditEvent,
   onDuplicateEvent,
@@ -135,11 +133,9 @@ const SidebarEventEntries = ({
                     </div>
                     <div className="space-y-1 text-sm flex-1 min-w-0">
                       <div className="font-medium text-foreground truncate">
-                        <span className={leftCollapsed ? 'sr-only' : ''}>{event.name || `Event #${event.id}`}</span>
-                        {!event.name && leftCollapsed && <span className="text-xs text-muted-foreground">#{event.id}</span>}
+                        <span>{event.name || `Event #${event.id}`}</span>
                       </div>
-                      {!leftCollapsed && (
-                        <div className="flex flex-wrap gap-1 mt-1">
+                      <div className="flex flex-wrap gap-1 mt-1">
                           {activationLabel ? (
                             <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium border ${ACTIVATION_COLORS[activationLabel]?.badge ?? 'bg-blue-500/20 text-blue-600 dark:text-blue-400 border-blue-500/30'}`}>
                               {activationLabel}
@@ -150,7 +146,6 @@ const SidebarEventEntries = ({
                             </span>
                           )}
                         </div>
-                      )}
                     </div>
                     <Tooltip content="Drag to the map, or click then drag an area on the map to place event">
                       <div

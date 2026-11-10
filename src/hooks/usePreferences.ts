@@ -18,27 +18,8 @@ export default function usePreferences() {
     }
   }, [isDarkMode]);
 
-  const [showSidebarToggle, setShowSidebarToggle] = useState<boolean>(() => {
-    try {
-      const saved = localStorage.getItem('showSidebarToggle');
-      return saved ? JSON.parse(saved) : true;
-    } catch {
-      return true;
-    }
-  });
-
-  useEffect(() => {
-    try {
-      localStorage.setItem('showSidebarToggle', JSON.stringify(showSidebarToggle));
-    } catch {
-      // ignore storage errors
-    }
-  }, [showSidebarToggle]);
-
   return {
     isDarkMode,
     setIsDarkMode,
-    showSidebarToggle,
-    setShowSidebarToggle
   } as const;
 }

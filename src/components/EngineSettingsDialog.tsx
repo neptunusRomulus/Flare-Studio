@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { Moon, Sun, Target, X, Save, Settings, Eye, PanelLeft, History, HelpCircle } from 'lucide-react';
+import { Moon, Sun, Target, X, Save, Settings, Eye, History, HelpCircle } from 'lucide-react';
 import Tooltip from '@/components/ui/tooltip';
 import UndoPersistencePanel from '@/components/UndoPersistencePanel';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
@@ -21,8 +21,6 @@ type EngineSettingsDialogProps = {
   setShowActiveGid: Dispatch<SetStateAction<boolean>>;
   debugMode: boolean;
   setDebugMode: Dispatch<SetStateAction<boolean>>;
-  showSidebarToggle: boolean;
-  setShowSidebarToggle: Dispatch<SetStateAction<boolean>>;
   undoPersistenceEnabled?: boolean;
   setUndoPersistenceEnabled?: Dispatch<SetStateAction<boolean>>;
   onClearUndoHistory?: () => void;
@@ -39,8 +37,6 @@ const EngineSettingsDialog = ({
   setShowActiveGid,
   debugMode,
   setDebugMode,
-  showSidebarToggle,
-  setShowSidebarToggle,
   undoPersistenceEnabled = false,
   setUndoPersistenceEnabled,
   onClearUndoHistory,

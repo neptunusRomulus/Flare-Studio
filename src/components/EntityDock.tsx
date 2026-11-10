@@ -10,8 +10,8 @@ type Props = {
   layers: TileLayer[];
   activeLayer: TileLayer | null;
   onSelectLayer: (id: number) => void;
-  actors: Omit<React.ComponentProps<typeof SidebarActorArea>, 'leftCollapsed'>;
-  events: Omit<React.ComponentProps<typeof SidebarEventArea>, 'leftCollapsed'>;
+  actors: Omit<React.ComponentProps<typeof SidebarActorArea>, 'isNpcLayer' | 'isEnemyLayer' | 'projectPath' | 'mapName'>;
+  events: Omit<React.ComponentProps<typeof SidebarEventArea>, 'isEventLayer'>;
   visibility?: LayerVisibilityControls;
   projectPath?: string | null;
   mapName?: string;
@@ -28,9 +28,9 @@ const EntityDock: React.FC<Props> = ({ layers, activeLayer, onSelectLayer, actor
       <MapTargetSwitch group={ENTITY_GROUP} layers={layers} activeLayer={activeLayer} onSelectLayer={onSelectLayer} visibility={visibility} />
       <div className="flex flex-col flex-1 min-h-0 overflow-y-auto">
         {(type === 'npc' || type === 'enemy') && (
-          <SidebarActorArea {...actors} isNpcLayer={type === 'npc'} isEnemyLayer={type === 'enemy'} leftCollapsed={false} projectPath={projectPath} mapName={mapName} />
+          <SidebarActorArea {...actors} isNpcLayer={type === 'npc'} isEnemyLayer={type === 'enemy'} projectPath={projectPath} mapName={mapName} />
         )}
-        {type === 'event' && <SidebarEventArea {...events} isEventLayer leftCollapsed={false} />}
+        {type === 'event' && <SidebarEventArea {...events} isEventLayer />}
       </div>
     </div>
   );

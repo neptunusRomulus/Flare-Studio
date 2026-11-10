@@ -61,7 +61,6 @@ type EditorContext = {
   handleFillSelection: () => void;
   handleDeleteSelection: () => void;
   handleClearSelection: () => void;
-  leftTransitioning: boolean;
   isDarkMode: boolean;
 };
 
@@ -108,7 +107,6 @@ export default function EditorCanvas(props: Props) {
     handleFillSelection,
     handleDeleteSelection,
     handleClearSelection,
-    leftTransitioning
   } = ctx;
 
   const [cursorScreenPos, setCursorScreenPos] = React.useState<{x: number, y: number} | null>(null);
@@ -550,7 +548,7 @@ export default function EditorCanvas(props: Props) {
       <canvas
         ref={canvasRef}
         id="mapCanvas"
-        className={`tile-canvas flex-1 canvas-fade ${leftTransitioning ? 'during-sidebar-transition' : ''}`}
+        className="tile-canvas flex-1 canvas-fade"
       />
 
       <MapInitOverlay mapInitialized={mapInitialized} handleOpenCreateMapDialog={handleOpenCreateMapDialog} isPreparingNewMap={isPreparingNewMap} />

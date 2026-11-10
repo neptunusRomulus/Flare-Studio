@@ -51,7 +51,6 @@ type UseEditorCanvasDeps = {
   handleFillSelection: () => void;
   handleDeleteSelection: () => void;
   handleClearSelection: () => void;
-  leftTransitioning: boolean;
 
   // bottom toolbar
   bottomToolbarExpanded: boolean;
@@ -128,7 +127,6 @@ export default function useEditorCanvasCtx(deps: UseEditorCanvasDeps) {
     handleFillSelection: deps.handleFillSelection,
     handleDeleteSelection: deps.handleDeleteSelection,
     handleClearSelection: deps.handleClearSelection,
-    leftTransitioning: deps.leftTransitioning
   };
 
   return { ctx };

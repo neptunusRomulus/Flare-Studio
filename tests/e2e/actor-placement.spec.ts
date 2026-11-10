@@ -90,9 +90,9 @@ test('actor can be placed on the map canvas by dragging from the NPC sidebar', a
     const npcEntry = window.locator('div.w-full.box-border.rounded-md', { hasText: 'Drag NPC Test' }).first();
     await expect(npcEntry).toBeVisible({ timeout: 15000 });
 
-    const dragHandle = npcEntry.locator('div[draggable="true"]').first();
     const canvas = window.locator('canvas').first();
-    await dragHandle.dragTo(canvas, { force: true });
+    // Dragging anywhere on the NPC row places an instance on the map.
+    await npcEntry.dragTo(canvas, { force: true });
 
     await expect(npcEntry).toHaveClass(/bg-background\/50/, { timeout: 15000 });
   } finally {

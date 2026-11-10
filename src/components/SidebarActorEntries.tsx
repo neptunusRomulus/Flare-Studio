@@ -50,7 +50,7 @@ const SidebarActorEntries = ({
   onCreateActorShell,
 }: ActorEntriesPanelProps) => {
   const armed = React.useSyncExternalStore(entityPlacement.subscribe, entityPlacement.get, entityPlacement.get);
-  const { getItemDragProps, reorderClass } = useListReorder(
+  const { getItemDragProps, getItemDropProps, startReorder, endReorder, reorderClass } = useListReorder(
     actorEntries,
     (a) => a.id,
     onReorderActors,
@@ -258,8 +258,20 @@ const SidebarActorEntries = ({
                   onDelete={() => onDeleteObject(actor.id)}
                 >
                 <div
-                  {...getItemDragProps(index)}
-                  className={`w-full box-border rounded-md px-2 py-2 hover:bg-background transition-colors cursor-pointer border border-dashed border-gray-400 dark:border-gray-600 flex ${
+                  {...(isNpcLayer
+                    ? {
+                        draggable: true,
+                        onDragStart: (event: React.DragEvent<HTMLDivElement>) => {
+                          event.dataTransfer.effectAllowed = 'move';
+                          onDragStart(event, actor.id);
+                        },
+                        onDragEnd,
+                        ...getItemDropProps(index),
+                      }
+                    : getItemDragProps(index))}
+                  className={`w-full box-border rounded-md px-2 py-2 hover:bg-background transition-colors ${
+                    isNpcLayer ? 'cursor-grab active:cursor-grabbing select-none' : 'cursor-pointer'
+                  } border border-dashed border-gray-400 dark:border-gray-600 flex ${
                     isPlacedOnMap ? 'bg-background/50' : 'bg-muted/20'
                   } ${draggingNpcId === actor.id ? 'opacity-50' : ''} ${reorderClass(index)}`}
                   onClick={() => isEnemyLayer ? onEditEnemyTemplate(actor.id) : onEditObject(actor.id)}
@@ -273,6 +285,7 @@ const SidebarActorEntries = ({
                         <img
                           src={portraitPath}
                           alt={actor.name || 'NPC portrait'}
+                          draggable={false}
                           className={`w-full h-full object-cover ${!isPlacedOnMap ? 'opacity-50' : ''}`}
                           onError={(event) => {
                             event.currentTarget.style.display = 'none';
@@ -357,11 +370,26 @@ const SidebarActorEntries = ({
                       )}
                     </div>
                     {(isNpcLayer || isEnemyLayer) && (
-                      <Tooltip content={isNpcLayer ? 'Drag to the map, or click then click the map to place NPC' : 'Drag to the map, or click then click the map to place enemy'}>
+                      <Tooltip content={isNpcLayer ? 'Drag to reorder. Click to arm placement, then click the map.' : 'Drag to the map, or click then click the map to place enemy'}>
                         <div
                           draggable
-                          onDragStart={(event) => onDragStart(event, actor.id)}
-                          onDragEnd={onDragEnd}
+                          onDragStart={(event) => {
+                            if (isNpcLayer) {
+                              // Reorder only: keep this drag away from the row's map-placement drag.
+                              event.stopPropagation();
+                              startReorder(event, index);
+                              return;
+                            }
+                            onDragStart(event, actor.id);
+                          }}
+                          onDragEnd={(event) => {
+                            if (isNpcLayer) {
+                              event.stopPropagation();
+                              endReorder();
+                              return;
+                            }
+                            onDragEnd();
+                          }}
                           className={`w-8 h-8 flex items-center justify-center cursor-grab active:cursor-grabbing transition-colors flex-shrink-0 rounded ${armed?.id === actor.id ? 'text-primary ring-1 ring-primary' : 'text-muted-foreground hover:text-foreground'}`}
                           onClick={(event) => { event.stopPropagation(); entityPlacement.toggle({ id: actor.id, type: (isNpcLayer ? 'npc' : 'enemy') }); }}
                           data-armed={armed?.id === actor.id ? 'true' : undefined}

@@ -1,9 +1,12 @@
-import { useState, type ReactNode } from 'react';
+import { useContext, useEffect, useState, type ReactNode } from 'react';
 import { Coins, Flag, Gift, Package, Plus, Sparkles, X } from 'lucide-react';
 import Tooltip from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import { STORY_FLAG_LIST_ID } from '@/editor/powers/storyFlags';
 import { joinStatusList, splitStatusList } from '@/editor/questSteps';
+import AppContext from '@/context/AppContext';
+import { loadProjectTextMap } from '@/editor/projectFiles';
+import { findTurnInTarget, listMapEvents } from '@/editor/questRewards';
 
 export type WhenDoneRewards = {
   set_status?: string;
@@ -11,6 +14,8 @@ export type WhenDoneRewards = {
   reward_currency?: string;
   reward_item?: string;
   reward_loot?: string;
+  event_path?: string;
+  event_key?: string;
 };
 
 type Props = {
@@ -19,12 +24,32 @@ type Props = {
   rewards: WhenDoneRewards;
   onRewardsChange: (rewards: WhenDoneRewards) => void;
   items?: Array<{ id: string | number; name?: string }>;
+  questId?: string;
 };
 
 type OpenKey = 'flags' | 'items' | 'xp' | 'currency' | 'loot' | null;
 
-const WhenDoneRow = ({ completeStatus, onCompleteStatusChange, rewards, onRewardsChange, items = [] }: Props) => {
+const WhenDoneRow = ({ completeStatus, onCompleteStatusChange, rewards = {}, onRewardsChange, items = [], questId = '' }: Props) => {
   const [open, setOpen] = useState<OpenKey>(null);
+  const ctx = useContext(AppContext);
+  const projectPath = typeof ctx?.currentProjectPath === 'string' ? ctx.currentProjectPath : null;
+  const [turnIn, setTurnIn] = useState<string | null>(null);
+  const [events, setEvents] = useState<Array<{ path: string; eventKey: string; label: string }>>([]);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      if (!projectPath || !questId) {
+        if (!cancelled) { setTurnIn(null); setEvents([]); }
+        return;
+      }
+      const files = await loadProjectTextMap(projectPath);
+      if (cancelled) return;
+      const target = findTurnInTarget(files, questId, completeStatus);
+      setTurnIn(target && target.kind === 'npc' ? `${target.dialogueId} (${target.path})` : null);
+      setEvents(listMapEvents(files));
+    })();
+    return () => { cancelled = true; };
+  }, [projectPath, questId, completeStatus]);
   const flags = splitStatusList(completeStatus);
   const setFlags = splitStatusList(rewards.set_status);
   const itemTokens = splitStatusList(rewards.reward_item);
@@ -46,6 +71,33 @@ const WhenDoneRow = ({ completeStatus, onCompleteStatusChange, rewards, onReward
         <IconButton label="Currency" tip="reward_currency" icon={Coins} active={!!rewards.reward_currency} onClick={() => toggle('currency')} />
         <IconButton label="Loot" tip="reward_loot" icon={Gift} active={!!rewards.reward_loot} onClick={() => toggle('loot')} />
       </div>
+      {turnIn ? (
+        <p className="text-[11px] text-muted-foreground">Rewards go to the turn-in dialog {turnIn}.</p>
+      ) : (
+        <div className="space-y-1">
+          <p className="text-[11px] text-muted-foreground">No turn-in NPC dialog found. Pick a map event to write reward_xp, reward_item, and set_status.</p>
+          <select
+            className="h-6 w-full rounded border border-input bg-background text-[11px]"
+            value={rewards.event_path && rewards.event_key ? `${rewards.event_path}::${rewards.event_key}` : ''}
+            onChange={(e) => {
+              const value = e.target.value;
+              if (!value) {
+                onRewardsChange({ ...rewards, event_path: '', event_key: '' });
+                return;
+              }
+              const at = value.indexOf('::');
+              const path = at >= 0 ? value.slice(0, at) : value;
+              const key = at >= 0 ? value.slice(at + 2) : '';
+              onRewardsChange({ ...rewards, event_path: path, event_key: key });
+            }}
+          >
+            <option value="">Map event</option>
+            {events.map((event) => (
+              <option key={`${event.path}::${event.eventKey}`} value={`${event.path}::${event.eventKey}`}>{event.label}</option>
+            ))}
+          </select>
+        </div>
+      )}
       {open === 'flags' && (
         <Panel onClose={() => setOpen(null)}>
           <p className="text-[11px] text-muted-foreground">complete_status</p>

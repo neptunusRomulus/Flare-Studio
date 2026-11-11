@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { canonicalJson, contentSlug, importQuestText, mergeQuestText } from '../adapters/flare/flareAdapter.cjs';
-import { projectRoot, writeProjectFiles } from '../editor/projectFiles';
+import { loadProjectTextMap, projectRoot, writeProjectFiles } from '../editor/projectFiles';
+import { applyWhenDoneRewards, findTurnInTarget, rewardsFromWhenDone } from '../editor/questRewards';
 import useEditorRefs from './useEditorRefs';
 import useEditorSetup from './useEditorSetup';
 import useLoadProjectData from './useLoadProjectData';
@@ -68,6 +69,8 @@ export type QuestDraft = {
     reward_currency?: string;
     reward_item?: string;
     reward_loot?: string;
+    event_path?: string;
+    event_key?: string;
   };
 };
 
@@ -272,10 +275,29 @@ export default function useAppMainState() {
     void (async () => {
       const existingText = window.electronAPI?.readFile ? ((await window.electronAPI.readFile(`${root}/${rel}`)) || '') : '';
       const text = mergeQuestText(existingText, { name: nextName, complete_status: complete, steps });
-      const saved = await writeProjectFiles(currentProjectPath, [
+      const writes = [
         { path: rel, content: text },
         { path: `content/quests/${id}.json`, content: canonicalJson('quest', stored) },
-      ]);
+      ];
+      const rewards = rewardsFromWhenDone(questDraft.when_done);
+      if (Object.keys(rewards).length > 0) {
+        const files = await loadProjectTextMap(currentProjectPath);
+        const picked = questDraft.when_done?.event_path && questDraft.when_done?.event_key
+          ? { kind: 'event' as const, path: questDraft.when_done.event_path, eventKey: questDraft.when_done.event_key }
+          : null;
+        const target = findTurnInTarget(files, id, complete) || picked;
+        if (target) {
+          const applied = applyWhenDoneRewards(files, target, rewards);
+          if (applied.changed) writes.push({ path: target.path, content: applied.files[target.path] });
+        } else {
+          toast({
+            title: 'When done rewards not written',
+            description: 'Pick a map event in When done, or add a turn-in NPC dialog first.',
+            variant: 'destructive',
+          });
+        }
+      }
+      const saved = await writeProjectFiles(currentProjectPath, writes);
       if (!saved) {
         toast({ title: 'Quest save failed', description: 'Could not write the quests folder.', variant: 'destructive' });
       }

@@ -219,6 +219,7 @@ const QuestStepCards = ({ steps, onChange, ctx, items = [], completeStatus = '',
                   rewards={rewards}
                   onRewardsChange={onRewardsChange || (() => {})}
                   items={items}
+                  questId={ctx.questId}
                 />
               </div>
             </div>

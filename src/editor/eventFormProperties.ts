@@ -1,5 +1,7 @@
 /** Event form fields. Keys the form does not own must survive a save. */
 
+import { EVENT_EXTRA_KEYS } from './eventExtraProperties';
+
 export type EventPropertyValue = string | string[];
 
 export const EVENT_FORM_KEYS = new Set([
@@ -51,6 +53,7 @@ export const EVENT_FORM_KEYS = new Set([
   'show_on_minimap',
   'parallax_layers',
   'random_status',
+  ...EVENT_EXTRA_KEYS,
 ]);
 
 export function mergeEventFormProperties(

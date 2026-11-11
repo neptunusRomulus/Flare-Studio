@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { X } from 'lucide-react';
 import SearchablePalette, { type SearchablePaletteEntry } from '@/components/ui/searchable-palette';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import Tooltip from '@/components/ui/tooltip';
 import { InlineConfirm } from '@/components/ui/inline-confirm';
 
@@ -10,6 +11,8 @@ export type EditorProperty = {
   label: string;
   value: string;
   tooltip?: string;
+  /** 'toggle' renders an on/off switch writing "true"/"false". */
+  kind?: 'text' | 'toggle';
 };
 
 type Props = {
@@ -33,12 +36,22 @@ const EditorPropertyList = ({ title = 'Properties', properties, catalog, onChang
             <Tooltip content={property.tooltip || property.key} side="left">
               <label className="w-36 shrink-0 text-xs text-foreground truncate">{property.label}</label>
             </Tooltip>
-            <Input
-              className="h-7 text-xs"
-              value={property.value}
-              onChange={(event) => onChange(property.key, event.target.value)}
-              aria-label={property.label}
-            />
+            {property.kind === 'toggle' ? (
+              <div className="flex-1 h-7 flex items-center">
+                <Switch
+                  checked={property.value.trim().toLowerCase() !== 'false'}
+                  onCheckedChange={(checked) => onChange(property.key, checked ? 'true' : 'false')}
+                  aria-label={property.label}
+                />
+              </div>
+            ) : (
+              <Input
+                className="h-7 text-xs"
+                value={property.value}
+                onChange={(event) => onChange(property.key, event.target.value)}
+                aria-label={property.label}
+              />
+            )}
             <InlineConfirm
               open={confirmKey === property.key}
               onCancel={() => setConfirmKey(null)}

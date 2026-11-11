@@ -10,6 +10,15 @@ import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 import { ACTIVATION_COLORS } from '@/editor/eventActivationColors';
 import ResizeHandle from '@/components/ResizeHandle';
 import { mergeEventFormProperties } from '@/editor/eventFormProperties';
+import EditorPropertyList from '@/components/EditorPropertyList';
+import {
+  EVENT_EXTRA_CATALOG,
+  eventExtraPaletteKeys,
+  eventExtraPropsFrom,
+  eventExtraRowsFrom,
+  newEventExtraRowId,
+  type EventExtraRow,
+} from '@/editor/eventExtraProperties';
 
 type EventActivation = 'Trigger' | 'Interact' | 'Load' | 'Leave' | 'MapExit' | 'MapClear' | 'Loop';
 
@@ -169,6 +178,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const currentProjectPath: string | null = (controls as any)?.currentProjectPath ?? null;
   const [projectMaps, setProjectMaps] = useState<string[]>([]);
+  const [extraRows, setExtraRows] = useState<EventExtraRow[]>([]);
 
   const isEditing = editingEventId != null;
 
@@ -279,6 +289,8 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
     if (eventData.rewards.showOnMinimap) props.show_on_minimap = 'true';
     if (eventData.rewards.parallaxLayers.trim()) props.parallax_layers = eventData.rewards.parallaxLayers.trim();
     if (eventData.rewards.randomStatus.trim()) props.random_status = eventData.rewards.randomStatus.trim();
+
+    Object.assign(props, eventExtraPropsFrom(extraRows));
 
     return props;
   };
@@ -439,6 +451,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
       const obj = objects.find((o: { id: number }) => o.id === editingEventId);
       if (obj) {
         const p = obj.properties || {};
+        setExtraRows(eventExtraRowsFrom(p));
         // Parse hotspot "x,y,w,h"
         const hotParts = (p.hotspot || '').split(',').map(Number);
         const hotspot = hotParts.length === 4 && hotParts.every((n: number) => !isNaN(n))
@@ -561,6 +574,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
     // Reset to defaults for new event
     if (!isEditing) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
+      setExtraRows([]);
       setEventData({
         name: '',
         description: '',
@@ -2023,6 +2037,34 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
               </div>
             </div>
           </CollapsibleSection>
+
+          <div className="px-1">
+            <EditorPropertyList
+              title="More"
+              properties={extraRows.map((row) => {
+                const entry = EVENT_EXTRA_CATALOG.find((item) => item.key === row.key);
+                return {
+                  key: row.id,
+                  label: entry?.label || row.key,
+                  value: row.value,
+                  tooltip: entry?.tooltip || row.key,
+                  kind: entry?.kind,
+                };
+              })}
+              catalog={eventExtraPaletteKeys(extraRows).map((entry) => ({
+                id: entry.key,
+                label: entry.label,
+                tooltip: entry.tooltip,
+                searchText: `${entry.key} ${entry.synonyms || ''}`,
+              }))}
+              onChange={(id, value) => setExtraRows((rows) => rows.map((row) => (row.id === id ? { ...row, value } : row)))}
+              onAdd={(key) => {
+                const entry = EVENT_EXTRA_CATALOG.find((item) => item.key === key);
+                setExtraRows((rows) => [...rows, { id: newEventExtraRowId(), key, value: entry?.kind === 'toggle' ? 'true' : '' }]);
+              }}
+              onRemove={(id) => setExtraRows((rows) => rows.filter((row) => row.id !== id))}
+            />
+          </div>
         </div>
 
         <div className="sticky bottom-0 border-t border-border/50 bg-background px-6 py-3 flex justify-end">

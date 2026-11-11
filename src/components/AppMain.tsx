@@ -33,6 +33,7 @@ import { takeTemplateImport, markPreMapSlots } from '@/flare/projectTemplate';
 import { importTemplateTilesets, type TilesetImportEditor } from '@/editor/importTileset';
 import { importTemplateActors, type ActorImportResult } from '@/flare/templateActors';
 import { toast } from '@/hooks/use-toast';
+import type { HelpTarget } from '@/help/helpTopics';
 
 export default function AppMain() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -83,8 +84,6 @@ export default function AppMain() {
     editingEventId,
     confirmDialogProps,
     showHelp,
-    activeHelpTab,
-    setActiveHelpTab,
     handleHelpClose,
     topBarProps,
     canvasCtx,
@@ -273,6 +272,24 @@ export default function AppMain() {
     })();
   }, [editor, hasMap, templateProjectPath, layersObj, tileset]);
 
+  // Help "Go there": switch to a layer tab, or open Engine Settings on a tab.
+  const [settingsTab, setSettingsTab] = useState<'general' | 'save' | 'display' | undefined>(undefined);
+  const closeSettings = useCallback(() => { setSettingsTab(undefined); handleCloseSettings?.(); }, [handleCloseSettings]);
+  const canGoHelp = useCallback((target: HelpTarget) => {
+    if (target === 'display') return typeof controls?.setShowSettings === 'function';
+    return !!layersObj?.layers?.some((l: { type: string }) => l.type === target);
+  }, [controls, layersObj]);
+  const goHelp = useCallback((target: HelpTarget) => {
+    handleHelpClose?.();
+    if (target === 'display') {
+      setSettingsTab('display');
+      controls?.setShowSettings?.(true);
+      return;
+    }
+    const layer = layersObj?.layers?.find((l: { type: string }) => l.type === target);
+    if (layer) { try { void layersObj?.handleSetActiveLayer?.(layer.id); } catch { /* ignore */ } }
+  }, [controls, layersObj, handleHelpClose]);
+
   // Merge flare engine state into titleBarProps
   const enhancedTitleBarProps = useMemo(() => ({
     ...titleBarProps,
@@ -356,7 +373,8 @@ export default function AppMain() {
 
         <EngineSettingsDialog
           open={showSettings}
-          onClose={handleCloseSettings}
+          onClose={closeSettings}
+          initialTab={settingsTab}
           isDarkMode={isDarkMode}
           setIsDarkMode={setIsDarkMode}
           editor={editor}
@@ -388,7 +406,7 @@ export default function AppMain() {
 
         <AnchoredConfirm open={!!confirmDialogProps.action} onCancel={confirmDialogProps.onCancel} onConfirm={confirmDialogProps.onConfirm} />
 
-        <HelpDialog open={showHelp} activeTab={activeHelpTab} setActiveTab={setActiveHelpTab} onClose={handleHelpClose} />
+        <HelpDialog open={showHelp} onClose={handleHelpClose} onGo={goHelp} canGo={canGoHelp} />
 
         <ConflictDialog />
       </main>

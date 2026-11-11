@@ -3,7 +3,7 @@ import { Moon, Sun, Target, X, Save, Settings, Eye, History, HelpCircle } from '
 import Tooltip from '@/components/ui/tooltip';
 import UndoPersistencePanel from '@/components/UndoPersistencePanel';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
-import { useState, type Dispatch, type SetStateAction } from 'react';
+import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import { createPortal } from 'react-dom';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 import ResizeHandle from '@/components/ResizeHandle';
@@ -25,6 +25,8 @@ type EngineSettingsDialogProps = {
   setUndoPersistenceEnabled?: Dispatch<SetStateAction<boolean>>;
   onClearUndoHistory?: () => void;
   undoStorageSizeKB?: number;
+  /** Tab to show when the dialog opens (e.g. 'display' from Help). */
+  initialTab?: SettingsTab;
 };
 
 const EngineSettingsDialog = ({
@@ -40,7 +42,8 @@ const EngineSettingsDialog = ({
   undoPersistenceEnabled = false,
   setUndoPersistenceEnabled,
   onClearUndoHistory,
-  undoStorageSizeKB
+  undoStorageSizeKB,
+  initialTab
 }: EngineSettingsDialogProps) => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const [, setForceRender] = useState(0);
@@ -52,6 +55,8 @@ const EngineSettingsDialog = ({
     handleHeaderMouseDown,
     handleResizeMouseDown,
   } = useDraggableResizable({ id: 'engine_settings', initialWidth: 450, initialHeight: 500, minWidth: 380, minHeight: 400 });
+
+  useEffect(() => { if (open && initialTab) setActiveTab(initialTab); }, [open, initialTab]);
 
   if (!open) return null;
 

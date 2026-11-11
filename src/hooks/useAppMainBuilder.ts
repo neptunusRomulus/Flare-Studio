@@ -1010,8 +1010,6 @@ export default function useAppMainBuilder() {
       setEditingEventId: appState.setEditingEventId,
       confirmDialogProps: buildConfirmDialogProps({ confirmAction, setConfirmAction, onCancel, onConfirm }),
       showHelp: helpState.showHelp,
-      activeHelpTab: helpState.activeHelpTab,
-      setActiveHelpTab: helpState.setActiveHelpTab,
       handleHelpClose: () => { if (typeof helpState.setShowHelp === 'function') helpState.setShowHelp(false); },
       topBarProps: {
         toolbarExpanded: toolbarState.toolbarExpanded,

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertTriangle, Trash2, X } from 'lucide-react';
+import RenameIdButton from '@/components/RenameIdButton';
 import { Button } from '@/components/ui/button';
 import DraftInput from './DraftInput';
 import { Switch } from '@/components/ui/switch';
@@ -331,7 +332,7 @@ const EffectEditor = ({ target, data, onClose, onOpen }: Props) => {
   );
 };
 
-const FlagView = ({ target, data }: Props) => {
+const FlagView = ({ target, data, onOpen }: Props) => {
   const usage = data.project.flags[target.id] || { setBy: [], readBy: [] };
   const row = (label: string, key: string, items: string[]) => (
     <Field label={label} flareKey={key}>
@@ -345,7 +346,7 @@ const FlagView = ({ target, data }: Props) => {
   if (usage.readBy.length === 0) warnings.push({ id: 'never_read', text: 'Nothing checks this flag', tooltip: 'Set, but no requires_status / requires_not_status reads it' });
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2"><KindIcon kind="flag" className="w-5 h-5" /><span className="text-sm font-semibold">{target.id}</span></div>
+      <div className="flex items-center gap-2"><KindIcon kind="flag" className="w-5 h-5" /><span className="text-sm font-semibold">{target.id}</span><RenameIdButton kind="flag" currentId={target.id} onRenamed={(nextId) => { void data.reload(); onOpen({ type: 'flag', id: nextId }); }} /></div>
       <Warnings items={warnings} />
       {row('Set by', 'set_status / unset_status / defeat_status …', usage.setBy)}
       {row('Checked by', 'requires_status / requires_not_status …', usage.readBy)}

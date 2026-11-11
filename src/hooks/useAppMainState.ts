@@ -238,6 +238,17 @@ export default function useAppMainState() {
     };
   }, [currentProjectPath]);
 
+  const handleRenameQuestId = useCallback((nextId: string) => {
+    const id = String(nextId || '').replace(/^quests\//, '').replace(/\.txt$/i, '').trim();
+    if (!id) return;
+    const previous = editingQuestId;
+    setEditingQuestId(id);
+    setQuestDraft((prev) => ({ ...prev, id }));
+    if (previous && previous !== id) {
+      setRulesList((prev) => prev.map((rule) => (rule.id === previous ? { ...rule, id } : rule)));
+    }
+  }, [editingQuestId]);
+
   const handleSaveQuest = useCallback(() => {
     const nextName = questDraft.name.trim() || `Quest ${rulesList.length + 1}`;
     const existing = rulesList.find((rule) => rule.id === editingQuestId);
@@ -343,6 +354,7 @@ export default function useAppMainState() {
     handleOpenQuestDialog,
     handleCloseQuestDialog,
     handleOpenQuestEditDialog,
-    handleSaveQuest
+    handleSaveQuest,
+    handleRenameQuestId
   };
 }

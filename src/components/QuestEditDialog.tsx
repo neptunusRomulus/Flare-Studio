@@ -4,6 +4,8 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import Tooltip from '@/components/ui/tooltip';
 import { HelpCircle, X, Save } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import RenameIdButton from '@/components/RenameIdButton';
 import { useAppContext } from '@/context/AppContext';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 import { type QuestDraft } from '@/hooks/useAppMainState';
@@ -25,9 +27,10 @@ type QuestEditDialogProps = {
   questDraft: QuestDraft;
   setQuestDraft: React.Dispatch<React.SetStateAction<QuestDraft>>;
   onSave: () => void;
+  onRenameId?: (nextId: string) => void;
 };
 
-const QuestEditDialog = ({ open, onOpenChange, questDraft, setQuestDraft, onSave }: QuestEditDialogProps) => {
+const QuestEditDialog = ({ open, onOpenChange, questDraft, setQuestDraft, onSave, onRenameId }: QuestEditDialogProps) => {
   const { itemsList = [] } = useAppContext() as any;
   const inventoryItems = React.useMemo(
     () => (itemsList as any[]).filter((item) => item.role !== 'loot_groups'),
@@ -126,6 +129,17 @@ const QuestEditDialog = ({ open, onOpenChange, questDraft, setQuestDraft, onSave
 
       <div className="flex-1 overflow-y-auto space-y-6 px-5 py-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/15 [&::-webkit-scrollbar-thumb]:rounded-full">
         <div className="grid gap-4 sm:grid-cols-2">
+          <div className="sm:col-span-2 flex items-center gap-2">
+            <div>
+              <div className="text-xs text-muted-foreground mb-1">ID</div>
+              <div className="flex items-center gap-1">
+                <Badge variant="secondary" className="w-fit text-xs px-2 py-1 border border-border bg-muted/60 font-mono">
+                  {questId}
+                </Badge>
+                <RenameIdButton kind="quest" currentId={questId} onRenamed={(nextId) => onRenameId?.(nextId)} />
+              </div>
+            </div>
+          </div>
           <div>
             <label className="flex items-center gap-2 text-sm font-medium mb-1">
               Name

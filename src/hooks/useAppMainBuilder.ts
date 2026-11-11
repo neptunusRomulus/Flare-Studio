@@ -89,7 +89,8 @@ export default function useAppMainBuilder() {
     handleOpenQuestDialog,
     handleCloseQuestDialog,
     handleOpenQuestEditDialog,
-    handleSaveQuest
+    handleSaveQuest,
+    handleRenameQuestId
   } = useAppMainState();
 
   const { isDarkMode, setIsDarkMode } = preferences;
@@ -102,7 +103,8 @@ export default function useAppMainBuilder() {
     setQuestDraft,
     handleOpenQuestDialog,
     handleCloseQuestDialog,
-    handleSaveQuest
+    handleSaveQuest,
+    handleRenameQuestId
   });
 
   const [showStatusDialog, setShowStatusDialog] = useState(false);

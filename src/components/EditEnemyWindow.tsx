@@ -4,6 +4,7 @@ import Tooltip from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import RenameIdButton from '@/components/RenameIdButton';
 import { Badge } from '@/components/ui/badge';
 import { User, Eye, Sword, Gift, Flag, MapPin, Volume2, HelpCircle, X, Save, Plus, Check, Rabbit, Sigma, Zap, ChevronDown, ChevronUp, FolderOpen } from 'lucide-react';
 import type { MapObject } from '@/types';
@@ -944,6 +945,26 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
                         <LabelWithTooltip field="name">Full Name</LabelWithTooltip>
                         <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Goblin Warrior" className="h-9" />
                       </div>
+                      {enemySourceRel(enemy) ? (
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs text-muted-foreground">File</span>
+                          <Badge variant="secondary" className="w-fit text-xs px-2 py-1 border border-border bg-muted/60 font-mono">
+                            {enemySourceRel(enemy).replace(/^enemies\//, '')}
+                          </Badge>
+                          <RenameIdButton
+                            kind="enemy"
+                            currentId={enemySourceRel(enemy)}
+                            projectPath={projectPath}
+                            onRenamed={(nextId) => {
+                              const path = nextId.startsWith('enemies/') ? nextId : `enemies/${nextId.replace(/\.txt$/i, '')}.txt`;
+                              if (enemy && onSave) {
+                                const props = { ...(enemy.properties || {}), sourcePath: path, enemyFilename: path };
+                                onSave({ ...enemy, properties: props });
+                              }
+                            }}
+                          />
+                        </div>
+                      ) : null}
                       <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1">
                           <LabelWithTooltip field="level">Level</LabelWithTooltip>

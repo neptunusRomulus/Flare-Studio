@@ -10,6 +10,8 @@ import { emptyMapPresentation, type MapPresentation } from '@/editor/studioDraft
 import { MapPresentationFields } from '@/components/studio/studioEditors';
 import { AnchoredConfirm } from '@/components/ui/inline-confirm';
 import ResizeHandle from '@/components/ResizeHandle';
+import RenameIdButton from '@/components/RenameIdButton';
+import { slugFileName } from '@/adapters/flare/flareAdapter.cjs';
 
 type MapSettingsDialogProps = {
   open: boolean;
@@ -102,13 +104,22 @@ const MapSettingsDialog = ({
         <div className="flex-1 overflow-y-auto space-y-4 p-4">
           <div>
             <label className="block text-sm font-medium mb-2">Map Name</label>
-            <Input
-              type="text"
-              value={mapName}
-              onChange={(e) => setMapName(e.target.value)}
-              placeholder="Enter map name"
-              className="w-full"
-            />
+            <div className="flex items-center gap-1">
+              <Input
+                type="text"
+                value={mapName}
+                onChange={(e) => setMapName(e.target.value)}
+                placeholder="Enter map name"
+                className="w-full"
+              />
+              {slugFileName(mapName) ? (
+                <RenameIdButton
+                  kind="map"
+                  currentId={slugFileName(mapName)}
+                  onRenamed={(nextId) => setMapName(nextId.replace(/^maps\//, '').replace(/\.txt$/i, ''))}
+                />
+              ) : null}
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium mb-2">Map Width</label>

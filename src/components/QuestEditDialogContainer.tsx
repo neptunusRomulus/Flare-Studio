@@ -7,6 +7,7 @@ type QuestDialogCtx = {
   questDraft?: QuestDraft;
   handleCloseQuestDialog?: () => void;
   handleSaveQuest?: () => void;
+  handleRenameQuestId?: (nextId: string) => void;
 };
 
 export default function QuestEditDialogContainer({ ctx }: { ctx: unknown }) {
@@ -36,6 +37,7 @@ export default function QuestEditDialogContainer({ ctx }: { ctx: unknown }) {
       questDraft={c.questDraft ?? defaultDraft}
       setQuestDraft={c.setQuestDraft ?? (() => {})}
       onSave={c.handleSaveQuest ?? (() => {})}
+      onRenameId={c.handleRenameQuestId}
     />
   );
 }

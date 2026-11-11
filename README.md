@@ -65,9 +65,9 @@ Coming Soon...
 - [x] 3- NPCs
 - [x] 4- Enemies
 - [x] 5- Dialogue (chat editor)
-- [x] Items & loot groups (in progress: loot chance words and 10-kill summary)
+- [x] Items & loot groups (loot chance words and 10-kill summary)
 - [ ] 6- Sounds (partial: sound fields on enemies, events, items and powers; no sound library)
-- [x] 7- Quest (Quest Map included; in progress: When done rewards row)
+- [x] 7- Quest (Quest Map included; When done rewards row)
 - [ ] 8- Cutscenes (partial: events can play a cutscene; editor exists but is not in the UI)
 - [x] Help
 - [ ] 9- **You name it. I will check on it. Promise.**
@@ -75,8 +75,8 @@ Coming Soon...
 ---
 #### ⚡ **Full Release** (Maybe)
 
-- [ ] 9- UI Edits (in progress: menu position editor)
-- [ ] Book editor (in progress)
+- [x] 9- UI Edits (HUD menu layout preview with drag-to-move)
+- [x] Book editor
 - [x] 10- Skills (Statuses, powers and Story Flags)
 - [ ] 12- Stats (partial: engine config editor exists, not in the UI)
 - [ ] 13- Shaders (with injection method)

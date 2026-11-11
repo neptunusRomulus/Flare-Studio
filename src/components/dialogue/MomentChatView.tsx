@@ -1,13 +1,15 @@
-import React, { useState } from 'react';
-import { GripVertical, Plus, X } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { CornerDownRight, GripVertical, Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { InlineConfirm } from '@/components/ui/inline-confirm';
 import useListReorder from '@/hooks/useListReorder';
 import { removeDialogueLine, reorderDialogueLines } from '@/editor/dialogueLines';
 import { applyMomentToTopic, type RoleMoment } from '@/editor/roleMoments';
-import type { DialogueLine, DialogueReward, DialogueTree, DialogueWorldEffect } from '@/types';
+import type { DialogueLine, DialogueRequirement, DialogueReward, DialogueTree, DialogueWorldEffect } from '@/types';
 import SearchablePalette from '@/components/ui/searchable-palette';
 import Tooltip from '@/components/ui/tooltip';
+import NpcAssetThumb from '@/components/NpcAssetThumb';
+import { resolveNpcPreviewPaths } from '@/flare/npcPreviewPaths';
 import {
   actionChipLabel,
   actionChipTooltip,
@@ -15,89 +17,95 @@ import {
   DIALOG_ACTION_CATALOG,
   type DialogActionChip,
 } from '@/editor/dialogActionChips';
+import {
+  addCondition,
+  chatBubbleMeta,
+  chatResponses,
+  conditionChipLabel,
+  conditionChipTooltip,
+  conditionEntry,
+  DIALOG_CONDITION_CATALOG,
+  removeAction,
+  removeCondition,
+  updateCondition,
+} from '@/editor/dialogueChat';
 
 type Props = {
   trees: DialogueTree[];
   visibleTrees: DialogueTree[];
   setTrees: (trees: DialogueTree[]) => void;
   moment: RoleMoment;
+  /** NPC name shown above its bubbles. */
+  npcName?: string;
+  /** NPC portrait (project-relative, absolute or data URL) used until a line sets another. */
+  npcPortrait?: string;
+  projectPath?: string | null;
 };
 
 const newId = () => `line-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+const topicDomId = (id: string) => `chat-topic-${id}`;
 
 function patchTree(trees: DialogueTree[], id: string, next: DialogueTree): DialogueTree[] {
   return trees.map((tree) => ((tree.dialogueId || tree.id) === id ? next : tree));
 }
 
-const Bubble = ({
-  line,
-  index,
-  onChange,
-  onRemove,
-  dragHandle,
-  dropProps,
-  reorderClass,
-}: {
-  line: DialogueLine;
-  index: number;
-  onChange: (text: string) => void;
-  onRemove: () => void;
-  dragHandle: React.HTMLAttributes<HTMLButtonElement>;
-  dropProps: React.HTMLAttributes<HTMLDivElement>;
-  reorderClass: string;
-}) => {
-  const npc = line.speaker !== 'player';
-  const [confirm, setConfirm] = useState(false);
-  return (
-    <div className={`flex ${npc ? 'justify-start' : 'justify-end'} ${reorderClass}`} {...dropProps}>
-      <div className={`max-w-[80%] flex items-start gap-1 ${npc ? '' : 'flex-row-reverse'}`}>
-        <button type="button" className="mt-2 text-muted-foreground cursor-grab active:cursor-grabbing" aria-label="Reorder line" {...dragHandle}>
-          <GripVertical className="w-3.5 h-3.5" />
-        </button>
-        <div
-          className={`rounded-2xl px-3 py-2 text-sm ${
-            npc ? 'bg-muted rounded-tl-sm' : 'bg-blue-500/15 text-foreground rounded-tr-sm'
-          }`}
-        >
-          <textarea
-            value={line.text || ''}
-            onChange={(e) => onChange(e.target.value)}
-            rows={Math.min(6, Math.max(1, (line.text || '').split('\n').length))}
-            className="w-full min-w-[12rem] resize-none bg-transparent outline-none text-sm leading-relaxed"
-            placeholder={npc ? 'NPC line' : 'Player line'}
-          />
-        </div>
-        <InlineConfirm open={confirm} onCancel={() => setConfirm(false)} onConfirm={onRemove} message="Remove this line?">
-          <button type="button" className="mt-2 text-muted-foreground hover:text-foreground" aria-label="Remove line" onClick={() => setConfirm(true)}>
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </InlineConfirm>
-      </div>
+/** Round avatar; resolves project / Flare portraits like the Edit NPC preview. */
+const ChatAvatar = ({ portrait, name, projectPath }: { portrait: string; name: string; projectPath?: string | null }) => {
+  const [resolved, setResolved] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    setResolved(null);
+    if (!portrait) return;
+    resolveNpcPreviewPaths({ portraitPath: portrait, projectPath })
+      .then((paths) => { if (!cancelled) setResolved(paths.portrait); })
+      .catch(() => { /* no portrait */ });
+    return () => { cancelled = true; };
+  }, [portrait, projectPath]);
+  const initial = (name || 'N').trim().charAt(0).toUpperCase() || 'N';
+  return resolved ? (
+    <NpcAssetThumb imagePath={resolved} alt={initial} className="w-8 h-8 rounded-full" />
+  ) : (
+    <div className="w-8 h-8 rounded-full bg-muted border border-border flex items-center justify-center text-xs font-semibold text-muted-foreground">
+      {initial}
     </div>
   );
 };
 
-
-const ActionChip = ({
-  chip,
+/** Small chip that edits its value inline; X removes it. */
+const EditChip = ({
+  label,
+  tooltip,
+  value,
+  placeholder,
+  needsValue = true,
+  tone = 'neutral',
   onChange,
   onRemove,
 }: {
-  chip: DialogActionChip;
-  onChange: (chip: DialogActionChip) => void;
+  label: string;
+  tooltip: string;
+  value: string;
+  placeholder?: string;
+  needsValue?: boolean;
+  tone?: 'neutral' | 'condition';
+  onChange: (value: string) => void;
   onRemove: () => void;
 }) => {
-  const [editing, setEditing] = useState(!chip.value && chip.type !== 'restore' && chip.type !== 'stash' && chip.type !== 'save_game');
-  const needsValue = !['stash', 'save_game'].includes(chip.type);
+  const [editing, setEditing] = useState(needsValue && !value);
   return (
-    <Tooltip content={actionChipTooltip(chip)}>
-      <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[11px]">
+    <Tooltip content={tooltip}>
+      <span
+        className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] ${
+          tone === 'condition' ? 'border-amber-500/40 bg-amber-500/10' : 'border-border bg-background/80'
+        }`}
+      >
         {editing && needsValue ? (
           <input
             autoFocus
             className="h-5 w-24 bg-transparent text-[11px] outline-none"
-            value={chip.value}
-            onChange={(e) => onChange({ ...chip, value: e.target.value })}
+            value={value}
+            placeholder={placeholder}
+            onChange={(e) => onChange(e.target.value)}
             onBlur={() => setEditing(false)}
             onKeyDown={(e) => {
               if (e.key === 'Enter') setEditing(false);
@@ -105,7 +113,7 @@ const ActionChip = ({
           />
         ) : (
           <button type="button" onClick={() => setEditing(true)}>
-            {actionChipLabel(chip)}
+            {label}
           </button>
         )}
         <button type="button" aria-label="Remove" className="text-muted-foreground hover:text-foreground" onClick={onRemove}>
@@ -116,13 +124,108 @@ const ActionChip = ({
   );
 };
 
-const ActionChips = ({
-  tree,
-  onPatch,
+const Bubble = ({
+  line,
+  side,
+  startsRun,
+  portrait,
+  npcName,
+  projectPath,
+  onChange,
+  onRemove,
+  dragHandle,
+  dropProps,
+  reorderClass,
 }: {
-  tree: DialogueTree;
-  onPatch: (next: DialogueTree) => void;
+  line: DialogueLine;
+  side: 'left' | 'right';
+  startsRun: boolean;
+  portrait: string;
+  npcName: string;
+  projectPath?: string | null;
+  onChange: (text: string) => void;
+  onRemove: () => void;
+  dragHandle: React.HTMLAttributes<HTMLButtonElement>;
+  dropProps: React.HTMLAttributes<HTMLDivElement>;
+  reorderClass: string;
 }) => {
+  const npc = side === 'left';
+  const [confirm, setConfirm] = useState(false);
+  // Grip and X keep their space and only fade in on hover, so nothing moves.
+  const tools = (
+    <div className={`flex flex-col items-center gap-1 pt-1 transition-opacity ${confirm ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100'}`}>
+      <button type="button" className="text-muted-foreground cursor-grab active:cursor-grabbing" aria-label="Reorder line" {...dragHandle}>
+        <GripVertical className="w-3.5 h-3.5" />
+      </button>
+      <InlineConfirm open={confirm} onCancel={() => setConfirm(false)} onConfirm={onRemove} message="Remove this line?">
+        <button type="button" className="text-muted-foreground hover:text-foreground" aria-label="Remove line" onClick={() => setConfirm(true)}>
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </InlineConfirm>
+    </div>
+  );
+  return (
+    <div className={`group flex ${npc ? 'justify-start' : 'justify-end'} ${startsRun ? 'mt-2' : 'mt-0.5'} ${reorderClass}`} {...dropProps}>
+      <div className={`max-w-[80%] flex items-start gap-1.5 ${npc ? '' : 'flex-row-reverse'}`}>
+        {npc && (
+          <div className="w-8 shrink-0">
+            {startsRun && <ChatAvatar portrait={portrait} name={npcName} projectPath={projectPath} />}
+          </div>
+        )}
+        <div
+          className={`relative rounded-2xl px-3 py-1.5 text-sm shadow-sm ${
+            npc
+              ? `bg-background border border-border ${startsRun ? 'rounded-tl-sm' : ''}`
+              : `bg-emerald-500/20 ${startsRun ? 'rounded-tr-sm' : ''}`
+          }`}
+        >
+          {npc && startsRun && (
+            <Tooltip content={line.key === 'her' ? 'her' : 'him'}>
+              <div className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 leading-tight">{npcName || 'NPC'}</div>
+            </Tooltip>
+          )}
+          <textarea
+            value={line.text || ''}
+            onChange={(e) => onChange(e.target.value)}
+            rows={Math.min(6, Math.max(1, (line.text || '').split('\n').length))}
+            className="block w-full min-w-[12rem] resize-none bg-transparent outline-none text-sm leading-relaxed"
+            placeholder={npc ? 'NPC says…' : 'Player says…'}
+          />
+        </div>
+        {tools}
+      </div>
+    </div>
+  );
+};
+
+const ConditionChips = ({ tree, onPatch }: { tree: DialogueTree; onPatch: (next: DialogueTree) => void }) => {
+  const reqs = tree.requirements || [];
+  const catalog = DIALOG_CONDITION_CATALOG.map((entry) => ({
+    id: entry.type,
+    label: entry.label,
+    tooltip: entry.flareKey,
+    searchText: `${entry.flareKey} ${entry.type} requires condition`,
+  }));
+  return (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {reqs.map((req: DialogueRequirement, index) => (
+        <EditChip
+          key={`${req.id || 'req'}-${index}`}
+          tone="condition"
+          label={conditionChipLabel(req)}
+          tooltip={conditionChipTooltip(req)}
+          value={req.value || ''}
+          placeholder={conditionEntry(req.type)?.placeholder}
+          onChange={(value) => onPatch(updateCondition(tree, index, value))}
+          onRemove={() => onPatch(removeCondition(tree, index))}
+        />
+      ))}
+      <SearchablePalette buttonLabel="Condition" placeholder="Search conditions…" entries={catalog} onSelect={(type) => onPatch(addCondition(tree, type as DialogueRequirement['type']))} />
+    </div>
+  );
+};
+
+const ActionChips = ({ tree, onPatch }: { tree: DialogueTree; onPatch: (next: DialogueTree) => void }) => {
   const chips = chipsFromActions(tree.rewards, tree.worldEffects);
   const catalog = DIALOG_ACTION_CATALOG.map((entry) => ({
     id: entry.id,
@@ -131,21 +234,16 @@ const ActionChips = ({
     searchText: `${entry.label} ${entry.flareKey} ${entry.description} ${entry.type}`,
   }));
 
-  const writeChip = (chip: DialogActionChip) => {
+  const writeChip = (chip: DialogActionChip, value: string) => {
     if (chip.group === 'reward') {
       const rewards = [...(tree.rewards || [])];
-      rewards[chip.index] = { ...(rewards[chip.index] || {}), id: chip.id, type: chip.type as DialogueReward['type'], value: chip.value, quantity: chip.quantity };
+      rewards[chip.index] = { ...(rewards[chip.index] || {}), id: chip.id, type: chip.type as DialogueReward['type'], value, quantity: chip.quantity };
       onPatch({ ...tree, rewards });
     } else {
       const worldEffects = [...(tree.worldEffects || [])];
-      worldEffects[chip.index] = { ...(worldEffects[chip.index] || {}), id: chip.id, type: chip.type as DialogueWorldEffect['type'], value: chip.value };
+      worldEffects[chip.index] = { ...(worldEffects[chip.index] || {}), id: chip.id, type: chip.type as DialogueWorldEffect['type'], value };
       onPatch({ ...tree, worldEffects });
     }
-  };
-
-  const removeChip = (chip: DialogActionChip) => {
-    if (chip.group === 'reward') onPatch({ ...tree, rewards: (tree.rewards || []).filter((_, i) => i !== chip.index) });
-    else onPatch({ ...tree, worldEffects: (tree.worldEffects || []).filter((_, i) => i !== chip.index) });
   };
 
   const addFromCatalog = (id: string) => {
@@ -160,11 +258,19 @@ const ActionChips = ({
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
+    <div className="flex flex-wrap items-center justify-center gap-1.5">
       {chips.map((chip) => (
-        <ActionChip key={`${chip.group}-${chip.index}-${chip.id}`} chip={chip} onChange={writeChip} onRemove={() => removeChip(chip)} />
+        <EditChip
+          key={`${chip.group}-${chip.index}-${chip.id}`}
+          label={actionChipLabel(chip)}
+          tooltip={actionChipTooltip(chip)}
+          value={chip.value}
+          needsValue={!['stash', 'save_game', 'respec'].includes(chip.type)}
+          onChange={(value) => writeChip(chip, value)}
+          onRemove={() => onPatch(removeAction(tree, chip.group, chip.index))}
+        />
       ))}
-      <SearchablePalette buttonLabel="Add property" entries={catalog} onSelect={addFromCatalog} />
+      <SearchablePalette buttonLabel="Effect" placeholder="Search effects…" entries={catalog} onSelect={addFromCatalog} />
     </div>
   );
 };
@@ -173,12 +279,19 @@ const TopicThread = ({
   tree,
   allTrees,
   onPatch,
+  npcName,
+  npcPortrait,
+  projectPath,
 }: {
   tree: DialogueTree;
   allTrees: DialogueTree[];
   onPatch: (next: DialogueTree) => void;
+  npcName: string;
+  npcPortrait: string;
+  projectPath?: string | null;
 }) => {
   const lines = tree.dialogues || [];
+  const meta = chatBubbleMeta(lines, npcPortrait);
   const reorder = useListReorder(lines, (line) => line.id || line.text || 'line', (from, to) => {
     onPatch(reorderDialogueLines(tree, from, to));
   });
@@ -193,69 +306,78 @@ const TopicThread = ({
     onPatch({ ...tree, dialogues: [...lines, line] });
   };
 
-  const removeLine = (index: number) => {
-    onPatch(removeDialogueLine(tree, index));
-  };
-
-  const responseButtons = (tree.responses || []).map((id) => {
-    const target = allTrees.find((entry) => entry.dialogueId === id);
-    const playerLine = target?.dialogues?.find((line) => line.speaker === 'player')?.text;
-    return { id, label: playerLine || target?.topic || id };
-  });
+  const responses = chatResponses(tree, allTrees);
 
   return (
-    <div className="space-y-2 rounded-lg border border-border bg-background p-3">
+    <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3">
       <div className="flex items-center gap-2 pr-6">
-        <input
-          className="flex-1 bg-transparent text-sm font-semibold outline-none"
-          value={tree.topic}
-          onChange={(e) => onPatch({ ...tree, topic: e.target.value })}
-          placeholder="Topic"
-        />
+        <Tooltip content="topic — the player picks this to start the talk">
+          <input
+            className="flex-1 bg-transparent text-sm font-semibold outline-none"
+            value={tree.topic}
+            onChange={(e) => onPatch({ ...tree, topic: e.target.value })}
+            placeholder="Topic"
+          />
+        </Tooltip>
       </div>
-      {lines.map((line, index) => (
-        <Bubble
-          key={line.id || `${tree.dialogueId}-${index}`}
-          line={line}
-          index={index}
-          onChange={(text) => setLineText(index, text)}
-          onRemove={() => removeLine(index)}
-          dragHandle={{
-            draggable: true,
-            onDragStart: (e) => {
-              e.stopPropagation();
-              reorder.startReorder(e, index);
-            },
-            onDragEnd: reorder.endReorder,
-          }}
-          dropProps={reorder.getItemDropProps(index)}
-          reorderClass={reorder.reorderClass(index)}
-        />
-      ))}
-      {responseButtons.length > 0 && (
-        <div className={`flex flex-wrap gap-1.5 ${lines.some((line) => line.speaker === 'player') ? 'justify-end' : 'justify-start'}`}>
-          {responseButtons.map((response) => (
-            <span key={response.id} className="inline-flex rounded-full border border-border bg-muted/40 px-2.5 py-1 text-xs">
-              {response.label}
-            </span>
+      <ConditionChips tree={tree} onPatch={onPatch} />
+      <div>
+        {lines.map((line, index) => (
+          <Bubble
+            key={line.id || `${tree.dialogueId}-${index}`}
+            line={line}
+            side={meta[index].side}
+            startsRun={meta[index].startsRun}
+            portrait={meta[index].portrait}
+            npcName={npcName}
+            projectPath={projectPath}
+            onChange={(text) => setLineText(index, text)}
+            onRemove={() => onPatch(removeDialogueLine(tree, index))}
+            dragHandle={{
+              draggable: true,
+              onDragStart: (e) => {
+                e.stopPropagation();
+                reorder.startReorder(e, index);
+              },
+              onDragEnd: reorder.endReorder,
+            }}
+            dropProps={reorder.getItemDropProps(index)}
+            reorderClass={reorder.reorderClass(index)}
+          />
+        ))}
+      </div>
+      {responses.length > 0 && (
+        <div className="flex flex-col items-end gap-1">
+          {responses.map((response) => (
+            <Tooltip key={response.id} content={response.missing ? `response=${response.id} (topic not found)` : `response=${response.id}`}>
+              <button
+                type="button"
+                className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs ${
+                  response.missing ? 'border-destructive/50 text-destructive' : 'border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20'
+                }`}
+                onClick={() => document.getElementById(topicDomId(response.id))?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+              >
+                <CornerDownRight className="w-3 h-3" />
+                {response.label}
+              </button>
+            </Tooltip>
           ))}
         </div>
       )}
       <ActionChips tree={tree} onPatch={onPatch} />
-      <div className="flex items-center gap-1.5 pt-1">
-        <Button type="button" size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => addLine('npc')}>
+      <div className="flex items-center justify-between gap-1.5 pt-1 border-t border-border/60">
+        <Button type="button" size="sm" variant="ghost" className="h-7 text-xs gap-1" onClick={() => addLine('npc')}>
           <Plus className="w-3 h-3" />
-          NPC
+          NPC line
         </Button>
-        <Button type="button" size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => addLine('player')}>
+        <Button type="button" size="sm" variant="ghost" className="h-7 text-xs gap-1" onClick={() => addLine('player')}>
+          Player line
           <Plus className="w-3 h-3" />
-          Player
         </Button>
       </div>
     </div>
   );
 };
-
 
 const TopicDeleteButton = ({ onConfirm }: { onConfirm: () => void }) => {
   const [open, setOpen] = useState(false);
@@ -270,7 +392,7 @@ const TopicDeleteButton = ({ onConfirm }: { onConfirm: () => void }) => {
   );
 };
 
-const MomentChatView = ({ trees, visibleTrees, setTrees, moment }: Props) => {
+const MomentChatView = ({ trees, visibleTrees, setTrees, moment, npcName = '', npcPortrait = '', projectPath }: Props) => {
   const addTopic = () => {
     const id = `dlg_${Math.random().toString(36).slice(2, 6)}`;
     const blank: DialogueTree = {
@@ -296,12 +418,15 @@ const MomentChatView = ({ trees, visibleTrees, setTrees, moment }: Props) => {
   return (
     <div className="flex-1 min-h-0 overflow-y-auto space-y-3 pr-1">
       {visibleTrees.map((tree) => (
-        <div key={tree.dialogueId || tree.id} className="relative">
+        <div key={tree.dialogueId || tree.id} id={topicDomId(tree.dialogueId || tree.id)} className="relative">
           <TopicDeleteButton onConfirm={() => removeTopic(tree.dialogueId || tree.id)} />
           <TopicThread
             tree={tree}
             allTrees={trees}
             onPatch={(next) => setTrees(patchTree(trees, tree.dialogueId || tree.id, next))}
+            npcName={npcName}
+            npcPortrait={npcPortrait}
+            projectPath={projectPath}
           />
         </div>
       ))}

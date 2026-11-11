@@ -49,6 +49,7 @@
 
 ## Known open issues
 - Multi-stage quest journals are edited as step cards; the Role center uses Moments (including Play and a shop-open indicator). List and Board stay behind a toggle.
+- Dialogue opens as a chat (`src/components/dialogue/MomentChatView.tsx`, helpers in `src/editor/dialogueChat.ts`): NPC bubbles left with portrait, player right, "shows when" condition chips, effect chips. Deleting a chip or line removes only its own file line.
 
 ## Edit NPC
 - Name and appearance (fantasycore picker, default sprite) are on the first screen. Roles use on/off switches; a reserved gear opens the Role center (Dialogue / Shop / Quest).

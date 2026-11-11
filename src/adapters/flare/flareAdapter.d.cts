@@ -32,6 +32,8 @@ export function applyEnemyFileUpdates(
 ): { text: string; warnings: string[] };
 export function exportNpcFile(npc: Record<string, unknown>): string;
 export function importNpcText(content: string): Record<string, unknown>;
+/** Category of a [dialog] key: meta, req, response, prefix, line, reward, effect or pass. */
+export function dialogCategory(key: string): 'meta' | 'req' | 'response' | 'prefix' | 'line' | 'reward' | 'effect' | 'pass';
 export function mergeNpcFile(existingText: string, update: { fields?: Record<string, unknown>; dialogueTrees?: unknown[]; sections?: Record<string, Array<Array<{ key: string; value: string }>>>; includes?: string[] }): string;
 export function statusStockFromEntries(raw: unknown): string[];
 export function importMapText(content: string): Record<string, unknown>;

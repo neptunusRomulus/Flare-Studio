@@ -1022,6 +1022,7 @@ function importMapText(content) {
 
 module.exports = {
   EDITOR_LAYER_TYPES,
+  dialogCategory,
   exportMapText,
   exportEventLines,
   exportTilesetText,

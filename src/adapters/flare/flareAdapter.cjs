@@ -398,6 +398,7 @@ module.exports = {
   exportNpcFile: serializers.exportNpcFile,
   exportDialogueTrees: serializers.exportDialogueTrees,
   importNpcText: serializers.importNpcText,
+  dialogCategory: serializers.dialogCategory,
   mergeNpcFile: serializers.mergeNpcFile,
   statusStockFromEntries: serializers.statusStockFromEntries,
   importMapText: serializers.importMapText,

@@ -372,7 +372,7 @@ const DialogueTreeDialog = ({
   const [effectMenuOpen, setEffectMenuOpen] = useState(false);
   const [effectQuery, setEffectQuery] = useState('');
   const [boardView, setBoardView] = useState(false);
-  const [viewMode, setViewMode] = useState<'chat' | 'list' | 'board'>(embedded ? 'chat' : 'list');
+  const [viewMode, setViewMode] = useState<'chat' | 'list' | 'board'>('chat');
   const visibleIndexSet = useMemo(() => {
     if (!visibleDialogueIds) return null;
     const ids = new Set(visibleDialogueIds);
@@ -550,6 +550,9 @@ const DialogueTreeDialog = ({
             visibleTrees={dialogueTrees.filter((tree, index) => !visibleIndexSet || visibleIndexSet.has(index))}
             setTrees={(next) => setDialogueTrees(next)}
             moment={selectedMoment || otherMoment()}
+            npcName={String(editingObject?.name || '')}
+            npcPortrait={String(editingObject?.properties?.portraitPath || editingObject?.properties?.portrait || '')}
+            projectPath={currentProjectPath}
           />
         </div>
       ) : (

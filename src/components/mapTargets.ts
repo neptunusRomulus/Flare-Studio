@@ -12,6 +12,15 @@ export const MAP_TARGET_CURSOR: Record<MapTarget, string> = {
 
 export const MAP_TAB_HELP = 'Tab: switch Ground, Object and Collision. Shift+Tab: switch main layers.';
 
+/** Collision-layer tile values the palette can paint. Labels plus raw engine keys (MapCollision.h). */
+export const COLLISION_LAYER_VALUES =
+  '1 Full · BLOCKS_ALL\n2 Ground · BLOCKS_MOVEMENT\n3 Hidden full · BLOCKS_ALL_HIDDEN\n4 Hidden ground · BLOCKS_MOVEMENT_HIDDEN';
+
+/** Append the collision value legend to the Collision layer tooltip only. */
+export function mapTargetTooltip(type: string, base: string): string {
+  return type === 'collision' ? `${base}\n${COLLISION_LAYER_VALUES}` : base;
+}
+
 export function isMapTarget(t: string | null | undefined): t is MapTarget {
   return !!t && (MAP_TARGETS as string[]).includes(t);
 }

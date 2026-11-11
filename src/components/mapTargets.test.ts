@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { nextTarget, shouldHandleTabKey, MAP_TARGET_CURSOR, collapseMapLayers } from './mapTargets';
+import { nextTarget, shouldHandleTabKey, MAP_TARGET_CURSOR, collapseMapLayers, mapTargetTooltip, COLLISION_LAYER_VALUES } from './mapTargets';
 import { groupLayers } from './layerGroups';
 
 describe('map targets', () => {
@@ -28,5 +28,16 @@ describe('map targets', () => {
     expect(entries.map(e => e.kind === 'map' ? 'map' : e.layer.type)).toEqual(['map', 'npc', 'items']);
     const map = entries[0];
     expect(map.kind === 'map' && map.targets.map(t => t.type)).toEqual(['background', 'object', 'collision']);
+  });
+
+  it('puts engine collision values on the Collision tooltip only', () => {
+    expect(mapTargetTooltip('object', 'Object')).toBe('Object');
+    const tip = mapTargetTooltip('collision', 'Collision · visible · opacity 100% (wheel)');
+    expect(tip.startsWith('Collision · visible · opacity 100% (wheel)\n')).toBe(true);
+    expect(tip).toContain('1 Full · BLOCKS_ALL');
+    expect(tip).toContain('2 Ground · BLOCKS_MOVEMENT');
+    expect(tip).toContain('3 Hidden full · BLOCKS_ALL_HIDDEN');
+    expect(tip).toContain('4 Hidden ground · BLOCKS_MOVEMENT_HIDDEN');
+    expect(tip).toBe(`Collision · visible · opacity 100% (wheel)\n${COLLISION_LAYER_VALUES}`);
   });
 });

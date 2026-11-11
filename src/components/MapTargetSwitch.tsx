@@ -3,7 +3,7 @@ import Tooltip from '@/components/ui/tooltip';
 import { HelpCircle, Eye, EyeOff } from 'lucide-react';
 import type { TileLayer } from '@/types';
 import { MAP_GROUP, groupOfType, rememberGroupTarget, tabTargetFor, type TargetGroup } from '@/components/targetGroups';
-import { rememberTarget, isMapTarget } from '@/components/mapTargets';
+import { rememberTarget, isMapTarget, mapTargetTooltip } from '@/components/mapTargets';
 import { TARGET_ICON } from '@/components/targetIcons';
 import SlidingSwitch, { type SwitchItem } from '@/components/SlidingSwitch';
 
@@ -58,14 +58,14 @@ const MapTargetSwitch: React.FC<Props> = ({ group = MAP_GROUP, layers, activeLay
   const items: SwitchItem[] = group.targets.map(t => {
     const label = group.labels[t];
     const l = layers.find(x => x.type === t);
-    if (!withVis || !l || !visibility) return { key: t, icon: TARGET_ICON[t], label, tooltip: label };
+    if (!withVis || !l || !visibility) return { key: t, icon: TARGET_ICON[t], label, tooltip: mapTargetTooltip(t, label) };
     const tr = l.transparency || 0;
     const EyeIcon = l.visible ? Eye : EyeOff;
     return {
       key: t,
       icon: TARGET_ICON[t],
       label,
-      tooltip: visibilityTooltip(label, l.visible, tr),
+      tooltip: mapTargetTooltip(t, visibilityTooltip(label, l.visible, tr)),
       dimmed: !l.visible,
       onWheel: (e) => { e.preventDefault(); visibility.onTransparencyChange(l.id, e.deltaY > 0 ? 0.1 : -0.1); },
       corner: (

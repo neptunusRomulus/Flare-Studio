@@ -6,6 +6,7 @@ import {
   tileFromTilesetConfig,
   withAppend,
 } from '../adapters/flare/flareAdapter.cjs';
+import { loadTextFiles } from './powers/powerFiles';
 
 const APPEND_RELATIVE = /^(items\/(types|qualities|sets)\.txt|powers\/(powers|effects)\.txt)$/;
 
@@ -61,4 +62,29 @@ export async function saveConfigDocument(
   const next = applyTileToProjectIndex(indexText, tileFromTilesetConfig(text));
   await window.electronAPI.writeFile(indexPath, next);
   return saved;
+}
+
+
+export const PROJECT_SCAN_DIRS = ['maps', 'npcs', 'enemies', 'items', 'quests', 'powers', 'loot', 'engine', 'books'];
+
+/** Load every scanned .txt as a project-relative path → text map. */
+export async function loadProjectTextMap(projectPath: string | null): Promise<Record<string, string>> {
+  if (!projectPath || !window.electronAPI?.readDir || !window.electronAPI?.readFile) return {};
+  const files = await loadTextFiles(window.electronAPI, projectRoot(projectPath), PROJECT_SCAN_DIRS);
+  const out: Record<string, string> = {};
+  for (const file of files) out[file.path] = file.text;
+  return out;
+}
+
+/** Write only paths whose text changed. */
+export async function writeChangedTextMap(
+  projectPath: string,
+  next: Record<string, string>,
+  previous: Record<string, string>,
+): Promise<boolean> {
+  const files = Object.entries(next)
+    .filter(([path, content]) => previous[path] !== content)
+    .map(([path, content]) => ({ path, content }));
+  if (files.length === 0) return true;
+  return writeProjectFiles(projectPath, files);
 }

@@ -16,7 +16,7 @@ import { useAppContext } from '@/context/AppContext';
 import { buildPowerProject } from '@/editor/powers/powerProject';
 import { loadTextFiles } from '@/editor/powers/powerFiles';
 import { projectRoot } from '@/editor/projectFiles';
-import { askConfirm, InlineConfirm } from '@/components/ui/inline-confirm';
+import { askConfirm } from '@/components/ui/inline-confirm';
 import ResizeHandle from '@/components/ResizeHandle';
 
 const RoleIcon = ({ roleId, className }: { roleId: string; className?: string }) => {
@@ -94,7 +94,7 @@ type ItemEditDialogProps = {
   updateEditingItemField: (key: string, value: FieldValue) => void;
   handleCloseItemEdit: () => void;
   handleSaveItemEdit: () => void;
-  onDeleteItem?: (item: { id: number; name: string; filePath: string }) => Promise<void>;
+  onDeleteItem?: (item: { id: number; name: string; filePath: string }) => Promise<boolean | void>;
 };
 
 const CollapsibleSection = ({
@@ -143,7 +143,6 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
     handleSaveItemEdit,
     onDeleteItem
   } = props;
-  const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false);
   const [powerIds, setPowerIds] = useState<string[]>([]);
   const [powerNames, setPowerNames] = useState<Record<string, string>>({});
   const ctx = useAppContext();
@@ -1035,33 +1034,24 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
       {/* Footer */}
       <div className="sticky bottom-0 border-t border-border/50 bg-background px-6 py-3 flex justify-between items-center">
         <div>
-          <InlineConfirm
-            open={showDeleteConfirm}
-            side="top"
-            onCancel={() => setShowDeleteConfirm(false)}
-            onConfirm={async () => {
-                  if (onDeleteItem && editingItem) {
-                    await onDeleteItem({ 
-                      id: editingItem.id as number, 
-                      name: editingItem.name as string, 
-                      filePath: editingItem.filePath as string 
-                    });
-                    handleCloseItemEdit();
-                  }
-                  setShowDeleteConfirm(false);
-            }}
-          >
-            <Tooltip content="Delete Item" side="top">
+          <Tooltip content="Delete Item" side="top">
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => setShowDeleteConfirm(!showDeleteConfirm)}
+                onClick={async () => {
+                  if (!onDeleteItem || !editingItem) return;
+                  const deleted = await onDeleteItem({
+                    id: editingItem.id as number,
+                    name: editingItem.name as string,
+                    filePath: editingItem.filePath as string,
+                  });
+                  if (deleted !== false) handleCloseItemEdit();
+                }}
                 className="h-9 w-9 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
               >
                 <Trash2 className="h-5 w-5" />
               </Button>
             </Tooltip>
-          </InlineConfirm>
         </div>
         <Tooltip content="Save Item" side="top">
           <Button

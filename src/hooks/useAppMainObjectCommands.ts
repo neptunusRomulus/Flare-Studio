@@ -2,6 +2,9 @@ import { useCallback } from 'react';
 import type { MapObject } from '@/types';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 import { toast } from '@/hooks/use-toast';
+import { askConfirm } from '@/components/ui/inline-confirm';
+import { compactUsageMessage, findUsages } from '@/editor/projectRefs';
+import { loadProjectTextMap } from '@/editor/projectFiles';
 
 type CommandEditor = TileMapEditor | null;
 
@@ -148,21 +151,27 @@ export default function useAppMainObjectCommands({
   }, [currentProjectPath, itemsHook, toast]);
 
   const handleDeleteItem = useCallback(async (item: { id: number; name: string; filePath: string }) => {
-    if (!currentProjectPath) return;
+    if (!currentProjectPath) return false;
+    const files = await loadProjectTextMap(currentProjectPath);
+    const usages = findUsages(files, 'item', String(item.id));
+    const ok = await askConfirm(compactUsageMessage('item', String(item.id), usages));
+    if (!ok) return false;
     try {
       if (window.electronAPI?.deleteItemFile) {
         const result = await window.electronAPI.deleteItemFile(item.filePath);
         if (result.success) {
           await itemsHook.refreshItemsList(currentProjectPath);
           toast({ title: 'Item Deleted', description: `${item.name} has been deleted.` });
-        } else {
-          toast({ title: 'Error', description: result.error || 'Failed to delete item.', variant: 'destructive' });
+          return true;
         }
+        toast({ title: 'Error', description: result.error || 'Failed to delete item.', variant: 'destructive' });
+        return false;
       }
     } catch (err) {
       console.error('Failed to delete item:', err);
       toast({ title: 'Error', description: 'Failed to delete item file.', variant: 'destructive' });
     }
+    return false;
   }, [currentProjectPath, itemsHook, toast]);
   return {
     handleDuplicateObject,

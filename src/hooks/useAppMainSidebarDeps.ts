@@ -52,7 +52,7 @@ export type AppMainSidebarDepsInput = {
   setExpandedItemCategories: AppMainState['itemsHook']['setExpandedItemCategories'];
   handleOpenItemEdit: AppMainState['itemsHook']['handleOpenItemEdit'];
   handleDuplicateItem: (item: { id: number; name: string; category: string; filePath: string; fileName: string; role?: string; resourceSubtype?: string }) => Promise<void>;
-  handleDeleteItem: (item: { id: number; name: string; filePath: string }) => Promise<void>;
+  handleDeleteItem: (item: { id: number; name: string; filePath: string }) => Promise<boolean | void>;
   handleOpenItemDialog: AppMainState['itemsHook']['handleOpenItemDialog'];
   isGameSettingsLayer: boolean;
   handleSetActiveLayer: LayerHandlers['handleSetActiveLayer'];

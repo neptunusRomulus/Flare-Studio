@@ -1,0 +1,4 @@
+# Miscellaneous engine settings
+
+aim_assist=96
+sfx_unable_to_cast=soundfx/no_mana.ogg

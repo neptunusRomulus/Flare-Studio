@@ -256,6 +256,66 @@ describe('FileParser rules', () => {
     expect(issues.some((issue) => issue.level === 'error')).toBe(true);
   });
 
+  it('rejects layer-less garbage but accepts a spawn map with no layers', () => {
+    const garbage = validateText('maps', 'this is not a map\nfoo=bar\n', 'maps/garbage.txt');
+    expect(
+      garbage.some((issue) => issue.level === 'error' && /missing a \[header\] section/i.test(issue.message)),
+    ).toBe(true);
+    const noSize = validateText('maps', '[header]\ntitle=Oops\n', 'maps/empty.txt');
+    expect(
+      noSize.some((issue) => issue.level === 'error' && /width and height/i.test(issue.message)),
+    ).toBe(true);
+    const eventOnly = validateText('maps', '[event]\nlocation=0,0,1,1\n', 'maps/event_only.txt');
+    expect(eventOnly.some((issue) => issue.level === 'error' && /missing a \[header\] section/i.test(issue.message))).toBe(
+      true,
+    );
+    const spawn = [
+      '# dummy starting map',
+      '[header]',
+      'width=1',
+      'height=1',
+      'hero_pos=0,0',
+      'location=0,0,3',
+      '',
+      '[event]',
+      'type=event',
+      'location=0,0,1,1',
+      'activate=on_load',
+      'intermap=maps/arrival.txt,20,20',
+      '',
+    ].join('\n');
+    expect(validateText('maps', spawn, 'maps/spawn.txt').filter((issue) => issue.level === 'error')).toEqual([]);
+  });
+
+  it('accepts committed map fixtures and real flare-game maps when present', () => {
+    const mapFiles: string[] = [];
+    const fixtureDir = path.resolve(process.cwd(), 'tests/fixtures/flare-maps');
+    for (const file of fs.readdirSync(fixtureDir)) {
+      if (file.endsWith('.txt')) mapFiles.push(path.join(fixtureDir, file));
+    }
+    mapFiles.push(path.resolve(process.cwd(), 'tests/fixtures/export/village.map.txt'));
+    const gameRoot = [process.env.FLARE_GAME, path.resolve(process.cwd(), '../flare-game')].find(
+      (dir) => dir && fs.existsSync(dir),
+    );
+    if (gameRoot) {
+      const walk = (dir: string) => {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+          const full = path.join(dir, entry.name);
+          if (entry.isDirectory()) walk(full);
+          else if (entry.isFile() && entry.name.endsWith('.txt') && path.basename(dir) === 'maps') {
+            mapFiles.push(full);
+          }
+        }
+      };
+      walk(gameRoot);
+    }
+    expect(mapFiles.length).toBeGreaterThan(0);
+    for (const file of mapFiles) {
+      const errors = validateText('maps', fs.readFileSync(file, 'utf8'), file).filter((issue) => issue.level === 'error');
+      expect(errors, file).toEqual([]);
+    }
+  });
+
   it('rejects an unknown item key', () => {
     const issues = validateText('items', 'APPEND\n\n[item]\nid=1\nname=X\nnot_a_key=1\n', 'items/items.txt');
     expect(issues.some((issue) => issue.message.includes('not_a_key'))).toBe(true);

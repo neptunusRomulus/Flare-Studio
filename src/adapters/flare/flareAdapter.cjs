@@ -60,7 +60,17 @@ function settingsText(meta) {
 
 function validateText(category, content, filePath) {
   const errors = [];
+  const sections = parseDocument(content);
   if (category === "maps") {
+    const header = sections.find((section) => section.name === "header");
+    if (!header) {
+      errors.push(issue("error", "Map is missing a [header] section.", filePath));
+    } else {
+      const keys = new Set(header.entries.map((entry) => entry.key));
+      if (!keys.has("width") || !keys.has("height")) {
+        errors.push(issue("error", "Map [header] must define width and height.", filePath));
+      }
+    }
     const map = serializers.importMapText(content);
     for (const layer of map.layers || []) {
       for (const message of validateLayerRows(map.width, map.height, layer.rows)) {
@@ -68,7 +78,6 @@ function validateText(category, content, filePath) {
       }
     }
   }
-  const sections = parseDocument(content);
   const knownSections = allowedSections(category);
   for (const section of sections) {
     const sectionName = section.name || "";
@@ -79,6 +88,9 @@ function validateText(category, content, filePath) {
     const allowed = keysFor(category, sectionName);
     if (!allowed || allowed.size === 0) continue;
     for (const entry of section.entries) {
+      // Official maps may carry undocumented header keys (e.g. location= in spawn.txt).
+      // Those survive export; do not reject the file for them.
+      if (category === "maps" && sectionName === "header" && !allowed.has(entry.key)) continue;
       if (!allowed.has(entry.key)) {
         errors.push(issue("error", `Line ${entry.line}: '${entry.key}' is not a valid key.`, filePath));
       }

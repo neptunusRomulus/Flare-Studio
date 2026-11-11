@@ -8,8 +8,10 @@ import EditorPropertyList from '@/components/EditorPropertyList';
 import { extraItemPropertyKeys, ITEM_EXTRA_CATALOG } from '@/editor/itemFileHydrate';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 import { Apple, Book, Box, Check, ChevronDown, ChevronRight, Coins, Folder, Gift, HelpCircle, Key, Layers, Save, Shield, Sparkles, Sword, Tag, Trash2, Volume2, X, Zap } from 'lucide-react';
-import { ITEM_ROLE_META, ITEM_ROLE_SELECTIONS, RESOURCE_SUBTYPE_META } from '@/editor/itemRoles';
-import type { ItemResourceSubtype } from '@/editor/itemRoles';
+import { ITEM_ROLE_META, ITEM_ROLE_SELECTIONS, RESOURCE_SUBTYPE_META } from '@/editor/itemRoles'
+import { bookRelPath, DEFAULT_BOOK_TEMPLATE } from '@/editor/bookFile'
+import { OPEN_BOOK_EVENT } from '@/components/BookEditorView';
+import type { ItemResourceSubtype } from '@/editor/itemRoles'
 import { useAppContext } from '@/context/AppContext';
 import { buildPowerProject } from '@/editor/powers/powerProject';
 import { loadTextFiles } from '@/editor/powers/powerFiles';
@@ -895,13 +897,36 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
         )}
 
         {/* Book / Lore */}
-        {isBook && (
-          <CollapsibleSection title="Book / Lore" icon={Book}>
+        <CollapsibleSection title="Book / Lore" icon={Book} defaultOpen={isBook || !!editingItem.book}>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-7 text-xs"
+                onClick={async () => {
+                  const rel = editingItem.book || bookRelPath(String(editingItem.name || editingItem.id || 'book'));
+                  const root = (currentProjectPath || '').replace(/\\/g, '/');
+                  if (root && window.electronAPI?.writeFile && window.electronAPI?.readFile) {
+                    const path = `${root}/${rel.replace(/^\//, '')}`;
+                    const exists = await window.electronAPI.readFile(path);
+                    if (!exists) await window.electronAPI.writeFile(path, DEFAULT_BOOK_TEMPLATE);
+                  }
+                  updateEditingItemField('book', rel);
+                  updateEditingItemField('book_is_readable', true);
+                  if (!editingItem.role || editingItem.role === 'unspecified') updateEditingItemField('role', 'book');
+                  window.dispatchEvent(new CustomEvent(OPEN_BOOK_EVENT, { detail: rel }));
+                }}
+              >
+                Make readable
+              </Button>
+              <span className="text-[11px] text-muted-foreground">Sets book and book_is_readable, and can create a book file.</span>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs text-muted-foreground">Book File</label>
                 <Input
-                  value={editingItem.book}
+                  value={editingItem.book || ''}
                   onChange={(e) => updateEditingItemField('book', e.target.value)}
                   placeholder="books/lore.txt"
                   className="h-8"
@@ -911,14 +936,13 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
                 <input
                   type="checkbox"
                   className="h-4 w-4"
-                  checked={editingItem.book_is_readable}
+                  checked={!!editingItem.book_is_readable}
                   onChange={(e) => updateEditingItemField('book_is_readable', e.target.checked)}
                 />
                 Show "Read" instead of "Use"
               </label>
             </div>
-          </CollapsibleSection>
-        )}
+        </CollapsibleSection>
 
         {/* Visual and Audio */}
         <CollapsibleSection title="Visual and Audio" icon={Volume2}>

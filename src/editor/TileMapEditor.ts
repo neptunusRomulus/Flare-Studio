@@ -1354,6 +1354,14 @@ export class TileMapEditor {
           transparency: 1.0
         },
         {
+          id: 12,
+          name: 'Books',
+          type: 'books',
+          data: new Array(this.mapWidth * this.mapHeight).fill(0),
+          visible: true,
+          transparency: 1.0
+        },
+        {
           id: 3,
           name: 'NPC Layer',
           type: 'npc',
@@ -1413,7 +1421,7 @@ export class TileMapEditor {
 
       // Set the background layer as active by default
       this.activeLayerId = 8;
-      this.nextLayerId = 11;
+      this.nextLayerId = 13;
       this.sortLayersByPriority();
     // Initialize layer tabs for background and object with one tab each
     try {
@@ -11053,6 +11061,22 @@ export class TileMapEditor {
           }
 
           this.nextLayerId = Math.max(this.nextLayerId, statusLayer.id + 1);
+        }
+
+        if (!this.tileLayers.some(l => l.type === 'books')) {
+          const maxId = this.tileLayers.reduce((max, l) => Math.max(max, l.id), 0);
+          const booksLayer: TileLayer = {
+            id: maxId + 1,
+            name: 'Books',
+            type: 'books',
+            data: new Array(this.mapWidth * this.mapHeight).fill(0),
+            visible: true,
+            transparency: 1.0
+          };
+          const itemsIndex = this.tileLayers.findIndex(l => l.type === 'items');
+          if (itemsIndex >= 0) this.tileLayers.splice(itemsIndex + 1, 0, booksLayer);
+          else this.tileLayers.unshift(booksLayer);
+          this.nextLayerId = Math.max(this.nextLayerId, booksLayer.id + 1);
         }
       } else {
         this.createDefaultLayers();

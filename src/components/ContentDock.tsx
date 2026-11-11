@@ -4,6 +4,7 @@ import MapTargetSwitch from '@/components/MapTargetSwitch';
 import SidebarItemsArea from '@/components/SidebarItemsArea';
 import SidebarStatusesArea from '@/components/SidebarStatusesArea';
 import SidebarRulesArea from '@/components/SidebarRulesArea';
+import SidebarBooksArea from '@/components/SidebarBooksArea';
 import { CONTENT_GROUP } from '@/components/targetGroups';
 
 type Props = {
@@ -13,10 +14,11 @@ type Props = {
   items: React.ComponentProps<typeof SidebarItemsArea>;
   statuses: React.ComponentProps<typeof SidebarStatusesArea>;
   rules: React.ComponentProps<typeof SidebarRulesArea>;
+  projectPath?: string | null;
 };
 
 /** Right dock content for the Content layer: existing Items / Statuses / Quests lists on top, target switch below. */
-const ContentDock: React.FC<Props> = ({ layers, activeLayer, onSelectLayer, items, statuses, rules }) => {
+const ContentDock: React.FC<Props> = ({ layers, activeLayer, onSelectLayer, items, statuses, rules, projectPath }) => {
   const type = activeLayer?.type;
   return (
     <div className="flex flex-col flex-1 min-h-0">
@@ -24,6 +26,7 @@ const ContentDock: React.FC<Props> = ({ layers, activeLayer, onSelectLayer, item
       <MapTargetSwitch group={CONTENT_GROUP} layers={layers} activeLayer={activeLayer} onSelectLayer={onSelectLayer} />
       <div className="flex flex-col flex-1 min-h-0 overflow-y-auto">
         {type === 'items' && <SidebarItemsArea {...items} />}
+        {type === 'books' && <SidebarBooksArea projectPath={projectPath} />}
         {type === 'status' && <SidebarStatusesArea {...statuses} />}
         {type === 'rules' && <SidebarRulesArea {...rules} />}
       </div>

@@ -26,9 +26,9 @@ export const ENTITY_GROUP: TargetGroup = {
 export const CONTENT_GROUP: TargetGroup = {
   id: 'content',
   label: 'Content',
-  targets: ['items', 'status', 'rules'],
-  labels: { items: 'Items', status: 'Statuses', rules: 'Quests' },
-  help: 'Tab: switch Items, Statuses and Quests. Shift+Tab: switch main layers.',
+  targets: ['items', 'books', 'status', 'rules'],
+  labels: { items: 'Items', books: 'Books', status: 'Statuses', rules: 'Quests' },
+  help: 'Tab: switch Items, Books, Statuses and Quests. Shift+Tab: switch main layers.',
   hasVisibility: false,
 };
 export const TARGET_GROUPS: TargetGroup[] = [MAP_GROUP, ENTITY_GROUP, CONTENT_GROUP];

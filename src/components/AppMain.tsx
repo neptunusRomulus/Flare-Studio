@@ -21,6 +21,7 @@ import HelpDialog from '@/components/HelpDialog';
 import ConflictDialog from '@/components/ConflictDialog';
 import EditorArea from '@/components/EditorArea';
 import QuestMapContainer from '@/components/QuestMapContainer';
+import BookEditorView from '@/components/BookEditorView';
 import { Toaster } from '@/components/ui/toaster';
 import DialogsContainer from '@/components/DialogsContainer';
 import StatusEditDialog from '@/components/StatusEditDialog';
@@ -196,6 +197,7 @@ export default function AppMain() {
     });
   }, []);
   const showQuestMap = questMapOpen && tileset.activeLayer?.type === 'rules' && !!controls?.currentProjectPath;
+  const showBookEditor = tileset.activeLayer?.type === 'books';
 
   // Per-layer visibility (corner eye) / opacity (wheel) on the Map and Entities sub-switch buttons
   const layerVisibility = useMemo(() => layersObj ? {
@@ -345,6 +347,7 @@ export default function AppMain() {
               onClose={toggleQuestMap}
             />
           )}
+          {showBookEditor && <BookEditorView projectPath={controls?.currentProjectPath} />}
         </div>
 
         <PaletteDock
@@ -375,6 +378,7 @@ export default function AppMain() {
               items={items}
               statuses={{ handleOpenStatusDialog: statuses?.handleOpenStatusDialog ?? (() => {}), projectPath: controls?.currentProjectPath ?? null }}
               rules={{ rulesList: rules.rulesList, handleAddRule: rules.handleAddRule, handleEditRule: rules.handleEditRule, questMapOpen, onToggleQuestMap: toggleQuestMap }}
+              projectPath={controls?.currentProjectPath}
             />
           ) : tileset.activeLayer?.type === 'gameSettings' ? (
             <SidebarGameSettingsArea />

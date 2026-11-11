@@ -2,7 +2,7 @@
 const GROUPS: string[][] = [
   ['collision', 'object', 'background'],
   ['npc', 'enemy', 'event'],
-  ['items', 'status', 'rules'],
+  ['items', 'books', 'status', 'rules'],
   ['gameSettings'],
 ];
 

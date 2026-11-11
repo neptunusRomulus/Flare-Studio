@@ -1,7 +1,7 @@
 export interface TileLayer {
   id: number;
   name: string;
-  type: 'background' | 'object' | 'collision' | 'event' | 'enemy' | 'npc' | 'items' | 'status' | 'rules' | 'actions' | 'gameSettings' | (string & {});
+  type: 'background' | 'object' | 'collision' | 'event' | 'enemy' | 'npc' | 'items' | 'books' | 'status' | 'rules' | 'actions' | 'gameSettings' | (string & {});
   data: number[];
   visible: boolean;
   transparency?: number; // 0-1, where 1 is fully opaque

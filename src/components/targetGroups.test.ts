@@ -17,6 +17,7 @@ describe('target groups', () => {
     expect(tabTargetFor({ key: 'Tab', shiftKey: true }, 'npc', div)).toBeNull();
     expect(tabTargetFor({ key: 'Tab' }, 'gameSettings', div)).toBeNull();
     expect(tabTargetFor({ key: 'Tab' }, 'rules', div)).toBe('items');
+    expect(tabTargetFor({ key: 'Tab' }, 'items', div)).toBe('books');
     expect(tabTargetFor({ key: 'Tab' }, 'npc', { tagName: 'TEXTAREA' })).toBeNull();
     expect(tabTargetFor({ key: 'Tab' }, 'npc', { tagName: 'DIV', closest: () => ({}) })).toBeNull();
   });
@@ -43,8 +44,9 @@ describe('target groups', () => {
     expect(groupOfType('event')).toBe(ENTITY_GROUP);
     expect(groupOfType('collision')).toBe(MAP_GROUP);
   });
-  it('content cycling Items -> Statuses -> Quests -> Items, no visibility', () => {
-    expect(cycleInGroup(CONTENT_GROUP, 'items')).toBe('status');
+  it('content cycling Items -> Books -> Statuses -> Quests -> Items, no visibility', () => {
+    expect(cycleInGroup(CONTENT_GROUP, 'items')).toBe('books');
+    expect(cycleInGroup(CONTENT_GROUP, 'books')).toBe('status');
     expect(cycleInGroup(CONTENT_GROUP, 'status')).toBe('rules');
     expect(cycleInGroup(CONTENT_GROUP, 'rules')).toBe('items');
     expect(cycleInGroup(CONTENT_GROUP, 'items', true)).toBe('rules');

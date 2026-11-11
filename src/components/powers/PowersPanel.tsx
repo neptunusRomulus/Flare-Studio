@@ -14,18 +14,18 @@ const GROUPS: ContentKind[] = [...POWER_KIND_ORDER, 'buff', 'debuff', 'flag'];
 /** Dock list for the Statuses layer: powers by usage, effects by Buff/Debuff, story flags. */
 const PowersPanel = ({ projectPath }: { projectPath: string | null | undefined }) => {
   const data = usePowerProjectFiles(projectPath);
-  const { project, kinds } = data;
+  const { project, powerKinds } = data;
   const [open, setOpen] = useState<Set<ContentKind>>(new Set());
   const [query, setQuery] = useState('');
   const [target, setTarget] = useState<PowerTarget | null>(null);
 
   const groups = useMemo(() => {
     const out = Object.fromEntries(GROUPS.map((g) => [g, [] as Row[]])) as Record<ContentKind, Row[]>;
-    for (const p of project.powers) out[categorizePower(p, project.powerUsedBy[p.id] || [], kinds[p.id])].push({ target: { type: 'power', id: p.id }, name: p.name, hint: p.id });
+    for (const p of project.powers) out[powerKinds[p.id] || categorizePower(p, project.powerUsedBy[p.id] || [])].push({ target: { type: 'power', id: p.id }, name: p.name, hint: p.id });
     for (const e of project.effects) out[classifyEffect(e, project.effectUsedBy[e.id] || [])].push({ target: { type: 'effect', id: e.id }, name: e.name, hint: e.id });
     for (const f of Object.keys(project.flags).sort()) out.flag.push({ target: { type: 'flag', id: f }, name: f, hint: '' });
     return out;
-  }, [project, kinds]);
+  }, [project, powerKinds]);
 
   const q = query.trim().toLowerCase();
   const match = (r: Row) => !q || `${r.name} ${r.hint}`.toLowerCase().includes(q);

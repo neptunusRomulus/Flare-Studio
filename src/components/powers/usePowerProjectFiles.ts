@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { buildPowerProject, type PowerKind, type ProjectFile } from '@/editor/powers/powerProject';
+import { resolvePowerKinds } from '@/editor/powers/powerKinds';
 import { joinPath, KIND_SIDECAR, loadPowerFiles, parseKindSidecar, serializeKindSidecar } from '@/editor/powers/powerFiles';
 
 type Api = {
@@ -65,8 +66,9 @@ export function usePowerProjectFiles(projectPath: string | null | undefined) {
 
   const textOf = useCallback((rel: string) => files.find((f) => f.path === rel)?.text ?? '', [files]);
   const project = useMemo(() => buildPowerProject(files), [files]);
+  const powerKinds = useMemo(() => resolvePowerKinds(project, kinds), [project, kinds]);
 
-  return { files, project, kinds, loading, reload, writeFile, textOf, setKind };
+  return { files, project, kinds, powerKinds, loading, reload, writeFile, textOf, setKind };
 }
 
 export type PowerProjectFiles = ReturnType<typeof usePowerProjectFiles>;

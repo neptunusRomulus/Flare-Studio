@@ -76,6 +76,16 @@ function lines(text: string): Array<{ section: string; key: string; value: strin
   return out;
 }
 
+/** flare-game labels unnamed blocks with a comment right above them ("# goblin spear throw"). */
+function commentAbove(text: string, start: number): string {
+  const all = text.split('\n');
+  const line = (all[start - 1] || '').trim();
+  if (!line.startsWith('#')) return '';
+  const words = line.replace(/^#+/, '').trim();
+  if (!words || words.length > 48 || /[=[\]]/.test(words)) return '';
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
 function fileTitle(text: string, path: string): string {
   for (const entry of lines(text)) if ((!entry.section || entry.section === 'header') && (entry.key === 'name' || entry.key === 'title')) return entry.value;
   return baseName(path);
@@ -121,7 +131,8 @@ export function buildPowerProject(files: ProjectFile[]): PowerProject {
         if (!block.id) return;
         const own = blockRecord(block);
         const keys = { ...includedKeys(block.includes), ...own };
-        const entry = { id: block.id, name: blockFirst(block, 'name') || keys.name?.[0] || block.id, path, blockIndex, keys, includes: block.includes };
+        const name = blockFirst(block, 'name') || keys.name?.[0] || commentAbove(text, block.start) || block.id;
+        const entry = { id: block.id, name, path, blockIndex, keys, includes: block.includes };
         (section === 'effect' ? effects : powers).push(entry);
       });
     }

@@ -11,7 +11,7 @@ const files: ProjectFile[] = [
 ];
 
 const data = (): PowerProjectFiles => ({
-  files, project: buildPowerProject(files), kinds: {}, loading: false,
+  files, project: buildPowerProject(files), kinds: {}, powerKinds: {}, loading: false,
   reload: async () => {}, writeFile: () => {}, textOf: (p: string) => files.find((f) => f.path === p)?.text ?? '', setKind: () => {},
 });
 const render = (type: 'power' | 'effect' | 'flag' | 'new', id: string) =>

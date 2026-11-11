@@ -71,7 +71,7 @@ const Warnings = ({ items }: { items: Warning[] }) => items.length === 0 ? null 
 const UsedByList = ({ items, extra }: { items: Array<UsedBy & { detail?: string }>; extra?: (u: UsedBy) => React.ReactNode }) => (
   items.length === 0 ? <div className="text-xs text-muted-foreground">Nothing yet.</div> : (
     <div className="flex flex-wrap gap-1">
-      {items.map((u, i) => (
+      {items.filter((u, i) => items.findIndex((x) => x.kind === u.kind && x.name === u.name && x.path === u.path) === i).map((u, i) => (
         <Tooltip key={`${u.path}-${u.key}-${i}`} content={`${u.path} · ${u.key}=`} side="top">
           <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px]">
             <span className="text-muted-foreground">{USED_BY_LABEL[u.kind]}</span>{u.name}{u.detail ? <span className="text-muted-foreground">{u.detail}</span> : null}{extra?.(u)}
@@ -107,7 +107,7 @@ const PowerEditor = ({ target, data, onClose, onOpen }: Props) => {
   const v = (key: string) => (keys[key] || [])[0] || '';
   const set = (key: string, value: string | null) => writeFile(power.path, setBlockValue(textOf(power.path), 'power', power.blockIndex, key, value));
   const usedBy = project.powerUsedBy[power.id] || [];
-  const kind = categorizePower(power, usedBy, kinds[power.id]);
+  const kind = data.powerKinds[power.id] || categorizePower(power, usedBy, kinds[power.id]);
   const effectName = (id: string) => project.effects.find((e) => e.id === id)?.name || id;
   const effectNames = Object.fromEntries(project.effects.map((e) => [e.id, e.name]));
   const warnings = powerWarnings(power, kind, usedBy, project);
@@ -146,7 +146,7 @@ const PowerEditor = ({ target, data, onClose, onOpen }: Props) => {
       <div className="space-y-1">
         <div className="flex items-center gap-2">
           <Tooltip content={`${KIND_META[kind].tooltip} · id=${power.id}`} side="bottom"><span><KindIcon kind={kind} className="w-5 h-5" /></span></Tooltip>
-          <DraftInput className="h-8 text-sm font-semibold border-0 shadow-none px-1 focus:ring-0" value={v('name')} placeholder="Name" aria-label="Name" onChange={(e) => set('name', e.target.value)} />
+          <DraftInput className="h-8 text-sm font-semibold border-0 shadow-none px-1 focus:ring-0" value={v('name')} placeholder={power.name || 'Name'} aria-label="Name" onChange={(e) => set('name', e.target.value)} />
           <span className={`text-[11px] ${KIND_META[kind].color}`}>{KIND_META[kind].label}</span>
           <InlineConfirm open={confirmDelete} onCancel={() => setConfirmDelete(false)} message={`Delete? ${deleteImpact(usedBy)}`}
             onConfirm={() => { writeFile(power.path, removeBlock(textOf(power.path), 'power', power.blockIndex), true); setKind(power.id, null); setConfirmDelete(false); onClose(); }}>
@@ -193,11 +193,13 @@ const PowerEditor = ({ target, data, onClose, onOpen }: Props) => {
           <Switch checked={v('buff') === 'true'} onCheckedChange={(c) => set('buff', c ? 'true' : null)} aria-label="Targets caster" />
         </Field>
         <div className="pt-1 space-y-1">
-          <Tooltip content="post_effect=id,magnitude,duration[,chance]" side="left"><div className="text-xs">When it hits, apply…</div></Tooltip>
+          <div><Tooltip content="post_effect=id,magnitude,duration[,chance]" side="left"><span className="text-xs">When it hits, apply…</span></Tooltip></div>
           {inherited.map((l, i) => (
-            <Tooltip key={`inc-${i}`} content={`From an INCLUDE file: ${l.key}=${l.effectId},${l.magnitude},${l.duration}`}>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground"><span className="w-32 truncate">{effectName(l.effectId)}</span>{l.magnitude} · {l.duration}</div>
-            </Tooltip>
+            <div key={`inc-${i}`}>
+              <Tooltip content={`From an INCLUDE file: ${l.key}=${l.effectId},${l.magnitude},${l.duration}`}>
+                <span className="flex items-center gap-2 text-xs text-muted-foreground"><span className="w-36 truncate">{effectName(l.effectId)}</span>{l.magnitude} · {l.duration}</span>
+              </Tooltip>
+            </div>
           ))}
           {ownChain.map((l) => {
             const e = project.effects.find((x) => x.id === l.effectId);

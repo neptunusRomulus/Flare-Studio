@@ -2,7 +2,7 @@
  * Studio names for Flare powers, effects and campaign statuses.
  * Powers are named by where they are used; effects by what they do.
  */
-import type { EffectKind, EffectUse, PowerEntry, PowerKind, UsedBy } from './powerProject';
+import type { EffectKind, EffectUse, PowerEntry, PowerKind, PowerProject, UsedBy } from './powerProject';
 
 export type ContentKind = PowerKind | EffectKind | 'flag';
 
@@ -84,4 +84,34 @@ export function classifyEffect(effect: Pick<PowerEntry, 'id' | 'name' | 'keys'>,
   if (magnitudes.some((n) => n < 0)) return 'debuff';
   if (/poison|bleed|burn|slow|stun|curse|weak|blind|fear/i.test(`${effect.id} ${effect.name}`)) return 'debuff';
   return 'buff';
+}
+
+/**
+ * Kind for every power in the project. A power only triggered by other powers
+ * (post_power, wall_power, …) takes the kind of the power that triggers it.
+ */
+export function resolvePowerKinds(
+  project: Pick<PowerProject, 'powers' | 'powerUsedBy'>,
+  picked: Record<string, PowerKind> = {},
+): Record<string, PowerKind> {
+  const byId = new Map(project.powers.map((p) => [p.id, p]));
+  const out: Record<string, PowerKind> = {};
+  const resolve = (id: string, seen: Set<string>): PowerKind => {
+    if (out[id]) return out[id];
+    const power = byId.get(id);
+    const usedBy = project.powerUsedBy[id] || [];
+    const direct = usedBy.filter((u) => u.kind !== 'power');
+    let kind: PowerKind;
+    if (direct.length || picked[id] || !usedBy.length || !power) {
+      kind = categorizePower(power || { path: '' }, direct, picked[id]);
+    } else {
+      seen.add(id);
+      const parents = project.powers.filter((p) => !seen.has(p.id) && usedBy.some((u) => u.path === p.path && u.name === p.name));
+      kind = parents.length ? resolve(parents[0].id, seen) : categorizePower(power, [], null);
+    }
+    out[id] = kind;
+    return kind;
+  };
+  for (const p of project.powers) resolve(p.id, new Set());
+  return out;
 }

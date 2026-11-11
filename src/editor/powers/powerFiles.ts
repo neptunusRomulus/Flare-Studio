@@ -85,6 +85,8 @@ const LABELS: Record<string, string> = {
   trait_elemental: 'Element', use_hazard: 'Can hit', spawn_type: 'Summons', post_effect: 'Applies on hit', post_effect_src: 'Applies to caster',
   buff: 'Targets caster', buff_teleport: 'Teleports caster', type: 'Works as', icon: 'Icon', animation: 'Animation', name: 'Name', description: 'Description',
   max_stacks: 'Max stacks', can_stack: 'Stacks', group_stack: 'Stacks as group',
+  hpot: 'HP over time', hpot_percent: 'HP % over time', mpot: 'Mana over time', mpot_percent: 'Mana % over time', damage_percent: 'Damage % over time',
+  damage: 'Damage over time', heal: 'Instant heal', attack_speed: 'Attack speed', death_sentence: 'Death sentence',
 };
 
 /** Plain label for a Flare key (the raw key goes in the Tooltip). */

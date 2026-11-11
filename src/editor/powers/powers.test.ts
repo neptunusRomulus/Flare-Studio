@@ -16,7 +16,7 @@ const files: ProjectFile[] = [
   { path: 'powers/powers.txt', text: [
     '# Fireball', '[power]', 'id=122', 'INCLUDE powers/base/magician/fireball.txt', 'name=Fireball', 'requires_mp=5', 'modifier_damage=multiply,130,0', '',
     '[power]', 'id=136', 'name=Shield', 'type=fixed', 'buff=true', 'post_effect=mage_shield,0,0', 'cooldown=30s', '',
-    '[power]', 'id=500', 'name=Forgotten', 'type=fixed', 'requires_mp=10', 'post_effect=nope,1,1s', '',
+    '# forgotten spell', '[power]', 'id=500', 'type=fixed', 'requires_mp=10', 'post_effect=nope,1,1s', '',
   ].join('\n') },
   { path: 'powers/categories/enemy.txt', text: '[power]\nid=240\nname=Teleport\ntype=fixed\nbuff_teleport=true\ntarget_range=8\ncooldown=6s\npost_power=241\n\n[power]\nid=241\nname=Slowing bite\ntype=fixed\nuse_hazard=true\nbase_damage=melee\npost_effect=slow,50,5s\n' },
   { path: 'powers/categories/items.txt', text: '[power]\nid=1\nname=Health Potion\ntype=fixed\nbuff=true\npost_effect=hp_heal,25,1s\n' },
@@ -45,6 +45,7 @@ describe('power project index', () => {
     expect(power('122').keys.type).toEqual(['missile']);
     expect(power('122').keys.speed).toEqual(['16']);
     expect(power('122').name).toBe('Fireball');
+    expect(power('500').name).toBe('Forgotten spell');
   });
 
   it('collects used-by from enemies, items, events, trees, classes and other powers', () => {
@@ -71,6 +72,17 @@ describe('categorization', () => {
     expect(kindOf('241')).toBe('monster');
     expect(kindOf('1')).toBe('item');
     expect(kindOf('178')).toBe('trap');
+  });
+
+  it('powers triggered only by other powers take their kind', async () => {
+    const { resolvePowerKinds } = await import('./powerKinds');
+    const extra = buildPowerProject([...files, { path: 'powers/extra.txt', text: '[power]\nid=600\nname=Splash\ntype=fixed\n\n[power]\nid=601\nname=Thrown\npost_power=600\n' },
+      { path: 'items/more.txt', text: '[item]\nid=9\nname=Bomb\npower=601\n' }]);
+    const kinds = resolvePowerKinds(extra);
+    expect(kinds['600']).toBe('item');
+    expect(kinds['601']).toBe('item');
+    expect(kinds['241']).toBe('monster');
+    expect(kinds['500']).toBe('skill');
   });
 
   it('falls back to the picked type, then the file name', () => {

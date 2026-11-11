@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   alignToScreenEdge,
@@ -12,9 +13,35 @@ import {
   viewSize,
 } from './menuLayout';
 
-const inventory = readFileSync('/tmp/fg-ref/menus/inventory.txt', 'utf8');
-const actionbar = readFileSync('/tmp/fg-ref/menus/actionbar.txt', 'utf8');
-const minimap = readFileSync('/tmp/fg-ref/menus/minimap.txt', 'utf8');
+function readFlareGameFile(...rels: string[]): string | null {
+  const roots = [
+    process.env.FLARE_GAME,
+    path.resolve(__dirname, '../../../flare-game'),
+    path.resolve(process.cwd(), '../flare-game'),
+    '/tmp/fg-ref',
+  ].filter(Boolean) as string[];
+  for (const root of roots) {
+    for (const rel of rels) {
+      const full = path.join(root, rel);
+      if (existsSync(full)) return readFileSync(full, 'utf8');
+    }
+  }
+  return null;
+}
+
+const inventory = readFlareGameFile(
+  'mods/fantasycore/menus/inventory.txt',
+  'menus/inventory.txt',
+);
+const actionbar = readFlareGameFile(
+  'mods/fantasycore/menus/actionbar.txt',
+  'menus/actionbar.txt',
+);
+const minimap = readFlareGameFile(
+  'mods/fantasycore/menus/minimap.txt',
+  'menus/minimap.txt',
+);
+const hasMenus = Boolean(inventory && actionbar && minimap);
 
 describe('viewSize', () => {
   it('picks virtual height and letterboxes like the engine', () => {
@@ -44,13 +71,13 @@ describe('alignToScreenEdge', () => {
   });
 });
 
-describe('mergeMenuPos', () => {
+describe.skipIf(!hasMenus)('mergeMenuPos', () => {
   it('rewrites only pos and keeps the rest of a real menu file', () => {
-    const next = mergeMenuPos(inventory, { x: 10, y: -20, w: 640, h: 832 });
+    const next = mergeMenuPos(inventory!, { x: 10, y: -20, w: 640, h: 832 });
     expect(next.startsWith('pos=10,-20,640,832\n')).toBe(true);
-    expect(next.slice(next.indexOf('\n') + 1)).toBe(inventory.slice(inventory.indexOf('\n') + 1));
-    expect(mergeMenuPos(actionbar, parseMenuText(actionbar).pos)).toBe(actionbar.endsWith('\n') ? actionbar : `${actionbar}\n`);
-    expect(parseMenuText(minimap).align).toBe('topright');
+    expect(next.slice(next.indexOf('\n') + 1)).toBe(inventory!.slice(inventory!.indexOf('\n') + 1));
+    expect(mergeMenuPos(actionbar!, parseMenuText(actionbar!).pos)).toBe(actionbar!.endsWith('\n') ? actionbar! : `${actionbar!}\n`);
+    expect(parseMenuText(minimap!).align).toBe('topright');
   });
 });
 

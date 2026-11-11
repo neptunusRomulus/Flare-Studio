@@ -9,6 +9,7 @@ import { useAppContext } from '@/context/AppContext';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 import { ACTIVATION_COLORS } from '@/editor/eventActivationColors';
 import ResizeHandle from '@/components/ResizeHandle';
+import { mergeEventFormProperties } from '@/editor/eventFormProperties';
 
 type EventActivation = 'Trigger' | 'Interact' | 'Load' | 'Leave' | 'MapExit' | 'MapClear' | 'Loop';
 
@@ -287,6 +288,11 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
     const { coordinates, size } = eventData.positioning;
     const flareActivate = ACTIVATION_TO_FLARE[eventData.timing.activeActivation || ''] || 'on_trigger';
     const props = buildProps();
+    const existing = isEditing && typeof editor.getMapObjects === 'function'
+      ? (editor.getMapObjects() as Array<{ id: number; properties?: Record<string, string | string[]> }>)
+        .find((object) => object.id === editingEventId)
+      : undefined;
+    const properties = mergeEventFormProperties(existing?.properties, props);
 
     if (isEditing && typeof editor.updateMapObject === 'function') {
       // Update existing event
@@ -299,7 +305,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
         y: coordinates.y,
         width: size.width,
         height: size.height,
-        properties: props
+        properties
       });
     } else if (typeof editor.addMapObject === 'function') {
       // Create new event
@@ -315,7 +321,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
           y: -1,
           width: 1,
           height: 1,
-          properties: props
+          properties
         });
       }
     }

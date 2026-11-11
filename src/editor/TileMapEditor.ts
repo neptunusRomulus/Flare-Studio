@@ -180,25 +180,6 @@ export class TileMapEditor {
     this.activeHotspotPreview = preview;
     if (changed) this.draw();
   }
-  /**
-   * Creates a settings.txt file in the project root folder for Flare compatibility.
-   * Call this after export. Updates description with project name.
-   */
-  public exportSettingsTxt(projectRoot: string) {
-    const w = window as unknown as { require?: (module: string) => unknown };
-    const fs = w.require ? w.require('fs') as { existsSync: (path: string) => boolean, writeFileSync: (path: string, content: string, encoding: string) => void } : null;
-    if (!fs) {
-      
-      return;
-    }
-    const content = `#this file is necesserey to work this project run in flare. please do not remove it. -Ism\ndescription=${this.projectName || '--> Project Name comes here.'}\ngame=flare_studio_game\nversion=1.14\nengine_version_min=1.13.01\n`;
-    const filePath = fs.existsSync(projectRoot) ? `${projectRoot}/settings.txt` : 'settings.txt';
-    try {
-      fs.writeFileSync(filePath, content, 'utf8');
-    } catch (_err) {
-      void _err;
-    }
-  }
   public projectName: string = '';
   // Tileset image and metadata for legacy/global tileset usage
   public tilesetImage: HTMLImageElement | null = null;

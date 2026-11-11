@@ -199,7 +199,7 @@ describe('settings.txt generation', () => {
     const plan = flare.planSettingsWrite(null, 'My Village');
     expect(plan.write).toBe(true);
     expect(plan.content).toContain('description=My Village');
-    expect(plan.content).toContain('version=1.0');
+    expect(plan.content).toContain('version=1.0.00');
     expect(plan.content).toContain('game=flare-game');
     expect(plan.content).toContain('requires=fantasycore');
     expect(plan.content).not.toContain('Town');
@@ -216,7 +216,7 @@ describe('settings.txt generation', () => {
     const plan = flare.planSettingsWrite('description=Kept\n', 'Ignored');
     expect(plan.write).toBe(true);
     expect(plan.content.startsWith('description=Kept\n')).toBe(true);
-    expect(plan.content).toContain('version=1.0');
+    expect(plan.content).toContain('version=1.0.00');
     expect(plan.content).toContain('game=flare-game');
     expect(plan.content).not.toContain('description=Ignored');
   });

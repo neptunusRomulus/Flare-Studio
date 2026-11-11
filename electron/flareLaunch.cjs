@@ -10,7 +10,7 @@ const fs = require("fs");
 const path = require("path");
 const { slugFileName, legacyMapFileName } = require("../src/adapters/flare/slug.cjs");
 
-const DEFAULT_MOD_VERSION = "1.0";
+const DEFAULT_MOD_VERSION = "1.0.00";
 const DEFAULT_GAME = "flare-game";
 const DEFAULT_ENGINE_MIN = "1.13.01";
 // Base mod for new projects: menus, HUD, hero and animations come from fantasycore.

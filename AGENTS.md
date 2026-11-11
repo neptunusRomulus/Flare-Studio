@@ -33,7 +33,8 @@
 - Main switch at top: Map | Entities | Content | Game Settings; sub-switch directly under it (Ground/Object/Collision; NPC/Enemy/Event; Items/Statuses/Quests). See `src/components/MapTargetSwitch.tsx`, `src/components/targetGroups.ts`, `src/components/EntityDock.tsx`.
 - Tab cycles sub-targets; Shift+Tab cycles main layers.
 - Map and Entities sub-switch buttons: corner eye = visibility, mouse wheel = opacity (per sub-target).
-- Title bar: Flare icon = app menu (incl. Engine Settings; `src/components/AppControls.tsx`, `MainMenuDialog.tsx`), Save button next to it.
+- Title bar: Flare Studio mark (`src/components/brand/BrandMark.tsx`) = app menu (incl. Engine Settings; `src/components/AppControls.tsx`, `MainMenuDialog.tsx`), Save button next to it.
+- Brand: sources in `assets/brand/` (regenerate with `scripts/brand/`), app icons in `build/icons/`, runtime copies in `public/brand/`. Chakra Petch is for the logo only.
 - GID readout only in Debug Mode. Minimap bottom-left.
 - Content > Quests: the Quest Map (`src/components/QuestMapView.tsx`, graph in `src/editor/questMap.ts`) replaces the map view; the network button next to "+ Quest" toggles it. Read-only: quests, the NPCs and map events that start/advance/end (NPCs also: talk about) them, and quest unlocks, linked by statuses. Dragged card positions live only in the Studio sidecar `content/quest-map.json`.
 - Entities: add button directly under the sub-switch. Add dialogs have no coordinates: position is instance data set by placing on the map. Unplaced = -1,-1, shown as "Not placed", not exported to the map (`src/editor/entityPlacementRules.ts`).

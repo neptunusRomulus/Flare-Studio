@@ -2,7 +2,8 @@ import React, { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import Tooltip from '@/components/ui/tooltip';
 import MainMenuDialog from '@/components/MainMenuDialog';
-import { Menu, Save } from 'lucide-react';
+import { ChevronDown, Save } from 'lucide-react';
+import BrandMark from '@/components/brand/BrandMark';
 
 type Props = {
   currentProjectPath: string | null;
@@ -20,14 +21,14 @@ type Props = {
   isPreparingNewMap: boolean;
   hasUnsavedChanges: boolean;
   setShowSettings: (v: boolean) => void;
-  /** Flare logo used as the menu button (falls back to a menu icon). */
+  /** @deprecated The menu button always shows the Flare Studio mark; kept for callers. */
   iconUrl?: string | null;
 };
 
-/** Title bar app menu: Flare icon opens the main menu (incl. Engine Settings); Save button next to it. */
+/** Title bar app menu: the Flare Studio mark opens the main menu (incl. Engine Settings); Save button next to it. */
 const AppControls: React.FC<Props> = ({
   currentProjectPath, onSaveAndQuit, onQuit, onShowProjectFolder, onShowHelp, onSaveAsCopy, onRestart, onExport, onCheckUpdates,
-  handleManualSave, isManuallySaving, isPreparingNewMap, hasUnsavedChanges, setShowSettings, iconUrl,
+  handleManualSave, isManuallySaving, isPreparingNewMap, hasUnsavedChanges, setShowSettings,
 }) => {
   const btnRef = useRef<HTMLButtonElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -41,7 +42,7 @@ const AppControls: React.FC<Props> = ({
           type="button"
           aria-label="Menu"
           aria-expanded={menuOpen}
-          className="h-6 px-0.5 inline-flex items-center justify-center rounded hover:bg-gray-200 dark:hover:bg-neutral-800"
+          className="group no-click-effect h-6 w-[30px] pl-0.5 inline-flex items-center gap-px rounded outline-none focus-visible:ring-1 focus-visible:ring-orange-500"
           onClick={() => {
             const btn = btnRef.current;
             if (btn) {
@@ -51,7 +52,15 @@ const AppControls: React.FC<Props> = ({
             setMenuOpen((s) => !s);
           }}
         >
-          {iconUrl ? <img src={iconUrl} alt="Flare Studio menu" className="w-4 h-6" /> : <Menu className="w-4 h-4" />}
+          {/* Hover/press hint that a menu opens: flame lifts, square presses, caret slides in. Fixed width, so no layout shift. */}
+          <BrandMark
+            className="w-5 h-5 shrink-0 transition-transform duration-150 ease-out group-active:scale-90 motion-reduce:transition-none motion-reduce:transform-none"
+            flameClassName="transition-transform duration-150 ease-out group-hover:scale-110 group-hover:-skew-x-3 group-aria-expanded:scale-110 motion-reduce:transition-none motion-reduce:transform-none"
+          />
+          <ChevronDown
+            aria-hidden="true"
+            className="w-2.5 h-2.5 shrink-0 text-muted-foreground opacity-0 -translate-y-0.5 transition duration-150 ease-out group-hover:opacity-100 group-hover:translate-y-0 group-focus-visible:opacity-100 group-aria-expanded:opacity-100 group-aria-expanded:translate-y-0 group-aria-expanded:rotate-180 motion-reduce:transition-none"
+          />
         </button>
       </Tooltip>
 

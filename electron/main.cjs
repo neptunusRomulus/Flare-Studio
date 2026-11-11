@@ -229,8 +229,9 @@ function cleanupPlaySession(projectPath) {
 }
 
 const getPlatformIcon = () => {
-  // PNG works for taskbar/window icon on both Windows and Linux
-  return path.join(__dirname, "..", "public", "flare-studio-ico.png");
+  // build/icons is copied to resources/icons in packaged builds (see package.json extraResources).
+  const dir = app.isPackaged ? path.join(process.resourcesPath, "icons") : path.join(__dirname, "..", "build", "icons");
+  return path.join(dir, process.platform === "win32" ? "flare.ico" : "512x512.png");
 };
 
 let mainWindow;
@@ -255,7 +256,7 @@ function createWindow() {
       preload: path.join(__dirname, "preload.js"),
     },
     icon: getPlatformIcon(),
-    title: "Isometric Tile Map Editor",
+    title: "Flare Studio",
   });
 
   displaySettings.applyInterfaceZoom(

@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Plus, FolderOpen, Grid3X3, Folder, Minus, Square, X } from 'lucide-react';
-import flareIconUrl from '/flare-ico.png?url';
-import flareLogoUrl from '/flare-logo.png?url';
+import flareIconUrl from '/brand/flare-studio-icon-small.svg?url';
+import flareLogoUrl from '/brand/flare-studio-lockup-stacked-light.svg?url';
+import flareLogoDarkUrl from '/brand/flare-studio-lockup-stacked.svg?url';
 import FlareInstallButtons from '@/components/FlareInstallButtons';
 import { getStoredFlarePath, FLARE_PATH_EVENT } from '@/flare/flarePathStore';
 import ProjectStartToggle from '@/components/ProjectStartToggle';
@@ -318,7 +319,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
             <img 
               src={flareIconUrl} 
               alt="Flare Studio Logo" 
-              className="w-6 h-6"
+              className="w-5 h-5"
             />
             <span className="text-sm font-semibold">Flare Studio</span>
           </div>
@@ -351,7 +352,8 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
           <div className="bg-white dark:bg-neutral-900 rounded-lg shadow-xl p-8 w-full max-w-md">
           <div className="text-center mb-6">
             <div className="inline-flex items-center justify-center">
-              <img src={flareLogoUrl} alt="Flare Logo" className="w-40 h-40 object-contain" />
+              <img src={flareLogoUrl} alt="Flare Studio" className="w-40 h-40 object-contain dark:hidden" />
+              <img src={flareLogoDarkUrl} alt="Flare Studio" className="w-40 h-40 object-contain hidden dark:block" />
             </div>
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Create a New Flare Project</h2>
           </div>
@@ -423,7 +425,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
           <img 
             src={flareIconUrl} 
             alt="Flare Studio Logo" 
-            className="w-4 h-6"
+            className="w-5 h-5"
           />
           <span className="text-sm font-semibold">Flare Studio</span>
         </div>
@@ -501,8 +503,9 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
           <div className="text-center max-w-md">
             {/* Logo */}
             <div className="mb-3">
-              <div className="inline-flex items-center justify-center w-50 h-20">
-                <img src={flareLogoUrl} alt="Flare Logo" className="w-100 h-100 object-contain"/>
+              <div className="inline-flex items-center justify-center h-40 mb-3">
+                <img src={flareLogoUrl} alt="Flare Studio" className="h-40 object-contain dark:hidden"/>
+                <img src={flareLogoDarkUrl} alt="Flare Studio" className="h-40 object-contain hidden dark:block"/>
               </div>
               <p className="text-gray-600 dark:text-gray-300 text-lg">Flare Studio is an unofficial, community-made editor inspired by the Flare engine. It is not affiliated with the official Flare developers.</p>
             </div>

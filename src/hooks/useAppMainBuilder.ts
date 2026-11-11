@@ -924,7 +924,7 @@ export default function useAppMainBuilder() {
         onClose: () => {
           try { window?.electronAPI?.close?.(); } catch (e) { console.warn('Close failed', e); }
         },
-        flareIconUrl: `${import.meta.env.BASE_URL}flare-studio-ico.png`
+        flareIconUrl: `${import.meta.env.BASE_URL}brand/flare-studio-icon-small.svg`
       },
       actors: sb['actors'] ?? defaultActors,
       rules: sb['rules'] ?? defaultRules,

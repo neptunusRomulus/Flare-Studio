@@ -23,6 +23,7 @@ import EditorArea from '@/components/EditorArea';
 import { Toaster } from '@/components/ui/toaster';
 import DialogsContainer from '@/components/DialogsContainer';
 import StatusEditDialog from '@/components/StatusEditDialog';
+import StoryFlagDatalist from '@/components/powers/StoryFlagDatalist';
 import SessionRecoveryDialog from '@/components/SessionRecoveryDialog';
 import useCrashRecovery from '@/hooks/useCrashRecovery';
 import useManualSaveSetup from '@/hooks/useManualSaveSetup';
@@ -371,6 +372,7 @@ export default function AppMain() {
       <DialogsContainer ctx={c} />
 
       <StatusEditDialog open={showStatusDialog} onClose={handleCloseStatusDialog} />
+      <StoryFlagDatalist projectPath={controls?.currentProjectPath ?? null} />
 
       <SessionRecoveryDialog
         isOpen={showRecoveryDialog && hasCrashBackup}

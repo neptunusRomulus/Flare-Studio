@@ -13,6 +13,8 @@ export type EditorProperty = {
   tooltip?: string;
   /** 'toggle' renders an on/off switch writing "true"/"false". */
   kind?: 'text' | 'toggle';
+  /** id of a <datalist> with suggestions (e.g. Story Flags). */
+  list?: string;
 };
 
 type Props = {
@@ -48,6 +50,7 @@ const EditorPropertyList = ({ title = 'Properties', properties, catalog, onChang
               <DraftInput
                 className="h-7 text-xs"
                 value={property.value}
+                list={property.list}
                 onChange={(event) => onChange(property.key, event.target.value)}
                 aria-label={property.label}
               />

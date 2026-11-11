@@ -11,6 +11,7 @@ import { ACTIVATION_COLORS } from '@/editor/eventActivationColors';
 import ResizeHandle from '@/components/ResizeHandle';
 import { mergeEventFormProperties } from '@/editor/eventFormProperties';
 import EditorPropertyList from '@/components/EditorPropertyList';
+import { isStoryFlagType, STORY_FLAG_LIST_ID } from '@/editor/powers/storyFlags';
 import {
   EVENT_EXTRA_CATALOG,
   eventExtraPaletteKeys,
@@ -1211,6 +1212,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                       <Input
                         value={status}
                         onChange={e => updateStatusRequirement(index, e.target.value)}
+                        list={STORY_FLAG_LIST_ID}
                         placeholder="Status name"
                         className="h-7 text-xs flex-1"
                       />
@@ -2049,6 +2051,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                   value: row.value,
                   tooltip: entry?.tooltip || row.key,
                   kind: entry?.kind,
+                  list: isStoryFlagType(row.key) ? STORY_FLAG_LIST_ID : undefined,
                 };
               })}
               catalog={eventExtraPaletteKeys(extraRows).map((entry) => ({

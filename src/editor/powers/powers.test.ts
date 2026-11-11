@@ -209,3 +209,16 @@ describe('create from template', () => {
     expect(buff.target).toEqual({ type: 'effect', id: 'mage_shield_2' });
   });
 });
+
+describe('story flag suggestions', () => {
+  it('lists project flags with where they are set', async () => {
+    const { flagSuggestions, isStoryFlagType } = await import('./storyFlags');
+    expect(flagSuggestions(project.flags)).toEqual([
+      { value: 'goblin_dead', label: 'set by Goblin' },
+      { value: 'guard_thanked', label: 'set by Guard · Hello' },
+      { value: 'spikes_off', label: 'checked by Cave (never set)' },
+    ]);
+    for (const t of ['status', 'not_status', 'requires_status', 'requires_not_status', 'set_status', 'unset_status', 'defeat_status']) expect(isStoryFlagType(t), t).toBe(true);
+    for (const t of ['requires_level', 'requires_item', 'random_status', '', null]) expect(isStoryFlagType(t), String(t)).toBe(false);
+  });
+});

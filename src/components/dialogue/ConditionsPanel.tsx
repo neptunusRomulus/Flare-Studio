@@ -7,6 +7,7 @@
 import React from 'react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
+import { STORY_FLAG_LIST_ID } from '@/editor/powers/storyFlags';
 import {
   DialogCondition,
   ConditionType,
@@ -129,6 +130,7 @@ export const ConditionsPanel: React.FC<ConditionsPanelProps> = ({
                 statuses: e.target.value.split(',').map(s => s.trim()).filter(Boolean) 
               })}
               placeholder="Status tags (comma separated)..."
+              list={STORY_FLAG_LIST_ID}
               className="h-7 flex-1 text-xs"
             />
           </div>

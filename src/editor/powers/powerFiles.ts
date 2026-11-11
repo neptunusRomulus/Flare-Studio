@@ -22,6 +22,11 @@ export function joinPath(root: string, rel: string): string {
 }
 
 export async function loadPowerFiles(api: Api, root: string): Promise<ProjectFile[]> {
+  return loadTextFiles(api, root, POWER_SCAN_DIRS, POWER_SCAN_FILES);
+}
+
+/** Every .txt under `dirs` (4 levels deep) plus the listed single files, as project-relative paths. */
+export async function loadTextFiles(api: Api, root: string, dirs: string[], singles: string[] = []): Promise<ProjectFile[]> {
   if (!api.readDir || !api.readFile) return [];
   const out: ProjectFile[] = [];
   const walk = async (rel: string, depth: number) => {
@@ -36,8 +41,8 @@ export async function loadPowerFiles(api: Api, root: string): Promise<ProjectFil
       }
     }
   };
-  for (const dir of POWER_SCAN_DIRS) await walk(dir, 0);
-  for (const file of POWER_SCAN_FILES) {
+  for (const dir of dirs) await walk(dir, 0);
+  for (const file of singles) {
     const text = await api.readFile(joinPath(root, file)).catch(() => null);
     if (typeof text === 'string') out.push({ path: file, text });
   }

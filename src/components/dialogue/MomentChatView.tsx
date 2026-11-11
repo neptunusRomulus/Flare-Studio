@@ -14,6 +14,7 @@ import { removeDialogueLine, reorderDialogueLines } from '@/editor/dialogueLines
 import { applyMomentToTopic, type RoleMoment } from '@/editor/roleMoments';
 import type { DialogueLine, DialogueRequirement, DialogueReward, DialogueTree, DialogueWorldEffect } from '@/types';
 import { resolveNpcPreviewPaths } from '@/flare/npcPreviewPaths';
+import { isStoryFlagType, STORY_FLAG_LIST_ID } from '@/editor/powers/storyFlags';
 import {
   actionChipLabel,
   actionChipTooltip,
@@ -271,8 +272,8 @@ const Bubble = ({
 };
 
 /** One editable row inside a popover: label, inline value, remove. */
-const DetailRow = ({ label, tooltip, value, placeholder, needsValue = true, onChange, onRemove }: {
-  label: string; tooltip: string; value: string; placeholder?: string; needsValue?: boolean;
+const DetailRow = ({ label, tooltip, value, placeholder, needsValue = true, list, onChange, onRemove }: {
+  label: string; tooltip: string; value: string; placeholder?: string; needsValue?: boolean; list?: string;
   onChange: (value: string) => void; onRemove: () => void;
 }) => (
   <div className="group/row flex items-center gap-1.5 rounded px-1 py-0.5 hover:bg-muted/60">
@@ -284,6 +285,7 @@ const DetailRow = ({ label, tooltip, value, placeholder, needsValue = true, onCh
         className="h-6 min-w-0 flex-1 rounded border-0 bg-transparent px-1 text-xs shadow-none outline-none focus:bg-background focus:ring-0"
         value={value}
         placeholder={placeholder}
+        list={list}
         onChange={(e) => onChange(e.target.value)}
       />
     ) : <span className="flex-1" />}
@@ -318,6 +320,7 @@ const TopicMeta = ({ tree, onPatch }: { tree: DialogueTree; onPatch: (next: Dial
               tooltip={conditionChipTooltip(req)}
               value={req.value || ''}
               placeholder={conditionEntry(req.type)?.placeholder}
+              list={isStoryFlagType(req.type) ? STORY_FLAG_LIST_ID : undefined}
               onChange={(value) => onPatch(updateCondition(tree, index, value))}
               onRemove={() => onPatch(removeCondition(tree, index))}
             />
@@ -343,6 +346,7 @@ const TopicMeta = ({ tree, onPatch }: { tree: DialogueTree; onPatch: (next: Dial
               tooltip={actionChipTooltip(chip)}
               value={chip.value}
               needsValue={!['stash', 'save_game', 'respec'].includes(chip.type)}
+              list={isStoryFlagType(chip.type) ? STORY_FLAG_LIST_ID : undefined}
               onChange={(value) => onPatch(writeEffect(tree, chip, value))}
               onRemove={() => onPatch(removeAction(tree, chip.group, chip.index))}
             />

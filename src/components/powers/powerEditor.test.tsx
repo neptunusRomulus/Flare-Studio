@@ -42,3 +42,18 @@ describe('power editor', () => {
     expect(render('new', 'debuff')).toContain('Slow Debuff');
   });
 });
+
+describe('story flag autocomplete', () => {
+  it('status fields point at the shared datalist', async () => {
+    const { default: EditorPropertyList } = await import('@/components/EditorPropertyList');
+    const { STORY_FLAG_LIST_ID, isStoryFlagType } = await import('@/editor/powers/storyFlags');
+    const { DIALOG_CONDITION_CATALOG } = await import('@/editor/dialogueChat');
+    const html = renderToStaticMarkup(
+      <EditorPropertyList properties={[{ key: 'set_status', label: 'Turns on status', value: 'met', list: STORY_FLAG_LIST_ID }]} catalog={[]} onChange={() => {}} onAdd={() => {}} onRemove={() => {}} />,
+    );
+    expect(html).toContain(`list="${STORY_FLAG_LIST_ID}"`);
+    expect(DIALOG_CONDITION_CATALOG.filter((c) => isStoryFlagType(c.type)).map((c) => c.flareKey).sort()).toEqual(['requires_not_status', 'requires_status']);
+    const { default: StoryFlagDatalist } = await import('./StoryFlagDatalist');
+    expect(renderToStaticMarkup(<StoryFlagDatalist projectPath={null} />)).toBe(`<datalist id="${STORY_FLAG_LIST_ID}"></datalist>`);
+  });
+});

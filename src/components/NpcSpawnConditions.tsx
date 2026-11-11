@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import Tooltip from '@/components/ui/tooltip';
+import { STORY_FLAG_LIST_ID } from '@/editor/powers/storyFlags';
 import { HelpCircle, Plus, X } from 'lucide-react';
 import type { MapObject } from '@/types';
 
@@ -195,6 +196,7 @@ const NpcSpawnConditions = ({ properties, get, setProp }: Props) => {
             value={statusHave ? get('requires_status', '') : get('requires_not_status', '')}
             onChange={(e) => setProp(statusHave ? 'requires_status' : 'requires_not_status', e.target.value)}
             placeholder="e.g. quest_started"
+            list={STORY_FLAG_LIST_ID}
           />
           <button
             type="button"

@@ -210,3 +210,55 @@ describe('map events', () => {
     expect(layoutQuestGraph(g2).map((b) => b.nodeId)).toContain('event:__current_map__#4');
   });
 });
+
+describe('crowded quests', () => {
+  const quest: QuestMapQuestInput = {
+    id: 'nasu', name: 'Nasu', complete_status: 'nasu_done',
+    steps: [{ requires_status: 'nasu_init' }, { requires_status: 'nasu_a' }, { requires_status: 'nasu_b' }, { requires_status: 'nasu_c' }],
+  };
+  const ev = (id: string, sets: string, x = 1) => ({ id, name: `Lever ${id}`, mapTitle: 'Fort Nasu', x, y: 2, sets: [sets] });
+  const events = [ev('s', 'nasu_init'), ev('a', 'nasu_a'), ev('b', 'nasu_b', 3), ev('c', 'nasu_c'), ev('e', 'nasu_done')];
+
+  it('bundles parallel event lines into one counted card', async () => {
+    const { bundleEventEdges } = await import('@/editor/questMap');
+    const graph = deriveQuestGraph([quest], [], events);
+    expect(graph.edges).toHaveLength(5);
+    const bundled = bundleEventEdges(graph);
+    expect(bundled.edges).toHaveLength(3);
+    const card = bundled.events.find((e) => e.count)!;
+    expect(card).toMatchObject({ name: '3 events', location: 'Fort Nasu', count: 3 });
+    expect(card.details).toEqual(['Lever a · Fort Nasu 1,2', 'Lever b · Fort Nasu 3,2', 'Lever c · Fort Nasu 1,2']);
+    const edge = bundled.edges.find((e) => e.from === card.nodeId)!;
+    expect(edge.label).toBe('A · B +1');
+    expect(edge.tooltip).toBe('Advances: nasu_a\nAdvances: nasu_b\nAdvances: nasu_c');
+    expect(layoutQuestGraph(bundled)).toHaveLength(4);
+    // Few lines: nothing to bundle.
+    expect(bundleEventEdges(deriveQuestGraph([quest], [], events.slice(0, 4)))).toEqual(deriveQuestGraph([quest], [], events.slice(0, 4)));
+  });
+
+  it('spreads ports along a card side and keeps labels apart', async () => {
+    const { routeEdges, labelSize } = await import('@/editor/questMap');
+    const graph = deriveQuestGraph([quest], [], events);
+    const boxes = new Map(layoutQuestGraph(graph).map((b) => [b.nodeId, b]));
+    const routes = routeEdges(graph.edges, boxes);
+    const questBox = boxes.get('quest:nasu')!;
+    const ends = graph.edges
+      .filter((e) => e.to === 'quest:nasu')
+      .map((e) => Number(routes.get(e.id)!.d.trim().split(/[ ,]+/).pop()));
+    expect(new Set(ends).size).toBe(ends.length);
+    for (const y of ends) expect(y > questBox.y && y < questBox.y + questBox.height).toBe(true);
+    const rects = graph.edges.map((e) => {
+      const p = routes.get(e.id)!.label;
+      const size = labelSize(e.label);
+      return { x: p.x - size.width / 2, y: p.y - size.height / 2, ...size };
+    });
+    for (let i = 0; i < rects.length; i += 1) {
+      for (let j = i + 1; j < rects.length; j += 1) {
+        const a = rects[i];
+        const b = rects[j];
+        const overlap = a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+        expect(overlap).toBe(false);
+      }
+    }
+  });
+});

@@ -99,6 +99,9 @@ export type QuestMapEventCard = {
   eventId: string;
   name: string;
   location: string;
+  /** Bundled events: how many, and "name · location" per event (tooltip). */
+  count?: number;
+  details?: string[];
 };
 
 export type QuestMapGraph = {
@@ -535,6 +538,171 @@ export function connectorPath(a: QuestMapBox, b: QuestMapBox): { d: string; mid:
   const c2x = x2 >= x1 ? x2 - bend : x2 + bend;
   const d = `M ${x1} ${y1} C ${x1 + bend} ${y1}, ${c2x} ${y2}, ${x2} ${y2}`;
   return { d, mid: { x: (x1 + x2) / 2, y: (y1 + y2) / 2 } };
+}
+
+const BUNDLE_MIN_EVENTS = 3;
+const BUNDLE_MIN_LINES = 5;
+
+/**
+ * When a quest has many connectors, events that only link to it with the same
+ * kind of link (e.g. six events that each advance it) become one "6 events"
+ * card with one connector. Details stay in the card's tooltip.
+ */
+export function bundleEventEdges(graph: QuestMapGraph): QuestMapGraph {
+  const edgesOf = new Map<string, QuestMapEdge[]>();
+  for (const edge of graph.edges) {
+    edgesOf.set(edge.from, [...(edgesOf.get(edge.from) || []), edge]);
+    edgesOf.set(edge.to, [...(edgesOf.get(edge.to) || []), edge]);
+  }
+  const eventByNode = new Map(graph.events.map((e) => [e.nodeId, e]));
+  const removedEvents = new Set<string>();
+  const removedEdges = new Set<string>();
+  const addedEvents: QuestMapEventCard[] = [];
+  const addedEdges: QuestMapEdge[] = [];
+  const replace = new Map<string, string>();
+
+  for (const quest of graph.quests) {
+    const lines = edgesOf.get(quest.nodeId) || [];
+    if (lines.length < BUNDLE_MIN_LINES) continue;
+    const groups = new Map<QuestMapLinkKind, QuestMapEdge[]>();
+    for (const edge of lines) {
+      const other = edge.from === quest.nodeId ? edge.to : edge.from;
+      const event = eventByNode.get(other);
+      if (!event || removedEvents.has(other) || (edgesOf.get(other) || []).length !== 1) continue;
+      const kind = primaryKind(edge.links);
+      groups.set(kind, [...(groups.get(kind) || []), edge]);
+    }
+    for (const [kind, group] of groups) {
+      if (group.length < BUNDLE_MIN_EVENTS) continue;
+      const events = group.map((edge) => eventByNode.get(edge.from === quest.nodeId ? edge.to : edge.from)!);
+      const eventId = `bundle:${quest.questId}:${kind}`;
+      const nodeId = eventNodeId(eventId);
+      const maps = unique(events.map((e) => e.location.replace(/ (-?\d+,-?\d+|· Not placed)$/, '')));
+      addedEvents.push({
+        nodeId,
+        eventId,
+        name: `${events.length} events`,
+        location: maps.length === 1 ? maps[0] : `${maps.length} maps`,
+        count: events.length,
+        details: events.map((e) => `${e.name} · ${e.location}`),
+      });
+      const links: QuestMapLink[] = [];
+      for (const edge of group) for (const link of edge.links) if (!links.some((l) => l.kind === link.kind && l.status === link.status)) links.push(link);
+      const toQuest = kind !== 'ends';
+      const statuses = unique(links.map((l) => l.status));
+      const pool = [...quest.startStatuses, ...quest.stepStatuses, quest.completeStatus];
+      const names = unique(statuses.map((st) => plainStatusName(st, pool)));
+      addedEdges.push({
+        id: [nodeId, quest.nodeId].sort().join('|'),
+        from: toQuest ? nodeId : quest.nodeId,
+        to: toQuest ? quest.nodeId : nodeId,
+        links,
+        label: names.length > 2 ? `${names.slice(0, 2).join(' · ')} +${names.length - 2}` : names.join(' · '),
+        tooltip: links.map((link) => `${KIND_VERB[link.kind]}: ${link.status}`).join('\n'),
+      });
+      for (const edge of group) removedEdges.add(edge.id);
+      for (const event of events) {
+        removedEvents.add(event.nodeId);
+        replace.set(event.eventId, eventId);
+      }
+    }
+  }
+  if (!addedEvents.length) return graph;
+  const swap = (ids: string[]) => unique(ids.map((id) => replace.get(id) || id));
+  return {
+    quests: graph.quests.map((q) => ({ ...q, starterEvents: swap(q.starterEvents), finisherEvents: swap(q.finisherEvents) })),
+    npcs: graph.npcs,
+    events: [...graph.events.filter((e) => !removedEvents.has(e.nodeId)), ...addedEvents],
+    edges: [...graph.edges.filter((e) => !removedEdges.has(e.id)), ...addedEdges],
+  };
+}
+
+export type QuestMapRoute = { d: string; label: { x: number; y: number } };
+
+type Rect = { x: number; y: number; width: number; height: number };
+
+const overlapArea = (a: Rect, b: Rect) =>
+  Math.max(0, Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x))
+  * Math.max(0, Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y));
+
+/** Approximate pill size of a connector label (10px font). */
+export function labelSize(label: string): { width: number; height: number } {
+  return { width: Math.min(160, Math.round(label.length * 5.6) + 18), height: 18 };
+}
+
+/**
+ * Connector paths with ports: the lines on one card side are spread along
+ * that side in the order of the cards they lead to, so they do not meet in
+ * one point. Labels slide along their path to avoid other labels and cards.
+ */
+export function routeEdges(edges: QuestMapEdge[], boxes: Map<string, QuestMapBox>): Map<string, QuestMapRoute> {
+  type End = { edgeId: string; nodeId: string; side: 'left' | 'right'; otherY: number };
+  const plans: Array<{ edge: QuestMapEdge; s: QuestMapBox; t: QuestMapBox; tSide: 'left' | 'right' }> = [];
+  const ends = new Map<string, End[]>();
+  const push = (end: End) => {
+    const key = `${end.nodeId}|${end.side}`;
+    ends.set(key, [...(ends.get(key) || []), end]);
+  };
+  for (const edge of edges) {
+    const a = boxes.get(edge.from);
+    const b = boxes.get(edge.to);
+    if (!a || !b) continue;
+    const [s, t] = a.x + a.width / 2 <= b.x + b.width / 2 ? [a, b] : [b, a];
+    const tSide = t.x >= s.x + s.width ? 'left' : 'right';
+    plans.push({ edge, s, t, tSide });
+    push({ edgeId: edge.id, nodeId: s.nodeId, side: 'right', otherY: t.y + t.height / 2 });
+    push({ edgeId: edge.id, nodeId: t.nodeId, side: tSide, otherY: s.y + s.height / 2 });
+  }
+  const portY = new Map<string, number>();
+  for (const [key, list] of ends) {
+    const box = boxes.get(list[0].nodeId)!;
+    list.sort((p, q) => p.otherY - q.otherY || (p.edgeId < q.edgeId ? -1 : 1));
+    const pad = Math.min(14, box.height / 4);
+    list.forEach((end, i) => {
+      portY.set(`${key}|${end.edgeId}`, box.y + pad + ((box.height - pad * 2) * (i + 1)) / (list.length + 1));
+    });
+  }
+
+  const obstacles: Rect[] = Array.from(boxes.values());
+  const placed: Rect[] = [];
+  const routes = new Map<string, QuestMapRoute>();
+  const params = [0.5, 0.4, 0.6, 0.3, 0.7, 0.22, 0.78, 0.15, 0.85];
+  for (const { edge, s, t, tSide } of plans) {
+    const x1 = s.x + s.width;
+    const y1 = portY.get(`${s.nodeId}|right|${edge.id}`) ?? s.y + s.height / 2;
+    const x2 = tSide === 'left' ? t.x : t.x + t.width;
+    const y2 = portY.get(`${t.nodeId}|${tSide}|${edge.id}`) ?? t.y + t.height / 2;
+    const bend = Math.max(40, Math.abs(x2 - x1) / 2);
+    const c1x = x1 + bend;
+    const c2x = tSide === 'left' ? x2 - bend : x2 + bend;
+    const d = `M ${x1} ${y1} C ${c1x} ${y1}, ${c2x} ${y2}, ${x2} ${y2}`;
+    const at = (k: number) => {
+      const u = 1 - k;
+      return {
+        x: u * u * u * x1 + 3 * u * u * k * c1x + 3 * u * k * k * c2x + k * k * k * x2,
+        y: u * u * u * y1 + 3 * u * u * k * y1 + 3 * u * k * k * y2 + k * k * k * y2,
+      };
+    };
+    let best = at(0.5);
+    if (edge.label) {
+      const size = labelSize(edge.label);
+      let bestCost = Number.POSITIVE_INFINITY;
+      for (const k of params) {
+        const p = at(k);
+        const rect = { x: p.x - size.width / 2, y: p.y - size.height / 2, ...size };
+        const cost = placed.reduce((sum, r) => sum + overlapArea(rect, r), 0) * 2
+          + obstacles.reduce((sum, r) => sum + overlapArea(rect, r), 0);
+        if (cost < bestCost) {
+          bestCost = cost;
+          best = p;
+        }
+        if (cost === 0) break;
+      }
+      placed.push({ x: best.x - size.width / 2, y: best.y - size.height / 2, ...size });
+    }
+    routes.set(edge.id, { d, label: best });
+  }
+  return routes;
 }
 
 /** Studio-only sidecar with dragged card positions (never a Flare file). */

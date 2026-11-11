@@ -6,7 +6,8 @@ import NpcAssetThumb from '@/components/NpcAssetThumb';
 import { npcListThumbPath, resolveNpcPreviewPaths } from '@/flare/npcPreviewPaths';
 import {
   MAX_CARD_STEPS,
-  connectorPath,
+  bundleEventEdges,
+  routeEdges,
   layoutQuestGraph,
   primaryKind,
   type QuestMapBox,
@@ -97,7 +98,7 @@ function NpcCardBody({ npc, projectPath }: { npc: QuestMapNpcCard; projectPath?:
 }
 
 /** Read-only canvas of quests and the NPCs linked to them by statuses. */
-export default function QuestMapView({ graph, positions, onPositionsChange, onOpenQuest, onOpenNpc, onClose, projectPath }: Props) {
+export default function QuestMapView({ graph: fullGraph, positions, onPositionsChange, onOpenQuest, onOpenNpc, onClose, projectPath }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [view, setView] = useState({ x: 40, y: 40, zoom: 1 });
   const [dragging, setDragging] = useState<{ nodeId: string; x: number; y: number } | null>(null);
@@ -105,6 +106,7 @@ export default function QuestMapView({ graph, positions, onPositionsChange, onOp
   const edgeFocus = (from: string, to: string) => (!hovered ? 'normal' : hovered === from || hovered === to ? 'on' : 'off');
   const gesture = useRef<{ kind: 'pan' | 'node'; nodeId?: string; startX: number; startY: number; originX: number; originY: number; moved: boolean } | null>(null);
 
+  const graph = useMemo(() => bundleEventEdges(fullGraph), [fullGraph]);
   const layout = useMemo(() => layoutQuestGraph(graph, positions), [graph, positions]);
   const boxes = useMemo(() => {
     const map = new Map<string, QuestMapBox>(layout.map((b) => [b.nodeId, b]));
@@ -114,6 +116,7 @@ export default function QuestMapView({ graph, positions, onPositionsChange, onOp
     }
     return map;
   }, [layout, dragging]);
+  const routes = useMemo(() => routeEdges(graph.edges, boxes), [graph.edges, boxes]);
   const npcByNode = useMemo(() => new Map(graph.npcs.map((n) => [n.nodeId, n])), [graph.npcs]);
   const questByNode = useMemo(() => new Map(graph.quests.map((q) => [q.nodeId, q])), [graph.quests]);
   const npcName = useCallback((id: string) => graph.npcs.find((n) => n.npcId === id)?.name || id, [graph.npcs]);
@@ -223,19 +226,17 @@ export default function QuestMapView({ graph, positions, onPositionsChange, onOp
           <div className="absolute left-0 top-0 origin-top-left" style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})` }}>
             <svg className="absolute left-0 top-0 overflow-visible pointer-events-none" width={1} height={1}>
               {graph.edges.map((edge) => {
-                const a = boxes.get(edge.from);
-                const b = boxes.get(edge.to);
-                if (!a || !b) return null;
+                const route = routes.get(edge.id);
+                if (!route) return null;
                 const style = EDGE_STYLE[primaryKind(edge.links)];
                 const focus = edgeFocus(edge.from, edge.to);
-                return <path key={edge.id} d={connectorPath(a, b).d} style={{ color: style.stroke, fill: 'none', stroke: style.stroke, strokeWidth: focus === 'on' ? 3 : 2, strokeDasharray: style.dash, opacity: focus === 'off' ? 0.15 : 0.85 }} />;
+                return <path key={edge.id} d={route.d} style={{ color: style.stroke, fill: 'none', stroke: style.stroke, strokeWidth: focus === 'on' ? 3 : 2, strokeDasharray: style.dash, opacity: focus === 'off' ? 0.15 : 0.85 }} />;
               })}
             </svg>
             {graph.edges.map((edge) => {
-              const a = boxes.get(edge.from);
-              const b = boxes.get(edge.to);
-              if (!a || !b || !edge.label) return null;
-              const { mid } = connectorPath(a, b);
+              const route = routes.get(edge.id);
+              if (!route || !edge.label) return null;
+              const mid = route.label;
               const style = EDGE_STYLE[primaryKind(edge.links)];
               return (
                 <div key={`label-${edge.id}`} className="absolute -translate-x-1/2 -translate-y-1/2" style={{ left: mid.x, top: mid.y, opacity: edgeFocus(edge.from, edge.to) === 'off' ? 0.2 : 1, zIndex: edgeFocus(edge.from, edge.to) === 'on' ? 5 : undefined }} onPointerDown={(e) => e.stopPropagation()}>
@@ -274,9 +275,17 @@ export default function QuestMapView({ graph, positions, onPositionsChange, onOp
                   onMouseEnter={() => setHovered(event.nodeId)}
                   onMouseLeave={() => setHovered((h) => (h === event.nodeId ? null : h))}
                 >
-                  <Tooltip content="Map event. Open its map to edit it" className="w-full h-full">
+                  <Tooltip
+                    content={event.details
+                      ? <span className="whitespace-pre text-[11px]">{event.details.join('\n')}</span>
+                      : 'Map event. Open its map to edit it'}
+                    className="w-full h-full"
+                  >
                     <div className="flex items-center gap-2 px-2 w-full h-full">
-                      <span className="text-violet-500 shrink-0 flex"><Zap className="w-4 h-4" /></span>
+                      <span className={`relative text-violet-500 shrink-0 flex ${event.count ? 'mr-2' : ''}`}>
+                        <Zap className="w-4 h-4" />
+                        {event.count ? <span className="absolute -right-2 -top-2 min-w-[16px] h-4 px-1 rounded-full bg-violet-500 text-white text-[9px] leading-4 text-center">{event.count}</span> : null}
+                      </span>
                       <div className="min-w-0">
                         <div className="text-xs font-medium truncate">{event.name}</div>
                         <div className="flex items-center gap-1 text-[11px] text-muted-foreground min-w-0">

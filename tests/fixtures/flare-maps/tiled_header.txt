@@ -1,0 +1,15 @@
+[header]
+width=1
+height=1
+tilewidth=192
+tileheight=96
+orientation=isometric
+background_color=0,0,0,255
+hero_pos=0,0
+title=Tiled header
+
+[layer]
+type=background
+format=dec
+data=
+0

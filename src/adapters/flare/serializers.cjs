@@ -71,6 +71,9 @@ function exportMapText(map) {
   const width = Math.max(1, Number(map.width) || 1);
   const height = Math.max(1, Number(map.height) || 1);
   const lines = ["[header]", `width=${width}`, `height=${height}`];
+  if (map.tilewidth != null && map.tilewidth !== "") lines.push(`tilewidth=${map.tilewidth}`);
+  if (map.tileheight != null && map.tileheight !== "") lines.push(`tileheight=${map.tileheight}`);
+  if (map.orientation) lines.push(`orientation=${map.orientation}`);
   if (map.tileset) lines.push(`tileset=${map.tileset}`);
   if (map.music) lines.push(`music=${map.music}`);
   lines.push(`hero_pos=${Number(map.heroX) || 0},${Number(map.heroY) || 0}`);
@@ -991,6 +994,9 @@ function importMapText(content) {
       else if (key === "procgen_type") map.procgen_type = value;
       else if (key === "procgen_unique_status") map.procgen_unique_status = value;
       else if (key === "procgen_reset_status") map.procgen_reset_status = value;
+      else if (key === "tilewidth") map.tilewidth = parseInt(value, 10) || value;
+      else if (key === "tileheight") map.tileheight = parseInt(value, 10) || value;
+      else if (key === "orientation") map.orientation = value;
     } else if (section === "tilesets" && key === "tileset") {
       const [file, tileWidth, tileHeight, spacing, margin] = value.split(",");
       map.tilesetImages.push({

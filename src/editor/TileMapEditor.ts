@@ -596,6 +596,9 @@ export class TileMapEditor {
   private tileSizeX: number = 192;
   private tileSizeY: number = 96;
   private orientation: 'isometric' | 'orthogonal' = 'isometric';
+  private mapHeaderTileWidth: number | string | undefined;
+  private mapHeaderTileHeight: number | string | undefined;
+  private mapHeaderOrientation: string | undefined;
   private mapParallax = '';
   private mapFog = '';
   private mapSaveFog = '';
@@ -5821,6 +5824,22 @@ export class TileMapEditor {
     if (typeof next.procgen_reset_status === 'string') this.mapProcgenReset = next.procgen_reset_status;
   }
 
+  private clearMapHeaderTileMetrics(): void {
+    this.mapHeaderTileWidth = undefined;
+    this.mapHeaderTileHeight = undefined;
+    this.mapHeaderOrientation = undefined;
+  }
+
+  private setMapHeaderTileMetrics(header: {
+    tilewidth?: number | string;
+    tileheight?: number | string;
+    orientation?: string;
+  }): void {
+    this.mapHeaderTileWidth = header.tilewidth;
+    this.mapHeaderTileHeight = header.tileheight;
+    this.mapHeaderOrientation = header.orientation;
+  }
+
   public getCurrentProjectPath(): string | null {
     return this.currentProjectPath;
   }
@@ -8253,6 +8272,9 @@ export class TileMapEditor {
       procgen_type?: string;
       procgen_unique_status?: string;
       procgen_reset_status?: string;
+      tilewidth?: number | string;
+      tileheight?: number | string;
+      orientation?: string;
       layers?: Array<{ type?: string; rows?: number[][] }>;
       events?: Array<Record<string, string | string[]>>;
       enemies?: Array<Record<string, string>>;
@@ -8271,6 +8293,11 @@ export class TileMapEditor {
       procgen_type: typeof map.procgen_type === 'string' ? map.procgen_type : '',
       procgen_unique_status: typeof map.procgen_unique_status === 'string' ? map.procgen_unique_status : '',
       procgen_reset_status: typeof map.procgen_reset_status === 'string' ? map.procgen_reset_status : '',
+    });
+    this.setMapHeaderTileMetrics({
+      tilewidth: map.tilewidth,
+      tileheight: map.tileheight,
+      orientation: typeof map.orientation === 'string' ? map.orientation : undefined,
     });
     this.importedTileSnapshots.clear();
 
@@ -8373,6 +8400,9 @@ export class TileMapEditor {
       heroX: this.heroX,
       heroY: this.heroY,
       music: this.mapMusic || undefined,
+      tilewidth: this.mapHeaderTileWidth,
+      tileheight: this.mapHeaderTileHeight,
+      orientation: this.mapHeaderOrientation,
       ...mapHeaderForExport(this.getMapPresentation()),
       tilesetImages,
       layers,
@@ -10464,6 +10494,7 @@ export class TileMapEditor {
   public clearMapKeepSlots(): void {
     if (this.autoSaveTimeout) { clearTimeout(this.autoSaveTimeout); this.autoSaveTimeout = null; }
     this.clearCrashBackup();
+    this.clearMapHeaderTileMetrics();
     this.mapName = 'Untitled Map';
     this.objects = [];
     this.nextObjectId = 1;
@@ -10495,6 +10526,7 @@ export class TileMapEditor {
     this.tilesetImage = null;
     this.tilesetFileName = null;
     this.mapName = 'Untitled Map';
+    this.clearMapHeaderTileMetrics();
     this.tilesetColumns = 0;
     this.tilesetRows = 0;
     this.tileCount = 0;

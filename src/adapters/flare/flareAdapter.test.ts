@@ -77,6 +77,29 @@ describe('FlareAdapter golden files', () => {
     expect(again.text).toBe(exported.text);
   });
 
+  it('keeps Tiled tilewidth, tileheight and orientation on the map header', () => {
+    const text = fs.readFileSync(path.resolve(process.cwd(), 'tests/fixtures/flare-maps/tiled_header.txt'), 'utf8');
+    const imported = importMapText(text) as {
+      tilewidth?: number;
+      tileheight?: number;
+      orientation?: string;
+      backgroundColor?: string;
+    };
+    expect(imported.tilewidth).toBe(192);
+    expect(imported.tileheight).toBe(96);
+    expect(imported.orientation).toBe('isometric');
+    const exported = exportMapText(imported);
+    expect(exported.errors).toEqual([]);
+    expect(exported.text).toContain('tilewidth=192');
+    expect(exported.text).toContain('tileheight=96');
+    expect(exported.text).toContain('orientation=isometric');
+    expect(exported.text).toContain('background_color=0,0,0,255');
+    const again = exportMapText(importMapText(exported.text));
+    expect(again.errors).toEqual([]);
+    expect(again.text).toBe(exported.text);
+    expect(validateText('maps', exported.text, 'maps/tiled_header.txt')).toEqual([]);
+  });
+
   it('moves item power keys into powers/powers.txt and keeps APPEND', () => {
     const items = exportItemFile([
       { id: 12, name: 'Sword', item_type: 'main', dmg_min: 2, dmg_max: 4, speed: 8, type: 'fixed' },

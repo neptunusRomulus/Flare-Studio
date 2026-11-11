@@ -4062,6 +4062,14 @@
      "description": "Inherited from Tiled map file. Unused by engine."
     },
     {
+     "key": "orientation",
+     "section": null,
+     "name": "orientation",
+     "type": "string",
+     "repeatable": false,
+     "description": "Inherited from Tiled map file. Unused by the engine; used by Tiled when importing Flare maps."
+    },
+    {
      "key": "procgen_type",
      "section": null,
      "name": "procgen_type",

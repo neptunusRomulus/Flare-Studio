@@ -1,5 +1,8 @@
 
-<img width="427" height="107" alt="flare-logo" src="https://github.com/user-attachments/assets/a01a6f21-3382-4b98-ac89-d6982e4d03c5" />
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="assets/brand/flare-studio-lockup-horizontal.png" />
+  <img width="427" alt="Flare Studio" src="assets/brand/flare-studio-lockup-horizontal-light.png" />
+</picture>
 
 Flare studio is a graphical user interface for Flare Engine which aims to improve the user experience of the engine and encourage users to make more games with Flare Engine. Flare Studio is at its the Alpha Stage — expect incomplete features and active development and use it with your own risk. 
 
@@ -117,3 +120,7 @@ This will:
 - Launch Electron app automatically
 
 Enjoy exploring Flare Studio, feedbacks are welcome. **Go make games!**
+
+## Logo and font
+The Flare Studio logo is an original design made for this project (it is not the Flare engine logo); sources are in `assets/brand/`.
+The wordmark uses [Chakra Petch](https://github.com/m4rc1e/Chakra-Petch) Bold by Cadson Demak, licensed under the SIL Open Font License 1.1 (`assets/brand/fonts/OFL.txt`).

@@ -142,7 +142,7 @@ const MainMenuDialog: React.FC<MainMenuDialogProps> = ({
     { label: '', icon: null, onClick: () => {}, separator: true },
     ...(onOpenSettings ? [{ label: 'Engine Settings', icon: <Settings className="w-3 h-3" />, onClick: onOpenSettings }] : []),
     {
-      label: 'Help & Documentation',
+      label: 'Help',
       icon: <HelpCircle className="w-3 h-3" />,
       onClick: onShowHelp
     },

@@ -80,7 +80,7 @@ const CanvasTips: React.FC<Props> = ({ tipsMinimized, setTipsMinimized, setShowH
             onClick={() => setShowHelp(true)}
           >
             <HelpCircle className="w-4 h-4 text-orange-400" />
-            <span className="font-medium">Help and Documentation</span>
+            <span className="font-medium">Help</span>
           </button>
         </div>
       </div>

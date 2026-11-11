@@ -62,6 +62,13 @@ export type QuestDraft = {
   requires_not_class: string;
   start_type?: 'player' | 'game';
   steps?: QuestStep[];
+  when_done?: {
+    set_status?: string;
+    reward_xp?: string;
+    reward_currency?: string;
+    reward_item?: string;
+    reward_loot?: string;
+  };
 };
 
 export type StoredQuest = QuestDraft & {
@@ -84,6 +91,7 @@ const emptyQuestDraft = (): QuestDraft => ({
   requires_class: '',
   requires_not_class: '',
   steps: [],
+  when_done: {},
 });
 
 function storedQuestFromRecord(value: Record<string, unknown>, fallbackId: string): StoredQuest {
@@ -110,6 +118,7 @@ function storedQuestFromRecord(value: Record<string, unknown>, fallbackId: strin
     startType,
     triggerId: typeof value.triggerId === 'string' ? value.triggerId : '',
     steps: Array.isArray(value.steps) ? stepsFromImported(value.steps) : undefined,
+    when_done: value.when_done && typeof value.when_done === 'object' ? value.when_done as QuestDraft['when_done'] : {},
   };
 }
 

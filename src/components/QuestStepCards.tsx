@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import Tooltip from '@/components/ui/tooltip';
 import { InlineConfirm } from '@/components/ui/inline-confirm';
 import SearchablePalette from '@/components/ui/searchable-palette';
+import WhenDoneRow, { type WhenDoneRewards } from '@/components/WhenDoneRow';
 import useListReorder from '@/hooks/useListReorder';
 import {
   addQuestStep,
@@ -27,6 +28,10 @@ type Props = {
   onChange: (steps: QuestStep[]) => void;
   ctx: QuestStepContext;
   items?: ItemOption[];
+  completeStatus?: string;
+  onCompleteStatusChange?: (value: string) => void;
+  rewards?: WhenDoneRewards;
+  onRewardsChange?: (rewards: WhenDoneRewards) => void;
 };
 
 const chipClass = 'inline-flex items-center gap-1 rounded-full border border-border bg-muted/40 px-2 py-0.5 text-[11px] leading-tight';
@@ -102,7 +107,7 @@ const ConditionChip = ({
   );
 };
 
-const QuestStepCards = ({ steps, onChange, ctx, items = [] }: Props) => {
+const QuestStepCards = ({ steps, onChange, ctx, items = [], completeStatus = '', onCompleteStatusChange, rewards = {}, onRewardsChange }: Props) => {
   const itemName = useMemo(() => {
     const map = new Map(items.map((item) => [String(item.id), item.name || String(item.id)]));
     return (id: string) => map.get(id) || id;
@@ -208,6 +213,13 @@ const QuestStepCards = ({ steps, onChange, ctx, items = [] }: Props) => {
                     onSelect={(id) => addCondition(index, id as QuestConditionKind)}
                   />
                 </div>
+                <WhenDoneRow
+                  completeStatus={completeStatus}
+                  onCompleteStatusChange={onCompleteStatusChange || (() => {})}
+                  rewards={rewards}
+                  onRewardsChange={onRewardsChange || (() => {})}
+                  items={items}
+                />
               </div>
             </div>
           </div>

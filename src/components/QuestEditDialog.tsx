@@ -173,6 +173,10 @@ const QuestEditDialog = ({ open, onOpenChange, questDraft, setQuestDraft, onSave
               completeStatus,
             }}
             items={inventoryItems.map((item: any) => ({ id: String(item.id), name: item.name || item.fileName || String(item.id) }))}
+            completeStatus={questDraft.complete_status}
+            onCompleteStatusChange={(value) => setQuestDraft((prev) => ({ ...prev, complete_status: value }))}
+            rewards={questDraft.when_done || {}}
+            onRewardsChange={(when_done) => setQuestDraft((prev) => ({ ...prev, when_done }))}
           />
         </div>
       </div>

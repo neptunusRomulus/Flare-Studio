@@ -189,6 +189,19 @@ export function completeStatusKey(questId: string): string {
   return `${slugQuestId(questId)}_complete`;
 }
 
+
+/** Comma or semicolon lists, the way CampaignManager::parseStatusList tokenizes them. */
+export function splitStatusList(value: string | null | undefined): string[] {
+  return String(value ?? '')
+    .split(/[,;]/)
+    .map((part) => part.trim())
+    .filter((part) => part !== '');
+}
+
+export function joinStatusList(values: Array<string | null | undefined>): string {
+  return values.map((value) => String(value ?? '').trim()).filter(Boolean).join(',');
+}
+
 export function slugQuestId(questId: string): string {
   const slug = clean(questId)
     .toLowerCase()

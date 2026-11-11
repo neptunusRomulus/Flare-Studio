@@ -9,6 +9,8 @@ import {
   chipTooltip,
   chipsFromStep,
   completeStatusKey,
+  joinStatusList,
+  splitStatusList,
   createFirstStep,
   filterConditionCatalog,
   reorderQuestSteps,
@@ -24,6 +26,8 @@ describe('quest step helpers', () => {
     expect(stepStatusKey('0010_krolan', 1)).toBe('0010_krolan_started');
     expect(stepStatusKey('0010_krolan', 2)).toBe('0010_krolan_step_2');
     expect(completeStatusKey('Krolan Quest')).toBe('krolan_quest_complete');
+    expect(splitStatusList('emp_main, emp_done')).toEqual(['emp_main', 'emp_done']);
+    expect(joinStatusList(['emp_main', '', 'emp_done'])).toBe('emp_main,emp_done');
   });
 
   it('titles a card from the journal text the player sees', () => {

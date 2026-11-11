@@ -21,6 +21,15 @@ import { TileDetector } from './tileDetection';
 import { exportMapText, importMapText, slugFileName, tilePixelOffset } from '../adapters/flare/flareAdapter.cjs';
 import { clipboardFromTiles, pasteTileGrid, type TileClipboard } from './tileClipboard';
 import { stampFromSelection } from './stampTiles';
+import {
+  addMapLayer,
+  bucketFill as fillLayerRegion,
+  deleteMapLayer,
+  pushHistoryState,
+  redoIndex,
+  sortLayersByPriority,
+  undoIndex,
+} from './mapGrid';
 import { mapHeaderForExport, type MapPresentation } from './studioDrafts';
 
 interface LayerTilesetEntry {
@@ -5657,78 +5666,31 @@ export class TileMapEditor {
   }
 
   public addLayer(name: string, type: 'background' | 'object' | 'collision' | 'event' | 'enemy' | 'npc'): boolean {
-    // Check if layer type already exists
-    const existingLayer = this.tileLayers.find(layer => layer.type === type);
-    if (existingLayer) {
-      return false; // Layer type already exists
-    }
+    const added = addMapLayer(this.tileLayers, this.nextLayerId, name, type, this.mapWidth, this.mapHeight);
+    if (!added) return false;
 
-    // Save state before adding layer
     this.saveState();
-
-    const newLayer = {
-      id: this.nextLayerId++,
-      name: name,
-      type: type,
-      data: new Array(this.mapWidth * this.mapHeight).fill(0),
-      visible: true,
-      transparency: 1.0 // Default to fully opaque
-    };
-    
-    // Add layer and sort by type priority
-    this.tileLayers.push(newLayer);
-    this.sortLayersByPriority();
-    this.activeLayerId = newLayer.id;
+    this.tileLayers = added.layers;
+    this.nextLayerId = added.nextId;
+    this.activeLayerId = added.layer.id;
     this.draw();
-
-    // Trigger immediate auto-save for critical changes
     this.markAsChanged(true);
-
-    return true; // Successfully added
+    return true;
   }
 
   private sortLayersByPriority(): void {
-    const typePriority: Record<string, number> = {
-      'rules': 0,
-      'actions': 1,
-      'items': 2,
-      'npc': 3,
-      'enemy': 4,
-      'event': 5,
-      'collision': 6,
-      'object': 7,
-      'background': 8
-    };
-
-    this.tileLayers.sort((a, b) => {
-      return typePriority[a.type] - typePriority[b.type];
-    });
+    this.tileLayers = sortLayersByPriority(this.tileLayers);
   }
 
   public deleteLayer(layerId: number): boolean {
-    if (this.tileLayers.length <= 1) {
-      return false; // Cannot delete the last layer
-    }
-    
-    const layerIndex = this.tileLayers.findIndex(l => l.id === layerId);
-    if (layerIndex !== -1) {
-      // Save state before deleting layer
-      this.saveState();
-      
-      this.tileLayers.splice(layerIndex, 1);
-      
-      // Set active layer to the first available layer
-      if (this.activeLayerId === layerId) {
-        this.activeLayerId = this.tileLayers.length > 0 ? this.tileLayers[0].id : null;
-      }
-      this.draw();
-
-      // Trigger immediate auto-save for critical changes
-      this.markAsChanged(true);
-
-      return true; // Successfully deleted
-    }
-    return false; // Layer not found
+    const removed = deleteMapLayer(this.tileLayers, layerId, this.activeLayerId);
+    if (!removed) return false;
+    this.saveState();
+    this.tileLayers = removed.layers;
+    this.activeLayerId = removed.activeLayerId;
+    this.draw();
+    this.markAsChanged(true);
+    return true;
   }
 
   public setActiveLayer(layerId: number): void {
@@ -6740,45 +6702,15 @@ export class TileMapEditor {
 
   // Bucket fill implementation using flood fill algorithm
   private bucketFill(layer: TileLayer, startX: number, startY: number, newValue: number): void {
-    const targetValue = layer.data[startY * this.mapWidth + startX];
-    
-    // If the target value is the same as new value, no need to fill
-    if (targetValue === newValue) {
-      return;
-    }
-
-    const stack: Array<{x: number, y: number}> = [{x: startX, y: startY}];
-    const visited = new Set<number>();
-
-    while (stack.length > 0) {
-      const {x, y} = stack.pop()!;
-      const index = y * this.mapWidth + x;
-
-      // Check bounds and if already visited
-      if (x < 0 || x >= this.mapWidth || y < 0 || y >= this.mapHeight || visited.has(index)) {
-        continue;
-      }
-
-      // Check if this tile matches the target value
-      if (layer.data[index] !== targetValue) {
-        continue;
-      }
-
-      // If a selection is active, only fill cells within the selection
-      if (!this.isInSelection(x, y)) {
-        continue;
-      }
-
-      // Mark as visited and fill
-      visited.add(index);
-      layer.data[index] = newValue;
-
-      // Add neighboring tiles to stack
-      stack.push({x: x + 1, y: y});
-      stack.push({x: x - 1, y: y});
-      stack.push({x: x, y: y + 1});
-      stack.push({x: x, y: y - 1});
-    }
+    fillLayerRegion(
+      layer.data,
+      this.mapWidth,
+      this.mapHeight,
+      startX,
+      startY,
+      newValue,
+      (x, y) => this.isInSelection(x, y),
+    );
   }
 
   // Selection algorithms
@@ -8771,18 +8703,9 @@ export class TileMapEditor {
       cellKeys: Array.from(this.layerCellTilesetKey.entries()).map(([k, v]) => [k, [...v]] as [string, Array<string | null>])
     };
 
-    // Remove any history beyond current index
-    this.history = this.history.slice(0, this.historyIndex + 1);
-    
-    // Add new state
-    this.history.push(stateCopy);
-    this.historyIndex = this.history.length - 1;
-
-    // Limit history size
-    if (this.history.length > this.maxHistorySize) {
-      this.history.shift();
-      this.historyIndex--;
-    }
+    const pushed = pushHistoryState(this.history, this.historyIndex, stateCopy, this.maxHistorySize);
+    this.history = pushed.history;
+    this.historyIndex = pushed.index;
 
     // Notify about undo state change (for persistence)
     if (this.undoStateChangeCallback) {
@@ -8805,17 +8728,17 @@ export class TileMapEditor {
   }
 
   public undo(): void {
-    if (this.historyIndex > 0) {
-      this.historyIndex--;
-      this.applyHistoryState();
-    }
+    const next = undoIndex(this.historyIndex);
+    if (next === null) return;
+    this.historyIndex = next;
+    this.applyHistoryState();
   }
 
   public redo(): void {
-    if (this.historyIndex < this.history.length - 1) {
-      this.historyIndex++;
-      this.applyHistoryState();
-    }
+    const next = redoIndex(this.historyIndex, this.history.length);
+    if (next === null) return;
+    this.historyIndex = next;
+    this.applyHistoryState();
   }
 
   private applyHistoryState(): void {

@@ -43,6 +43,17 @@ export type QuestMapNpcInput = {
   objectId?: number;
 };
 
+/** A map event that sets statuses (only start / advance / end links are drawn). */
+export type QuestMapEventInput = {
+  id: string;
+  name: string;
+  mapTitle: string;
+  /** -1,-1 when not placed. */
+  x: number;
+  y: number;
+  sets: string[];
+};
+
 export type QuestMapLinkKind = 'starts' | 'advances' | 'ends' | 'mentions' | 'unlocks';
 
 export type QuestMapLink = { kind: QuestMapLinkKind; status: string };
@@ -68,6 +79,9 @@ export type QuestMapQuestCard = {
   completeStatus: string;
   starters: string[];
   finishers: string[];
+  /** Event ids that start / end the quest. */
+  starterEvents: string[];
+  finisherEvents: string[];
 };
 
 export type QuestMapNpcCard = {
@@ -80,14 +94,23 @@ export type QuestMapNpcCard = {
   locations: QuestMapLocation[];
 };
 
+export type QuestMapEventCard = {
+  nodeId: string;
+  eventId: string;
+  name: string;
+  location: string;
+};
+
 export type QuestMapGraph = {
   quests: QuestMapQuestCard[];
   npcs: QuestMapNpcCard[];
+  events: QuestMapEventCard[];
   edges: QuestMapEdge[];
 };
 
 export const questNodeId = (questId: string) => `quest:${questId}`;
 export const npcNodeId = (npcId: string) => `npc:${npcId}`;
+export const eventNodeId = (eventId: string) => `event:${eventId}`;
 
 const clean = (value: unknown) => String(value ?? '').trim();
 
@@ -179,7 +202,7 @@ function dialogStatuses(dialog: QuestMapDialogInput) {
   return { has: unique(has), sets: unique(sets) };
 }
 
-export function deriveQuestGraph(questsIn: QuestMapQuestInput[], npcsIn: QuestMapNpcInput[]): QuestMapGraph {
+export function deriveQuestGraph(questsIn: QuestMapQuestInput[], npcsIn: QuestMapNpcInput[], eventsIn: QuestMapEventInput[] = []): QuestMapGraph {
   const quests: QuestMapQuestCard[] = questsIn.map((quest) => {
     const steps = questSteps(quest);
     const completeStatus = clean(quest.complete_status);
@@ -196,6 +219,8 @@ export function deriveQuestGraph(questsIn: QuestMapQuestInput[], npcsIn: QuestMa
       completeStatus,
       starters: [],
       finishers: [],
+      starterEvents: [],
+      finisherEvents: [],
     };
   });
 
@@ -237,6 +262,26 @@ export function deriveQuestGraph(questsIn: QuestMapQuestInput[], npcsIn: QuestMa
       }
       if (links.some((l) => l.kind === 'starts')) quest.starters.push(npc.id);
       if (links.some((l) => l.kind === 'ends')) quest.finishers.push(npc.id);
+    }
+  }
+
+  const usedEvents = new Set<string>();
+  for (const event of eventsIn) {
+    const sets = new Set(event.sets.map(clean));
+    const node = eventNodeId(event.id);
+    for (const quest of quests) {
+      const links: QuestMapLink[] = [];
+      for (const status of quest.startStatuses) if (sets.has(status)) links.push({ kind: 'starts', status });
+      for (const status of quest.stepStatuses) if (sets.has(status)) links.push({ kind: 'advances', status });
+      if (quest.completeStatus && sets.has(quest.completeStatus)) links.push({ kind: 'ends', status: quest.completeStatus });
+      if (!links.length) continue;
+      usedEvents.add(event.id);
+      for (const link of links) {
+        if (link.kind === 'ends') addLink(quest.nodeId, node, link);
+        else addLink(node, quest.nodeId, link);
+      }
+      if (links.some((l) => l.kind === 'starts')) quest.starterEvents.push(event.id);
+      if (links.some((l) => l.kind === 'ends')) quest.finisherEvents.push(event.id);
     }
   }
 
@@ -291,15 +336,26 @@ export function deriveQuestGraph(questsIn: QuestMapQuestInput[], npcsIn: QuestMa
       locations: npc.locations,
     }));
 
-  return { quests, npcs, edges };
+  const events: QuestMapEventCard[] = eventsIn
+    .filter((event) => usedEvents.has(event.id))
+    .map((event) => ({
+      nodeId: eventNodeId(event.id),
+      eventId: event.id,
+      name: clean(event.name) || 'Map event',
+      location: event.x >= 0 && event.y >= 0 ? `${event.mapTitle} ${event.x},${event.y}` : `${event.mapTitle} · Not placed`,
+    }));
+
+  return { quests, npcs, events, edges };
 }
 
 export const QUEST_CARD_WIDTH = 260;
 export const NPC_CARD_WIDTH = 210;
 export const NPC_CARD_HEIGHT = 64;
+export const EVENT_CARD_HEIGHT = 48;
 export const MAX_CARD_STEPS = 5;
 const COLUMN_GAP = 110;
 const ROW_GAP = 28;
+const BAND_GAP = 56;
 
 export function questCardHeight(stepCount: number): number {
   const shown = Math.min(stepCount, MAX_CARD_STEPS) + (stepCount > MAX_CARD_STEPS ? 1 : 0);
@@ -328,29 +384,62 @@ export function questDepths(graph: QuestMapGraph): Map<string, number> {
   return depth;
 }
 
-/** Left-to-right layout: NPCs that start or talk about a quest sit before it, end-only NPCs after it. */
+/**
+ * Left-to-right layout: NPCs and events that start or talk about a quest sit
+ * before it, end-only ones after it. Quests chained by unlocks share a band;
+ * unrelated quests get their own band, stacked top to bottom, so each quest
+ * stays next to its own NPCs.
+ */
 export function layoutQuestGraph(graph: QuestMapGraph, saved: QuestMapPositions = {}): QuestMapBox[] {
   const depth = questDepths(graph);
+  const questIndex = new Map(graph.quests.map((q, i) => [q.nodeId, i]));
+
+  // Bands: quests connected by unlock edges.
+  const parent = new Map(graph.quests.map((q) => [q.nodeId, q.nodeId]));
+  const find = (id: string): string => {
+    let root = id;
+    while (parent.get(root) !== root) root = parent.get(root)!;
+    parent.set(id, root);
+    return root;
+  };
+  for (const edge of graph.edges) {
+    if (!edge.links.some((l) => l.kind === 'unlocks')) continue;
+    const a = find(edge.from);
+    const b = find(edge.to);
+    if (a !== b) parent.set(b, a);
+  }
+  const bandOf = new Map<string, string>();
+  for (const quest of graph.quests) bandOf.set(quest.nodeId, find(quest.nodeId));
+
   const column = new Map<string, number>();
   for (const quest of graph.quests) column.set(quest.nodeId, (depth.get(quest.nodeId) ?? 0) * 2 + 1);
-  for (const npc of graph.npcs) {
-    const edges = graph.edges.filter((e) => e.from === npc.nodeId || e.to === npc.nodeId);
+  for (const source of [...graph.npcs, ...graph.events]) {
+    const edges = graph.edges.filter((e) => e.from === source.nodeId || e.to === source.nodeId);
     const before: number[] = [];
     const after: number[] = [];
+    let firstQuest = '';
     for (const edge of edges) {
-      const questNode = edge.from === npc.nodeId ? edge.to : edge.from;
+      const questNode = edge.from === source.nodeId ? edge.to : edge.from;
+      if (!firstQuest || (questIndex.get(questNode) ?? 0) < (questIndex.get(firstQuest) ?? 0)) firstQuest = questNode;
+    }
+    const band = bandOf.get(firstQuest) ?? firstQuest;
+    for (const edge of edges) {
+      const questNode = edge.from === source.nodeId ? edge.to : edge.from;
+      if ((bandOf.get(questNode) ?? questNode) !== band) continue;
       const d = depth.get(questNode) ?? 0;
       if (edge.links.every((l) => l.kind === 'ends')) after.push(d);
       else before.push(d);
     }
-    column.set(npc.nodeId, before.length ? Math.min(...before) * 2 : Math.max(0, ...after) * 2 + 2);
+    bandOf.set(source.nodeId, band);
+    column.set(source.nodeId, before.length ? Math.min(...before) * 2 : Math.max(0, ...after) * 2 + 2);
   }
   const used = Array.from(new Set(column.values())).sort((a, b) => a - b);
   const compact = new Map(used.map((c, i) => [c, i]));
 
   const items = [
     ...graph.npcs.map((n, i) => ({ nodeId: n.nodeId, width: NPC_CARD_WIDTH, height: NPC_CARD_HEIGHT, index: i })),
-    ...graph.quests.map((q, i) => ({ nodeId: q.nodeId, width: QUEST_CARD_WIDTH, height: questCardHeight(q.steps.length), index: graph.npcs.length + i })),
+    ...graph.events.map((e, i) => ({ nodeId: e.nodeId, width: NPC_CARD_WIDTH, height: EVENT_CARD_HEIGHT, index: graph.npcs.length + i })),
+    ...graph.quests.map((q, i) => ({ nodeId: q.nodeId, width: QUEST_CARD_WIDTH, height: questCardHeight(q.steps.length), index: graph.npcs.length + graph.events.length + i })),
   ];
   const neighbors = new Map<string, string[]>();
   for (const edge of graph.edges) {
@@ -358,28 +447,73 @@ export function layoutQuestGraph(graph: QuestMapGraph, saved: QuestMapPositions 
     neighbors.set(edge.to, [...(neighbors.get(edge.to) || []), edge.from]);
   }
 
-  const boxes = new Map<string, QuestMapBox>();
+  // Shared column x positions across bands.
+  const columnX: number[] = [];
   let x = 0;
   for (let c = 0; c < used.length; c += 1) {
-    const inColumn = items.filter((item) => compact.get(column.get(item.nodeId) ?? 0) === c);
-    const center = (nodeId: string) => {
-      const ys = (neighbors.get(nodeId) || []).map((n) => boxes.get(n)).filter(Boolean).map((b) => b!.y + b!.height / 2);
-      return ys.length ? ys.reduce((s, v) => s + v, 0) / ys.length : Number.POSITIVE_INFINITY;
-    };
-    inColumn.sort((a, b) => {
-      const ca = center(a.nodeId);
-      const cb = center(b.nodeId);
-      if (ca !== cb) return ca < cb ? -1 : 1;
-      return a.index - b.index;
-    });
-    let y = 0;
-    const width = Math.max(...inColumn.map((item) => item.width));
-    for (const item of inColumn) {
-      boxes.set(item.nodeId, { nodeId: item.nodeId, x: x + (width - item.width) / 2, y, width: item.width, height: item.height, column: c });
-      y += item.height + ROW_GAP;
-    }
+    const width = Math.max(0, ...items.filter((item) => compact.get(column.get(item.nodeId) ?? 0) === c).map((item) => item.width));
+    columnX.push(x);
     x += width + COLUMN_GAP;
   }
+  const columnWidth = (c: number) => (columnX[c + 1] ?? x) - columnX[c] - COLUMN_GAP;
+
+  const bands: string[] = [];
+  for (const quest of graph.quests) {
+    const band = bandOf.get(quest.nodeId)!;
+    if (!bands.includes(band)) bands.push(band);
+  }
+
+  // Lay out each band from y = 0, then wrap bands into side-by-side stacks
+  // so the whole map is closer to a screen shape than one tall strip.
+  const boxes = new Map<string, QuestMapBox>();
+  const bandHeights: number[] = [];
+  const bandMembers: string[][] = [];
+  for (const band of bands) {
+    let bandHeight = 0;
+    const members: string[] = [];
+    for (let c = 0; c < used.length; c += 1) {
+      const inColumn = items.filter((item) => bandOf.get(item.nodeId) === band && compact.get(column.get(item.nodeId) ?? 0) === c);
+      if (!inColumn.length) continue;
+      const center = (nodeId: string) => {
+        const ys = (neighbors.get(nodeId) || [])
+          .filter((n) => bandOf.get(n) === band)
+          .map((n) => boxes.get(n)).filter(Boolean).map((b) => b!.y + b!.height / 2);
+        return ys.length ? ys.reduce((sum, v) => sum + v, 0) / ys.length : Number.POSITIVE_INFINITY;
+      };
+      inColumn.sort((a, b) => {
+        const ca = center(a.nodeId);
+        const cb = center(b.nodeId);
+        if (ca !== cb) return ca < cb ? -1 : 1;
+        return a.index - b.index;
+      });
+      let y = 0;
+      for (const item of inColumn) {
+        boxes.set(item.nodeId, { nodeId: item.nodeId, x: columnX[c] + (columnWidth(c) - item.width) / 2, y, width: item.width, height: item.height, column: c });
+        members.push(item.nodeId);
+        y += item.height + ROW_GAP;
+      }
+      bandHeight = Math.max(bandHeight, y - ROW_GAP);
+    }
+    bandHeights.push(bandHeight);
+    bandMembers.push(members);
+  }
+  const bandWidth = Math.max(1, x - COLUMN_GAP);
+  const totalHeight = bandHeights.reduce((sum, h) => sum + h + BAND_GAP, 0);
+  const target = Math.max(Math.max(0, ...bandHeights), Math.sqrt((bandWidth * totalHeight * 9) / 16));
+  let stackX = 0;
+  let stackTop = 0;
+  bandHeights.forEach((height, i) => {
+    if (stackTop > 0 && stackTop + height > target) {
+      stackX += bandWidth + COLUMN_GAP * 1.5;
+      stackTop = 0;
+    }
+    for (const nodeId of bandMembers[i]) {
+      const box = boxes.get(nodeId)!;
+      boxes.set(nodeId, { ...box, x: box.x + stackX, y: box.y + stackTop });
+    }
+    stackTop += height + BAND_GAP;
+  });
+
   return items.map((item) => {
     const box = boxes.get(item.nodeId)!;
     const pos = saved[item.nodeId];

@@ -5,8 +5,11 @@ import { projectRoot, writeProjectFiles } from '@/editor/projectFiles';
 import { normalizeNpcFile, npcFileForActor } from '@/editor/npcInstances';
 import { propertyRecord, propertyText } from '@/editor/propertyText';
 import useNpcInstances from '@/hooks/useNpcInstances';
+import { questMapEventsFromMapProject, questMapEventsFromMapText, questMapEventsFromObjects } from '@/editor/questMapEvents';
+import { slugFileName } from '@/adapters/flare/flareAdapter.cjs';
 import {
   QUEST_MAP_SIDECAR,
+  type QuestMapEventInput,
   parseQuestMapPositions,
   serializeQuestMapPositions,
   type QuestMapDialogInput,
@@ -38,6 +41,7 @@ type Params = {
 /** NPC dialogs from npcs/*.txt (open map edits win), their map locations, and saved card positions. */
 export default function useQuestMapData({ open, projectPath, mapName = '', mapObjects }: Params) {
   const [fileNpcs, setFileNpcs] = useState<FileNpc[]>([]);
+  const [mapEvents, setMapEvents] = useState<QuestMapEventInput[]>([]);
   const [positions, setPositions] = useState<QuestMapPositions>({});
   const [loading, setLoading] = useState(false);
   const npcObjects = useMemo(() => mapObjects.filter((o) => o.type === 'npc'), [mapObjects]);
@@ -72,6 +76,26 @@ export default function useQuestMapData({ open, projectPath, mapName = '', mapOb
       } catch {
         /* no npcs folder yet */
       }
+      const events: QuestMapEventInput[] = [];
+      try {
+        const maps = api.listMaps ? await api.listMaps(projectPath) : [];
+        for (const file of maps) {
+          if (cancelled) return;
+          try {
+            if (/\.json$/i.test(file)) {
+              const text = await api.readFile(`${root}/${file}`);
+              if (text) events.push(...questMapEventsFromMapProject(text, file));
+            } else if (/\.txt$/i.test(file) && api.readMapFile) {
+              const text = await api.readMapFile(projectPath, file);
+              if (text) events.push(...questMapEventsFromMapText(text, file));
+            }
+          } catch {
+            /* a map Studio cannot read adds no events */
+          }
+        }
+      } catch {
+        /* listing failed */
+      }
       let saved: QuestMapPositions = {};
       try {
         saved = parseQuestMapPositions(await api.readFile(`${root}/${QUEST_MAP_SIDECAR}`));
@@ -80,6 +104,7 @@ export default function useQuestMapData({ open, projectPath, mapName = '', mapOb
       }
       if (cancelled) return;
       setFileNpcs(found);
+      setMapEvents(events);
       setPositions(saved);
       setLoading(false);
     })();
@@ -112,6 +137,16 @@ export default function useQuestMapData({ open, projectPath, mapName = '', mapOb
     return Array.from(byFile.values());
   }, [fileNpcs, npcObjects, instances]);
 
+  // The open map's saved copy is stale: use its live event objects instead.
+  const events = useMemo<QuestMapEventInput[]>(() => {
+    const currentKey = mapName.trim() ? slugFileName(mapName) : '';
+    const others = currentKey
+      ? mapEvents.filter((e) => slugFileName(e.mapTitle) !== currentKey && slugFileName(e.id.split('#')[0].replace(/\.(json|txt)$/i, '').replace(/^.*\//, '')) !== currentKey)
+      : mapEvents;
+    const live = questMapEventsFromObjects(mapObjects as unknown as Array<Record<string, unknown>>, '__current_map__', mapName.trim() || 'Current map');
+    return [...others, ...live];
+  }, [mapEvents, mapObjects, mapName]);
+
   const saveTimer = useRef<number | null>(null);
   const savePositions = useCallback((next: QuestMapPositions) => {
     setPositions(next);
@@ -124,5 +159,5 @@ export default function useQuestMapData({ open, projectPath, mapName = '', mapOb
 
   useEffect(() => () => { if (saveTimer.current) window.clearTimeout(saveTimer.current); }, []);
 
-  return { npcs, positions, savePositions, loading };
+  return { npcs, events, positions, savePositions, loading };
 }

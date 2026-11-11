@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Flag, GitBranch, HelpCircle, LayoutGrid, MapPin, Maximize2, Play, X } from 'lucide-react';
+import { Flag, GitBranch, HelpCircle, LayoutGrid, MapPin, Maximize2, Play, Zap, X } from 'lucide-react';
 import Tooltip from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
 import NpcAssetThumb from '@/components/NpcAssetThumb';
@@ -35,7 +35,7 @@ const EDGE_STYLE: Record<QuestMapLinkKind, { stroke: string; dash?: string; pill
   mentions: { stroke: '#94a3b8', dash: '5 5', pill: 'border-border text-muted-foreground' },
 };
 
-const MIN_ZOOM = 0.3;
+const MIN_ZOOM = 0.15;
 const MAX_ZOOM = 2;
 const clampZoom = (z: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z));
 
@@ -53,10 +53,13 @@ function NpcThumb({ portrait, name, projectPath }: { portrait?: string; name: st
   return <NpcAssetThumb imagePath={path} alt={name} className="h-full w-full" />;
 }
 
-function QuestCardBody({ quest, npcName }: { quest: QuestMapQuestCard; npcName: (id: string) => string }) {
+function QuestCardBody({ quest, npcName, eventName }: { quest: QuestMapQuestCard; npcName: (id: string) => string; eventName: (id: string) => string }) {
   const shown = quest.steps.slice(0, MAX_CARD_STEPS);
   const more = quest.steps.length - shown.length;
-  const who = (ids: string[]) => (ids.length ? ids.map(npcName).join(', ') : '—');
+  const who = (ids: string[], events: string[]) => {
+    const names = [...ids.map(npcName), ...events.map(eventName)];
+    return names.length ? Array.from(new Set(names)).join(', ') : '—';
+  };
   return (
     <>
       <div className="flex items-center gap-2 px-3 h-10 border-b border-border">
@@ -69,8 +72,8 @@ function QuestCardBody({ quest, npcName }: { quest: QuestMapQuestCard; npcName: 
         {more > 0 && <li className="h-5 leading-5">+{more} more</li>}
       </ol>
       <div className="flex items-center gap-3 px-3 h-[30px] border-t border-border text-[11px] text-muted-foreground">
-        <span className="flex items-center gap-1 min-w-0"><span className="text-emerald-500 shrink-0 flex"><Play className="w-3 h-3" /></span><span className="truncate">{who(quest.starters)}</span></span>
-        <span className="flex items-center gap-1 min-w-0"><span className="text-amber-500 shrink-0 flex"><Flag className="w-3 h-3" /></span><span className="truncate">{who(quest.finishers)}</span></span>
+        <span className="flex items-center gap-1 min-w-0"><span className="text-emerald-500 shrink-0 flex"><Play className="w-3 h-3" /></span><span className="truncate">{who(quest.starters, quest.starterEvents)}</span></span>
+        <span className="flex items-center gap-1 min-w-0"><span className="text-amber-500 shrink-0 flex"><Flag className="w-3 h-3" /></span><span className="truncate">{who(quest.finishers, quest.finisherEvents)}</span></span>
       </div>
     </>
   );
@@ -112,6 +115,7 @@ export default function QuestMapView({ graph, positions, onPositionsChange, onOp
   const npcByNode = useMemo(() => new Map(graph.npcs.map((n) => [n.nodeId, n])), [graph.npcs]);
   const questByNode = useMemo(() => new Map(graph.quests.map((q) => [q.nodeId, q])), [graph.quests]);
   const npcName = useCallback((id: string) => graph.npcs.find((n) => n.npcId === id)?.name || id, [graph.npcs]);
+  const eventName = useCallback((id: string) => graph.events.find((e) => e.eventId === id)?.name || 'Map event', [graph.events]);
 
   const fit = useCallback(() => {
     const el = containerRef.current;
@@ -249,7 +253,32 @@ export default function QuestMapView({ graph, positions, onPositionsChange, onOp
                   onPointerDown={(e) => onPointerDown(e, quest.nodeId)}
                   title={quest.name}
                 >
-                  <QuestCardBody quest={quest} npcName={npcName} />
+                  <QuestCardBody quest={quest} npcName={npcName} eventName={eventName} />
+                </div>
+              );
+            })}
+            {graph.events.map((event) => {
+              const box = boxes.get(event.nodeId);
+              if (!box) return null;
+              return (
+                <div
+                  key={event.nodeId}
+                  className="absolute rounded-lg border border-dashed border-border bg-card shadow-sm overflow-hidden cursor-move"
+                  style={{ left: box.x, top: box.y, width: box.width, height: box.height, zIndex: dragging?.nodeId === box.nodeId ? 10 : undefined }}
+                  onPointerDown={(e) => onPointerDown(e, event.nodeId)}
+                >
+                  <Tooltip content="Map event. Open its map to edit it" className="w-full h-full">
+                    <div className="flex items-center gap-2 px-2 w-full h-full">
+                      <span className="text-violet-500 shrink-0 flex"><Zap className="w-4 h-4" /></span>
+                      <div className="min-w-0">
+                        <div className="text-xs font-medium truncate">{event.name}</div>
+                        <div className="flex items-center gap-1 text-[11px] text-muted-foreground min-w-0">
+                          <MapPin className="w-3 h-3 shrink-0" />
+                          <span className="truncate">{event.location}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </Tooltip>
                 </div>
               );
             })}

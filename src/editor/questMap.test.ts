@@ -178,3 +178,35 @@ describe('helpers', () => {
     expect(parseQuestMapPositions('nope')).toEqual({});
   });
 });
+
+describe('map events', () => {
+  it('reads status-setting events from a flare-game map and links them to quests', async () => {
+    const { questMapEventsFromMapText, questMapEventsFromObjects } = await import('@/editor/questMapEvents');
+    const events = questMapEventsFromMapText(fixture('flare-maps/book_of_the_dead.txt'), 'maps/book_of_the_dead.txt');
+    expect(events.map((e) => [e.name, e.mapTitle, e.x, e.y, e.sets.join(',')])).toEqual([
+      ['Book of the Dead', 'Book of the Dead', 4, 25, 'emp_main_init'],
+      ['Book of the Dead', 'Book of the Dead', 4, 20, 'emp_main_underworld'],
+    ]);
+    const graph = deriveQuestGraph([quest('0000_empyrean', '0000_empyrean.txt')], [], events);
+    const empyrean = graph.quests[0];
+    expect(empyrean.starterEvents).toEqual([events[0].id]);
+    expect(events[0].id).toMatch(/^maps\/book_of_the_dead\.txt#\d+$/);
+    expect(graph.events.map((e) => e.location)).toEqual(['Book of the Dead 4,25', 'Book of the Dead 4,20']);
+    const advance = graph.edges.find((e) => e.from === `event:${events[1].id}`)!;
+    expect(advance.links).toEqual([{ kind: 'advances', status: 'emp_main_underworld' }]);
+
+    const live = questMapEventsFromObjects([
+      { id: 3, type: 'event', name: 'Event', x: 2, y: 5, properties: { set_status: ['a_started', 'b'] } },
+      { id: 4, type: 'event', x: -1, y: -1, properties: { tooltip: 'Gate', set_status: 'a_done' } },
+      { id: 5, type: 'npc', properties: { set_status: 'a_started' } },
+      { id: 6, type: 'event', properties: {} },
+    ], '__current_map__', 'Town');
+    expect(live.map((e) => [e.id, e.name, e.x, e.sets.join(',')])).toEqual([
+      ['__current_map__#3', 'Map event', 2, 'a_started,b'],
+      ['__current_map__#4', 'Gate', -1, 'a_done'],
+    ]);
+    const g2 = deriveQuestGraph([{ id: 'a', name: 'A', complete_status: 'a_done', steps: [{ requires_status: 'a_started' }] }], [], live);
+    expect(g2.events.map((e) => e.location)).toEqual(['Town 2,5', 'Town · Not placed']);
+    expect(layoutQuestGraph(g2).map((b) => b.nodeId)).toContain('event:__current_map__#4');
+  });
+});

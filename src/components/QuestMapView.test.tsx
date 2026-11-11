@@ -33,7 +33,7 @@ describe('QuestMapView', () => {
 
   it('shows an empty state without quests', () => {
     const html = renderToStaticMarkup(
-      <QuestMapView graph={{ quests: [], npcs: [], edges: [] }} positions={{}} onPositionsChange={noop} onOpenQuest={noop} onOpenNpc={noop} onClose={noop} />,
+      <QuestMapView graph={{ quests: [], npcs: [], events: [], edges: [] }} positions={{}} onPositionsChange={noop} onOpenQuest={noop} onOpenNpc={noop} onClose={noop} />,
     );
     expect(html).toContain('No quests yet');
   });

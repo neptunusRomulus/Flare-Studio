@@ -18,8 +18,8 @@ type Props = {
 
 const objectsSignature = (objects: MapObject[]) =>
   objects
-    .filter((o) => o.type === 'npc')
-    .map((o) => `${o.id}:${o.name}:${o.x},${o.y}:${String((o.properties as Record<string, unknown>)?.dialogueTrees ?? '').length}:${String((o.properties as Record<string, unknown>)?.portraitPath ?? '')}`)
+    .filter((o) => o.type === 'npc' || o.type === 'event')
+    .map((o) => `${o.id}:${o.name}:${o.x},${o.y}:${String((o.properties as Record<string, unknown>)?.dialogueTrees ?? '').length}:${String((o.properties as Record<string, unknown>)?.portraitPath ?? '')}:${JSON.stringify((o.properties as Record<string, unknown>)?.set_status ?? '')}`)
     .join('|');
 
 /** Quest Map overlay for the Quests sub-target. The editor's objects are re-read while it is open. */
@@ -40,8 +40,8 @@ export default function QuestMapContainer({ editor, quests, projectPath, mapName
     return () => window.clearInterval(timer);
   }, [editor]);
 
-  const { npcs, positions, savePositions } = useQuestMapData({ open: true, projectPath, mapName, mapObjects });
-  const graph = useMemo(() => deriveQuestGraph(quests, npcs), [quests, npcs]);
+  const { npcs, events, positions, savePositions } = useQuestMapData({ open: true, projectPath, mapName, mapObjects });
+  const graph = useMemo(() => deriveQuestGraph(quests, npcs, events), [quests, npcs, events]);
 
   return (
     <QuestMapView

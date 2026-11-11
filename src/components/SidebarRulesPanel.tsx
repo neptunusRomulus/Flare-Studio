@@ -2,7 +2,7 @@ import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Tooltip from '@/components/ui/tooltip';
-import { GitBranch, Plus } from 'lucide-react';
+import { GitBranch, Network, Plus } from 'lucide-react';
 import { RULE_TRIGGER_LOOKUP } from '@/editor/ruleOptions';
 import type { RuleStartType } from '@/editor/ruleOptions';
 
@@ -17,9 +17,11 @@ type SidebarRulesPanelProps = {
   rulesList: RuleListEntry[];
   onAddRule: () => void;
   onEditRule: (ruleId: string) => void;
+  questMapOpen?: boolean;
+  onToggleQuestMap?: () => void;
 };
 
-const SidebarRulesPanel = ({ rulesList, onAddRule, onEditRule }: SidebarRulesPanelProps) => (
+const SidebarRulesPanel = ({ rulesList, onAddRule, onEditRule, questMapOpen = false, onToggleQuestMap }: SidebarRulesPanelProps) => (
   <div className="flex flex-col flex-1">
     <div className="flex-1 min-h-0 border border-dashed border-border rounded-md overflow-y-auto">
       {rulesList.length === 0 ? (
@@ -61,7 +63,21 @@ const SidebarRulesPanel = ({ rulesList, onAddRule, onEditRule }: SidebarRulesPan
         </div>
       )}
     </div>
-    <div className="flex justify-center py-2">
+    <div className="flex justify-center items-center gap-2 py-2">
+      {onToggleQuestMap && (
+        <Tooltip content={questMapOpen ? 'Hide quest map' : 'Quest map: how quests and NPCs connect'} side="bottom">
+          <Button
+            variant={questMapOpen ? 'default' : 'outline'}
+            size="sm"
+            aria-label="Quest map"
+            aria-pressed={questMapOpen}
+            className="h-7 w-7 p-0"
+            onClick={onToggleQuestMap}
+          >
+            <Network className="w-3.5 h-3.5" />
+          </Button>
+        </Tooltip>
+      )}
       <Tooltip content="Add Quest" side="bottom">
         <Button
           variant="default"

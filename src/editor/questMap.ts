@@ -303,7 +303,8 @@ const ROW_GAP = 28;
 
 export function questCardHeight(stepCount: number): number {
   const shown = Math.min(stepCount, MAX_CARD_STEPS) + (stepCount > MAX_CARD_STEPS ? 1 : 0);
-  return 40 + Math.max(1, shown) * 20 + 30;
+  // header 40 + list padding 12 + rows + footer 30
+  return 40 + 12 + Math.max(1, shown) * 20 + 30;
 }
 
 export type QuestMapBox = { nodeId: string; x: number; y: number; width: number; height: number; column: number };

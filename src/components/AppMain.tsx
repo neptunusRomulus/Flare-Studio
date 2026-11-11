@@ -20,6 +20,7 @@ import { AnchoredConfirm } from '@/components/ui/inline-confirm';
 import HelpDialog from '@/components/HelpDialog';
 import ConflictDialog from '@/components/ConflictDialog';
 import EditorArea from '@/components/EditorArea';
+import QuestMapContainer from '@/components/QuestMapContainer';
 import { Toaster } from '@/components/ui/toaster';
 import DialogsContainer from '@/components/DialogsContainer';
 import StatusEditDialog from '@/components/StatusEditDialog';
@@ -184,6 +185,19 @@ export default function AppMain() {
 
   const hasMap = canvasCtx.mapInitialized;
 
+  // Quest Map replaces the map view while the Quests sub-target is active (choice remembered).
+  const [questMapOpen, setQuestMapOpen] = useState<boolean>(() => {
+    try { return localStorage.getItem('flare-studio.questMapOpen') !== 'false'; } catch { return true; }
+  });
+  const toggleQuestMap = useCallback(() => {
+    setQuestMapOpen((open) => {
+      const next = !open;
+      try { localStorage.setItem('flare-studio.questMapOpen', String(next)); } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
+  const showQuestMap = questMapOpen && tileset.activeLayer?.type === 'rules' && !!controls?.currentProjectPath;
+
   // Per-layer visibility (corner eye) / opacity (wheel) on the Map and Entities sub-switch buttons
   const layerVisibility = useMemo(() => layersObj ? {
     onToggleVisibility: layersObj.handleToggleLayerVisibility,
@@ -291,7 +305,20 @@ export default function AppMain() {
       />
 
       <main className="flex flex-1 min-h-0">
-        <EditorArea topBarProps={topBarProps} canvasCtx={canvasCtx} bottomToolbarProps={bottomToolbarProps} isDarkMode={isDarkMode} />
+        <div className="relative flex flex-1 min-w-0 min-h-0">
+          <EditorArea topBarProps={topBarProps} canvasCtx={canvasCtx} bottomToolbarProps={bottomToolbarProps} isDarkMode={isDarkMode} />
+          {showQuestMap && (
+            <QuestMapContainer
+              editor={editor}
+              quests={rules.rulesList ?? []}
+              projectPath={controls?.currentProjectPath}
+              mapName={mapName}
+              onOpenQuest={(id) => rules.handleEditRule?.(id)}
+              onOpenNpc={(id) => actors?.handleEditObject?.(id)}
+              onClose={toggleQuestMap}
+            />
+          )}
+        </div>
 
         <PaletteDock
           {...tileset}
@@ -320,7 +347,7 @@ export default function AppMain() {
               onSelectLayer={layersObj?.handleSetActiveLayer ?? (() => {})}
               items={items}
               statuses={{ handleOpenStatusDialog: statuses?.handleOpenStatusDialog ?? (() => {}), projectPath: controls?.currentProjectPath ?? null }}
-              rules={{ rulesList: rules.rulesList, handleAddRule: rules.handleAddRule, handleEditRule: rules.handleEditRule }}
+              rules={{ rulesList: rules.rulesList, handleAddRule: rules.handleAddRule, handleEditRule: rules.handleEditRule, questMapOpen, onToggleQuestMap: toggleQuestMap }}
             />
           ) : tileset.activeLayer?.type === 'gameSettings' ? (
             <SidebarGameSettingsArea />

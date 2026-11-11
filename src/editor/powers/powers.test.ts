@@ -77,6 +77,7 @@ describe('categorization', () => {
     expect(categorizePower(power('500'), [], 'trap')).toBe('trap');
     expect(categorizePower(power('500'), [])).toBe('skill');
     expect(categorizePower({ path: 'powers/categories/enemy.txt' }, [])).toBe('monster');
+    expect(categorizePower({ path: 'powers/powers.txt', name: 'Health Potion' }, [])).toBe('item');
   });
 
   it('classifies effects as Buff or Debuff', () => {
@@ -166,5 +167,45 @@ describe('templates', () => {
       expect(block.entries.length).toBe(template.keys.length + 1);
     }
     for (const kind of ['skill', 'monster', 'item', 'trap']) expect(POWER_TEMPLATES.some((t) => t.kind === kind)).toBe(true);
+  });
+});
+
+describe('project files', () => {
+  it('picks a file for new powers and keeps the kind sidecar tidy', async () => {
+    const { fileForNewPower, parseKindSidecar, serializeKindSidecar, loadPowerFiles, joinPath } = await import('./powerFiles');
+    const paths = ['powers/powers.txt', 'powers/categories/enemy.txt', 'powers/categories/items.txt'];
+    expect(fileForNewPower('monster', paths)).toBe('powers/categories/enemy.txt');
+    expect(fileForNewPower('item', paths)).toBe('powers/categories/items.txt');
+    expect(fileForNewPower('trap', paths)).toBe('powers/powers.txt');
+    expect(fileForNewPower('skill', [])).toBe('powers/powers.txt');
+    expect(parseKindSidecar(serializeKindSidecar({ '10': 'trap', '2': 'item' }))).toEqual({ '2': 'item', '10': 'trap' });
+    expect(parseKindSidecar('not json')).toEqual({});
+    expect(joinPath('C:\\mods\\x', 'powers/a.txt')).toBe('C:\\mods\\x\\powers\\a.txt');
+    const disk: Record<string, string> = { '/m/powers/a.txt': '[power]\nid=1\n', '/m/engine/classes.txt': '[class]\n' };
+    const api = {
+      readDir: async (dir: string) => (dir === '/m/powers' ? [{ name: 'a.txt', isDirectory: false }, { name: 'x.png', isDirectory: false }] : []),
+      readFile: async (p: string) => disk[p] ?? null,
+    };
+    expect(await loadPowerFiles(api, '/m')).toEqual([{ path: 'powers/a.txt', text: '[power]\nid=1\n' }, { path: 'engine/classes.txt', text: '[class]\n' }]);
+  });
+});
+
+describe('create from template', () => {
+  it('appends a power (and its effect when missing) without touching existing lines', async () => {
+    const { createFromTemplate } = await import('./powerCreate');
+    const textOf = (p: string) => files.find((f) => f.path === p)?.text ?? '';
+    const r = createFromTemplate(project, textOf, 'trap', 'poison_cloud');
+    expect(r.target).toEqual({ type: 'power', id: '501' });
+    expect(r.writes.map((w) => w.path)).toEqual(['powers/effects.txt', 'powers/categories/environment.txt']);
+    expect(r.writes[0].text.startsWith(textOf('powers/effects.txt'))).toBe(true);
+    expect(r.writes[0].text).toContain('[effect]\nid=poison\nname=Poison\n');
+    expect(r.writes[1].text.startsWith(textOf('powers/categories/environment.txt'))).toBe(true);
+    expect(r.writes[1].text).toContain('id=501\nname=Poison Cloud\n');
+    expect(r.writes[1].text).toContain('post_effect=poison,5,3s\n');
+    const reuse = createFromTemplate(project, textOf, 'monster', 'monster_spit');
+    expect(reuse.writes.map((w) => w.path)).toEqual(['powers/categories/enemy.txt']);
+    expect(reuse.writes[0].text).toContain('post_effect=slow,50,3s\n');
+    const buff = createFromTemplate(project, textOf, 'buff', 'shield');
+    expect(buff.target).toEqual({ type: 'effect', id: 'mage_shield_2' });
   });
 });

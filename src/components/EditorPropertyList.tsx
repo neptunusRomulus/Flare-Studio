@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import SearchablePalette, { type SearchablePaletteEntry } from '@/components/ui/searchable-palette';
-import { Input } from '@/components/ui/input';
+import DraftInput from '@/components/powers/DraftInput';
 import { Switch } from '@/components/ui/switch';
 import Tooltip from '@/components/ui/tooltip';
 import { InlineConfirm } from '@/components/ui/inline-confirm';
@@ -45,7 +45,7 @@ const EditorPropertyList = ({ title = 'Properties', properties, catalog, onChang
                 />
               </div>
             ) : (
-              <Input
+              <DraftInput
                 className="h-7 text-xs"
                 value={property.value}
                 onChange={(event) => onChange(property.key, event.target.value)}

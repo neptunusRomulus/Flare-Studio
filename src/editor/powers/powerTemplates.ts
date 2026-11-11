@@ -20,6 +20,8 @@ export type EffectTemplate = {
   label: string;
   kind: EffectKind;
   source: string;
+  /** Id of the same effect in flare-game; reused when the project already has it. */
+  flareId: string;
   keys: Array<[string, string]>;
   /** Suggested post_effect magnitude and duration when chained. */
   magnitude: string;
@@ -27,13 +29,13 @@ export type EffectTemplate = {
 };
 
 export const EFFECT_TEMPLATES: EffectTemplate[] = [
-  { id: 'speed_buff', label: 'Speed Buff', kind: 'buff', source: 'empyrean_campaign powers/effects.txt id=haste', keys: [['name', 'Haste'], ['type', 'speed'], ['icon', '9'], ['can_stack', 'false']], magnitude: '120', duration: '10s' },
-  { id: 'slow_debuff', label: 'Slow Debuff', kind: 'debuff', source: 'empyrean_campaign powers/effects.txt id=slow', keys: [['name', 'Slow'], ['type', 'speed'], ['icon', '24'], ['can_stack', 'false']], magnitude: '50', duration: '5s' },
-  { id: 'shield', label: 'Shield', kind: 'buff', source: 'empyrean_campaign powers/effects.txt id=mage_shield', keys: [['name', 'Shield'], ['type', 'shield'], ['icon', '15'], ['animation', 'animations/powers/shield.txt'], ['can_stack', 'false']], magnitude: '0', duration: '0' },
-  { id: 'poison', label: 'Poison', kind: 'debuff', source: 'empyrean_campaign powers/effects.txt id=poison', keys: [['name', 'Poison'], ['type', 'damage'], ['icon', '42'], ['animation', 'animations/powers/spark_green_loop.txt'], ['can_stack', 'false']], magnitude: '5', duration: '5s' },
-  { id: 'bleeding', label: 'Bleeding', kind: 'debuff', source: 'empyrean_campaign powers/effects.txt id=bleeding', keys: [['name', 'Bleeding'], ['type', 'damage_percent'], ['icon', '25'], ['animation', 'animations/powers/spark_red_loop.txt'], ['can_stack', 'false']], magnitude: '5', duration: '5s' },
-  { id: 'stun', label: 'Stun', kind: 'debuff', source: 'empyrean_campaign powers/effects.txt id=paralyze', keys: [['name', 'Stun'], ['type', 'stun'], ['icon', '26'], ['can_stack', 'false']], magnitude: '0', duration: '1s' },
-  { id: 'regeneration', label: 'Regeneration', kind: 'buff', source: 'empyrean_campaign powers/effects.txt id=hp_heal', keys: [['name', 'Regeneration'], ['type', 'heal'], ['icon', '11'], ['animation', 'animations/powers/heal.txt'], ['can_stack', 'false']], magnitude: '25', duration: '1s' },
+  { id: 'speed_buff', flareId: 'haste', label: 'Speed Buff', kind: 'buff', source: 'empyrean_campaign powers/effects.txt id=haste', keys: [['name', 'Haste'], ['type', 'speed'], ['icon', '9'], ['can_stack', 'false']], magnitude: '120', duration: '10s' },
+  { id: 'slow_debuff', flareId: 'slow', label: 'Slow Debuff', kind: 'debuff', source: 'empyrean_campaign powers/effects.txt id=slow', keys: [['name', 'Slow'], ['type', 'speed'], ['icon', '24'], ['can_stack', 'false']], magnitude: '50', duration: '5s' },
+  { id: 'shield', flareId: 'mage_shield', label: 'Shield', kind: 'buff', source: 'empyrean_campaign powers/effects.txt id=mage_shield', keys: [['name', 'Shield'], ['type', 'shield'], ['icon', '15'], ['animation', 'animations/powers/shield.txt'], ['can_stack', 'false']], magnitude: '0', duration: '0' },
+  { id: 'poison', flareId: 'poison', label: 'Poison', kind: 'debuff', source: 'empyrean_campaign powers/effects.txt id=poison', keys: [['name', 'Poison'], ['type', 'damage'], ['icon', '42'], ['animation', 'animations/powers/spark_green_loop.txt'], ['can_stack', 'false']], magnitude: '5', duration: '5s' },
+  { id: 'bleeding', flareId: 'bleeding', label: 'Bleeding', kind: 'debuff', source: 'empyrean_campaign powers/effects.txt id=bleeding', keys: [['name', 'Bleeding'], ['type', 'damage_percent'], ['icon', '25'], ['animation', 'animations/powers/spark_red_loop.txt'], ['can_stack', 'false']], magnitude: '5', duration: '5s' },
+  { id: 'stun', flareId: 'paralyze', label: 'Stun', kind: 'debuff', source: 'empyrean_campaign powers/effects.txt id=paralyze', keys: [['name', 'Stun'], ['type', 'stun'], ['icon', '26'], ['can_stack', 'false']], magnitude: '0', duration: '1s' },
+  { id: 'regeneration', flareId: 'hp_heal', label: 'Regeneration', kind: 'buff', source: 'empyrean_campaign powers/effects.txt id=hp_heal', keys: [['name', 'Regeneration'], ['type', 'heal'], ['icon', '11'], ['animation', 'animations/powers/heal.txt'], ['can_stack', 'false']], magnitude: '25', duration: '1s' },
 ];
 
 export const POWER_TEMPLATES: PowerTemplate[] = [

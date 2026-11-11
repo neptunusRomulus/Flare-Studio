@@ -38,16 +38,20 @@ function kindFromPath(path: string): PowerKind | null {
 }
 
 /**
- * Where is the power used? Player-usable wins, then items, then enemies, then
+ * Where is the power used? Skill trees win, then items, then classes, then enemies, then
  * map events/NPCs. No references: the kind the user picked, then the file name, then Skill.
  */
-export function categorizePower(power: Pick<PowerEntry, 'path'>, usedBy: UsedBy[] = [], picked?: PowerKind | null): PowerKind {
+export function categorizePower(power: Pick<PowerEntry, 'path'> & { name?: string }, usedBy: UsedBy[] = [], picked?: PowerKind | null): PowerKind {
   const kinds = new Set(usedBy.map((use) => use.kind));
-  if (kinds.has('skill_tree') || kinds.has('class')) return 'skill';
+  if (kinds.has('skill_tree')) return 'skill';
+  // Classes often put potions on the starting action bar; the item is the better name then.
   if (kinds.has('item')) return 'item';
+  if (kinds.has('class')) return 'skill';
   if (kinds.has('enemy')) return 'monster';
   if (kinds.has('event') || kinds.has('npc')) return 'trap';
-  return picked || kindFromPath(power.path) || 'skill';
+  if (picked) return picked;
+  if (/\b(potion|elixir|scroll)\b/i.test(power.name || '')) return 'item';
+  return kindFromPath(power.path) || 'skill';
 }
 
 const DEBUFF_TYPES = new Set(['damage', 'damage_percent', 'stun', 'knockback']);

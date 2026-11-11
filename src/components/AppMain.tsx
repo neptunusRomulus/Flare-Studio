@@ -318,7 +318,7 @@ export default function AppMain() {
               activeLayer={tileset.activeLayer}
               onSelectLayer={layersObj?.handleSetActiveLayer ?? (() => {})}
               items={items}
-              statuses={{ handleOpenStatusDialog: statuses?.handleOpenStatusDialog ?? (() => {}) }}
+              statuses={{ handleOpenStatusDialog: statuses?.handleOpenStatusDialog ?? (() => {}), projectPath: controls?.currentProjectPath ?? null }}
               rules={{ rulesList: rules.rulesList, handleAddRule: rules.handleAddRule, handleEditRule: rules.handleEditRule }}
             />
           ) : tileset.activeLayer?.type === 'gameSettings' ? (

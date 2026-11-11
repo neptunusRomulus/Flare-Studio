@@ -1,7 +1,7 @@
 # AGENTS.md — rules for AI agents working on Flare Studio
 
 ## Project
-- Flare Studio: Electron + React + TypeScript plug-and-play editor/IDE for the Flare engine. Target: **flare-engine master** (`f9a17a26`, 2026-10-29, engine version **1.15.86**). See `src/flare/engineTarget.ts`. The official v1.15 tag is older and lacks craft/vendor-tab/visual-effect keys.
+- Flare Studio: Electron + React + TypeScript plug-and-play editor/IDE for the Flare engine. Target: **flare-engine master** (`c6772106`, 2026-11-11, engine version **1.15.87**). See `src/flare/engineTarget.ts`. The official v1.15 tag is older and lacks craft/vendor-tab/visual-effect keys.
 - Goal: expose every engine feature, but keep the UI simple for beginners (progressive disclosure; no Unity/Unreal-style clutter). Features may be relocated, never removed.
 - Long term: a multi-genre engine with CLI/MCP control.
 

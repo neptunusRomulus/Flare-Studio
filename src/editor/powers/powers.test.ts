@@ -90,6 +90,9 @@ describe('categorization', () => {
     expect(categorizePower(power('500'), [])).toBe('skill');
     expect(categorizePower({ path: 'powers/categories/enemy.txt' }, [])).toBe('monster');
     expect(categorizePower({ path: 'powers/powers.txt', name: 'Health Potion' }, [])).toBe('item');
+    const bar = [{ kind: 'class' as const, name: 'Brute', path: 'engine/classes.txt', key: 'actionbar' }];
+    expect(categorizePower({ path: 'powers/categories/items.txt', name: 'Health Potion' }, bar)).toBe('item');
+    expect(categorizePower({ path: 'powers/powers.txt', name: 'Swing' }, bar)).toBe('skill');
   });
 
   it('classifies effects as Buff or Debuff', () => {

@@ -28,6 +28,8 @@ export const KIND_META: Record<ContentKind, KindMeta> = {
 
 export const POWER_KIND_ORDER: PowerKind[] = ['skill', 'monster', 'item', 'trap'];
 
+const isItemName = (name?: string) => /\b(potion|elixir|scroll)\b/i.test(name || '');
+
 /** Category from the file a power lives in (flare-game keeps enemy/item/environment powers in their own files). */
 function kindFromPath(path: string): PowerKind | null {
   const name = path.toLowerCase();
@@ -46,11 +48,16 @@ export function categorizePower(power: Pick<PowerEntry, 'path'> & { name?: strin
   if (kinds.has('skill_tree')) return 'skill';
   // Classes often put potions on the starting action bar; the item is the better name then.
   if (kinds.has('item')) return 'item';
-  if (kinds.has('class')) return 'skill';
+  if (kinds.has('class')) {
+    // Only on a starting action bar (not class powers=): potions live there too.
+    const onlyActionbar = usedBy.every((use) => use.kind !== 'class' || use.key === 'actionbar');
+    if (onlyActionbar && (isItemName(power.name) || kindFromPath(power.path) === 'item')) return 'item';
+    return 'skill';
+  }
   if (kinds.has('enemy')) return 'monster';
   if (kinds.has('event') || kinds.has('npc')) return 'trap';
   if (picked) return picked;
-  if (/\b(potion|elixir|scroll)\b/i.test(power.name || '')) return 'item';
+  if (isItemName(power.name)) return 'item';
   return kindFromPath(power.path) || 'skill';
 }
 

@@ -147,7 +147,7 @@ const PowerEditor = ({ target, data, onClose, onOpen }: Props) => {
         <div className="flex items-center gap-2">
           <Tooltip content={`${KIND_META[kind].tooltip} · id=${power.id}`} side="bottom"><span><KindIcon kind={kind} className="w-5 h-5" /></span></Tooltip>
           <DraftInput className="h-8 text-sm font-semibold border-0 shadow-none px-1 focus:ring-0" value={v('name')} placeholder={power.name || 'Name'} aria-label="Name" onChange={(e) => set('name', e.target.value)} />
-          <span className={`text-[11px] ${KIND_META[kind].color}`}>{KIND_META[kind].label}</span>
+          <span className={`text-[11px] whitespace-nowrap ${KIND_META[kind].color}`}>{KIND_META[kind].label}</span>
           <InlineConfirm open={confirmDelete} onCancel={() => setConfirmDelete(false)} message={`Delete? ${deleteImpact(usedBy)}`}
             onConfirm={() => { writeFile(power.path, removeBlock(textOf(power.path), 'power', power.blockIndex), true); setKind(power.id, null); setConfirmDelete(false); onClose(); }}>
             <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground" aria-label="Delete" onClick={() => setConfirmDelete(true)}><Trash2 className="w-3.5 h-3.5" /></Button>
@@ -281,7 +281,7 @@ const EffectEditor = ({ target, data, onClose, onOpen }: Props) => {
         <div className="flex items-center gap-2">
           <Tooltip content={`${KIND_META[kind].tooltip} · id=${effect.id}`} side="bottom"><span><KindIcon kind={kind} className="w-5 h-5" /></span></Tooltip>
           <DraftInput className="h-8 text-sm font-semibold border-0 shadow-none px-1 focus:ring-0" value={v('name')} placeholder={effect.id} aria-label="Name" onChange={(e) => set('name', e.target.value || null)} />
-          <span className={`text-[11px] ${KIND_META[kind].color}`}>{KIND_META[kind].label}</span>
+          <span className={`text-[11px] whitespace-nowrap ${KIND_META[kind].color}`}>{KIND_META[kind].label}</span>
           <InlineConfirm open={confirmDelete} onCancel={() => setConfirmDelete(false)} message={`Delete? ${deleteImpact(uses)}`}
             onConfirm={() => { writeFile(effect.path, removeBlock(textOf(effect.path), 'effect', effect.blockIndex), true); setConfirmDelete(false); onClose(); }}>
             <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground" aria-label="Delete" onClick={() => setConfirmDelete(true)}><Trash2 className="w-3.5 h-3.5" /></Button>

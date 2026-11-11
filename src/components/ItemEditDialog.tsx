@@ -11,7 +11,8 @@ import { Apple, Book, Box, Check, ChevronDown, ChevronRight, Coins, Folder, Gift
 import { ITEM_ROLE_META, ITEM_ROLE_SELECTIONS, RESOURCE_SUBTYPE_META } from '@/editor/itemRoles';
 import type { ItemResourceSubtype } from '@/editor/itemRoles';
 import { useAppContext } from '@/context/AppContext';
-import { listPowerIds } from '@/adapters/flare/flareAdapter.cjs';
+import { buildPowerProject } from '@/editor/powers/powerProject';
+import { loadTextFiles } from '@/editor/powers/powerFiles';
 import { projectRoot } from '@/editor/projectFiles';
 import { askConfirm, InlineConfirm } from '@/components/ui/inline-confirm';
 import ResizeHandle from '@/components/ResizeHandle';
@@ -142,6 +143,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
   } = props;
   const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false);
   const [powerIds, setPowerIds] = useState<string[]>([]);
+  const [powerNames, setPowerNames] = useState<Record<string, string>>({});
   const ctx = useAppContext();
   const currentProjectPath = typeof ctx.currentProjectPath === 'string' ? ctx.currentProjectPath : null;
   const itemBaseline = React.useRef('');
@@ -180,8 +182,11 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
       return;
     }
     let cancelled = false;
-    void window.electronAPI.readFile(`${projectRoot(currentProjectPath)}/powers/powers.txt`).then((text) => {
-      if (!cancelled) setPowerIds(text ? listPowerIds(text) : []);
+    void loadTextFiles(window.electronAPI, projectRoot(currentProjectPath), ['powers']).then((files) => {
+      if (cancelled) return;
+      const project = buildPowerProject(files);
+      setPowerIds(project.powers.map((power) => power.id));
+      setPowerNames(Object.fromEntries(project.powers.map((power) => [power.id, power.name])));
     });
     return () => {
       cancelled = true;
@@ -676,7 +681,9 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
             )}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-muted-foreground">Power ID</label>
+                <Tooltip content="power= — the Flare [power] id this item casts when used">
+                  <label className="text-xs text-muted-foreground">Item Use</label>
+                </Tooltip>
                 {powerIds.length > 0 ? (
                   <select
                     className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm"
@@ -688,7 +695,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
                       ? [String(editingItem.power), ...powerIds]
                       : powerIds
                     ).map((id) => (
-                      <option key={id} value={id}>{id}</option>
+                      <option key={id} value={id}>{powerNames[id] && powerNames[id] !== id ? `${powerNames[id]} (${id})` : id}</option>
                     ))}
                   </select>
                 ) : (

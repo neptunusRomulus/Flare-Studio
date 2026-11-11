@@ -24,16 +24,19 @@ const trees: DialogueTree[] = [
 ];
 
 describe('MomentChatView', () => {
-  it('renders a chat thread with NPC name once per run, chips and answers', () => {
+  it('renders a minimal chat: one avatar per NPC run, meta icons, effect pills, answers and a composer', () => {
     const html = renderToStaticMarkup(
       <MomentChatView trees={trees} visibleTrees={trees} setTrees={() => {}} moment={otherMoment()} npcName="Martigan" />,
     );
-    expect(html.match(/>Martigan</g)?.length).toBe(1);
+    // Avatar fallback initial only on the first bubble of the NPC run (+1 in the composer speaker toggle).
+    expect(html.match(/>M<\/span>/g)?.length).toBe(2);
     expect(html).toContain('Welcome, traveler.');
-    expect(html).toContain('Status is off: met');
+    expect(html).toContain('aria-label="Conditions"');
     expect(html).toContain('+10 XP');
     expect(html).toContain('Any work?');
     expect(html).toContain('justify-end');
     expect(html).toContain('id="chat-topic-b"');
+    expect(html).toContain('Type NPC line…');
+    expect(html).not.toContain('<textarea rows="1" value="Welcome');
   });
 });

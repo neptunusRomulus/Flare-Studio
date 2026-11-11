@@ -61,27 +61,30 @@ Coming Soon...
 #### ⚡ **Beta Version** 
 - [x] 0- Multi-tileset use with "Tabs"
 - [x] 1- Objects
-- [x] 2- Events (Partly finished) 
-- [ ] 3- NPCs (In progress)
-- [ ] 4- Enemies
-- [ ] 5- Dialogue (In progress)
-- [ ] 6- Sounds
-- [ ] 7- Quest (In progress)
-- [ ] 8- Cutscenes  
+- [x] 2- Events
+- [x] 3- NPCs
+- [x] 4- Enemies
+- [x] 5- Dialogue (chat editor)
+- [x] Items & loot groups (in progress: loot chance words and 10-kill summary)
+- [ ] 6- Sounds (partial: sound fields on enemies, events, items and powers; no sound library)
+- [x] 7- Quest (Quest Map included; in progress: When done rewards row)
+- [ ] 8- Cutscenes (partial: events can play a cutscene; editor exists but is not in the UI)
+- [x] Help
 - [ ] 9- **You name it. I will check on it. Promise.**
 
 ---
 #### ⚡ **Full Release** (Maybe)
 
-- [ ] 9- UI Edits
-- [ ] 10- Skills
-- [ ] 12- Stats
+- [ ] 9- UI Edits (in progress: menu position editor)
+- [ ] Book editor (in progress)
+- [x] 10- Skills (Statuses, powers and Story Flags)
+- [ ] 12- Stats (partial: engine config editor exists, not in the UI)
 - [ ] 13- Shaders (with injection method)
-- [ ] 14- Translations/localization editor
+- [ ] 14- Translations/localization editor (partial: catalog editor exists, not in the UI)
 - [ ] 15- Particles
-- [ ] 16- Player Settings
-- [ ] 15- Gameworld Settings
-- [ ] 15- Engine Settings
+- [ ] 16- Player Settings (partial: not in the UI)
+- [ ] 15- Gameworld Settings (partial: tile size and map header; some editors not in the UI)
+- [ ] 15- Engine Settings (partial: Flare engine config editor exists, not in the UI)
 - [x] 15- Linux, MacOS support. (Partly tested on Archlinux, works decent.)
 - [ ] 16- **You name it. I will check on it. Promise.**
 

@@ -4,6 +4,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Tooltip from '@/components/ui/tooltip';
+import EditorPropertyList from '@/components/EditorPropertyList';
+import { extraItemPropertyKeys, ITEM_EXTRA_CATALOG } from '@/editor/itemFileHydrate';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 import { Apple, Book, Box, Check, ChevronDown, ChevronRight, Coins, Folder, Gift, HelpCircle, Key, Layers, Save, Shield, Sparkles, Sword, Tag, Trash2, Volume2, X, Zap } from 'lucide-react';
 import { ITEM_ROLE_META, ITEM_ROLE_SELECTIONS, RESOURCE_SUBTYPE_META } from '@/editor/itemRoles';
@@ -970,6 +972,33 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
             </div>
           </CollapsibleSection>
         )}
+
+        <CollapsibleSection title="Properties" icon={Layers} className="border-none">
+          <EditorPropertyList
+            properties={extraItemPropertyKeys((editingItem || {}) as Record<string, unknown>).map((key) => {
+              const entry = ITEM_EXTRA_CATALOG.find((item) => item.id === key);
+              const raw = editingItem ? editingItem[key] : '';
+              return {
+                key,
+                label: entry?.label || key,
+                value: raw == null ? '' : String(raw),
+                tooltip: entry?.tooltip || key,
+              };
+            })}
+            catalog={ITEM_EXTRA_CATALOG.filter((entry) => {
+              const raw = editingItem ? editingItem[entry.id] : undefined;
+              return raw == null || raw === '';
+            }).map((entry) => ({
+              id: entry.id,
+              label: entry.label,
+              tooltip: entry.tooltip,
+              searchText: `${entry.label} ${entry.tooltip}`,
+            }))}
+            onChange={(key, value) => updateEditingItemField(key, value)}
+            onAdd={(key) => updateEditingItemField(key, '')}
+            onRemove={(key) => updateEditingItemField(key, '')}
+          />
+        </CollapsibleSection>
       </div>
 
       {/* Footer */}

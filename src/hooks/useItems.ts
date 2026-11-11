@@ -3,6 +3,7 @@ import type { ItemRole, ItemResourceSubtype } from '../editor/itemRoles';
 import type { RawItem, ItemSummary } from '@/utils/items';
 import { canonicalJson, exportLootFile, importLootText, mergeLootText, slugFileName } from '../adapters/flare/flareAdapter.cjs';
 import { loadConfigDocument, writeProjectFiles } from '../editor/projectFiles';
+import { hydrateItemDraft } from '@/editor/itemFileHydrate';
 
 const safeString = (value: unknown) => {
   if (typeof value === 'string') return value;
@@ -248,7 +249,7 @@ export default function useItems({ currentProjectPath, toast, normalizeItemsForS
             if (itemRole === 'resource') return 99;
             return 1;
           })();
-          setEditingItem({
+          setEditingItem(hydrateItemDraft(d, {
             id: (typeof d.id === 'number' ? d.id : item.id),
             name: (typeof d.name === 'string' ? d.name : item.name),
             role: itemRole,
@@ -302,7 +303,7 @@ export default function useItems({ currentProjectPath, toast, normalizeItemsForS
             category: item.category,
             filePath: item.filePath,
             fileName: item.fileName,
-          } as ItemEdit);
+          }) as ItemEdit);
           setShowItemEditDialog(true);
         } else {
           const fallbackRole = (typeof item.role === 'string' ? item.role : 'unspecified') as ItemRole;

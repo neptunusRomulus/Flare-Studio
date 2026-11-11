@@ -6,6 +6,7 @@ import { validateAndSanitizeObject } from '@/editor/objectValidation';
 import { propertyText } from '@/editor/propertyText';
 import { askConfirm } from '@/components/ui/inline-confirm';
 import { resolveDefaultNpcAppearance } from '@/flare/npcAppearance';
+import { hydrateEnemyObject, enemyFilePath } from '@/utils/enemyFileHydrate';
 import { hydrateNpcObject, npcFilePath } from '@/utils/npcFileHydrate';
 
 /**
@@ -392,15 +393,26 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
     }
   }, [editor, mapObjects, currentProjectPath]);
 
-  const handleEditEnemyTemplate = useCallback((objectId: number) => {
+  const handleEditEnemyTemplate = useCallback(async (objectId: number) => {
     const objects = editor && typeof editor.getMapObjects === 'function' ? editor.getMapObjects() : mapObjects;
-    const obj = objects?.find(o => o.id === objectId) || null;
+    let obj = objects?.find(o => o.id === objectId) || null;
     if (!obj || obj.type !== 'enemy') return;
+
+    if (currentProjectPath) {
+      try {
+        const api = window.electronAPI;
+        const filePath = enemyFilePath(currentProjectPath, obj);
+        const text = api?.readFile ? await api.readFile(filePath) : '';
+        if (text) obj = hydrateEnemyObject(obj, text);
+      } catch (err) {
+        console.warn('Could not load enemy file into the editor', err);
+      }
+    }
 
     setEditingObject(obj);
     setShowObjectDialog(false);
     setShowEnemyEditor(true);
-  }, [editor, mapObjects]);
+  }, [editor, mapObjects, currentProjectPath]);
 
   const handleUpdateObject = useCallback((updatedObject: MapObject) => {
     try {

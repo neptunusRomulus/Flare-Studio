@@ -148,6 +148,15 @@ describe('warnings', () => {
     expect(powerWarnings(power('122'), 'skill', project.powerUsedBy['122'], project)).toEqual([]);
   });
 
+  it('does not warn when post_effect uses an engine stat name', () => {
+    const p = {
+      id: '1',
+      keys: { type: ['fixed'], post_effect: ['hp,10,0', 'dmg_melee_min,2,0'] },
+    };
+    const texts = powerWarnings(p, 'skill', [{ kind: 'item', name: 'Potion', path: 'items/items.txt', key: 'power' }], project).map((x) => x.text);
+    expect(texts.some((t) => t.includes('hp') || t.includes('dmg_melee_min'))).toBe(false);
+  });
+
   it('flags unused effects', () => {
     expect(effectWarnings(effect('lonely'), 'debuff', []).map((x) => x.text)).toEqual(['This Debuff is never used']);
     expect(effectWarnings(effect('slow'), 'debuff', project.effectUsedBy.slow)).toEqual([]);

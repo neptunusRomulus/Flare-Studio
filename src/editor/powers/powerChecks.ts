@@ -8,6 +8,40 @@ import { parseSectionFile, setBlockValues } from './sectionFile';
 
 export type Warning = { id: string; text: string; tooltip: string };
 
+/** Built-in ids PowerManager::isValidEffect accepts besides [effect] definitions. */
+export const ENGINE_POST_EFFECT_IDS = new Set([
+  // Effect::getTypeFromString
+  'damage', 'damage_percent', 'hpot', 'hpot_percent', 'mpot', 'mpot_percent',
+  'speed', 'attack_speed', 'resist_all', 'stun', 'revive', 'convert', 'fear',
+  'death_sentence', 'shield', 'heal', 'knockback',
+  'immunity', 'immunity_damage', 'immunity_slow', 'immunity_stun', 'immunity_knockback',
+  'immunity_damage_reflect', 'immunity_stat_debuff', 'immunity_hp_steal', 'immunity_mp_steal',
+  'hp_percent', 'mp_percent',
+  // Stats::KEY
+  'hp', 'hp_regen', 'mp', 'mp_regen', 'accuracy', 'avoidance', 'absorb_min', 'absorb_max',
+  'crit', 'xp_gain', 'currency_find', 'item_find', 'stealth', 'poise', 'reflect_chance',
+  'return_damage', 'hp_steal', 'mp_steal',
+  'resist_damage_over_time', 'resist_slow', 'resist_stun', 'resist_knockback',
+  'resist_stat_debuff', 'resist_damage_reflect', 'resist_hp_steal', 'resist_mp_steal',
+  // default + official-campaign primary / damage type ids
+  'physical', 'mental', 'offense', 'defense',
+  'dmg_melee_min', 'dmg_melee_max', 'resist_melee',
+  'dmg_ranged_min', 'dmg_ranged_max', 'resist_ranged',
+  'dmg_ment_min', 'dmg_ment_max', 'resist_ment',
+  'scroll_min', 'scroll_max', 'resist_scroll',
+  'mage_shield_min', 'mage_shield_max', 'resist_mage_shield',
+  'dmg_fire_min', 'dmg_fire_max', 'resist_fire',
+  'dmg_ice_min', 'dmg_ice_max', 'resist_ice',
+  'dmg_lightning_min', 'dmg_lightning_max', 'resist_lightning',
+  'dmg_dark_min', 'dmg_dark_max', 'resist_dark',
+]);
+
+export function isValidPostEffectId(id: string, effectIds: Set<string>): boolean {
+  if (!id) return false;
+  return effectIds.has(id) || ENGINE_POST_EFFECT_IDS.has(id);
+}
+
+
 const has = (keys: Record<string, string[] | undefined>, key: string) => (keys[key] || []).some((v) => v.trim() !== '');
 const first = (keys: Record<string, string[] | undefined>, key: string) => (keys[key] || [])[0] || '';
 
@@ -37,7 +71,7 @@ export function powerWarnings(
   for (const key of EFFECT_LINK_KEYS) {
     for (const value of keys[key] || []) {
       const id = value.split(',')[0].trim();
-      if (id && !effectIds.has(id)) out.push({ id: `missing_effect_${id}`, text: `Applies "${id}", which does not exist`, tooltip: `${key}=${value}: no [effect] id=${id} in powers/effects.txt` });
+      if (id && !isValidPostEffectId(id, effectIds)) out.push({ id: `missing_effect_${id}`, text: `Applies "${id}", which does not exist`, tooltip: `${key}=${value}: no [effect] id=${id} in powers/effects.txt` });
     }
   }
   const powerIds = new Set(project.powers.map((p) => p.id));

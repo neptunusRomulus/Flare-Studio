@@ -397,6 +397,7 @@ function includesFromEnemyText(content) {
  * keep comments, unknown keys, and repeated keys (stat=, power=, sfx_*=).
  * Used by "Save as preset" so it does not rebuild the file from the form alone.
  * `fields` values update keys that appear at most once; repeated keys are left as they are.
+ * `listFields` replaces every line of a repeated key (loot=) in file order; omit the key to leave it alone.
  * When `content` is empty, builds a new file from `includes`, optional `header`, `lines`, and `fields`.
  */
 function applyEnemyFileUpdates(content, update) {
@@ -404,6 +405,7 @@ function applyEnemyFileUpdates(content, update) {
     ? (update.includes || []).map((p) => String(p || "").trim()).filter(Boolean)
     : undefined;
   const fields = (update && update.fields) || {};
+  const listFields = normalizeListFields(update && update.listFields);
   const extraLines = (update && update.lines) || null;
   const raw = String(content || "").replace(/\r/g, "");
   if (!raw.trim()) {
@@ -419,6 +421,9 @@ function applyEnemyFileUpdates(content, update) {
           if (!v) continue;
           lines.push(v.includes("=") ? v : `${key}=${v}`);
         }
+      }
+      for (const [key, values] of Object.entries(listFields)) {
+        for (const value of values) lines.push(`${key}=${value}`);
       }
     }
     return normalizeEnemyText(`${lines.join("\n")}\n`);
@@ -447,6 +452,12 @@ function applyEnemyFileUpdates(content, update) {
     const eq = line.indexOf("=");
     if (line && !line.startsWith("#") && line !== "APPEND" && !/^\[/.test(line) && eq > 0) {
       const key = line.slice(0, eq).trim();
+      if (Object.prototype.hasOwnProperty.call(listFields, key)) {
+        if (replaced.has(key)) continue;
+        replaced.add(key);
+        for (const value of listFields[key]) out.push(`${key}=${value}`);
+        continue;
+      }
       if (Object.prototype.hasOwnProperty.call(fields, key) && !keepRepeats.has(key)) {
         if (replaced.has(key)) continue;
         replaced.add(key);
@@ -462,11 +473,26 @@ function applyEnemyFileUpdates(content, update) {
   const at = includeAt < 0 ? 0 : includeAt;
   out.splice(at, 0, ...incLines);
   for (const [key, value] of Object.entries(fields)) {
-    if (replaced.has(key) || keepRepeats.has(key)) continue;
+    if (replaced.has(key) || keepRepeats.has(key) || Object.prototype.hasOwnProperty.call(listFields, key)) continue;
     if (value == null || value === "") continue;
     out.push(`${key}=${value}`);
   }
+  for (const [key, values] of Object.entries(listFields)) {
+    if (replaced.has(key)) continue;
+    for (const value of values) out.push(`${key}=${value}`);
+  }
   return normalizeEnemyText(out.join("\n"));
+}
+
+function normalizeListFields(raw) {
+  const out = {};
+  if (!raw || typeof raw !== "object") return out;
+  for (const [key, value] of Object.entries(raw)) {
+    if (!key) continue;
+    const values = Array.isArray(value) ? value : [value];
+    out[key] = values.map((item) => String(item ?? "").trim()).filter((item) => item !== "");
+  }
+  return out;
 }
 
 const REQ_TYPE_BY_KEY = {

@@ -26,6 +26,7 @@ export function applyEnemyFileUpdates(
   update?: {
     includes?: string[];
     fields?: Record<string, string | number | null | undefined>;
+    listFields?: Record<string, string[]>;
     lines?: string[];
     header?: string;
   }

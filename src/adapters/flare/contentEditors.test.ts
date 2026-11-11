@@ -247,6 +247,16 @@ describe('content editor exports', () => {
     expect(mergeLootText(common, importLootText(common))).toBe(common);
   });
 
+  it('updates a shorthand loot chance and leaves comments and INCLUDE in place', () => {
+    const chest = readFileSync(new URL('../../../tests/fixtures/flare-loot/chest_level_1.txt', import.meta.url), 'utf8');
+    const edited = mergeLootText(chest, { loot: [{ loot: 'currency,50,20,40' }] });
+    expect(edited).toContain('# guaranteed gold');
+    expect(edited).toContain('loot=currency,50,20,40');
+    expect(edited).not.toContain('loot=currency,100,20,40');
+    expect(edited).toContain('INCLUDE loot/chest_common.txt');
+    expect(edited).toContain('INCLUDE loot/level_1.txt');
+  });
+
   it('merges one item without dropping INCLUDE, comments or later items', () => {
     const text = readFileSync(new URL('../../../tests/fixtures/flare-items/level_12_unique.txt', import.meta.url), 'utf8');
     const merged = mergeItemText(text, { id: 305, name: 'Lost Totem' });

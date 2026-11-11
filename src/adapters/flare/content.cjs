@@ -912,6 +912,120 @@ function updateExistingDocKey(doc, start, end, key, value) {
   if (at >= 0) doc[at].value = value == null ? "" : String(value);
 }
 
+function lootEntryCompact(entry) {
+  if (!entry || typeof entry !== "object") return "";
+  if (entry.status_loot) return "";
+  const shorthand = safeString(entry.loot);
+  if (shorthand) return shorthand;
+  const id = safeString(entry["loot.id"]);
+  if (!id) return "";
+  const chance = safeString(entry["loot.chance"]);
+  const quantity = formatList(entry["loot.quantity"]);
+  if (chance && quantity) return `${id},${chance},${quantity}`;
+  if (chance) return `${id},${chance}`;
+  if (quantity) return `${id},,${quantity}`;
+  return id;
+}
+
+function existingLootSlots(doc) {
+  const slots = [];
+  let i = 0;
+  while (i < doc.length) {
+    const entry = doc[i];
+    if (entry && entry.kind === "key" && (entry.key === "loot" || entry.key === "status_loot")) {
+      slots.push({ kind: "shorthand", key: entry.key, index: i, end: i + 1 });
+      i += 1;
+      continue;
+    }
+    if (entry && entry.kind === "section" && String(entry.name).toLowerCase() === "loot") {
+      let end = i + 1;
+      while (end < doc.length && !(doc[end] && doc[end].kind === "section")) end += 1;
+      slots.push({ kind: "block", index: i, end });
+      i = end;
+      continue;
+    }
+    i += 1;
+  }
+  return slots;
+}
+
+function applyLootEntries(doc, entries) {
+  const wanted = Array.isArray(entries) ? entries : [];
+  const slots = existingLootSlots(doc);
+  const unchanged = slots.length === wanted.length && slots.every((slot, i) => {
+    const entry = wanted[i] || {};
+    if (slot.kind === "shorthand") {
+      if (entry.status_loot) return doc[slot.index].key === "status_loot" && doc[slot.index].value === safeString(entry.status_loot);
+      if (doc[slot.index].key !== "loot") return false;
+      return doc[slot.index].value === lootEntryCompact(entry);
+    }
+    const block = doc.slice(slot.index, slot.end);
+    const id = blockId(block);
+    const chance = existingListValue(block, 0, block.length, "chance") || (block.find((e) => e && e.kind === "key" && e.key === "chance") || {}).value;
+    const quantity = existingListValue(block, 0, block.length, "quantity");
+    const wantId = safeString(entry["loot.id"]);
+    const wantChance = safeString(entry["loot.chance"]);
+    const wantQty = formatList(entry["loot.quantity"]);
+    if (entry.loot || entry.status_loot) return false;
+    return id === wantId && (wantChance === "" || chance === wantChance) && (wantQty === "" || quantity === wantQty);
+  });
+  if (unchanged) return;
+
+  const values = wanted.map((entry) => {
+    if (entry && entry.status_loot) return { key: "status_loot", value: safeString(entry.status_loot) };
+    if (entry && entry["loot.id"] && !entry.loot) {
+      return { kind: "block", entry };
+    }
+    return { key: "loot", value: lootEntryCompact(entry) };
+  });
+
+  // Replace from the last slot backwards so indexes stay valid, then append leftovers.
+  const count = Math.max(slots.length, values.length);
+  for (let i = count - 1; i >= 0; i -= 1) {
+    const slot = slots[i];
+    const next = values[i];
+    if (slot && !next) {
+      const removed = doc.splice(slot.index, slot.end - slot.index);
+      if (removed.length && doc[slot.index] && doc[slot.index].kind === "blank") continue;
+      continue;
+    }
+    if (!slot && next) {
+      const at = doc.length;
+      if (next.kind === "block") {
+        const block = [{ kind: "section", name: "loot" }];
+        const e = next.entry;
+        if (e["loot.id"]) block.push({ kind: "key", key: "id", value: safeString(e["loot.id"]) });
+        if (e["loot.chance"]) block.push({ kind: "key", key: "chance", value: safeString(e["loot.chance"]) });
+        if (e["loot.quantity"]) block.push({ kind: "key", key: "quantity", value: formatList(e["loot.quantity"]) });
+        if (e["loot.requires_status"]) block.push({ kind: "key", key: "requires_status", value: safeString(e["loot.requires_status"]) });
+        if (e["loot.requires_level"]) block.push({ kind: "key", key: "requires_level", value: formatList(e["loot.requires_level"]) });
+        if (e["loot.quantity_per_level"]) block.push({ kind: "key", key: "quantity_per_level", value: formatList(e["loot.quantity_per_level"]) });
+        block.push({ kind: "blank" });
+        doc.splice(at, 0, ...block);
+      } else if (next.value) {
+        doc.splice(at, 0, { kind: "key", key: next.key, value: next.value });
+      }
+      continue;
+    }
+    if (slot.kind === "shorthand" && next.key) {
+      doc[slot.index] = { kind: "key", key: next.key, value: next.value };
+    } else if (slot.kind === "block" && next.kind === "block") {
+      const block = doc.slice(slot.index, slot.end);
+      const e = next.entry;
+      setDocKey(block, 1, block.length, "id", safeString(e["loot.id"]), false);
+      if (e["loot.chance"] !== undefined) setDocKey(block, 1, block.length, "chance", safeString(e["loot.chance"]), false);
+      if (e["loot.quantity"] !== undefined) setDocKey(block, 1, block.length, "quantity", formatList(e["loot.quantity"]), false);
+      doc.splice(slot.index, slot.end - slot.index, ...block);
+    } else if (slot.kind === "shorthand" && next.kind === "block") {
+      const e = next.entry;
+      const compact = lootEntryCompact({ loot: undefined, ...e, "loot.id": e["loot.id"] });
+      doc[slot.index] = { kind: "key", key: "loot", value: compact };
+    } else if (slot.kind === "block" && next.key) {
+      doc.splice(slot.index, slot.end - slot.index, { kind: "key", key: next.key, value: next.value });
+    }
+  }
+}
+
 function mergeLootText(existingText, data) {
   const text = String(existingText || "").replace(/\r/g, "");
   if (!text.trim()) return exportLootFile(data || {});
@@ -921,6 +1035,7 @@ function mergeLootText(existingText, data) {
   if (source.id != null && String(source.id).trim() !== "") updateExistingDocKey(doc, 0, end, "id", source.id);
   if (source.name != null && String(source.name).trim() !== "") updateExistingDocKey(doc, 0, end, "name", source.name);
   if (source.description !== undefined) updateExistingDocKey(doc, 0, end, "description", source.description);
+  if (Array.isArray(source.loot)) applyLootEntries(doc, source.loot);
   if (Array.isArray(source.includes)) {
     const paths = source.includes.map((item) => String(item || "").trim()).filter(Boolean);
     const existing = [];

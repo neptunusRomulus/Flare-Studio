@@ -7,6 +7,15 @@ import Tooltip from '@/components/ui/tooltip';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 import type { ItemSummary } from '@/utils/items';
 import ResizeHandle from '@/components/ResizeHandle';
+import LootChancePicker from '@/components/LootChancePicker';
+import LootRowsEditor from '@/components/LootRowsEditor';
+import {
+  formatLootChance,
+  formatLootRow,
+  parseLootChance,
+  parseLootValue,
+  type LootRow,
+} from '@/editor/lootChance';
 
 type LootGroupEditDialogProps = {
   open: boolean;
@@ -120,12 +129,12 @@ function LootGroupEditDialog(props: LootGroupEditDialogProps) {
   const quantityPerLevel = safeString(lootGroupData?.quantity_per_level);
   const lootChanceValue = safeString(lootGroupData?.loot_chance_value);
   const lootChanceFixed = lootGroupData?.loot_chance_fixed === true;
+  const defaultChance = parseLootChance(lootChanceFixed ? 'fixed' : lootChanceValue);
 
-  const handleChanceFixedChange = (checked: boolean) => {
-    updateLootGroupField('loot_chance_fixed', checked);
-    if (checked) {
-      updateLootGroupField('loot_chance_value', '');
-    }
+  const handleDefaultChance = (value: ReturnType<typeof parseLootChance>) => {
+    const stored = formatLootChance(value);
+    updateLootGroupField('loot_chance_fixed', stored === 'fixed');
+    updateLootGroupField('loot_chance_value', stored === 'fixed' ? '' : stored);
   };
 
   useEffect(() => {
@@ -163,6 +172,57 @@ function LootGroupEditDialog(props: LootGroupEditDialogProps) {
   const handleLootEntryField = (idx: number, key: string, value: string) => {
     const updated = lootEntries.map((entry, i) => i === idx ? { ...entry, [key]: value } : entry);
     updateLootGroupField('loot', updated);
+  };
+
+  const rowsFromData = (): LootRow[] => {
+    if (lootEntries.length) {
+      const rows: LootRow[] = [];
+      for (const entry of lootEntries) {
+        if (entry.status_loot) {
+          const parsed = parseLootValue(String(entry.status_loot).split(',').slice(1).join(','));
+          rows.push(...parsed);
+          continue;
+        }
+        if (entry.loot) {
+          rows.push(...parseLootValue(String(entry.loot)));
+          continue;
+        }
+        const qty = String(entry['loot.quantity'] || '1').split(',').map((part: string) => part.trim());
+        const min = Math.max(1, Number(qty[0]) || 1);
+        rows.push({
+          id: String(entry['loot.id'] || ''),
+          chance: parseLootChance(entry['loot.chance'] || (lootChanceFixed ? 'fixed' : lootChanceValue) || '20'),
+          quantityMin: min,
+          quantityMax: qty[1] ? Math.max(min, Number(qty[1]) || min) : min,
+          isTable: String(entry['loot.id'] || '').includes('/') || String(entry['loot.id'] || '').endsWith('.txt'),
+        });
+      }
+      return rows;
+    }
+    return Object.entries(selectedContents).map(([id, qty]) => {
+      const min = Math.max(1, Number(qty) || 1);
+      return {
+        id,
+        chance: defaultChance,
+        quantityMin: min,
+        quantityMax: min,
+        isTable: false,
+      } as LootRow;
+    });
+  };
+
+  const handleRowsChange = (rows: LootRow[]) => {
+    const entries = rows.filter((row) => row.id.trim()).map((row) => (
+      row.isTable
+        ? { loot: row.id }
+        : { loot: formatLootRow(row) }
+    ));
+    updateLootGroupField('loot', entries);
+    const contents: Record<string, number> = {};
+    for (const row of rows) {
+      if (!row.isTable && row.id && row.id !== 'currency') contents[row.id] = row.quantityMax || row.quantityMin || 1;
+    }
+    updateLootGroupField('loot_contents', contents);
   };
 
   // ESC key closes dialog
@@ -337,6 +397,14 @@ function LootGroupEditDialog(props: LootGroupEditDialogProps) {
                 </tbody>
               </table>
             </div>
+            <div className="pt-3">
+              <label className="mb-2 block text-xs font-medium text-muted-foreground">Drop chances</label>
+              <LootRowsEditor
+                rows={rowsFromData()}
+                onChange={handleRowsChange}
+                items={availableItems}
+              />
+            </div>
           </CollapsibleSection>
 
           <CollapsibleSection title="Conditions" icon={Shield}>
@@ -385,29 +453,12 @@ function LootGroupEditDialog(props: LootGroupEditDialogProps) {
               </div>
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <label className="text-xs font-medium text-muted-foreground">loot.chance</label>
-                  <Tooltip content="Set a drop chance as a float, or check Fixed to force the loot to drop before random selection.">
+                  <label className="text-xs font-medium text-muted-foreground">Default chance</label>
+                  <Tooltip content="loot chance used when a row has no chance of its own. Always is fixed.">
                     <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
                   </Tooltip>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Input
-                    value={lootChanceValue}
-                    onChange={(event) => updateLootGroupField('loot_chance_value', event.target.value)}
-                    disabled={lootChanceFixed}
-                    placeholder="0.0 - 1.0"
-                    className="h-10 flex-1"
-                  />
-                  <label className="inline-flex items-center gap-2 text-xs text-muted-foreground">
-                    <input
-                      type="checkbox"
-                      checked={lootChanceFixed}
-                      onChange={(event) => handleChanceFixedChange(event.target.checked)}
-                      className="h-4 w-4 rounded border-border text-orange-500"
-                    />
-                    Fixed
-                  </label>
-                </div>
+                <LootChancePicker value={defaultChance} onChange={handleDefaultChance} />
               </div>
             </div>
           </CollapsibleSection>

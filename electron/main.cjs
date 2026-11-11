@@ -147,11 +147,15 @@ function migrateProjectIfNeeded(projectPath) {
     fs.writeFileSync(dest, content, "utf8");
   }
   const result = flareAdapter.migrateFiles(files, path.basename(projectPath));
-  if (result.errors && result.errors.length > 0) {
+  if (!result.files || result.files.length === 0) {
     console.warn("[migrate] kept the backup and did not write canonical files:", result.errors);
     return { migrated: false, errors: result.errors, backup: backupRoot };
   }
   for (const file of result.files) writeAdapterFile(projectPath, file.path, file.content);
+  if (result.errors && result.errors.length > 0) {
+    console.warn("[migrate] wrote files with per-file errors:", result.errors);
+    return { migrated: true, errors: result.errors, backup: backupRoot };
+  }
   console.log("[migrate] wrote canonical project from", backupRoot);
   return { migrated: true, backup: backupRoot };
 }

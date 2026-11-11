@@ -246,8 +246,10 @@ describe('FileParser rules', () => {
       },
     ];
     const exported = exportProject(project);
-    expect(exported.files).toEqual([]);
     expect(exported.errors.length).toBeGreaterThan(0);
+    expect(exported.errors.some((issue) => issue.path === 'maps/bad.txt')).toBe(true);
+    expect(exported.files.some((file) => file.path === 'settings.txt')).toBe(true);
+    expect(exported.files.some((file) => file.path === 'maps/bad.txt')).toBe(true);
     const issues = validateText(
       'maps',
       '[header]\nwidth=2\nheight=1\n\n[layer]\ntype=background\nformat=dec\ndata=\n1\n',
@@ -356,5 +358,84 @@ describe('launch plan and migration', () => {
     const index = JSON.parse(migrated.files.find((file) => file.path === 'project.json')?.content || '{}');
     expect(index.schemaVersion).toBe(1);
     expect(index.editor).toBeUndefined();
+  });
+  it('exports valid files and reports the bad file when one map is invalid', () => {
+    const project = emptyProject('Mixed');
+    project.maps = [
+      {
+        id: 'ok',
+        width: 1,
+        height: 1,
+        heroX: 0,
+        heroY: 0,
+        layers: [{ type: 'background', rows: [[1]] }],
+        events: [],
+        enemies: [],
+        npcs: [],
+      },
+      {
+        id: 'bad',
+        width: 2,
+        height: 1,
+        heroX: 0,
+        heroY: 0,
+        layers: [{ type: 'background', rows: [[1]] }],
+        events: [],
+        enemies: [],
+        npcs: [],
+      },
+    ];
+    const exported = exportProject(project);
+    const names = exported.files.map((file) => file.path);
+    expect(names).toContain('maps/ok.txt');
+    expect(names).toContain('maps/bad.txt');
+    expect(exported.errors.some((issue) => issue.path === 'maps/bad.txt')).toBe(true);
+    expect(exported.errors.every((issue) => issue.path !== 'maps/ok.txt')).toBe(true);
+  });
+
+  it('accepts enemy sfx_* keys', () => {
+    const issues = validateText(
+      'enemies',
+      'name=Goblin\nsfx_attack=swing,soundfx/hit.ogg\nsfx_hit=soundfx/hit.ogg\nsfx_die=soundfx/die.ogg\n',
+      'enemies/goblin.txt',
+    );
+    expect(issues).toEqual([]);
+  });
+
+  const flareGameCampaign = path.resolve(process.cwd(), '../flare-game/mods/empyrean_campaign');
+  it.skipIf(!fs.existsSync(flareGameCampaign))('keeps loot paths, quest file names and item files when migrating a flare-game copy', () => {
+    const root = flareGameCampaign;
+    const load = (rel: string) => fs.readFileSync(path.join(root, rel), 'utf8');
+    const files: Record<string, string> = {
+      'settings.txt': 'description=Empyrean Campaign\nversion=1.0\ngame=flare-game\n',
+      'loot/chest_common.txt': load('loot/chest_common.txt'),
+      'loot/il_common.txt': load('loot/il_common.txt'),
+      'quests/0010_krolan.txt': load('quests/0010_krolan.txt'),
+      'quests/0000_empyrean.txt': load('quests/0000_empyrean.txt'),
+      'items/items.txt': load('items/items.txt'),
+      'items/categories/quest.txt': load('items/categories/quest.txt'),
+      'items/types.txt': load('items/types.txt'),
+      'enemies/base/seagate.txt': load('enemies/base/seagate.txt'),
+    };
+    const migrated = migrateFiles(files, 'Empyrean');
+    const sfxErrors = migrated.errors.filter((issue) => /sfx_/i.test(issue.message));
+    expect(sfxErrors).toEqual([]);
+    const byPath = Object.fromEntries(migrated.files.map((file) => [file.path, file.content]));
+    const same = (rel: string) => {
+      const got = byPath[rel];
+      const want = files[rel].endsWith('\n') ? files[rel] : `${files[rel]}\n`;
+      expect(got, rel).toBe(want);
+    };
+    same('loot/chest_common.txt');
+    same('loot/il_common.txt');
+    same('quests/0010_krolan.txt');
+    same('quests/0000_empyrean.txt');
+    same('items/items.txt');
+    same('items/categories/quest.txt');
+    same('items/types.txt');
+    same('enemies/base/seagate.txt');
+    expect(migrated.files.some((file) => /krolan_s_missing|krolans_missing/.test(file.path))).toBe(false);
+    const items = migrated.project.items as Array<{ sourcePath?: string }>;
+    expect(items.some((item) => item.sourcePath === 'items/categories/quest.txt')).toBe(true);
   });
 });

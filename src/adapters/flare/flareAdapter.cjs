@@ -144,18 +144,33 @@ function exportProject(project) {
     }
   }
 
-  const itemExport = serializers.exportItemFile(source.items || [], { append: true });
-  if ((source.items || []).length > 0) {
+  const itemFiles = new Map();
+  for (const file of source.itemFiles || []) {
+    if (file && file.path) itemFiles.set(file.path, file.content);
+  }
+  const looseItems = [];
+  let itemPowers = [];
+  for (const item of source.items || []) {
+    const id = slugFileName(item.name || item.id || "item");
+    index.items.push(id);
+    const { _raw, ...itemJson } = item;
+    files.push({ path: `content/items/${id}.json`, content: `${JSON.stringify(itemJson, null, 2)}\n` });
+    if (item.sourcePath && typeof _raw === "string") itemFiles.set(item.sourcePath, _raw);
+    else if (item.sourcePath && itemFiles.has(item.sourcePath)) continue;
+    else looseItems.push(item);
+  }
+  for (const [itemPath, raw] of itemFiles) {
+    const textOut = String(raw).endsWith("\n") ? String(raw) : `${raw}\n`;
+    files.push({ path: itemPath, content: textOut });
+  }
+  if (looseItems.length > 0) {
+    const itemExport = serializers.exportItemFile(looseItems, { append: true });
     files.push({ path: "items/items.txt", content: itemExport.text });
     errors.push(...validateText("items", itemExport.text, "items/items.txt"));
-    source.items.forEach((item) => {
-      const id = slugFileName(item.name || item.id || "item");
-      index.items.push(id);
-      files.push({ path: `content/items/${id}.json`, content: `${JSON.stringify(item, null, 2)}\n` });
-    });
+    itemPowers = itemExport.powers;
   }
-  if (itemExport.powers.length > 0 || (source.powers || []).length > 0) {
-    const powers = [...(source.powers || []), ...itemExport.powers];
+  if (itemPowers.length > 0 || (source.powers || []).length > 0) {
+    const powers = [...(source.powers || []), ...itemPowers];
     const powerText = serializers.exportPowerFile(powers);
     files.push({ path: "powers/powers.txt", content: powerText });
     errors.push(...validateText("powers", powerText, "powers/powers.txt"));
@@ -191,8 +206,10 @@ function exportProject(project) {
   for (const quest of source.quests || []) {
     const id = slugFileName(quest.id || quest.name || "quest");
     index.quests.push(id);
-    const questPath = `quests/${id}.txt`;
-    const text = content.exportQuestFile(quest);
+    const questPath = quest.sourcePath || `quests/${id}.txt`;
+    const text = typeof quest._raw === "string"
+      ? (quest._raw.endsWith("\n") ? quest._raw : `${quest._raw}\n`)
+      : content.exportQuestFile(quest);
     files.push({ path: questPath, content: text });
     files.push({ path: `content/quests/${id}.json`, content: `${JSON.stringify({ ...quest, id }, null, 2)}\n` });
     errors.push(...validateText("quests", text, questPath));
@@ -201,8 +218,10 @@ function exportProject(project) {
   for (const table of source.loot || []) {
     const id = slugFileName(table.id || table.name || "loot");
     index.loot.push(id);
-    const lootPath = `loot/${id}.txt`;
-    const text = content.exportLootFile({ ...table, id });
+    const lootPath = table.sourcePath || `loot/${id}.txt`;
+    const text = typeof table._raw === "string"
+      ? (table._raw.endsWith("\n") ? table._raw : `${table._raw}\n`)
+      : content.exportLootFile({ ...table, id });
     files.push({ path: lootPath, content: text });
     files.push({ path: `content/loot/${id}.json`, content: `${JSON.stringify({ ...table, id }, null, 2)}\n` });
     errors.push(...validateText("loot", text, lootPath));
@@ -229,7 +248,7 @@ function exportProject(project) {
   files.unshift({ path: "project.json", content: `${JSON.stringify(index, null, 2)}\n` });
 
   return {
-    files: errors.length > 0 ? [] : files,
+    files,
     errors,
     warnings,
   };
@@ -364,13 +383,30 @@ function migrateFiles(files, projectName) {
       const base = normalized.split("/").pop().replace(/\.txt$/i, "");
       imported.id = imported.id || slugFileName(base);
       if (!imported.name) imported.name = base;
+      imported.sourcePath = normalized;
+      imported._raw = fileText;
       project.loot.push(imported);
     }
     if (normalized.startsWith("quests/") && normalized.endsWith(".txt")) {
       const imported = content.importQuestText(fileText);
       const base = normalized.split("/").pop().replace(/\.txt$/i, "");
-      imported.id = slugFileName(imported.name || base);
+      imported.id = base;
+      imported.sourcePath = normalized;
+      imported._raw = fileText;
       project.quests.push(imported);
+    }
+    if (normalized.startsWith("items/") && normalized.endsWith(".txt")) {
+      if (!project.itemFiles) project.itemFiles = [];
+      project.itemFiles.push({ path: normalized, content: fileText });
+      for (const section of parseDocument(fileText)) {
+        if (section.name !== "item") continue;
+        const item = { sourcePath: normalized };
+        for (const entry of section.entries) {
+          if (item[entry.key]) item[entry.key] = `${item[entry.key]}\n${entry.value}`;
+          else item[entry.key] = entry.value;
+        }
+        project.items.push(item);
+      }
     }
     if (normalized === "powers/powers.txt") project.powers.push(...content.importPowerText(fileText));
     if (normalized === "powers/effects.txt") project.effects.push(...content.importEffectText(fileText));

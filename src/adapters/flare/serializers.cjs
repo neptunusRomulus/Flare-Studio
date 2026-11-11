@@ -85,6 +85,9 @@ function exportMapText(map) {
   if (map.procgen_type) lines.push(`procgen_type=${map.procgen_type}`);
   if (map.procgen_unique_status) lines.push(`procgen_unique_status=${map.procgen_unique_status}`);
   if (map.procgen_reset_status) lines.push(`procgen_reset_status=${map.procgen_reset_status}`);
+  for (const extra of map.extraHeaders || []) {
+    if (extra && extra.key) pushKey(lines, extra.key, extra.value);
+  }
   lines.push("");
 
   if (Array.isArray(map.tilesetImages) && map.tilesetImages.length > 0) {
@@ -938,6 +941,7 @@ function importMapText(content) {
     enemies: [],
     npcs: [],
     tilesetImages: [],
+    extraHeaders: [],
   };
   let section = "";
   let event = null;
@@ -997,6 +1001,7 @@ function importMapText(content) {
       else if (key === "tilewidth") map.tilewidth = parseInt(value, 10) || value;
       else if (key === "tileheight") map.tileheight = parseInt(value, 10) || value;
       else if (key === "orientation") map.orientation = value;
+      else map.extraHeaders.push({ key, value });
     } else if (section === "tilesets" && key === "tileset") {
       const [file, tileWidth, tileHeight, spacing, margin] = value.split(",");
       map.tilesetImages.push({

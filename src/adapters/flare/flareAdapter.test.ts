@@ -100,6 +100,34 @@ describe('FlareAdapter golden files', () => {
     expect(validateText('maps', exported.text, 'maps/tiled_header.txt')).toEqual([]);
   });
 
+  it('keeps unknown map header keys such as location= on a round-trip', () => {
+    const text = [
+      '[header]',
+      'width=1',
+      'height=1',
+      'hero_pos=0,0',
+      'location=0,0,3',
+      'custom_note=keep-me',
+      '',
+      '[event]',
+      'type=event',
+      'location=0,0,1,1',
+      'activate=on_load',
+      'intermap=maps/lab_welcome.txt,5,8',
+      '',
+    ].join('\n');
+    const exported = exportMapText(importMapText(text));
+    expect(exported.errors).toEqual([]);
+    const header = exported.text.split('[event]')[0];
+    expect(header).toContain('location=0,0,3');
+    expect(header).toContain('custom_note=keep-me');
+    expect(exported.text).toContain('intermap=maps/lab_welcome.txt,5,8');
+    const eventBlock = exported.text.split('[event]')[1];
+    expect(eventBlock).toContain('location=0,0,1,1');
+    const again = exportMapText(importMapText(exported.text));
+    expect(again.text).toBe(exported.text);
+  });
+
   it('moves item power keys into powers/powers.txt and keeps APPEND', () => {
     const items = exportItemFile([
       { id: 12, name: 'Sword', item_type: 'main', dmg_min: 2, dmg_max: 4, speed: 8, type: 'fixed' },

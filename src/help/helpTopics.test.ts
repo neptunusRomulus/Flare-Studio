@@ -14,7 +14,9 @@ describe('help topics', () => {
   it('search matches title, text and synonyms, all words required', () => {
     expect(filterHelpTopics('').length).toBe(HELP_TOPICS.length);
     expect(filterHelpTopics('vendor').map((t) => t.id)).toContain('npcs');
-    expect(filterHelpTopics('monster').map((t) => t.id)).toEqual(['enemies']);
+    expect(filterHelpTopics('monster').map((t) => t.id)).toEqual(['enemies', 'statuses']);
+    expect(filterHelpTopics('story flag').map((t) => t.id)).toContain('statuses');
+    expect(filterHelpTopics('network button').map((t) => t.id)).toEqual(['quest-map']);
     expect(filterHelpTopics('FONT size').map((t) => t.id)).toEqual(['display']);
     expect(filterHelpTopics('quest board').map((t) => t.id)).toEqual(['quest-map']);
     expect(filterHelpTopics('zzzz')).toEqual([]);

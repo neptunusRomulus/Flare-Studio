@@ -277,6 +277,9 @@ export default function AppMain() {
   const closeSettings = useCallback(() => { setSettingsTab(undefined); handleCloseSettings?.(); }, [handleCloseSettings]);
   const canGoHelp = useCallback((target: HelpTarget) => {
     if (target === 'display') return typeof controls?.setShowSettings === 'function';
+    if (target === 'quest-map') {
+      return !!layersObj?.layers?.some((l: { type: string }) => l.type === 'rules') && !!controls?.currentProjectPath;
+    }
     return !!layersObj?.layers?.some((l: { type: string }) => l.type === target);
   }, [controls, layersObj]);
   const goHelp = useCallback((target: HelpTarget) => {
@@ -284,6 +287,13 @@ export default function AppMain() {
     if (target === 'display') {
       setSettingsTab('display');
       controls?.setShowSettings?.(true);
+      return;
+    }
+    if (target === 'quest-map') {
+      const layer = layersObj?.layers?.find((l: { type: string }) => l.type === 'rules');
+      if (layer) { try { void layersObj?.handleSetActiveLayer?.(layer.id); } catch { /* ignore */ } }
+      setQuestMapOpen(true);
+      try { localStorage.setItem('flare-studio.questMapOpen', 'true'); } catch { /* ignore */ }
       return;
     }
     const layer = layersObj?.layers?.find((l: { type: string }) => l.type === target);

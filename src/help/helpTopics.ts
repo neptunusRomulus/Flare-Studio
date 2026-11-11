@@ -5,7 +5,7 @@
  */
 
 /** Where a card's "Go there" button leads. Layer types are real editor layer types. */
-export type HelpTarget = 'background' | 'npc' | 'enemy' | 'event' | 'items' | 'status' | 'rules' | 'display';
+export type HelpTarget = 'background' | 'npc' | 'enemy' | 'event' | 'items' | 'status' | 'rules' | 'quest-map' | 'display';
 
 export type HelpTopic = {
   id: string;
@@ -55,9 +55,9 @@ export const HELP_TOPICS: HelpTopic[] = [
   {
     id: 'quest-map',
     title: 'Quest Map',
-    text: 'See all quests on one board: who starts each one, who finishes it, and what links them.',
-    keywords: 'quest map board graph tree flow canvas overview',
-    target: 'rules',
+    text: 'The network button next to "+ Quest" toggles a board of every quest, the NPCs and map events that start or finish them, and the Story Flags that link them.',
+    keywords: 'quest map board graph tree flow canvas overview toggle network button event npc story flag',
+    target: 'quest-map',
     where: 'Content › Quests',
   },
   {
@@ -94,9 +94,9 @@ export const HELP_TOPICS: HelpTopic[] = [
   },
   {
     id: 'statuses',
-    title: 'Statuses & story flags',
-    text: 'Statuses are powers and their effects. Story flags are on/off marks, like "met the guard", that quests and dialogue check.',
-    keywords: 'status power effect buff debuff skill story flag campaign requires_status set_status',
+    title: 'Statuses & Story Flags',
+    text: 'This list groups Skills, Monster Attacks, Item Uses, Traps, Buffs and Debuffs. Story Flags are on/off marks, like "met the guard", that quests and dialogue check.',
+    keywords: 'status power effect buff debuff skill monster attack item use trap story flag campaign requires_status set_status',
     target: 'status',
     where: 'Content › Statuses',
   },
@@ -111,8 +111,8 @@ export const HELP_TOPICS: HelpTopic[] = [
   {
     id: 'export',
     title: 'Export & Play in Flare',
-    text: 'Play in the title bar saves and opens your game in Flare. Export Project is in the Flare icon menu.',
-    keywords: 'export play run launch test flare engine mod package build new game',
+    text: 'Play in the title bar saves and opens your game in Flare. Export Project is in the app menu behind the Flare Studio mark.',
+    keywords: 'export play run launch test flare engine mod package build new game icon logo brand mark menu',
   },
 ];
 

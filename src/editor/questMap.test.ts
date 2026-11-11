@@ -262,3 +262,22 @@ describe('crowded quests', () => {
     }
   });
 });
+
+describe('shared NPCs', () => {
+  it('keeps the quests of a multi-quest NPC together next to it', () => {
+    const q = (id: string) => ({ id, name: id, complete_status: `${id}_done`, steps: [{ quest_text: id, requires_status: `${id}_init` }] });
+    const starts = (...ids: string[]) => ids.map((id) => ({ requirements: [], worldEffects: [{ type: 'set_status', value: `${id}_init` }] }));
+    const graph = deriveQuestGraph([q('a'), q('b'), q('c')], [
+      { id: 'npcs/x.txt', name: 'X', locations: [], dialogs: starts('a', 'c') },
+      { id: 'npcs/y.txt', name: 'Y', locations: [], dialogs: starts('b') },
+    ]);
+    const boxes = new Map(layoutQuestGraph(graph).map((b) => [b.nodeId, b]));
+    const mid = (id: string) => boxes.get(id)!.y + boxes.get(id)!.height / 2;
+    // A and C share a band: C sits right under A, with B elsewhere.
+    const a = boxes.get('quest:a')!;
+    const c = boxes.get('quest:c')!;
+    expect(c.x).toBe(a.x);
+    expect(c.y).toBe(a.y + a.height + 28);
+    expect(Math.abs(mid('npc:npcs/x.txt') - mid('quest:c'))).toBeLessThan(200);
+  });
+});

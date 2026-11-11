@@ -359,6 +359,7 @@ export const MAX_CARD_STEPS = 5;
 const COLUMN_GAP = 110;
 const ROW_GAP = 28;
 const BAND_GAP = 56;
+const MAX_SHARED_BAND = 6;
 
 export function questCardHeight(stepCount: number): number {
   const shown = Math.min(stepCount, MAX_CARD_STEPS) + (stepCount > MAX_CARD_STEPS ? 1 : 0);
@@ -410,6 +411,25 @@ export function layoutQuestGraph(graph: QuestMapGraph, saved: QuestMapPositions 
     const a = find(edge.from);
     const b = find(edge.to);
     if (a !== b) parent.set(b, a);
+  }
+  // An NPC linked to several quests pulls them into one band (up to a limit),
+  // so it sits right next to all of them instead of sending long lines across.
+  const bandSize = new Map<string, number>();
+  for (const quest of graph.quests) bandSize.set(find(quest.nodeId), (bandSize.get(find(quest.nodeId)) ?? 0) + 1);
+  for (const npc of graph.npcs) {
+    const quests = unique(graph.edges
+      .filter((e) => e.from === npc.nodeId || e.to === npc.nodeId)
+      .map((e) => (e.from === npc.nodeId ? e.to : e.from))
+      .filter((id) => questIndex.has(id)));
+    for (const other of quests.slice(1)) {
+      const a = find(quests[0]);
+      const b = find(other);
+      if (a === b) continue;
+      const size = (bandSize.get(a) ?? 1) + (bandSize.get(b) ?? 1);
+      if (size > MAX_SHARED_BAND) continue;
+      parent.set(b, a);
+      bandSize.set(a, size);
+    }
   }
   const bandOf = new Map<string, string>();
   for (const quest of graph.quests) bandOf.set(quest.nodeId, find(quest.nodeId));
@@ -471,7 +491,7 @@ export function layoutQuestGraph(graph: QuestMapGraph, saved: QuestMapPositions 
   const boxes = new Map<string, QuestMapBox>();
   const bandHeights: number[] = [];
   const bandMembers: string[][] = [];
-  for (const band of bands) {
+  const placeBand = (band: string) => {
     let bandHeight = 0;
     const members: string[] = [];
     for (let c = 0; c < used.length; c += 1) {
@@ -497,6 +517,12 @@ export function layoutQuestGraph(graph: QuestMapGraph, saved: QuestMapPositions 
       }
       bandHeight = Math.max(bandHeight, y - ROW_GAP);
     }
+    return { bandHeight, members };
+  };
+  for (const band of bands) {
+    // Second pass orders each column by all its placed neighbors, not just earlier columns.
+    placeBand(band);
+    const { bandHeight, members } = placeBand(band);
     bandHeights.push(bandHeight);
     bandMembers.push(members);
   }

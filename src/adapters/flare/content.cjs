@@ -573,48 +573,88 @@ function importPowerText(content) {
   return importSectionBlocks(content, "power", POWER_KEYS);
 }
 
-function blockWithoutAppend(text) {
-  return String(text || "").replace(/^APPEND\n+/, "").trim();
+function copyDocEntries(entries) {
+  return (entries || []).map((entry) => (entry && typeof entry === "object" ? { ...entry } : entry));
 }
 
-function escapeRegExp(value) {
-  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function blockHasValue(block, start, key, value) {
+  for (let i = start; i < block.length; i += 1) {
+    const entry = block[i];
+    if (entry && entry.kind === "key" && entry.key === key && String(entry.value) === value) return true;
+  }
+  return false;
 }
 
-function replaceOrAppendBlock(existingText, sectionName, id, blockBody) {
+/** Update provided keys in a [power]/[effect] block. Unknown keys, comments and repeated lines stay put. */
+function applySectionItemToBlock(block, sectionName, keys, item) {
+  const next = copyDocEntries(block && block.length ? block : [{ kind: "section", name: sectionName }]);
+  if (!next[0] || next[0].kind !== "section") next.unshift({ kind: "section", name: sectionName });
+  const source = item || {};
+  for (const key of keys) {
+    if (!Object.prototype.hasOwnProperty.call(source, key)) continue;
+    const raw = source[key];
+    const value = Array.isArray(raw) ? raw.join(",") : raw === true ? "true" : raw == null ? "" : String(raw);
+    if (!value) continue;
+    const joined = existingListValue(next, 1, next.length, key);
+    if (joined === value || blockHasValue(next, 1, key, value)) continue;
+    if (Array.isArray(raw)) setDocListKey(next, 1, next.length, key, value, false);
+    else setDocKey(next, 1, next.length, key, value, false);
+  }
+  return next;
+}
+
+function newSectionBlock(sectionName, keys, item) {
+  const block = [{ kind: "section", name: sectionName }];
+  const source = item || {};
+  for (const key of keys) {
+    if (!Object.prototype.hasOwnProperty.call(source, key)) continue;
+    const raw = source[key];
+    if (raw == null || raw === "" || raw === false) continue;
+    const value = Array.isArray(raw) ? raw.join(",") : raw === true ? "true" : String(raw);
+    if (value) block.push({ kind: "key", key, value });
+  }
+  block.push({ kind: "blank" });
+  return block;
+}
+
+function mergeNamedSectionText(existingText, sectionName, items, keys, emptyExport) {
   const text = String(existingText || "").replace(/\r/g, "");
-  const base = text.trim() ? text : "APPEND\n";
-  const chunks = new RegExp(`\\[${sectionName}\\][\\s\\S]*?(?=\\n\\[${sectionName}\\]|$)`, "g");
-  const idPattern = new RegExp(`(^|\\n)id=${escapeRegExp(id)}(\\n|$)`);
-  let replaced = false;
-  const next = base.replace(chunks, (chunk) => {
-    if (replaced || !idPattern.test(chunk)) return chunk;
-    replaced = true;
-    return `${blockBody.trim()}\n`;
+  const list = (items || []).filter((item) => item && safeString(item.id));
+  if (!text.trim()) return emptyExport(list);
+  if (!list.length) return text.endsWith("\n") ? text : `${text}\n`;
+  const doc = importEngineText(text);
+  const { header, blocks } = collectNamedBlocks(doc, sectionName);
+  const pending = new Map();
+  for (const item of list) pending.set(safeString(item.id), item);
+  const outBlocks = blocks.map((block) => {
+    const id = blockId(block);
+    const update = pending.get(id);
+    if (!update) return block;
+    pending.delete(id);
+    return applySectionItemToBlock(block, sectionName, keys, update);
   });
-  const withHeader = /(^|\n)APPEND(\n|$)/.test(next) ? next : `APPEND\n\n${next.trim()}\n`;
-  const body = replaced ? withHeader : `${withHeader.replace(/\s*$/, "")}\n\n${blockBody.trim()}\n`;
-  return body.endsWith("\n") ? body : `${body}\n`;
+  let appended = false;
+  for (const item of list) {
+    if (!pending.has(safeString(item.id))) continue;
+    if (!appended) {
+      const last = outBlocks[outBlocks.length - 1];
+      if (last && last.length && last[last.length - 1].kind !== "blank") last.push({ kind: "blank" });
+      appended = true;
+    }
+    outBlocks.push(newSectionBlock(sectionName, keys, item));
+  }
+  const out = header.slice();
+  for (const block of outBlocks) out.push(...block);
+  return exportEngineText(out);
 }
 
 function mergePowerText(existingText, powers) {
-  let text = existingText || "";
-  for (const power of powers || []) {
-    const id = safeString(power.id);
-    if (!id) continue;
-    text = replaceOrAppendBlock(text, "power", id, blockWithoutAppend(serializers.exportPowerFile([power])));
-  }
-  return text.endsWith("\n") ? text : `${text}\n`;
+  const { POWER_KEYS } = require("./attributeKeys.cjs");
+  return mergeNamedSectionText(existingText, "power", powers, POWER_KEYS, (list) => serializers.exportPowerFile(list));
 }
 
 function mergeEffectText(existingText, effects) {
-  let text = existingText || "";
-  for (const effect of effects || []) {
-    const id = safeString(effect.id);
-    if (!id) continue;
-    text = replaceOrAppendBlock(text, "effect", id, blockWithoutAppend(exportEffectFile([effect])));
-  }
-  return text.endsWith("\n") ? text : `${text}\n`;
+  return mergeNamedSectionText(existingText, "effect", effects, new Set(EFFECT_KEYS), (list) => exportEffectFile(list));
 }
 
 function listPowerIds(content) {

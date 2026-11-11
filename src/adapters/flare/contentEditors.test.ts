@@ -20,6 +20,9 @@ import {
   importQuestText,
   mergeItemText,
   mergeLootText,
+  importEffectText,
+  importPowerText,
+  mergeEffectText,
   mergePowerText,
   mergeQuestText,
   normalizeEnemyText,
@@ -294,6 +297,36 @@ describe('content editor exports', () => {
     expect(merged).toContain('custom_note=keep');
     expect(merged).toContain('id=2');
     expect(merged).toContain('name=New');
+    expect(merged.startsWith('APPEND')).toBe(false);
+    expect(merged).toContain('APPEND');
+  });
+
+  it('leaves a power file byte-identical when the form values did not change', () => {
+    const quest = readFileSync(new URL('../../../tests/fixtures/flare-powers/quest.txt', import.meta.url), 'utf8');
+    expect(mergePowerText(quest, importPowerText(quest))).toBe(quest);
+    expect(mergePowerText(quest, [{ id: '238', name: 'Sacrifice', type: 'fixed', speed: '' }])).toBe(quest);
+    const renamed = mergePowerText(quest, [{ id: '238', name: 'Offering' }]);
+    expect(renamed).toContain('name=Offering');
+    expect(renamed).toContain('post_effect=hp_regen,200,0');
+    expect(renamed).toContain('post_effect=mp_regen,20,0');
+    expect(renamed).toContain('post_effect=sacrifice_icon,0,0');
+
+    const powers = readFileSync(new URL('../../../tests/fixtures/flare-powers/powers.txt', import.meta.url), 'utf8');
+    expect(mergePowerText(powers, importPowerText(powers))).toBe(powers);
+    expect(mergePowerText(powers, [{ id: '501', name: 'Turn Invisible', type: 'fixed', speed: '' }])).toBe(powers);
+    expect(powers.startsWith('APPEND')).toBe(false);
+
+    const effects = readFileSync(new URL('../../../tests/fixtures/flare-powers/effects.txt', import.meta.url), 'utf8');
+    expect(mergeEffectText(effects, importEffectText(effects))).toBe(effects);
+  });
+
+  it('does not prepend APPEND when adding a power to a file that lacks it', () => {
+    const existing = '# authored\n\n[power]\nid=1\nname=Old\ncustom_note=keep\n';
+    const merged = mergePowerText(existing, [{ id: '2', name: 'New', type: 'fixed' }]);
+    expect(merged.startsWith('APPEND')).toBe(false);
+    expect(merged).not.toContain('APPEND');
+    expect(merged).toContain('custom_note=keep');
+    expect(merged).toContain('id=2');
   });
 
   it('round-trips a sectionless engine file without inventing a section', () => {

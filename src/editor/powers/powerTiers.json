@@ -1,0 +1,76 @@
+{
+  "source": "flare-game af6eee6",
+  "method": "nearest-rank p33/p66 of positive values in mods/*/powers",
+  "keys": {
+    "requires_mp": {
+      "p33": 7,
+      "p66": 10,
+      "min": 1,
+      "max": 32,
+      "n": 157
+    },
+    "radius": {
+      "p33": 1,
+      "p66": 1,
+      "min": 0.5,
+      "max": 1000,
+      "n": 129
+    },
+    "target_range": {
+      "p33": 8,
+      "p66": 8,
+      "min": 8,
+      "max": 12,
+      "n": 8
+    },
+    "count": {
+      "p33": 3,
+      "p66": 8,
+      "min": 2,
+      "max": 48,
+      "n": 35
+    },
+    "speed": {
+      "p33": 15,
+      "p66": 16,
+      "min": 4,
+      "max": 36,
+      "n": 77
+    },
+    "cooldown": {
+      "p33": 1.5,
+      "p66": 10,
+      "min": 0.4,
+      "max": 60,
+      "n": 86
+    },
+    "lifespan": {
+      "p33": 0.4,
+      "p66": 0.8,
+      "min": 0.033,
+      "max": 60,
+      "n": 137
+    },
+    "modifier_damage": {
+      "p33": 80,
+      "p66": 130,
+      "min": 10,
+      "max": 400,
+      "n": 145
+    },
+    "post_effect_duration": {
+      "p33": 3,
+      "p66": 10,
+      "min": 0.033,
+      "max": 240,
+      "n": 209
+    },
+    "post_effect_magnitude": {
+      "p33": 20,
+      "p66": 50,
+      "min": 1,
+      "max": 400,
+      "n": 208
+    }
+  }
+}

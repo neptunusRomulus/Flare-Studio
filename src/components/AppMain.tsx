@@ -22,6 +22,7 @@ import ConflictDialog from '@/components/ConflictDialog';
 import EditorArea from '@/components/EditorArea';
 import QuestMapContainer from '@/components/QuestMapContainer';
 import BookEditorView from '@/components/BookEditorView';
+import MenuEditorView from '@/components/MenuEditorView';
 import { Toaster } from '@/components/ui/toaster';
 import DialogsContainer from '@/components/DialogsContainer';
 import StatusEditDialog from '@/components/StatusEditDialog';
@@ -198,6 +199,7 @@ export default function AppMain() {
   }, []);
   const showQuestMap = questMapOpen && tileset.activeLayer?.type === 'rules' && !!controls?.currentProjectPath;
   const showBookEditor = tileset.activeLayer?.type === 'books';
+  const showMenuEditor = tileset.activeLayer?.type === 'gameSettings';
 
   // Per-layer visibility (corner eye) / opacity (wheel) on the Map and Entities sub-switch buttons
   const layerVisibility = useMemo(() => layersObj ? {
@@ -348,6 +350,7 @@ export default function AppMain() {
             />
           )}
           {showBookEditor && <BookEditorView projectPath={controls?.currentProjectPath} />}
+          {showMenuEditor && <MenuEditorView projectPath={controls?.currentProjectPath} />}
         </div>
 
         <PaletteDock

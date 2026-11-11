@@ -731,6 +731,28 @@ export function routeEdges(edges: QuestMapEdge[], boxes: Map<string, QuestMapBox
   return routes;
 }
 
+/** Space kept free at the top for the floating toolbar, and around the edges. */
+export const FIT_PADDING = { top: 60, right: 32, bottom: 32, left: 32 };
+
+/** Pan/zoom that shows every card, leaving the toolbar strip at the top clear. */
+export function fitViewport(
+  boxes: QuestMapBox[],
+  viewport: { width: number; height: number },
+  minZoom: number,
+  maxZoom: number,
+  padding = FIT_PADDING,
+): { x: number; y: number; zoom: number } {
+  if (!boxes.length) return { x: padding.left, y: padding.top, zoom: 1 };
+  const minX = Math.min(...boxes.map((b) => b.x));
+  const minY = Math.min(...boxes.map((b) => b.y));
+  const maxX = Math.max(...boxes.map((b) => b.x + b.width));
+  const maxY = Math.max(...boxes.map((b) => b.y + b.height));
+  const availW = Math.max(1, viewport.width - padding.left - padding.right);
+  const availH = Math.max(1, viewport.height - padding.top - padding.bottom);
+  const zoom = Math.min(maxZoom, Math.max(minZoom, Math.min(availW / Math.max(1, maxX - minX), availH / Math.max(1, maxY - minY))));
+  return { zoom, x: padding.left - minX * zoom, y: padding.top - minY * zoom };
+}
+
 /** Studio-only sidecar with dragged card positions (never a Flare file). */
 export const QUEST_MAP_SIDECAR = 'content/quest-map.json';
 

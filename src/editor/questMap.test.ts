@@ -281,3 +281,16 @@ describe('shared NPCs', () => {
     expect(Math.abs(mid('npc:npcs/x.txt') - mid('quest:c'))).toBeLessThan(200);
   });
 });
+
+describe('fit', () => {
+  it('keeps the toolbar strip clear', async () => {
+    const { fitViewport, FIT_PADDING } = await import('@/editor/questMap');
+    const boxes = [{ nodeId: 'a', x: 100, y: 50, width: 1500, height: 400, column: 0 }];
+    const view = fitViewport(boxes, { width: 1280, height: 800 }, 0.15, 1);
+    expect(view.zoom).toBeCloseTo((1280 - FIT_PADDING.left - FIT_PADDING.right) / 1500);
+    expect(50 * view.zoom + view.y).toBeCloseTo(FIT_PADDING.top);
+    const tall = fitViewport([{ ...boxes[0], height: 4000 }], { width: 1280, height: 800 }, 0.15, 1);
+    expect(50 * tall.zoom + tall.y).toBeCloseTo(FIT_PADDING.top);
+    expect((50 + 4000) * tall.zoom + tall.y).toBeLessThanOrEqual(800 - FIT_PADDING.bottom + 0.001);
+  });
+});

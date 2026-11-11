@@ -7,6 +7,7 @@ import { npcListThumbPath, resolveNpcPreviewPaths } from '@/flare/npcPreviewPath
 import {
   MAX_CARD_STEPS,
   bundleEventEdges,
+  fitViewport,
   routeEdges,
   layoutQuestGraph,
   primaryKind,
@@ -125,13 +126,7 @@ export default function QuestMapView({ graph: fullGraph, positions, onPositionsC
   const fit = useCallback(() => {
     const el = containerRef.current;
     if (!el || !layout.length) return;
-    const minX = Math.min(...layout.map((b) => b.x));
-    const minY = Math.min(...layout.map((b) => b.y));
-    const maxX = Math.max(...layout.map((b) => b.x + b.width));
-    const maxY = Math.max(...layout.map((b) => b.y + b.height));
-    const pad = 40;
-    const zoom = clampZoom(Math.min((el.clientWidth - pad * 2) / Math.max(1, maxX - minX), (el.clientHeight - pad * 2) / Math.max(1, maxY - minY), 1));
-    setView({ zoom, x: pad - minX * zoom, y: pad - minY * zoom });
+    setView(fitViewport(layout, { width: el.clientWidth, height: el.clientHeight }, MIN_ZOOM, 1));
   }, [layout]);
 
   const fitted = useRef(false);

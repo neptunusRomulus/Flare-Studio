@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { enemyFilePath, hydrateEnemyObject, propertiesFromEnemyFile } from './enemyFileHydrate';
+import { enemyFilePath, formatStatProperty, hydrateEnemyObject, propertiesFromEnemyFile, statsFromProperties } from './enemyFileHydrate';
 import type { MapObject } from '@/types';
 
 const fixture = (name: string) => readFileSync(new URL(`../../tests/fixtures/flare-enemies/${name}`, import.meta.url), 'utf8');
@@ -52,5 +52,19 @@ describe('enemy file hydrate', () => {
   it('builds an enemies/*.txt path from filename or sourcePath', () => {
     expect(enemyFilePath('/proj', emptyEnemy({ properties: { enemyFilename: 'goblin.txt' } as MapObject['properties'] }))).toBe('/proj/enemies/goblin.txt');
     expect(enemyFilePath('/proj', emptyEnemy({ properties: { sourcePath: 'enemies/base/antlion.txt' } as MapObject['properties'] }))).toBe('/proj/enemies/base/antlion.txt');
+  });
+
+  it('reads individual stats from stat= lines and keeps extras on save', () => {
+    const props = propertiesFromEnemyFile('name=X\nstat=hp,40\nstat=accuracy,75\nstat=dmg_ment_min,4\n');
+    expect(props.hp).toBe('40');
+    expect(props.accuracy).toBe('75');
+    expect(props.dmg_ment_min).toBe('4');
+    expect(props.stat).toContain('hp,40');
+    const stats = statsFromProperties(props);
+    expect(stats).toMatchObject({ hp: '40', accuracy: '75', dmg_ment_min: '4' });
+    stats.hp = '55';
+    delete stats.accuracy;
+    const written = formatStatProperty(stats, props.stat);
+    expect(written).toBe('hp,55\ndmg_ment_min,4');
   });
 });

@@ -9,6 +9,7 @@ import { User, Eye, Sword, Gift, Flag, MapPin, Volume2, HelpCircle, X, Save, Plu
 import type { MapObject } from '@/types';
 import { applyEnemyFileUpdates, includesFromEnemyText } from '@/adapters/flare/flareAdapter.cjs';
 import { propertyRecord, propertyText } from '@/editor/propertyText';
+import { ENEMY_STAT_IDS, formatStatProperty, statsFromProperties } from '@/utils/enemyFileHydrate';
 import type { LucideIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import useItems from '@/hooks/useItems';
@@ -290,9 +291,30 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
     if (defeatStatus) uniqueFields.defeat_status = defeatStatus;
 
     const lootValues = lootRows.filter((row) => row.id.trim()).map((row) => formatLootRow(row));
-    const listFields = formatLootProperty(lootRows) !== formatLootProperty(originalLoot) || !source.trim()
-      ? { loot: lootValues }
-      : undefined;
+    const presetStats: Record<string, string> = {
+      hp, mp,
+      hp_regen: hpRegen, mp_regen: mpRegen, accuracy, avoidance, crit, poise, stealth,
+      absorb_min: absorbMin, absorb_max: absorbMax, xp_gain: xpGain,
+      currency_find: currencyFind, item_find: itemFind,
+      reflect_chance: reflectChance, return_damage: returnDamage,
+      hp_steal: hpSteal, mp_steal: mpSteal,
+      resist_damage_over_time: resistDamageOverTime, resist_slow: resistSlow,
+      resist_stun: resistStun, resist_knockback: resistKnockback,
+      resist_stat_debuff: resistStatDebuff, resist_damage_reflect: resistDamageReflect,
+      dmg_melee_min: dmgMeleeMin, dmg_melee_max: dmgMeleeMax,
+      dmg_ranged_min: dmgRangedMin, dmg_ranged_max: dmgRangedMax,
+    };
+    const presetStatText = formatStatProperty(
+      { ...statsFromProperties(enemy?.properties as Record<string, unknown> | undefined), ...presetStats },
+      (enemy?.properties as Record<string, unknown> | undefined)?.stat,
+    );
+    const listFields: Record<string, string[]> = {};
+    if (formatLootProperty(lootRows) !== formatLootProperty(originalLoot) || !source.trim()) {
+      listFields.loot = lootValues;
+    }
+    if (presetStatText || propertyText(enemy?.properties?.stat)) {
+      listFields.stat = presetStatText ? presetStatText.split('\n') : [];
+    }
     const { text: content, warnings } = source.trim()
       ? applyEnemyFileUpdates(source, { includes: includePaths, fields: uniqueFields, listFields })
       : applyEnemyFileUpdates('', {
@@ -364,9 +386,10 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
   const [sfxDie, setSfxDie] = useState<string>(() => propertyText(enemy?.properties?.sfx_die));
   const [sfxCritDie, setSfxCritDie] = useState<string>(() => propertyText(enemy?.properties?.sfx_critdie));
 
-  // Stats
-  const [hp, setHp] = useState<string>(() => propertyText(enemy?.properties?.hp));
-  const [mp, setMp] = useState<string>(() => propertyText(enemy?.properties?.mp));
+  // Stats (values come from stat=id,value lines, not bare hp= keys)
+  const loadedStats = statsFromProperties(enemy?.properties as Record<string, unknown> | undefined);
+  const [hp, setHp] = useState<string>(() => loadedStats.hp || '');
+  const [mp, setMp] = useState<string>(() => loadedStats.mp || '');
   const [attack, setAttack] = useState<string>(() => propertyText(enemy?.properties?.attack));
   const [defense, setDefense] = useState<string>(() => propertyText(enemy?.properties?.defense));
   const [speed, setSpeed] = useState<string>(() => propertyText(enemy?.properties?.speed));
@@ -379,34 +402,34 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
   const [xpScaling, setXpScaling] = useState<string>(() => propertyText(enemy?.properties?.xp_scaling));
   const [vulnerable, setVulnerable] = useState<string>(() => propertyText(enemy?.properties?.vulnerable));
   // More advanced stats (resists, regen, utility)
-  const [resistDamageOverTime, setResistDamageOverTime] = useState<string>(() => propertyText(enemy?.properties?.resist_damage_over_time));
-  const [resistSlow, setResistSlow] = useState<string>(() => propertyText(enemy?.properties?.resist_slow));
-  const [resistStun, setResistStun] = useState<string>(() => propertyText(enemy?.properties?.resist_stun));
-  const [resistKnockback, setResistKnockback] = useState<string>(() => propertyText(enemy?.properties?.resist_knockback));
-  const [resistStatDebuff, setResistStatDebuff] = useState<string>(() => propertyText(enemy?.properties?.resist_stat_debuff));
-  const [resistDamageReflect, setResistDamageReflect] = useState<string>(() => propertyText(enemy?.properties?.resist_damage_reflect));
-  const [xpGain, setXpGain] = useState<string>(() => propertyText(enemy?.properties?.xp_gain));
-  const [hpRegen, setHpRegen] = useState<string>(() => propertyText(enemy?.properties?.hp_regen));
-  const [mpRegen, setMpRegen] = useState<string>(() => propertyText(enemy?.properties?.mp_regen));
-  const [hpSteal, setHpSteal] = useState<string>(() => propertyText(enemy?.properties?.hp_steal));
-  const [mpSteal, setMpSteal] = useState<string>(() => propertyText(enemy?.properties?.mp_steal));
-  const [accuracy, setAccuracy] = useState<string>(() => propertyText(enemy?.properties?.accuracy));
-  const [avoidance, setAvoidance] = useState<string>(() => propertyText(enemy?.properties?.avoidance));
-  const [crit, setCrit] = useState<string>(() => propertyText(enemy?.properties?.crit));
-  const [absorbMin, setAbsorbMin] = useState<string>(() => propertyText(enemy?.properties?.absorb_min));
-  const [absorbMax, setAbsorbMax] = useState<string>(() => propertyText(enemy?.properties?.absorb_max));
-  const [poise, setPoise] = useState<string>(() => propertyText(enemy?.properties?.poise));
-  const [reflectChance, setReflectChance] = useState<string>(() => propertyText(enemy?.properties?.reflect_chance));
-  const [returnDamage, setReturnDamage] = useState<string>(() => propertyText(enemy?.properties?.return_damage));
-  const [currencyFind, setCurrencyFind] = useState<string>(() => propertyText(enemy?.properties?.currency_find));
-  const [itemFind, setItemFind] = useState<string>(() => propertyText(enemy?.properties?.item_find));
-  const [stealth, setStealth] = useState<string>(() => propertyText(enemy?.properties?.stealth));
+  const [resistDamageOverTime, setResistDamageOverTime] = useState<string>(() => loadedStats.resist_damage_over_time || '');
+  const [resistSlow, setResistSlow] = useState<string>(() => loadedStats.resist_slow || '');
+  const [resistStun, setResistStun] = useState<string>(() => loadedStats.resist_stun || '');
+  const [resistKnockback, setResistKnockback] = useState<string>(() => loadedStats.resist_knockback || '');
+  const [resistStatDebuff, setResistStatDebuff] = useState<string>(() => loadedStats.resist_stat_debuff || '');
+  const [resistDamageReflect, setResistDamageReflect] = useState<string>(() => loadedStats.resist_damage_reflect || '');
+  const [xpGain, setXpGain] = useState<string>(() => loadedStats.xp_gain || '');
+  const [hpRegen, setHpRegen] = useState<string>(() => loadedStats.hp_regen || '');
+  const [mpRegen, setMpRegen] = useState<string>(() => loadedStats.mp_regen || '');
+  const [hpSteal, setHpSteal] = useState<string>(() => loadedStats.hp_steal || '');
+  const [mpSteal, setMpSteal] = useState<string>(() => loadedStats.mp_steal || '');
+  const [accuracy, setAccuracy] = useState<string>(() => loadedStats.accuracy || '');
+  const [avoidance, setAvoidance] = useState<string>(() => loadedStats.avoidance || '');
+  const [crit, setCrit] = useState<string>(() => loadedStats.crit || '');
+  const [absorbMin, setAbsorbMin] = useState<string>(() => loadedStats.absorb_min || '');
+  const [absorbMax, setAbsorbMax] = useState<string>(() => loadedStats.absorb_max || '');
+  const [poise, setPoise] = useState<string>(() => loadedStats.poise || '');
+  const [reflectChance, setReflectChance] = useState<string>(() => loadedStats.reflect_chance || '');
+  const [returnDamage, setReturnDamage] = useState<string>(() => loadedStats.return_damage || '');
+  const [currencyFind, setCurrencyFind] = useState<string>(() => loadedStats.currency_find || '');
+  const [itemFind, setItemFind] = useState<string>(() => loadedStats.item_find || '');
+  const [stealth, setStealth] = useState<string>(() => loadedStats.stealth || '');
 
   // Combat & powers (dmg stats)
-  const [dmgMeleeMin, setDmgMeleeMin] = useState<string>(() => propertyText(enemy?.properties?.dmg_melee_min));
-  const [dmgMeleeMax, setDmgMeleeMax] = useState<string>(() => propertyText(enemy?.properties?.dmg_melee_max));
-  const [dmgRangedMin, setDmgRangedMin] = useState<string>(() => propertyText(enemy?.properties?.dmg_ranged_min));
-  const [dmgRangedMax, setDmgRangedMax] = useState<string>(() => propertyText(enemy?.properties?.dmg_ranged_max));
+  const [dmgMeleeMin, setDmgMeleeMin] = useState<string>(() => loadedStats.dmg_melee_min || '');
+  const [dmgMeleeMax, setDmgMeleeMax] = useState<string>(() => loadedStats.dmg_melee_max || '');
+  const [dmgRangedMin, setDmgRangedMin] = useState<string>(() => loadedStats.dmg_ranged_min || '');
+  const [dmgRangedMax, setDmgRangedMax] = useState<string>(() => loadedStats.dmg_ranged_max || '');
   const [animations, setAnimations] = useState<string>(() => propertyText(enemy?.properties?.animations));
 
   const [powers, setPowers] = useState<Array<{ state: string; id: string; chance: number }>>(() => {
@@ -528,7 +551,7 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
       'tilesetPath','portraitPath','gfx','render_layers','animation_slots','suppress_hp','hp','mp','attack','defense','speed','xp','gold',
       'melee','ranged','caster','summoner','boss','passive','stationary','humanoid','lifeform',
       'powers','passive_powers','cooldown','cooldown_hit','power_filter','script','loot','loot_count','first_defeat_loot','quest_loot','defeat_status','categories','include'
-    ].includes(k));
+    , 'stat', ...ENEMY_STAT_IDS].includes(k));
     return pairs.map(([k,v]) => `${k}=${v}`).join('\n');
   });
 
@@ -557,8 +580,9 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
       setSfxDie(propertyText(enemy?.properties?.sfx_die));
       setSfxCritDie(propertyText(enemy?.properties?.sfx_critdie));
 
-      setHp(propertyText(enemy?.properties?.hp));
-      setMp(propertyText(enemy?.properties?.mp));
+      const stats = statsFromProperties(enemy?.properties as Record<string, unknown> | undefined);
+      setHp(stats.hp || '');
+      setMp(stats.mp || '');
       setAttack(propertyText(enemy?.properties?.attack));
       setDefense(propertyText(enemy?.properties?.defense));
       setSpeed(propertyText(enemy?.properties?.speed));
@@ -569,6 +593,28 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
       setStatPerLevel(propertyText(enemy?.properties?.stat_per_level));
       setXpScaling(propertyText(enemy?.properties?.xp_scaling));
       setVulnerable(propertyText(enemy?.properties?.vulnerable));
+      setResistDamageOverTime(stats.resist_damage_over_time || '');
+      setResistSlow(stats.resist_slow || '');
+      setResistStun(stats.resist_stun || '');
+      setResistKnockback(stats.resist_knockback || '');
+      setResistStatDebuff(stats.resist_stat_debuff || '');
+      setResistDamageReflect(stats.resist_damage_reflect || '');
+      setXpGain(stats.xp_gain || '');
+      setHpRegen(stats.hp_regen || '');
+      setMpRegen(stats.mp_regen || '');
+      setHpSteal(stats.hp_steal || '');
+      setMpSteal(stats.mp_steal || '');
+      setAccuracy(stats.accuracy || '');
+      setAvoidance(stats.avoidance || '');
+      setCrit(stats.crit || '');
+      setAbsorbMin(stats.absorb_min || '');
+      setAbsorbMax(stats.absorb_max || '');
+      setPoise(stats.poise || '');
+      setReflectChance(stats.reflect_chance || '');
+      setReturnDamage(stats.return_damage || '');
+      setCurrencyFind(stats.currency_find || '');
+      setItemFind(stats.item_find || '');
+      setStealth(stats.stealth || '');
 
       setIsMelee(enemy?.properties?.melee === 'true');
       setIsRanged(enemy?.properties?.ranged === 'true');
@@ -600,10 +646,10 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
       setIsFlying(enemy?.properties?.flying === 'true');
       setIsIntangible(enemy?.properties?.intangible === 'true');
 
-      setDmgMeleeMin(propertyText(enemy?.properties?.dmg_melee_min));
-      setDmgMeleeMax(propertyText(enemy?.properties?.dmg_melee_max));
-      setDmgRangedMin(propertyText(enemy?.properties?.dmg_ranged_min));
-      setDmgRangedMax(propertyText(enemy?.properties?.dmg_ranged_max));
+      setDmgMeleeMin(stats.dmg_melee_min || '');
+      setDmgMeleeMax(stats.dmg_melee_max || '');
+      setDmgRangedMin(stats.dmg_ranged_min || '');
+      setDmgRangedMax(stats.dmg_ranged_max || '');
       setAnimations(propertyText(enemy?.properties?.animations));
 
       try {
@@ -629,7 +675,7 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
 
       setCustomPropsRaw(() => {
         if (!enemy?.properties) return '';
-        const pairs = Object.entries(enemy.properties).filter(([k]) => !['tilesetPath','portraitPath','gfx','render_layers','animation_slots','suppress_hp','hp','mp','attack','defense','speed','xp','gold','melee','ranged','caster','summoner','boss','passive','stationary','humanoid','lifeform','powers','passive_powers','cooldown','cooldown_hit','power_filter','script','loot','loot_count','first_defeat_loot','quest_loot','defeat_status','categories','combat_style','threat_range','flee_range','flee_duration','flee_cooldown','chance_pursue','chance_flee','turn_delay','wander_radius','waypoints','waypoint_pause','facing','flying','intangible','include'].includes(k));
+        const pairs = Object.entries(enemy.properties).filter(([k]) => !['tilesetPath','portraitPath','gfx','render_layers','animation_slots','suppress_hp','hp','mp','attack','defense','speed','xp','gold','melee','ranged','caster','summoner','boss','passive','stationary','humanoid','lifeform','powers','passive_powers','cooldown','cooldown_hit','power_filter','script','loot','loot_count','first_defeat_loot','quest_loot','defeat_status','categories','combat_style','threat_range','flee_range','flee_duration','flee_cooldown','chance_pursue','chance_flee','turn_delay','wander_radius','waypoints','waypoint_pause','facing','flying','intangible','include', 'stat', ...ENEMY_STAT_IDS].includes(k));
         return pairs.map(([k,v]) => `${k}=${v}`).join('\n');
       });
 
@@ -653,7 +699,8 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
     const knownKeys = [
       'tilesetPath','portraitPath','gfx','render_layers','animation_slots','suppress_hp','hp','mp','attack','defense','speed','xp','gold',
       'melee','ranged','caster','summoner','boss','passive','stationary','humanoid','lifeform',
-      'powers','passive_powers','cooldown','cooldown_hit','power_filter','script','loot','loot_count','first_defeat_loot','quest_loot','defeat_status','categories','sfx_attack','sfx_hit','sfx_die','sfx_critdie','melee_range','combat_style','threat_range','flee_range','flee_duration','flee_cooldown','chance_pursue','chance_flee','turn_delay','wander_radius','waypoints','flying','intangible','include','abilities'
+      'powers','passive_powers','cooldown','cooldown_hit','power_filter','script','loot','loot_count','first_defeat_loot','quest_loot','defeat_status','categories','sfx_attack','sfx_hit','sfx_die','sfx_critdie','melee_range','combat_style','threat_range','flee_range','flee_duration','flee_cooldown','chance_pursue','chance_flee','turn_delay','wander_radius','waypoints','flying','intangible','include','abilities',
+      'stat', ...ENEMY_STAT_IDS,
     ];
 
     if (rarity) newProps.rarity = rarity; else delete newProps.rarity;
@@ -672,8 +719,23 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
     if (sfxDie) newProps.sfx_die = sfxDie; else delete newProps.sfx_die;
     if (sfxCritDie) newProps.sfx_critdie = sfxCritDie; else delete newProps.sfx_critdie;
 
-    if (hp) newProps.hp = hp; else delete newProps.hp;
-    if (mp) newProps.mp = mp; else delete newProps.mp;
+    const formStats: Record<string, string> = {
+      hp, mp,
+      hp_regen: hpRegen, mp_regen: mpRegen, accuracy, avoidance, crit, poise, stealth,
+      absorb_min: absorbMin, absorb_max: absorbMax, xp_gain: xpGain,
+      currency_find: currencyFind, item_find: itemFind,
+      reflect_chance: reflectChance, return_damage: returnDamage,
+      hp_steal: hpSteal, mp_steal: mpSteal,
+      resist_damage_over_time: resistDamageOverTime, resist_slow: resistSlow,
+      resist_stun: resistStun, resist_knockback: resistKnockback,
+      resist_stat_debuff: resistStatDebuff, resist_damage_reflect: resistDamageReflect,
+      dmg_melee_min: dmgMeleeMin, dmg_melee_max: dmgMeleeMax,
+      dmg_ranged_min: dmgRangedMin, dmg_ranged_max: dmgRangedMax,
+    };
+    const mergedStats = { ...statsFromProperties(enemy.properties as Record<string, unknown>), ...formStats };
+    const statText = formatStatProperty(mergedStats, (enemy.properties as Record<string, unknown> | undefined)?.stat);
+    if (statText) newProps.stat = statText; else delete newProps.stat;
+    for (const id of ENEMY_STAT_IDS) delete newProps[id];
     if (attack) newProps.attack = attack; else delete newProps.attack;
     if (defense) newProps.defense = defense; else delete newProps.defense;
     if (speed) newProps.speed = speed; else delete newProps.speed;
@@ -712,10 +774,6 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
     if (isFlying) newProps.flying = 'true'; else delete newProps.flying;
     if (isIntangible) newProps.intangible = 'true'; else delete newProps.intangible;
 
-    if (dmgMeleeMin) newProps.dmg_melee_min = dmgMeleeMin; else delete newProps.dmg_melee_min;
-    if (dmgMeleeMax) newProps.dmg_melee_max = dmgMeleeMax; else delete newProps.dmg_melee_max;
-    if (dmgRangedMin) newProps.dmg_ranged_min = dmgRangedMin; else delete newProps.dmg_ranged_min;
-    if (dmgRangedMax) newProps.dmg_ranged_max = dmgRangedMax; else delete newProps.dmg_ranged_max;
     if (animations) newProps.animations = animations; else delete newProps.animations;
 
     if (powersList) {

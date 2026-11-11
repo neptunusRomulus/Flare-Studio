@@ -9,6 +9,72 @@ import type { MapObject } from '@/types';
 
 const text = (v: unknown): string => (Array.isArray(v) ? String(v[0] ?? '') : v == null ? '' : String(v));
 
+/** StatBlock ids the enemy form edits as `stat=id,value` (not bare hp=). */
+export const ENEMY_STAT_IDS = [
+  'hp', 'mp', 'hp_regen', 'mp_regen', 'accuracy', 'avoidance', 'crit', 'poise', 'stealth',
+  'absorb_min', 'absorb_max', 'xp_gain', 'currency_find', 'item_find',
+  'reflect_chance', 'return_damage', 'hp_steal', 'mp_steal',
+  'resist_damage_over_time', 'resist_slow', 'resist_stun', 'resist_knockback',
+  'resist_stat_debuff', 'resist_damage_reflect', 'resist_hp_steal', 'resist_mp_steal',
+  'dmg_melee_min', 'dmg_melee_max', 'dmg_ranged_min', 'dmg_ranged_max',
+  'dmg_ment_min', 'dmg_ment_max',
+] as const;
+
+/** Parse newline-joined `stat=` values (`hp,40` / `accuracy,75`) into a map. */
+export function parseStatMap(raw: unknown): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const line of String(raw || '').split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const comma = trimmed.indexOf(',');
+    if (comma <= 0) continue;
+    const id = trimmed.slice(0, comma).trim();
+    const value = trimmed.slice(comma + 1).trim();
+    if (id) out[id] = value;
+  }
+  return out;
+}
+
+/**
+ * Stats for the enemy form: `stat=` lines win, then leftover top-level keys
+ * (older Studio saves wrote properties.hp instead of stat=hp).
+ */
+export function statsFromProperties(properties: Record<string, unknown> | null | undefined): Record<string, string> {
+  const props = properties || {};
+  const out = parseStatMap(props.stat);
+  for (const id of ENEMY_STAT_IDS) {
+    if (out[id] != null) continue;
+    const value = text(props[id]);
+    if (value) out[id] = value;
+  }
+  return out;
+}
+
+/** Keep previous `stat=` order, update values, drop empty, append new ids. */
+export function formatStatProperty(
+  stats: Record<string, string>,
+  previousRaw?: unknown,
+): string {
+  const seen = new Set<string>();
+  const lines: string[] = [];
+  for (const line of String(previousRaw || '').split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const id = trimmed.split(',')[0].trim();
+    if (!id) continue;
+    seen.add(id);
+    const next = stats[id];
+    if (next == null || next === '') continue;
+    lines.push(`${id},${next}`);
+  }
+  for (const [id, value] of Object.entries(stats)) {
+    if (!id || value == null || value === '' || seen.has(id)) continue;
+    lines.push(`${id},${value}`);
+  }
+  return lines.join('\n');
+}
+
+
 function isPresent(value: unknown): boolean {
   if (value == null) return false;
   if (Array.isArray(value)) return value.length > 0 && String(value[0] ?? '') !== '';
@@ -54,6 +120,10 @@ export function propertiesFromEnemyFile(content: string): Record<string, string>
   if (out.gfx && !out.animations) out.animations = out.gfx;
   if (out.thread_range && !out.threat_range) out.threat_range = out.thread_range;
   delete out.thread_range;
+  const fromStat = parseStatMap(out.stat);
+  for (const [id, value] of Object.entries(fromStat)) {
+    if (!out[id]) out[id] = value;
+  }
   return out;
 }
 

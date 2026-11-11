@@ -284,4 +284,46 @@ describe("main-process save handlers write into a temp project", () => {
     }
   });
 
+  it("delete-map removes the map json and maps txt without throwing", async () => {
+    const project = makeProject("fs-delete-map-");
+    const outsider = makeProject("fs-delete-out-");
+    try {
+      expect(await invoke<boolean>("save-map-project", project, { name: "Harbor Town", width: 2, height: 2 })).toBe(
+        true,
+      );
+      const jsonPath = path.join(project, "harbor_town.json");
+      expect(fs.existsSync(jsonPath)).toBe(true);
+
+      const mapsDir = path.join(project, "maps");
+      fs.mkdirSync(mapsDir, { recursive: true });
+      // Different case than the slug so the handler must match case-insensitively.
+      const mapTxtPath = path.join(mapsDir, "Harbor_Town.txt");
+      fs.writeFileSync(mapTxtPath, "[header]\nwidth=1\nheight=1\n");
+      const keepPath = path.join(mapsDir, "other.txt");
+      fs.writeFileSync(keepPath, "keep\n");
+      const outsiderPath = path.join(outsider, "harbor_town.json");
+      fs.writeFileSync(outsiderPath, "leave-me\n");
+
+      const result = (await invoke("delete-map", project, "Harbor Town")) as {
+        success: boolean;
+        message?: string;
+      };
+      expect(result.success, result.message ?? "delete-map failed").toBe(true);
+      expect(result.message ?? "").not.toMatch(/deleteMatchingFile is not defined/);
+      expect(fs.existsSync(jsonPath)).toBe(false);
+      expect(fs.existsSync(mapTxtPath)).toBe(false);
+      expect(fs.existsSync(keepPath)).toBe(true);
+      expect(fs.readFileSync(outsiderPath, "utf8")).toBe("leave-me\n");
+
+      const again = (await invoke("delete-map", project, "Harbor Town")) as {
+        success: boolean;
+        message?: string;
+      };
+      expect(again.success, again.message ?? "delete-map of a missing map failed").toBe(true);
+    } finally {
+      fs.rmSync(project, { recursive: true, force: true });
+      fs.rmSync(outsider, { recursive: true, force: true });
+    }
+  });
+
 });

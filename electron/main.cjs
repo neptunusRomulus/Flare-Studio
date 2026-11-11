@@ -18,6 +18,28 @@ const tilesetDefLookup = require("./tilesetDefLookup.cjs");
 const flareAdapter = require("../src/adapters/flare/flareAdapter.cjs");
 /** Map file base name; same slug Play and the adapter use. */
 const sanitizeMapNameForFilename = (name) => flareAdapter.slugFileName(name);
+
+/** Case-insensitive unlink of a single file inside dir. Path pieces in filename are rejected. */
+const deleteMatchingFile = (dir, filename) => {
+  if (!dir || !filename) return false;
+  const base = String(filename);
+  if (base.includes("/") || base.includes("\\") || base.includes("..")) return false;
+  if (!fs.existsSync(dir)) return false;
+  try {
+    const entries = fs.readdirSync(dir);
+    const normalized = base.toLowerCase();
+    const match = entries.find((entry) => entry.toLowerCase() === normalized);
+    if (!match) return false;
+    const targetPath = path.join(dir, match);
+    if (fs.existsSync(targetPath) && fs.statSync(targetPath).isFile()) {
+      fs.unlinkSync(targetPath);
+      return true;
+    }
+  } catch (error) {
+    console.warn("deleteMatchingFile failed for", dir, filename, error);
+  }
+  return false;
+};
 const { isInsideRoot } = require("../src/editor/pathGuard.cjs");
 const allowedProjectRoots = new Set();
 

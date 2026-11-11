@@ -14,6 +14,7 @@ import SidebarGameSettingsArea from '@/components/SidebarGameSettingsArea';
 import PaletteDock from '@/components/PaletteDock';
 import { shouldShowPanels } from '@/hooks/preMapEditor';
 import EngineSettingsDialog from '@/components/EngineSettingsDialog';
+import EngineStudioWindows from '@/components/engine/EngineStudioWindows';
 import MapSettingsDialog from '@/components/MapSettingsDialog';
 import EventDialog from '@/components/EventDialog';
 import { AnchoredConfirm } from '@/components/ui/inline-confirm';
@@ -387,6 +388,8 @@ export default function AppMain() {
             <SidebarGameSettingsArea />
           ) : !tileset.activeLayer ? null : undefined}
         />
+
+        <EngineStudioWindows />
 
         <EngineSettingsDialog
           open={showSettings}

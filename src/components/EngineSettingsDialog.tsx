@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { Moon, Sun, Target, X, Save, Settings, Eye, History, HelpCircle } from 'lucide-react';
+import { Moon, Sun, Target, X, Save, Settings, Eye, History, HelpCircle, FileText } from 'lucide-react';
 import Tooltip from '@/components/ui/tooltip';
 import UndoPersistencePanel from '@/components/UndoPersistencePanel';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
@@ -8,8 +8,9 @@ import { createPortal } from 'react-dom';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 import ResizeHandle from '@/components/ResizeHandle';
 import { useDisplayScale } from '@/hooks/useInterfaceScale';
+import { openEngineStudio } from '@/components/studio/engineStudio';
 
-type SettingsTab = 'general' | 'save' | 'display';
+type SettingsTab = 'general' | 'save' | 'display' | 'files';
 
 type EngineSettingsDialogProps = {
   open: boolean;
@@ -64,6 +65,7 @@ const EngineSettingsDialog = ({
     { id: 'general', icon: <Settings className="w-4 h-4" />, label: 'General' },
     { id: 'save', icon: <Save className="w-4 h-4" />, label: 'Save & History' },
     { id: 'display', icon: <Eye className="w-4 h-4" />, label: 'Display' },
+    { id: 'files', icon: <FileText className="w-4 h-4" />, label: 'Game files' },
   ];
 
   const dialogContent = (
@@ -325,6 +327,21 @@ const EngineSettingsDialog = ({
                 </div>
                 <p className="text-xs text-gray-500 mt-1">Toggle whether the Active GID badge is visible next to the hover coordinates.</p>
               </div>
+            </div>
+          )}
+
+          {activeTab === 'files' && (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Engine data files including stats, the XP table, titles, loot currency, hero appearance and equipment layers.
+              </p>
+              <button
+                type="button"
+                className="h-8 px-3 rounded-md border border-border text-sm hover:bg-muted"
+                onClick={() => openEngineStudio('files')}
+              >
+                Open engine files
+              </button>
             </div>
           )}
         </div>

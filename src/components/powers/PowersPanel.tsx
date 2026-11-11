@@ -7,6 +7,7 @@ import { KIND_META, POWER_KIND_ORDER, categorizePower, classifyEffect, type Cont
 import { KindIcon } from './kindIcon';
 import PowerEditorWindow, { type PowerTarget } from './PowerEditorWindow';
 import { usePowerProjectFiles } from './usePowerProjectFiles';
+import { openEngineStudio } from '@/components/studio/engineStudio';
 
 type Row = { target: PowerTarget; name: string; hint: string };
 const GROUPS: ContentKind[] = [...POWER_KIND_ORDER, 'buff', 'debuff', 'flag'];
@@ -71,6 +72,9 @@ const PowersPanel = ({ projectPath }: { projectPath: string | null | undefined }
       <div className="flex justify-center py-2">
         <Button size="sm" className="h-7 text-xs px-3" onClick={() => setTarget({ type: 'new', id: 'skill' })}>
           <Plus className="w-3 h-3 mr-1" />New
+        </Button>
+        <Button size="sm" variant="outline" className="h-7 text-xs px-3" onClick={() => openEngineStudio('tree')}>
+          Power tree
         </Button>
       </div>
       {target && <PowerEditorWindow target={target} data={data} onClose={() => setTarget(null)} onOpen={setTarget} />}

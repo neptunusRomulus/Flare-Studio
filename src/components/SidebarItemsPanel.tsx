@@ -6,6 +6,7 @@ import { ITEM_ROLE_META, ITEM_ROLE_SELECTIONS } from '@/editor/itemRoles';
 import type { ItemRole, ItemResourceSubtype } from '@/editor/itemRoles';
 import ElementContextMenu from '@/components/ElementContextMenu';
 import ListItemTooltip from '@/components/ListItemTooltip';
+import { openEngineStudio } from '@/components/studio/engineStudio';
 
 type ItemEntry = {
   id: number;
@@ -160,7 +161,7 @@ const SidebarItemsPanel = ({
         })()}
       </div>
     </div>
-    <div className="flex justify-center py-2">
+    <div className="flex justify-center items-center gap-2 py-2">
       <Tooltip content="Add Item" side="bottom">
         <Button
           variant="default"
@@ -175,6 +176,17 @@ const SidebarItemsPanel = ({
         >
           <Plus className="w-3 h-3" />
           Item
+        </Button>
+      </Tooltip>
+      <Tooltip content="items/types.txt, qualities.txt, sets.txt" side="bottom">
+        <Button
+          variant="outline"
+          size="sm"
+          aria-label="Item types, qualities and sets"
+          className="text-xs px-3 py-1 h-7"
+          onClick={() => openEngineStudio('items')}
+        >
+          Types
         </Button>
       </Tooltip>
     </div>

@@ -10,9 +10,12 @@ import {
   exportTilesetConfig,
   sectionsFromEngineText,
 } from '@/adapters/flare/flareAdapter.cjs';
-import { projectRoot, saveConfigDocument } from '@/editor/projectFiles';
+import { loadProjectTextMap, projectRoot, saveConfigDocument } from '@/editor/projectFiles';
+import { collectSectionIds } from '@/editor/engineForms';
+import { ClassHeroForm, HeroLayersForm, HeroOptionsForm, LootSettingsForm, XpTableForm } from '@/components/engine/EngineSpecialForms';
+import { registerProblemOpener } from '@/editor/projectProblems';
 
-interface ParsedSection {
+export interface ParsedSection {
   type: string;
   fields: ConfigField[];
   rawLines?: string[];
@@ -43,17 +46,44 @@ const ENGINE_CONFIG_FILES = [
   { name: 'resolutions.txt', displayName: 'Resolutions', description: 'Supported resolutions' },
   { name: 'tileset_config.txt', displayName: 'Tileset Config', description: 'Tileset configuration' },
   { name: 'tooltips.txt', displayName: 'Tooltips', description: 'Tooltip definitions' },
+  { name: 'stats.txt', displayName: 'Stats', description: 'Hero stat bases and growth' },
+  { name: 'xp_table.txt', displayName: 'XP Table', description: 'XP required per level' },
+  { name: 'titles.txt', displayName: 'Titles', description: 'Hero titles by level or stat' },
+  { name: 'loot.txt', displayName: 'Loot', description: 'Currency name and vendor ratios' },
+  { name: 'hero_options.txt', displayName: 'Hero Options', description: 'New-hero appearance choices' },
+  { name: 'hero_layers.txt', displayName: 'Hero Layers', description: 'Equipment draw order' },
 ];
 
-export function EngineConfigEditor() {
+export function EngineConfigEditor({ initialFile }: { initialFile?: string } = {}) {
   const ctx = useAppContext();
   const currentProjectPath = typeof ctx.currentProjectPath === 'string' ? ctx.currentProjectPath : null;
-  const [activeTab, setActiveTab] = useState<string>('classes.txt');
+  const [activeTab, setActiveTab] = useState<string>(initialFile || 'classes.txt');
   const [fileContents, setFileContents] = useState<Record<string, string>>({});
   const [parsedData, setParsedData] = useState<Record<string, ParsedSection[]>>({});
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<Record<string, boolean>>({});
+
+  const [itemIds, setItemIds] = useState<Set<string>>(new Set());
+  const [powerIds, setPowerIds] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (initialFile) setActiveTab(initialFile);
+  }, [initialFile]);
+
+  useEffect(() => {
+    return registerProblemOpener((problem) => {
+      if (!problem.path.startsWith('engine/')) return false;
+      setActiveTab(problem.path.replace(/^engine\//, ''));
+      return true;
+    });
+  }, []);
+
+  const updateFileText = (fileName: string, text: string) => {
+    setFileContents((prev) => ({ ...prev, [fileName]: text }));
+    setParsedData((prev) => ({ ...prev, [fileName]: sectionsFromEngineText(text) }));
+    setHasUnsavedChanges((prev) => ({ ...prev, [fileName]: true }));
+  };
 
   // Load all engine config files
   const loadAllConfigs = async () => {
@@ -101,6 +131,9 @@ export function EngineConfigEditor() {
       setFileContents(contents);
       setParsedData(parsed);
       setHasUnsavedChanges({});
+      const projectFiles = await loadProjectTextMap(currentProjectPath);
+      setItemIds(collectSectionIds(projectFiles, ['item']));
+      setPowerIds(collectSectionIds(projectFiles, ['power', 'upgrade']));
     } catch (error) {
       toast({ title: 'Error', description: 'Failed to load engine configs', variant: 'destructive' });
     } finally {
@@ -284,17 +317,33 @@ export function EngineConfigEditor() {
               </Button>
             </div>
           ) : (
-            <ConfigFileEditor
-              fileName={activeTab}
-              displayName={filteredFiles.find(f => f.name === activeTab)?.displayName || activeTab}
-              sections={parsedData[activeTab] || []}
-              onFieldChange={handleFieldChange}
-              onAddField={addField}
-              onRemoveField={removeField}
-              onAddSection={addSection}
-              onSave={() => saveConfig(activeTab)}
-              hasUnsavedChanges={hasUnsavedChanges[activeTab]}
-            />
+            <div className="space-y-4">
+              {activeTab === 'xp_table.txt' && <XpTableForm text={fileContents[activeTab] || ''} onChange={(text) => updateFileText(activeTab, text)} />}
+              {activeTab === 'loot.txt' && <LootSettingsForm text={fileContents[activeTab] || ''} onChange={(text) => updateFileText(activeTab, text)} />}
+              {activeTab === 'hero_options.txt' && <HeroOptionsForm text={fileContents[activeTab] || ''} onChange={(text) => updateFileText(activeTab, text)} />}
+              {activeTab === 'hero_layers.txt' && <HeroLayersForm text={fileContents[activeTab] || ''} onChange={(text) => updateFileText(activeTab, text)} />}
+              {activeTab === 'classes.txt' && (
+                <ClassHeroForm
+                  fileName={activeTab}
+                  sections={parsedData[activeTab] || []}
+                  onFieldChange={handleFieldChange}
+                  itemIds={itemIds}
+                  powerIds={powerIds}
+                />
+              )}
+              <ConfigFileEditor
+                fileName={activeTab}
+                displayName={filteredFiles.find(f => f.name === activeTab)?.displayName || activeTab}
+                sections={parsedData[activeTab] || []}
+                onFieldChange={handleFieldChange}
+                onAddField={addField}
+                onRemoveField={removeField}
+                onAddSection={addSection}
+                onSave={() => saveConfig(activeTab)}
+                hasUnsavedChanges={hasUnsavedChanges[activeTab]}
+                hideGeneric={['xp_table.txt', 'hero_options.txt', 'hero_layers.txt'].includes(activeTab)}
+              />
+            </div>
           )}
         </div>
       </div>
@@ -312,6 +361,7 @@ interface ConfigFileEditorProps {
   onAddSection: (fileName: string) => void;
   onSave: () => void;
   hasUnsavedChanges: boolean;
+  hideGeneric?: boolean;
 }
 
 function ConfigFileEditor({ 
@@ -323,9 +373,21 @@ function ConfigFileEditor({
   onRemoveField,
   onAddSection,
   onSave,
-  hasUnsavedChanges 
+  hasUnsavedChanges,
+  hideGeneric = false,
 }: ConfigFileEditorProps) {
   const [editingSection, setEditingSection] = useState<number | null>(null);
+
+  if (hideGeneric) {
+    return (
+      <div className="flex items-center justify-end">
+        <Button variant="default" size="sm" onClick={onSave} disabled={!hasUnsavedChanges}>
+          <Save className="w-3 h-3 mr-1" />
+          Save
+        </Button>
+      </div>
+    );
+  }
 
   if (sections.length === 0) {
     return (

@@ -932,6 +932,12 @@ export default function useAppMainBuilder() {
       items: sb['items'] ?? defaultItems,
       gameSettings: sb['gameSettings'] ?? { isGameSettingsLayer: false },
       itemsList,
+      handleOpenItemEdit,
+      handleOpenQuestEditDialog,
+      openProjectMap: async (filename: string) => {
+        const manager = projectManager as ProjectManagerView;
+        if (manager?.handleOpenMapFromMapsFolder) await manager.handleOpenMapFromMapsFolder(filename);
+      },
       events: sb['events'] ?? defaultEvents,
       tileset: {
         ...defaultTileset,

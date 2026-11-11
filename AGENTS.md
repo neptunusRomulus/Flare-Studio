@@ -50,6 +50,7 @@
 ## Known open issues
 - Multi-stage quest journals are edited as step cards; the Role center uses Moments (including Play and a shop-open indicator). List and Board stay behind a toggle.
 - Dialogue opens as a chat (`src/components/dialogue/MomentChatView.tsx`, helpers in `src/editor/dialogueChat.ts`): NPC bubbles left with portrait, player right, "shows when" condition chips, effect chips. Deleting a chip or line removes only its own file line.
+- Statuses layer = powers, effects and campaign statuses under Studio names (`src/components/powers/`, pure logic in `src/editor/powers/`): Skill / Monster Attack / Item Use / Trap from where a power is used, Buff / Debuff for effects, Story Flag for statuses. Files are edited line by line (`sectionFile.ts`); slider bands come from `scripts/power-tiers.mjs` (flare-game p33/p66). Status fields use the shared `story-flag-suggestions` datalist.
 
 ## Edit NPC
 - Name and appearance (fantasycore picker, default sprite) are on the first screen. Roles use on/off switches; a reserved gear opens the Role center (Dialogue / Shop / Quest).

@@ -2789,6 +2789,24 @@ ipcMainLocal.handle("write-file", async (_event, filePath, content) => {
   }
 });
 
+ipcMainLocal.handle("rename-project-file", async (_event, fromPath, toPath) => {
+  try {
+    if (!isAllowedProjectPath(fromPath) || !isAllowedProjectPath(toPath)) {
+      return { success: false, error: "Path not allowed" };
+    }
+    if (path.resolve(fromPath) === path.resolve(toPath)) return { success: true };
+    if (!fs.existsSync(fromPath)) return { success: false, error: "Source not found", missing: true };
+    if (fs.existsSync(toPath)) return { success: false, error: "Target already exists" };
+    const directory = path.dirname(toPath);
+    if (!fs.existsSync(directory)) fs.mkdirSync(directory, { recursive: true });
+    fs.renameSync(fromPath, toPath);
+    return { success: true };
+  } catch (error) {
+    console.error("Error renaming file:", fromPath, toPath, error);
+    return { success: false, error: error.message };
+  }
+});
+
 ipcMainLocal.handle("read-dir", async (_event, dirPath) => {
   try {
     if (!isAllowedProjectPath(dirPath) || !fs.existsSync(dirPath)) {

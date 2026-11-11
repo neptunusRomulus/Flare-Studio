@@ -106,6 +106,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("create-folder-if-not-exists", folderPath),
   writeFile: (filePath, content) =>
     ipcRenderer.invoke("write-file", filePath, content),
+  renameProjectFile: (fromPath, toPath) =>
+    ipcRenderer.invoke("rename-project-file", fromPath, toPath),
   readDir: (dirPath) => ipcRenderer.invoke("read-dir", dirPath),
   getProjectFolder: () => ipcRenderer.invoke("get-project-folder"),
   listEnemies: (projectPath) => ipcRenderer.invoke("list-enemies", projectPath),

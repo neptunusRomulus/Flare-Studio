@@ -110,6 +110,7 @@ declare global {
       createFolderIfNotExists: (folderPath: string) => Promise<boolean>;
       readFile: (filePath: string) => Promise<string | null>;
       writeFile: (filePath: string, content: string) => Promise<boolean>;
+      renameProjectFile: (fromPath: string, toPath: string) => Promise<{ success: boolean; error?: string; missing?: boolean }>;
       readDir: (dirPath: string) => Promise<Array<{ name: string; isDirectory: boolean }>>;
       getProjectFolder: () => Promise<string | null>;
       // Menu event listeners

@@ -570,6 +570,14 @@
      "type": "float",
      "repeatable": false,
      "description": "Determines the number of steps used when testing line-of-sight and line-of-movement. A smaller value equates to more accurate results at the cost of performance. Defaults to 0.1."
+    },
+    {
+     "key": "min_fps",
+     "section": null,
+     "name": "min_fps",
+     "type": "int",
+     "repeatable": false,
+     "description": "Sets the minimum frame limit that can be selected in the Video options. It will not change the player's saved max_fps setting if it is lower. If set to 0, this property will be ignored."
     }
    ]
   },

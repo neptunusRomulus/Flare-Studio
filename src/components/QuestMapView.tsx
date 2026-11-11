@@ -101,6 +101,8 @@ export default function QuestMapView({ graph, positions, onPositionsChange, onOp
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [view, setView] = useState({ x: 40, y: 40, zoom: 1 });
   const [dragging, setDragging] = useState<{ nodeId: string; x: number; y: number } | null>(null);
+  const [hovered, setHovered] = useState<string | null>(null);
+  const edgeFocus = (from: string, to: string) => (!hovered ? 'normal' : hovered === from || hovered === to ? 'on' : 'off');
   const gesture = useRef<{ kind: 'pan' | 'node'; nodeId?: string; startX: number; startY: number; originX: number; originY: number; moved: boolean } | null>(null);
 
   const layout = useMemo(() => layoutQuestGraph(graph, positions), [graph, positions]);
@@ -225,7 +227,8 @@ export default function QuestMapView({ graph, positions, onPositionsChange, onOp
                 const b = boxes.get(edge.to);
                 if (!a || !b) return null;
                 const style = EDGE_STYLE[primaryKind(edge.links)];
-                return <path key={edge.id} d={connectorPath(a, b).d} style={{ color: style.stroke, fill: 'none', stroke: style.stroke, strokeWidth: 2, strokeDasharray: style.dash, opacity: 0.85 }} />;
+                const focus = edgeFocus(edge.from, edge.to);
+                return <path key={edge.id} d={connectorPath(a, b).d} style={{ color: style.stroke, fill: 'none', stroke: style.stroke, strokeWidth: focus === 'on' ? 3 : 2, strokeDasharray: style.dash, opacity: focus === 'off' ? 0.15 : 0.85 }} />;
               })}
             </svg>
             {graph.edges.map((edge) => {
@@ -235,7 +238,7 @@ export default function QuestMapView({ graph, positions, onPositionsChange, onOp
               const { mid } = connectorPath(a, b);
               const style = EDGE_STYLE[primaryKind(edge.links)];
               return (
-                <div key={`label-${edge.id}`} className="absolute -translate-x-1/2 -translate-y-1/2" style={{ left: mid.x, top: mid.y }} onPointerDown={(e) => e.stopPropagation()}>
+                <div key={`label-${edge.id}`} className="absolute -translate-x-1/2 -translate-y-1/2" style={{ left: mid.x, top: mid.y, opacity: edgeFocus(edge.from, edge.to) === 'off' ? 0.2 : 1, zIndex: edgeFocus(edge.from, edge.to) === 'on' ? 5 : undefined }} onPointerDown={(e) => e.stopPropagation()}>
                   <Tooltip content={<span className="whitespace-pre font-mono text-[11px]">{edge.tooltip}</span>}>
                     <span className={`inline-block max-w-[160px] truncate rounded-full border bg-background px-2 py-0.5 text-[10px] font-medium ${style.pill}`}>{edge.label}</span>
                   </Tooltip>
@@ -251,6 +254,8 @@ export default function QuestMapView({ graph, positions, onPositionsChange, onOp
                   className="absolute rounded-lg border border-orange-500/40 bg-card shadow-sm hover:border-orange-500 cursor-pointer overflow-hidden"
                   style={{ left: box.x, top: box.y, width: box.width, height: box.height, zIndex: dragging?.nodeId === box.nodeId ? 10 : undefined }}
                   onPointerDown={(e) => onPointerDown(e, quest.nodeId)}
+                  onMouseEnter={() => setHovered(quest.nodeId)}
+                  onMouseLeave={() => setHovered((h) => (h === quest.nodeId ? null : h))}
                   title={quest.name}
                 >
                   <QuestCardBody quest={quest} npcName={npcName} eventName={eventName} />
@@ -266,6 +271,8 @@ export default function QuestMapView({ graph, positions, onPositionsChange, onOp
                   className="absolute rounded-lg border border-dashed border-border bg-card shadow-sm overflow-hidden cursor-move"
                   style={{ left: box.x, top: box.y, width: box.width, height: box.height, zIndex: dragging?.nodeId === box.nodeId ? 10 : undefined }}
                   onPointerDown={(e) => onPointerDown(e, event.nodeId)}
+                  onMouseEnter={() => setHovered(event.nodeId)}
+                  onMouseLeave={() => setHovered((h) => (h === event.nodeId ? null : h))}
                 >
                   <Tooltip content="Map event. Open its map to edit it" className="w-full h-full">
                     <div className="flex items-center gap-2 px-2 w-full h-full">
@@ -293,6 +300,8 @@ export default function QuestMapView({ graph, positions, onPositionsChange, onOp
                   className={`absolute rounded-lg border bg-card shadow-sm overflow-hidden ${editable ? 'border-blue-500/40 hover:border-blue-500 cursor-pointer' : 'border-border cursor-move'}`}
                   style={{ left: box.x, top: box.y, width: box.width, height: box.height, zIndex: dragging?.nodeId === box.nodeId ? 10 : undefined }}
                   onPointerDown={(e) => onPointerDown(e, npc.nodeId)}
+                  onMouseEnter={() => setHovered(npc.nodeId)}
+                  onMouseLeave={() => setHovered((h) => (h === npc.nodeId ? null : h))}
                 >
                   {editable ? body : <Tooltip content="Open its map to edit this NPC" className="w-full h-full">{body}</Tooltip>}
                 </div>

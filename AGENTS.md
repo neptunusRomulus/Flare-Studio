@@ -35,7 +35,7 @@
 - Map and Entities sub-switch buttons: corner eye = visibility, mouse wheel = opacity (per sub-target).
 - Title bar: Flare icon = app menu (incl. Engine Settings; `src/components/AppControls.tsx`, `MainMenuDialog.tsx`), Save button next to it.
 - GID readout only in Debug Mode. Minimap bottom-left.
-- Content > Quests: the Quest Map (`src/components/QuestMapView.tsx`, graph in `src/editor/questMap.ts`) replaces the map view; the network button next to "+ Quest" toggles it. Read-only: quests, the NPCs that start/advance/end/mention them, and quest unlocks, linked by statuses. Dragged card positions live only in the Studio sidecar `content/quest-map.json`.
+- Content > Quests: the Quest Map (`src/components/QuestMapView.tsx`, graph in `src/editor/questMap.ts`) replaces the map view; the network button next to "+ Quest" toggles it. Read-only: quests, the NPCs and map events that start/advance/end (NPCs also: talk about) them, and quest unlocks, linked by statuses. Dragged card positions live only in the Studio sidecar `content/quest-map.json`.
 - Entities: add button directly under the sub-switch. Add dialogs have no coordinates: position is instance data set by placing on the map. Unplaced = -1,-1, shown as "Not placed", not exported to the map (`src/editor/entityPlacementRules.ts`).
 
 ## Data safety

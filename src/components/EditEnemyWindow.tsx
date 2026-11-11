@@ -362,7 +362,6 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
   const [xp, setXp] = useState<string>(() => propertyText(enemy?.properties?.xp));
   const [gold, setGold] = useState<string>(() => propertyText(enemy?.properties?.gold));
   const [meleeRange, setMeleeRange] = useState<string>(() => propertyText(enemy?.properties?.melee_range));
-  const [threadRange, setThreadRange] = useState<string>(() => propertyText(enemy?.properties?.thread_range));
 
   // Advanced
   const [statPerLevel, setStatPerLevel] = useState<string>(() => propertyText(enemy?.properties?.stat_per_level));
@@ -584,7 +583,6 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
       setXp(propertyText(enemy?.properties?.xp));
       setGold(propertyText(enemy?.properties?.gold));
       setMeleeRange(propertyText(enemy?.properties?.melee_range));
-      setThreadRange(propertyText(enemy?.properties?.thread_range));
 
       setStatPerLevel(propertyText(enemy?.properties?.stat_per_level));
       setXpScaling(propertyText(enemy?.properties?.xp_scaling));
@@ -673,7 +671,7 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
     const knownKeys = [
       'tilesetPath','portraitPath','gfx','render_layers','animation_slots','suppress_hp','hp','mp','attack','defense','speed','xp','gold',
       'melee','ranged','caster','summoner','boss','passive','stationary','humanoid','lifeform',
-      'powers','passive_powers','cooldown','cooldown_hit','power_filter','script','loot','loot_count','first_defeat_loot','quest_loot','defeat_status','categories','sfx_attack','sfx_hit','sfx_die','sfx_critdie','melee_range','thread_range','combat_style','threat_range','flee_range','flee_duration','flee_cooldown','chance_pursue','chance_flee','turn_delay','wander_radius','waypoints','flying','intangible','include','abilities'
+      'powers','passive_powers','cooldown','cooldown_hit','power_filter','script','loot','loot_count','first_defeat_loot','quest_loot','defeat_status','categories','sfx_attack','sfx_hit','sfx_die','sfx_critdie','melee_range','combat_style','threat_range','flee_range','flee_duration','flee_cooldown','chance_pursue','chance_flee','turn_delay','wander_radius','waypoints','flying','intangible','include','abilities'
     ];
 
     if (rarity) newProps.rarity = rarity; else delete newProps.rarity;
@@ -705,7 +703,7 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
     if (vulnerable) newProps.vulnerable = vulnerable; else delete newProps.vulnerable;
 
     if (meleeRange) newProps.melee_range = meleeRange; else delete newProps.melee_range;
-    if (threadRange) newProps.thread_range = threadRange; else delete newProps.thread_range;
+    delete newProps.thread_range;
 
     if (isMelee) newProps.melee = 'true'; else delete newProps.melee;
     if (isRanged) newProps.ranged = 'true'; else delete newProps.ranged;

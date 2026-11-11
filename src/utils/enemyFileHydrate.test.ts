@@ -43,6 +43,12 @@ describe('enemy file hydrate', () => {
     });
   });
 
+  it('maps the typo thread_range to threat_range', () => {
+    const props = propertiesFromEnemyFile('name=X\nthread_range=8,16\n');
+    expect(props.threat_range).toBe('8,16');
+    expect(props).not.toHaveProperty('thread_range');
+  });
+
   it('builds an enemies/*.txt path from filename or sourcePath', () => {
     expect(enemyFilePath('/proj', emptyEnemy({ properties: { enemyFilename: 'goblin.txt' } as MapObject['properties'] }))).toBe('/proj/enemies/goblin.txt');
     expect(enemyFilePath('/proj', emptyEnemy({ properties: { sourcePath: 'enemies/base/antlion.txt' } as MapObject['properties'] }))).toBe('/proj/enemies/base/antlion.txt');

@@ -52,6 +52,8 @@ export function propertiesFromEnemyFile(content: string): Record<string, string>
   if (includes.length) out.include = includes.join('\n');
   if (out.animations && !out.tilesetPath) out.tilesetPath = out.animations;
   if (out.gfx && !out.animations) out.animations = out.gfx;
+  if (out.thread_range && !out.threat_range) out.threat_range = out.thread_range;
+  delete out.thread_range;
   return out;
 }
 

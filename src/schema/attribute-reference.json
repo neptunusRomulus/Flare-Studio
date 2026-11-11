@@ -7852,7 +7852,7 @@
      "key": "complete_status",
      "section": null,
      "name": "complete_status",
-     "type": "string",
+     "type": "list(status)",
      "repeatable": false,
      "description": "If this status is set, the quest will be displayed as completed."
     },
@@ -7943,6 +7943,14 @@
      "type": "string",
      "repeatable": false,
      "description": "Text that gets displayed in the Quest log when this quest is active."
+    },
+    {
+     "key": "quest.show_status",
+     "section": "quest",
+     "name": "show_status",
+     "type": "string",
+     "repeatable": false,
+     "description": "Displays the value of the given status ID after the quest text."
     }
    ]
   },

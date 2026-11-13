@@ -418,6 +418,8 @@ export default function AppMain() {
           handleMapResize={handleMapResize}
           handleDeleteMap={handleDeleteMap}
           editor={editor}
+          projectPath={controls?.currentProjectPath}
+          currentMapFileId={(titleBarProps?.tabs ?? []).find((t: { id?: string }) => t.id === titleBarProps?.activeTabId)?.name || mapName}
         />
 
         <EventDialog open={eventDialogOpen} onOpenChange={setEventDialogOpen} eventLocation={eventDialogLocation} editingEventId={editingEventId} />

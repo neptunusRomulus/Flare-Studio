@@ -1997,8 +1997,14 @@ ipcMainLocal.handle("create-npc-file", async (event, projectPath, npcData) => {
       console.log("Created npcs directory:", npcsDir);
     }
 
-    // Sanitize NPC name for filename
-    const sanitizedName = flareAdapter.slugFileName(npcData.name);
+    // Sanitize NPC name for filename; append _2, _3 when that file already exists.
+    const base = flareAdapter.slugFileName(npcData.name);
+    let sanitizedName = base;
+    let n = 2;
+    while (fs.existsSync(path.join(npcsDir, `${sanitizedName}.txt`))) {
+      sanitizedName = `${base}_${n}`;
+      n += 1;
+    }
 
     // Only generate the sanitized filename here — the actual NPC .txt content
     // is written by the save-export flow (saveExportFiles) which produces the

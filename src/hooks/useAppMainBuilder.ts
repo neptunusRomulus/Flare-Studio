@@ -35,6 +35,7 @@ import useBeforeCreateMap from './useBeforeCreateMap';
 import { TileMapEditor } from '@/editor/TileMapEditor';
 import type { EditorProjectData } from '@/editor/TileMapEditor';
 import type { MapObject } from '@/types';
+import { slugFileName } from '@/adapters/flare/flareAdapter.cjs';
 
 export default function useAppMainBuilder() {
   type EditorTabsType = ReturnType<typeof useEditorTabs>;
@@ -739,8 +740,9 @@ export default function useAppMainBuilder() {
   const handleMapResize = useCallback(() => {
     mapConfig.handleMapResize();
     if (activeTabId) {
+      const tabName = slugFileName(mapConfig.mapName) || mapConfig.mapName;
       setTabs((prev: EditorTab[]) =>
-        prev.map((t) => t.id === activeTabId ? { ...t, name: mapConfig.mapName } : t)
+        prev.map((t) => t.id === activeTabId ? { ...t, name: tabName } : t)
       );
     }
   }, [mapConfig, activeTabId, setTabs]);

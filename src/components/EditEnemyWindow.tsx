@@ -4,13 +4,15 @@ import Tooltip from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import RenameIdButton from '@/components/RenameIdButton';
 import { Badge } from '@/components/ui/badge';
 import { User, Eye, Sword, Gift, Flag, MapPin, Volume2, HelpCircle, X, Save, Plus, Check, Rabbit, Sigma, Zap, ChevronDown, ChevronUp, FolderOpen } from 'lucide-react';
 import type { MapObject } from '@/types';
 import { applyEnemyFileUpdates, includesFromEnemyText } from '@/adapters/flare/flareAdapter.cjs';
 import { propertyRecord, propertyText } from '@/editor/propertyText';
 import { ENEMY_STAT_IDS, enemyFilePath, formatStatProperty, statsFromProperties } from '@/utils/enemyFileHydrate';
+import { canonicalIdentity, displayIdentity } from '@/editor/identityRename';
+import { renameIfNameChanged, uniqueSlugFromName } from '@/editor/identityFromName';
+import { loadProjectTextMap } from '@/editor/projectFiles';
 import type { LucideIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import useItems from '@/hooks/useItems';
@@ -139,16 +141,17 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
     if (!projectPath || !window.electronAPI?.saveEnemyPreset) return;
     if (!name.trim()) return;
 
-    const sanitizeFileName = (input: string) =>
-      String(input || '')
-        .toLowerCase()
-        .replace(/[<>:"/\\|?*]/g, '_')
-        .trim()
-        .replace(/\s+/g, '_')
-        .replace(/_{2,}/g, '_') || 'unnamed_enemy';
+    const previousPath = propertyText(enemy?.properties?.enemyFilename) || propertyText(enemy?.properties?.sourcePath);
+    const files = await loadProjectTextMap(projectPath);
+    let allocated = previousPath
+      ? uniqueSlugFromName(files, 'enemy', name, previousPath)
+      : uniqueSlugFromName(files, 'enemy', name);
+    if (previousPath) {
+      const renamed = await renameIfNameChanged(projectPath, 'enemy', previousPath, name);
+      if (renamed.ok) allocated = displayIdentity('enemy', renamed.nextId);
+    }
+    const filename = `${allocated.split('/').pop()}.txt`;
 
-    const sanitizedName = sanitizeFileName(name);
-    const filename = `${sanitizedName}.txt`;
     const includePaths = includes.map((s) => s.trim()).filter(Boolean);
 
     const lines: string[] = [];
@@ -694,7 +697,7 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
 
   const handleClose = () => onOpenChange ? onOpenChange(false) : undefined;
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!enemy) {
       handleClose();
       return;
@@ -816,6 +819,27 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
       }
     }
 
+    const previousPath = propertyText(enemy.properties?.enemyFilename) || propertyText(enemy.properties?.sourcePath);
+    if (projectPath && name.trim()) {
+      try {
+        if (previousPath) {
+          const renamed = await renameIfNameChanged(projectPath, 'enemy', previousPath, name);
+          if (renamed.ok && renamed.changed) {
+            const path = canonicalIdentity('enemy', renamed.nextId);
+            newProps.sourcePath = path;
+            newProps.enemyFilename = path;
+          }
+        } else {
+          const files = await loadProjectTextMap(projectPath);
+          const path = canonicalIdentity('enemy', uniqueSlugFromName(files, 'enemy', name));
+          newProps.sourcePath = path;
+          newProps.enemyFilename = path;
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
     const updated: MapObject = {
       ...enemy,
       name,
@@ -831,7 +855,7 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
 
   const handleCloseDecision = (decision: 'save' | 'discard' | 'cancel') => {
     if (decision === 'save') {
-      handleSave();
+      void handleSave();
     }
     onCloseDecision?.(decision);
   };
@@ -949,26 +973,6 @@ export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, pro
                         <LabelWithTooltip field="name">Full Name</LabelWithTooltip>
                         <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Goblin Warrior" className="h-9" />
                       </div>
-                      {enemySourceRel(enemy) ? (
-                        <div className="flex items-center gap-1">
-                          <span className="text-xs text-muted-foreground">File</span>
-                          <Badge variant="secondary" className="w-fit text-xs px-2 py-1 border border-border bg-muted/60 font-mono">
-                            {enemySourceRel(enemy).replace(/^enemies\//, '')}
-                          </Badge>
-                          <RenameIdButton
-                            kind="enemy"
-                            currentId={enemySourceRel(enemy)}
-                            projectPath={projectPath}
-                            onRenamed={(nextId) => {
-                              const path = nextId.startsWith('enemies/') ? nextId : `enemies/${nextId.replace(/\.txt$/i, '')}.txt`;
-                              if (enemy && onSave) {
-                                const props = { ...(enemy.properties || {}), sourcePath: path, enemyFilename: path };
-                                onSave({ ...enemy, properties: props });
-                              }
-                            }}
-                          />
-                        </div>
-                      ) : null}
                       <div className="grid grid-cols-2 gap-3">
                         <div className="space-y-1">
                           <LabelWithTooltip field="level">Level</LabelWithTooltip>

@@ -12,7 +12,7 @@ const files: ProjectFile[] = [
 
 const data = (): PowerProjectFiles => ({
   files, project: buildPowerProject(files), kinds: {}, powerKinds: {}, loading: false,
-  reload: async () => {}, writeFile: () => {}, textOf: (p: string) => files.find((f) => f.path === p)?.text ?? '', setKind: () => {},
+  reload: async () => {}, writeFile: () => {}, textOf: (p: string) => files.find((f) => f.path === p)?.text ?? '', setKind: () => {}, projectPath: null,
 });
 const render = (type: 'power' | 'effect' | 'flag' | 'new', id: string) =>
   renderToStaticMarkup(<PowerEditorBody target={{ type, id }} data={data()} onClose={() => {}} onOpen={() => {}} />);

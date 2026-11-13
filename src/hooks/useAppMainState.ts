@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { canonicalJson, contentSlug, importQuestText, mergeQuestText } from '../adapters/flare/flareAdapter.cjs';
 import { loadProjectTextMap, projectRoot, writeProjectFiles } from '../editor/projectFiles';
+import { displayIdentity } from '../editor/identityRename';
+import { renameIfNameChanged, uniqueSlugFromName } from '../editor/identityFromName';
 import { applyWhenDoneRewards, findTurnInTarget, rewardsFromWhenDone } from '../editor/questRewards';
 import useEditorRefs from './useEditorRefs';
 import useEditorSetup from './useEditorSetup';
@@ -252,66 +254,88 @@ export default function useAppMainState() {
   const handleSaveQuest = useCallback(() => {
     const nextName = questDraft.name.trim() || `Quest ${rulesList.length + 1}`;
     const existing = rulesList.find((rule) => rule.id === editingQuestId);
-    const id = existing?.id || contentSlug(nextName, 'quest');
-    const startType = questDraft.start_type || existing?.startType || 'player';
-    const complete = questDraft.complete_status.trim() || completeStatusKey(id);
-    const steps = (questDraft.steps && questDraft.steps.length)
-      ? questDraft.steps
-      : [createFirstStep({ questId: id, acceptStatus: questDraft.requires_status, completeStatus: complete }, questDraft.quest_text || nextName)];
-    const first = flattenFirstStep(steps);
-    const stored: StoredQuest = {
-      ...questDraft,
-      ...first,
-      id,
-      name: nextName,
-      complete_status: complete,
-      startType,
-      start_type: startType,
-      triggerId: existing?.triggerId || '',
-      itemRequirements: questDraft.itemRequirements || [],
-      steps,
-    };
-    setRulesList((prev) => {
-      if (existing) return prev.map((rule) => (rule.id === existing.id ? stored : rule));
-      return [...prev, stored];
-    });
 
-    setShowQuestDialog(false);
-    setEditingQuestId(null);
-    setQuestDraft(emptyQuestDraft());
+    const persist = (id: string) => {
+      const startType = questDraft.start_type || existing?.startType || 'player';
+      const complete = questDraft.complete_status.trim() || completeStatusKey(id);
+      const steps = (questDraft.steps && questDraft.steps.length)
+        ? questDraft.steps
+        : [createFirstStep({ questId: id, acceptStatus: questDraft.requires_status, completeStatus: complete }, questDraft.quest_text || nextName)];
+      const first = flattenFirstStep(steps);
+      const stored: StoredQuest = {
+        ...questDraft,
+        ...first,
+        id,
+        name: nextName,
+        complete_status: complete,
+        startType,
+        start_type: startType,
+        triggerId: existing?.triggerId || '',
+        itemRequirements: questDraft.itemRequirements || [],
+        steps,
+      };
+      const previousId = existing?.id;
+      setRulesList((prev) => {
+        if (previousId) return prev.map((rule) => (rule.id === previousId ? stored : rule));
+        return [...prev, stored];
+      });
 
-    if (!currentProjectPath) return;
-    const root = projectRoot(currentProjectPath);
-    const rel = `quests/${id}.txt`;
-    void (async () => {
-      const existingText = window.electronAPI?.readFile ? ((await window.electronAPI.readFile(`${root}/${rel}`)) || '') : '';
-      const text = mergeQuestText(existingText, { name: nextName, complete_status: complete, steps });
-      const writes = [
-        { path: rel, content: text },
-        { path: `content/quests/${id}.json`, content: canonicalJson('quest', stored) },
-      ];
-      const rewards = rewardsFromWhenDone(questDraft.when_done);
-      if (Object.keys(rewards).length > 0) {
-        const files = await loadProjectTextMap(currentProjectPath);
-        const picked = questDraft.when_done?.event_path && questDraft.when_done?.event_key
-          ? { kind: 'event' as const, path: questDraft.when_done.event_path, eventKey: questDraft.when_done.event_key }
-          : null;
-        const target = findTurnInTarget(files, id, complete) || picked;
-        if (target) {
-          const applied = applyWhenDoneRewards(files, target, rewards);
-          if (applied.changed) writes.push({ path: target.path, content: applied.files[target.path] });
-        } else {
-          toast({
-            title: 'When done rewards not written',
-            description: 'Pick a map event in When done, or add a turn-in NPC dialog first.',
-            variant: 'destructive',
-          });
+      setShowQuestDialog(false);
+      setEditingQuestId(null);
+      setQuestDraft(emptyQuestDraft());
+
+      if (!currentProjectPath) return;
+      const root = projectRoot(currentProjectPath);
+      const rel = `quests/${id}.txt`;
+      void (async () => {
+        const existingText = window.electronAPI?.readFile ? ((await window.electronAPI.readFile(`${root}/${rel}`)) || '') : '';
+        const text = mergeQuestText(existingText, { name: nextName, complete_status: complete, steps });
+        const writes = [
+          { path: rel, content: text },
+          { path: `content/quests/${id}.json`, content: canonicalJson('quest', stored) },
+        ];
+        const rewards = rewardsFromWhenDone(questDraft.when_done);
+        if (Object.keys(rewards).length > 0) {
+          const files = await loadProjectTextMap(currentProjectPath);
+          const picked = questDraft.when_done?.event_path && questDraft.when_done?.event_key
+            ? { kind: 'event' as const, path: questDraft.when_done.event_path, eventKey: questDraft.when_done.event_key }
+            : null;
+          const target = findTurnInTarget(files, id, complete) || picked;
+          if (target) {
+            const applied = applyWhenDoneRewards(files, target, rewards);
+            if (applied.changed) writes.push({ path: target.path, content: applied.files[target.path] });
+          } else {
+            toast({
+              title: 'When done rewards not written',
+              description: 'Pick a map event in When done, or add a turn-in NPC dialog first.',
+              variant: 'destructive',
+            });
+          }
         }
+        const saved = await writeProjectFiles(currentProjectPath, writes);
+        if (!saved) {
+          toast({ title: 'Quest save failed', description: 'Could not write the quests folder.', variant: 'destructive' });
+        }
+      })();
+    };
+
+    void (async () => {
+      if (existing && currentProjectPath) {
+        const renamed = await renameIfNameChanged(currentProjectPath, 'quest', existing.id, nextName);
+        if (!renamed.ok) {
+          toast({ title: 'Could not rename the quest', description: renamed.error, variant: 'destructive' });
+          persist(existing.id);
+          return;
+        }
+        persist(displayIdentity('quest', renamed.nextId) || existing.id);
+        return;
       }
-      const saved = await writeProjectFiles(currentProjectPath, writes);
-      if (!saved) {
-        toast({ title: 'Quest save failed', description: 'Could not write the quests folder.', variant: 'destructive' });
+      if (currentProjectPath) {
+        const files = await loadProjectTextMap(currentProjectPath);
+        persist(uniqueSlugFromName(files, 'quest', nextName, existing?.id));
+        return;
       }
+      persist(existing?.id || contentSlug(nextName, 'quest'));
     })();
   }, [currentProjectPath, editingQuestId, questDraft, rulesList]);
 

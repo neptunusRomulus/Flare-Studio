@@ -7,8 +7,6 @@ import type { MapObject } from '@/types';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 import type { ItemSummary } from '@/utils/items';
 import NameField from '@/components/NameField';
-import { Badge } from '@/components/ui/badge';
-import RenameIdButton from '@/components/RenameIdButton';
 import PositionField from '@/components/PositionField';
 import NpcAppearanceSection from '@/components/NpcAppearanceSection';
 import NpcAssetThumb from '@/components/NpcAssetThumb';
@@ -164,20 +162,6 @@ const NpcEditDialog = ({
               onChange={(value) => setEditingObject({ ...editingObject, name: value })}
               placeholder="NPC name"
             />
-            {getEditingObjectProperty('npcFilename', '') ? (
-              <div className="flex items-center gap-1 pt-2">
-                <span className="text-xs text-muted-foreground">File</span>
-                <Badge variant="secondary" className="w-fit text-xs px-2 py-1 border border-border bg-muted/60 font-mono">
-                  {getEditingObjectProperty('npcFilename', '').replace(/^npcs\//, '')}
-                </Badge>
-                <RenameIdButton
-                  kind="npc"
-                  currentId={getEditingObjectProperty('npcFilename', '')}
-                  projectPath={projectPath}
-                  onRenamed={(nextId) => updateEditingObjectProperty('npcFilename', nextId.startsWith('npcs/') ? nextId : `npcs/${nextId.replace(/\.txt$/i, '')}.txt`)}
-                />
-              </div>
-            ) : null}
           </div>
         </div>
 

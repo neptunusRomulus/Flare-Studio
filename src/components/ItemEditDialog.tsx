@@ -1,7 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Badge } from '@/components/ui/badge';
-import RenameIdButton from '@/components/RenameIdButton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Tooltip from '@/components/ui/tooltip';
@@ -241,24 +239,6 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
         <CollapsibleSection title="Identity" icon={Tag}>
           <div className="grid grid-cols-2 gap-3 items-start">
             <div className="space-y-2">
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-muted-foreground">ID</label>
-                <div className="flex items-center gap-1">
-                  <Badge variant="secondary" className="w-fit text-xs px-2 py-1 border border-border bg-muted/60">
-                    {editingItem.id}
-                  </Badge>
-                  <RenameIdButton
-                    kind="item"
-                    currentId={String(editingItem.id)}
-                    projectPath={currentProjectPath}
-                    onRenamed={(nextId) => {
-                      updateEditingItemField('id', Number(nextId));
-                      const path = String(editingItem.filePath || '');
-                      if (/#item_\d+$/.test(path)) updateEditingItemField('filePath', path.replace(/#item_\d+$/, `#item_${nextId}`));
-                    }}
-                  />
-                </div>
-              </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs text-muted-foreground">Name</label>
                 <Input

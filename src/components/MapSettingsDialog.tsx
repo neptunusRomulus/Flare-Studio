@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Tooltip from '@/components/ui/tooltip';
@@ -10,8 +10,8 @@ import { emptyMapPresentation, type MapPresentation } from '@/editor/studioDraft
 import { MapPresentationFields } from '@/components/studio/studioEditors';
 import { AnchoredConfirm } from '@/components/ui/inline-confirm';
 import ResizeHandle from '@/components/ResizeHandle';
-import RenameIdButton from '@/components/RenameIdButton';
-import { slugFileName } from '@/adapters/flare/flareAdapter.cjs';
+import { toast } from '@/hooks/use-toast';
+import { renameIfNameChanged } from '@/editor/identityFromName';
 
 type MapSettingsDialogProps = {
   open: boolean;
@@ -27,6 +27,8 @@ type MapSettingsDialogProps = {
   handleMapResize: () => void;
   handleDeleteMap: () => Promise<boolean>;
   editor?: TileMapEditor | null;
+  projectPath?: string | null;
+  currentMapFileId?: string;
 };
 
 const MapSettingsDialog = ({
@@ -42,7 +44,9 @@ const MapSettingsDialog = ({
   updateStartingMap,
   handleMapResize,
   handleDeleteMap,
-  editor
+  editor,
+  projectPath = null,
+  currentMapFileId = '',
 }: MapSettingsDialogProps) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [presentation, setPresentation] = useState<MapPresentation>(() => emptyMapPresentation());
@@ -54,6 +58,15 @@ const MapSettingsDialog = ({
     handleResizeMouseDown,
   } = useDraggableResizable({ id: 'map_settings', initialWidth: 460, initialHeight: 640, minWidth: 400, minHeight: 420 });
   
+  const openedRef = useRef({ name: mapName, fileId: currentMapFileId });
+
+  useEffect(() => {
+    if (!open) return;
+    openedRef.current = { name: mapName, fileId: currentMapFileId };
+    // Capture name/file only when the dialog opens, not while the user types.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
   useEffect(() => {
     if (!open || !editor?.getMapPresentation) return;
     setPresentation(editor.getMapPresentation());
@@ -65,6 +78,21 @@ const MapSettingsDialog = ({
       setShowDeleteConfirm(false);
       onClose();
     }
+  };
+
+  const saveSettings = async () => {
+    const nextName = mapName.trim();
+    const opened = openedRef.current;
+    if (nextName && projectPath && opened.fileId && nextName !== opened.name.trim()) {
+      const result = await renameIfNameChanged(projectPath, 'map', opened.fileId, nextName);
+      if (!result.ok) {
+        toast({ title: 'Could not rename the map', description: result.error, variant: 'destructive' });
+        return;
+      }
+    }
+    editor?.setMapPresentation?.(presentation);
+    handleMapResize();
+    onClose();
   };
 
   if (!open) return null;
@@ -104,22 +132,13 @@ const MapSettingsDialog = ({
         <div className="flex-1 overflow-y-auto space-y-4 p-4">
           <div>
             <label className="block text-sm font-medium mb-2">Map Name</label>
-            <div className="flex items-center gap-1">
-              <Input
-                type="text"
-                value={mapName}
-                onChange={(e) => setMapName(e.target.value)}
-                placeholder="Enter map name"
-                className="w-full"
-              />
-              {slugFileName(mapName) ? (
-                <RenameIdButton
-                  kind="map"
-                  currentId={slugFileName(mapName)}
-                  onRenamed={(nextId) => setMapName(nextId.replace(/^maps\//, '').replace(/\.txt$/i, ''))}
-                />
-              ) : null}
-            </div>
+            <Input
+              type="text"
+              value={mapName}
+              onChange={(e) => setMapName(e.target.value)}
+              placeholder="Enter map name"
+              className="w-full"
+            />
           </div>
           <div>
             <label className="block text-sm font-medium mb-2">Map Width</label>
@@ -180,11 +199,7 @@ const MapSettingsDialog = ({
               <Button
                 variant="outline"
                 size="icon"
-                onClick={() => {
-                  editor?.setMapPresentation?.(presentation);
-                  handleMapResize();
-                  onClose();
-                }}
+                onClick={() => { void saveSettings(); }}
                 className="w-8 h-8 p-0"
                 aria-label="Save map settings"
               >

@@ -68,7 +68,7 @@ export function usePowerProjectFiles(projectPath: string | null | undefined) {
   const project = useMemo(() => buildPowerProject(files), [files]);
   const powerKinds = useMemo(() => resolvePowerKinds(project, kinds), [project, kinds]);
 
-  return { files, project, kinds, powerKinds, loading, reload, writeFile, textOf, setKind };
+  return { files, project, kinds, powerKinds, loading, reload, writeFile, textOf, setKind, projectPath: projectPath ?? null };
 }
 
 export type PowerProjectFiles = ReturnType<typeof usePowerProjectFiles>;

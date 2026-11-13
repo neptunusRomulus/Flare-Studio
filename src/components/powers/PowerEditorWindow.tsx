@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertTriangle, Trash2, X } from 'lucide-react';
-import RenameIdButton from '@/components/RenameIdButton';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import DraftInput from './DraftInput';
 import { Switch } from '@/components/ui/switch';
 import Tooltip from '@/components/ui/tooltip';
@@ -24,6 +24,8 @@ import TemplatePicker from './TemplatePicker';
 import { createFromTemplate } from '@/editor/powers/powerCreate';
 import type { ContentKind } from '@/editor/powers/powerKinds';
 import type { PowerProjectFiles } from './usePowerProjectFiles';
+import { renameIfNameChanged } from '@/editor/identityFromName';
+import { displayIdentity } from '@/editor/identityRename';
 
 export type PowerTarget = { type: 'power' | 'effect' | 'flag' | 'new'; id: string };
 
@@ -334,6 +336,35 @@ const EffectEditor = ({ target, data, onClose, onOpen }: Props) => {
 
 const FlagView = ({ target, data, onOpen }: Props) => {
   const usage = data.project.flags[target.id] || { setBy: [], readBy: [] };
+  const [name, setName] = useState(target.id);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    setName(target.id);
+    setError('');
+  }, [target.id]);
+  const commitName = async () => {
+    const next = name.trim();
+    if (!data.projectPath || busy || !next) return;
+    setBusy(true);
+    try {
+      const result = await renameIfNameChanged(data.projectPath, 'flag', target.id, next);
+      if (!result.ok) {
+        setError(result.error || 'Could not rename.');
+        return;
+      }
+      setError('');
+      if (result.changed) {
+        void data.reload();
+        onOpen({ type: 'flag', id: displayIdentity('flag', result.nextId) || result.nextId });
+      }
+    } catch (err) {
+      console.error(err);
+      setError('Could not rename.');
+    } finally {
+      setBusy(false);
+    }
+  };
   const row = (label: string, key: string, items: string[]) => (
     <Field label={label} flareKey={key}>
       <div className="flex flex-wrap gap-1">
@@ -346,7 +377,19 @@ const FlagView = ({ target, data, onOpen }: Props) => {
   if (usage.readBy.length === 0) warnings.push({ id: 'never_read', text: 'Nothing checks this flag', tooltip: 'Set, but no requires_status / requires_not_status reads it' });
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2"><KindIcon kind="flag" className="w-5 h-5" /><span className="text-sm font-semibold">{target.id}</span><RenameIdButton kind="flag" currentId={target.id} onRenamed={(nextId) => { void data.reload(); onOpen({ type: 'flag', id: nextId }); }} /></div>
+      <div className="flex items-center gap-2">
+        <KindIcon kind="flag" className="w-5 h-5 shrink-0" />
+        <Input
+          className="h-8 text-sm font-semibold"
+          value={name}
+          aria-label="Name"
+          onChange={(e) => { setName(e.target.value); setError(''); }}
+          onBlur={() => { void commitName(); }}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void commitName(); } }}
+          disabled={busy || !data.projectPath}
+        />
+      </div>
+      {error ? <p className="text-[11px] text-destructive">{error}</p> : null}
       <Warnings items={warnings} />
       {row('Set by', 'set_status / unset_status / defeat_status …', usage.setBy)}
       {row('Checked by', 'requires_status / requires_not_status …', usage.readBy)}

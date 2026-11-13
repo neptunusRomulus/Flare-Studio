@@ -11,6 +11,9 @@ import {
 } from '../utils/animationUtils';
 import type { MapObject } from '../types';
 import { propertyText } from '../editor/propertyText';
+import { canonicalIdentity } from '../editor/identityRename';
+import { renameIfNameChanged, uniqueSlugFromName } from '../editor/identityFromName';
+import { loadProjectTextMap } from '../editor/projectFiles';
 
 type Params = {
   editingObject: MapObject | null;
@@ -32,11 +35,22 @@ export default function useObjectDialogHandlers({ editingObject, setEditingObjec
 
     setObjectValidationErrors([]);
 
+    let savedProperties = sanitized;
     if (editingObject.type === 'npc' && window.electronAPI?.writeNpcFile && currentProjectPath) {
       const existingFilename = sanitized.npcFilename || propertyText(editingObject.properties?.npcFilename);
-      if (existingFilename) {
-        try {
-
+      const npcName = sanitized.name || editingObject.name || '';
+      let filename = existingFilename;
+      try {
+        if (existingFilename && npcName.trim()) {
+          const renamed = await renameIfNameChanged(currentProjectPath, 'npc', existingFilename, npcName);
+          if (renamed.ok && renamed.changed) {
+            filename = canonicalIdentity('npc', renamed.nextId);
+          }
+        } else if (!existingFilename && npcName.trim()) {
+          const files = await loadProjectTextMap(currentProjectPath);
+          filename = canonicalIdentity('npc', uniqueSlugFromName(files, 'npc', npcName));
+        }
+        if (filename) {
           const animProps = getAnimationProps(sanitized);
           let gfxPath = sanitized.tilesetPath || undefined;
           let animationDefinitionPath: string | undefined;
@@ -53,7 +67,7 @@ export default function useObjectDialogHandlers({ editingObject, setEditingObjec
           ) {
             const animationFolder = `${currentProjectPath.replace(/\\/g, '/')}/animations/npcs`;
             await window.electronAPI.createFolderIfNotExists(animationFolder);
-            const safeBaseName = buildSafeNpcAnimationFilename(sanitized.name || existingFilename.replace(/^npcs\//, '') || `npc_${editingObject.id}`);
+            const safeBaseName = buildSafeNpcAnimationFilename(sanitized.name || String(existingFilename || filename || '').replace(/^npcs\//, '') || `npc_${editingObject.id}`);
             let animationFileName = `${safeBaseName}.txt`;
             // Never overwrite a hand-made (multi-animation) file: use Studio's own name instead
             try {
@@ -75,7 +89,7 @@ export default function useObjectDialogHandlers({ editingObject, setEditingObjec
           }
 
           // Merge into the existing NPC file (keys/sections/dialog order Studio doesn't model survive)
-          const npcFilenameClean = npcFileBase(existingFilename);
+          const npcFilenameClean = npcFileBase(filename);
           let existingNpcText: string | null = null;
           try {
             const api = window.electronAPI as unknown as { readFile?: (p: string) => Promise<string | null> };
@@ -88,15 +102,16 @@ export default function useObjectDialogHandlers({ editingObject, setEditingObjec
           });
           const npcFileContent = mergedNpcFileContent(existingNpcText, npcUpdate);
           await window.electronAPI.writeNpcFile(currentProjectPath, npcFilenameClean, npcFileContent);
-        } catch (error) {
-          console.error('Failed to save NPC file:', error);
+          if (filename !== existingFilename) {
+            savedProperties = { ...sanitized, npcFilename: filename };
+          }
         }
-      } else {
-        console.warn('NPC has no filename, skipping file save');
+      } catch (error) {
+        console.error('Failed to save NPC file:', error);
       }
     }
 
-    if (editingObject) handleUpdateObject({ ...editingObject, properties: sanitized });
+    if (editingObject) handleUpdateObject({ ...editingObject, properties: savedProperties });
   }, [editingObject, setObjectValidationErrors, currentProjectPath, handleUpdateObject]);
 
   const updateEditingObjectProperty = useCallback((key: string, value: string | null) => {

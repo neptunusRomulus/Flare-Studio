@@ -10,7 +10,7 @@ import { User, Eye, Sword, Gift, Flag, MapPin, Volume2, HelpCircle, X, Save, Plu
 import type { MapObject } from '@/types';
 import { applyEnemyFileUpdates, includesFromEnemyText } from '@/adapters/flare/flareAdapter.cjs';
 import { propertyRecord, propertyText } from '@/editor/propertyText';
-import { ENEMY_STAT_IDS, formatStatProperty, statsFromProperties } from '@/utils/enemyFileHydrate';
+import { ENEMY_STAT_IDS, enemyFilePath, formatStatProperty, statsFromProperties } from '@/utils/enemyFileHydrate';
 import type { LucideIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import useItems from '@/hooks/useItems';
@@ -51,8 +51,12 @@ function includeListFromProp(value: string): string[] {
 }
 
 function enemySourceRel(enemy?: MapObject | null): string {
-  const props = enemy?.properties || {};
-  return propertyText(props.enemyFilename) || propertyText(props.sourcePath);
+  if (!enemy) return '';
+  const props = enemy.properties || {};
+  const explicit = propertyText(props.enemyFilename) || propertyText(props.sourcePath);
+  if (!explicit && !String(enemy.name || '').trim()) return '';
+  // Same path the save uses: enemies/<name>.txt when no file was recorded yet.
+  return enemyFilePath('', enemy).replace(/^\/+/, '');
 }
 
 

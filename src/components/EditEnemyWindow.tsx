@@ -65,7 +65,11 @@ function enemySourceRel(enemy?: MapObject | null): string {
 export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, projectPath = '', inline = false, showCloseConfirm = false, onCloseDecision }: EditEnemyWindowProps) {
   const { toast } = useToast();
   const itemsHook = useItems({ currentProjectPath: projectPath || null, toast, normalizeItemsForState });
-  const { itemsList = [] } = itemsHook;
+  const { itemsList = [], refreshItemsList } = itemsHook;
+  // The window stays mounted, so reload items each time it opens; otherwise items made after the project loaded never show up in Loot.
+  useEffect(() => {
+    if (open && projectPath) void refreshItemsList(projectPath);
+  }, [open, projectPath, refreshItemsList]);
   const lootItems = useMemo(() => itemsList.filter((item) => item.role !== 'loot_groups'), [itemsList]);
 
   const {

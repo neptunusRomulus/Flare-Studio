@@ -74,6 +74,35 @@ const SidebarItemsPanel = ({
   onAddItem
 }: SidebarItemsPanelProps) => (
   <div className="flex flex-col flex-1">
+    <div className="flex justify-center items-center gap-2 py-2">
+      <Tooltip content="Add Item" side="bottom">
+        <Button
+          variant="default"
+          size="sm"
+          aria-label="Add Item"
+          className="text-xs px-3 py-1 h-7 shadow-sm bg-orange-500 hover:bg-orange-600 text-white border-orange-500"
+          onClick={(event) => {
+            event.stopPropagation();
+            event.preventDefault();
+            onAddItem();
+          }}
+        >
+          <Plus className="w-3 h-3 mr-1" />
+          Item
+        </Button>
+      </Tooltip>
+      <Tooltip content="items/types.txt, qualities.txt, sets.txt" side="bottom">
+        <Button
+          variant="outline"
+          size="sm"
+          aria-label="Item types, qualities and sets"
+          className="text-xs px-3 py-1 h-7"
+          onClick={() => openEngineStudio('items')}
+        >
+          Types
+        </Button>
+      </Tooltip>
+    </div>
     <div className="flex-1 min-h-0 border border-dashed border-border rounded-md overflow-y-auto">
       <div className="flex flex-col gap-0.5 px-1">
         {(() => {
@@ -160,35 +189,6 @@ const SidebarItemsPanel = ({
           });
         })()}
       </div>
-    </div>
-    <div className="flex justify-center items-center gap-2 py-2">
-      <Tooltip content="Add Item" side="bottom">
-        <Button
-          variant="default"
-          size="sm"
-          aria-label="Add Item"
-          className="text-xs px-3 py-1 h-7 shadow-sm bg-orange-500 hover:bg-orange-600 text-white border-orange-500"
-          onClick={(event) => {
-            event.stopPropagation();
-            event.preventDefault();
-            onAddItem();
-          }}
-        >
-          <Plus className="w-3 h-3" />
-          Item
-        </Button>
-      </Tooltip>
-      <Tooltip content="items/types.txt, qualities.txt, sets.txt" side="bottom">
-        <Button
-          variant="outline"
-          size="sm"
-          aria-label="Item types, qualities and sets"
-          className="text-xs px-3 py-1 h-7"
-          onClick={() => openEngineStudio('items')}
-        >
-          Types
-        </Button>
-      </Tooltip>
     </div>
   </div>
 );

@@ -1,8 +1,9 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 import type { MapObject } from '@/types';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 import { toast } from '@/hooks/use-toast';
 import { askConfirm } from '@/components/ui/inline-confirm';
+import { lastAnchorRect, type Rect } from '@/components/ui/inlineConfirmCore';
 import { compactUsageMessage, findUsages } from '@/editor/projectRefs';
 import { loadProjectTextMap } from '@/editor/projectFiles';
 
@@ -150,13 +151,21 @@ export default function useAppMainObjectCommands({
     }
   }, [currentProjectPath, itemsHook, toast]);
 
-  const handleDeleteItem = useCallback(async (item: { id: number; name: string; filePath: string }) => {
-    if (!currentProjectPath) return false;
-    const files = await loadProjectTextMap(currentProjectPath);
-    const usages = findUsages(files, 'item', String(item.id));
-    const ok = await askConfirm(compactUsageMessage('item', String(item.id), usages));
-    if (!ok) return false;
+  const deleteItemBusy = useRef(false);
+
+  const handleDeleteItem = useCallback(async (item: { id: number; name: string; filePath: string }, anchor?: Rect) => {
+    if (!currentProjectPath) {
+      toast({ title: 'Error', description: 'No project is open.', variant: 'destructive' });
+      return false;
+    }
+    if (deleteItemBusy.current) return false;
+    deleteItemBusy.current = true;
+    const confirmAnchor = anchor ?? lastAnchorRect();
     try {
+      const files = await loadProjectTextMap(currentProjectPath);
+      const usages = findUsages(files, 'item', String(item.id));
+      const ok = await askConfirm(compactUsageMessage('item', String(item.id), usages), confirmAnchor);
+      if (!ok) return false;
       if (window.electronAPI?.deleteItemFile) {
         const result = await window.electronAPI.deleteItemFile(item.filePath);
         if (result.success) {
@@ -167,11 +176,15 @@ export default function useAppMainObjectCommands({
         toast({ title: 'Error', description: result.error || 'Failed to delete item.', variant: 'destructive' });
         return false;
       }
+      toast({ title: 'Error', description: 'Item deletion is not available.', variant: 'destructive' });
+      return false;
     } catch (err) {
       console.error('Failed to delete item:', err);
-      toast({ title: 'Error', description: 'Failed to delete item file.', variant: 'destructive' });
+      toast({ title: 'Error', description: 'Failed to delete item.', variant: 'destructive' });
+      return false;
+    } finally {
+      deleteItemBusy.current = false;
     }
-    return false;
   }, [currentProjectPath, itemsHook, toast]);
   return {
     handleDuplicateObject,

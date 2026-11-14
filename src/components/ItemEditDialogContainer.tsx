@@ -8,7 +8,7 @@ type ItemEditDialogCtx = {
   updateEditingItemField?: (key: string, value: unknown) => void;
   handleCloseItemEdit?: () => void;
   handleSaveItemEdit?: () => void;
-  onDeleteItem?: (item: any) => Promise<void>;
+  onDeleteItem?: (item: any, anchor?: { left: number; top: number; width: number; height: number }) => Promise<boolean | void>;
 };
 
 export default function ItemEditDialogContainer({ ctx }: { ctx: unknown }) {

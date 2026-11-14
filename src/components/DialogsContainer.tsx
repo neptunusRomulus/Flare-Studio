@@ -17,6 +17,17 @@ import SaveErrorNotificationPanel from '@/components/SaveErrorNotificationPanel'
 import EditEnemyWindow from '@/components/EditEnemyWindow';
 import QuestEditDialogContainer from '@/components/QuestEditDialogContainer';
 
+
+/** Nested dialogsCtx drops top-level handlers like onDeleteItem; copy them back. */
+export function dialogCtxForContainers(ctx: unknown): unknown {
+  if (!ctx || typeof ctx !== 'object') return ctx;
+  const root = ctx as Record<string, unknown>;
+  const nested = root.dialogsCtx;
+  if (!nested || typeof nested !== 'object' || Array.isArray(nested)) return ctx;
+  const n = nested as Record<string, unknown>;
+  return { ...n, onDeleteItem: n.onDeleteItem ?? root.onDeleteItem };
+}
+
 // The dialog context is a large, aggregated object assembled in App.tsx.
 // It's acceptable to allow a broad shape here; keep the exception narrow.
 export default function DialogsContainer({ ctx }: { ctx: unknown }) {
@@ -29,9 +40,7 @@ export default function DialogsContainer({ ctx }: { ctx: unknown }) {
     itemDialogState?: unknown;
   };
   const local = ctx as LocalSeparateCtx;
-
-  const root = ctx as Record<string, unknown>;
-  const dialogCtx = (root.dialogsCtx as unknown) ?? ctx;
+  const dialogCtx = dialogCtxForContainers(ctx);
 
   // If no dialog context was assembled, avoid mounting dialog components
   // which expect many nested fields — return nothing until ctx is populated.

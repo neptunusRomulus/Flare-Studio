@@ -1175,6 +1175,7 @@ export default function useAppMainBuilder() {
           updateEditingItemField: itemsHook.updateEditingItemField,
           handleCloseItemEdit: itemsHook.handleCloseItemEdit,
           handleSaveItemEdit: itemsHook.handleSaveItemEdit,
+          onDeleteItem: handleDeleteItem,
           showLootGroupEditDialog: itemsHook.showLootGroupEditDialog,
           lootGroupEditingItem: itemsHook.lootGroupEditingItem,
           lootGroupEditingData: itemsHook.lootGroupEditingData,

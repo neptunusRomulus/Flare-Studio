@@ -25,7 +25,14 @@ function ConfirmBubble({ anchor, side = 'auto', message, onCancel, onConfirm, tr
   }, [anchor, side, message]);
 
   useEffect(() => {
+    // Ignore the opening click's leftover mouse events, and any mousedown
+    // that happens before this bubble has painted and the gesture has ended.
+    let armed = false;
+    const arm = () => { armed = true; };
+    const armTimer = window.setTimeout(arm, 0);
+    const onUp = () => { armed = true; };
     const onDown = (e: MouseEvent) => {
+      if (!armed) return;
       const t = e.target as Node;
       // Presses on the trigger itself are left to its own onClick (it usually toggles).
       if (ref.current?.contains(t) || triggerRef?.current?.contains(t)) return;
@@ -34,9 +41,14 @@ function ConfirmBubble({ anchor, side = 'auto', message, onCancel, onConfirm, tr
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); onCancel(); }
     };
+    document.addEventListener('pointerup', onUp, true);
+    document.addEventListener('mouseup', onUp, true);
     document.addEventListener('mousedown', onDown, true);
     document.addEventListener('keydown', onKey, true);
     return () => {
+      window.clearTimeout(armTimer);
+      document.removeEventListener('pointerup', onUp, true);
+      document.removeEventListener('mouseup', onUp, true);
       document.removeEventListener('mousedown', onDown, true);
       document.removeEventListener('keydown', onKey, true);
     };

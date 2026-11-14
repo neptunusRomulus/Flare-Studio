@@ -93,7 +93,7 @@ type ItemEditDialogProps = {
   updateEditingItemField: (key: string, value: FieldValue) => void;
   handleCloseItemEdit: () => void;
   handleSaveItemEdit: () => void;
-  onDeleteItem?: (item: { id: number; name: string; filePath: string }) => Promise<boolean | void>;
+  onDeleteItem?: (item: { id: number; name: string; filePath: string }, anchor?: { left: number; top: number; width: number; height: number }) => Promise<boolean | void>;
 };
 
 const CollapsibleSection = ({
@@ -148,6 +148,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
   const currentProjectPath = typeof ctx.currentProjectPath === 'string' ? ctx.currentProjectPath : null;
   const itemBaseline = React.useRef('');
   const itemOpen = React.useRef(false);
+  const itemDeleteBusy = React.useRef(false);
   if (showItemEditDialog && editingItem && !itemOpen.current) {
     itemBaseline.current = JSON.stringify(editingItem);
     itemOpen.current = true;
@@ -1029,16 +1030,30 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
         <div>
           <Tooltip content="Delete Item" side="top">
               <Button
+                type="button"
                 variant="ghost"
                 size="icon"
-                onClick={async () => {
-                  if (!onDeleteItem || !editingItem) return;
-                  const deleted = await onDeleteItem({
-                    id: editingItem.id as number,
-                    name: editingItem.name as string,
-                    filePath: editingItem.filePath as string,
-                  });
-                  if (deleted !== false) handleCloseItemEdit();
+                aria-label="Delete Item"
+                onClick={async (e) => {
+                  if (!onDeleteItem) {
+                    console.warn('ItemEditDialog: onDeleteItem is missing; cannot delete.');
+                    return;
+                  }
+                  if (!editingItem || itemDeleteBusy.current) return;
+                  itemDeleteBusy.current = true;
+                  try {
+                    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                    const deleted = await onDeleteItem({
+                      id: editingItem.id as number,
+                      name: editingItem.name as string,
+                      filePath: editingItem.filePath as string,
+                    }, { left: r.left, top: r.top, width: r.width, height: r.height });
+                    if (deleted !== false) handleCloseItemEdit();
+                  } catch (err) {
+                    console.error('Failed to delete item:', err);
+                  } finally {
+                    itemDeleteBusy.current = false;
+                  }
                 }}
                 className="h-9 w-9 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
               >

@@ -1,4 +1,5 @@
 import { Plus, X } from 'lucide-react';
+import NpcAssetThumb from '@/components/NpcAssetThumb';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Tooltip from '@/components/ui/tooltip';
@@ -10,7 +11,7 @@ import {
   type LootSummaryInput,
 } from '@/editor/lootChance';
 
-type ItemOption = { id: string | number; name?: string };
+type ItemOption = { id: string | number; name?: string; icon?: string };
 
 type Props = {
   rows: LootRow[];
@@ -45,8 +46,17 @@ const LootRowsEditor = ({ rows, onChange, items = [], summary }: Props) => {
   return (
     <div className="space-y-2">
       <div className="space-y-1">
-        {rows.map((row, index) => (
+        {rows.map((row, index) => {
+          const icon = !row.isTable ? items.find((item) => String(item.id) === row.id)?.icon : undefined;
+          return (
           <div key={`${row.id}-${index}`} className="flex flex-wrap items-center gap-1.5">
+            {icon ? (
+              <NpcAssetThumb
+                imagePath={icon}
+                alt={itemLabel(row.id)}
+                className="h-8 w-8 shrink-0"
+              />
+            ) : null}
             {row.isTable ? (
               <Input
                 aria-label="Loot table"
@@ -106,7 +116,8 @@ const LootRowsEditor = ({ rows, onChange, items = [], summary }: Props) => {
               <X className="h-3.5 w-3.5" />
             </button>
           </div>
-        ))}
+          );
+        })}
       </div>
       <div className="flex flex-wrap gap-2">
         <Button type="button" size="sm" variant="outline" className="h-7 text-[11px]" onClick={() => onChange([...rows, emptyItemRow()])}>

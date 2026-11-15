@@ -89,6 +89,12 @@ Coming Soon...
 - [ ] 16- **You name it. I will check on it. Promise.**
 
 ---
+#### ⚡ **After v1**
+
+- [ ] Codebase cleanup (dead code, duplication, split oversized files)
+- [ ] Migrate from Electron to Tauri (Rust backend, keep the React + shadcn UI) to cut RAM and app size
+
+---
 ### Testing
 
 I need people for testings the Flare Studio for Windows, MacOS and Linux. If you have can spare some time to do please reach me out in [**Flare Official Discord.**](https://discord.gg/6UmaA8HA55) - if discord link is broken please visit [Flare Engine webpage](https://flarerpg.org/get-involved/). My name is Isemlorer (ismlorer - 173499916004360192) in discord.

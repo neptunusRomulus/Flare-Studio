@@ -5,7 +5,7 @@ import { toast } from '@/hooks/use-toast';
 import { askConfirm } from '@/components/ui/inline-confirm';
 import { lastAnchorRect, type Rect } from '@/components/ui/inlineConfirmCore';
 import { compactUsageMessage, findUsages } from '@/editor/projectRefs';
-import { loadProjectTextMap } from '@/editor/projectFiles';
+import { loadProjectRefMap } from '@/editor/studioMapRefs';
 
 type CommandEditor = TileMapEditor | null;
 
@@ -162,7 +162,7 @@ export default function useAppMainObjectCommands({
     deleteItemBusy.current = true;
     const confirmAnchor = anchor ?? lastAnchorRect();
     try {
-      const files = await loadProjectTextMap(currentProjectPath);
+      const files = await loadProjectRefMap(currentProjectPath);
       const usages = findUsages(files, 'item', String(item.id));
       const ok = await askConfirm(compactUsageMessage('item', String(item.id), usages), confirmAnchor);
       if (!ok) return false;

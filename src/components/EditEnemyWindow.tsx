@@ -15,6 +15,7 @@ import type { MapObject } from '@/types';
 import { applyEnemyFileUpdates, includesFromEnemyText } from '@/adapters/flare/flareAdapter.cjs';
 import { propertyRecord, propertyText } from '@/editor/propertyText';
 import { ENEMY_STAT_IDS, enemyFilePath, formatStatProperty, statsFromProperties } from '@/utils/enemyFileHydrate';
+import { writeEnemyDefinition } from '@/utils/enemyFileWrite';
 import { canonicalIdentity, displayIdentity } from '@/editor/identityRename';
 import { renameIfNameChanged, uniqueSlugFromName } from '@/editor/identityFromName';
 import { loadProjectTextMap } from '@/editor/projectFiles';
@@ -1050,6 +1051,15 @@ const [name, setName] = useState(() => enemy?.name || '');
       category: category,
       properties: newProps,
     };
+
+    if (projectPath) {
+      try {
+        const wrote = await writeEnemyDefinition(projectPath, updated);
+        if (!wrote) console.error('Failed to write enemy file');
+      } catch (err) {
+        console.error('Failed to write enemy file:', err);
+      }
+    }
 
     onSave?.(updated);
     handleClose();

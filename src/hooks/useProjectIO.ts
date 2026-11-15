@@ -4,6 +4,7 @@ import type { TileMapEditor } from '@/editor/TileMapEditor';
 import { buildSpawnContent, computeIntermapTarget, STARTING_MAP_INVALID_NAMES } from '@/editor/mapSpawnUtils';
 import { legacyMapFileName, slugFileName } from '../adapters/flare/flareAdapter.cjs';
 import { npcFileUpdate, npcFileContent, npcFileBase } from '@/utils/npcFileUpdate';
+import { writeEnemyDefinition } from '@/utils/enemyFileWrite';
 import { askConfirm } from '@/components/ui/inline-confirm';
 
 type ProjectIOOptions = {
@@ -266,6 +267,17 @@ const useProjectIO = ({
           }
         } catch (npcErr) {
           console.warn('Failed to collect NPC files for export:', npcErr);
+        }
+
+        try {
+          if (currentProjectPath) {
+            for (const enemy of mapObjects.filter((obj) => obj.type === 'enemy')) {
+              const wrote = await writeEnemyDefinition(currentProjectPath, enemy);
+              if (!wrote) console.warn('Failed to write enemy file for', enemy.name || enemy.id);
+            }
+          }
+        } catch (enemyErr) {
+          console.warn('Failed to write enemy files for export:', enemyErr);
         }
 
         const result = await window.electronAPI.saveExportFiles(

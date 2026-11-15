@@ -48,6 +48,7 @@ const LootRowsEditor = ({ rows, onChange, items = [], summary }: Props) => {
       <div className="space-y-1">
         {rows.map((row, index) => {
           const icon = !row.isTable ? items.find((item) => String(item.id) === row.id)?.icon : undefined;
+          const missing = !row.isTable && Boolean(row.id) && row.id !== 'currency' && !items.some((item) => String(item.id) === row.id);
           return (
           <div key={`${row.id}-${index}`} className="flex flex-wrap items-center gap-1.5">
             {icon ? (
@@ -68,7 +69,8 @@ const LootRowsEditor = ({ rows, onChange, items = [], summary }: Props) => {
             ) : (
               <select
                 aria-label="Loot item"
-                className="h-8 min-w-[9rem] flex-1 rounded-md border border-input bg-background px-2 text-xs"
+                className={`h-8 min-w-[9rem] flex-1 rounded-md border bg-background px-2 text-xs ${missing ? 'border-red-500/50 text-red-600 dark:text-red-400' : 'border-input'}`}
+                aria-invalid={missing || undefined}
                 value={row.id}
                 onChange={(event) => update(index, { id: event.target.value, isTable: false })}
               >
@@ -77,8 +79,8 @@ const LootRowsEditor = ({ rows, onChange, items = [], summary }: Props) => {
                 {items.map((item) => (
                   <option key={item.id} value={String(item.id)}>{item.name || item.id} ({item.id})</option>
                 ))}
-                {row.id && !items.some((item) => String(item.id) === row.id) && row.id !== 'currency' && (
-                  <option value={row.id}>{row.id}</option>
+                {missing && (
+                  <option value={row.id}>Missing item #{row.id}</option>
                 )}
               </select>
             )}

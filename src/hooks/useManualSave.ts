@@ -11,6 +11,7 @@ import useSaveSequencing from './useSaveSequencing';
 import useSaveErrorNotification from './useSaveErrorNotification';
 import useFileConflictDetection from './useFileConflictDetection';
 import { propertyRecord, propertyText } from '@/editor/propertyText';
+import { writeEnemyDefinition } from '@/utils/enemyFileWrite';
 
 // Helper to safely get file stats from Electron
 const getFileStatsSafe = async (path: string) => {
@@ -538,6 +539,21 @@ export default function useManualSave(args: {
                 }
               } catch (npcErr) {
                 console.warn('[ManualSave][TXT] Failed to collect NPC files:', npcErr);
+              }
+
+              try {
+                if (projectPath) {
+                  const enemyObjects = editor.getMapObjects().filter((obj) => obj.type === 'enemy');
+                  for (const enemy of enemyObjects) {
+                    const wrote = await writeEnemyDefinition(projectPath, enemy);
+                    if (!wrote) console.warn('[ManualSave][TXT] Failed to write enemy file for', enemy.name || enemy.id);
+                  }
+                  if (enemyObjects.length > 0) {
+                    console.log(`[ManualSave][TXT] Wrote ${enemyObjects.length} enemy definition file(s)`);
+                  }
+                }
+              } catch (enemyErr) {
+                console.warn('[ManualSave][TXT] Failed to write enemy files:', enemyErr);
               }
 
               console.log('[ManualSave][TXT] Generated mapTxt length:', mapTxt.length, '| tilesetDef length:', tilesetDef.length);

@@ -3,8 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import useAppMainObjectCommands from './useAppMainObjectCommands';
 
-vi.mock('@/editor/projectFiles', () => ({
-  loadProjectTextMap: vi.fn(),
+vi.mock('@/editor/studioMapRefs', () => ({
+  loadProjectRefMap: vi.fn(),
 }));
 vi.mock('@/components/ui/inline-confirm', () => ({
   askConfirm: vi.fn(),
@@ -13,7 +13,7 @@ vi.mock('@/hooks/use-toast', () => ({
   toast: vi.fn(),
 }));
 
-import { loadProjectTextMap } from '@/editor/projectFiles';
+import { loadProjectRefMap } from '@/editor/studioMapRefs';
 import { askConfirm } from '@/components/ui/inline-confirm';
 import { toast } from '@/hooks/use-toast';
 
@@ -32,10 +32,10 @@ function hook() {
 
 describe('handleDeleteItem', () => {
   beforeEach(() => {
-    vi.mocked(loadProjectTextMap).mockReset();
+    vi.mocked(loadProjectRefMap).mockReset();
     vi.mocked(askConfirm).mockReset();
     vi.mocked(toast).mockReset();
-    vi.mocked(loadProjectTextMap).mockResolvedValue({});
+    vi.mocked(loadProjectRefMap).mockResolvedValue({});
     vi.mocked(askConfirm).mockResolvedValue(false);
     window.electronAPI = {
       deleteItemFile: vi.fn().mockResolvedValue({ success: true }),
@@ -47,7 +47,7 @@ describe('handleDeleteItem', () => {
   });
 
   it('shows an error toast when the project scan throws, and does not open a confirm', async () => {
-    vi.mocked(loadProjectTextMap).mockRejectedValue(new Error('scan failed'));
+    vi.mocked(loadProjectRefMap).mockRejectedValue(new Error('scan failed'));
     const err = vi.spyOn(console, 'error').mockImplementation(() => {});
     const { result } = hook();
     await expect(result.current.handleDeleteItem(item)).resolves.toBe(false);
@@ -65,14 +65,27 @@ describe('handleDeleteItem', () => {
 
   it('ignores a second click while a scan is already in progress', async () => {
     let release: (files: Record<string, string>) => void = () => {};
-    vi.mocked(loadProjectTextMap).mockReturnValue(new Promise((resolve) => { release = resolve; }));
+    vi.mocked(loadProjectRefMap).mockReturnValue(new Promise((resolve) => { release = resolve; }));
     const { result } = hook();
     const first = result.current.handleDeleteItem(item, { left: 1, top: 1, width: 1, height: 1 });
     const second = result.current.handleDeleteItem(item);
     await expect(second).resolves.toBe(false);
     release({});
     await expect(first).resolves.toBe(false);
-    expect(loadProjectTextMap).toHaveBeenCalledTimes(1);
+    expect(loadProjectRefMap).toHaveBeenCalledTimes(1);
     expect(askConfirm).toHaveBeenCalledTimes(1);
+  });
+
+  it('mentions a map-JSON-only loot reference in the delete warning', async () => {
+    vi.mocked(loadProjectRefMap).mockResolvedValue({
+      'npctest123.json#enemy/3': 'name=TESTEnemy\nloot=7,fixed\n',
+    });
+    vi.mocked(askConfirm).mockResolvedValue(false);
+    const { result } = hook();
+    await result.current.handleDeleteItem(item);
+    expect(askConfirm).toHaveBeenCalledWith(
+      expect.stringContaining('npctest123.json#enemy/3'),
+      expect.anything(),
+    );
   });
 });

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAppContext } from '@/context/AppContext';
-import { loadProjectTextMap } from '@/editor/projectFiles';
+import { loadProjectRefMap } from '@/editor/studioMapRefs';
 import { findProjectProblems, openProjectProblem, type ProjectProblem } from '@/editor/projectProblems';
 import { openEngineStudio } from '@/components/studio/engineStudio';
 
@@ -24,7 +24,7 @@ export default function ProblemsPanel() {
     if (!projectPath) { setProblems([]); return; }
     setLoading(true);
     try {
-      const files = await loadProjectTextMap(projectPath);
+      const files = await loadProjectRefMap(projectPath);
       setProblems(findProjectProblems(files));
     } finally {
       setLoading(false);
@@ -33,8 +33,39 @@ export default function ProblemsPanel() {
 
   useEffect(() => { void reload(); }, [projectPath]);
 
+  const openEnemyEditor = (problem: ProjectProblem): boolean => {
+    const editor = ctx.editor as { getMapObjects?: () => Array<{ id: number; type?: string; name?: string; properties?: Record<string, string> }> } | null;
+    const objects = editor?.getMapObjects?.() || [];
+    const actors = ctx.actors as { handleEditEnemyTemplate?: (id: number) => void } | undefined;
+    const edit = actors?.handleEditEnemyTemplate || (ctx.handleEditEnemyTemplate as ((id: number) => void) | undefined);
+    const hash = problem.path.split('#');
+    const fromHash = hash[1]?.startsWith('enemy/') ? Number(hash[1].slice('enemy/'.length)) : NaN;
+    const defPath = problem.path.startsWith('enemies/') ? problem.path : '';
+    const match = objects.find((object) => {
+      if (object.type !== 'enemy') return false;
+      if (Number.isFinite(fromHash) && object.id === fromHash) return true;
+      const recorded = (object.properties?.enemyFilename || object.properties?.sourcePath || '').replace(/\\/g, '/');
+      if (!defPath || !recorded) return false;
+      return recorded === defPath || recorded.endsWith(`/${defPath}`) || `enemies/${recorded.replace(/^enemies\//, '')}` === defPath;
+    });
+    if (match && edit) {
+      void Promise.resolve(edit(match.id));
+      return true;
+    }
+    const mapFile = hash[0];
+    const openMap = ctx.openProjectMap as ((name: string) => void | Promise<void>) | undefined;
+    if (mapFile.endsWith('.json') && openMap) {
+      void openMap(mapFile);
+      return true;
+    }
+    return false;
+  };
+
   const open = (problem: ProjectProblem) => {
     if (openProjectProblem(problem)) return;
+    if (problem.kind === 'loot' || problem.path.startsWith('enemies/') || /#enemy\//.test(problem.path)) {
+      if (openEnemyEditor(problem)) return;
+    }
     if (problem.path.startsWith('engine/')) {
       openEngineStudio('files', problem.path.replace(/^engine\//, ''));
       return;

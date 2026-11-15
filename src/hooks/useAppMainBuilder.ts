@@ -1356,6 +1356,7 @@ export default function useAppMainBuilder() {
       updateEditingObjectBoolean: objectEditing.updateEditingObjectBoolean,
       getEditingObjectProperty: objectEditing.getEditingObjectProperty,
       currentProjectPath,
+      handleEditEnemyTemplate: objectEditing.handleEditEnemyTemplate,
       handleEditingTilesetBrowse: objectEditing.handleEditingTilesetBrowse,
       handleEditingPortraitBrowse: objectEditing.handleEditingPortraitBrowse,
       handleAutoDetectAnim: objectEditing.handleAutoDetectAnim,

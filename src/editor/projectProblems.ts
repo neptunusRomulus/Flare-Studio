@@ -72,15 +72,15 @@ export function findProjectProblems(files: Record<string, string>): ProjectProbl
           }
         } else {
           const id = listedIds(value)[0];
-          if (id && itemIds.size && !itemIds.has(id)) add('loot', path, line, key, value, `Unknown item ${id}`);
+          if (id && !itemIds.has(id)) add('loot', path, line, key, value, `Unknown item ${id}`);
         }
       }
-      if (key === 'status_stock' && itemIds.size) {
+      if (key === 'status_stock') {
         for (const id of listedIds(value.split(',').slice(1).join(','))) {
           if (!itemIds.has(id)) add('vendor', path, line, key, value, `Vendor stock item ${id} does not exist`);
         }
       }
-      if (path.startsWith('engine/classes.txt') && itemIds.size) {
+      if (path.startsWith('engine/classes.txt')) {
         if (key === 'equipment' || key === 'equipment_set' || key === 'carried') {
           for (const id of listedIds(value)) {
             if (!itemIds.has(id)) add('class', path, line, key, value, `Class ${key} item ${id} does not exist`);
@@ -100,7 +100,7 @@ export function findProjectProblems(files: Record<string, string>): ProjectProbl
           add('book', path, line, key, value, `Book not found: ${dest}`);
         }
       }
-      if (itemIds.size && (key === 'requires_item' || key === 'requires_not_item' || key === 'reward_item' || key === 'remove_item')) {
+      if (key === 'requires_item' || key === 'requires_not_item' || key === 'reward_item' || key === 'remove_item') {
         for (const id of listedIds(value)) {
           if (!itemIds.has(id)) add('item', path, line, key, value, `Unknown item ${id}`);
         }

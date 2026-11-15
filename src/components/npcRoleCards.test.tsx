@@ -33,21 +33,27 @@ const editProps = {
   itemsList: [],
 };
 
-describe('NPC role cards and role windows', () => {
-  it('renders on cards with the sidebar role colors and + Add on an off card', () => {
-    const { container } = render(
+describe('NPC role buttons and role windows', () => {
+  it('renders a Dialogue/Quest/Vendor group: active uses the sidebar color and a settings button, inactive stays grey', () => {
+    const { container, getByRole, queryByRole } = render(
       <NpcEditDialog
         {...editProps}
         editingObject={npc({ talker: 'true' })}
         getEditingObjectProperty={(key, fallback = '') => (key === 'talker' ? 'true' : fallback)}
       />,
     );
-    const html = container.innerHTML;
-    expect(html).toContain(NPC_ROLE_META_LOOKUP.isTalker.badgeClass);
-    expect(html).toContain('+ Add');
-    expect(container.textContent).toMatch(/Dialogue/);
-    expect(container.textContent).toMatch(/Shop/);
-    expect(container.textContent).toMatch(/Quest/);
+    expect(container.innerHTML).toContain(NPC_ROLE_META_LOOKUP.isTalker.badgeClass);
+    expect(container.textContent).not.toContain('+ Add');
+    const dialogue = getByRole('button', { name: 'Dialogue' });
+    const quest = getByRole('button', { name: 'Quest' });
+    const vendor = getByRole('button', { name: 'Vendor' });
+    expect(dialogue.getAttribute('aria-pressed')).toBe('true');
+    expect(quest.getAttribute('aria-pressed')).toBe('false');
+    expect(vendor.getAttribute('aria-pressed')).toBe('false');
+    expect(getByRole('button', { name: 'Dialogue settings' })).toBeTruthy();
+    expect(queryByRole('button', { name: 'Quest settings' })).toBeNull();
+    expect(queryByRole('button', { name: 'Vendor settings' })).toBeNull();
+    expect(vendor.className).toContain('bg-gray-500/20');
   });
 
   it('opens a Shop window with no Dialogue/Quest tabs and exactly one Save', () => {

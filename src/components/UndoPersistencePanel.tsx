@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
 import { HelpCircle, Trash2 } from 'lucide-react';
 import Tooltip from '@/components/ui/tooltip';
 
@@ -65,9 +66,11 @@ export default function UndoPersistencePanel({
               <HelpCircle className="w-4 h-4 text-slate-500 cursor-help" />
             </Tooltip>
           </div>
-          <button
+          <Button
+            type="button"
+            variant="ghost"
             onClick={handleToggle}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+            className={`relative inline-flex h-6 w-11 items-center rounded-full p-0 hover:bg-transparent transition-colors ${
               localEnabled
                 ? 'bg-orange-500 hover:bg-orange-600'
                 : 'bg-slate-300 hover:bg-slate-400'
@@ -79,7 +82,7 @@ export default function UndoPersistencePanel({
                 localEnabled ? 'translate-x-6' : 'translate-x-1'
               }`}
             />
-          </button>
+          </Button>
         </div>
 
         {/* Info when enabled */}
@@ -106,13 +109,15 @@ export default function UndoPersistencePanel({
 
             {/* Clear button */}
             {onClearHistory && (
-              <button
+              <Button
+                type="button"
+                variant="ghost"
                 onClick={onClearHistory}
-                className="mt-2 flex items-center gap-2 px-3 py-1 text-xs bg-slate-200 hover:bg-slate-300 text-slate-700 rounded transition-colors"
+                className="mt-2 h-auto flex items-center gap-2 px-3 py-1 text-xs bg-slate-200 hover:bg-slate-300 text-slate-700 rounded transition-colors"
               >
                 <Trash2 className="w-3 h-3" />
                 Clear Saved History
-              </button>
+              </Button>
             )}
           </div>
         )}

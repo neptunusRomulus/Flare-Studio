@@ -2,6 +2,8 @@ import { useContext, useEffect, useState, type ReactNode } from 'react';
 import { Coins, Flag, Gift, Package, Plus, Sparkles, X } from 'lucide-react';
 import Tooltip from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
 import { STORY_FLAG_LIST_ID } from '@/editor/powers/storyFlags';
 import { joinStatusList, splitStatusList } from '@/editor/questSteps';
 import AppContext from '@/context/AppContext';
@@ -76,12 +78,10 @@ const WhenDoneRow = ({ completeStatus, onCompleteStatusChange, rewards = {}, onR
       ) : (
         <div className="space-y-1">
           <p className="text-[11px] text-muted-foreground">No turn-in NPC dialog found. Pick a map event to write reward_xp, reward_item, and set_status.</p>
-          <select
-            className="h-6 w-full rounded border border-input bg-background text-[11px]"
-            value={rewards.event_path && rewards.event_key ? `${rewards.event_path}::${rewards.event_key}` : ''}
-            onChange={(e) => {
-              const value = e.target.value;
-              if (!value) {
+          <Select
+            value={rewards.event_path && rewards.event_key ? `${rewards.event_path}::${rewards.event_key}` : '__empty__'}
+            onValueChange={(value) => {
+              if (!value || value === '__empty__') {
                 onRewardsChange({ ...rewards, event_path: '', event_key: '' });
                 return;
               }
@@ -91,11 +91,16 @@ const WhenDoneRow = ({ completeStatus, onCompleteStatusChange, rewards = {}, onR
               onRewardsChange({ ...rewards, event_path: path, event_key: key });
             }}
           >
-            <option value="">Map event</option>
-            {events.map((event) => (
-              <option key={`${event.path}::${event.eventKey}`} value={`${event.path}::${event.eventKey}`}>{event.label}</option>
-            ))}
-          </select>
+            <SelectTrigger className="h-6 w-full text-[11px]">
+              <SelectValue placeholder="Map event" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__empty__">Map event</SelectItem>
+              {events.map((event) => (
+                <SelectItem key={`${event.path}::${event.eventKey}`} value={`${event.path}::${event.eventKey}`}>{event.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       )}
       {open === 'flags' && (
@@ -109,9 +114,9 @@ const WhenDoneRow = ({ completeStatus, onCompleteStatusChange, rewards = {}, onR
               onRemove={() => onCompleteStatusChange(joinStatusList(flags.filter((_, i) => i !== index)))}
             />
           ))}
-          <button type="button" className="text-[11px] text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5" onClick={() => onCompleteStatusChange(joinStatusList([...flags, '']))}>
+          <Button type="button" variant="ghost" className="h-auto text-[11px] text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5 px-1 py-0" onClick={() => onCompleteStatusChange(joinStatusList([...flags, '']))}>
             <Plus className="w-3 h-3" /> Flag
-          </button>
+          </Button>
           <p className="text-[11px] text-muted-foreground pt-1">set_status</p>
           {setFlags.map((flag, index) => (
             <FlagInput
@@ -121,28 +126,33 @@ const WhenDoneRow = ({ completeStatus, onCompleteStatusChange, rewards = {}, onR
               onRemove={() => onRewardsChange({ ...rewards, set_status: joinStatusList(setFlags.filter((_, i) => i !== index)) })}
             />
           ))}
-          <button type="button" className="text-[11px] text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5" onClick={() => onRewardsChange({ ...rewards, set_status: joinStatusList([...setFlags, '']) })}>
+          <Button type="button" variant="ghost" className="h-auto text-[11px] text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5 px-1 py-0" onClick={() => onRewardsChange({ ...rewards, set_status: joinStatusList([...setFlags, '']) })}>
             <Plus className="w-3 h-3" /> Flag
-          </button>
+          </Button>
         </Panel>
       )}
       {open === 'items' && (
         <Panel onClose={() => setOpen(null)}>
           {itemTokens.map((token, index) => (
             <div key={`i-${index}`} className="flex items-center gap-1">
-              <select
-                className="h-6 flex-1 rounded border border-input bg-background text-[11px]"
-                value={token.split(':')[0]}
-                onChange={(e) => {
+              <Select
+                value={token.split(':')[0] || '__empty__'}
+                onValueChange={(value) => {
                   const qty = token.includes(':') ? token.slice(token.indexOf(':')) : '';
-                  onRewardsChange({ ...rewards, reward_item: joinStatusList(itemTokens.map((entry, i) => (i === index ? `${e.target.value}${qty}` : entry))) });
+                  const next = value === '__empty__' ? '' : value;
+                  onRewardsChange({ ...rewards, reward_item: joinStatusList(itemTokens.map((entry, i) => (i === index ? `${next}${qty}` : entry))) });
                 }}
               >
-                <option value="">Item</option>
-                {items.map((item) => (
-                  <option key={item.id} value={String(item.id)}>{item.name || item.id}</option>
-                ))}
-              </select>
+                <SelectTrigger className="h-6 flex-1 text-[11px]">
+                  <SelectValue placeholder="Item" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__empty__">Item</SelectItem>
+                  {items.map((item) => (
+                    <SelectItem key={item.id} value={String(item.id)}>{item.name || item.id}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Input
                 className="h-6 w-12 text-[11px]"
                 type="number"
@@ -154,14 +164,14 @@ const WhenDoneRow = ({ completeStatus, onCompleteStatusChange, rewards = {}, onR
                   onRewardsChange({ ...rewards, reward_item: joinStatusList(itemTokens.map((entry, i) => (i === index ? `${id}:${qty}` : entry))) });
                 }}
               />
-              <button type="button" aria-label="Remove" onClick={() => onRewardsChange({ ...rewards, reward_item: joinStatusList(itemTokens.filter((_, i) => i !== index)) })}>
+              <Button type="button" variant="ghost" size="icon" className="h-auto w-auto p-0" aria-label="Remove" onClick={() => onRewardsChange({ ...rewards, reward_item: joinStatusList(itemTokens.filter((_, i) => i !== index)) })}>
                 <X className="w-3 h-3 text-muted-foreground" />
-              </button>
+              </Button>
             </div>
           ))}
-          <button type="button" className="text-[11px] text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5" onClick={() => onRewardsChange({ ...rewards, reward_item: joinStatusList([...itemTokens, '']) })}>
+          <Button type="button" variant="ghost" className="h-auto text-[11px] text-muted-foreground hover:text-foreground inline-flex items-center gap-0.5 px-1 py-0" onClick={() => onRewardsChange({ ...rewards, reward_item: joinStatusList([...itemTokens, '']) })}>
             <Plus className="w-3 h-3" /> Item
-          </button>
+          </Button>
         </Panel>
       )}
       {open === 'xp' && (
@@ -186,14 +196,14 @@ const WhenDoneRow = ({ completeStatus, onCompleteStatusChange, rewards = {}, onR
 const FlagInput = ({ value, onChange, onRemove }: { value: string; onChange: (value: string) => void; onRemove: () => void }) => (
   <div className="flex items-center gap-1">
     <Input className="h-6 text-[11px]" list={STORY_FLAG_LIST_ID} value={value} onChange={(e) => onChange(e.target.value)} placeholder="Story Flag" />
-    <button type="button" aria-label="Remove" onClick={onRemove}><X className="w-3 h-3 text-muted-foreground" /></button>
+    <Button type="button" variant="ghost" size="icon" className="h-auto w-auto p-0" aria-label="Remove" onClick={onRemove}><X className="w-3 h-3 text-muted-foreground" /></Button>
   </div>
 );
 
 const Panel = ({ children, onClose }: { children: ReactNode; onClose: () => void }) => (
   <div className="rounded-md border border-border bg-background p-2 space-y-1 shadow-sm">
     {children}
-    <button type="button" className="sr-only" onClick={onClose}>Close</button>
+    <Button type="button" variant="ghost" className="sr-only" onClick={onClose}>Close</Button>
   </div>
 );
 
@@ -207,14 +217,17 @@ const IconButton = ({
   onClick: () => void;
 }) => (
   <Tooltip content={tip}>
-    <button
+    <Button
       type="button"
+      variant="outline"
+      size="icon"
+      aria-pressed={active}
       aria-label={label}
       onClick={onClick}
-      className={`h-6 w-6 inline-flex items-center justify-center rounded border ${active ? 'border-primary bg-primary/10 text-foreground' : 'border-border text-muted-foreground hover:text-foreground'}`}
+      className={`h-6 w-6 inline-flex items-center justify-center rounded border p-0 ${active ? 'border-primary bg-primary/10 text-foreground' : 'border-border text-muted-foreground hover:text-foreground'}`}
     >
       <Icon className="w-3.5 h-3.5" />
-    </button>
+    </Button>
   </Tooltip>
 );
 

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import Tooltip from '@/components/ui/tooltip';
 
 type PositionFieldProps = {
@@ -18,7 +19,7 @@ const PositionField = ({
   label = 'Position',
 }: PositionFieldProps) => (
   <div>
-    <label className="text-xs text-muted-foreground">{label}</label>
+    <Label className="text-xs text-muted-foreground font-normal">{label}</Label>
     {x < 0 || y < 0 ? (
       // Unplaced dock entity: position is instance data, set by placing it on the map
       <div className="flex items-center h-7 mt-1">

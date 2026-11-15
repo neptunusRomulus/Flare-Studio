@@ -1,4 +1,5 @@
 import React from 'react';
+import { Button } from '@/components/ui/button';
 import { X, Check, Folder } from 'lucide-react';
 
 type Props = {
@@ -11,12 +12,15 @@ const ExportSuccessModal: React.FC<Props> = ({ open, onClose }) => {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-black rounded-lg shadow-xl p-6 max-w-md mx-4 relative">
-        <button
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
           onClick={onClose}
-          className="absolute top-3 right-3 text-gray-400 hover:text-gray-200 transition-colors"
+          className="absolute top-3 right-3 h-auto w-auto text-gray-400 hover:text-gray-200 transition-colors"
         >
           <X className="w-5 h-5" />
-        </button>
+        </Button>
 
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center">

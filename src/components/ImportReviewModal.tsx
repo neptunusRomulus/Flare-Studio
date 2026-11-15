@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
 import type { AssetRecord, TilesetProfile } from '@/types';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 import ResizeHandle from '@/components/ResizeHandle';
@@ -145,14 +146,16 @@ export const ImportReviewModal: React.FC<ImportReviewModalProps> = ({
       }}
       onClick={(e) => e.stopPropagation()}
     >
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="icon"
         onClick={onCancel}
         aria-label="Close import review window"
         className="absolute top-3 right-3 h-7 w-7 text-lg leading-none text-muted-foreground hover:text-foreground"
       >
         ×
-      </button>
+      </Button>
       <div 
         className="pb-3 px-6 pt-6 border-b border-border cursor-move select-none"
         onMouseDown={handleHeaderMouseDown}
@@ -183,9 +186,9 @@ export const ImportReviewModal: React.FC<ImportReviewModalProps> = ({
           {/* Fixed tile size info */}
           <div className="bg-muted/30 p-3 rounded-md border border-border">
             <div className="flex items-center justify-between gap-2">
-              <label className="text-xs font-semibold uppercase tracking-wide text-foreground">
+              <Label className="text-xs font-semibold uppercase tracking-wide text-foreground">
                 Tile Size
-              </label>
+              </Label>
               <span className="text-xs font-mono bg-background px-2 py-0.5 rounded border border-border text-foreground">
                 {tileWidth}x{tileHeight}
               </span>
@@ -206,7 +209,7 @@ export const ImportReviewModal: React.FC<ImportReviewModalProps> = ({
                   { value: 'top-center', label: 'Top-Center' },
                   { value: 'top-left', label: 'Top-Left' }
                 ].map((option) => (
-                  <label key={option.value} className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
+                  <Label key={option.value} className="flex items-center gap-2 text-sm font-normal text-foreground cursor-pointer">
                     <input
                       type="radio"
                       name="asset-origin"
@@ -216,7 +219,7 @@ export const ImportReviewModal: React.FC<ImportReviewModalProps> = ({
                       className="h-4 w-4"
                     />
                     <span>{option.label}</span>
-                  </label>
+                  </Label>
                 ))}
               </div>
               {originPreset !== 'bottom-center' && (

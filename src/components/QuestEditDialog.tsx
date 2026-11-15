@@ -1,6 +1,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import Tooltip from '@/components/ui/tooltip';
 import { HelpCircle, X, Save } from 'lucide-react';
@@ -128,12 +129,12 @@ const QuestEditDialog = ({ open, onOpenChange, questDraft, setQuestDraft, onSave
       <div className="flex-1 overflow-y-auto space-y-6 px-5 py-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/15 [&::-webkit-scrollbar-thumb]:rounded-full">
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="flex items-center gap-2 text-sm font-medium mb-1">
+            <Label className="flex items-center gap-2 text-sm font-medium mb-1">
               Name
               <Tooltip content="name — Shown in the quest log.">
                 <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
               </Tooltip>
-            </label>
+            </Label>
             <Input
               value={questDraft.name}
               onChange={(e) => {
@@ -147,7 +148,7 @@ const QuestEditDialog = ({ open, onOpenChange, questDraft, setQuestDraft, onSave
             {nameError ? <p className="mt-1 text-sm text-destructive">{nameError}</p> : null}
           </div>
           <div>
-            <label className="flex items-center gap-2 text-sm font-medium mb-1">Start type</label>
+            <Label className="flex items-center gap-2 text-sm font-medium mb-1">Start type</Label>
             <Select
               value={questDraft.start_type ?? ''}
               onValueChange={(value) => setQuestDraft((prev) => ({ ...prev, start_type: value as 'player' | 'game' }))}

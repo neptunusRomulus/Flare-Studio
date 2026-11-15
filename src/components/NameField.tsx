@@ -1,5 +1,6 @@
 import React from 'react';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 type NameFieldProps = {
   value: string;
@@ -15,7 +16,7 @@ const NameField = ({
   label = 'Name',
 }: NameFieldProps) => (
   <div>
-    <label className="text-xs text-muted-foreground">{label}</label>
+    <Label className="text-xs text-muted-foreground font-normal">{label}</Label>
     <Input
       value={value}
       onChange={(e) => onChange(e.target.value)}

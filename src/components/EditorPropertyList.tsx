@@ -1,3 +1,5 @@
+import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import SearchablePalette, { type SearchablePaletteEntry } from '@/components/ui/searchable-palette';
@@ -36,7 +38,7 @@ const EditorPropertyList = ({ title = 'Properties', properties, catalog, onChang
         {properties.map((property) => (
           <div key={property.key} className="flex items-center gap-2">
             <Tooltip content={property.tooltip || property.key} side="left">
-              <label className="w-36 shrink-0 text-xs text-foreground truncate">{property.label}</label>
+              <Label className="w-36 shrink-0 text-xs text-foreground truncate font-normal">{property.label}</Label>
             </Tooltip>
             {property.kind === 'toggle' ? (
               <div className="flex-1 h-7 flex items-center">
@@ -64,14 +66,16 @@ const EditorPropertyList = ({ title = 'Properties', properties, catalog, onChang
               }}
               message="Remove this property?"
             >
-              <button
+              <Button
                 type="button"
-                className="h-6 w-6 flex items-center justify-center rounded hover:bg-muted text-muted-foreground"
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 flex items-center justify-center rounded hover:bg-muted text-muted-foreground p-0"
                 aria-label={`Remove ${property.label}`}
                 onClick={() => setConfirmKey(property.key)}
               >
                 <X className="w-3.5 h-3.5" />
-              </button>
+              </Button>
             </InlineConfirm>
           </div>
         ))}

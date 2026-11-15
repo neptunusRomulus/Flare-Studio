@@ -1,4 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { createPortal } from 'react-dom';
 
 export interface CellContextMenuPosition {
@@ -219,15 +220,17 @@ export const CellContextMenuItem = React.forwardRef<
   const fullClassName = `w-full px-2 py-1.5 text-left text-xs font-medium flex items-center gap-2 transition-colors duration-100 cursor-pointer ${bgHoverClass} ${textClass} ${className}`;
 
   return (
-    <button
+    <Button
       ref={ref}
-      className={fullClassName}
+      type="button"
+      variant="ghost"
+      className={`h-auto ${fullClassName}`}
       role="menuitem"
       {...props}
     >
       {icon && <span className="flex-shrink-0 w-3.5 h-3.5">{icon}</span>}
       <span>{label}</span>
-    </button>
+    </Button>
   );
 });
 

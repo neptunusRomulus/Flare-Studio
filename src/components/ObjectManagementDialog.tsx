@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import type { ItemSummary } from '@/utils/items';
 import { ArrowUp, ArrowUpRight, ArrowRight, ArrowDownRight, ArrowDown, ArrowDownLeft, ArrowLeft, ArrowUpLeft, HelpCircle, Save, Trash2, User, X } from 'lucide-react';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
@@ -224,7 +225,7 @@ const ObjectManagementDialog = ({
             <div className="space-y-4">
               <div className="grid grid-cols-3 gap-3 items-end">
                 <div className="col-span-2">
-                  <label className="text-xs text-muted-foreground">Name</label>
+                  <Label className="text-xs text-muted-foreground font-normal">Name</Label>
                   <Input
                     value={editingObject.name || ''}
                     onChange={(e) => setEditingObject({ ...editingObject, name: e.target.value })}
@@ -233,7 +234,7 @@ const ObjectManagementDialog = ({
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-muted-foreground">Spawn Count</label>
+                  <Label className="text-xs text-muted-foreground font-normal">Spawn Count</Label>
                   <div className="relative">
                     <Input
                       type="number"
@@ -251,7 +252,7 @@ const ObjectManagementDialog = ({
 
               <div>
                 <div>
-                  <label className="text-xs text-muted-foreground">Size</label>
+                  <Label className="text-xs text-muted-foreground font-normal">Size</Label>
                   <div className="flex items-center gap-1 mt-1">
                     <Input
                       type="number"
@@ -275,7 +276,7 @@ const ObjectManagementDialog = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs text-muted-foreground">Wander Radius</label>
+                  <Label className="text-xs text-muted-foreground font-normal">Wander Radius</Label>
                   <Tooltip content="Radius in tiles this enemy can move from its spawn location.">
                     <HelpCircle className="w-3 h-3 text-muted-foreground ml-1" />
                   </Tooltip>
@@ -291,7 +292,7 @@ const ObjectManagementDialog = ({
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-muted-foreground">Waypoints</label>
+                  <Label className="text-xs text-muted-foreground font-normal">Waypoints</Label>
                   <Tooltip content="Optional patrol path: x1,y1;x2,y2;...">
                     <HelpCircle className="w-3 h-3 text-muted-foreground ml-1" />
                   </Tooltip>
@@ -306,7 +307,7 @@ const ObjectManagementDialog = ({
 
               <div>
                 <div className="flex items-center gap-1 mb-1">
-                  <label className="text-xs text-muted-foreground">Direction</label>
+                  <Label className="text-xs text-muted-foreground font-normal">Direction</Label>
                   <Tooltip content="The facing direction when this enemy spawns on the map.">
                     <HelpCircle className="w-3 h-3 text-muted-foreground" />
                   </Tooltip>
@@ -334,11 +335,13 @@ const ObjectManagementDialog = ({
                     const currentDir = getEditingObjectProperty('direction', '');
                     const isSelected = currentDir === dir.value;
                     return (
-                      <button
+                      <Button
                         key={dir.value}
                         type="button"
+                        variant="outline"
+                        aria-pressed={isSelected}
                         onClick={() => updateEditingObjectProperty('direction', isSelected ? null : dir.value)}
-                        className={`flex flex-col items-center justify-center w-9 h-9 gap-0.5 rounded text-[9px] font-medium transition-colors ${
+                        className={`flex flex-col items-center justify-center w-9 h-9 gap-0.5 rounded text-[9px] font-medium transition-colors p-0 ${
                           isSelected
                             ? 'bg-orange-500/20 text-orange-600 dark:text-orange-400 border border-orange-500/50'
                             : 'bg-muted/50 text-muted-foreground border border-transparent hover:bg-muted'
@@ -347,7 +350,7 @@ const ObjectManagementDialog = ({
                       >
                         <Icon className="w-3.5 h-3.5" />
                         <span>{dir.label}</span>
-                      </button>
+                      </Button>
                     );
                   })}
                 </div>
@@ -381,7 +384,7 @@ const ObjectManagementDialog = ({
         {editingObject.type !== 'npc' && (
           <div className="flex gap-3 items-end">
             <div className="flex-1">
-              <label className="text-xs text-muted-foreground">Name</label>
+              <Label className="text-xs text-muted-foreground font-normal">Name</Label>
               <Input
                 value={editingObject.name || ''}
                 onChange={(e) => setEditingObject({...editingObject, name: e.target.value})}
@@ -390,7 +393,7 @@ const ObjectManagementDialog = ({
               />
             </div>
             <div className="w-24">
-              <label className="text-xs text-muted-foreground">Position</label>
+              <Label className="text-xs text-muted-foreground font-normal">Position</Label>
               <div className="flex items-center gap-1">
                 <Input
                   type="number"

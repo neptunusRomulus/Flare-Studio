@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import Tooltip from '@/components/ui/tooltip';
 import { Edit2, Save, X } from 'lucide-react';
 import { ENEMY_ROLE_OPTIONS, NPC_ROLE_OPTIONS } from '@/editor/actorRoles';
@@ -83,9 +84,9 @@ const ActorDialog = ({
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-1">
+            <Label className="block text-sm font-medium mb-1">
               {actorDialogState.type === 'npc' ? 'NPC Name' : 'Enemy Name'} <span className="text-red-500">*</span>
-            </label>
+            </Label>
             <Input
               value={actorDialogState.name}
               onChange={(event) => onFieldChange('name', event.target.value)}
@@ -99,18 +100,19 @@ const ActorDialog = ({
               const hasRoleSelection = roleOptions.some((option) => actorDialogState[option.key]);
               return (
                 <>
-                  <label className="block text-sm font-medium mb-1">
+                  <Label className="block text-sm font-medium mb-1">
                     {actorDialogState.type === 'npc' ? 'Roles' : 'Enemy Types'}
-                  </label>
+                  </Label>
                   <div className="flex flex-wrap gap-2">
                     {roleOptions.map((option) => {
                       const isActive = actorDialogState[option.key];
                       return (
-                        <button
+                        <Button
                           key={option.key}
                           type="button"
+                          variant="outline"
                           onClick={() => onRoleToggle(option.key)}
-                          className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                          className={`h-auto px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
                             isActive
                               ? `border ${option.badgeClass} ring-1 ring-border/60`
                               : 'border-transparent bg-muted/50 text-muted-foreground hover:bg-muted'
@@ -118,7 +120,7 @@ const ActorDialog = ({
                           title={option.description}
                         >
                           {option.label}
-                        </button>
+                        </Button>
                       );
                     })}
                   </div>

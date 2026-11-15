@@ -2,6 +2,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import Tooltip from '@/components/ui/tooltip';
 import { GitBranch, Shield, User } from 'lucide-react';
 import { RULE_ACTION_GROUPS, RULE_TRIGGER_LOOKUP } from '@/editor/ruleOptions';
@@ -76,9 +77,9 @@ const RuleDialog = ({
         {ruleDialogStep === 'start' ? (
           <>
             <div>
-              <label className="block text-sm font-medium mb-1">
+              <Label className="block text-sm font-medium mb-1">
                 Rule Name <span className="text-red-500">*</span>
-              </label>
+              </Label>
               <Input
                 value={ruleNameInput}
                 onChange={(event) => setRuleNameInput(event.target.value)}
@@ -87,7 +88,7 @@ const RuleDialog = ({
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">How does this rule start?</label>
+              <Label className="block text-sm font-medium mb-1">How does this rule start?</Label>
               <div className="grid sm:grid-cols-2 gap-2">
                 {[
                   { id: 'player', label: 'Started by player', hint: 'Triggered by player actions', icon: User },
@@ -105,10 +106,11 @@ const RuleDialog = ({
                         </div>
                       }
                     >
-                      <button
+                      <Button
                         type="button"
+                        variant="outline"
                         onClick={() => setRuleStartType(option.id as RuleStartType)}
-                        className={`flex items-center justify-center rounded-md p-1 transition-all border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                        className={`h-auto flex items-center justify-center rounded-md p-1 transition-all border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                           isActive
                             ? 'bg-orange-50 dark:bg-orange-900/20 shadow-md border-orange-500'
                             : 'hover:bg-muted/60 border-transparent'
@@ -119,7 +121,7 @@ const RuleDialog = ({
                           <IconComp className="w-5 h-5" />
                         </span>
                         <span className="sr-only">{option.label}</span>
-                      </button>
+                      </Button>
                     </Tooltip>
                   );
                 })}
@@ -128,7 +130,7 @@ const RuleDialog = ({
 
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <label className="text-sm font-medium">Pick a trigger</label>
+                <Label className="text-sm font-medium">Pick a trigger</Label>
                 <span className="text-xs text-muted-foreground">
                   {ruleStartType === 'player'
                     ? 'Player driven events'
@@ -145,10 +147,11 @@ const RuleDialog = ({
                       const isActive = ruleTriggerId === option.id;
                       return (
                         <Tooltip key={option.id} content={option.tooltip || option.label}>
-                          <button
+                          <Button
                             type="button"
+                            variant="outline"
                             onClick={() => setRuleTriggerId(option.id)}
-                            className={`flex flex-col items-center gap-1 rounded-md p-0 transition-colors border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                            className={`h-auto flex flex-col items-center gap-1 rounded-md p-0 transition-colors border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                               isActive
                                 ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-200 shadow-md border-orange-500'
                                 : 'border-transparent hover:bg-muted/60'
@@ -160,7 +163,7 @@ const RuleDialog = ({
                             <span className="text-[10px] text-muted-foreground">
                               {option.label}
                             </span>
-                          </button>
+                          </Button>
                         </Tooltip>
                       );
                     })}
@@ -176,7 +179,7 @@ const RuleDialog = ({
         ) : (
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-2">Pick an action</label>
+              <Label className="block text-sm font-medium mb-2">Pick an action</Label>
               <div className="grid gap-3">
                 {RULE_ACTION_GROUPS.map((group) => {
                   const GroupIcon = group.icon;
@@ -193,13 +196,14 @@ const RuleDialog = ({
                           const isActive = ruleActionSelection?.groupId === group.id && ruleActionSelection.actionId === action.id;
                           return (
                             <Tooltip content={action.label} key={action.id}>
-                              <button
+                              <Button
                                 type="button"
-                                className={`rounded-md border px-2 py-2 ${isActive ? 'border-orange-500 bg-orange-500/10' : 'border-border bg-background hover:bg-muted/60'}`}
+                                variant="outline"
+                                className={`h-auto rounded-md border px-2 py-2 ${isActive ? 'border-orange-500 bg-orange-500/10' : 'border-border bg-background hover:bg-muted/60'}`}
                                 onClick={() => setRuleActionSelection({ groupId: group.id, actionId: action.id })}
                               >
                                 <ActionIcon className="w-5 h-5" />
-                              </button>
+                              </Button>
                             </Tooltip>
                           );
                         })}

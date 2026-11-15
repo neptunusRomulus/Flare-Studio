@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Zap } from 'lucide-react';
 
 type AbilityDialogProps = {
@@ -32,9 +33,9 @@ const AbilityDialog = ({ open, abilityNameInput, onNameChange, onClose, onCreate
 
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-1">
+            <Label className="block text-sm font-medium mb-1">
               Ability Name <span className="text-red-500">*</span>
-            </label>
+            </Label>
             <Input
               value={abilityNameInput}
               onChange={(e) => onNameChange(e.target.value)}

@@ -1,6 +1,9 @@
+import { Label } from '@/components/ui/label';
 import React, { useState, useEffect } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
+import { Textarea } from './ui/textarea';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from './ui/select';
 import { Plus, Trash2, MessageSquare, ArrowRight, X, Key } from 'lucide-react';
 
 export interface DialogResponse {
@@ -156,9 +159,9 @@ export const DialogueNodeEditor: React.FC<DialogueNodeEditorProps> = ({ dialogNo
             {/* Header / ID */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="text-[10px] font-medium text-muted-foreground flex items-center gap-1">
+                <Label className="text-[10px] font-medium text-muted-foreground flex items-center gap-1">
                   <Key className="h-3 w-3" /> Node ID Component
-                </label>
+                </Label>
                 <Input 
                   className="h-7 text-xs" 
                   value={selectedNode.id} 
@@ -167,24 +170,25 @@ export const DialogueNodeEditor: React.FC<DialogueNodeEditorProps> = ({ dialogNo
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-medium text-muted-foreground">Speaker</label>
-                <select 
-                  className="flex w-full rounded-md border border-input bg-background px-3 h-7 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                  value={selectedNode.speaker}
-                  onChange={(e) => updateSelectedNode('speaker', e.target.value)}
-                >
-                  <option value="him">Him</option>
-                  <option value="her">Her</option>
-                  <option value="you">You</option>
-                </select>
+                <Label className="text-[10px] font-medium text-muted-foreground">Speaker</Label>
+                <Select value={selectedNode.speaker} onValueChange={(value) => updateSelectedNode('speaker', value)}>
+                  <SelectTrigger className="h-7 w-full px-3 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="him">Him</SelectItem>
+                    <SelectItem value="her">Her</SelectItem>
+                    <SelectItem value="you">You</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
             {/* Text Content */}
             <div className="space-y-1">
-              <label className="text-[10px] font-medium text-muted-foreground">Dialog Msg</label>
-              <textarea
-                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 resize-none h-16"
+              <Label className="text-[10px] font-medium text-muted-foreground">Dialog Msg</Label>
+              <Textarea
+                className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 resize-none h-16 min-h-0"
                 value={selectedNode.text}
                 onChange={(e) => updateSelectedNode('text', e.target.value)}
                 placeholder="The text spoken by the NPC or Player..."
@@ -194,7 +198,7 @@ export const DialogueNodeEditor: React.FC<DialogueNodeEditorProps> = ({ dialogNo
             {/* Optional Modifiers */}
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label className="text-[10px] font-medium text-muted-foreground">Voice File</label>
+                <Label className="text-[10px] font-medium text-muted-foreground">Voice File</Label>
                 <Input 
                   className="h-7 text-xs" 
                   value={selectedNode.voice || ''} 
@@ -203,7 +207,7 @@ export const DialogueNodeEditor: React.FC<DialogueNodeEditorProps> = ({ dialogNo
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-medium text-muted-foreground">Portrait</label>
+                <Label className="text-[10px] font-medium text-muted-foreground">Portrait</Label>
                 <Input 
                   className="h-7 text-xs" 
                   value={selectedNode.portrait || ''} 
@@ -216,9 +220,9 @@ export const DialogueNodeEditor: React.FC<DialogueNodeEditorProps> = ({ dialogNo
             {/* Responses */}
             <div className="space-y-2 pt-2 border-t">
               <div className="flex justify-between items-center">
-                <label className="text-[10px] font-medium text-muted-foreground flex items-center gap-1">
+                <Label className="text-[10px] font-medium text-muted-foreground flex items-center gap-1">
                   <ArrowRight className="h-3 w-3" /> Responses
-                </label>
+                </Label>
                 <Button variant="outline" size="sm" className="h-5 text-[10px] px-2 py-0" onClick={() => addResponse('responses')}>
                   + Add
                 </Button>

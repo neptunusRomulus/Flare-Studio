@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useMemo } from 'react';
+import { Button } from '@/components/ui/button';
 import { AlertTriangle, X, RotateCw } from 'lucide-react';
 import { useSaveError } from '@/context/SaveErrorContext';
 import type { SaveError } from '@/context/SaveErrorContext';
@@ -82,12 +83,14 @@ export default function SaveErrorNotificationPanel({
               (Unsaved changes at risk)
             </span>
           </div>
-          <button
+          <Button
+            type="button"
+            variant="ghost"
             onClick={() => setIsExpanded(!isExpanded)}
-            className="px-2 py-1 text-xs font-medium text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800/50 rounded transition-colors"
+            className="h-auto px-2 py-1 text-xs font-medium text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800/50 rounded transition-colors"
           >
             {isExpanded ? 'Hide' : 'Show'}
-          </button>
+          </Button>
         </div>
 
         {/* Error list */}
@@ -130,22 +133,25 @@ export default function SaveErrorNotificationPanel({
                   {/* Actions */}
                   <div className="flex gap-2 flex-shrink-0 mt-0.5">
                     {onRetry && (
-                      <button
+                      <Button
+                        type="button"
                         onClick={() => handleRetry(error)}
                         disabled={retrying === error.id}
-                        className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-white bg-amber-600 hover:bg-amber-700 disabled:bg-amber-400 dark:bg-amber-700 dark:hover:bg-amber-600 dark:disabled:bg-amber-600/50 rounded transition-colors"
+                        className="h-auto flex items-center gap-1 px-2 py-1 text-xs font-medium text-white bg-amber-600 hover:bg-amber-700 disabled:bg-amber-400 dark:bg-amber-700 dark:hover:bg-amber-600 dark:disabled:bg-amber-600/50 rounded transition-colors"
                       >
                         <RotateCw className={`w-3 h-3 ${retrying === error.id ? 'animate-spin' : ''}`} />
                         {retrying === error.id ? 'Retrying...' : 'Retry'}
-                      </button>
+                      </Button>
                     )}
-                    <button
+                    <Button
+                      type="button"
+                      variant="ghost"
                       onClick={() => handleDismiss(error.id)}
-                      className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800/50 rounded transition-colors"
+                      className="h-auto flex items-center gap-1 px-2 py-1 text-xs font-medium text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800/50 rounded transition-colors"
                     >
                       <X className="w-3 h-3" />
                       Dismiss
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>

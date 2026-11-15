@@ -1,4 +1,5 @@
 import React from 'react';
+import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 
 type SpawnFieldOverlayProps = {
@@ -12,14 +13,15 @@ const SpawnFieldOverlay = ({ active, onActivate, children }: SpawnFieldOverlayPr
   <div className="relative">
     <div className={active ? '' : 'pointer-events-none'}>{children}</div>
     {!active && (
-      <button
+      <Button
         type="button"
+        variant="outline"
         onClick={onActivate}
         aria-label="Add field"
-        className="absolute top-5 left-0 right-0 bottom-0 z-10 flex min-h-7 items-center justify-center gap-1 rounded-md border border-dashed border-border bg-background/80 text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+        className="absolute top-5 left-0 right-0 bottom-0 z-10 h-auto flex min-h-7 items-center justify-center gap-1 rounded-md border border-dashed border-border bg-background/80 text-muted-foreground hover:bg-muted/50 hover:text-foreground"
       >
         <Plus className="w-3.5 h-3.5" />
-      </button>
+      </Button>
     )}
   </div>
 );

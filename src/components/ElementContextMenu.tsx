@@ -1,4 +1,5 @@
 import React from 'react';
+import { Button } from '@/components/ui/button';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -102,20 +103,20 @@ export function ElementContextMenuPanel({
       role="menu"
     >
       {onEdit ? (
-        <button type="button" className={`w-full ${MENU_ITEM_CLASS}`} role="menuitem" onClick={() => { onEdit(); onClose(); }}>
+        <Button type="button" variant="ghost" className={`h-auto w-full ${MENU_ITEM_CLASS} rounded-none justify-start`} role="menuitem" onClick={() => { onEdit(); onClose(); }}>
           <Pencil className="w-3 h-3" />
           Edit
-        </button>
+        </Button>
       ) : null}
-      <button type="button" className={`w-full ${MENU_ITEM_CLASS}`} role="menuitem" onClick={() => { onDuplicate(); onClose(); }}>
+      <Button type="button" variant="ghost" className={`h-auto w-full ${MENU_ITEM_CLASS} rounded-none justify-start`} role="menuitem" onClick={() => { onDuplicate(); onClose(); }}>
         <Copy className="w-3 h-3" />
         Duplicate
-      </button>
+      </Button>
       <div className="h-px bg-border my-0.5" />
-      <button type="button" className={`w-full ${MENU_ITEM_CLASS} text-destructive focus:text-destructive`} role="menuitem" onClick={() => { onDelete(); onClose(); }}>
+      <Button type="button" variant="ghost" className={`h-auto w-full ${MENU_ITEM_CLASS} rounded-none justify-start text-destructive focus:text-destructive`} role="menuitem" onClick={() => { onDelete(); onClose(); }}>
         <Trash2 className="w-3 h-3" />
         Delete
-      </button>
+      </Button>
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { Button } from '@/components/ui/button';
 import Tooltip from '@/components/ui/tooltip';
 import { HelpCircle, Eye, EyeOff } from 'lucide-react';
 import type { TileLayer } from '@/types';
@@ -69,15 +70,17 @@ const MapTargetSwitch: React.FC<Props> = ({ group = MAP_GROUP, layers, activeLay
       dimmed: !l.visible,
       onWheel: (e) => { e.preventDefault(); visibility.onTransparencyChange(l.id, e.deltaY > 0 ? 0.1 : -0.1); },
       corner: (
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="icon"
           aria-label={`${l.visible ? 'Hide' : 'Show'} ${label}`}
           aria-pressed={!l.visible}
           onClick={(e) => { e.stopPropagation(); visibility.onToggleVisibility(l.id); }}
-          className="w-3.5 h-3.5 inline-flex items-center justify-center rounded-full bg-background border border-border text-muted-foreground hover:text-foreground"
+          className="w-3.5 h-3.5 inline-flex items-center justify-center rounded-full bg-background border border-border text-muted-foreground hover:text-foreground p-0"
         >
           <EyeIcon className="w-2.5 h-2.5" />
-        </button>
+        </Button>
       ),
     };
   });

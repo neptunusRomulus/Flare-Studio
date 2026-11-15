@@ -62,15 +62,16 @@ const SidebarBooksArea = ({ projectPath }: Props) => {
       )}
       <div className="space-y-0.5">
         {books.map((path) => (
-          <button
+          <Button
             key={path}
             type="button"
+            variant="ghost"
             onClick={() => open(path)}
-            className={`w-full flex items-center gap-2 rounded px-2 py-1.5 text-left text-xs ${selected === path ? 'bg-muted' : 'hover:bg-muted/60'}`}
+            className={`h-auto w-full flex items-center gap-2 rounded px-2 py-1.5 text-left text-xs ${selected === path ? 'bg-muted' : 'hover:bg-muted/60'}`}
           >
             <Book className="w-3.5 h-3.5 text-muted-foreground" />
             <span className="truncate">{path.replace(/^books\//, '').replace(/\.txt$/, '')}</span>
-          </button>
+          </Button>
         ))}
         {books.length === 0 && (
           <p className="text-[11px] text-muted-foreground px-1">No books/*.txt files yet.</p>

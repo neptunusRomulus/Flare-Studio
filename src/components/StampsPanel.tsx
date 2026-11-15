@@ -1,5 +1,6 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import Tooltip from '@/components/ui/tooltip';
 import { X } from 'lucide-react';
 
@@ -59,12 +60,12 @@ export default function StampsPanel({
           <div className="border-t pt-2">
             <div className="text-xs font-medium mb-1">Create New Stamp</div>
             <div className="flex gap-1">
-              <input
+              <Input
                 type="text"
                 placeholder="Stamp name"
                 value={newStampName}
                 onChange={(event) => setNewStampName(event.target.value)}
-                className="flex-1 text-xs px-2 py-1 border rounded"
+                className="h-auto flex-1 text-xs px-2 py-1 border rounded"
                 onKeyDown={(event) => {
                   if (event.key === 'Enter') {
                     handleCreateStamp();

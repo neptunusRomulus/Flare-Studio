@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Folder, Plus } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 type Props = {
   mapsDropdownOpen: boolean;
@@ -47,13 +48,15 @@ const MapsDropdown: React.FC<Props> = ({
         {currentProjectPath ? (
           <>
             <div className="relative">
-              <button
-                className="w-full text-left p-2 hover:bg-gray-100 dark:hover:bg-neutral-800 text-xs flex items-center gap-2"
+              <Button
+                type="button"
+                variant="ghost"
+                className="h-auto w-full text-left p-2 hover:bg-gray-100 dark:hover:bg-neutral-800 text-xs flex items-center gap-2 rounded-none"
                 onClick={() => setMapsSubOpen(s => !s)}
               >
                 <span className="flex items-center gap-2"><Folder className="w-3 h-3" /><span>Open map</span></span>
                 <svg className={`w-3 h-3 transition-transform ${mapsSubOpen ? 'transform rotate-90' : ''}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>
-              </button>
+              </Button>
 
               {/* nested maps list portal handled by parent when mapsSubOpen is true */}
             </div>
@@ -61,9 +64,11 @@ const MapsDropdown: React.FC<Props> = ({
             <div className="p-2 text-xs">{projectMaps.length === 0 ? 'No maps found in project.' : null}</div>
 
             {projectMaps.map((m) => (
-              <button
+              <Button
                 key={m}
-                className="w-full text-left p-2 hover:bg-gray-100 dark:hover:bg-neutral-800 text-xs flex items-center gap-2"
+                type="button"
+                variant="ghost"
+                className="h-auto w-full text-left p-2 hover:bg-gray-100 dark:hover:bg-neutral-800 text-xs flex items-center gap-2 rounded-none"
                 onClick={async () => {
                   try {
                     // Extract map name from filename (e.g., "m1.json" -> "m1")
@@ -82,13 +87,15 @@ const MapsDropdown: React.FC<Props> = ({
                 }}
               >
                 <span className="truncate">{m}</span>
-              </button>
+              </Button>
             ))}
           </>
         ) : (
           <>
-            <button
-              className="w-full text-left p-2 hover:bg-gray-100 dark:hover:bg-neutral-800 text-xs flex items-center gap-2"
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-auto w-full text-left p-2 hover:bg-gray-100 dark:hover:bg-neutral-800 text-xs flex items-center gap-2 rounded-none"
               onClick={async () => {
                   try {
                     // ask parent to handle open directory; parent previously used electronAPI.selectDirectory
@@ -110,7 +117,7 @@ const MapsDropdown: React.FC<Props> = ({
             >
               <Folder className="w-3 h-3" />
               <span>Open project...</span>
-            </button>
+            </Button>
 
             <div className="border-t border-border" />
 
@@ -118,8 +125,10 @@ const MapsDropdown: React.FC<Props> = ({
 
             <div className="border-t border-border" />
 
-            <button
-              className="w-full text-left p-2 hover:bg-gray-100 dark:hover:bg-neutral-800 text-xs flex items-center gap-2"
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-auto w-full text-left p-2 hover:bg-gray-100 dark:hover:bg-neutral-800 text-xs flex items-center gap-2 rounded-none"
               onClick={() => {
                 setMapsDropdownOpen(false);
                 handleOpenCreateMapDialog();
@@ -127,7 +136,7 @@ const MapsDropdown: React.FC<Props> = ({
             >
               <Plus className="w-3 h-3" />
               <span>Create new map</span>
-            </button>
+            </Button>
           </>
         )}
       </div>

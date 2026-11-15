@@ -74,9 +74,10 @@ const SidebarStatusesPanel = ({ onAddStatus }: SidebarStatusesPanelProps) => {
             const isExpanded = expandedCategories.has(category.id);
             return (
               <div key={category.id} className="flex flex-col w-full">
-                <button
+                <Button
                   type="button"
-                  className={`flex items-center gap-2 py-2 px-2 rounded transition-colors w-full ${getCategoryHeaderStyles(category.id)}`}
+                  variant="ghost"
+                  className={`h-auto flex items-center gap-2 py-2 px-2 rounded transition-colors w-full ${getCategoryHeaderStyles(category.id)}`}
                   onClick={() => toggleCategory(category.id)}
                 >
                   <span className={`w-5 h-5 flex items-center justify-center rounded-md ${isExpanded ? 'bg-white/10' : 'bg-white/5'}`}>
@@ -84,7 +85,7 @@ const SidebarStatusesPanel = ({ onAddStatus }: SidebarStatusesPanelProps) => {
                   </span>
                   <span className="flex-1 text-xs font-medium truncate">{category.label}</span>
                   <span className="text-[10px] opacity-70">(0)</span>
-                </button>
+                </Button>
                 <div className={`overflow-hidden transition-all duration-200 ${isExpanded ? 'max-h-40 opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
                   <div className="rounded-md border border-border/50 bg-muted/50 px-3 py-3 text-[11px] text-muted-foreground italic">
                     No statuses exist yet in this category.

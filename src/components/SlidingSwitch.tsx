@@ -1,4 +1,5 @@
 import React from 'react';
+import { Button } from '@/components/ui/button';
 import Tooltip from '@/components/ui/tooltip';
 
 export const SWITCH_BTN = 28; // px, square buttons
@@ -42,17 +43,19 @@ const SlidingSwitch: React.FC<Props> = ({ items, selected, onSelect, ariaLabel }
         return (
           <div key={item.key} className="relative z-10" style={{ width: SWITCH_BTN, height: SWITCH_BTN }}>
             <Tooltip content={item.tooltip} side="bottom">
-              <button
+              <Button
                 type="button"
+                variant="ghost"
+                size="icon"
                 aria-label={item.label}
                 aria-pressed={sel}
                 onClick={() => onSelect(item.key)}
                 onWheel={item.onWheel}
-                className={`inline-flex items-center justify-center rounded ${sel ? 'text-primary-foreground' : 'text-gray-400 dark:text-gray-500 hover:text-gray-500'}`}
+                className={`inline-flex items-center justify-center rounded p-0 hover:bg-transparent ${sel ? 'text-primary-foreground' : 'text-gray-400 dark:text-gray-500 hover:text-gray-500'}`}
                 style={{ width: SWITCH_BTN, height: SWITCH_BTN, opacity: item.dimmed ? 0.4 : 1, transition: reduce ? 'none' : 'color 180ms ease, opacity 180ms ease' }}
               >
                 <Icon className="w-4 h-4" />
-              </button>
+              </Button>
             </Tooltip>
             {item.corner && <div className="absolute -top-0.5 -right-0.5">{item.corner}</div>}
           </div>

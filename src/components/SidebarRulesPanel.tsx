@@ -34,10 +34,11 @@ const SidebarRulesPanel = ({ rulesList, onAddRule, onEditRule, questMapOpen = fa
             const triggerMeta = RULE_TRIGGER_LOOKUP[rule.triggerId];
             const TriggerIcon = triggerMeta?.icon;
             return (
-              <button
+              <Button
                 key={rule.id}
                 type="button"
-                className="flex items-center gap-3 p-2 bg-muted/50 hover:bg-muted rounded-md border border-border cursor-pointer transition-colors w-full text-left"
+                variant="outline"
+                className="h-auto flex items-center gap-3 p-2 bg-muted/50 hover:bg-muted rounded-md border border-border cursor-pointer transition-colors w-full text-left"
                 title={rule.name}
                 onClick={() => onEditRule(rule.id)}
               >
@@ -57,7 +58,7 @@ const SidebarRulesPanel = ({ rulesList, onAddRule, onEditRule, questMapOpen = fa
                     )}
                   </div>
                 </div>
-              </button>
+              </Button>
             );
           })}
         </div>

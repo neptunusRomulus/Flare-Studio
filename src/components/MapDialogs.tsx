@@ -1,5 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import Tooltip from '@/components/ui/tooltip';
 import { HelpCircle, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
@@ -112,9 +114,9 @@ const MapDialogs = ({
 
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             <div>
-              <label className="block text-sm font-medium text-muted-foreground mb-1">
+              <Label className="block text-sm font-medium text-muted-foreground mb-1">
                 Map Name
-              </label>
+              </Label>
               <Input
                 value={newMapName}
                 onChange={(e) => {
@@ -135,9 +137,9 @@ const MapDialogs = ({
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-muted-foreground mb-1">
+                <Label className="block text-sm font-medium text-muted-foreground mb-1">
                   Width (tiles)
-                </label>
+                </Label>
                 <Input
                   type="number"
                   min={1}
@@ -147,9 +149,9 @@ const MapDialogs = ({
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-muted-foreground mb-1">
+                <Label className="block text-sm font-medium text-muted-foreground mb-1">
                   Height (tiles)
-                </label>
+                </Label>
                 <Input
                   type="number"
                   min={1}
@@ -161,20 +163,18 @@ const MapDialogs = ({
             </div>
             <div className="flex items-center gap-2 rounded-md border border-border px-3 py-2">
               <div className="flex items-center gap-2">
-                <label htmlFor="starting-map-checkbox" className="text-sm font-medium text-muted-foreground">
+                <Label htmlFor="starting-map-checkbox" className="text-sm font-medium text-muted-foreground">
                   Starting Map
-                </label>
+                </Label>
                 <Tooltip content="If this map is the map that players will start the game then mark this option">
                   <HelpCircle className="h-4 w-4 text-muted-foreground" aria-hidden />
                 </Tooltip>
               </div>
-              <input
+              <Checkbox
                 id="starting-map-checkbox"
-                type="checkbox"
                 className="h-4 w-4 rounded border border-border accent-orange-500"
                 checked={newMapStarting}
-                onChange={(e) => setNewMapStarting(e.target.checked)}
-                aria-checked={newMapStarting}
+                onCheckedChange={(checked) => setNewMapStarting(checked === true)}
                 aria-label="Set this map as the starting map"
               />
             </div>
@@ -232,14 +232,17 @@ const MapDialogs = ({
             className="flex items-center justify-between px-4 py-3 border-b border-border cursor-move select-none bg-muted/30"
           >
             <h2 className="text-lg font-semibold">Edit Hero Position</h2>
-            <button
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
               onClick={() => {
                 setShowHeroEditDialog(false);
               }}
-              className="text-muted-foreground hover:text-foreground transition-colors"
+              className="h-auto w-auto text-muted-foreground hover:text-foreground transition-colors"
             >
               <X className="w-4 h-4" />
-            </button>
+            </Button>
           </div>
 
           {/* Content */}
@@ -252,7 +255,7 @@ const MapDialogs = ({
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium mb-1">X Position</label>
+                    <Label className="block text-sm font-medium mb-1">X Position</Label>
                     <Input
                       type="number"
                       min={0}
@@ -273,7 +276,7 @@ const MapDialogs = ({
                     </span>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium mb-1">Y Position</label>
+                    <Label className="block text-sm font-medium mb-1">Y Position</Label>
                     <Input
                       type="number"
                       min={0}

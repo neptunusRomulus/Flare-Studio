@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import Tooltip from '@/components/ui/tooltip';
 import { HelpCircle, X, Save, Trash2 } from 'lucide-react';
 import { createPortal } from 'react-dom';
@@ -131,7 +133,7 @@ const MapSettingsDialog = ({
 
         <div className="flex-1 overflow-y-auto space-y-4 p-4">
           <div>
-            <label className="block text-sm font-medium mb-2">Map Name</label>
+            <Label className="block text-sm font-medium mb-2">Map Name</Label>
             <Input
               type="text"
               value={mapName}
@@ -141,7 +143,7 @@ const MapSettingsDialog = ({
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-2">Map Width</label>
+            <Label className="block text-sm font-medium mb-2">Map Width</Label>
             <Input
               type="number"
               value={mapWidth}
@@ -152,7 +154,7 @@ const MapSettingsDialog = ({
             />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-2">Map Height</label>
+            <Label className="block text-sm font-medium mb-2">Map Height</Label>
             <Input
               type="number"
               value={mapHeight}
@@ -164,20 +166,18 @@ const MapSettingsDialog = ({
           </div>
           <div className="flex items-center gap-2 rounded-md border border-border px-3 py-2">
             <div className="flex items-center gap-2">
-              <label htmlFor="starting-map-checkbox-modal" className="text-sm font-medium text-muted-foreground">
+              <Label htmlFor="starting-map-checkbox-modal" className="text-sm font-medium text-muted-foreground">
                 Starting Map
-              </label>
+              </Label>
               <Tooltip content="If this map is the map that players will start the game then mark this option">
                 <HelpCircle className="h-4 w-4 text-muted-foreground" aria-hidden />
               </Tooltip>
             </div>
-            <input
+            <Checkbox
               id="starting-map-checkbox-modal"
-              type="checkbox"
               className="h-4 w-4 rounded border border-border accent-orange-500"
               checked={isStartingMap}
-              onChange={(e) => updateStartingMap(e.target.checked)}
-              aria-checked={isStartingMap}
+              onCheckedChange={(checked) => updateStartingMap(checked === true)}
               aria-label="Set this map as the starting map"
             />
           </div>

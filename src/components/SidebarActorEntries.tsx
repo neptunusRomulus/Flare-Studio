@@ -405,10 +405,12 @@ const SidebarActorEntries = ({
                     </div>
                     {isNpcLayer && (
                       <Tooltip content="Number of NPC instances total" side="left">
-                        <button
+                        <Button
                           type="button"
+                          variant="ghost"
+                          size="icon"
                           aria-label={`${instanceCount} NPC instances total`}
-                          className="shrink-0 cursor-pointer rounded-full focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                          className="h-auto w-auto shrink-0 cursor-pointer rounded-full focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                           draggable={false}
                           onDragStart={(event) => event.preventDefault()}
                           onMouseDown={(event) => event.stopPropagation()}
@@ -427,7 +429,7 @@ const SidebarActorEntries = ({
                           >
                             {instanceCount}
                           </Badge>
-                        </button>
+                        </Button>
                       </Tooltip>
                     )}
                     {(isNpcLayer || isEnemyLayer) && (

@@ -3,6 +3,7 @@ import type { TileLayer } from '@/types';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 import usePreferences from '@/hooks/usePreferences';
 import { Check, X, FlipHorizontal2, FlipVertical2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { fitZoom } from '@/components/paletteLayout';
 import { classifyWheel } from '@/editor/wheelNav';
 
@@ -924,57 +925,67 @@ const TilesetPalette = ({
         {detectedTiles.length > 0 && selectedDetectedGids.length > 1 && (
           <div className="absolute bottom-3 right-3 z-20 bg-background/95 border border-border shadow-md rounded-md px-2 py-1.5 text-xs flex items-center gap-2">
             <span className="text-muted-foreground">merge this assets?</span>
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
               onClick={handleMergeSelectedAssets}
-              className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-accent"
+              className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-accent p-0"
               aria-label="Merge selected assets"
               title="Merge selected assets"
             >
               <Check className="h-3.5 w-3.5" />
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
               onClick={() => { setSelectedDetectedGids([]); }}
-              className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-accent"
+              className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-accent p-0"
               aria-label="Cancel merge"
               title="Cancel"
             >
               <X className="h-3.5 w-3.5" />
-            </button>
+            </Button>
           </div>
         )}
 
         {detectedTiles.length > 0 && selectedDetectedGids.length === 1 && (
           <div className="absolute bottom-3 right-3 z-20 bg-background/95 border border-border shadow-md rounded-md px-2 py-1.5 text-xs flex items-center gap-2">
             <span className="text-muted-foreground">slice this asset?</span>
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
               onClick={() => handleSliceSelectedAsset('horizontal')}
-              className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-accent"
+              className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-accent p-0"
               aria-label="Slice horizontally"
               title="Slice horizontally"
             >
               <FlipHorizontal2 className="h-3.5 w-3.5" />
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
               onClick={() => handleSliceSelectedAsset('vertical')}
-              className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-accent"
+              className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-accent p-0"
               aria-label="Slice vertically"
               title="Slice vertically"
             >
               <FlipVertical2 className="h-3.5 w-3.5" />
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
               onClick={() => { setSelectedDetectedGids([]); }}
-              className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-accent"
+              className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-accent p-0"
               aria-label="Cancel slice"
               title="Cancel"
             >
               <X className="h-3.5 w-3.5" />
-            </button>
+            </Button>
           </div>
         )}
 

@@ -1,3 +1,4 @@
+import { Button } from '@/components/ui/button';
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown } from 'lucide-react';
@@ -46,9 +47,10 @@ export default function TilesetTabPicker({ tabs, activeId, onSelect }: { tabs: P
   return (
     <>
       <Tooltip content={label} side="bottom">
-        <button
+        <Button
           ref={triggerRef}
           type="button"
+          variant="outline"
           aria-haspopup="listbox"
           aria-expanded={open}
           onClick={toggle}
@@ -56,7 +58,7 @@ export default function TilesetTabPicker({ tabs, activeId, onSelect }: { tabs: P
         >
           <span className="flex-1 min-w-0 truncate text-left">{label}</span>
           <ChevronDown className="w-3 h-3 shrink-0 opacity-70" />
-        </button>
+        </Button>
       </Tooltip>
       {anchor && createPortal(
         <ul
@@ -69,13 +71,14 @@ export default function TilesetTabPicker({ tabs, activeId, onSelect }: { tabs: P
             const isActive = tab.id === active.id;
             return (
               <li key={tab.id} role="option" aria-selected={isActive}>
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
                   onClick={() => { setAnchor(null); if (!isActive) onSelect(tab.id); }}
-                  className={`w-full flex items-center px-2 py-1.5 text-xs text-left ${isActive ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/60'}`}
+                  className={`h-auto w-full flex items-center px-2 py-1.5 text-xs text-left ${isActive ? 'bg-accent text-accent-foreground' : 'hover:bg-accent/60'}`}
                 >
                   <span className="truncate">{tabLabel(tab, idx)}</span>
-                </button>
+                </Button>
               </li>
             );
           })}

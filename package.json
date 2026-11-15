@@ -1,5 +1,5 @@
 {
-  "name": "ism-tile",
+  "name": "flare-studio",
   "version": "0.0.0",
   "private": true,
   "description": "Tile map editor (Flare Studio fork)",
@@ -80,7 +80,7 @@
     "wait-on": "^7.0.0"
   },
   "build": {
-    "appId": "com.ismtile.editor",
+    "appId": "com.flarestudio.editor",
     "productName": "Flare Studio",
     "directories": {
       "output": "release",

@@ -7,8 +7,23 @@ const {
   ipcMain: ipcMainLocal,
 } = require("electron");
 const path = require("path");
-const displaySettings = require("./displaySettings.cjs");
 const fs = require("fs");
+const { migrateUserDataFromLegacyName } = require("./migrateUserData.cjs");
+
+// Before anything reads userData: package name is now flare-studio, so
+// app.getPath("userData") is ~/.config/flare-studio (or the OS equivalent).
+try {
+  const migration = migrateUserDataFromLegacyName(app);
+  if (migration.migrated) {
+    console.log("[userData] Copied settings from ism-tile to flare-studio");
+  } else if (migration.skipped) {
+    console.log("[userData] Migration skipped:", migration.skipped);
+  }
+} catch (error) {
+  console.warn("[userData] Migration failed:", error);
+}
+
+const displaySettings = require("./displaySettings.cjs");
 const { validateSerializedFlareData, loadFlareDataSchema } = require("./flareDataValidator.cjs");
 const flareLaunch = require("./flareLaunch.cjs");
 const flareInstaller = require("./flareInstaller.cjs");

@@ -168,6 +168,8 @@ declare global {
         files: Array<{ name: string; path: string }>;
       }>;
     };
+    __FLARE_STUDIO_PROJECT_MAPS__?: string[];
+    /** @deprecated Use __FLARE_STUDIO_PROJECT_MAPS__ */
     __ISM_TILE_PROJECT_MAPS__?: string[];
   }
 }

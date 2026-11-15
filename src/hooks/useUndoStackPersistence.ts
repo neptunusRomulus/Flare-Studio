@@ -1,4 +1,5 @@
 import { useCallback, useRef } from 'react';
+import { UNDO_STORAGE_KEY as STORAGE_KEY, ensureUndoStorageKeysMigrated, trackedUndoStorageKeys } from './undoStorageKeys';
 import type { TileLayer, MapObject } from '../types';
 import type { TileMapEditor as TileMapEditorType } from '../editor/TileMapEditor';
 
@@ -12,7 +13,6 @@ export interface UndoStackPersistenceOptions {
   maxStorageSize?: number; // Max size in KB (default 5000)
 }
 
-const STORAGE_KEY = 'ism-tile-undo-stack';
 const STORAGE_SIZE_LIMIT = 5000; // KB
 
 /**
@@ -39,11 +39,10 @@ export default function useUndoStackPersistence() {
     if (typeof localStorage === 'undefined') return 0;
     
     try {
+      ensureUndoStorageKeysMigrated(localStorage);
       let size = 0;
-      for (const key in localStorage) {
-        if (key.startsWith('ism-tile')) {
-          size += localStorage.getItem(key)?.length ?? 0;
-        }
+      for (const key of trackedUndoStorageKeys(localStorage)) {
+        size += localStorage.getItem(key)?.length ?? 0;
       }
       return Math.ceil(size / 1024);
     } catch (e) {
@@ -103,6 +102,7 @@ export default function useUndoStackPersistence() {
    */
   const saveUndoStack = useCallback((editor: TileMapEditorType): boolean => {
     if (!persistenceEnabledRef.current || !editor) return false;
+    ensureUndoStorageKeysMigrated();
     
     try {
       // Get history using public getter method
@@ -132,6 +132,7 @@ export default function useUndoStackPersistence() {
    */
   const loadUndoStack = useCallback((editor: TileMapEditorType): boolean => {
     if (!persistenceEnabledRef.current || !editor) return false;
+    ensureUndoStorageKeysMigrated();
 
     try {
       const json = localStorage.getItem(STORAGE_KEY);
@@ -158,6 +159,7 @@ export default function useUndoStackPersistence() {
    * Clear saved undo/redo history from localStorage
    */
   const clearUndoStack = useCallback((): void => {
+    ensureUndoStorageKeysMigrated();
     try {
       localStorage.removeItem(STORAGE_KEY);
       console.log('[UndoStack] Cleared saved undo history');
@@ -217,6 +219,7 @@ export default function useUndoStackPersistence() {
     isEnabled: boolean;
     lastSaveTime: number;
   } => {
+    ensureUndoStorageKeysMigrated();
     const json = localStorage.getItem(STORAGE_KEY);
     const state = json ? deserializeState(json) : null;
 

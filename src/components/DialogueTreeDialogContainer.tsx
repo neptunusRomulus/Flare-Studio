@@ -19,7 +19,7 @@ type DialogueTreeDialogCtx = {
 export default function DialogueTreeDialogContainer({ ctx }: { ctx: unknown }) {
   const c = ctx as DialogueTreeDialogCtx & { projectMaps?: string[] };
   // Try to get projectMaps from context if available
-  const projectMaps = (c.projectMaps ?? (window.__ISM_TILE_PROJECT_MAPS__ ?? []));
+  const projectMaps = (c.projectMaps ?? (window.__FLARE_STUDIO_PROJECT_MAPS__ ?? window.__ISM_TILE_PROJECT_MAPS__ ?? []));
   return (
     <DialogueTreeDialog
       showDialogueTreeDialog={c.showDialogueTreeDialog ?? false}

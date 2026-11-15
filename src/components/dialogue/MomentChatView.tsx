@@ -33,8 +33,12 @@ import {
   DIALOG_CONDITION_CATALOG,
   removeAction,
   removeCondition,
+  renameDialogueId,
   updateCondition,
 } from '@/editor/dialogueChat';
+import { DIALOGUE_RECIPES, buildRecipeTree, findDialogueRecipe } from '@/editor/dialogueRecipes';
+import ChatTopicSettings from '@/components/dialogue/ChatTopicSettings';
+import ChatLineDetails from '@/components/dialogue/ChatLineDetails';
 
 type Props = {
   trees: DialogueTree[];
@@ -174,6 +178,7 @@ const Bubble = ({
   npcName,
   projectPath,
   onChange,
+  onPatchLine,
   onRemove,
   dragHandle,
   dropProps,
@@ -186,6 +191,7 @@ const Bubble = ({
   npcName: string;
   projectPath?: string | null;
   onChange: (text: string) => void;
+  onPatchLine: (patch: Partial<DialogueLine>) => void;
   onRemove: () => void;
   dragHandle: React.HTMLAttributes<HTMLButtonElement>;
   dropProps: React.HTMLAttributes<HTMLDivElement>;
@@ -204,6 +210,7 @@ const Bubble = ({
 
   const actions = (
     <div className={cn('flex items-center self-center transition-opacity', confirm ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-within:opacity-100')}>
+      <ChatLineDetails line={line} npc={npc} onPatch={onPatchLine} />
       <Button type="button" variant="ghost" size="icon" className="h-5 w-5 cursor-grab text-muted-foreground active:cursor-grabbing" aria-label="Reorder line" {...dragHandle}>
         <GripVertical className="h-3 w-3" />
       </Button>
@@ -365,6 +372,7 @@ const TopicThread = ({
   active,
   onActivate,
   onPatch,
+  onRenameId,
   onRemove,
   npcName,
   npcPortrait,
@@ -375,6 +383,7 @@ const TopicThread = ({
   active: boolean;
   onActivate: () => void;
   onPatch: (next: DialogueTree) => void;
+  onRenameId: (nextId: string) => void;
   onRemove: () => void;
   npcName: string;
   npcPortrait: string;
@@ -405,6 +414,7 @@ const TopicThread = ({
             </span>
           </Tooltip>
           <TopicMeta tree={tree} onPatch={onPatch} />
+          <ChatTopicSettings tree={tree} allTrees={allTrees} onPatch={onPatch} onRenameId={onRenameId} />
           <InlineConfirm open={confirm} onCancel={() => setConfirm(false)} onConfirm={() => { onRemove(); setConfirm(false); }} message="Remove this topic?">
             <Button type="button" variant="ghost" size="icon" className={cn('h-4 w-4 text-muted-foreground hover:text-destructive', confirm ? 'opacity-100' : 'opacity-0 group-hover:opacity-100')} aria-label="Remove topic" onClick={() => setConfirm(true)}>
               <X className="h-3 w-3" />
@@ -422,6 +432,7 @@ const TopicThread = ({
           npcName={npcName}
           projectPath={projectPath}
           onChange={(text) => onPatch({ ...tree, dialogues: lines.map((entry, i) => (i === index ? { ...entry, text } : entry)) })}
+          onPatchLine={(patch) => onPatch({ ...tree, dialogues: lines.map((entry, i) => (i === index ? { ...entry, ...patch } : entry)) })}
           onRemove={() => onPatch(removeDialogueLine(tree, index))}
           dragHandle={{
             draggable: true,
@@ -468,13 +479,14 @@ const TopicThread = ({
 };
 
 /** WhatsApp-style input bar: speaker toggle, auto-growing line field, + menu, send. */
-const Composer = ({ speaker, setSpeaker, onSend, onAddCondition, onAddEffect, onAddTopic, npcName, npcPortrait, projectPath, topicLabel }: {
+const Composer = ({ speaker, setSpeaker, onSend, onAddCondition, onAddEffect, onAddTopic, onAddRecipe, npcName, npcPortrait, projectPath, topicLabel }: {
   speaker: 'npc' | 'player';
   setSpeaker: (s: 'npc' | 'player') => void;
   onSend: (text: string) => void;
   onAddCondition: (type: string) => void;
   onAddEffect: (id: string) => void;
   onAddTopic: () => void;
+  onAddRecipe: (id: string) => void;
   npcName: string;
   npcPortrait: string;
   projectPath?: string | null;
@@ -500,6 +512,13 @@ const Composer = ({ speaker, setSpeaker, onSend, onAddCondition, onAddEffect, on
           <Button type="button" variant="ghost" className="h-7 w-full justify-start px-2 text-xs" onClick={onAddTopic}>
             <Plus className="mr-1 h-3 w-3" /> New topic
           </Button>
+          {DIALOGUE_RECIPES.map((recipe) => (
+            <Tooltip key={recipe.id} content={recipe.description}>
+              <Button type="button" variant="ghost" className="h-7 w-full justify-start px-2 text-xs" onClick={() => onAddRecipe(recipe.id)}>
+                {recipe.label}
+              </Button>
+            </Tooltip>
+          ))}
           <div className="flex gap-1">
             <SearchablePalette buttonLabel="Condition" placeholder="Search conditions…" entries={CONDITION_ENTRIES} onSelect={onAddCondition} />
             <SearchablePalette buttonLabel="Effect" placeholder="Search effects…" entries={EFFECT_ENTRIES} onSelect={onAddEffect} />
@@ -552,6 +571,17 @@ const MomentChatView = ({ trees, visibleTrees, setTrees, moment, npcName = '', n
     requestAnimationFrame(() => document.getElementById(topicDomId(id))?.scrollIntoView({ block: 'end' }));
   };
 
+  const addRecipe = (recipeId: string) => {
+    const recipe = findDialogueRecipe(recipeId);
+    if (!recipe) return;
+    const makeId = () => `dlg_${Math.random().toString(36).slice(2, 6)}`;
+    const tree = applyMomentToTopic(buildRecipeTree(recipe, trees, makeId, makeId), moment);
+    setTrees([...trees, tree]);
+    const id = topicKey(tree);
+    setActiveId(id);
+    requestAnimationFrame(() => document.getElementById(topicDomId(id))?.scrollIntoView({ block: 'end' }));
+  };
+
   const removeTopic = (id: string) => {
     setTrees(trees.filter((tree) => topicKey(tree) !== id).map((tree) => ({
       ...tree,
@@ -581,6 +611,12 @@ const MomentChatView = ({ trees, visibleTrees, setTrees, moment, npcName = '', n
             active={!!active && topicKey(active) === topicKey(tree)}
             onActivate={() => setActiveId(topicKey(tree))}
             onPatch={(next) => setTrees(patchTree(trees, topicKey(tree), next))}
+            onRenameId={(nextId) => {
+              const from = tree.dialogueId;
+              setTrees(renameDialogueId(trees, from, nextId));
+              const trimmed = nextId.trim();
+              if (trimmed && (activeId === from || activeId === topicKey(tree))) setActiveId(trimmed);
+            }}
             onRemove={() => removeTopic(topicKey(tree))}
             npcName={npcName}
             npcPortrait={npcPortrait}
@@ -598,6 +634,7 @@ const MomentChatView = ({ trees, visibleTrees, setTrees, moment, npcName = '', n
         onAddCondition={(type) => patchActive((tree) => addCondition(tree, type as DialogueRequirement['type']))}
         onAddEffect={(id) => patchActive((tree) => addEffect(tree, id))}
         onAddTopic={addTopic}
+        onAddRecipe={addRecipe}
         npcName={npcName}
         npcPortrait={npcPortrait}
         projectPath={projectPath}

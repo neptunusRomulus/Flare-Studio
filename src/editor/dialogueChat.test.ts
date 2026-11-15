@@ -10,6 +10,7 @@ import {
   conditionChipLabel,
   removeAction,
   removeCondition,
+  renameDialogueId,
   updateCondition,
 } from './dialogueChat';
 import { reorderDialogueLines } from './dialogueLines';
@@ -104,5 +105,17 @@ describe('chat bubble layout', () => {
       { id: 'zz', label: 'zz', missing: true },
     ]);
     expect(conditionChipLabel({ id: 'r', type: 'not_status', value: 'done' })).toBe('Status is off: done');
+  });
+
+  it('renames a topic id and remaps response links', () => {
+    const trees = [
+      { id: 'a', dialogueId: 'a', topic: 'Hi', responses: ['b'], requirements: [], dialogues: [], rewards: [], worldEffects: [] },
+      { id: 'b', dialogueId: 'b', topic: 'Quest', responses: [], requirements: [], dialogues: [], rewards: [], worldEffects: [] },
+    ];
+    expect(renameDialogueId(trees, 'b', 'quest_1')).toEqual([
+      { ...trees[0], responses: ['quest_1'] },
+      { ...trees[1], dialogueId: 'quest_1' },
+    ]);
+    expect(renameDialogueId(trees, 'b', '  ')).toBe(trees);
   });
 });

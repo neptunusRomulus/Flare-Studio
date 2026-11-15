@@ -138,3 +138,14 @@ export function chatResponses(tree: DialogueTree, allTrees: DialogueTree[]): Arr
     return { id, label: playerLine || target?.topic || id, missing: !target };
   });
 }
+
+/** Rename a topic's dialogueId and remap response links that pointed at the old id. */
+export function renameDialogueId(trees: DialogueTree[], from: string, to: string): DialogueTree[] {
+  const next = to.trim();
+  if (!from || !next || next === from) return trees;
+  return trees.map((tree) => ({
+    ...tree,
+    dialogueId: tree.dialogueId === from ? next : tree.dialogueId,
+    responses: (tree.responses || []).map((id) => (id === from ? next : id)),
+  }));
+}

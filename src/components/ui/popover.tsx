@@ -2,6 +2,7 @@ import * as React from "react"
 import * as PopoverPrimitive from "@radix-ui/react-popover"
 
 import { cn } from "@/lib/utils"
+import { Z_INDEX } from "@/lib/zIndex"
 
 const Popover = PopoverPrimitive.Root
 
@@ -18,7 +19,7 @@ const PopoverAnchor = PopoverPrimitive.Anchor
 const PopoverContent = React.forwardRef<
   React.ElementRef<typeof PopoverPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof PopoverPrimitive.Content>
->(({ className, align = "center", side = "bottom", sideOffset = 4, ...props }, ref) => (
+>(({ className, align = "center", side = "bottom", sideOffset = 4, style, ...props }, ref) => (
   <PopoverPrimitive.Portal>
     <PopoverPrimitive.Content
       ref={ref}
@@ -26,9 +27,10 @@ const PopoverContent = React.forwardRef<
       side={side}
       sideOffset={sideOffset}
       className={cn(
-        "z-50 w-64 rounded-md border bg-popover p-2 text-popover-foreground shadow-md outline-none",
+        "w-64 rounded-md border bg-popover p-2 text-popover-foreground shadow-md outline-none",
         className
       )}
+      style={{ zIndex: Z_INDEX.popover, ...style }}
       {...props}
     />
   </PopoverPrimitive.Portal>

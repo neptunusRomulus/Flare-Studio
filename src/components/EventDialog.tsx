@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { HelpCircle, X, Save, MapPinPlus, MousePointerClick, MapPinMinus, LogIn, LogOut, SquareCheckBig, Repeat2, ChevronDown, ChevronUp, Zap } from 'lucide-react';
 import Tooltip from '@/components/ui/tooltip';
@@ -742,17 +744,18 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
 
   const CollapsibleSection = ({ title, icon: Icon, isExpanded, onToggle, children, id }: { title: string; icon: React.ComponentType<React.SVGProps<SVGSVGElement>>; isExpanded: boolean; onToggle: () => void; children: React.ReactNode; id: string }) => (
     <div className="border border-border/50 rounded-lg overflow-hidden mb-4 shadow-sm" id={`section-${id}`}>
-      <button
+      <Button
         type="button"
+        variant="ghost"
         onClick={onToggle}
-        className="w-full flex items-center justify-between p-3 bg-muted/20 hover:bg-muted/30 transition-colors select-none"
+        className="w-full h-auto flex items-center justify-between p-3 bg-muted/20 hover:bg-muted/30 transition-colors select-none rounded-none font-normal"
       >
         <div className="flex items-center gap-2">
           <Icon className="w-4 h-4 text-orange-500" />
           <span className="text-sm font-semibold tracking-wide">{title}</span>
         </div>
         {isExpanded ? <ChevronUp className="w-4 h-4 text-muted-foreground" /> : <ChevronDown className="w-4 h-4 text-muted-foreground" />}
-      </button>
+      </Button>
       {isExpanded && <div className="p-4 bg-background border-t border-border/10 animate-in slide-in-from-top-2 duration-200">{children}</div>}
     </div>
   );
@@ -804,7 +807,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
           >
             <div className="space-y-4">
               <div className="space-y-2">
-                <label className="text-xs font-medium text-foreground/80">Name</label>
+                <Label className="text-xs font-medium text-foreground/80">Name</Label>
                 <Input
                   value={eventData.name}
                   onChange={e => setEventData(prev => ({ ...prev, name: e.target.value }))}
@@ -813,7 +816,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-xs font-medium text-foreground/80">Description</label>
+                <Label className="text-xs font-medium text-foreground/80">Description</Label>
                 <Input
                   value={eventData.description}
                   onChange={e => setEventData(prev => ({ ...prev, description: e.target.value }))}
@@ -838,7 +841,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
               {/* Activation */}
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <label className="text-xs font-medium text-foreground/80">Activation</label>
+                  <Label className="text-xs font-medium text-foreground/80">Activation</Label>
                   <Tooltip content="When this event executes">
                     <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
                   </Tooltip>
@@ -850,16 +853,19 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                     const isActive = eventData.timing.activeActivation === activation;
                     return (
                       <Tooltip key={activation} content={config.tooltip} side="right">
-                        <button
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          aria-pressed={isActive}
                           onClick={() => setActivation(activation)}
-                          className={`rounded-md border p-2 transition-colors ${
+                          className={`h-auto rounded-md border p-2 transition-colors hover:bg-muted/50 ${
                             isActive
                               ? (ACTIVATION_COLORS[activation]?.active ?? 'border-orange-500/50 bg-orange-500/10 text-orange-600')
                               : 'border-border/50 bg-muted/30 text-foreground/60 hover:bg-muted/50'
                           }`}
                         >
                           <IconComponent className="h-5 w-5" />
-                        </button>
+                        </Button>
                       </Tooltip>
                     );
                   })}
@@ -879,7 +885,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                 {/* Area/hotspot belong to the map instance: set by placing (dragging an area) on the map, edited here afterwards */}
                 {isEditing && !eventPlaced && (
                   <div className="flex items-center gap-2 h-7">
-                    <label className="text-xs font-medium text-foreground/80">Location</label>
+                    <Label className="text-xs font-medium text-foreground/80">Location</Label>
                     <Tooltip content="Place it from the Entities dock: click its pin, then drag an area on the map.">
                       <span className="text-xs text-muted-foreground italic cursor-help">Not placed</span>
                     </Tooltip>
@@ -889,14 +895,14 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                 {/* Location and Size */}
                 <div className={`space-y-2 transition-opacity ${!isLocEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
                   <div className="flex items-center gap-2">
-                    <label className="text-xs font-medium text-foreground/80">Location and Size</label>
+                    <Label className="text-xs font-medium text-foreground/80">Location and Size</Label>
                     <Tooltip content="Defines the physical area of the event">
                       <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
                     </Tooltip>
                   </div>
                   <div className="grid grid-cols-4 gap-2">
                     <div>
-                      <label className="text-[10px] text-muted-foreground">X</label>
+                      <Label className="text-[10px] text-muted-foreground">X</Label>
                       <Input
                         type="number"
                         min="0"
@@ -922,7 +928,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] text-muted-foreground">Y</label>
+                      <Label className="text-[10px] text-muted-foreground">Y</Label>
                       <Input
                         type="number"
                         min="0"
@@ -948,7 +954,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] text-muted-foreground">Width</label>
+                      <Label className="text-[10px] text-muted-foreground">Width</Label>
                       <Input
                         type="number"
                         min="1"
@@ -970,7 +976,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] text-muted-foreground">Height</label>
+                      <Label className="text-[10px] text-muted-foreground">Height</Label>
                       <Input
                         type="number"
                         min="1"
@@ -997,14 +1003,14 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                 {/* Hotspot */}
                 <div className={`space-y-2 transition-opacity ${!isHotspotEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
                   <div className="flex items-center gap-2">
-                    <label className="text-xs font-medium text-foreground/80">Hotspot</label>
+                    <Label className="text-xs font-medium text-foreground/80">Hotspot</Label>
                     <Tooltip content="Property determines the specific clickable area for an interaction">
                       <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
                     </Tooltip>
                   </div>
                   <div className="grid grid-cols-4 gap-2">
                     <div>
-                      <label className="text-[10px] text-muted-foreground">X</label>
+                      <Label className="text-[10px] text-muted-foreground">X</Label>
                       <Input
                         type="number"
                         min="0"
@@ -1022,7 +1028,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] text-muted-foreground">Y</label>
+                      <Label className="text-[10px] text-muted-foreground">Y</Label>
                       <Input
                         type="number"
                         min="0"
@@ -1040,7 +1046,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] text-muted-foreground">Width</label>
+                      <Label className="text-[10px] text-muted-foreground">Width</Label>
                       <Input
                         type="number"
                         min="1"
@@ -1058,7 +1064,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] text-muted-foreground">Height</label>
+                      <Label className="text-[10px] text-muted-foreground">Height</Label>
                       <Input
                         type="number"
                         min="1"
@@ -1082,7 +1088,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                 {/* Cooldown */}
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <label className="text-xs font-medium text-foreground/80">Cooldown (ms)</label>
+                    <Label className="text-xs font-medium text-foreground/80">Cooldown (ms)</Label>
                     <Tooltip content="Adds a waiting period between activations">
                       <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
                     </Tooltip>
@@ -1129,7 +1135,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                 {/* Delay */}
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <label className="text-xs font-medium text-foreground/80">Delay (ms)</label>
+                    <Label className="text-xs font-medium text-foreground/80">Delay (ms)</Label>
                     <Tooltip content="Postpones the event's execution after it is triggered">
                       <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
                     </Tooltip>
@@ -1197,7 +1203,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <label className="text-xs font-medium text-foreground/80">Status Checks</label>
+                    <Label className="text-xs font-medium text-foreground/80">Status Checks</Label>
                     <Tooltip content="Checks for specific campaign or quest status">
                       <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
                     </Tooltip>
@@ -1232,7 +1238,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
               {/* Minimum Level */}
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <label className="text-xs font-medium text-foreground/80">Minimum Level</label>
+                  <Label className="text-xs font-medium text-foreground/80">Minimum Level</Label>
                   <Tooltip content="Requires a minimum player level">
                     <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
                   </Tooltip>
@@ -1270,7 +1276,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <label className="text-xs font-medium text-foreground/80">Item Requirements</label>
+                    <Label className="text-xs font-medium text-foreground/80">Item Requirements</Label>
                     <Tooltip content="Require or forbid a specific inventory item for this event">
                       <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
                     </Tooltip>
@@ -1347,7 +1353,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
               {/* Currency */}
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <label className="text-xs font-medium text-foreground/80">Currency Requirement</label>
+                  <Label className="text-xs font-medium text-foreground/80">Currency Requirement</Label>
                   <Tooltip content="Checks if the player has enough money">
                     <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
                   </Tooltip>
@@ -1382,7 +1388,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
 
               {/* Message */}
               <div className="space-y-2">
-                <label className="text-xs font-medium text-foreground/80">Message</label>
+                <Label className="text-xs font-medium text-foreground/80">Message</Label>
                 <Input
                   value={eventData.rewards.message}
                   onChange={e =>
@@ -1398,7 +1404,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
 
               {/* EXP Reward */}
               <div className="space-y-2">
-                <label className="text-xs font-medium text-foreground/80">EXP Reward</label>
+                <Label className="text-xs font-medium text-foreground/80">EXP Reward</Label>
                 <Input
                   type="number"
                   min="0"
@@ -1417,7 +1423,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
               {/* Inventory and Loot Effects */}
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <label className="text-xs font-medium text-foreground/80">Inventory & Loot Effects</label>
+                  <Label className="text-xs font-medium text-foreground/80">Inventory & Loot Effects</Label>
                   <Tooltip content="Take or give items, currency, or item groups when this event triggers">
                     <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
                   </Tooltip>
@@ -1635,7 +1641,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
 
               {/* Enemy Spawn */}
               <div className="space-y-2">
-                <label className="text-xs font-medium text-foreground/80">Enemy Spawn</label>
+                <Label className="text-xs font-medium text-foreground/80">Enemy Spawn</Label>
                 <Input
                   value={eventData.rewards.enemySpawn}
                   onChange={e =>
@@ -1651,7 +1657,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
 
               {/* Teleport */}
               <div className="space-y-2">
-                <label className="text-xs font-medium text-foreground/80">Teleport</label>
+                <Label className="text-xs font-medium text-foreground/80">Teleport</Label>
                 <div className="flex items-center gap-2">
                   <Select
                     value={eventData.rewards.teleportMap}
@@ -1679,7 +1685,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                     </SelectContent>
                   </Select>
                   <div>
-                    <label className="text-[10px] text-muted-foreground">X</label>
+                    <Label className="text-[10px] text-muted-foreground">X</Label>
                     <Input
                       type="number"
                       value={eventData.rewards.teleportX}
@@ -1694,7 +1700,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] text-muted-foreground">Y</label>
+                    <Label className="text-[10px] text-muted-foreground">Y</Label>
                     <Input
                       type="number"
                       value={eventData.rewards.teleportY}
@@ -1713,7 +1719,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
 
               {/* Sound */}
               <div className="space-y-2">
-                <label className="text-xs font-medium text-foreground/80">Sound File</label>
+                <Label className="text-xs font-medium text-foreground/80">Sound File</Label>
                 <Input
                   value={eventData.rewards.sound}
                   onChange={e =>
@@ -1742,10 +1748,10 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
 
               {/* Power Effects */}
               <div className="space-y-4 border-t pt-4">
-                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">Power & Spell Effects</label>
+                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">Power & Spell Effects</Label>
                 <div className="space-y-3">
                   <div className="space-y-1">
-                    <label className="text-xs font-medium text-foreground/80">Power ID</label>
+                    <Label className="text-xs font-medium text-foreground/80">Power ID</Label>
                     <Input
                       value={eventData.rewards.power}
                       onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, power: e.target.value } }))}
@@ -1754,7 +1760,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-medium text-foreground/80">Power Path</label>
+                    <Label className="text-xs font-medium text-foreground/80">Power Path</Label>
                     <Input
                       value={eventData.rewards.powerPath}
                       onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, powerPath: e.target.value } }))}
@@ -1764,7 +1770,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <label className="text-xs font-medium text-foreground/80">Power Damage</label>
+                      <Label className="text-xs font-medium text-foreground/80">Power Damage</Label>
                       <Input
                         type="number"
                         min="0"
@@ -1775,7 +1781,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                       />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs font-medium text-foreground/80">Power Level</label>
+                      <Label className="text-xs font-medium text-foreground/80">Power Level</Label>
                       <Input
                         value={eventData.rewards.powerLevel}
                         onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, powerLevel: e.target.value } }))}
@@ -1785,7 +1791,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                     </div>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-medium text-foreground/80">Power Stats</label>
+                    <Label className="text-xs font-medium text-foreground/80">Power Stats</Label>
                     <Input
                       value={eventData.rewards.powerStats}
                       onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, powerStats: e.target.value } }))}
@@ -1798,10 +1804,10 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
 
               {/* Map Modification */}
               <div className="space-y-4 border-t pt-4">
-                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">Map Modification</label>
+                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">Map Modification</Label>
                 <div className="space-y-3">
                   <div className="space-y-1">
-                    <label className="text-xs font-medium text-foreground/80">MapMod</label>
+                    <Label className="text-xs font-medium text-foreground/80">MapMod</Label>
                     <Input
                       value={eventData.rewards.mapmod}
                       onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, mapmod: e.target.value } }))}
@@ -1810,7 +1816,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-medium text-foreground/80">MapMod Toggle</label>
+                    <Label className="text-xs font-medium text-foreground/80">MapMod Toggle</Label>
                     <Input
                       value={eventData.rewards.mapmodToggle}
                       onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, mapmodToggle: e.target.value } }))}
@@ -1820,31 +1826,31 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
-                      <label className="text-xs font-medium text-foreground/80">Requires Tile</label>
+                      <Label className="text-xs font-medium text-foreground/80">Requires Tile</Label>
                       <Input value={eventData.rewards.requiresTile} onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, requiresTile: e.target.value } }))} placeholder="layer,x,y,tile" className="h-7 text-xs" />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs font-medium text-foreground/80">Requires Not Tile</label>
+                      <Label className="text-xs font-medium text-foreground/80">Requires Not Tile</Label>
                       <Input value={eventData.rewards.requiresNotTile} onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, requiresNotTile: e.target.value } }))} placeholder="layer,x,y,tile" className="h-7 text-xs" />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs font-medium text-foreground/80">Spawn Level</label>
+                      <Label className="text-xs font-medium text-foreground/80">Spawn Level</Label>
                       <Input value={eventData.rewards.spawnLevel} onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, spawnLevel: e.target.value } }))} placeholder="fixed,2 or level,min,max" className="h-7 text-xs" />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs font-medium text-foreground/80">Intermap Id</label>
+                      <Label className="text-xs font-medium text-foreground/80">Intermap Id</Label>
                       <Input value={eventData.rewards.intermapId} onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, intermapId: e.target.value } }))} className="h-7 text-xs" />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs font-medium text-foreground/80">Procgen File</label>
+                      <Label className="text-xs font-medium text-foreground/80">Procgen File</Label>
                       <Input value={eventData.rewards.procgenFilename} onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, procgenFilename: e.target.value } }))} className="h-7 text-xs" />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs font-medium text-foreground/80">Procgen Link</label>
+                      <Label className="text-xs font-medium text-foreground/80">Procgen Link</Label>
                       <Input value={eventData.rewards.procgenLink} onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, procgenLink: e.target.value } }))} className="h-7 text-xs" />
                     </div>
                     <div className="space-y-1">
-                      <label className="text-xs font-medium text-foreground/80">Procgen Door Level</label>
+                      <Label className="text-xs font-medium text-foreground/80">Procgen Door Level</Label>
                       <Input value={eventData.rewards.procgenDoorLevel} onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, procgenDoorLevel: e.target.value } }))} className="h-7 text-xs" />
                     </div>
                   </div>
@@ -1854,7 +1860,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
               {/* Restore */}
               <div className="space-y-4 border-t pt-4">
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-foreground/80">Restore</label>
+                  <Label className="text-xs font-medium text-foreground/80">Restore</Label>
                   <Input
                     value={eventData.rewards.restore}
                     onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, restore: e.target.value } }))}
@@ -1866,10 +1872,10 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
 
               {/* NPC, Music, Book */}
               <div className="space-y-4 border-t pt-4">
-                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">NPC / Music / Book</label>
+                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">NPC / Music / Book</Label>
                 <div className="grid grid-cols-3 gap-3">
                   <div className="space-y-1">
-                    <label className="text-xs font-medium text-foreground/80">NPC</label>
+                    <Label className="text-xs font-medium text-foreground/80">NPC</Label>
                     <Input
                       value={eventData.rewards.npc}
                       onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, npc: e.target.value } }))}
@@ -1878,7 +1884,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-medium text-foreground/80">Music</label>
+                    <Label className="text-xs font-medium text-foreground/80">Music</Label>
                     <Input
                       value={eventData.rewards.music}
                       onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, music: e.target.value } }))}
@@ -1887,7 +1893,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-medium text-foreground/80">Book</label>
+                    <Label className="text-xs font-medium text-foreground/80">Book</Label>
                     <Input
                       value={eventData.rewards.book}
                       onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, book: e.target.value } }))}
@@ -1900,30 +1906,28 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
 
               {/* Advanced Flags */}
               <div className="space-y-4 border-t pt-4">
-                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">Advanced Flags</label>
+                <Label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">Advanced Flags</Label>
                 <div className="space-y-3">
                   <div className="grid grid-cols-2 gap-3">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
+                    <Label className="flex items-center gap-2 cursor-pointer font-normal">
+                      <Checkbox
                         checked={eventData.rewards.respec}
-                        onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, respec: e.target.checked } }))}
-                        className="h-4 w-4 rounded border-border/70"
+                        onCheckedChange={(value) => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, respec: value === true } }))}
+                        className="h-4 w-4"
                       />
                       <span className="text-xs">Respec (XP/Stats/Powers)</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
+                    </Label>
+                    <Label className="flex items-center gap-2 cursor-pointer font-normal">
+                      <Checkbox
                         checked={eventData.rewards.showOnMinimap}
-                        onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, showOnMinimap: e.target.checked } }))}
-                        className="h-4 w-4 rounded border-border/70"
+                        onCheckedChange={(value) => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, showOnMinimap: value === true } }))}
+                        className="h-4 w-4"
                       />
                       <span className="text-xs">Show on Minimap</span>
-                    </label>
+                    </Label>
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-medium text-foreground/80">Parallax Layers</label>
+                    <Label className="text-xs font-medium text-foreground/80">Parallax Layers</Label>
                     <Input
                       value={eventData.rewards.parallaxLayers}
                       onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, parallaxLayers: e.target.value } }))}
@@ -1932,7 +1936,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-medium text-foreground/80">Random Status</label>
+                    <Label className="text-xs font-medium text-foreground/80">Random Status</Label>
                     <Input
                       value={eventData.rewards.randomStatus}
                       onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, randomStatus: e.target.value } }))}
@@ -1959,7 +1963,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
               {/* Chance */}
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <label className="text-xs font-medium text-foreground/80">Chance (%)</label>
+                  <Label className="text-xs font-medium text-foreground/80">Chance (%)</Label>
                   <Tooltip content="Sets a percentage chance for the event to fire">
                     <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
                   </Tooltip>
@@ -1997,21 +2001,20 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
 
               {/* Auto Save */}
               <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
+                <Checkbox
                   id="autoSave"
                   checked={eventData.engine.autoSave}
-                  onChange={e =>
+                  onCheckedChange={(value) =>
                     setEventData(prev => ({
                       ...prev,
-                      engine: { ...prev.engine, autoSave: e.target.checked },
+                      engine: { ...prev.engine, autoSave: value === true },
                     }))
                   }
-                  className="h-4 w-4 rounded border-border/70"
+                  className="h-4 w-4"
                 />
-                <label htmlFor="autoSave" className="text-xs font-medium text-foreground/80">
+                <Label htmlFor="autoSave" className="text-xs font-medium text-foreground/80">
                   Auto Save Game
-                </label>
+                </Label>
                 <Tooltip content="Automatically saves the game and updates the respawn point">
                   <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
                 </Tooltip>
@@ -2020,7 +2023,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
               {/* Script */}
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <label className="text-xs font-medium text-foreground/80">Script File</label>
+                  <Label className="text-xs font-medium text-foreground/80">Script File</Label>
                   <Tooltip content="Calls an external script file for complex logic">
                     <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
                   </Tooltip>

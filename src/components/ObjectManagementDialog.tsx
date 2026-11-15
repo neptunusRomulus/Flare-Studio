@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import PositionField from '@/components/PositionField';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -250,16 +249,7 @@ const ObjectManagementDialog = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <PositionField
-                    label="Location"
-                    x={editingObject.x}
-                    y={editingObject.y}
-                    onChangeX={(x) => setEditingObject({ ...editingObject, x })}
-                    onChangeY={(y) => setEditingObject({ ...editingObject, y })}
-                  />
-                </div>
+              <div>
                 <div>
                   <label className="text-xs text-muted-foreground">Size</label>
                   <div className="flex items-center gap-1 mt-1">

@@ -279,10 +279,6 @@ export default function EditorCanvas(props: Props) {
           eventAreaStartRef.current = tile;
           return;
         }
-        if (armed.type === 'npc') {
-          const conflict = editorRef.current.getMapObjects().find(o => o.type === 'npc' && o.id !== armed.id && o.x === tile.x && o.y === tile.y);
-          if (conflict) return;
-        }
         handlePlaceActorOnMap(armed.id, tile.x, tile.y);
         entityPlacement.clear();
       }}
@@ -512,12 +508,7 @@ export default function EditorCanvas(props: Props) {
             const { x: canvasX, y: canvasY } = clientToCanvas(e.clientX, e.clientY, canvas);
             const mapCoords = editorRef.current.screenToTile(canvasX, canvasY);
             if (mapCoords && mapCoords.x >= 0 && mapCoords.x < mapWidth && mapCoords.y >= 0 && mapCoords.y < mapHeight) {
-              // NPC pawns cannot occupy the same cell as another NPC
-              const allObjects = editorRef.current.getMapObjects();
-              const conflict = allObjects.find(o => o.type === 'npc' && o.id !== npcId && o.x === mapCoords.x && o.y === mapCoords.y);
-              if (!conflict) {
-                handlePlaceActorOnMap(npcId, mapCoords.x, mapCoords.y);
-              }
+              handlePlaceActorOnMap(npcId, mapCoords.x, mapCoords.y);
             }
           }
           editorRef.current.clearNpcDragHover();

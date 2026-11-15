@@ -2,7 +2,8 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { TileMapEditor } from '../editor/TileMapEditor';
 import type { TileMapEditor as TileMapEditorType } from '../editor/TileMapEditor';
 import type { MapObject } from '@/types';
-import { deleteMapNpcInstanceAction, nearestFreeTile, npcOccupiedTiles } from '@/editor/mapNpcActions';
+import { deleteMapNpcInstanceAction, nearestFreeTile, npcOccupiedTiles, resolveNpcDropTile } from '@/editor/mapNpcActions';
+import { toast } from '@/hooks/use-toast';
 
 export type HeroEditData = {
   currentX: number;
@@ -106,12 +107,31 @@ export function useEditorState(optsRef: React.RefObject<Partial<UseEditorStateOp
     } catch (e) {
       opts = {};
     }
-    const spawnX = x !== undefined ? x : Math.floor((opts.mapWidth ?? 0) / 2);
-    const spawnY = y !== undefined ? y : Math.floor((opts.mapHeight ?? 0) / 2);
+    let spawnX = x !== undefined ? x : Math.floor((opts.mapWidth ?? 0) / 2);
+    let spawnY = y !== undefined ? y : Math.floor((opts.mapHeight ?? 0) / 2);
     const source = editor.getMapObjects().find((obj: MapObject) => obj.id === objectId);
     if (!source) return;
 
     const shouldDuplicate = (source.type === 'enemy' || source.type === 'npc') && source.x >= 0 && source.y >= 0;
+    if (source.type === 'npc') {
+      const resolved = resolveNpcDropTile(
+        editor.getMapObjects(),
+        spawnX,
+        spawnY,
+        editor.getMapWidth(),
+        editor.getMapHeight(),
+        shouldDuplicate ? undefined : objectId,
+      );
+      if (!resolved) {
+        toast({ title: 'No free tile to place this NPC' });
+        return;
+      }
+      if (resolved.adjusted) {
+        toast({ title: 'Tile occupied', description: 'Placed on the nearest free tile.' });
+      }
+      spawnX = resolved.x;
+      spawnY = resolved.y;
+    }
     if (shouldDuplicate) {
       const newObject = editor.addMapObject(source.type as 'enemy' | 'npc', spawnX, spawnY, source.width ?? 1, source.height ?? 1);
       if (newObject) {

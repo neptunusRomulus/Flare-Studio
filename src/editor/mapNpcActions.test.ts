@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { deleteMapNpcInstanceAction, nearestFreeTile, npcOccupiedTiles } from './mapNpcActions';
+import { deleteMapNpcInstanceAction, nearestFreeTile, npcOccupiedTiles, resolveNpcDropTile } from './mapNpcActions';
 
 describe('nearestFreeTile', () => {
   it('prefers the tile to the east, then south, when the origin is taken', () => {
@@ -31,5 +31,23 @@ describe('npcOccupiedTiles', () => {
       { id: 3, type: 'enemy', x: 2, y: 2 },
     ], 1);
     expect([...tiles]).toEqual([]);
+  });
+});
+
+describe('resolveNpcDropTile', () => {
+  const npc = (id: number, x: number, y: number) => ({ id, type: 'npc' as const, x, y });
+
+  it('keeps a free tile and snaps to the nearest free one when occupied', () => {
+    const objects = [npc(1, 2, 2), npc(2, -1, -1)];
+    expect(resolveNpcDropTile(objects, 4, 4, 10, 10, 2)).toEqual({ x: 4, y: 4, adjusted: false });
+    expect(resolveNpcDropTile(objects, 2, 2, 10, 10, 2)).toEqual({ x: 3, y: 2, adjusted: true });
+  });
+
+  it('does not exclude the source NPC when placing a new instance (exceptId omitted)', () => {
+    expect(resolveNpcDropTile([npc(1, 2, 2)], 2, 2, 10, 10)).toEqual({ x: 3, y: 2, adjusted: true });
+  });
+
+  it('returns null when the map is full', () => {
+    expect(resolveNpcDropTile([npc(1, 0, 0)], 0, 0, 1, 1, 2)).toBeNull();
   });
 });

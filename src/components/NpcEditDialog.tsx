@@ -9,7 +9,6 @@ import type { MapObject } from '@/types';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 import type { ItemSummary } from '@/utils/items';
 import NameField from '@/components/NameField';
-import PositionField from '@/components/PositionField';
 import NpcAppearanceSection from '@/components/NpcAppearanceSection';
 import NpcAssetThumb from '@/components/NpcAssetThumb';
 import NpcPropertyList from '@/components/NpcPropertyList';
@@ -73,26 +72,6 @@ const NpcEditDialog = ({
     void resolve();
     return () => { cancelled = true; };
   }, [tilesetPath, templateImage, tilesetSourcePath, portraitPath, projectPath]);
-
-  const setPositionX = (newX: number) => {
-    if (editor) {
-      const conflict = editor.getMapObjects().find(
-        (o) => o.type === 'npc' && o.id !== editingObject.id && o.x === newX && o.y === editingObject.y,
-      );
-      if (conflict) return;
-    }
-    setEditingObject({ ...editingObject, x: newX });
-  };
-
-  const setPositionY = (newY: number) => {
-    if (editor) {
-      const conflict = editor.getMapObjects().find(
-        (o) => o.type === 'npc' && o.id !== editingObject.id && o.x === editingObject.x && o.y === newY,
-      );
-      if (conflict) return;
-    }
-    setEditingObject({ ...editingObject, y: newY });
-  };
 
   const applyPropertyBag = (props: Record<string, string | null>) => {
     setEditingObject({
@@ -251,12 +230,6 @@ const NpcEditDialog = ({
         onAutoDetect={() => { void handleAutoDetectAnim(); }}
         onBrowsePortrait={() => { void handleEditingPortraitBrowse(); }}
       />
-
-      <section className="space-y-2 border border-border rounded-md p-3 bg-muted/20">
-        <div className="w-28">
-          <PositionField x={editingObject.x} y={editingObject.y} onChangeX={setPositionX} onChangeY={setPositionY} />
-        </div>
-      </section>
 
       <NpcPropertyList
         editingObject={editingObject}

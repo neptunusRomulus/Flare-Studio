@@ -10,6 +10,7 @@
   PaintMode
 } from '../types';
 import { placedOfType } from './entityPlacementRules';
+import { applyExportLocation, updatesWithSyncedLocation } from './actorLocation';
 import { MAP_TARGET_CURSOR } from '@/components/mapTargets';
 import { SharedSlotMap, slotGroup, mergeSharedSlotLists } from './sharedSlots';
 import { classifyWheel, pinchFactor, panForZoomAt } from './wheelNav'
@@ -676,8 +677,10 @@ export class TileMapEditor {
   private selectedObjectId: number | null = null;
   private isDraggingActor: boolean = false;
   private draggingActorId: number | null = null;
+  private actorDragOrigin: { x: number; y: number } | null = null;
   private isDraggingEvent: boolean = false;
   private draggingEventObjectId: number | null = null;
+  private eventDragOrigin: { x: number; y: number } | null = null;
     private hoveredEventIndex: number = 0;
   // These are rendered as single sprites, not per-cell tiles
   // Key: layerType, Value: array of placed objects
@@ -1506,14 +1509,13 @@ export class TileMapEditor {
     if (!actor) return;
     if (actor.x === x && actor.y === y) return;
 
-    // NPC pawns cannot occupy the same cell as another NPC
+    // Stay on the last free tile; cursor feedback is applied in updateCursorForHover.
     if (actor.type === 'npc') {
       const conflict = this.objects.find(obj => obj.type === 'npc' && obj.id !== actor.id && obj.x === x && obj.y === y);
       if (conflict) return;
     }
 
-    this.updateMapObject(actor.id, { x, y });
-    this.draw();
+    this.updateMapObject(actor.id, { x, y }, { recordHistory: false });
   }
 
   private handleEventDrag(x: number, y: number): void {
@@ -1535,8 +1537,7 @@ export class TileMapEditor {
       props.hotspot = `${x},${y},${ev.width},${ev.height}`;
     }
     updates.properties = props;
-    this.updateMapObject(ev.id, updates);
-    this.draw();
+    this.updateMapObject(ev.id, updates, { recordHistory: false });
   }
 
   private handleMouseDown(event: MouseEvent): void {
@@ -1618,6 +1619,7 @@ export class TileMapEditor {
           // Left-click - start dragging
           this.isDraggingActor = true;
           this.draggingActorId = actorAtPosition.id;
+          this.actorDragOrigin = { x: actorAtPosition.x, y: actorAtPosition.y };
           this.selectedObject = actorAtPosition;
           this.selectedObjectId = actorAtPosition.id;
           return;
@@ -1636,6 +1638,7 @@ export class TileMapEditor {
           // Start dragging event - single click edit is now handled in mouseup if not dragged
           this.isDraggingEvent = true;
           this.draggingEventObjectId = eventAtPosition.id;
+          this.eventDragOrigin = { x: eventAtPosition.x, y: eventAtPosition.y };
           this.selectedObject = eventAtPosition;
           this.selectedObjectId = eventAtPosition.id;
           return;
@@ -1800,6 +1803,36 @@ export class TileMapEditor {
     this.draw();
   }
 
+  private finishActorDrag(): void {
+    if (!this.isDraggingActor) return;
+    const id = this.draggingActorId;
+    const origin = this.actorDragOrigin;
+    this.isDraggingActor = false;
+    this.draggingActorId = null;
+    this.actorDragOrigin = null;
+    if (id == null || !origin) return;
+    const actor = this.objects.find(obj => obj.id === id);
+    if (actor && (actor.x !== origin.x || actor.y !== origin.y)) {
+      this.saveState();
+      this.notifyObjectsChanged();
+    }
+  }
+
+  private finishEventDrag(): void {
+    if (!this.isDraggingEvent) return;
+    const id = this.draggingEventObjectId;
+    const origin = this.eventDragOrigin;
+    this.isDraggingEvent = false;
+    this.draggingEventObjectId = null;
+    this.eventDragOrigin = null;
+    if (id == null || !origin) return;
+    const ev = this.objects.find(obj => obj.id === id);
+    if (ev && (ev.x !== origin.x || ev.y !== origin.y)) {
+      this.saveState();
+      this.notifyObjectsChanged();
+    }
+  }
+
   private handleMouseUp(): void {
     if (this.isMiddlePanning) {
       this.isMiddlePanning = false;
@@ -1832,17 +1865,14 @@ export class TileMapEditor {
       if (wasClick && this.objectEditCallback && this.draggingActorId !== null) {
         this.objectEditCallback(this.draggingActorId);
       }
-      this.isDraggingActor = false;
-      this.draggingActorId = null;
+      this.finishActorDrag();
     }
 
     if (this.isDraggingEvent) {
       if (wasClick && this.eventEditCallback && this.draggingEventObjectId !== null) {
         this.eventEditCallback(this.draggingEventObjectId);
       }
-      this.isDraggingEvent = false;
-      this.draggingEventObjectId = null;
-      this.notifyObjectsChanged();
+      this.finishEventDrag();
     }
 
     if (wasClick && !this.isDraggingHero && !this.isDraggingActor && !this.isDraggingEvent) {
@@ -1874,10 +1904,8 @@ export class TileMapEditor {
     // Reset hover coordinates
     this.hoverX = -1;
     this.hoverY = -1;
-    this.isDraggingActor = false;
-    this.draggingActorId = null;
-    this.isDraggingEvent = false;
-    this.draggingEventObjectId = null;
+    this.finishActorDrag();
+    this.finishEventDrag();
     this.isMinimapPanning = false;
     this.isResizingMinimap = false;
     if (this.isMiddlePanning) {
@@ -8144,7 +8172,7 @@ export class TileMapEditor {
 
   private enemyRecord(enemy: MapObject): Record<string, unknown> {
     const record: Record<string, unknown> = { ...(enemy.properties || {}) };
-    if (!record.location) record.location = `${enemy.x},${enemy.y},${enemy.width},${enemy.height}`;
+    applyExportLocation(record, enemy);
     if (enemy.category) record.category = enemy.category;
     if (enemy.level) record.level = String(enemy.level);
     if (enemy.number) record.number = String(enemy.number);
@@ -8168,7 +8196,7 @@ export class TileMapEditor {
         .filter(Boolean)
         .join(',');
     }
-    if (!record.location) record.location = `${npc.x},${npc.y},${npc.width},${npc.height}`;
+    applyExportLocation(record, npc);
     const named = npc.properties?.npcFilename;
     const filename = typeof named === 'string' && named.trim()
       ? named
@@ -10023,12 +10051,14 @@ export class TileMapEditor {
     return false;
   }
 
-  public updateMapObject(objectId: number, updates: Partial<MapObject>): boolean {
+  public updateMapObject(objectId: number, updates: Partial<MapObject>, options?: { recordHistory?: boolean }): boolean {
     const object = this.objects.find(obj => obj.id === objectId);
     if (object) {
-      Object.assign(object, updates);
-      this.saveState();
-      this.notifyObjectsChanged();
+      Object.assign(object, updatesWithSyncedLocation(object, updates));
+      if (options?.recordHistory !== false) {
+        this.saveState();
+        this.notifyObjectsChanged();
+      }
       return true;
     }
     return false;
@@ -10066,6 +10096,16 @@ export class TileMapEditor {
   }
 
   private updateCursorForHover(): void {
+    if (this.isDraggingActor) {
+      const outOfBounds = this.hoverX < 0 || this.hoverY < 0 || this.hoverX >= this.mapWidth || this.hoverY >= this.mapHeight;
+      const actor = this.objects.find(obj => obj.id === this.draggingActorId);
+      const npcConflict = actor?.type === 'npc' && this.objects.some(
+        obj => obj.type === 'npc' && obj.id !== actor.id && obj.x === this.hoverX && obj.y === this.hoverY
+      );
+      this.mapCanvas.style.cursor = outOfBounds || npcConflict ? 'not-allowed' : 'move';
+      return;
+    }
+
     // Check if we're hovering over the hero position
     if (this.isHeroAtPosition(this.hoverX, this.hoverY)) {
       this.mapCanvas.style.cursor = 'move';

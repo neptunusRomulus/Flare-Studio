@@ -68,3 +68,19 @@ export function deleteMapNpcInstanceAction(
   const others = objects.some((o) => o.id !== id && o.type === 'npc' && npcFileForActor(o) === file);
   return others ? 'remove' : 'unplace';
 }
+
+/** Resolve a drop/place tile for an NPC. Snaps to the nearest free tile when the target is taken. */
+export function resolveNpcDropTile(
+  objects: Array<Pick<MapObject, 'id' | 'type' | 'x' | 'y'>>,
+  x: number,
+  y: number,
+  mapWidth: number,
+  mapHeight: number,
+  exceptId?: number,
+): { x: number; y: number; adjusted: boolean } | null {
+  const occupied = npcOccupiedTiles(objects, exceptId);
+  const tile = nearestFreeTile(x, y, occupied, mapWidth, mapHeight);
+  if (!tile) return null;
+  return { x: tile.x, y: tile.y, adjusted: tile.x !== x || tile.y !== y };
+}
+

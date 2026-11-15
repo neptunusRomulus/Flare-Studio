@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { MessageSquare, HandCoins, MessageCircleQuestionMark, Play, X } from 'lucide-react';
+import { MessageSquare, HandCoins, MessageCircleQuestionMark, Save, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 import type { DialogueTree, MapObject } from '@/types';
@@ -21,7 +21,6 @@ import { stepsFromImported, type QuestStep } from '@/editor/questSteps';
 import { importQuestText, contentSlug } from '@/adapters/flare/flareAdapter.cjs';
 import { projectRoot } from '@/editor/projectFiles';
 import MomentsStrip from '@/components/MomentsStrip';
-import DialogPlayPanel from '@/components/dialogue/DialogPlayPanel';
 import ResizeHandle from '@/components/ResizeHandle';
 
 export type RoleCenterTab = 'dialogue' | 'vendor' | 'quest';
@@ -42,6 +41,9 @@ type Props = {
   onCreateVendorStockGroup: (stockType: 'constant' | 'status' | 'random', selectedGroupId: string | null, npcName: string) => Promise<ItemSummary | null>;
   getEditingObjectProperty: (key: string, fallback?: string) => string;
   updateEditingObjectProperty: (key: string, value: string | null) => void;
+  /** Saves the whole NPC (same as the NPC window's Save). */
+  onSave?: () => void;
+  dirty?: boolean;
 };
 
 const tabMeta: Record<RoleCenterTab, { label: string; tone: string; Icon: React.ComponentType<{ className?: string }> }> = {
@@ -67,6 +69,8 @@ const NpcRoleCenterDialog = ({
   onCreateVendorStockGroup,
   getEditingObjectProperty,
   updateEditingObjectProperty,
+  onSave,
+  dirty = false,
 }: Props) => {
   const {
     position,
@@ -79,14 +83,12 @@ const NpcRoleCenterDialog = ({
   const [customMoments, setCustomMoments] = useState<RoleMoment[]>([]);
   const [journalSteps, setJournalSteps] = useState<QuestStep[]>([]);
   const [selectedMomentId, setSelectedMomentId] = useState<string>('');
-  const [playing, setPlaying] = useState(false);
   const npcKey = editingObject?.id || editingObject?.name || '';
 
   useEffect(() => {
     setCustomMoments([]);
     setJournalSteps([]);
     setSelectedMomentId('');
-    setPlaying(false);
   }, [npcKey]);
 
   const questFlow = useMemo(() => readQuestFlowTrees(dialogueTrees), [dialogueTrees]);
@@ -185,10 +187,6 @@ const NpcRoleCenterDialog = ({
           <span className="font-semibold">{editingObject?.name || 'NPC'} roles</span>
         </div>
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="sm" className="h-7 px-2 gap-1 text-xs" onClick={() => setPlaying((value) => !value)}>
-            <Play className="w-3.5 h-3.5" />
-            {playing ? 'Stop' : 'Play'}
-          </Button>
           <Button variant="ghost" size="sm" className="w-6 h-6 p-0 hover:bg-transparent" onClick={() => onTabChange(null)}>
             <X className="w-4 h-4 text-muted-foreground" />
           </Button>
@@ -234,9 +232,7 @@ const NpcRoleCenterDialog = ({
               setSelectedMomentId(added.id);
             }}
           />
-          {playing ? (
-            <DialogPlayPanel trees={dialogueTrees} onClose={() => setPlaying(false)} />
-          ) : tab === 'dialogue' ? (
+          {tab === 'dialogue' ? (
             <DialogueTreeDialog
               embedded
               showDialogueTreeDialog
@@ -280,6 +276,23 @@ const NpcRoleCenterDialog = ({
           )}
         </div>
       </div>
+
+      {onSave && (
+        <div className="flex justify-end border-t border-border p-4">
+          <div className="relative flex gap-2">
+            {dirty && (
+              <span
+                className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-gray-400"
+                aria-hidden
+                title="Unsaved changes"
+              />
+            )}
+            <Button size="icon" onClick={onSave} aria-label="Save">
+              <Save className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+      )}
 
       <ResizeHandle onMouseDown={handleResizeMouseDown} />
     </div>

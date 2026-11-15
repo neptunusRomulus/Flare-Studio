@@ -539,6 +539,8 @@ const ObjectManagementDialog = ({
           onCreateVendorStockGroup={handleCreateVendorStockGroup}
           getEditingObjectProperty={getEditingObjectProperty}
           updateEditingObjectProperty={updateEditingObjectProperty}
+          onSave={handleObjectDialogSave}
+          dirty={objectDialogDirty}
         />
       </>
   );

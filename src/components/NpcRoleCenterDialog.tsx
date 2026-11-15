@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { cleanDialogueTreesForSave } from '@/editor/dialogueTreesClean';
 import { MessageSquare, HandCoins, MessageCircleQuestionMark, Save, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
@@ -90,6 +91,27 @@ const NpcRoleCenterDialog = ({
     setJournalSteps([]);
     setSelectedMomentId('');
   }, [npcKey]);
+
+  // Dialogue edits live in dialogueTrees; copy them onto the NPC so the one Save button keeps them.
+  const treesBaselineRef = useRef<string | null>(null);
+  const isOpen = tab !== null;
+  useEffect(() => {
+    treesBaselineRef.current = null;
+  }, [isOpen, npcKey]);
+  useEffect(() => {
+    if (!isOpen) return;
+    const json = JSON.stringify(dialogueTrees);
+    if (treesBaselineRef.current === null) {
+      treesBaselineRef.current = json;
+      return;
+    }
+    if (json === treesBaselineRef.current) return;
+    const clean = cleanDialogueTreesForSave(dialogueTrees);
+    const next = clean.length ? JSON.stringify(clean) : null;
+    if (next !== (getEditingObjectProperty('dialogueTrees', '') || null)) {
+      updateEditingObjectProperty('dialogueTrees', next);
+    }
+  }, [isOpen, dialogueTrees, getEditingObjectProperty, updateEditingObjectProperty]);
 
   const questFlow = useMemo(() => readQuestFlowTrees(dialogueTrees), [dialogueTrees]);
 

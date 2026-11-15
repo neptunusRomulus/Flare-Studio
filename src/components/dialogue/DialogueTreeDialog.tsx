@@ -8,6 +8,7 @@ import { AlignLeft, ArrowLeft, ArrowRight, ChevronDown, ChevronUp, Coins, Eye, E
 import Tooltip from '@/components/ui/tooltip';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 import { useAppContext } from '@/context/AppContext';
+import { cleanDialogueTreesForSave } from '@/editor/dialogueTreesClean';
 import type { DialogueLine, DialogueRequirement, DialogueReward, DialogueWorldEffect, DialogueTree, MapObject } from '@/types';
 import { removeDialogueLine } from '@/editor/dialogueLines';
 import { InlineConfirm } from '@/components/ui/inline-confirm';
@@ -2071,56 +2072,26 @@ const DialogueTreeDialog = ({
       )}
     </div>
     
+    {!embedded && (
     <div className="flex justify-end gap-2 px-4 py-3 border-t border-border">
-      <Button 
-        size="icon" 
-        className="h-9 w-9" 
+      <Button
+        size="icon"
+        className="h-9 w-9"
         disabled={!dialogueTrees.some(tree => tree.topic.trim() && tree.dialogues.some(d => d.text.trim()))}
-        title={!dialogueTrees.some(tree => tree.topic.trim() && tree.dialogues.some(d => d.text.trim())) 
-          ? "Each dialogue needs a topic and at least one dialogue line" 
+        title={!dialogueTrees.some(tree => tree.topic.trim() && tree.dialogues.some(d => d.text.trim()))
+          ? "Each dialogue needs a topic and at least one dialogue line"
           : "Save dialogues"}
         onClick={() => {
-          // Validate: at least one tree must have topic and at least one dialogue
-          const validTrees = dialogueTrees.filter(tree => 
-            tree.topic.trim() && tree.dialogues.some(d => d.text.trim())
-          );
-          
-          if (validTrees.length === 0) {
-            return; // Button should be disabled anyway
-          }
-          
-          // Save dialogue trees to editing object properties
-          if (editingObject) {
-            // Clean up expanded state before saving, only save valid trees
-            const cleanTrees = validTrees.map(tree => ({
-              // fields Studio doesn't edit (passthrough, components, ...) ride along
-              ...Object.fromEntries(Object.entries(tree).filter(([k]) => !k.startsWith('_'))),
-              id: tree.id,
-              dialogueId: tree.dialogueId || '',
-              topic: tree.topic,
-              group: tree.group || undefined,
-              responseOnly: tree.responseOnly || false,
-              responses: (tree.responses || []).filter(Boolean),
-              requirements: tree.requirements.filter(r => r.value.trim()),
-              dialogues: tree.dialogues.filter(d => d.text.trim() || d.keepEmpty).map(d => ({
-                ...d,
-                id: d.id,
-                speaker: d.speaker,
-                text: d.text,
-                ...(d.voice ? { voice: d.voice } : {}),
-                ...(d.portrait ? { portrait: d.portrait } : {}),
-              })),
-              rewards: (tree.rewards || []).filter(r => r.value.trim() || r.type === 'restore'),
-              worldEffects: (tree.worldEffects || []).filter(w => w.value.trim())
-            }));
-            updateEditingObjectProperty('dialogueTrees', JSON.stringify(cleanTrees));
-          }
-          if (!embedded) onClose();
+          const cleanTrees = cleanDialogueTreesForSave(dialogueTrees);
+          if (cleanTrees.length === 0) return;
+          if (editingObject) updateEditingObjectProperty('dialogueTrees', JSON.stringify(cleanTrees));
+          onClose();
         }}
       >
         <Save className="w-4 h-4" />
       </Button>
     </div>
+    )}
 
     {/* Resize handle */}
     {!embedded && (

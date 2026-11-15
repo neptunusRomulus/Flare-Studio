@@ -11,7 +11,7 @@ type ObjMgmtCtx = {
   objectValidationErrors?: string[] | null;
   setEditingObject?: (obj: MapObject | null) => void;
   handleObjectDialogClose?: () => void;
-  handleObjectDialogSave?: () => void;
+  handleObjectDialogSave?: (opts?: { keepOpen?: boolean }) => void | Promise<void>;
   updateEditingObjectProperty?: (key: string, value: string | null) => void;
   updateEditingObjectBoolean?: (key: string, value: boolean) => void;
   getEditingObjectProperty?: (key: string, fallback?: string) => string;

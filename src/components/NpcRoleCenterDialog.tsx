@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { cleanDialogueTreesForSave } from '@/editor/dialogueTreesClean';
 import { MessageSquare, HandCoins, MessageCircleQuestionMark, Save, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -42,8 +42,8 @@ type Props = {
   onCreateVendorStockGroup: (stockType: 'constant' | 'status' | 'random', selectedGroupId: string | null, npcName: string) => Promise<ItemSummary | null>;
   getEditingObjectProperty: (key: string, fallback?: string) => string;
   updateEditingObjectProperty: (key: string, value: string | null) => void;
-  /** Saves the whole NPC (same as the NPC window's Save). */
-  onSave?: () => void;
+  /** Saves the whole NPC and closes only this window; the NPC window stays open. */
+  onSave?: () => void | Promise<void>;
   dirty?: boolean;
 };
 
@@ -112,6 +112,26 @@ const NpcRoleCenterDialog = ({
       updateEditingObjectProperty('dialogueTrees', next);
     }
   }, [isOpen, dialogueTrees, getEditingObjectProperty, updateEditingObjectProperty]);
+
+  // Save: apply the quest tab first (state updates), then save the NPC on the next render so it sees them.
+  const questSaveRef = useRef<(() => Promise<boolean>) | null>(null);
+  const registerQuestSave = useCallback((fn: (() => Promise<boolean>) | null) => { questSaveRef.current = fn; }, []);
+  const [pendingSave, setPendingSave] = useState(false);
+  const [savingNow, setSavingNow] = useState(false);
+  const handleSaveClick = async () => {
+    if (!onSave || savingNow) return;
+    setSavingNow(true);
+    if (tab === 'quest' && questSaveRef.current) {
+      const ok = await questSaveRef.current();
+      if (!ok) { setSavingNow(false); return; }
+    }
+    setPendingSave(true);
+  };
+  useEffect(() => {
+    if (!pendingSave || !onSave) return;
+    setPendingSave(false);
+    void Promise.resolve(onSave()).finally(() => setSavingNow(false));
+  }, [pendingSave, onSave]);
 
   const questFlow = useMemo(() => readQuestFlowTrees(dialogueTrees), [dialogueTrees]);
 
@@ -294,6 +314,7 @@ const NpcRoleCenterDialog = ({
               setDialogueTrees={setDialogueTrees}
               getEditingObjectProperty={getEditingObjectProperty}
               updateEditingObjectProperty={updateEditingObjectProperty}
+              registerSave={registerQuestSave}
             />
           )}
         </div>
@@ -309,7 +330,7 @@ const NpcRoleCenterDialog = ({
                 title="Unsaved changes"
               />
             )}
-            <Button size="icon" onClick={onSave} aria-label="Save">
+            <Button size="icon" onClick={() => void handleSaveClick()} disabled={savingNow} aria-label="Save">
               <Save className="w-4 h-4" />
             </Button>
           </div>

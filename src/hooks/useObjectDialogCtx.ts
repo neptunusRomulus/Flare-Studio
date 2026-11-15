@@ -8,7 +8,7 @@ type Params = {
   objectValidationErrors: string[] | null | undefined;
   setEditingObject: Dispatch<SetStateAction<MapObject | null>>;
   handleObjectDialogClose: () => void;
-  handleObjectDialogSave: () => void;
+  handleObjectDialogSave: (opts?: { keepOpen?: boolean }) => void | Promise<void>;
   updateEditingObjectProperty: (key: string, value: string | null) => void;
   updateEditingObjectBoolean: (key: string, checked: boolean) => void;
   getEditingObjectProperty: (key: string, fallback?: string) => string;

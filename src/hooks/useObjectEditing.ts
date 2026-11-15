@@ -414,7 +414,7 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
     setShowEnemyEditor(true);
   }, [editor, mapObjects, currentProjectPath]);
 
-  const handleUpdateObject = useCallback((updatedObject: MapObject) => {
+  const handleUpdateObject = useCallback((updatedObject: MapObject, opts?: { keepOpen?: boolean }) => {
     try {
       if (editor && typeof editor.updateMapObject === 'function') {
         editor.updateMapObject(updatedObject.id, updatedObject);
@@ -424,8 +424,13 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
     } catch (err) {
       console.error('Failed to update object:', err);
     }
-    setEditingObject(null);
-    setShowObjectDialog(false);
+    if (opts?.keepOpen) {
+      setEditingObject(updatedObject);
+      objectBaselineRef.current = JSON.stringify(updatedObject);
+    } else {
+      setEditingObject(null);
+      setShowObjectDialog(false);
+    }
     setObjectValidationErrors([]);
     if (typeof syncMapObjects === 'function') syncMapObjects();
     try {
@@ -469,7 +474,7 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
     setShowQuestSettingsDialog(false);
   }, []);
 
-  const handleObjectDialogSave = useCallback(async () => {
+  const handleObjectDialogSave = useCallback(async (opts?: { keepOpen?: boolean }) => {
     if (!editingObject) return;
     const { errors, sanitized } = validateAndSanitizeObject(editingObject);
     if (errors.length > 0) {
@@ -480,7 +485,7 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
 
     // If NPC and a write API is available we could persist NPC file here
     // For now, just update the editor/local state
-    handleUpdateObject({ ...editingObject, properties: sanitized });
+    handleUpdateObject({ ...editingObject, properties: sanitized }, opts);
   }, [editingObject, handleUpdateObject]);
 
   const updateEditingObjectProperty = useCallback((key: string, value: string | null) => {

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import PositionField from '@/components/PositionField';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
@@ -23,7 +23,7 @@ type ObjectManagementDialogProps = {
   objectValidationErrors: string[];
   setEditingObject: (obj: MapObject | null) => void;
   handleObjectDialogClose: () => void;
-  handleObjectDialogSave: () => void;
+  handleObjectDialogSave: (opts?: { keepOpen?: boolean }) => void | Promise<void>;
   updateEditingObjectProperty: (key: string, value: string | null) => void;
   updateEditingObjectBoolean: (key: string, checked: boolean) => void;
   getEditingObjectProperty: (key: string, fallback?: string) => string;
@@ -105,6 +105,7 @@ const ObjectManagementDialog = ({
   const [roleCenterTab, setRoleCenterTab] = useState<RoleCenterTab | null>(null);
   const [objectBaseline, setObjectBaseline] = useState('');
   const baselineReadyRef = useRef(false);
+  const [baselineTick, setBaselineTick] = useState(0);
 
   useEffect(() => {
     if (!isOpen) {
@@ -121,7 +122,15 @@ const ObjectManagementDialog = ({
       baselineReadyRef.current = false;
       setObjectBaseline('');
     }
-  }, [isOpen, editingObject]);
+  }, [isOpen, editingObject, baselineTick]);
+
+  // Role window Save: write the NPC, close only the role window, keep the NPC window open and clean.
+  const handleRoleCenterSave = useCallback(async () => {
+    await handleObjectDialogSave({ keepOpen: true });
+    baselineReadyRef.current = false;
+    setBaselineTick((n) => n + 1);
+    setRoleCenterTab(null);
+  }, [handleObjectDialogSave]);
 
   const objectDialogDirty = Boolean(
     isOpen && objectBaseline && editingObject && JSON.stringify(editingObject) !== objectBaseline,
@@ -488,7 +497,7 @@ const ObjectManagementDialog = ({
               title="Unsaved changes"
             />
           )}
-          <Button size="icon" onClick={handleObjectDialogSave} aria-label="Save">
+          <Button size="icon" onClick={() => void handleObjectDialogSave()} aria-label="Save">
             <Save className="w-4 h-4" />
           </Button>
         </div>
@@ -539,7 +548,7 @@ const ObjectManagementDialog = ({
           onCreateVendorStockGroup={handleCreateVendorStockGroup}
           getEditingObjectProperty={getEditingObjectProperty}
           updateEditingObjectProperty={updateEditingObjectProperty}
-          onSave={handleObjectDialogSave}
+          onSave={handleRoleCenterSave}
           dirty={objectDialogDirty}
         />
       </>

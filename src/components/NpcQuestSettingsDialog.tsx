@@ -41,6 +41,8 @@ type NpcQuestSettingsDialogProps = {
   updateEditingObjectProperty: (key: string, value: string | null) => void;
   /** Render inside the role center instead of a floating window. */
   embedded?: boolean;
+  /** Role center's Save calls this to apply the quest before the NPC is saved. */
+  registerSave?: (fn: (() => Promise<boolean>) | null) => void;
 };
 
 const cleanTrees = (trees: DialogueTree[]) =>
@@ -57,6 +59,7 @@ const NpcQuestSettingsDialog = ({
   getEditingObjectProperty,
   updateEditingObjectProperty,
   embedded = false,
+  registerSave,
 }: NpcQuestSettingsDialogProps) => {
   const {
     position,
@@ -188,13 +191,15 @@ const NpcQuestSettingsDialog = ({
     }
   };
 
-  const handleSave = async () => {
-    if (saving) return;
+  const handleSave = async (closeAfter = true): Promise<boolean> => {
+    if (saving) return false;
     const questName = flow.questName.trim();
     const acceptStatus = flow.acceptStatus.trim();
+    // Nothing filled in: nothing to apply, let the NPC save go on.
+    if (!closeAfter && !questName && !acceptStatus) return true;
     if (!questName || !acceptStatus) {
       toast({ title: 'Quest needs a name and an accept status', variant: 'destructive' });
-      return;
+      return false;
     }
     setSaving(true);
     const input: QuestFlowInput = {
@@ -211,8 +216,17 @@ const NpcQuestSettingsDialog = ({
     updateEditingObjectProperty('questGiver', 'true');
     if (writeJournal) await writeJournalEntry(input);
     setSaving(false);
-    onClose();
+    if (closeAfter) onClose();
+    return true;
   };
+
+  const handleSaveRef = useRef(handleSave);
+  handleSaveRef.current = handleSave;
+  useEffect(() => {
+    if (!registerSave) return;
+    registerSave(() => handleSaveRef.current(false));
+    return () => registerSave(null);
+  }, [registerSave]);
 
   const removeQuestTopics = () => {
     const questId = contentSlug(flow.questId || flow.questName, 'quest');
@@ -536,10 +550,12 @@ const NpcQuestSettingsDialog = ({
             Remove
           </Button>
         </InlineConfirm>
+        {!embedded && (
         <Button size="sm" className="gap-1" onClick={() => void handleSave()} disabled={saving}>
           <Save className="w-4 h-4" />
           Save
         </Button>
+        )}
       </div>
 
       {!embedded && (

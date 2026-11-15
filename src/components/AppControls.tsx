@@ -37,12 +37,13 @@ const AppControls: React.FC<Props> = ({
   return (
     <div className="flex items-center gap-1 no-drag">
       <Tooltip content="Menu" side="bottom">
-        <button
+        <Button
           ref={btnRef}
           type="button"
+          variant="ghost"
           aria-label="Menu"
           aria-expanded={menuOpen}
-          className="group no-click-effect h-6 w-[30px] pl-0.5 inline-flex items-center gap-px rounded outline-none focus-visible:ring-1 focus-visible:ring-orange-500"
+          className="group no-click-effect h-6 w-[30px] pl-0.5 inline-flex items-center gap-px rounded outline-none focus-visible:ring-1 focus-visible:ring-orange-500 hover:bg-transparent p-0"
           onClick={() => {
             const btn = btnRef.current;
             if (btn) {
@@ -61,7 +62,7 @@ const AppControls: React.FC<Props> = ({
             aria-hidden="true"
             className="w-2.5 h-2.5 shrink-0 text-muted-foreground opacity-0 -translate-y-0.5 transition duration-150 ease-out group-hover:opacity-100 group-hover:translate-y-0 group-focus-visible:opacity-100 group-aria-expanded:opacity-100 group-aria-expanded:translate-y-0 group-aria-expanded:rotate-180 motion-reduce:transition-none"
           />
-        </button>
+        </Button>
       </Tooltip>
 
       <MainMenuDialog

@@ -151,15 +151,16 @@ const MenuEditorView = ({ projectPath }: Props) => {
       <div className="flex flex-1 min-h-0">
         <div className="w-44 overflow-y-auto border-r border-border p-2 space-y-0.5">
           {panels.map((panel) => (
-            <button
+            <Button
               key={panel.file}
               type="button"
-              className={`w-full text-left rounded px-2 py-1 text-[11px] ${selected === panel.file ? 'bg-muted' : 'hover:bg-muted/60'}`}
+              variant="ghost"
+              className={`h-auto w-full text-left rounded px-2 py-1 text-[11px] ${selected === panel.file ? 'bg-muted' : 'hover:bg-muted/60'}`}
               onClick={() => setSelected(panel.file)}
             >
               {panel.name}
               {dirty[panel.file] ? ' •' : ''}
-            </button>
+            </Button>
           ))}
           {panels.length === 0 && <p className="text-[11px] text-muted-foreground">No menus/*.txt in this project.</p>}
         </div>

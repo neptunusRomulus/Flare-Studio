@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Plus, FolderOpen, Grid3X3, Folder, Minus, Square, X } from 'lucide-react';
 import flareIconUrl from '/brand/flare-studio-icon-small.svg?url';
 import flareLogoUrl from '/brand/flare-studio-lockup-stacked-light.svg?url';
@@ -324,27 +325,33 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
             <span className="text-sm font-semibold">Flare Studio</span>
           </div>
           <div className="flex no-drag">
-            <button 
+            <Button 
+              type="button"
+              variant="ghost"
               onClick={handleMinimize}
-              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
+              className="h-auto text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
               aria-label="Minimize"
             >
               <Minus className="w-4 h-4" />
-            </button>
-            <button 
+            </Button>
+            <Button 
+              type="button"
+              variant="ghost"
               onClick={handleMaximize}
-              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
+              className="h-auto text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
               aria-label="Maximize"
             >
               <Square className="w-4 h-4" />
-            </button>
-            <button 
+            </Button>
+            <Button 
+              type="button"
+              variant="ghost"
               onClick={handleClose}
-              className="text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
+              className="h-auto text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
               aria-label="Close"
             >
               <X className="w-4 h-4" />
-            </button>
+            </Button>
           </div>
         </div>
         
@@ -360,9 +367,9 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
 
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Project Name
-              </label>
+              </Label>
               <Input
                 value={mapConfig.name}
                 onChange={(e) => setMapConfig({ ...mapConfig, name: e.target.value })}
@@ -375,9 +382,9 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
             <p className="text-xs text-muted-foreground">Tiles are 192×96 isometric and the game builds on fantasycore. You can change the tile size later in Game Settings.</p>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Project Location
-              </label>
+              </Label>
               <div className="flex gap-2">
                 <Input
                   value={mapConfig.location}
@@ -430,27 +437,33 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
           <span className="text-sm font-semibold">Flare Studio</span>
         </div>
           <div className="flex no-drag">
-            <button 
+            <Button 
+              type="button"
+              variant="ghost"
               onClick={handleMinimize}
-              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
+              className="h-auto text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
               aria-label="Minimize"
             >
               <Minus className="w-4 h-4" />
-            </button>
-            <button 
+            </Button>
+            <Button 
+              type="button"
+              variant="ghost"
               onClick={handleMaximize}
-              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
+              className="h-auto text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
               aria-label="Maximize"
             >
               <Square className="w-4 h-4" />
-            </button>
-            <button 
+            </Button>
+            <Button 
+              type="button"
+              variant="ghost"
               onClick={handleClose}
-              className="text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
+              className="h-auto text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
               aria-label="Close"
             >
               <X className="w-4 h-4" />
-            </button>
+            </Button>
           </div>
       </div>
       

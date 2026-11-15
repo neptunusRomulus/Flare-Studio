@@ -3,6 +3,9 @@ import { InlineConfirm } from '@/components/ui/inline-confirm';
 import Tooltip from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { useAppContext } from '@/context/AppContext';
 import { toast } from '@/hooks/use-toast';
 import { loadConfigDocument, projectRoot, writeProjectFiles } from '@/editor/projectFiles';
@@ -295,7 +298,7 @@ export function LanguagePotEditor() {
   return (
     <div className="space-y-2 rounded-lg border border-border p-3">
       <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Language catalog</div>
-      <textarea
+      <Textarea
         aria-label="Translatable strings"
         value={text}
         onChange={(event) => setText(event.target.value)}
@@ -418,23 +421,33 @@ export function FogEditor({ editor }: { editor?: StudioEditor | null }) {
       <Input value={mask.color_fog || ''} onChange={(event) => setMask({ ...mask, color_fog: event.target.value })} placeholder="color_fog" className="h-8" aria-label="Color fog" />
       <Input value={mask.tileset_dark || ''} onChange={(event) => setMask({ ...mask, tileset_dark: event.target.value })} placeholder="tileset_dark" className="h-8" aria-label="Tileset dark" />
       <Input value={mask.tileset_fog || ''} onChange={(event) => setMask({ ...mask, tileset_fog: event.target.value })} placeholder="tileset_fog" className="h-8" aria-label="Tileset fog" />
-      <textarea aria-label="Fog bits" value={bitsText} onChange={(event) => setBitsText(event.target.value)} placeholder="bit lines" className="h-16 w-full rounded-md border border-input bg-background px-2 py-1 text-sm" />
-      <textarea aria-label="Fog tiles" value={tilesText} onChange={(event) => setTilesText(event.target.value)} placeholder="tile lines" className="h-16 w-full rounded-md border border-input bg-background px-2 py-1 text-sm" />
-      <textarea aria-label="Fog mask data" value={mask.data || ''} onChange={(event) => setMask({ ...mask, data: event.target.value })} placeholder="mask data" className="h-16 w-full rounded-md border border-input bg-background px-2 py-1 text-sm" />
-      <label className="block text-xs text-muted-foreground" htmlFor="map-fogofwar">Map fogofwar</label>
-      <select id="map-fogofwar" className={selectClass} value={fogofwar} onChange={(event) => setFogofwar(event.target.value)}>
-        <option value="">leave map header unchanged</option>
-        <option value="0">0 disabled</option>
-        <option value="1">1 minimap</option>
-        <option value="2">2 tint</option>
-        <option value="3">3 overlay</option>
-      </select>
-      <label className="block text-xs text-muted-foreground" htmlFor="map-save-fog">Map save_fogofwar</label>
-      <select id="map-save-fog" className={selectClass} value={saveFog} onChange={(event) => setSaveFog(event.target.value)}>
-        <option value="">leave map header unchanged</option>
-        <option value="true">true</option>
-        <option value="false">false</option>
-      </select>
+      <Textarea aria-label="Fog bits" value={bitsText} onChange={(event) => setBitsText(event.target.value)} placeholder="bit lines" className="h-16 w-full rounded-md border border-input bg-background px-2 py-1 text-sm" />
+      <Textarea aria-label="Fog tiles" value={tilesText} onChange={(event) => setTilesText(event.target.value)} placeholder="tile lines" className="h-16 w-full rounded-md border border-input bg-background px-2 py-1 text-sm" />
+      <Textarea aria-label="Fog mask data" value={mask.data || ''} onChange={(event) => setMask({ ...mask, data: event.target.value })} placeholder="mask data" className="h-16 w-full rounded-md border border-input bg-background px-2 py-1 text-sm" />
+      <Label className="block text-xs text-muted-foreground font-normal" htmlFor="map-fogofwar">Map fogofwar</Label>
+      <Select value={fogofwar || '__empty__'} onValueChange={(value) => setFogofwar(value === '__empty__' ? '' : value)}>
+        <SelectTrigger id="map-fogofwar" className={selectClass}>
+          <SelectValue placeholder="leave map header unchanged" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__empty__">leave map header unchanged</SelectItem>
+          <SelectItem value="0">0 disabled</SelectItem>
+          <SelectItem value="1">1 minimap</SelectItem>
+          <SelectItem value="2">2 tint</SelectItem>
+          <SelectItem value="3">3 overlay</SelectItem>
+        </SelectContent>
+      </Select>
+      <Label className="block text-xs text-muted-foreground font-normal" htmlFor="map-save-fog">Map save_fogofwar</Label>
+      <Select value={saveFog || '__empty__'} onValueChange={(value) => setSaveFog(value === '__empty__' ? '' : value)}>
+        <SelectTrigger id="map-save-fog" className={selectClass}>
+          <SelectValue placeholder="leave map header unchanged" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__empty__">leave map header unchanged</SelectItem>
+          <SelectItem value="true">true</SelectItem>
+          <SelectItem value="false">false</SelectItem>
+        </SelectContent>
+      </Select>
       <Button type="button" size="sm" onClick={() => { void save(); }}>Write fog mask</Button>
     </div>
   );
@@ -488,7 +501,7 @@ export function ProcgenEditor() {
           aria-label={label}
         />
       ))}
-      <textarea aria-label="Procgen chunks" value={chunksText} onChange={(event) => setChunksText(event.target.value)} placeholder="chunk filenames" className="h-16 w-full rounded-md border border-input bg-background px-2 py-1 text-sm" />
+      <Textarea aria-label="Procgen chunks" value={chunksText} onChange={(event) => setChunksText(event.target.value)} placeholder="chunk filenames" className="h-16 w-full rounded-md border border-input bg-background px-2 py-1 text-sm" />
       <p className="text-xs text-muted-foreground">Event <span className="font-mono">procgen_filename</span> points at {procgenRelativePath(slug)}. Chunk type stays on the map header.</p>
       <div className="flex gap-2">
         <Button type="button" size="sm" variant="outline" onClick={() => { void load(); }}>Load rules</Button>
@@ -498,7 +511,7 @@ export function ProcgenEditor() {
   );
 }
 
-const PROCGEN_TYPES = ['', 'links', 'normal', 'start', 'end', 'key', 'door_north_south', 'door_west_east'];
+export const PROCGEN_TYPES = ['', 'links', 'normal', 'start', 'end', 'key', 'door_north_south', 'door_west_east'];
 
 export function MapPresentationFields({
   value,
@@ -511,26 +524,41 @@ export function MapPresentationFields({
   return (
     <div className="space-y-2 rounded-lg border border-border p-3">
       <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Map header</div>
-      <label className="block text-xs text-muted-foreground" htmlFor="map-parallax">Parallax layers</label>
+      <Label className="block text-xs text-muted-foreground font-normal" htmlFor="map-parallax">Parallax layers</Label>
       <Input id="map-parallax" value={value.parallax} onChange={(event) => set({ parallax: event.target.value })} placeholder="maps/parallax/sky.txt" className="h-8" />
-      <label className="block text-xs text-muted-foreground" htmlFor="header-fogofwar">Fog of war</label>
-      <select id="header-fogofwar" className={selectClass} value={value.fogofwar} onChange={(event) => set({ fogofwar: event.target.value })}>
-        <option value="">default</option>
-        <option value="0">0 disabled</option>
-        <option value="1">1 minimap</option>
-        <option value="2">2 tint</option>
-        <option value="3">3 overlay</option>
-      </select>
-      <label className="block text-xs text-muted-foreground" htmlFor="header-save-fog">Save fog of war</label>
-      <select id="header-save-fog" className={selectClass} value={value.save_fogofwar} onChange={(event) => set({ save_fogofwar: event.target.value })}>
-        <option value="">default</option>
-        <option value="true">true</option>
-        <option value="false">false</option>
-      </select>
-      <label className="block text-xs text-muted-foreground" htmlFor="header-procgen-type">Procgen type</label>
-      <select id="header-procgen-type" className={selectClass} value={value.procgen_type} onChange={(event) => set({ procgen_type: event.target.value })}>
-        {PROCGEN_TYPES.map((type) => <option key={type || 'none'} value={type}>{type || 'none'}</option>)}
-      </select>
+      <Label className="block text-xs text-muted-foreground font-normal" htmlFor="header-fogofwar">Fog of war</Label>
+      <Select value={value.fogofwar || '__empty__'} onValueChange={(next) => set({ fogofwar: next === '__empty__' ? '' : next })}>
+        <SelectTrigger id="header-fogofwar" className={selectClass}>
+          <SelectValue placeholder="default" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__empty__">default</SelectItem>
+          <SelectItem value="0">0 disabled</SelectItem>
+          <SelectItem value="1">1 minimap</SelectItem>
+          <SelectItem value="2">2 tint</SelectItem>
+          <SelectItem value="3">3 overlay</SelectItem>
+        </SelectContent>
+      </Select>
+      <Label className="block text-xs text-muted-foreground font-normal" htmlFor="header-save-fog">Save fog of war</Label>
+      <Select value={value.save_fogofwar || '__empty__'} onValueChange={(next) => set({ save_fogofwar: next === '__empty__' ? '' : next })}>
+        <SelectTrigger id="header-save-fog" className={selectClass}>
+          <SelectValue placeholder="default" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__empty__">default</SelectItem>
+          <SelectItem value="true">true</SelectItem>
+          <SelectItem value="false">false</SelectItem>
+        </SelectContent>
+      </Select>
+      <Label className="block text-xs text-muted-foreground font-normal" htmlFor="header-procgen-type">Procgen type</Label>
+      <Select value={value.procgen_type || '__empty__'} onValueChange={(next) => set({ procgen_type: next === '__empty__' ? '' : next })}>
+        <SelectTrigger id="header-procgen-type" className={selectClass}>
+          <SelectValue placeholder="none" />
+        </SelectTrigger>
+        <SelectContent>
+          {PROCGEN_TYPES.map((type) => <SelectItem key={type || 'none'} value={type || '__empty__'}>{type || 'none'}</SelectItem>)}
+        </SelectContent>
+      </Select>
       <Input value={value.procgen_unique_status} onChange={(event) => set({ procgen_unique_status: event.target.value })} placeholder="procgen_unique_status" className="h-8" aria-label="Procgen unique status" />
       <Input value={value.procgen_reset_status} onChange={(event) => set({ procgen_reset_status: event.target.value })} placeholder="procgen_reset_status" className="h-8" aria-label="Procgen reset status" />
     </div>

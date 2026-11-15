@@ -9,6 +9,7 @@ import {
   MapPresentationFields,
   ParallaxEditor,
   ProcgenEditor,
+  PROCGEN_TYPES,
   StudioWorldPanel,
   TileSizeForm,
 } from './studioEditors';
@@ -75,7 +76,8 @@ describe('studio editor screens', () => {
     );
     expect(fields).toContain('Parallax layers');
     expect(fields).toContain('Procgen type');
-    expect(fields).toContain('door_west_east');
+    // Radix Select options are not in static markup; the catalog still includes the door types.
+    expect(PROCGEN_TYPES).toContain('door_west_east');
     const panel = render(<StudioWorldPanel />);
     expect(panel).toContain('Cutscene');
     expect(panel).toContain('Language catalog');

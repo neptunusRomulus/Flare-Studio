@@ -18,13 +18,16 @@ const CanvasTips: React.FC<Props> = ({ tipsMinimized, setTipsMinimized, setShowH
         className={`absolute inset-0 transition-all duration-300 ${tipsMinimized ? 'opacity-100 scale-100 pointer-events-auto' : 'opacity-0 scale-75 pointer-events-none'}`}
       >
         <Tooltip content="Click to see help" side="right">
-          <button
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
             className="w-8 h-8 flex items-center justify-center bg-white dark:bg-neutral-900 rounded-full border border-border shadow-lg hover:bg-gray-100 dark:hover:bg-neutral-800 transition-all duration-200 hover:scale-105"
             onClick={() => setTipsMinimized(false)}
             aria-label="Show help tips"
           >
             <HelpCircle className="w-4 h-4 text-gray-600 dark:text-gray-300" />
-          </button>
+          </Button>
         </Tooltip>
       </div>
 
@@ -75,13 +78,15 @@ const CanvasTips: React.FC<Props> = ({ tipsMinimized, setTipsMinimized, setShowH
               to Zoom In-Out
             </span>
           </div>
-          <button
-            className="flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300 hover:text-orange-500 transition-colors w-full text-left mt-1 pt-1 border-t border-gray-100 dark:border-neutral-800"
+          <Button
+            type="button"
+            variant="ghost"
+            className="h-auto flex items-center gap-2 text-xs text-gray-700 dark:text-gray-300 hover:text-orange-500 transition-colors w-full text-left mt-1 pt-1 border-t border-gray-100 dark:border-neutral-800"
             onClick={() => setShowHelp(true)}
           >
             <HelpCircle className="w-4 h-4 text-orange-400" />
             <span className="font-medium">Help</span>
-          </button>
+          </Button>
         </div>
       </div>
     </div>

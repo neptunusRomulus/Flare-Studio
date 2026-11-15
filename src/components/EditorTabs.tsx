@@ -1,4 +1,5 @@
 import React from 'react';
+import { Button } from '@/components/ui/button';
 import Tooltip from '@/components/ui/tooltip';
 import { Plus } from 'lucide-react';
 import TabItem from '@/components/editor/TabItem';
@@ -39,13 +40,16 @@ export default function EditorTabs({
         />
       ))}
       <Tooltip content="Create a new map" side="right">
-        <button
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
           onClick={onCreateNewMap}
-          className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-neutral-800 no-drag flex-shrink-0"
+          className="h-auto w-auto p-1 rounded-md hover:bg-slate-100 dark:hover:bg-neutral-800 no-drag flex-shrink-0"
           aria-label="Create new map"
         >
           <Plus className="w-4 h-4 text-orange-600 dark:text-orange-400" />
-        </button>
+        </Button>
       </Tooltip>
     </div>
   );

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
 import type { FlareLaunchMode } from '@/hooks/useFlareEngine';
 
 interface PlayButtonProps {
@@ -45,10 +46,12 @@ const PlayButton: React.FC<PlayButtonProps> = ({ isRunning, lastError, hasProjec
   return (
     <div ref={menuRef} className="relative no-drag">
       {/* Main play button */}
-      <button
+      <Button
+        type="button"
+        variant="ghost"
         onClick={() => setOpen(prev => !prev)}
         disabled={isRunning}
-        className={`
+        className={`h-auto 
           flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-semibold transition-all
           ${isRunning
             ? 'bg-orange-200 dark:bg-orange-900 text-orange-600 dark:text-orange-300 cursor-wait'
@@ -75,15 +78,17 @@ const PlayButton: React.FC<PlayButtonProps> = ({ isRunning, lastError, hasProjec
             </svg>
           </>
         )}
-      </button>
+      </Button>
 
       {/* Dropdown menu */}
       {open && !isRunning && (
         <div className="absolute top-full left-0 mt-1 z-50 min-w-[200px] bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-600 rounded-md shadow-lg py-1 text-sm">
-          <button
+          <Button
+        type="button"
+        variant="ghost"
             onClick={() => handleSelect('current-map')}
             disabled={!hasProject || !hasMap}
-            className="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-neutral-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+            className="h-auto w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-neutral-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 rounded-none"
           >
             <svg width="10" height="12" viewBox="0 0 10 12" fill="currentColor" className="text-green-500 flex-shrink-0">
               <polygon points="0,0 10,6 0,12" />
@@ -92,12 +97,14 @@ const PlayButton: React.FC<PlayButtonProps> = ({ isRunning, lastError, hasProjec
               <div className="font-medium text-gray-800 dark:text-gray-200">Play Current Map</div>
               <div className="text-xs text-gray-500 dark:text-gray-400">Save &amp; launch into this map</div>
             </div>
-          </button>
+          </Button>
 
-          <button
+          <Button
+        type="button"
+        variant="ghost"
             onClick={() => handleSelect('new-game')}
             disabled={!hasProject}
-            className="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-neutral-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2"
+            className="h-auto w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-neutral-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 rounded-none"
           >
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-blue-500 flex-shrink-0">
               <rect x="1" y="1" width="10" height="10" rx="2" />
@@ -106,13 +113,15 @@ const PlayButton: React.FC<PlayButtonProps> = ({ isRunning, lastError, hasProjec
               <div className="font-medium text-gray-800 dark:text-gray-200">New Game</div>
               <div className="text-xs text-gray-500 dark:text-gray-400">Save &amp; play from beginning</div>
             </div>
-          </button>
+          </Button>
 
           <div className="border-t border-gray-200 dark:border-neutral-600 my-1" />
 
-          <button
+          <Button
+        type="button"
+        variant="ghost"
             onClick={() => handleSelect('main-menu')}
-            className="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-neutral-700 flex items-center gap-2"
+            className="h-auto w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-neutral-700 flex items-center gap-2 rounded-none"
           >
             <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" className="text-orange-500 flex-shrink-0">
               <circle cx="6" cy="6" r="5" />
@@ -121,7 +130,7 @@ const PlayButton: React.FC<PlayButtonProps> = ({ isRunning, lastError, hasProjec
               <div className="font-medium text-gray-800 dark:text-gray-200">Flare Main Menu</div>
               <div className="text-xs text-gray-500 dark:text-gray-400">Launch engine title screen</div>
             </div>
-          </button>
+          </Button>
 
           {lastError && (
             <>
@@ -132,9 +141,11 @@ const PlayButton: React.FC<PlayButtonProps> = ({ isRunning, lastError, hasProjec
 
           <div className="border-t border-gray-200 dark:border-neutral-600 my-1" />
 
-          <button
+          <Button
+        type="button"
+        variant="ghost"
             onClick={() => { setOpen(false); onConfigurePath(); }}
-            className="w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-neutral-700 flex items-center gap-2"
+            className="h-auto w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-neutral-700 flex items-center gap-2 rounded-none"
           >
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-gray-500 flex-shrink-0">
               <path d="M10.5 6.5v3a1 1 0 01-1 1h-7a1 1 0 01-1-1v-7a1 1 0 011-1h3" />
@@ -151,7 +162,7 @@ const PlayButton: React.FC<PlayButtonProps> = ({ isRunning, lastError, hasProjec
                 <div className="text-xs text-amber-500">Select flare.exe to enable play</div>
               )}
             </div>
-          </button>
+          </Button>
         </div>
       )}
     </div>

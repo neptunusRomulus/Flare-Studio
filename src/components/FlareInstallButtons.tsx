@@ -143,14 +143,16 @@ const FlareInstallButtons: React.FC = () => {
       {installed && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" role="dialog" aria-label="Flare installed">
           <div className="relative w-80 rounded-lg border border-slate-200 bg-white p-4 text-left shadow-xl dark:border-neutral-700 dark:bg-neutral-900">
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
               aria-label="Close"
               onClick={() => setInstalled(null)}
-              className="absolute right-2 top-2 rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-neutral-800 dark:hover:text-gray-100"
+              className="absolute right-2 top-2 h-auto w-auto rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-neutral-800 dark:hover:text-gray-100"
             >
               <X className="h-4 w-4" />
-            </button>
+            </Button>
             <h4 className="mb-2 text-sm font-semibold text-gray-900 dark:text-white">
               Flare {installed.version} installed
             </h4>

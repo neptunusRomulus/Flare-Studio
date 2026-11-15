@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { canonicalJson, contentSlug, importQuestText, mergeQuestText } from '../adapters/flare/flareAdapter.cjs';
 import { loadProjectTextMap, projectRoot, writeProjectFiles } from '../editor/projectFiles';
 import { displayIdentity } from '../editor/identityRename';
@@ -149,12 +149,6 @@ export default function useAppMainState() {
 
   const itemsHook = useItems({ currentProjectPath, toast, normalizeItemsForState });
   const vendorState = useVendorState();
-
-  const [mapsDropdownOpen, setMapsDropdownOpen] = useState(false);
-  const [mapsSubOpen, setMapsSubOpen] = useState(false);
-  const [mapsDropdownPos, setMapsDropdownPos] = useState<{ left: number; top: number } | null>(null);
-  const mapsButtonRef = useRef<HTMLButtonElement | null>(null);
-  const mapsPortalRef = useRef<HTMLDivElement | null>(null);
 
   const [showQuestDialog, setShowQuestDialog] = useState<boolean>(false);
   const [editingQuestId, setEditingQuestId] = useState<string | null>(null);
@@ -361,14 +355,6 @@ export default function useAppMainState() {
     setImportReviewData,
     itemsHook,
     vendorState,
-    mapsDropdownOpen,
-    setMapsDropdownOpen,
-    mapsSubOpen,
-    setMapsSubOpen,
-    mapsDropdownPos,
-    setMapsDropdownPos,
-    mapsButtonRef,
-    mapsPortalRef,
     showQuestDialog,
     setShowQuestDialog,
     editingQuestId,

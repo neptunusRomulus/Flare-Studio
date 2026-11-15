@@ -74,12 +74,6 @@ export type AppMainSidebarDepsInput = {
   mapConfig: MapConfig;
   isNpcLayer: boolean;
   isEnemyLayer: boolean;
-  mapsDropdownOpen: boolean;
-  mapsSubOpen: boolean;
-  mapsDropdownPos: AppMainState['mapsDropdownPos'];
-  setMapsDropdownPos: AppMainState['setMapsDropdownPos'];
-  mapsButtonRef: AppMainState['mapsButtonRef'];
-  mapsPortalRef: AppMainState['mapsPortalRef'];
   setShowSettings: (open: boolean) => void;
 };
 
@@ -137,12 +131,6 @@ export default function useAppMainSidebarDeps(args: AppMainSidebarDepsInput) {
     mapConfig,
     isNpcLayer,
     isEnemyLayer,
-    mapsDropdownOpen,
-    mapsSubOpen,
-    mapsDropdownPos,
-    setMapsDropdownPos,
-    mapsButtonRef,
-    mapsPortalRef,
     setShowSettings,
   } = args;
 
@@ -369,12 +357,6 @@ export default function useAppMainSidebarDeps(args: AppMainSidebarDepsInput) {
     toolbarState.stamps,
     toolbarState.selectedStamp,
     toolbarState.stampMode,
-    mapsDropdownOpen,
-    mapsSubOpen,
-    mapsDropdownPos,
-    setMapsDropdownPos,
-    mapsButtonRef,
-    mapsPortalRef,
     currentProjectPath,
     mapConfig.handleOpenCreateMapDialog,
     mapConfig.isPreparingNewMap,

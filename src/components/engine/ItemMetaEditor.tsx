@@ -69,10 +69,10 @@ export default function ItemMetaEditor({ initialFile }: { initialFile?: string }
     <div className="flex flex-col h-full">
       <div className="flex items-center gap-1 px-3 py-2 border-b border-border">
         {FILES.map((file) => (
-          <button key={file.path} type="button" onClick={() => setActive(file.path)}
+          <Button key={file.path} type="button" variant="outline" size="sm" aria-pressed={active === file.path} onClick={() => setActive(file.path)}
             className={`h-7 px-2 rounded border text-xs ${active === file.path ? 'bg-orange-600 text-white border-orange-600' : 'border-border text-muted-foreground'}`}>
             {file.label}{dirty[file.path] ? ' ●' : ''}
-          </button>
+          </Button>
         ))}
         <div className="flex-1" />
         <Button size="sm" className="h-7 text-xs" onClick={() => void save()} disabled={!dirty[active]}>Save</Button>

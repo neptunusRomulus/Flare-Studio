@@ -2,6 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import Tooltip from '@/components/ui/tooltip';
 import EditorPropertyList from '@/components/EditorPropertyList';
 import { extraItemPropertyKeys, ITEM_EXTRA_CATALOG } from '@/editor/itemFileHydrate';
@@ -17,6 +20,8 @@ import { loadTextFiles } from '@/editor/powers/powerFiles';
 import { projectRoot } from '@/editor/projectFiles';
 import { askConfirm } from '@/components/ui/inline-confirm';
 import ResizeHandle from '@/components/ResizeHandle';
+
+const EMPTY_POWER = '__empty__';
 
 const RoleIcon = ({ roleId, className }: { roleId: string; className?: string }) => {
   switch (roleId) {
@@ -113,10 +118,11 @@ const CollapsibleSection = ({
 
   return (
     <div className={`space-y-3 border-b border-border/50 pb-4 ${className}`}>
-      <button
+      <Button
         type="button"
+        variant="ghost"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between group py-1"
+        className="w-full h-auto flex items-center justify-between group py-1 px-0 hover:bg-transparent"
       >
         <h4 className="text-sm font-semibold flex items-center gap-2">
           <Icon className="w-4 h-4 text-orange-500" />
@@ -127,7 +133,7 @@ const CollapsibleSection = ({
         ) : (
           <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
         )}
-      </button>
+      </Button>
       {isOpen && <div className="animate-in fade-in slide-in-from-top-1 duration-200">{children}</div>}
     </div>
   );
@@ -241,7 +247,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
           <div className="grid grid-cols-2 gap-3 items-start">
             <div className="space-y-2">
               <div className="flex flex-col gap-1">
-                <label className="text-xs text-muted-foreground">Name</label>
+                <Label className="text-xs text-muted-foreground font-normal">Name</Label>
                 <Input
                   value={editingItem.name}
                   onChange={(e) => updateEditingItemField('name', e.target.value)}
@@ -250,7 +256,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
                 />
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-xs text-muted-foreground">Description</label>
+                <Label className="text-xs text-muted-foreground font-normal">Description</Label>
                 <Input
                   value={editingItem.flavor}
                   onChange={(e) => updateEditingItemField('flavor', e.target.value)}
@@ -259,7 +265,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
                 />
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-xs text-muted-foreground">Icon</label>
+                <Label className="text-xs text-muted-foreground font-normal">Icon</Label>
                 <Input
                   value={editingItem.icon ?? ''}
                   onChange={(e) => updateEditingItemField('icon', e.target.value)}
@@ -268,7 +274,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
                 />
               </div>
               <div className="pt-2">
-                <label className="text-xs text-muted-foreground block mb-2">Category (Role)</label>
+                <Label className="text-xs text-muted-foreground block mb-2 font-normal">Category (Role)</Label>
                 <div className="flex flex-wrap gap-1.5">
                   {ITEM_ROLE_SELECTIONS.filter((roleOpt) => roleOpt.id !== 'loot_groups').map((roleOpt) => {
                     const isActive = (editingItem.role || 'unspecified') === roleOpt.id;
@@ -303,7 +309,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
             </div>
             <div className="space-y-2">
               <div>
-                <label className="text-xs text-muted-foreground">Level</label>
+                <Label className="text-xs text-muted-foreground font-normal">Level</Label>
                 <Input
                   type="text"
                   value={editingItem.level}
@@ -313,7 +319,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
               </div>
               <div>
                 <div className="flex items-center gap-1">
-                  <label className="text-xs text-muted-foreground">Quality (Rarity)</label>
+                  <Label className="text-xs text-muted-foreground font-normal">Quality (Rarity)</Label>
                   <Tooltip content="Controls rarity color & overlay; does not affect stats." side="right">
                     <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
                   </Tooltip>
@@ -388,30 +394,28 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
                       </Tooltip>
                     </div>
                     <div className="flex flex-col gap-1">
-                      <label className="flex items-center gap-2 text-xs text-foreground">
-                        <input
-                          type="checkbox"
+                      <Label className="flex items-center gap-2 text-xs font-normal text-foreground">
+                        <Checkbox
                           className="h-4 w-4"
                           checked={allowPrivate}
-                          onChange={(e) => updateStash(e.target.checked, allowShared)}
+                          onCheckedChange={(checked) => updateStash(checked === true, allowShared)}
                         />
                         <span className="leading-tight">
                           Private stash
                           <span className="block text-muted-foreground text-[11px]">Character-only storage</span>
                         </span>
-                      </label>
-                      <label className="flex items-center gap-2 text-xs text-foreground">
-                        <input
-                          type="checkbox"
+                      </Label>
+                      <Label className="flex items-center gap-2 text-xs font-normal text-foreground">
+                        <Checkbox
                           className="h-4 w-4"
                           checked={allowShared}
-                          onChange={(e) => updateStash(allowPrivate, e.target.checked)}
+                          onCheckedChange={(checked) => updateStash(allowPrivate, checked === true)}
                         />
                         <span className="leading-tight">
                           Shared stash
                           <span className="block text-muted-foreground text-[11px]">Account-wide storage</span>
                         </span>
-                      </label>
+                      </Label>
                     </div>
                     {editingItem.quest_item && (
                       <div className="text-[11px] text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-900/30 border border-amber-300 dark:border-amber-700 rounded px-2 py-1">
@@ -427,12 +431,12 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
                 <div className="space-y-2">
                   <div>
                     <div className="flex items-center gap-1">
-                      <label className="text-xs text-muted-foreground">Buy Price</label>
+                      <Label className="text-xs text-muted-foreground font-normal">Buy Price</Label>
                       <Tooltip content="0 = vendors won't buy this item (unsellable)." side="right">
                         <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
                       </Tooltip>
                     </div>
-                    <input
+                    <Input
                       type="text"
                       value={editingItem.price ?? ''}
                       onChange={(e) => updateEditingItemField('price', e.target.value)}
@@ -449,18 +453,17 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
                         <>
                           <div className="flex items-center gap-2">
                             <div className="flex items-center gap-1">
-                              <label className="text-xs text-muted-foreground">Sell Price</label>
+                              <Label className="text-xs text-muted-foreground font-normal">Sell Price</Label>
                               <Tooltip content="0 = use automatic sell price (price * vendor_ratio_sell)." side="right">
                                 <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
                               </Tooltip>
                             </div>
-                            <label className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                              <input
-                                type="checkbox"
+                            <Label className="flex items-center gap-1 text-[11px] font-normal text-muted-foreground">
+                              <Checkbox
                                 className="h-3.5 w-3.5"
                                 checked={autoSell}
-                                onChange={(e) => {
-                                  if (e.target.checked) {
+                                onCheckedChange={(checked) => {
+                                  if (checked === true) {
                                     updateEditingItemField('price_sell', '0');
                                   } else {
                                     const fallbackValue = editingItem.price_sell && editingItem.price_sell !== '0'
@@ -471,9 +474,9 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
                                 }}
                               />
                               Use automatic sell price
-                            </label>
+                            </Label>
                           </div>
-                          <input
+                          <Input
                             type="text"
                             value={editingItem.price_sell ?? ''}
                             onChange={(e) => updateEditingItemField('price_sell', e.target.value)}
@@ -489,8 +492,8 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs text-muted-foreground">Price per Level</label>
-                  <input
+                  <Label className="text-xs text-muted-foreground font-normal">Price per Level</Label>
+                  <Input
                     type="text"
                     value={editingItem.price_per_level ?? ''}
                     onChange={(e) => updateEditingItemField('price_per_level', e.target.value)}
@@ -502,12 +505,12 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
                 </div>
                 <div>
                   <div className="flex items-center gap-1">
-                    <label className="text-xs text-muted-foreground">Max stack size</label>
+                    <Label className="text-xs text-muted-foreground font-normal">Max stack size</Label>
                     <Tooltip content="Maximum items per stack. 1 = no stacking." side="right">
                       <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
                     </Tooltip>
                   </div>
-                  <input
+                  <Input
                     type="text"
                     value={editingItem.max_quantity}
                     onChange={(e) => updateEditingItemField('max_quantity', parseInt(e.target.value, 10) || 1)}
@@ -529,11 +532,13 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
                 const meta = RESOURCE_SUBTYPE_META[key];
                 const isActive = editingItem.resourceSubtype === key;
                 return (
-                  <button
+                  <Button
                     key={key}
                     type="button"
+                    variant="outline"
+                    aria-pressed={isActive}
                     onClick={() => updateEditingItemField('resourceSubtype', key)}
-                    className={`text-left border rounded-md px-3 py-2 transition-colors ${isActive ? 'border-purple-500 bg-purple-500/10 ring-1 ring-purple-500/30' : 'border-border hover:bg-muted/60'}`}
+                    className={`h-auto text-left border rounded-md px-3 py-2 transition-colors ${isActive ? 'border-purple-500 bg-purple-500/10 ring-1 ring-purple-500/30' : 'border-border hover:bg-muted/60'}`}
                   >
                     <div className="flex items-center gap-2">
                       <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${meta.badgeClass}`}>
@@ -542,7 +547,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
                       <Check className={`w-4 h-4 transition-opacity ${isActive ? 'opacity-100 text-purple-500' : 'opacity-0'}`} />
                     </div>
                     <p className="text-xs text-muted-foreground mt-1 leading-snug">{meta.hint}</p>
-                  </button>
+                  </Button>
                 );
               })}
             </div>
@@ -554,7 +559,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
           <CollapsibleSection title="Equipment and Requirements" icon={Shield}>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-muted-foreground">Item Type (equipment slot)</label>
+                <Label className="text-xs text-muted-foreground font-normal">Item Type (equipment slot)</Label>
                 <Input
                   value={editingItem.item_type}
                   onChange={(e) => updateEditingItemField('item_type', e.target.value)}
@@ -563,7 +568,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
                 />
               </div>
               <div>
-                <label className="text-xs text-muted-foreground">Equip Flags</label>
+                <Label className="text-xs text-muted-foreground font-normal">Equip Flags</Label>
                 <Input
                   value={editingItem.equip_flags}
                   onChange={(e) => updateEditingItemField('equip_flags', e.target.value)}
@@ -574,7 +579,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div>
-                <label className="text-xs text-muted-foreground">Requires Level</label>
+                <Label className="text-xs text-muted-foreground font-normal">Requires Level</Label>
                 <Input
                   type="number"
                   value={editingItem.requires_level}
@@ -584,7 +589,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
                 />
               </div>
               <div>
-                <label className="text-xs text-muted-foreground">Requires Stat</label>
+                <Label className="text-xs text-muted-foreground font-normal">Requires Stat</Label>
                 <Input
                   value={editingItem.requires_stat}
                   onChange={(e) => updateEditingItemField('requires_stat', e.target.value)}
@@ -593,7 +598,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
                 />
               </div>
               <div>
-                <label className="text-xs text-muted-foreground">Requires Class</label>
+                <Label className="text-xs text-muted-foreground font-normal">Requires Class</Label>
                 <Input
                   value={editingItem.requires_class}
                   onChange={(e) => updateEditingItemField('requires_class', e.target.value)}
@@ -604,7 +609,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-muted-foreground">Disable Slots</label>
+                <Label className="text-xs text-muted-foreground font-normal">Disable Slots</Label>
                 <Input
                   value={editingItem.disable_slots}
                   onChange={(e) => updateEditingItemField('disable_slots', e.target.value)}
@@ -613,7 +618,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
                 />
               </div>
               <div>
-                <label className="text-xs text-muted-foreground">GFX (Animation)</label>
+                <Label className="text-xs text-muted-foreground font-normal">GFX (Animation)</Label>
                 <Input
                   value={editingItem.gfx}
                   onChange={(e) => updateEditingItemField('gfx', e.target.value)}
@@ -629,7 +634,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
         {isEquipment && (
           <CollapsibleSection title="Bonuses and Effects" icon={Sparkles}>
             <div>
-              <label className="text-xs text-muted-foreground">Bonus (stat bonuses)</label>
+              <Label className="text-xs text-muted-foreground font-normal">Bonus (stat bonuses)</Label>
               <Input
                 value={editingItem.bonus}
                 onChange={(e) => updateEditingItemField('bonus', e.target.value)}
@@ -638,7 +643,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
               />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">Bonus Power Level</label>
+              <Label className="text-xs text-muted-foreground font-normal">Bonus Power Level</Label>
               <Input
                 value={editingItem.bonus_power_level}
                 onChange={(e) => updateEditingItemField('bonus_power_level', e.target.value)}
@@ -655,7 +660,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
             {isEquipment && (
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs text-muted-foreground">Damage (dmg)</label>
+                  <Label className="text-xs text-muted-foreground font-normal">Damage (dmg)</Label>
                   <Input
                     value={editingItem.dmg}
                     onChange={(e) => updateEditingItemField('dmg', e.target.value)}
@@ -664,7 +669,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-muted-foreground">Absorb (abs)</label>
+                  <Label className="text-xs text-muted-foreground font-normal">Absorb (abs)</Label>
                   <Input
                     value={editingItem.abs}
                     onChange={(e) => updateEditingItemField('abs', e.target.value)}
@@ -677,22 +682,26 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <Tooltip content="power= — the Flare [power] id this item casts when used">
-                  <label className="text-xs text-muted-foreground">Item Use</label>
+                  <Label className="text-xs text-muted-foreground font-normal">Item Use</Label>
                 </Tooltip>
                 {powerIds.length > 0 ? (
-                  <select
-                    className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm"
-                    value={editingItem.power || ''}
-                    onChange={(e) => updateEditingItemField('power', e.target.value)}
+                  <Select
+                    value={editingItem.power || EMPTY_POWER}
+                    onValueChange={(value) => updateEditingItemField('power', value === EMPTY_POWER ? '' : value)}
                   >
-                    <option value="">Select a power</option>
-                    {(editingItem.power && !powerIds.includes(String(editingItem.power))
-                      ? [String(editingItem.power), ...powerIds]
-                      : powerIds
-                    ).map((id) => (
-                      <option key={id} value={id}>{powerNames[id] && powerNames[id] !== id ? `${powerNames[id]} (${id})` : id}</option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="h-8 w-full px-2 text-sm">
+                      <SelectValue placeholder="Select a power" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={EMPTY_POWER}>Select a power</SelectItem>
+                      {(editingItem.power && !powerIds.includes(String(editingItem.power))
+                        ? [String(editingItem.power), ...powerIds]
+                        : powerIds
+                      ).map((id) => (
+                        <SelectItem key={id} value={id}>{powerNames[id] && powerNames[id] !== id ? `${powerNames[id]} (${id})` : id}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 ) : (
                   <Input
                     value={editingItem.power}
@@ -703,7 +712,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
                 )}
               </div>
               <div>
-                <label className="text-xs text-muted-foreground">Power Description</label>
+                <Label className="text-xs text-muted-foreground font-normal">Power Description</Label>
                 <Input
                   value={editingItem.power_desc}
                   onChange={(e) => updateEditingItemField('power_desc', e.target.value)}
@@ -713,7 +722,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
               </div>
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">Replace Power</label>
+              <Label className="text-xs text-muted-foreground font-normal">Replace Power</Label>
               <Input
                 value={editingItem.replace_power}
                 onChange={(e) => updateEditingItemField('replace_power', e.target.value)}
@@ -722,7 +731,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
               />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">Script</label>
+              <Label className="text-xs text-muted-foreground font-normal">Script</Label>
               <Input
                 value={editingItem.script}
                 onChange={(e) => updateEditingItemField('script', e.target.value)}
@@ -736,7 +745,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
         <CollapsibleSection title="Advanced Item Attributes" icon={Box} defaultOpen={false}>
           <div className="grid gap-3 sm:grid-cols-3">
             <div>
-              <label className="text-xs text-muted-foreground">Type</label>
+              <Label className="text-xs text-muted-foreground font-normal">Type</Label>
               <Input
                 value={editingItem.type ?? ''}
                 onChange={(e) => updateEditingItemField('type', e.target.value)}
@@ -745,7 +754,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
               />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">Speed</label>
+              <Label className="text-xs text-muted-foreground font-normal">Speed</Label>
               <Input
                 value={editingItem.speed ?? ''}
                 onChange={(e) => updateEditingItemField('speed', e.target.value)}
@@ -754,7 +763,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
               />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">Radius</label>
+              <Label className="text-xs text-muted-foreground font-normal">Radius</Label>
               <Input
                 value={editingItem.radius ?? ''}
                 onChange={(e) => updateEditingItemField('radius', e.target.value)}
@@ -763,7 +772,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
               />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">Trait Elemental</label>
+              <Label className="text-xs text-muted-foreground font-normal">Trait Elemental</Label>
               <Input
                 value={editingItem.trait_elemental ?? ''}
                 onChange={(e) => updateEditingItemField('trait_elemental', e.target.value)}
@@ -772,7 +781,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
               />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">Wall Power</label>
+              <Label className="text-xs text-muted-foreground font-normal">Wall Power</Label>
               <Input
                 value={editingItem.wall_power ?? ''}
                 onChange={(e) => updateEditingItemField('wall_power', e.target.value)}
@@ -781,16 +790,15 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
               />
             </div>
             <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
+              <Checkbox
                 className="h-4 w-4"
                 checked={!!editingItem.use_hazard}
-                onChange={(e) => updateEditingItemField('use_hazard', e.target.checked)}
+                onCheckedChange={(checked) => updateEditingItemField('use_hazard', checked === true)}
               />
-              <label className="text-xs text-muted-foreground">Use Hazard</label>
+              <Label className="text-xs text-muted-foreground font-normal">Use Hazard</Label>
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">Post Power</label>
+              <Label className="text-xs text-muted-foreground font-normal">Post Power</Label>
               <Input
                 value={editingItem.post_power ?? ''}
                 onChange={(e) => updateEditingItemField('post_power', e.target.value)}
@@ -799,7 +807,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
               />
             </div>
             <div className="sm:col-span-2">
-              <label className="text-xs text-muted-foreground">Post Effect</label>
+              <Label className="text-xs text-muted-foreground font-normal">Post Effect</Label>
               <Input
                 value={editingItem.post_effect ?? ''}
                 onChange={(e) => updateEditingItemField('post_effect', e.target.value)}
@@ -808,7 +816,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
               />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">Requires HP/MP State</label>
+              <Label className="text-xs text-muted-foreground font-normal">Requires HP/MP State</Label>
               <Input
                 value={editingItem.requires_hpmp_state ?? ''}
                 onChange={(e) => updateEditingItemField('requires_hpmp_state', e.target.value)}
@@ -817,7 +825,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
               />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">Requires Item</label>
+              <Label className="text-xs text-muted-foreground font-normal">Requires Item</Label>
               <Input
                 value={editingItem.requires_item ?? ''}
                 onChange={(e) => updateEditingItemField('requires_item', e.target.value)}
@@ -826,7 +834,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
               />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">New State</label>
+              <Label className="text-xs text-muted-foreground font-normal">New State</Label>
               <Input
                 value={editingItem.new_state ?? ''}
                 onChange={(e) => updateEditingItemField('new_state', e.target.value)}
@@ -835,7 +843,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
               />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">Modifier Damage</label>
+              <Label className="text-xs text-muted-foreground font-normal">Modifier Damage</Label>
               <Input
                 value={editingItem.modifier_damage ?? ''}
                 onChange={(e) => updateEditingItemField('modifier_damage', e.target.value)}
@@ -844,7 +852,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
               />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">Lifespan</label>
+              <Label className="text-xs text-muted-foreground font-normal">Lifespan</Label>
               <Input
                 value={editingItem.lifespan ?? ''}
                 onChange={(e) => updateEditingItemField('lifespan', e.target.value)}
@@ -853,13 +861,12 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
               />
             </div>
             <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
+              <Checkbox
                 className="h-4 w-4"
                 checked={!!editingItem.face}
-                onChange={(e) => updateEditingItemField('face', e.target.checked)}
+                onCheckedChange={(checked) => updateEditingItemField('face', checked === true)}
               />
-              <label className="text-xs text-muted-foreground">Face</label>
+              <Label className="text-xs text-muted-foreground font-normal">Face</Label>
             </div>
           </div>
         </CollapsibleSection>
@@ -868,17 +875,16 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
         {isQuest && (
           <CollapsibleSection title="Quest Item Settings" icon={Key}>
             <div className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
+              <Checkbox
                 id="quest_item_lock"
                 checked={!!editingItem.quest_item}
                 disabled
                 className="h-4 w-4"
               />
-              <label htmlFor="quest_item_lock" className="text-xs text-muted-foreground">Quest item (always on for this role)</label>
+              <Label htmlFor="quest_item_lock" className="text-xs font-normal text-muted-foreground">Quest item (always on for this role)</Label>
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">Pickup Status</label>
+              <Label className="text-xs text-muted-foreground font-normal">Pickup Status</Label>
               <Input
                 value={editingItem.pickup_status}
                 onChange={(e) => updateEditingItemField('pickup_status', e.target.value)}
@@ -917,7 +923,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-muted-foreground">Book File</label>
+                <Label className="text-xs text-muted-foreground font-normal">Book File</Label>
                 <Input
                   value={editingItem.book || ''}
                   onChange={(e) => updateEditingItemField('book', e.target.value)}
@@ -925,15 +931,14 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
                   className="h-8"
                 />
               </div>
-              <label className="flex items-center gap-2 text-xs text-foreground mt-6">
-                <input
-                  type="checkbox"
+              <Label className="flex items-center gap-2 text-xs font-normal text-foreground mt-6">
+                <Checkbox
                   className="h-4 w-4"
                   checked={!!editingItem.book_is_readable}
-                  onChange={(e) => updateEditingItemField('book_is_readable', e.target.checked)}
+                  onCheckedChange={(checked) => updateEditingItemField('book_is_readable', checked === true)}
                 />
                 Show "Read" instead of "Use"
-              </label>
+              </Label>
             </div>
         </CollapsibleSection>
 
@@ -941,7 +946,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
         <CollapsibleSection title="Visual and Audio" icon={Volume2}>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-muted-foreground">Sound FX</label>
+              <Label className="text-xs text-muted-foreground font-normal">Sound FX</Label>
               <Input
                 value={editingItem.soundfx}
                 onChange={(e) => updateEditingItemField('soundfx', e.target.value)}
@@ -950,7 +955,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
               />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">Step FX (for armor)</label>
+              <Label className="text-xs text-muted-foreground font-normal">Step FX (for armor)</Label>
               <Input
                 value={editingItem.stepfx}
                 onChange={(e) => updateEditingItemField('stepfx', e.target.value)}
@@ -960,7 +965,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
             </div>
           </div>
           <div>
-            <label className="text-xs text-muted-foreground">Loot Animation</label>
+            <Label className="text-xs text-muted-foreground font-normal">Loot Animation</Label>
             <Input
               value={editingItem.loot_animation}
               onChange={(e) => updateEditingItemField('loot_animation', e.target.value)}
@@ -975,7 +980,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
           <CollapsibleSection title="Randomization and Loot" icon={Gift} className="border-none">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-muted-foreground">Randomizer Definition</label>
+                <Label className="text-xs text-muted-foreground font-normal">Randomizer Definition</Label>
                 <Input
                   value={editingItem.randomizer_def}
                   onChange={(e) => updateEditingItemField('randomizer_def', e.target.value)}
@@ -984,7 +989,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
                 />
               </div>
               <div>
-                <label className="text-xs text-muted-foreground">Loot Drops Max</label>
+                <Label className="text-xs text-muted-foreground font-normal">Loot Drops Max</Label>
                 <Input
                   type="number"
                   value={editingItem.loot_drops_max}

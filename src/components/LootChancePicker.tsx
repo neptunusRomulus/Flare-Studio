@@ -1,5 +1,6 @@
 import Tooltip from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import {
   formatLootChance,
   lootChanceLabel,
@@ -21,13 +22,9 @@ const LootChancePicker = ({ value, onChange, id }: Props) => {
   return (
     <Tooltip content="loot chance: Always is fixed. Other words save as 50, 20, 5 or 1. Custom keeps a raw percent.">
       <span className="inline-flex min-w-0 items-center gap-1">
-        <select
-          id={id}
-          aria-label="Loot chance"
-          className="h-8 min-w-[7.5rem] rounded-md border border-input bg-background px-2 text-xs"
+        <Select
           value={selected}
-          onChange={(event) => {
-            const next = event.target.value;
+          onValueChange={(next) => {
             if (next === CUSTOM) {
               const percent = value.kind === 'custom' ? value.percent : lootChanceNumberOr(value, 12);
               onChange({ kind: 'custom', percent, stored: String(percent) });
@@ -36,11 +33,16 @@ const LootChancePicker = ({ value, onChange, id }: Props) => {
             onChange(parseLootChance(next));
           }}
         >
-          {LOOT_CHANCE_WORDS.map((entry) => (
-            <option key={entry.value} value={entry.value}>{entry.word}</option>
-          ))}
-          <option value={CUSTOM}>{value.kind === 'custom' ? lootChanceLabel(value) : 'Custom'}</option>
-        </select>
+          <SelectTrigger id={id} aria-label="Loot chance" className="h-8 min-w-[7.5rem] px-2 text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {LOOT_CHANCE_WORDS.map((entry) => (
+              <SelectItem key={entry.value} value={entry.value}>{entry.word}</SelectItem>
+            ))}
+            <SelectItem value={CUSTOM}>{value.kind === 'custom' ? lootChanceLabel(value) : 'Custom'}</SelectItem>
+          </SelectContent>
+        </Select>
         {value.kind === 'custom' && (
           <Input
             aria-label="Custom chance percent"

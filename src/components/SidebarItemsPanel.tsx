@@ -165,14 +165,16 @@ const SidebarItemsPanel = ({
                             onDelete={() => onDeleteItem(item)}
                           >
                             <ListItemTooltip item={{ id: item.id, name: item.name }} showActions={false}>
-                              <button
-                                className="flex flex-col items-center justify-center rounded-md border border-border bg-transparent hover:bg-muted cursor-pointer transition-colors w-full aspect-square relative group"
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="flex h-auto flex-col items-center justify-center rounded-md border border-border bg-transparent hover:bg-muted cursor-pointer transition-colors w-full aspect-square relative group"
                                 onClick={() => onOpenItemEdit(item)}
                               >
                                 <span className="absolute top-0 left-1 text-[7px] text-muted-foreground/40 select-none leading-none">#{item.id}</span>
                                 <CategoryIcon roleId={roleId} className={`w-5 h-5 ${getCategoryColor(roleId)}`} />
                                 <span className="text-[9px] text-muted-foreground truncate w-full text-center leading-none mt-0.5 px-0.5">{item.name}</span>
-                              </button>
+                              </Button>
                             </ListItemTooltip>
                           </ElementContextMenu>
                         ))}

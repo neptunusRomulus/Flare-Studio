@@ -1,6 +1,9 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Sheet, Save, X, Tag, Layers, Shield, Check, HelpCircle, Search, ChevronDown, ChevronRight } from 'lucide-react';
 import Tooltip from '@/components/ui/tooltip';
@@ -57,10 +60,11 @@ const CollapsibleSection = ({
 
   return (
     <div className={`space-y-3 border-b border-border/50 pb-4 ${className}`}>
-      <button
+      <Button
         type="button"
+        variant="ghost"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between group py-2"
+        className="w-full h-auto flex items-center justify-between group py-2 px-0 hover:bg-transparent"
       >
         <h4 className="text-sm font-semibold flex items-center gap-2">
           <Icon className="w-4 h-4 text-orange-500" />
@@ -71,7 +75,7 @@ const CollapsibleSection = ({
         ) : (
           <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors" />
         )}
-      </button>
+      </Button>
       {isOpen && <div className="animate-in fade-in slide-in-from-top-1 duration-200">{children}</div>}
     </div>
   );
@@ -265,15 +269,17 @@ function LootGroupEditDialog(props: LootGroupEditDialogProps) {
           <Sheet className="w-5 h-5 text-slate-700 dark:text-slate-200" />
           <span className="text-lg font-semibold flex-1">Edit Item Group</span>
           <Tooltip content="Close">
-            <button
+            <Button
               type="button"
-              className="ml-2 p-1 rounded hover:bg-muted/40 focus:outline-none focus:ring-2 focus:ring-orange-400"
+              variant="ghost"
+              size="icon"
+              className="ml-2 h-auto w-auto p-1 rounded hover:bg-muted/40 focus:outline-none focus:ring-2 focus:ring-orange-400"
               onClick={onClose}
               aria-label="Close"
               tabIndex={0}
             >
               <X className="w-5 h-5 text-muted-foreground" />
-            </button>
+            </Button>
           </Tooltip>
         </div>
 
@@ -284,7 +290,7 @@ function LootGroupEditDialog(props: LootGroupEditDialogProps) {
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <label className="text-xs font-medium text-muted-foreground">Name</label>
+                  <Label className="text-xs font-medium text-muted-foreground">Name</Label>
                   <Tooltip content="Set the display name for this item group. This name helps generate the loot group ID and file name.">
                     <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
                   </Tooltip>
@@ -298,7 +304,7 @@ function LootGroupEditDialog(props: LootGroupEditDialogProps) {
               </div>
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <label className="text-xs font-medium text-muted-foreground">Description (optional)</label>
+                  <Label className="text-xs font-medium text-muted-foreground">Description (optional)</Label>
                   <Tooltip content="Optional notes or author-facing description for this loot group.">
                     <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
                   </Tooltip>
@@ -313,7 +319,7 @@ function LootGroupEditDialog(props: LootGroupEditDialogProps) {
             </div>
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <label className="text-xs font-medium text-muted-foreground">Loot Group ID</label>
+                <Label className="text-xs font-medium text-muted-foreground">Loot Group ID</Label>
                 <Tooltip content="This ID is automatically generated from the group name and cannot be edited directly.">
                   <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
                 </Tooltip>
@@ -326,7 +332,7 @@ function LootGroupEditDialog(props: LootGroupEditDialogProps) {
             <div className="grid gap-3 md:grid-cols-2">
               <div className="space-y-2 md:col-span-2">
                 <div className="flex items-center gap-2">
-                  <label className="text-xs font-medium text-muted-foreground">Search items</label>
+                  <Label className="text-xs font-medium text-muted-foreground">Search items</Label>
                   <Tooltip content="Filter the user-created items list by ID, name, or category.">
                     <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
                   </Tooltip>
@@ -360,10 +366,9 @@ function LootGroupEditDialog(props: LootGroupEditDialogProps) {
                     return (
                       <tr key={item.filePath} className={`border-b border-border/50 ${selected ? 'bg-orange-50' : ''}`}>
                         <td className="p-2">
-                          <input
-                            type="checkbox"
+                          <Checkbox
                             checked={selected}
-                            onChange={() => handleToggleContentItem(item.id)}
+                            onCheckedChange={() => handleToggleContentItem(item.id)}
                             className="h-4 w-4 rounded border-border text-orange-500"
                           />
                         </td>
@@ -398,7 +403,7 @@ function LootGroupEditDialog(props: LootGroupEditDialogProps) {
               </table>
             </div>
             <div className="pt-3">
-              <label className="mb-2 block text-xs font-medium text-muted-foreground">Drop chances</label>
+              <Label className="mb-2 block text-xs font-medium text-muted-foreground">Drop chances</Label>
               <LootRowsEditor
                 rows={rowsFromData()}
                 onChange={handleRowsChange}
@@ -411,7 +416,7 @@ function LootGroupEditDialog(props: LootGroupEditDialogProps) {
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <label className="text-xs font-medium text-muted-foreground">requires_status</label>
+                  <Label className="text-xs font-medium text-muted-foreground">requires_status</Label>
                   <Tooltip content="Enter a campaign status ID that must be active for this loot to drop.">
                     <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
                   </Tooltip>
@@ -425,7 +430,7 @@ function LootGroupEditDialog(props: LootGroupEditDialogProps) {
               </div>
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <label className="text-xs font-medium text-muted-foreground">requires_level</label>
+                  <Label className="text-xs font-medium text-muted-foreground">requires_level</Label>
                   <Tooltip content="Specify a player level range in the form min,max for this loot to be eligible.">
                     <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
                   </Tooltip>
@@ -439,7 +444,7 @@ function LootGroupEditDialog(props: LootGroupEditDialogProps) {
               </div>
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <label className="text-xs font-medium text-muted-foreground">quantity_per_level</label>
+                  <Label className="text-xs font-medium text-muted-foreground">quantity_per_level</Label>
                   <Tooltip content="Enter a min,max pair to add scaled quantity based on player level.">
                     <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
                   </Tooltip>
@@ -453,7 +458,7 @@ function LootGroupEditDialog(props: LootGroupEditDialogProps) {
               </div>
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <label className="text-xs font-medium text-muted-foreground">Default chance</label>
+                  <Label className="text-xs font-medium text-muted-foreground">Default chance</Label>
                   <Tooltip content="loot chance used when a row has no chance of its own. Always is fixed.">
                     <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
                   </Tooltip>
@@ -471,14 +476,14 @@ function LootGroupEditDialog(props: LootGroupEditDialogProps) {
         {/* Footer: Save icon-only button with tooltip */}
         <div className="flex justify-end px-6 pb-4">
           <Tooltip content="Save Item Group">
-            <button
+            <Button
               type="button"
-              className="p-2 rounded bg-orange-500 hover:bg-orange-600 text-white shadow focus:outline-none focus:ring-2 focus:ring-orange-400"
+              className="h-auto p-2 rounded bg-orange-500 hover:bg-orange-600 text-white shadow focus:outline-none focus:ring-2 focus:ring-orange-400"
               onClick={onSave}
               aria-label="Save Item Group"
             >
               <Save className="w-5 h-5" />
-            </button>
+            </Button>
           </Tooltip>
         </div>
       </div>

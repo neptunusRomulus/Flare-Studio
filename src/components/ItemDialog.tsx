@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import Tooltip from '@/components/ui/tooltip';
 import { AlertTriangle, Apple, Book, Check, Key, Layers, Package, Sheet, Sword, X, Coins } from 'lucide-react';
 import { ITEM_ROLE_META, ITEM_ROLE_SELECTIONS } from '@/editor/itemRoles';
@@ -127,9 +128,9 @@ const ItemDialog = ({
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
             <div>
-            <label className="block text-sm font-medium mb-1">
+            <Label className="block text-sm font-medium mb-1">
               Item Name <span className="text-red-500">*</span>
-            </label>
+            </Label>
             <Input
               value={itemDialogState.name}
               onChange={(event) => onFieldChange('name', event.target.value)}
@@ -140,7 +141,7 @@ const ItemDialog = ({
 
           <div>
             <div className="flex items-center justify-between gap-4 mb-2">
-              <label className="block text-sm font-medium">Category</label>
+              <Label className="block text-sm font-medium">Category</Label>
               {selectedRoleMeta?.description ? (
                 <span className="text-xs text-muted-foreground">{selectedRoleMeta.description}</span>
               ) : null}
@@ -151,16 +152,18 @@ const ItemDialog = ({
                 const RoleIcon = getRoleIcon(roleOption.id);
                 return (
                   <Tooltip key={roleOption.id} content={roleOption.label} side="top" className="h-9 w-9 inline-flex items-center justify-center">
-                    <button
+                    <Button
                       type="button"
+                      variant="outline"
                       aria-label={roleOption.label}
                       onClick={() => {
                         onFieldChange('role', roleOption.id);
                       }}
+                      aria-pressed={isActive}
                       className={`flex aspect-square h-9 w-9 items-center justify-center rounded-md border transition-colors ${isActive ? 'border-orange-500 bg-orange-500/10 ring-1 ring-orange-500/30' : 'border-border hover:bg-muted/60'}`}
                     >
                       <RoleIcon className={`w-3.5 h-3.5 ${getCategoryIconColor(roleOption.id, isActive)}`} />
-                    </button>
+                    </Button>
                   </Tooltip>
                 );
               })}
@@ -175,16 +178,18 @@ const ItemDialog = ({
                 const RoleIcon = getRoleIcon(roleOption.id);
                 return (
                   <Tooltip key={roleOption.id} content={roleOption.label} side="top" className="h-9 w-9 inline-flex items-center justify-center">
-                    <button
+                    <Button
                       type="button"
+                      variant="outline"
                       aria-label={roleOption.label}
                       onClick={() => {
                         onFieldChange('role', roleOption.id);
                       }}
+                      aria-pressed={isActive}
                       className={`flex aspect-square h-9 w-9 items-center justify-center rounded-md border transition-colors ${isActive ? 'border-orange-500 bg-orange-500/10 ring-1 ring-orange-500/30' : 'border-border hover:bg-muted/60'}`}
                     >
                       <RoleIcon className={`w-3.5 h-3.5 ${getCategoryIconColor(roleOption.id, isActive)}`} />
-                    </button>
+                    </Button>
                   </Tooltip>
                 );
               })}

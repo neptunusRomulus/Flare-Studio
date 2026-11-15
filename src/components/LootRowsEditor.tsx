@@ -2,6 +2,7 @@ import { Plus, X } from 'lucide-react';
 import NpcAssetThumb from '@/components/NpcAssetThumb';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import Tooltip from '@/components/ui/tooltip';
 import LootChancePicker from '@/components/LootChancePicker';
 import {
@@ -67,22 +68,28 @@ const LootRowsEditor = ({ rows, onChange, items = [], summary }: Props) => {
                 className="h-8 min-w-[10rem] flex-1 font-mono text-xs"
               />
             ) : (
-              <select
-                aria-label="Loot item"
-                className={`h-8 min-w-[9rem] flex-1 rounded-md border bg-background px-2 text-xs ${missing ? 'border-red-500/50 text-red-600 dark:text-red-400' : 'border-input'}`}
-                aria-invalid={missing || undefined}
-                value={row.id}
-                onChange={(event) => update(index, { id: event.target.value, isTable: false })}
+              <Select
+                value={row.id || '__empty__'}
+                onValueChange={(value) => update(index, { id: value === '__empty__' ? '' : value, isTable: false })}
               >
-                <option value="">Item</option>
-                <option value="currency">Currency</option>
-                {items.map((item) => (
-                  <option key={item.id} value={String(item.id)}>{item.name || item.id} ({item.id})</option>
-                ))}
-                {missing && (
-                  <option value={row.id}>Missing item #{row.id}</option>
-                )}
-              </select>
+                <SelectTrigger
+                  aria-label="Loot item"
+                  aria-invalid={missing || undefined}
+                  className={`h-8 min-w-[9rem] flex-1 px-2 text-xs ${missing ? 'border-red-500/50 text-red-600 dark:text-red-400' : ''}`}
+                >
+                  <SelectValue placeholder="Item" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__empty__">Item</SelectItem>
+                  <SelectItem value="currency">Currency</SelectItem>
+                  {items.map((item) => (
+                    <SelectItem key={item.id} value={String(item.id)}>{item.name || item.id} ({item.id})</SelectItem>
+                  ))}
+                  {missing && row.id && (
+                    <SelectItem value={row.id}>Missing item #{row.id}</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
             )}
             {!row.isTable && (
               <>
@@ -109,14 +116,16 @@ const LootRowsEditor = ({ rows, onChange, items = [], summary }: Props) => {
                 </Tooltip>
               </>
             )}
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="icon"
               aria-label="Remove loot row"
-              className="text-muted-foreground hover:text-foreground"
+              className="h-auto w-auto text-muted-foreground hover:text-foreground"
               onClick={() => onChange(rows.filter((_, i) => i !== index))}
             >
               <X className="h-3.5 w-3.5" />
-            </button>
+            </Button>
           </div>
           );
         })}

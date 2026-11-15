@@ -1,4 +1,6 @@
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import * as SliderPrimitive from '@radix-ui/react-slider';
 import { Moon, Sun, Target, X, Save, Settings, Eye, History, HelpCircle, FileText } from 'lucide-react';
 import Tooltip from '@/components/ui/tooltip';
 import UndoPersistencePanel from '@/components/UndoPersistencePanel';
@@ -104,16 +106,19 @@ const EngineSettingsDialog = ({
         <div className="flex items-center gap-1 p-2 border-b border-border bg-muted/30">
           {tabs.map((tab) => (
             <Tooltip key={tab.id} content={tab.label} side="top">
-              <button
+              <Button
+                type="button"
+                variant="ghost"
+                aria-pressed={activeTab === tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`p-2 rounded-md transition-colors ${
+                className={`h-auto p-2 rounded-md transition-colors ${
                   activeTab === tab.id
-                    ? 'bg-orange-600 text-white'
+                    ? 'bg-orange-600 text-white hover:bg-orange-600 hover:text-white'
                     : 'hover:bg-muted text-muted-foreground hover:text-foreground'
                 }`}
               >
                 {tab.icon}
-              </button>
+              </Button>
             </Tooltip>
           ))}
         </div>
@@ -124,13 +129,16 @@ const EngineSettingsDialog = ({
           {activeTab === 'general' && (
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-2">Theme (Experimental)</label>
+                <Label className="block text-sm font-medium mb-2">Theme (Experimental)</Label>
                 <div className="flex items-center gap-2">
                   <span className="text-sm">Light Mode</span>
-                  <button
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    aria-pressed={isDarkMode}
                     onClick={() => setIsDarkMode(!isDarkMode)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      isDarkMode ? 'bg-orange-600' : 'bg-gray-200'
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full p-0 hover:bg-transparent transition-colors ${
+                      isDarkMode ? 'bg-orange-600 hover:bg-orange-600' : 'bg-gray-200 hover:bg-gray-200'
                     }`}
                   >
                     <span
@@ -138,7 +146,7 @@ const EngineSettingsDialog = ({
                         isDarkMode ? 'translate-x-6' : 'translate-x-1'
                       }`} />
                     <span className="sr-only">Toggle dark mode</span>
-                  </button>
+                  </Button>
                   <span className="text-sm flex items-center gap-1">
                     {isDarkMode ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
                     Dark Mode
@@ -147,17 +155,20 @@ const EngineSettingsDialog = ({
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2">Debug Mode</label>
+                <Label className="block text-sm font-medium mb-2">Debug Mode</Label>
                 <div className="flex items-center gap-2">
                   <span className="text-sm">Disabled</span>
-                  <button
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    aria-pressed={debugMode}
                     onClick={() => {
                       const next = !debugMode;
                       if (editor && editor.getDebugMode() !== next) editor.toggleDebugMode();
                       setDebugMode(next);
                     }}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      debugMode ? 'bg-orange-600' : 'bg-gray-200'
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full p-0 hover:bg-transparent transition-colors ${
+                      debugMode ? 'bg-orange-600 hover:bg-orange-600' : 'bg-gray-200 hover:bg-gray-200'
                     }`}
                   >
                     <span
@@ -165,7 +176,7 @@ const EngineSettingsDialog = ({
                         debugMode ? 'translate-x-6' : 'translate-x-1'
                       }`} />
                     <span className="sr-only">Toggle debug mode</span>
-                  </button>
+                  </Button>
                   <span className="text-sm flex items-center gap-1">
                     <Target className="w-4 h-4" />
                     Debug Tiles
@@ -177,18 +188,21 @@ const EngineSettingsDialog = ({
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2">Minimap View Mode</label>
+                <Label className="block text-sm font-medium mb-2">Minimap View Mode</Label>
                 <div className="flex items-center gap-2">
                   <span className="text-sm">Bird's-eye (Orthogonal)</span>
-                  <button
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    aria-pressed={editor?.getMinimapMode() === 'isometric'}
                     onClick={() => {
                       if (editor) {
                         editor.toggleMinimapMode();
                         setForceRender(prev => prev + 1);
                       }
                     }}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      editor?.getMinimapMode() === 'isometric' ? 'bg-orange-600' : 'bg-gray-200'
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full p-0 hover:bg-transparent transition-colors ${
+                      editor?.getMinimapMode() === 'isometric' ? 'bg-orange-600 hover:bg-orange-600' : 'bg-gray-200 hover:bg-gray-200'
                     }`}
                   >
                     <span
@@ -196,7 +210,7 @@ const EngineSettingsDialog = ({
                         editor?.getMinimapMode() === 'isometric' ? 'translate-x-6' : 'translate-x-1'
                       }`} />
                     <span className="sr-only">Toggle Minimap View Mode</span>
-                  </button>
+                  </Button>
                   <span className="text-sm">Isometric (Grid)</span>
                 </div>
                 <p className="text-xs text-gray-500 mt-1">
@@ -205,22 +219,27 @@ const EngineSettingsDialog = ({
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1">Minimap Window Size</label>
+                <Label className="block text-sm font-medium mb-1">Minimap Window Size</Label>
                 <div className="flex items-center gap-3">
-                  <input
-                    type="range"
-                    min="0.5"
-                    max="3.0"
-                    step="0.1"
-                    value={editor?.getMinimapWindowScale() || 1.0}
-                    onChange={(e) => {
+                  <SliderPrimitive.Root
+                    min={0.5}
+                    max={3.0}
+                    step={0.1}
+                    value={[editor?.getMinimapWindowScale() || 1.0]}
+                    onValueChange={(vals) => {
                       if (editor) {
-                        editor.setMinimapWindowScale(parseFloat(e.target.value));
+                        editor.setMinimapWindowScale(vals[0] ?? 1.0);
                         setForceRender(prev => prev + 1);
                       }
                     }}
-                    className="flex-1 accent-orange-600"
-                  />
+                    className="relative flex flex-1 touch-none select-none items-center h-4"
+                    aria-label="Minimap window size"
+                  >
+                    <SliderPrimitive.Track className="relative h-1 w-full grow overflow-hidden rounded-full bg-muted">
+                      <SliderPrimitive.Range className="absolute h-full bg-orange-600" />
+                    </SliderPrimitive.Track>
+                    <SliderPrimitive.Thumb className="block h-3 w-3 rounded-full border-2 border-orange-600 bg-background shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />
+                  </SliderPrimitive.Root>
                   <span className="text-xs font-mono w-10 text-right">
                     {((editor?.getMinimapWindowScale() || 1.0) * 100).toFixed(0)}%
                   </span>
@@ -255,66 +274,77 @@ const EngineSettingsDialog = ({
               <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-1 min-w-0">
-                    <label className="text-sm font-medium">Interface size</label>
+                    <Label className="text-sm font-medium">Interface size</Label>
                     <Tooltip content="Scales the whole window. Ctrl + / Ctrl - to change, Ctrl 0 to reset.">
                       <HelpCircle className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                     </Tooltip>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
-                    <button type="button" className="h-7 w-7 rounded-md border border-border text-sm hover:bg-muted" aria-label="Smaller interface" onClick={() => stepInterfaceScale(-1)}>−</button>
+                    <Button type="button" variant="outline" size="icon" className="h-7 w-7 rounded-md border border-border text-sm hover:bg-muted" aria-label="Smaller interface" onClick={() => stepInterfaceScale(-1)}>−</Button>
                     <span className="w-12 text-center text-sm tabular-nums">{interfaceScale}%</span>
-                    <button type="button" className="h-7 w-7 rounded-md border border-border text-sm hover:bg-muted" aria-label="Larger interface" onClick={() => stepInterfaceScale(1)}>+</button>
+                    <Button type="button" variant="outline" size="icon" className="h-7 w-7 rounded-md border border-border text-sm hover:bg-muted" aria-label="Larger interface" onClick={() => stepInterfaceScale(1)}>+</Button>
                     {interfaceScale !== 100 && (
-                      <button type="button" className="h-7 px-2 rounded-md text-xs text-muted-foreground hover:bg-muted" onClick={resetInterfaceScale}>Reset</button>
+                      <Button type="button" variant="ghost" className="h-7 px-2 rounded-md text-xs text-muted-foreground hover:bg-muted" onClick={resetInterfaceScale}>Reset</Button>
                     )}
                   </div>
                 </div>
-                <input
-                  type="range"
+                <SliderPrimitive.Root
                   min={75}
                   max={200}
                   step={10}
-                  value={interfaceScale}
-                  onChange={(e) => setInterfaceScale(Number(e.target.value))}
-                  className="w-full accent-primary"
+                  value={[interfaceScale]}
+                  onValueChange={(vals) => setInterfaceScale(vals[0] ?? interfaceScale)}
+                  className="relative flex w-full touch-none select-none items-center h-4"
                   aria-label="Interface size"
-                />
+                >
+                  <SliderPrimitive.Track className="relative h-1 w-full grow overflow-hidden rounded-full bg-muted">
+                    <SliderPrimitive.Range className="absolute h-full bg-primary" />
+                  </SliderPrimitive.Track>
+                  <SliderPrimitive.Thumb className="block h-3 w-3 rounded-full border-2 border-primary bg-background shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />
+                </SliderPrimitive.Root>
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-1 min-w-0">
-                    <label className="text-sm font-medium">Text size</label>
+                    <Label className="text-sm font-medium">Text size</Label>
                     <Tooltip content="Scales text only, on top of interface size.">
                       <HelpCircle className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                     </Tooltip>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
-                    <button type="button" className="h-7 w-7 rounded-md border border-border text-sm hover:bg-muted" aria-label="Smaller text" onClick={() => setTextScale(textScale - 10)}>−</button>
+                    <Button type="button" variant="outline" size="icon" className="h-7 w-7 rounded-md border border-border text-sm hover:bg-muted" aria-label="Smaller text" onClick={() => setTextScale(textScale - 10)}>−</Button>
                     <span className="w-12 text-center text-sm tabular-nums">{textScale}%</span>
-                    <button type="button" className="h-7 w-7 rounded-md border border-border text-sm hover:bg-muted" aria-label="Larger text" onClick={() => setTextScale(textScale + 10)}>+</button>
+                    <Button type="button" variant="outline" size="icon" className="h-7 w-7 rounded-md border border-border text-sm hover:bg-muted" aria-label="Larger text" onClick={() => setTextScale(textScale + 10)}>+</Button>
                   </div>
                 </div>
-                <input
-                  type="range"
+                <SliderPrimitive.Root
                   min={75}
                   max={200}
                   step={10}
-                  value={textScale}
-                  onChange={(e) => setTextScale(Number(e.target.value))}
-                  className="w-full accent-primary"
+                  value={[textScale]}
+                  onValueChange={(vals) => setTextScale(vals[0] ?? textScale)}
+                  className="relative flex w-full touch-none select-none items-center h-4"
                   aria-label="Text size"
-                />
+                >
+                  <SliderPrimitive.Track className="relative h-1 w-full grow overflow-hidden rounded-full bg-muted">
+                    <SliderPrimitive.Range className="absolute h-full bg-primary" />
+                  </SliderPrimitive.Track>
+                  <SliderPrimitive.Thumb className="block h-3 w-3 rounded-full border-2 border-primary bg-background shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />
+                </SliderPrimitive.Root>
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-2">Active GID Indicator</label>
+                <Label className="block text-sm font-medium mb-2">Active GID Indicator</Label>
                 <div className="flex items-center gap-2">
                   <span className="text-sm">Show</span>
-                  <button
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    aria-pressed={showActiveGid}
                     onClick={() => {
                       const newVal = !showActiveGid;
                       setShowActiveGid(newVal);
                     }}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      showActiveGid ? 'bg-orange-600' : 'bg-gray-200'
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full p-0 hover:bg-transparent transition-colors ${
+                      showActiveGid ? 'bg-orange-600 hover:bg-orange-600' : 'bg-gray-200 hover:bg-gray-200'
                     }`}
                   >
                     <span
@@ -322,7 +352,7 @@ const EngineSettingsDialog = ({
                         showActiveGid ? 'translate-x-6' : 'translate-x-1'
                       }`} />
                     <span className="sr-only">Toggle Active GID Indicator</span>
-                  </button>
+                  </Button>
                   <span className="text-sm">{showActiveGid ? 'Shown' : 'Hidden'}</span>
                 </div>
                 <p className="text-xs text-gray-500 mt-1">Toggle whether the Active GID badge is visible next to the hover coordinates.</p>
@@ -335,13 +365,14 @@ const EngineSettingsDialog = ({
               <p className="text-sm text-muted-foreground">
                 Engine data files including stats, the XP table, titles, loot currency, hero appearance and equipment layers.
               </p>
-              <button
+              <Button
                 type="button"
+                variant="outline"
                 className="h-8 px-3 rounded-md border border-border text-sm hover:bg-muted"
                 onClick={() => openEngineStudio('files')}
               >
                 Open engine files
-              </button>
+              </Button>
             </div>
           )}
         </div>

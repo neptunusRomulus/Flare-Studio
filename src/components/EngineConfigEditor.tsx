@@ -284,10 +284,13 @@ export function EngineConfigEditor({ initialFile }: { initialFile?: string } = {
           </div>
           <div className="flex-1 overflow-y-auto p-2 space-y-1">
             {filteredFiles.map(file => (
-              <button
+              <Button
+                type="button"
+                variant="ghost"
+                aria-pressed={activeTab === file.name}
                 key={file.name}
                 onClick={() => setActiveTab(file.name)}
-                className={`w-full text-left px-2 py-1.5 text-xs rounded transition-colors flex items-start gap-2 ${
+                className={`w-full h-auto text-left px-2 py-1.5 text-xs rounded transition-colors flex items-start gap-2 font-normal ${
                   activeTab === file.name 
                     ? 'bg-accent/20 text-accent' 
                     : 'hover:bg-accent/10 text-foreground/80'
@@ -300,7 +303,7 @@ export function EngineConfigEditor({ initialFile }: { initialFile?: string } = {
                 {hasUnsavedChanges[file.name] && (
                   <span className="w-1.5 h-1.5 rounded-full bg-accent flex-shrink-0 mt-1" />
                 )}
-              </button>
+              </Button>
             ))}
           </div>
         </div>

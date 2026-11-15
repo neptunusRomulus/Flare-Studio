@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { HelpCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import Tooltip from '@/components/ui/tooltip';
 
 type AutoSaveSettingsPanelProps = {
@@ -65,16 +68,16 @@ const AutoSaveSettingsPanel = ({
   return (
     <div className="space-y-5 pt-2">
       <div>
-        <label className="text-sm font-medium mb-3 flex items-center gap-2">
+        <Label className="text-sm font-medium mb-3 flex items-center gap-2">
           Save Interval
           <Tooltip content="How often the editor automatically saves your work">
             <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
           </Tooltip>
-        </label>
+        </Label>
         
         <div className="space-y-3">
           <div className="flex items-center gap-3">
-            <input
+            <Input
               type="number"
               value={localInterval}
               onChange={handleIntervalChange}
@@ -82,7 +85,7 @@ const AutoSaveSettingsPanel = ({
               min={1000}
               max={60000}
               step={500}
-              className="w-24 px-2 py-1 border border-border rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              className="h-8 w-24 px-2 py-1 border border-border rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             />
             <span className="text-sm text-muted-foreground">milliseconds</span>
             <span className="text-sm text-muted-foreground">
@@ -92,21 +95,24 @@ const AutoSaveSettingsPanel = ({
 
           <div className="flex flex-wrap gap-2">
             {presetIntervals.map(preset => (
-              <button
+              <Button
+                type="button"
+                variant="ghost"
                 key={preset.value}
                 onClick={() => {
                   setLocalInterval(preset.value);
                   onIntervalChange(preset.value);
                 }}
                 disabled={!autoSaveEnabled}
-                className={`px-3 py-1 text-xs border border-border rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                aria-pressed={localInterval === preset.value}
+                className={`h-auto px-3 py-1 text-xs border border-border rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                   localInterval === preset.value
-                    ? 'bg-orange-600 text-white border-orange-600'
+                    ? 'bg-orange-600 text-white border-orange-600 hover:bg-orange-600 hover:text-white'
                     : 'bg-background hover:bg-muted'
                 }`}
               >
                 {preset.label}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
@@ -117,16 +123,16 @@ const AutoSaveSettingsPanel = ({
       </div>
 
       <div>
-        <label className="text-sm font-medium mb-3 flex items-center gap-2">
+        <Label className="text-sm font-medium mb-3 flex items-center gap-2">
           Change Debounce Delay
           <Tooltip content="Waits for this duration of no changes before saving. Prevents excessive saves during rapid edits.">
             <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
           </Tooltip>
-        </label>
+        </Label>
 
         <div className="space-y-3">
           <div className="flex items-center gap-3">
-            <input
+            <Input
               type="number"
               value={localDebounce}
               onChange={handleDebounceChange}
@@ -134,7 +140,7 @@ const AutoSaveSettingsPanel = ({
               min={500}
               max={10000}
               step={100}
-              className="w-24 px-2 py-1 border border-border rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+              className="h-8 w-24 px-2 py-1 border border-border rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             />
             <span className="text-sm text-muted-foreground">milliseconds</span>
             <span className="text-sm text-muted-foreground">
@@ -144,21 +150,24 @@ const AutoSaveSettingsPanel = ({
 
           <div className="flex flex-wrap gap-2">
             {presetDebounces.map(preset => (
-              <button
+              <Button
+                type="button"
+                variant="ghost"
                 key={preset.value}
                 onClick={() => {
                   setLocalDebounce(preset.value);
                   onDebounceChange(preset.value);
                 }}
                 disabled={!autoSaveEnabled}
-                className={`px-3 py-1 text-xs border border-border rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                aria-pressed={localDebounce === preset.value}
+                className={`h-auto px-3 py-1 text-xs border border-border rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                   localDebounce === preset.value
-                    ? 'bg-orange-600 text-white border-orange-600'
+                    ? 'bg-orange-600 text-white border-orange-600 hover:bg-orange-600 hover:text-white'
                     : 'bg-background hover:bg-muted'
                 }`}
               >
                 {preset.label}
-              </button>
+              </Button>
             ))}
           </div>
         </div>

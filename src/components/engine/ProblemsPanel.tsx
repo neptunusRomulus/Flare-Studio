@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { useAppContext } from '@/context/AppContext';
 import { loadProjectRefMap } from '@/editor/studioMapRefs';
 import { findProjectProblems, openProjectProblem, type ProjectProblem } from '@/editor/projectProblems';
@@ -103,22 +104,23 @@ export default function ProblemsPanel() {
         <div className="text-xs text-muted-foreground">
           {loading ? 'Checking…' : problems.length === 0 ? 'No broken references found.' : `${problems.length} problem${problems.length === 1 ? '' : 's'}`}
         </div>
-        <button type="button" className="text-xs text-muted-foreground hover:text-foreground" onClick={() => void reload()}>Refresh</button>
+        <Button type="button" variant="ghost" className="h-auto p-0 text-xs text-muted-foreground hover:text-foreground hover:bg-transparent" onClick={() => void reload()}>Refresh</Button>
       </div>
       <div className="flex-1 overflow-y-auto">
         {problems.map((problem) => (
-          <button
+          <Button
             key={problem.id}
             type="button"
+            variant="ghost"
             onClick={() => open(problem)}
-            className="w-full text-left px-3 py-2 border-b border-border/40 hover:bg-muted/50 space-y-0.5"
+            className="w-full h-auto text-left px-3 py-2 border-b border-border/40 hover:bg-muted/50 space-y-0.5 rounded-none font-normal"
           >
             <div className="flex items-center gap-2 text-xs">
               <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wide">{KIND_LABEL[problem.kind]}</span>
               <span className="truncate">{problem.message}</span>
             </div>
             <div className="text-[11px] text-muted-foreground truncate">{problem.path}:{problem.line} {problem.key}=</div>
-          </button>
+          </Button>
         ))}
       </div>
     </div>

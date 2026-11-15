@@ -2,6 +2,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import Tooltip from '@/components/ui/tooltip';
 import type { ItemResourceSubtype, ItemRole } from '@/editor/itemRoles';
 import { Gift, HelpCircle, Package, Save, Sparkles, X } from 'lucide-react';
@@ -171,10 +172,11 @@ const VendorDialogs = (props: VendorDialogsProps) => {
                               : 'border-border bg-muted/30 hover:bg-muted/50'
                           }`}
                         >
-                          <button
+                          <Button
                             type="button"
+                            variant="ghost"
                             onClick={() => handleToggleVendorUnlockItem(entry.id, item.id)}
-                            className="flex-1 text-left"
+                            className="h-auto flex-1 text-left px-0 py-0 hover:bg-transparent"
                           >
                             <div className="flex items-center gap-2">
                               <Badge className="text-[10px] font-semibold px-2 py-0.5">
@@ -186,7 +188,7 @@ const VendorDialogs = (props: VendorDialogsProps) => {
                             <div className="text-xs text-muted-foreground mt-0.5">
                               {item.category || 'Default'} • {item.fileName}
                             </div>
-                          </button>
+                          </Button>
                           <div className="flex items-center gap-2">
                             <span className="text-xs text-muted-foreground">Qty</span>
                             <Input
@@ -257,10 +259,11 @@ const VendorDialogs = (props: VendorDialogsProps) => {
                         : 'border-border bg-muted/30 hover:bg-muted/50'
                     }`}
                   >
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
                       onClick={() => handleToggleVendorRandomItem(item.id)}
-                      className="flex-1 text-left"
+                      className="h-auto flex-1 text-left px-0 py-0 hover:bg-transparent"
                     >
                       <div className="flex items-center gap-2">
                         <Badge className="text-[10px] font-semibold px-2 py-0.5">
@@ -272,19 +275,23 @@ const VendorDialogs = (props: VendorDialogsProps) => {
                       <div className="text-xs text-muted-foreground mt-0.5">
                         {item.category || 'Default'} · {item.fileName}
                       </div>
-                    </button>
+                    </Button>
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-muted-foreground">Chance</span>
-                      <select
-                        className="h-8 text-xs border rounded px-2 bg-background"
+                      <Select
                         disabled={!selected}
                         value={entry.chance.toString()}
-                        onChange={(e) => handleVendorRandomFieldChange(item.id, 'chance', parseInt(e.target.value, 10) || 1)}
+                        onValueChange={(value) => handleVendorRandomFieldChange(item.id, 'chance', parseInt(value, 10) || 1)}
                       >
-                        {[100, 50, 25, 10, 5].map((c) => (
-                          <option key={c} value={c}>{c}</option>
-                        ))}
-                      </select>
+                        <SelectTrigger className="h-8 text-xs border rounded px-2 bg-background">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {[100, 50, 25, 10, 5].map((c) => (
+                            <SelectItem key={c} value={String(c)}>{c}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-muted-foreground">Min</span>
@@ -384,10 +391,11 @@ const VendorDialogs = (props: VendorDialogsProps) => {
                       : 'border-border bg-muted/30 hover:bg-muted/50'
                     }`}
                   >
-                    <button
+                    <Button
                       type="button"
+                      variant="ghost"
                       onClick={() => handleToggleVendorStockItem(item.id)}
-                      className="flex-1 text-left"
+                      className="h-auto flex-1 text-left px-0 py-0 hover:bg-transparent"
                     >
                       <div className="flex items-center gap-2">
                         <Badge className="text-[10px] font-semibold px-2 py-0.5">
@@ -399,7 +407,7 @@ const VendorDialogs = (props: VendorDialogsProps) => {
                       <div className="text-xs text-muted-foreground mt-0.5">
                         {item.category || 'Default'} • {item.fileName}
                       </div>
-                    </button>
+                    </Button>
                     <div className="flex items-center gap-2">
                       <span className="text-xs text-muted-foreground">Qty</span>
                       <Input

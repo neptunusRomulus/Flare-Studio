@@ -200,12 +200,12 @@ const NpcVendorSettingsDialog = ({
             <div className="px-3 pb-3 space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="flex items-center gap-2 text-sm font-medium mb-1">
+                  <Label className="flex items-center gap-2 text-sm font-medium mb-1">
                     Vendor Requires Status
                     <Tooltip content="vendor_requires_status — The player must have these statuses in order to use this NPC as a vendor.">
                       <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
                     </Tooltip>
-                  </label>
+                  </Label>
                   <Input
                     className="h-10 text-sm"
                     value={getEditingObjectProperty('vendor_requires_status', '')}
@@ -214,12 +214,12 @@ const NpcVendorSettingsDialog = ({
                   />
                 </div>
                 <div>
-                  <label className="flex items-center gap-2 text-sm font-medium mb-1">
+                  <Label className="flex items-center gap-2 text-sm font-medium mb-1">
                     Vendor Requires Not Status
                     <Tooltip content="vendor_requires_not_status — The player must not have these statuses in order to use this NPC as a vendor.">
                       <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
                     </Tooltip>
-                  </label>
+                  </Label>
                   <Input
                     className="h-10 text-sm"
                     value={getEditingObjectProperty('vendor_requires_not_status', '')}

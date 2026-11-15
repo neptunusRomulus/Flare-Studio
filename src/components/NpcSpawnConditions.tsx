@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
 import Tooltip from '@/components/ui/tooltip';
 import { STORY_FLAG_LIST_ID } from '@/editor/powers/storyFlags';
 import { HelpCircle, Plus, X } from 'lucide-react';
@@ -52,20 +54,24 @@ const polarityToggle = (
   onHaveNot: () => void,
 ) => (
   <div className="flex rounded-md border border-border overflow-hidden shrink-0">
-    <button
+    <Button
       type="button"
-      className={`h-7 px-2 text-[10px] ${have ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted/50'}`}
+      variant="ghost"
+      aria-pressed={have}
+      className={`h-7 px-2 text-[10px] rounded-none ${have ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted/50'}`}
       onClick={onHave}
     >
       Have
-    </button>
-    <button
+    </Button>
+    <Button
       type="button"
-      className={`h-7 px-2 text-[10px] border-l border-border ${!have ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted/50'}`}
+      variant="ghost"
+      aria-pressed={!have}
+      className={`h-7 px-2 text-[10px] rounded-none border-l border-border ${!have ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted/50'}`}
       onClick={onHaveNot}
     >
       Have not
-    </button>
+    </Button>
   </div>
 );
 
@@ -101,10 +107,10 @@ const NpcSpawnConditions = ({ properties, get, setProp }: Props) => {
       {activeKinds.includes('level') && (
         <div className="flex items-center gap-1.5">
           <Tooltip content="requires_level / requires_not_level — Player level range to load this NPC. Empty side = no limit.">
-            <label className="text-[10px] text-muted-foreground w-16 shrink-0 flex items-center gap-0.5">
+            <Label className="text-[10px] font-normal text-muted-foreground w-16 shrink-0 flex items-center gap-0.5">
               Level
               <HelpCircle className="w-3 h-3" />
-            </label>
+            </Label>
           </Tooltip>
           <Input
             type="number"
@@ -123,24 +129,26 @@ const NpcSpawnConditions = ({ properties, get, setProp }: Props) => {
             placeholder="Max"
             min={0}
           />
-          <button
+          <Button
             type="button"
-            className="ml-auto h-7 w-7 flex items-center justify-center rounded hover:bg-muted"
+            variant="ghost"
+            size="icon"
+            className="ml-auto h-7 w-7 flex items-center justify-center rounded hover:bg-muted p-0"
             aria-label="Remove level condition"
             onClick={() => clearKeys(setProp, ['requires_level', 'requires_not_level'])}
           >
             <X className="w-3.5 h-3.5" />
-          </button>
+          </Button>
         </div>
       )}
 
       {activeKinds.includes('currency') && (
         <div className="flex items-center gap-1.5">
           <Tooltip content="requires_currency / requires_not_currency — Player currency range to load this NPC. Empty side = no limit.">
-            <label className="text-[10px] text-muted-foreground w-16 shrink-0 flex items-center gap-0.5">
+            <Label className="text-[10px] font-normal text-muted-foreground w-16 shrink-0 flex items-center gap-0.5">
               Currency
               <HelpCircle className="w-3 h-3" />
-            </label>
+            </Label>
           </Tooltip>
           <Input
             type="number"
@@ -159,24 +167,26 @@ const NpcSpawnConditions = ({ properties, get, setProp }: Props) => {
             placeholder="Max"
             min={0}
           />
-          <button
+          <Button
             type="button"
-            className="ml-auto h-7 w-7 flex items-center justify-center rounded hover:bg-muted"
+            variant="ghost"
+            size="icon"
+            className="ml-auto h-7 w-7 flex items-center justify-center rounded hover:bg-muted p-0"
             aria-label="Remove currency condition"
             onClick={() => clearKeys(setProp, ['requires_currency', 'requires_not_currency'])}
           >
             <X className="w-3.5 h-3.5" />
-          </button>
+          </Button>
         </div>
       )}
 
       {activeKinds.includes('status') && (
         <div className="flex items-center gap-1.5">
           <Tooltip content="requires_status / requires_not_status — Campaign statuses that must (or must not) be active.">
-            <label className="text-[10px] text-muted-foreground w-16 shrink-0 flex items-center gap-0.5">
+            <Label className="text-[10px] font-normal text-muted-foreground w-16 shrink-0 flex items-center gap-0.5">
               Status
               <HelpCircle className="w-3 h-3" />
-            </label>
+            </Label>
           </Tooltip>
           {polarityToggle(
             statusHave,
@@ -198,24 +208,26 @@ const NpcSpawnConditions = ({ properties, get, setProp }: Props) => {
             placeholder="e.g. quest_started"
             list={STORY_FLAG_LIST_ID}
           />
-          <button
+          <Button
             type="button"
-            className="h-7 w-7 flex items-center justify-center rounded hover:bg-muted"
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 flex items-center justify-center rounded hover:bg-muted p-0"
             aria-label="Remove status condition"
             onClick={() => clearKeys(setProp, ['requires_status', 'requires_not_status'])}
           >
             <X className="w-3.5 h-3.5" />
-          </button>
+          </Button>
         </div>
       )}
 
       {activeKinds.includes('item') && (
         <div className="flex items-center gap-1.5">
           <Tooltip content="requires_item / requires_not_item — Item that must (or must not) be in the player inventory.">
-            <label className="text-[10px] text-muted-foreground w-16 shrink-0 flex items-center gap-0.5">
+            <Label className="text-[10px] font-normal text-muted-foreground w-16 shrink-0 flex items-center gap-0.5">
               Item
               <HelpCircle className="w-3 h-3" />
-            </label>
+            </Label>
           </Tooltip>
           {polarityToggle(
             itemHave,
@@ -248,24 +260,26 @@ const NpcSpawnConditions = ({ properties, get, setProp }: Props) => {
             placeholder="Qty"
             min={1}
           />
-          <button
+          <Button
             type="button"
-            className="h-7 w-7 flex items-center justify-center rounded hover:bg-muted"
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 flex items-center justify-center rounded hover:bg-muted p-0"
             aria-label="Remove item condition"
             onClick={() => clearKeys(setProp, ['requires_item', 'requires_item_quantity', 'requires_not_item', 'requires_not_item_quantity'])}
           >
             <X className="w-3.5 h-3.5" />
-          </button>
+          </Button>
         </div>
       )}
 
       {activeKinds.includes('class') && (
         <div className="flex items-center gap-1.5">
           <Tooltip content="requires_class / requires_not_class — Player base class that must (or must not) match.">
-            <label className="text-[10px] text-muted-foreground w-16 shrink-0 flex items-center gap-0.5">
+            <Label className="text-[10px] font-normal text-muted-foreground w-16 shrink-0 flex items-center gap-0.5">
               Class
               <HelpCircle className="w-3 h-3" />
-            </label>
+            </Label>
           </Tooltip>
           {polarityToggle(
             classHave,
@@ -286,38 +300,42 @@ const NpcSpawnConditions = ({ properties, get, setProp }: Props) => {
             onChange={(e) => setProp(classHave ? 'requires_class' : 'requires_not_class', e.target.value)}
             placeholder="e.g. warrior"
           />
-          <button
+          <Button
             type="button"
-            className="h-7 w-7 flex items-center justify-center rounded hover:bg-muted"
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 flex items-center justify-center rounded hover:bg-muted p-0"
             aria-label="Remove class condition"
             onClick={() => clearKeys(setProp, ['requires_class', 'requires_not_class'])}
           >
             <X className="w-3.5 h-3.5" />
-          </button>
+          </Button>
         </div>
       )}
 
       {available.length > 0 && (
         <div className="relative">
-          <button
+          <Button
             type="button"
+            variant="outline"
             className="h-7 px-2 text-xs rounded-md border border-dashed border-border text-muted-foreground hover:bg-muted/50 hover:text-foreground inline-flex items-center gap-1"
             onClick={() => setMenuOpen((v) => !v)}
           >
             <Plus className="w-3.5 h-3.5" />
             Add condition
-          </button>
+          </Button>
           {menuOpen && (
             <div className="absolute z-20 mt-1 min-w-[8rem] rounded-md border border-border bg-background shadow-md py-1">
               {available.map((kind) => (
-                <button
+                <Button
                   key={kind}
                   type="button"
-                  className="w-full px-3 py-1.5 text-left text-xs hover:bg-muted"
+                  variant="ghost"
+                  className="h-auto w-full px-3 py-1.5 text-left text-xs hover:bg-muted rounded-none"
                   onClick={() => addKind(kind)}
                 >
                   {KIND_LABEL[kind]}
-                </button>
+                </Button>
               ))}
             </div>
           )}

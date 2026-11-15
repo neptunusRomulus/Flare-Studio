@@ -1,5 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import Tooltip from '@/components/ui/tooltip';
 import { HelpCircle, Plus, X } from 'lucide-react';
 import { parseSectionProperty, sectionsFromNpcText, type KeyValue } from '@/utils/npcFileUpdate';
@@ -91,19 +94,20 @@ const NpcAdvancedSection = ({
               <Input className="h-7 text-xs font-mono flex-1" value={entry.value} placeholder="Value"
                 onChange={(e) => writeStats(stats.map((s, j) => (j === i ? { ...s, value: e.target.value } : s)))} />
             </Tooltip>
-            <button type="button" className="h-7 w-7 shrink-0 flex items-center justify-center rounded hover:bg-muted" onClick={() => writeStats(stats.filter((_, j) => j !== i))} aria-label="Remove stat">
+            <Button type="button" variant="ghost" size="icon" className="h-7 w-7 shrink-0 flex items-center justify-center rounded hover:bg-muted p-0" onClick={() => writeStats(stats.filter((_, j) => j !== i))} aria-label="Remove stat">
               <X className="w-3.5 h-3.5" />
-            </button>
+            </Button>
           </div>
         ))}
-        <button
+        <Button
           type="button"
+          variant="outline"
           className="h-7 px-2 text-xs rounded-md border border-dashed border-border text-muted-foreground hover:bg-muted/50 hover:text-foreground inline-flex items-center gap-1"
           onClick={() => writeStats([...stats, { key: '', value: '' }])}
         >
           <Plus className="w-3.5 h-3.5" />
           Add stat
-        </button>
+        </Button>
       </div>
 
       <div className="space-y-2">
@@ -124,33 +128,36 @@ const NpcAdvancedSection = ({
                 const on = raw ? raw === 'true' || raw === '1' : def;
                 return (
                   <Tooltip key={f.key} content={`${f.key}: ${f.tooltip}`}>
-                    <label className="inline-flex items-center gap-1.5">
-                      <input type="checkbox" className="h-3.5 w-3.5" checked={on}
-                        onChange={(e) => writeVfx(effects.map((x, j) => (j === i ? setValue(x, f.key, e.target.checked === def ? '' : String(e.target.checked)) : x)))} />
+                    <Label className="inline-flex items-center gap-1.5 font-normal">
+                      <Checkbox className="h-3.5 w-3.5" checked={on}
+                        onCheckedChange={(checked) => writeVfx(effects.map((x, j) => (j === i ? setValue(x, f.key, (checked === true) === def ? '' : String(checked === true)) : x)))} />
                       {f.key === 'render_above' ? 'Above NPC' : 'Automatic'}
-                    </label>
+                    </Label>
                   </Tooltip>
                 );
               })}
-              <button
+              <Button
                 type="button"
-                className="ml-auto h-6 w-6 flex items-center justify-center rounded hover:bg-muted"
+                variant="ghost"
+                size="icon"
+                className="ml-auto h-6 w-6 flex items-center justify-center rounded hover:bg-muted p-0"
                 onClick={() => writeVfx(effects.filter((_, j) => j !== i))}
                 aria-label="Remove visual effect"
               >
                 <X className="w-3.5 h-3.5" />
-              </button>
+              </Button>
             </div>
           </div>
         ))}
-        <button
+        <Button
           type="button"
+          variant="outline"
           className="h-7 px-2 text-xs rounded-md border border-dashed border-border text-muted-foreground hover:bg-muted/50 hover:text-foreground inline-flex items-center gap-1"
           onClick={() => writeVfx([...effects, [{ key: 'id', value: `effect_${effects.length + 1}` }]])}
         >
           <Plus className="w-3.5 h-3.5" />
           Add effect
-        </button>
+        </Button>
       </div>
     </div>
   );
@@ -159,16 +166,17 @@ const NpcAdvancedSection = ({
 
   return (
     <div className="border border-border rounded-md bg-muted/20">
-      <button
+      <Button
         type="button"
+        variant="ghost"
         onClick={() => setExpanded(!expanded)}
-        className="w-full px-3 py-2 flex items-center gap-2 text-sm font-semibold hover:bg-muted/50 rounded-t-md text-left"
+        className="h-auto w-full px-3 py-2 flex items-center gap-2 text-sm font-semibold hover:bg-muted/50 rounded-t-md text-left"
       >
         <span>Stats &amp; Effects</span>
         <Tooltip content="[stats] and [visual_effect] sections from the NPC file.">
           <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
         </Tooltip>
-      </button>
+      </Button>
       {expanded && body}
     </div>
   );

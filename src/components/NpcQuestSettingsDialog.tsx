@@ -243,12 +243,12 @@ const NpcQuestSettingsDialog = ({
   };
 
   const fieldLabel = (label: string, tooltip: string) => (
-    <label className="flex items-center gap-1 text-sm font-medium mb-1">
+    <Label className="flex items-center gap-1 text-sm font-medium mb-1">
       {label}
       <Tooltip content={tooltip}>
         <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
       </Tooltip>
-    </label>
+    </Label>
   );
 
   const frame = (

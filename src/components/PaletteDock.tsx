@@ -4,7 +4,7 @@ import { clampPanelWidth, PALETTE_PANEL_DEFAULT, PALETTE_PANEL_KEY } from '@/com
 
 type Props = React.ComponentProps<typeof TilesetPanel> & { open: boolean; content?: React.ReactNode; header?: React.ReactNode; footer?: React.ReactNode };
 
-export const DOCK_ANIM_MS = 200; // matches left sidebar (duration-200)
+export const DOCK_ANIM_MS = 220;
 
 function prefersReducedMotion(): boolean {
   try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; }
@@ -77,10 +77,10 @@ const PaletteDock: React.FC<Props> = ({ open, content, header, footer, ...props 
       aria-hidden={!open}
     >
     <aside
-      className="relative h-full min-h-0 border-l border-border bg-muted/30 flex flex-col"
+      className="relative ml-auto h-full min-h-0 border-l border-border bg-muted/30 flex flex-col"
       style={{
         width,
-        transform: shown ? 'translateX(0)' : 'translateX(24px)',
+        transform: shown ? 'translateX(0)' : 'translateX(100%)',
         opacity: shown ? 1 : 0,
         transition: ms ? `transform ${ms}ms ${ease}, opacity ${ms}ms ${ease}` : 'none',
       }}

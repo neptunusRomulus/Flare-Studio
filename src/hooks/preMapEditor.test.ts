@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { shouldCreatePreMapEditor, shouldShowPanels } from './preMapEditor';
+import { shouldCreatePreMapEditor, shouldShowPanels, shouldShowRightSidebar } from './preMapEditor';
 
 const base = { hasEditor: false, canvasMounted: true, showWelcome: false, isOpeningProject: false, hasPendingMapConfig: false, mapInitialized: false, projectPath: '/p' };
 
@@ -18,5 +18,9 @@ describe('pre-map editor', () => {
   it('panels show once the pre-map editor exists', () => {
     expect(shouldShowPanels({ hasMap: false, hasEditor: false, projectPath: '/p' })).toBe(false);
     expect(shouldShowPanels({ hasMap: false, hasEditor: true, projectPath: '/p' })).toBe(true);
+  });
+  it('hides the right sidebar until a map is open', () => {
+    expect(shouldShowRightSidebar({ hasMap: false })).toBe(false);
+    expect(shouldShowRightSidebar({ hasMap: true })).toBe(true);
   });
 });

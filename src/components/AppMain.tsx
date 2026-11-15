@@ -12,7 +12,7 @@ import DockFooter from '@/components/DockFooter';
 import AppControls from '@/components/AppControls';
 import SidebarGameSettingsArea from '@/components/SidebarGameSettingsArea';
 import PaletteDock from '@/components/PaletteDock';
-import { shouldShowPanels } from '@/hooks/preMapEditor';
+import { shouldShowPanels, shouldShowRightSidebar } from '@/hooks/preMapEditor';
 import EngineSettingsDialog from '@/components/EngineSettingsDialog';
 import EngineStudioWindows from '@/components/engine/EngineStudioWindows';
 import MapSettingsDialog from '@/components/MapSettingsDialog';
@@ -216,7 +216,7 @@ export default function AppMain() {
     onBeforeLaunch: flareEngineSave,
   });
 
-  // Sidebars + palette dock are available as soon as a project's editor exists, even before the first map.
+  // Left-side panels are available as soon as a project's editor exists, even before the first map.
   const templateProjectPath: string | null = controls?.currentProjectPath ?? null;
   const showPanels = shouldShowPanels({ hasMap, hasEditor: !!editor, projectPath: templateProjectPath });
 
@@ -358,7 +358,7 @@ export default function AppMain() {
           {...tileset}
           mapLayers={layersObj?.layers}
           onSelectLayer={layersObj?.handleSetActiveLayer}
-          open={showPanels}
+          open={shouldShowRightSidebar({ hasMap })}
           layerVisibility={layerVisibility}
           header={<MainLayerSwitch layers={layersObj?.layers ?? []} activeLayer={tileset.activeLayer} onSelectLayer={layersObj?.handleSetActiveLayer ?? (() => {})} />}
           footer={<DockFooter exportStatus={exportStatus} />}

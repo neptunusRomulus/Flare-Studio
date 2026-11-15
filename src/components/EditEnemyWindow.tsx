@@ -3,8 +3,12 @@ import { createPortal } from 'react-dom';
 import Tooltip from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import * as SliderPrimitive from '@radix-ui/react-slider';
 import { Sword, HelpCircle, X, Save, Plus, FolderOpen, Shield, Footprints, Swords, Feather } from 'lucide-react';
 import NameField from '@/components/NameField';
 import NpcAssetThumb from '@/components/NpcAssetThumb';
@@ -188,21 +192,21 @@ const enemyPropertyTooltips: Record<string, string> = {
 };
 
 const LabelWithTooltip = ({ field, children, className }: { field: string; children: React.ReactNode; className?: string }) => (
-  <label className={`text-xs text-muted-foreground flex items-center gap-1 ${className || ''}`}>
+  <Label className={`text-xs text-muted-foreground font-normal flex items-center gap-1 ${className || ''}`}>
     {children}
     {enemyPropertyTooltips[field] ? (
       <Tooltip content={enemyPropertyTooltips[field]} side="top">
         <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
       </Tooltip>
     ) : null}
-  </label>
+  </Label>
 );
 
 const MoreToggle = ({ open, onToggle, children }: { open: boolean; onToggle: () => void; children: React.ReactNode }) => (
   <div className="space-y-2">
-    <button type="button" className="text-[10px] text-muted-foreground underline underline-offset-2" onClick={onToggle}>
+    <Button type="button" variant="ghost" className="h-auto p-0 text-[10px] text-muted-foreground underline underline-offset-2 hover:bg-transparent hover:text-muted-foreground" onClick={onToggle}>
       {open ? 'Less' : 'More'}
-    </button>
+    </Button>
     {open ? children : null}
   </div>
 );
@@ -215,15 +219,15 @@ const EditorSection = ({ title, children }: { title: string; children: React.Rea
 );
 
 const Flag = ({ checked, onChange, label, tip }: { checked: boolean; onChange: (on: boolean) => void; label: string; tip?: string }) => (
-  <label className="flex items-center gap-2 cursor-pointer">
-    <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="h-3.5 w-3.5 rounded border-border" />
+  <Label className="flex items-center gap-2 cursor-pointer font-normal">
+    <Checkbox checked={checked} onCheckedChange={(value) => onChange(value === true)} className="h-3.5 w-3.5" />
     <span className="text-xs">{label}</span>
     {tip ? (
       <Tooltip content={tip} side="top">
         <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
       </Tooltip>
     ) : null}
-  </label>
+  </Label>
 );
 
 export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, projectPath = '', inline = false, showCloseConfirm = false, onCloseDecision }: EditEnemyWindowProps) {
@@ -1161,27 +1165,35 @@ const [name, setName] = useState(() => enemy?.name || '');
               <div>
                 <div className="flex justify-between text-[11px] mb-0.5">
                   {STRENGTH_TIERS.map((tier) => (
-                    <button
+                    <Button
                       key={tier}
                       type="button"
-                      className={`font-medium ${strength === tier ? TIER_COLOR[tier] : 'text-muted-foreground/50'}`}
+                      variant="ghost"
+                      className={`h-auto p-0 font-medium hover:bg-transparent ${strength === tier ? TIER_COLOR[tier] : 'text-muted-foreground/50'}`}
                       onClick={() => applyStrength(tier)}
                     >
                       {strengthLabel(tier)}
-                    </button>
+                    </Button>
                   ))}
                 </div>
                 <Tooltip content="Sets HP, attack, defense and XP together. You can still edit those numbers by hand.">
-                  <input
-                    type="range"
+                  <SliderPrimitive.Root
                     aria-label="Enemy strength"
                     min={0}
                     max={2}
                     step={1}
-                    value={strength ? STRENGTH_TIERS.indexOf(strength) : 1}
-                    className="w-full h-1 accent-orange-500 cursor-pointer"
-                    onChange={(e) => applyStrength(STRENGTH_TIERS[Number(e.target.value)])}
-                  />
+                    value={[strength ? STRENGTH_TIERS.indexOf(strength) : 1]}
+                    onValueChange={(vals) => applyStrength(STRENGTH_TIERS[vals[0] ?? 1])}
+                    className="relative flex w-full touch-none select-none items-center h-4 cursor-pointer"
+                  >
+                    <SliderPrimitive.Track className="relative h-1 w-full grow overflow-hidden rounded-full bg-muted">
+                      <SliderPrimitive.Range className="absolute h-full bg-orange-500" />
+                    </SliderPrimitive.Track>
+                    <SliderPrimitive.Thumb
+                      aria-label="Enemy strength"
+                      className="block h-3 w-3 rounded-full border-2 border-orange-500 bg-background shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    />
+                  </SliderPrimitive.Root>
                 </Tooltip>
                 <div className="text-[10px] text-muted-foreground mt-1">
                   HP {hp || '—'} · Atk {dmgMeleeMax || attack || '—'} · Def {absorbMax || defense || '—'} · XP {xp || '—'}
@@ -1211,16 +1223,16 @@ const [name, setName] = useState(() => enemy?.name || '');
             </div>
           </div>
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground flex items-center gap-1">
+            <Label className="text-xs text-muted-foreground font-normal flex items-center gap-1">
               Categories
-            </label>
+            </Label>
             <div className="flex flex-wrap gap-1.5">
               {selectedCategories.map((cat) => (
                 <Badge key={cat} variant="secondary" className="pl-2 pr-1 h-6 gap-1 bg-background border-border/50">
                   {cat}
-                  <button type="button" onClick={() => toggleCategory(cat)} className="hover:text-red-500 transition-colors" aria-label={`Remove ${cat}`}>
+                  <Button type="button" variant="ghost" size="icon" onClick={() => toggleCategory(cat)} className="h-auto w-auto p-0 hover:bg-transparent hover:text-red-500 transition-colors" aria-label={`Remove ${cat}`}>
                     <X className="w-3 h-3" />
-                  </button>
+                  </Button>
                 </Badge>
               ))}
               {isAddingCategory ? (
@@ -1237,10 +1249,10 @@ const [name, setName] = useState(() => enemy?.name || '');
             </div>
           </div>
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground flex items-center gap-1">
+            <Label className="text-xs text-muted-foreground font-normal flex items-center gap-1">
               Shared file
               <Tooltip content={enemyPropertyTooltips.include}><HelpCircle className="w-3 h-3" /></Tooltip>
-            </label>
+            </Label>
             <div className="space-y-1.5">
               {includes.map((path, index) => (
                 <div key={index} className="flex items-center gap-1">
@@ -1362,14 +1374,16 @@ const [name, setName] = useState(() => enemy?.name || '');
               ['Ranged', isRanged, setIsRanged],
               ['Caster', isCaster, setIsCaster],
             ] as const).map(([label, on, set]) => (
-              <button
+              <Button
                 key={label}
                 type="button"
-                className={`h-7 px-2 rounded-md border text-xs ${on ? 'border-orange-500 bg-muted/40' : 'border-border bg-muted/20'}`}
+                variant="ghost"
+                className={`h-7 px-2 rounded-md border text-xs hover:bg-muted/40 ${on ? 'border-orange-500 bg-muted/40' : 'border-border bg-muted/20'}`}
                 onClick={() => set(!on)}
+                aria-pressed={on}
               >
                 {label}
-              </button>
+              </Button>
             ))}
           </div>
           <div className="grid grid-cols-4 gap-2">
@@ -1454,9 +1468,9 @@ const [name, setName] = useState(() => enemy?.name || '');
                     setPowers(next);
                   }} className={`${inputCls} w-16 text-center`} />
                   <span className="text-[10px] text-muted-foreground">%</span>
-                  <button type="button" aria-label="Remove power" className="text-muted-foreground hover:text-foreground" onClick={() => { setPowersList(''); setPowers((prev) => prev.filter((_, i) => i !== index)); }}>
+                  <Button type="button" variant="ghost" size="icon" aria-label="Remove power" className="h-auto w-auto p-0 text-muted-foreground hover:text-foreground hover:bg-transparent" onClick={() => { setPowersList(''); setPowers((prev) => prev.filter((_, i) => i !== index)); }}>
                     <X className="h-3.5 w-3.5" />
-                  </button>
+                  </Button>
                 </div>
               ))}
             </div>
@@ -1468,9 +1482,9 @@ const [name, setName] = useState(() => enemy?.name || '');
                 ['Boss', isBoss, setIsBoss],
                 ['Passive', isPassive, setIsPassive],
               ] as const).map(([label, on, set]) => (
-                <button key={label} type="button" className={`h-7 px-2 rounded-md border text-xs ${on ? 'border-orange-500 bg-muted/40' : 'border-border bg-muted/20'}`} onClick={() => set(!on)}>
+                <Button key={label} type="button" variant="ghost" className={`h-7 px-2 rounded-md border text-xs hover:bg-muted/40 ${on ? 'border-orange-500 bg-muted/40' : 'border-border bg-muted/20'}`} onClick={() => set(!on)} aria-pressed={on}>
                   {label}
-                </button>
+                </Button>
               ))}
             </div>
             <div className="grid grid-cols-3 gap-2">
@@ -1535,18 +1549,20 @@ const [name, setName] = useState(() => enemy?.name || '');
               const Icon = BEHAVIOR_ICONS[id];
               const active = behaviorPreset === id;
               return (
-                <button
+                <Button
                   key={id}
                   type="button"
+                  variant="ghost"
                   onClick={() => applyBehavior(id)}
-                  className={`min-w-0 rounded-md border px-2 py-1.5 text-left ${active ? 'border-orange-500 bg-muted/40' : 'border-border bg-muted/20'}`}
+                  className={`h-auto min-w-0 rounded-md border px-2 py-1.5 text-left hover:bg-muted/40 ${active ? 'border-orange-500 bg-muted/40' : 'border-border bg-muted/20'}`}
+                  aria-pressed={active}
                 >
                   <div className="flex items-center gap-1.5">
                     <Icon className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                     <span className="text-sm font-medium leading-none truncate">{meta.label}</span>
                   </div>
-                  <div className="h-3.5 mt-1 text-[10px] leading-[14px] text-muted-foreground truncate">{meta.hint}</div>
-                </button>
+                  <div className="h-3.5 mt-1 text-[10px] leading-[14px] text-muted-foreground truncate font-normal">{meta.hint}</div>
+                </Button>
               );
             })}
           </div>
@@ -1672,11 +1688,11 @@ const [name, setName] = useState(() => enemy?.name || '');
                 <Input value={script} onChange={(e) => setScript(e.target.value)} className={`${inputCls} font-mono`} />
               </div>
               <div className="space-y-1">
-                <label className="text-xs text-muted-foreground">Raw properties</label>
-                <textarea
+                <Label className="text-xs text-muted-foreground font-normal">Raw properties</Label>
+                <Textarea
                   value={customPropsRaw}
                   onChange={(e) => setCustomPropsRaw(e.target.value)}
-                  className="min-h-[8rem] w-full bg-muted/10 border border-border rounded-md p-2 font-mono text-xs focus:ring-1 focus:ring-orange-500 outline-none resize-y"
+                  className="min-h-[8rem] w-full bg-muted/10 border border-border rounded-md p-2 font-mono text-xs focus-visible:ring-1 focus-visible:ring-orange-500 focus-visible:ring-offset-0 outline-none resize-y"
                   placeholder="KEY=VALUE"
                 />
                 <p className="text-[10px] text-muted-foreground">Keys not covered above. Written as they are.</p>
@@ -1730,12 +1746,16 @@ const [name, setName] = useState(() => enemy?.name || '');
           <Sword className="w-5 h-5 text-orange-500" />
           {name && <Badge variant="outline" className="bg-muted/30">{name}</Badge>}
         </div>
-        <button
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label="Close"
           onClick={() => onOpenChange?.(false)}
-          className="text-muted-foreground hover:text-foreground transition-colors"
+          className="h-auto w-auto p-0 text-muted-foreground hover:text-foreground hover:bg-transparent transition-colors"
         >
           <X className="w-4 h-4" />
-        </button>
+        </Button>
       </div>
 
       <div className="flex-1 overflow-hidden flex flex-col">

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import Tooltip from '@/components/ui/tooltip';
 import NpcAssetThumb from '@/components/NpcAssetThumb';
 import { HelpCircle, X } from 'lucide-react';
@@ -165,14 +166,16 @@ const NpcVendorShelves = ({ properties, itemsList, updateProperty }: Props) => {
                       {vendorPriceText(prices)}
                     </span>
                   </Tooltip>
-                  <button
+                  <Button
                     type="button"
-                    className="h-6 w-6 shrink-0 flex items-center justify-center rounded hover:bg-muted"
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 shrink-0"
                     aria-label={`Remove ${item.id}`}
                     onClick={() => removeItem(shelf, item.id)}
                   >
                     <X className="w-3.5 h-3.5" />
-                  </button>
+                  </Button>
                 </div>
               );
             })}

@@ -1,5 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Tooltip from '@/components/ui/tooltip';
 import DirectionField from '@/components/DirectionField';
@@ -48,14 +51,16 @@ const CardShell = ({
         <HelpCircle className="w-3 h-3 text-muted-foreground shrink-0" />
       </div>
     </Tooltip>
-    <button
+    <Button
       type="button"
-      className="h-6 w-6 shrink-0 flex items-center justify-center rounded hover:bg-muted"
+      variant="ghost"
+      size="icon"
+      className="h-6 w-6 shrink-0"
       aria-label="Remove property"
       onClick={onRemove}
     >
       <X className="w-3.5 h-3.5" />
-    </button>
+    </Button>
   </div>
 );
 
@@ -356,14 +361,16 @@ const NpcPropertyList = ({ editingObject, get, setProp, applyPatch, projectPath 
               placeholder="npcs/base/common.txt"
               onChange={(e) => applyPatch(patchLineValue('npc_includes', card.index, e.target.value, editingObject.properties))}
             />
-            <button
+            <Button
               type="button"
-              className="h-6 w-6 shrink-0 flex items-center justify-center rounded hover:bg-muted"
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 shrink-0"
               aria-label="Choose file"
               onClick={() => { void browseInclude(card.index); }}
             >
               <FolderOpen className="w-3.5 h-3.5" />
-            </button>
+            </Button>
           </CardShell>
         );
       case 'custom_animation':
@@ -403,13 +410,14 @@ const NpcPropertyList = ({ editingObject, get, setProp, applyPatch, projectPath 
               placeholder="1200ms"
               onChange={(e) => setProp('anim_duration', e.target.value || null)}
             />
-            <button
+            <Button
               type="button"
-              className="text-[10px] text-muted-foreground underline underline-offset-2"
+              variant="link"
+              className="h-auto p-0 text-[10px] text-muted-foreground"
               onClick={() => setAnimMore((v) => !v)}
             >
               More
-            </button>
+            </Button>
             {animMore && (
               <div className="w-full flex flex-wrap items-center gap-1 pt-1">
                 <span className="text-muted-foreground">offset</span>
@@ -501,22 +509,22 @@ const NpcPropertyList = ({ editingObject, get, setProp, applyPatch, projectPath 
               placeholder="2s"
               onChange={(e) => updateEffect(card.index, 'duration', e.target.value)}
             />
-            <label className="inline-flex items-center gap-1">
-              <input
-                type="checkbox"
+            <div className="inline-flex items-center gap-1">
+              <Checkbox
+                id={`effect-automatic-${card.index}`}
                 checked={/^(true|1)$/i.test(card.values.automatic || '')}
-                onChange={(e) => updateEffect(card.index, 'automatic', e.target.checked ? 'true' : '')}
+                onCheckedChange={(checked) => updateEffect(card.index, 'automatic', checked === true ? 'true' : '')}
               />
-              automatic
-            </label>
-            <label className="inline-flex items-center gap-1">
-              <input
-                type="checkbox"
+              <Label htmlFor={`effect-automatic-${card.index}`} className="text-sm font-normal">automatic</Label>
+            </div>
+            <div className="inline-flex items-center gap-1">
+              <Checkbox
+                id={`effect-above-${card.index}`}
                 checked={!/^(false|0)$/i.test(card.values.render_above || '')}
-                onChange={(e) => updateEffect(card.index, 'render_above', e.target.checked ? 'true' : 'false')}
+                onCheckedChange={(checked) => updateEffect(card.index, 'render_above', checked === true ? 'true' : 'false')}
               />
-              above
-            </label>
+              <Label htmlFor={`effect-above-${card.index}`} className="text-sm font-normal">above</Label>
+            </div>
             <Input
               className={`${inlineInput} min-w-[6rem] max-w-[12rem] text-left`}
               value={card.values.requires_status}

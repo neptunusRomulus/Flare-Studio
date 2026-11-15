@@ -1,7 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Tooltip from '@/components/ui/tooltip';
 import { InlineConfirm } from '@/components/ui/inline-confirm';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
@@ -413,14 +416,15 @@ const NpcQuestSettingsDialog = ({
           <div className="grid grid-cols-2 gap-3">
             <div>
               {fieldLabel('Available when', 'requires_status — "Quest accepted" lets the player finish right away; "Objective complete" waits for the complete status.')}
-              <select
-                className="h-10 w-full px-3 rounded-md border border-input bg-background text-sm"
-                value={flow.turnInMode}
-                onChange={(e) => set('turnInMode', e.target.value as QuestTurnInMode)}
-              >
-                <option value="accept">Quest accepted</option>
-                <option value="complete">Objective complete</option>
-              </select>
+              <Select value={flow.turnInMode} onValueChange={(value) => set('turnInMode', value as QuestTurnInMode)}>
+                <SelectTrigger className="h-10 w-full text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="accept">Quest accepted</SelectItem>
+                  <SelectItem value="complete">Objective complete</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div>
               {fieldLabel('Complete status', 'complete_status — Status that marks the quest as complete.')}
@@ -459,16 +463,20 @@ const NpcQuestSettingsDialog = ({
           <div className="space-y-2">
             {flow.items.map((item, index) => (
               <div key={index} className="flex items-center gap-2">
-                <select
-                  className="h-9 flex-1 px-2 rounded-md border border-input bg-background text-sm"
-                  value={item.id}
-                  onChange={(e) => setItem(index, { id: e.target.value })}
+                <Select
+                  value={item.id || '__empty__'}
+                  onValueChange={(value) => setItem(index, { id: value === '__empty__' ? '' : value })}
                 >
-                  <option value="">Pick an item</option>
-                  {itemsList.map((entry) => (
-                    <option key={entry.id} value={entry.id}>{entry.name || `Item ${entry.id}`}</option>
-                  ))}
-                </select>
+                  <SelectTrigger className="h-9 flex-1 text-sm">
+                    <SelectValue placeholder="Pick an item" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__empty__">Pick an item</SelectItem>
+                    {itemsList.map((entry) => (
+                      <SelectItem key={entry.id} value={String(entry.id)}>{entry.name || `Item ${entry.id}`}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <Input
                   className="h-9 w-20 text-sm"
                   value={item.quantity}
@@ -491,33 +499,31 @@ const NpcQuestSettingsDialog = ({
             </Button>
           </div>
 
-          <label className="inline-flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              className="h-4 w-4"
+          <div className="inline-flex items-center gap-2 text-sm">
+            <Checkbox
+              id="quest-one-time-reward"
               checked={flow.oneTimeReward}
-              onChange={(e) => set('oneTimeReward', e.target.checked)}
+              onCheckedChange={(checked) => set('oneTimeReward', checked === true)}
             />
-            One-time reward
+            <Label htmlFor="quest-one-time-reward" className="text-sm font-normal">One-time reward</Label>
             <Tooltip content={`Adds a status guard (${flow.questId || 'quest'}_rewarded / complete status) so the reward cannot be claimed twice.`}>
               <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
             </Tooltip>
-          </label>
+          </div>
         </section>
 
         <section className="rounded-md border border-border p-3 space-y-3">
-          <label className="inline-flex items-center gap-2 text-sm font-medium">
-            <input
-              type="checkbox"
-              className="h-4 w-4"
+          <div className="inline-flex items-center gap-2 text-sm font-medium">
+            <Checkbox
+              id="quest-write-journal"
               checked={writeJournal}
-              onChange={(e) => setWriteJournal(e.target.checked)}
+              onCheckedChange={(checked) => setWriteJournal(checked === true)}
             />
-            Write quest log entry
+            <Label htmlFor="quest-write-journal" className="text-sm font-medium">Write quest log entry</Label>
             <Tooltip content="Creates or merges quests/<id>.txt. Accept and turn-in statuses line up with the steps. Other keys and comments stay.">
               <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
             </Tooltip>
-          </label>
+          </div>
           {writeJournal && (
             <QuestStepCards
               steps={journalSteps}

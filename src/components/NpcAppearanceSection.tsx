@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import Tooltip from '@/components/ui/tooltip';
 import { Check, ChevronDown, ChevronUp, HelpCircle, Image, Sparkles, User } from 'lucide-react';
 import { getStoredFlarePath } from '@/flare/flarePathStore';
@@ -133,20 +134,22 @@ const NpcAppearanceSection = ({
   }, [projectPath]);
 
   return (
-    <div className="space-y-3">
-      <div className="border border-border rounded-md bg-muted/20">
-        <button
-          type="button"
-          onClick={() => setLooksExpanded(!looksExpanded)}
-          className="w-full px-3 py-2 flex items-center gap-2 text-sm font-semibold hover:bg-muted/50 rounded-t-md text-left"
-        >
-          {looksExpanded ? <ChevronUp className="w-4 h-4 shrink-0" /> : <ChevronDown className="w-4 h-4 shrink-0" />}
-          <span>Appearance</span>
-          <Tooltip content="Pick a sprite from fantasycore (or the project). Custom imports still work below.">
-            <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
-          </Tooltip>
-        </button>
-        {looksExpanded && (
+    <div className="border border-border rounded-md bg-muted/20">
+      <Collapsible open={looksExpanded} onOpenChange={setLooksExpanded}>
+        <CollapsibleTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            className="w-full h-auto px-3 py-2 justify-start gap-2 text-sm font-semibold hover:bg-muted/50 rounded-t-md rounded-b-none"
+          >
+            {looksExpanded ? <ChevronUp className="w-4 h-4 shrink-0" /> : <ChevronDown className="w-4 h-4 shrink-0" />}
+            <span>Appearance</span>
+            <Tooltip content="Pick a sprite from fantasycore (or the project). Custom imports still work below.">
+              <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
+            </Tooltip>
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
           <div className="space-y-3 px-3 pb-3">
             {looks.length > 0 ? (
               <div className="grid grid-cols-4 gap-2 max-h-48 overflow-y-auto pr-1">
@@ -207,24 +210,23 @@ const NpcAppearanceSection = ({
               label="Stance direction"
               tooltip="direction — The direction to use for this NPC's stance animation. Facing on the map is set separately in Properties."
             />
-          </div>
-        )}
-      </div>
 
-      <div className="border border-border rounded-md bg-muted/20">
-        <button
-          type="button"
-          onClick={() => setPortraitsExpanded(!portraitsExpanded)}
-          className="w-full px-3 py-2 flex items-center gap-2 text-sm font-semibold hover:bg-muted/50 rounded-t-md text-left"
-        >
-          {portraitsExpanded ? <ChevronUp className="w-4 h-4 shrink-0" /> : <ChevronDown className="w-4 h-4 shrink-0" />}
-          <span>Portrait</span>
-          <Tooltip content="Dialog portrait shown when talking to this NPC.">
-            <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
-          </Tooltip>
-        </button>
-        {portraitsExpanded && (
-          <div className="space-y-3 px-3 pb-3">
+            <Collapsible open={portraitsExpanded} onOpenChange={setPortraitsExpanded}>
+              <CollapsibleTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="w-full h-auto px-0 py-1.5 justify-start gap-2 text-sm font-medium hover:bg-transparent"
+                >
+                  {portraitsExpanded ? <ChevronUp className="w-4 h-4 shrink-0" /> : <ChevronDown className="w-4 h-4 shrink-0" />}
+                  <span>Portrait</span>
+                  <Tooltip content="Dialog portrait shown when talking to this NPC.">
+                    <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
+                  </Tooltip>
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="space-y-3">
             {portraits.length > 0 ? (
               <div className="grid grid-cols-5 gap-2 max-h-40 overflow-y-auto pr-1">
                 {portraits.map((portrait) => (
@@ -262,9 +264,12 @@ const NpcAppearanceSection = ({
                 </span>
               )}
             </div>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
           </div>
-        )}
-      </div>
+        </CollapsibleContent>
+      </Collapsible>
     </div>
   );
 };

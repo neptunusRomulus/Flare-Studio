@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Button } from '@/components/ui/button';
 
 type Props = {
   imagePath: string | null | undefined;
@@ -39,16 +40,17 @@ const NpcAssetThumb = ({ imagePath, alt, className = '', selected = false, onCli
 
   if (onClick) {
     return (
-      <button
+      <Button
         type="button"
+        variant="ghost"
         title={title || alt}
         onClick={onClick}
-        className={`flex items-center justify-center overflow-hidden rounded border bg-muted/40 transition-colors ${
+        className={`h-auto p-0 flex items-center justify-center overflow-hidden rounded border bg-muted/40 ${
           selected ? 'border-orange-500 ring-1 ring-orange-500/40' : 'border-border hover:border-foreground/40'
         } ${className}`}
       >
         {body}
-      </button>
+      </Button>
     );
   }
 

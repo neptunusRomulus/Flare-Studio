@@ -1,3 +1,4 @@
+import { Button } from '@/components/ui/button';
 import { TileSizeForm } from './studio/studioEditors';
 import { openEngineStudio } from '@/components/studio/engineStudio';
 
@@ -11,10 +12,10 @@ export default function SidebarGameSettingsArea() {
       <div className="space-y-1">
         <div className="text-xs font-medium">Engine data</div>
         <div className="flex flex-col gap-1">
-          <button type="button" className="h-7 px-2 rounded border border-border text-xs text-left hover:bg-muted" onClick={() => openEngineStudio('files')}>Engine files</button>
-          <button type="button" className="h-7 px-2 rounded border border-border text-xs text-left hover:bg-muted" onClick={() => openEngineStudio('tree')}>Power tree</button>
-          <button type="button" className="h-7 px-2 rounded border border-border text-xs text-left hover:bg-muted" onClick={() => openEngineStudio('items')}>Types, qualities, sets</button>
-          <button type="button" className="h-7 px-2 rounded border border-border text-xs text-left hover:bg-muted" onClick={() => openEngineStudio('problems')}>Problems</button>
+          <Button type="button" variant="outline" className="h-7 px-2 justify-start text-xs" onClick={() => openEngineStudio('files')}>Engine files</Button>
+          <Button type="button" variant="outline" className="h-7 px-2 justify-start text-xs" onClick={() => openEngineStudio('tree')}>Power tree</Button>
+          <Button type="button" variant="outline" className="h-7 px-2 justify-start text-xs" onClick={() => openEngineStudio('items')}>Types, qualities, sets</Button>
+          <Button type="button" variant="outline" className="h-7 px-2 justify-start text-xs" onClick={() => openEngineStudio('problems')}>Problems</Button>
         </div>
       </div>
     </div>

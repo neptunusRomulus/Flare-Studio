@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Image, Pause, Play } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface AnimationPreviewProps {
   tilesetPath: string;
@@ -268,14 +269,17 @@ const AnimationPreview: React.FC<AnimationPreviewProps> = ({ tilesetPath, proper
       />
       {showControls && (
         <div className="flex items-center gap-2">
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="icon"
             onClick={() => setPlaying(p => !p)}
-            className="w-5 h-5 flex items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+            className="w-5 h-5 text-muted-foreground hover:text-foreground"
             title={playing ? 'Pause' : 'Play'}
+            aria-label={playing ? 'Pause' : 'Play'}
           >
             {playing ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
-          </button>
+          </Button>
           <span className="text-[10px] text-muted-foreground tabular-nums">
             {currentFrame + 1}/{frameCount}
           </span>

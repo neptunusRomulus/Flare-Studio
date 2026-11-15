@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { InlineConfirm } from '@/components/ui/inline-confirm';
 import SearchablePalette from '@/components/ui/searchable-palette';
@@ -281,8 +282,8 @@ const DetailRow = ({ label, tooltip, value, placeholder, needsValue = true, list
       <span className="w-24 shrink-0 truncate text-[11px] text-muted-foreground">{label}</span>
     </Tooltip>
     {needsValue ? (
-      <input
-        className="h-6 min-w-0 flex-1 rounded border-0 bg-transparent px-1 text-xs shadow-none outline-none focus:bg-background focus:ring-0"
+      <Input
+        className="h-6 min-w-0 flex-1 rounded border-0 bg-transparent px-1 text-xs shadow-none focus-visible:ring-0 focus-visible:ring-offset-0 focus:bg-background"
         value={value}
         placeholder={placeholder}
         list={list}
@@ -305,10 +306,10 @@ const TopicMeta = ({ tree, onPatch }: { tree: DialogueTree; onPatch: (next: Dial
       <Popover>
         <Tooltip content={condTip}>
           <PopoverTrigger>
-            <button type="button" className={cn('inline-flex items-center gap-0.5 rounded px-1 hover:bg-background/60', reqs.length ? 'text-amber-500' : 'text-muted-foreground/60')} aria-label="Conditions">
+            <Button type="button" variant="ghost" size="sm" className={cn('h-auto py-0 px-1 gap-0.5', reqs.length ? 'text-amber-500' : 'text-muted-foreground/60')} aria-label="Conditions">
               <ListFilter className="h-3 w-3" />
               {reqs.length > 0 && <span className="text-[10px] tabular-nums">{reqs.length}</span>}
-            </button>
+            </Button>
           </PopoverTrigger>
         </Tooltip>
         <PopoverContent className="space-y-1 text-left">
@@ -331,10 +332,10 @@ const TopicMeta = ({ tree, onPatch }: { tree: DialogueTree; onPatch: (next: Dial
       <Popover>
         <Tooltip content={effTip}>
           <PopoverTrigger>
-            <button type="button" className={cn('inline-flex items-center gap-0.5 rounded px-1 hover:bg-background/60', chips.length ? 'text-emerald-500' : 'text-muted-foreground/60')} aria-label="Effects">
+            <Button type="button" variant="ghost" size="sm" className={cn('h-auto py-0 px-1 gap-0.5', chips.length ? 'text-emerald-500' : 'text-muted-foreground/60')} aria-label="Effects">
               <Sparkles className="h-3 w-3" />
               {chips.length > 0 && <span className="text-[10px] tabular-nums">{chips.length}</span>}
-            </button>
+            </Button>
           </PopoverTrigger>
         </Tooltip>
         <PopoverContent className="space-y-1 text-left">
@@ -395,9 +396,8 @@ const TopicThread = ({
           <Tooltip content="topic — what the player picks to start this talk">
             <span className="inline-grid">
               <span aria-hidden className="invisible col-start-1 row-start-1 whitespace-pre font-medium">{tree.topic || 'Topic'}</span>
-              <input
-                size={1}
-                className="col-start-1 row-start-1 w-full min-w-0 border-0 bg-transparent p-0 text-center text-[11px] font-medium shadow-none outline-none focus:ring-0"
+              <Input
+                className="col-start-1 row-start-1 h-auto w-full min-w-0 border-0 bg-transparent p-0 text-center text-[11px] font-medium shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
                 value={tree.topic}
                 onChange={(e) => onPatch({ ...tree, topic: e.target.value })}
                 placeholder="Topic"

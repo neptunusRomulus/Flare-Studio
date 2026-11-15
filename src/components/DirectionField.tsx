@@ -1,5 +1,6 @@
 import React from 'react';
 import Tooltip from '@/components/ui/tooltip';
+import { Button } from '@/components/ui/button';
 import { ArrowUp, ArrowUpRight, ArrowRight, ArrowDownRight, ArrowDown, ArrowDownLeft, ArrowLeft, ArrowUpLeft, HelpCircle } from 'lucide-react';
 
 type DirectionFieldProps = {
@@ -51,11 +52,13 @@ const DirectionField = ({
         const isSelected = value === dir.value;
         return (
           <Tooltip key={dir.value} content={dir.facing}>
-            <button
+            <Button
               type="button"
+              variant="ghost"
               onClick={() => onChange(isSelected ? null : dir.value)}
               aria-label={dir.facing}
-              className={`flex flex-col items-center justify-center w-9 h-9 gap-0.5 rounded text-[9px] font-medium transition-colors ${
+              aria-pressed={isSelected}
+              className={`flex flex-col items-center justify-center w-9 h-9 p-0 gap-0.5 rounded text-[9px] font-medium ${
                 isSelected
                   ? 'bg-orange-500/20 text-orange-600 dark:text-orange-400 border border-orange-500/50'
                   : 'bg-muted/50 text-muted-foreground border border-transparent hover:bg-muted'
@@ -63,7 +66,7 @@ const DirectionField = ({
             >
               <Icon className="w-3.5 h-3.5" />
               <span>{dir.label}</span>
-            </button>
+            </Button>
           </Tooltip>
         );
       })}

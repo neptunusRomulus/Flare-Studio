@@ -1,5 +1,9 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Input } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
@@ -178,18 +182,21 @@ const NpcVendorSettingsDialog = ({
 
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         <div className="rounded-xl border border-border bg-muted/50 overflow-hidden">
-          <button
+          <Collapsible open={vendorRequirementsExpanded} onOpenChange={setVendorRequirementsExpanded}>
+          <CollapsibleTrigger asChild>
+          <Button
             type="button"
-            className="w-full px-3 py-3 flex items-center justify-between gap-3 text-sm font-semibold text-foreground hover:bg-transparent"
-            onClick={() => setVendorRequirementsExpanded((prev) => !prev)}
+            variant="ghost"
+            className="w-full h-auto px-3 py-3 justify-between gap-3 text-sm font-semibold text-foreground hover:bg-transparent rounded-none"
           >
             <span className="flex items-center gap-2">
               <HandCoins className="w-4 h-4 text-emerald-500" />
               Vendor Requirements
             </span>
             <ChevronDown className={`w-4 h-4 transition-transform ${vendorRequirementsExpanded ? 'rotate-180' : ''}`} />
-          </button>
-          {vendorRequirementsExpanded && (
+          </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
             <div className="px-3 pb-3 space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -222,22 +229,26 @@ const NpcVendorSettingsDialog = ({
                 </div>
               </div>
             </div>
-          )}
+                    </CollapsibleContent>
+          </Collapsible>
         </div>
 
         <div className="rounded-xl border border-border bg-muted/50 overflow-hidden">
-          <button
+          <Collapsible open={vendorStockExpanded} onOpenChange={setVendorStockExpanded}>
+          <CollapsibleTrigger asChild>
+          <Button
             type="button"
-            className="w-full px-3 py-3 flex items-center justify-between gap-3 text-sm font-semibold text-foreground hover:bg-transparent"
-            onClick={() => setVendorStockExpanded((prev) => !prev)}
+            variant="ghost"
+            className="w-full h-auto px-3 py-3 justify-between gap-3 text-sm font-semibold text-foreground hover:bg-transparent rounded-none"
           >
             <span className="flex items-center gap-2">
               <Package className="w-4 h-4 text-cyan-500" />
               Vendor Stock
             </span>
             <ChevronDown className={`w-4 h-4 transition-transform ${vendorStockExpanded ? 'rotate-180' : ''}`} />
-          </button>
-          {vendorStockExpanded && (
+          </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
             <div className="px-3 pb-3 space-y-3">
               <NpcVendorShelves
                 properties={properties}
@@ -307,22 +318,26 @@ const NpcVendorSettingsDialog = ({
                 </div>
               ))}
             </div>
-          )}
+                    </CollapsibleContent>
+          </Collapsible>
         </div>
 
         <div className="rounded-xl border border-border bg-muted/50 overflow-hidden">
-          <button
+          <Collapsible open={vendorPricingExpanded} onOpenChange={setVendorPricingExpanded}>
+          <CollapsibleTrigger asChild>
+          <Button
             type="button"
-            className="w-full px-3 py-3 flex items-center justify-between gap-3 text-sm font-semibold text-foreground hover:bg-transparent"
-            onClick={() => setVendorPricingExpanded((prev) => !prev)}
+            variant="ghost"
+            className="w-full h-auto px-3 py-3 justify-between gap-3 text-sm font-semibold text-foreground hover:bg-transparent rounded-none"
           >
             <span className="flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-violet-500" />
               Vendor Pricing
             </span>
             <ChevronDown className={`w-4 h-4 transition-transform ${vendorPricingExpanded ? 'rotate-180' : ''}`} />
-          </button>
-          {vendorPricingExpanded && (
+          </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
             <div className="px-3 pb-3 space-y-4">
               <div className="grid gap-3">
                 <div className="grid gap-2">
@@ -343,21 +358,20 @@ const NpcVendorSettingsDialog = ({
                       disabled={useGlobalVendorRatioBuy}
                       onChange={(e) => updateEditingObjectProperty('vendor_ratio_buy', e.target.value.trim() === '' ? '' : e.target.value)}
                     />
-                    <label className="inline-flex items-center gap-2 text-xs text-muted-foreground">
-                      <input
-                        type="checkbox"
+                    <div className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+                      <Checkbox
+                        id="vendor-global-buy"
                         checked={useGlobalVendorRatioBuy}
-                        onChange={(e) => {
-                          if (e.target.checked) {
+                        onCheckedChange={(checked) => {
+                          if (checked === true) {
                             updateEditingObjectProperty('vendor_ratio_buy', '');
                           } else {
                             updateEditingObjectProperty('vendor_ratio_buy', '1.0');
                           }
                         }}
-                        className="h-4 w-4 rounded border-border"
                       />
-                      Use global settings
-                    </label>
+                      <Label htmlFor="vendor-global-buy" className="text-xs font-normal text-muted-foreground">Use global settings</Label>
+                    </div>
                   </div>
                 </div>
 
@@ -379,21 +393,20 @@ const NpcVendorSettingsDialog = ({
                       disabled={useGlobalVendorRatioSell}
                       onChange={(e) => updateEditingObjectProperty('vendor_ratio_sell', e.target.value.trim() === '' ? '' : e.target.value)}
                     />
-                    <label className="inline-flex items-center gap-2 text-xs text-muted-foreground">
-                      <input
-                        type="checkbox"
+                    <div className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+                      <Checkbox
+                        id="vendor-global-sell"
                         checked={useGlobalVendorRatioSell}
-                        onChange={(e) => {
-                          if (e.target.checked) {
+                        onCheckedChange={(checked) => {
+                          if (checked === true) {
                             updateEditingObjectProperty('vendor_ratio_sell', '');
                           } else {
                             updateEditingObjectProperty('vendor_ratio_sell', '0.25');
                           }
                         }}
-                        className="h-4 w-4 rounded border-border"
                       />
-                      Use global settings
-                    </label>
+                      <Label htmlFor="vendor-global-sell" className="text-xs font-normal text-muted-foreground">Use global settings</Label>
+                    </div>
                   </div>
                 </div>
 
@@ -415,67 +428,70 @@ const NpcVendorSettingsDialog = ({
                       disabled={useGlobalVendorRatioSellOld}
                       onChange={(e) => updateEditingObjectProperty('vendor_ratio_sell_old', e.target.value.trim() === '' ? '' : e.target.value)}
                     />
-                    <label className="inline-flex items-center gap-2 text-xs text-muted-foreground">
-                      <input
-                        type="checkbox"
+                    <div className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+                      <Checkbox
+                        id="vendor-global-sell-old"
                         checked={useGlobalVendorRatioSellOld}
-                        onChange={(e) => {
-                          if (e.target.checked) {
+                        onCheckedChange={(checked) => {
+                          if (checked === true) {
                             updateEditingObjectProperty('vendor_ratio_sell_old', '');
                           } else {
                             updateEditingObjectProperty('vendor_ratio_sell_old', '0.0');
                           }
                         }}
-                        className="h-4 w-4 rounded border-border"
                       />
-                      Use global settings
-                    </label>
+                      <Label htmlFor="vendor-global-sell-old" className="text-xs font-normal text-muted-foreground">Use global settings</Label>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          )}
+                    </CollapsibleContent>
+          </Collapsible>
         </div>
 
         <div className="rounded-xl border border-border bg-muted/50 overflow-hidden">
-          <button
+          <Collapsible open={vendorCraftExpanded} onOpenChange={setVendorCraftExpanded}>
+          <CollapsibleTrigger asChild>
+          <Button
             type="button"
-            className="w-full px-3 py-3 flex items-center justify-between gap-3 text-sm font-semibold text-foreground hover:bg-transparent"
-            onClick={() => setVendorCraftExpanded((prev) => !prev)}
+            variant="ghost"
+            className="w-full h-auto px-3 py-3 justify-between gap-3 text-sm font-semibold text-foreground hover:bg-transparent rounded-none"
           >
             <span className="flex items-center gap-2">
               <Hammer className="w-4 h-4 text-amber-500" />
               Crafting &amp; Tabs
             </span>
             <ChevronDown className={`w-4 h-4 transition-transform ${vendorCraftExpanded ? 'rotate-180' : ''}`} />
-          </button>
-          {vendorCraftExpanded && (
+          </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
             <div className="px-3 pb-3 space-y-3">
               <div className="flex flex-wrap items-center gap-4 text-xs">
                 {(['buy', 'sell', 'craft'] as VendorTab[]).map((tab) => (
-                  <label key={tab} className="inline-flex items-center gap-1.5 capitalize">
-                    <input
-                      type="checkbox"
+                  <div key={tab} className="inline-flex items-center gap-1.5 capitalize">
+                    <Checkbox
+                      id={`vendor-tab-${tab}`}
                       className="h-3.5 w-3.5"
                       checked={vendorTabs[tab]}
-                      onChange={(e) => updateEditingObjectProperty('vendor_tab_enabled', formatVendorTabs({ ...vendorTabs, [tab]: e.target.checked }))}
+                      onCheckedChange={(checked) => updateEditingObjectProperty('vendor_tab_enabled', formatVendorTabs({ ...vendorTabs, [tab]: checked === true }))}
                     />
-                    {tab}
-                  </label>
+                    <Label htmlFor={`vendor-tab-${tab}`} className="text-xs font-normal capitalize">{tab}</Label>
+                  </div>
                 ))}
                 <Tooltip content="vendor_tab_enabled — Buy and Sell are on by default, Craft is off.">
                   <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
                 </Tooltip>
                 {(['vendor_gamble_buy', 'vendor_gamble_craft'] as const).map((key) => (
-                  <label key={key} className="inline-flex items-center gap-1.5">
-                    <input
-                      type="checkbox"
+                  <div key={key} className="inline-flex items-center gap-1.5">
+                    <Checkbox
+                      id={key}
                       className="h-3.5 w-3.5"
                       checked={getEditingObjectProperty(key, '') === 'true'}
-                      onChange={(e) => updateEditingObjectProperty(key, e.target.checked ? 'true' : '')}
+                      onCheckedChange={(checked) => updateEditingObjectProperty(key, checked === true ? 'true' : '')}
                     />
-                    {key === 'vendor_gamble_buy' ? 'Gamble Buy' : 'Gamble Craft'}
-                  </label>
+                    <Label htmlFor={key} className="text-xs font-normal">{key === 'vendor_gamble_buy' ? 'Gamble Buy' : 'Gamble Craft'}</Label>
+                  </div>
                 ))}
                 <Tooltip content="vendor_gamble_buy / vendor_gamble_craft — Hide damage, absorb and bonuses of randomized items on that tab until purchase.">
                   <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
@@ -490,9 +506,9 @@ const NpcVendorSettingsDialog = ({
                     </Tooltip>
                   </span>
                   {field.multiline ? (
-                    <textarea
+                    <Textarea
                       rows={2}
-                      className="w-full rounded-md border border-border bg-background px-2 py-1 text-xs font-mono resize-y"
+                      className="min-h-0 px-2 py-1 text-xs font-mono resize-y"
                       value={getEditingObjectProperty(field.key, '')}
                       placeholder={field.placeholder}
                       onChange={(e) => updateEditingObjectProperty(field.key, e.target.value)}
@@ -508,7 +524,8 @@ const NpcVendorSettingsDialog = ({
                 </div>
               ))}
             </div>
-          )}
+                    </CollapsibleContent>
+          </Collapsible>
         </div>
       </div>
 

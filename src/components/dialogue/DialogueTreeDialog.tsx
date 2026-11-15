@@ -1,8 +1,11 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Input } from '@/components/ui/input';
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem, SelectGroup, SelectLabel } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { AlignLeft, ArrowLeft, ArrowRight, ChevronDown, ChevronUp, Coins, Eye, EyeOff, Fingerprint, Gift, HelpCircle, Image, Link2, MessageSquare, Package, Plus, Save, Shield, Sparkles, Tag, User, Volume2, X, Zap } from 'lucide-react';
 import Tooltip from '@/components/ui/tooltip';
@@ -23,6 +26,22 @@ import { otherMoment, type RoleMoment } from '@/editor/roleMoments';
 function generateDialogueId(): string {
   return 'dlg_' + Math.random().toString(36).substring(2, 6);
 }
+
+const ViewModeToggle = ({ value, onChange }: { value: 'chat' | 'list' | 'board'; onChange: (value: 'chat' | 'list' | 'board') => void }) => (
+  <ToggleGroup
+    type="single"
+    value={value}
+    onValueChange={(next) => { if (next) onChange(next as 'chat' | 'list' | 'board'); }}
+    variant="outline"
+    size="sm"
+    className="justify-start"
+  >
+    <ToggleGroupItem value="chat" className="h-auto px-1.5 py-0.5 text-[10px] data-[state=on]:bg-muted data-[state=on]:font-semibold">Chat</ToggleGroupItem>
+    <ToggleGroupItem value="list" className="h-auto px-1.5 py-0.5 text-[10px] data-[state=on]:bg-muted data-[state=on]:font-semibold">List</ToggleGroupItem>
+    <ToggleGroupItem value="board" className="h-auto px-1.5 py-0.5 text-[10px] data-[state=on]:bg-muted data-[state=on]:font-semibold">Board</ToggleGroupItem>
+  </ToggleGroup>
+);
+
 
 /** Requirement type config for labels/placeholders */
 const REQ_CONFIG: Record<DialogueRequirement['type'], { label: string; placeholder: string }> = {
@@ -90,7 +109,7 @@ const BranchingPanel: React.FC<{
       {incomingLinks.length > 0 && (
         <div className="space-y-1">
           {incomingLinks.map((link, i) => (
-            <button
+            <Button variant="ghost" size="sm"
               key={`in-${i}`}
               type="button"
               onClick={() => onNavigate(link.fromIdx)}
@@ -100,14 +119,14 @@ const BranchingPanel: React.FC<{
               <span className="text-blue-500 font-medium truncate">{link.fromTopic}</span>
               <ArrowRight className="w-2.5 h-2.5 text-muted-foreground shrink-0" />
               <span className="text-muted-foreground truncate">this</span>
-            </button>
+            </Button>
           ))}
         </div>
       )}
       {outgoingLinks.length > 0 && (
         <div className="space-y-1">
           {outgoingLinks.map((link, i) => (
-            <button
+            <Button variant="ghost" size="sm"
               key={`out-${i}`}
               type="button"
               onClick={() => onNavigate(link.toIdx)}
@@ -117,7 +136,7 @@ const BranchingPanel: React.FC<{
               <ArrowRight className="w-2.5 h-2.5 text-emerald-400 shrink-0" />
               <span className="text-emerald-500 font-medium truncate">{link.toTopic}</span>
               <span className="text-muted-foreground/60 ml-auto text-[10px] shrink-0">{link.toDialogueId}</span>
-            </button>
+            </Button>
           ))}
         </div>
       )}
@@ -540,11 +559,7 @@ const DialogueTreeDialog = ({
       {viewMode === 'chat' ? (
         <div className="flex-1 flex flex-col min-h-0 min-w-0 gap-2">
           <div className="flex justify-end">
-            <div className="flex rounded-md border border-border overflow-hidden">
-              <button type="button" className="px-1.5 py-0.5 text-[10px] bg-muted font-semibold" onClick={() => setViewMode('chat')}>Chat</button>
-              <button type="button" className="px-1.5 py-0.5 text-[10px] text-muted-foreground hover:bg-muted" onClick={() => setViewMode('list')}>List</button>
-              <button type="button" className="px-1.5 py-0.5 text-[10px] text-muted-foreground hover:bg-muted" onClick={() => setViewMode('board')}>Board</button>
-            </div>
+            <ViewModeToggle value={viewMode} onChange={setViewMode} />
           </div>
           <MomentChatView
             trees={dialogueTrees}
@@ -582,34 +597,12 @@ const DialogueTreeDialog = ({
           <span className="text-[10px] uppercase tracking-wide text-muted-foreground">
             {(visibleIndexSet ? visibleIndexSet.size : dialogueTrees.length)} topics{boardWarnings > 0 ? ` · ${boardWarnings} warnings` : ''}
           </span>
-          <div className="flex rounded-md border border-border overflow-hidden">
-            <button
-              type="button"
-              className="px-1.5 py-0.5 text-[10px] text-muted-foreground hover:bg-muted"
-              onClick={() => setViewMode('chat')}
-            >
-              Chat
-            </button>
-            <button
-              type="button"
-              className={`px-1.5 py-0.5 text-[10px] ${viewMode === 'list' ? 'bg-muted font-semibold' : 'text-muted-foreground hover:bg-muted'}`}
-              onClick={() => setViewMode('list')}
-            >
-              List
-            </button>
-            <button
-              type="button"
-              className={`px-1.5 py-0.5 text-[10px] ${viewMode === 'board' ? 'bg-muted font-semibold' : 'text-muted-foreground hover:bg-muted'}`}
-              onClick={() => setViewMode('board')}
-            >
-              Board
-            </button>
-          </div>
+          <ViewModeToggle value={viewMode} onChange={setViewMode} />
         </div>
         {viewMode === 'board' && (
           <div className="flex-1 space-y-1.5 overflow-y-auto minimal-scroll pr-0.5">
             {board.map((card) => (
-              <button
+              <Button variant="ghost" size="sm"
                 key={`board-${card.index}`}
                 type="button"
                 onClick={() => {
@@ -656,7 +649,7 @@ const DialogueTreeDialog = ({
                 {card.orphan && (
                   <div className="text-[9px] text-muted-foreground mt-1">Not linked from another topic</div>
                 )}
-              </button>
+              </Button>
             ))}
           </div>
         )}
@@ -668,7 +661,7 @@ const DialogueTreeDialog = ({
             const isResponseOnly = tree.responseOnly;
             const isResponseTarget = dialogueTrees.some(t => (t.responses || []).includes(tree.dialogueId));
             return (
-            <button
+            <Button variant="ghost" size="sm"
               key={tree.id}
               type="button"
               onContextMenu={(e) => {
@@ -705,7 +698,7 @@ const DialogueTreeDialog = ({
                     )}
                   </div>
                 </div>
-            </button>
+            </Button>
             );
           })}
         <Button
@@ -722,7 +715,7 @@ const DialogueTreeDialog = ({
             <div className="mt-1 rounded-md border border-border bg-background">
               {DIALOGUE_RECIPES.map((recipe) => (
                 <Tooltip key={recipe.id} content={recipe.description}>
-                  <button
+                  <Button variant="ghost" size="sm"
                     type="button"
                     className="w-full px-2.5 py-1.5 text-left text-xs hover:bg-muted"
                     onClick={() => {
@@ -738,7 +731,7 @@ const DialogueTreeDialog = ({
                     }}
                   >
                     {recipe.label}
-                  </button>
+                  </Button>
                 </Tooltip>
               ))}
             </div>
@@ -853,7 +846,7 @@ const DialogueTreeDialog = ({
                     </InlineConfirm>
                   </div>
                 ) : (
-                  <button
+                  <Button variant="ghost" size="sm"
                     type="button"
                     onClick={() => {
                       setEditingIdIndex(activeDialogueTab);
@@ -864,7 +857,7 @@ const DialogueTreeDialog = ({
                     title={activeTree.dialogueId || 'No ID'}
                   >
                     {activeTree.dialogueId || '—'}
-                  </button>
+                  </Button>
                 )}
               </div>
             </div>
@@ -910,7 +903,7 @@ const DialogueTreeDialog = ({
 
             {/* Response Links (outgoing) */}
             <div className="border rounded-md">
-              <button
+              <Button variant="ghost" size="sm"
                 type="button"
                 onClick={() => updateTree(activeDialogueTab, { _respExpanded: !((activeTree as any)._respExpanded) } as any)}
                 className="w-full px-3 py-2 flex items-center gap-2 text-sm font-medium hover:bg-muted/50 rounded-t-md"
@@ -922,7 +915,7 @@ const DialogueTreeDialog = ({
                 {(activeTree as any)._respExpanded
                   ? <ChevronUp className="w-4 h-4" />
                   : <ChevronDown className="w-4 h-4" />}
-              </button>
+              </Button>
               {(activeTree as any)._respExpanded && (
                 <div className="px-3 pb-3 space-y-2">
                   <Tooltip content="After the lines above, these appear as the player's clickable choices.">
@@ -931,24 +924,28 @@ const DialogueTreeDialog = ({
                   {(activeTree.responses || []).map((respId, respIndex) => (
                     <div key={respIndex} className="flex gap-2 items-center bg-blue-500/5 border-l-2 border-l-blue-500/50 rounded-md p-2">
                       <ArrowRight className="w-3 h-3 text-blue-400 shrink-0" />
-                      <select
-                        value={respId}
-                        onChange={(e) => {
+                      <Select
+                        value={respId || '__empty__'}
+                        onValueChange={(value) => {
                           const newResponses = [...(activeTree.responses || [])];
-                          newResponses[respIndex] = e.target.value;
+                          newResponses[respIndex] = value === '__empty__' ? '' : value;
                           updateTree(activeDialogueTab, { responses: newResponses });
                         }}
-                        className="h-7 px-2 rounded border text-[11px] bg-background cursor-pointer flex-1"
                       >
-                        <option value="">Select target...</option>
-                        {allDialogueIds
-                          .filter(t => t.index !== activeDialogueTab)
-                          .map(t => (
-                            <option key={t.dialogueId} value={t.dialogueId}>
-                              {t.topic || `Dialogue ${t.index + 1}`} ({t.dialogueId})
-                            </option>
-                          ))}
-                      </select>
+                        <SelectTrigger className="h-7 px-2 rounded border text-[11px] bg-background cursor-pointer flex-1">
+                          <SelectValue placeholder="Select target..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__empty__">Select target...</SelectItem>
+                          {allDialogueIds
+                            .filter(t => t.index !== activeDialogueTab)
+                            .map(t => (
+                              <SelectItem key={t.dialogueId} value={t.dialogueId}>
+                                {t.topic || `Dialogue ${t.index + 1}`} ({t.dialogueId})
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -986,7 +983,7 @@ const DialogueTreeDialog = ({
             
             {/* Requirements - Expandable */}
             <div className="border rounded-md">
-              <button
+              <Button variant="ghost" size="sm"
                 type="button"
                 onClick={() => updateTree(activeDialogueTab, { _reqExpanded: !activeTree._reqExpanded })}
                 className="w-full px-3 py-2 flex items-center gap-2 text-sm font-medium hover:bg-muted/50 rounded-t-md"
@@ -998,7 +995,7 @@ const DialogueTreeDialog = ({
                 {activeTree._reqExpanded 
                   ? <ChevronUp className="w-4 h-4" /> 
                   : <ChevronDown className="w-4 h-4" />}
-              </button>
+              </Button>
               {activeTree._reqExpanded && (
                 <div className="px-3 pb-3 space-y-2">
                   {activeTree.requirements.length === 0 && (
@@ -1010,42 +1007,52 @@ const DialogueTreeDialog = ({
                     const config = REQ_CONFIG[req.type] || REQ_CONFIG.status;
                     return (
                       <div key={req.id} className="flex gap-2 items-center bg-muted/30 rounded-md p-2">
-                        <select
+                        <Select
                           value={req.type}
-                          onChange={(e) => {
+                          onValueChange={(value) => {
                             const newTrees = [...dialogueTrees];
                             const newReqs = [...newTrees[activeDialogueTab].requirements];
-                            newReqs[reqIndex] = { ...newReqs[reqIndex], type: e.target.value as DialogueRequirement['type'], value: '' };
+                            newReqs[reqIndex] = { ...newReqs[reqIndex], type: value as DialogueRequirement['type'], value: '' };
                             newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], requirements: newReqs };
                             setDialogueTrees(newTrees);
                           }}
-                          className="h-8 px-2 py-1 rounded border text-[11px] bg-background cursor-pointer hover:border-primary/50 transition-colors min-w-[130px]"
                         >
-                          <optgroup label="Status">
-                            <option value="status">Has Status</option>
-                            <option value="not_status">Missing Status</option>
-                          </optgroup>
-                          <optgroup label="Items">
-                            <option value="item">Has Item</option>
-                            <option value="not_item">Has Not Item</option>
-                          </optgroup>
-                          <optgroup label="Level">
-                            <option value="level">Min Level</option>
-                            <option value="not_level">Max Level</option>
-                          </optgroup>
-                          <optgroup label="Currency">
-                            <option value="currency">Min Currency</option>
-                            <option value="not_currency">Max Currency</option>
-                          </optgroup>
-                          <optgroup label="Class">
-                            <option value="class">Has Class</option>
-                            <option value="not_class">Has Not Class</option>
-                          </optgroup>
-                          <optgroup label="Map">
-                            <option value="tile">Has Tile</option>
-                            <option value="not_tile">Has Not Tile</option>
-                          </optgroup>
-                        </select>
+                          <SelectTrigger className="h-8 px-2 py-1 rounded border text-[11px] bg-background cursor-pointer hover:border-primary/50 transition-colors min-w-[130px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectGroup>
+                              <SelectLabel>Status</SelectLabel>
+                              <SelectItem value="status">Has Status</SelectItem>
+                              <SelectItem value="not_status">Missing Status</SelectItem>
+                            </SelectGroup>
+                            <SelectGroup>
+                              <SelectLabel>Items</SelectLabel>
+                              <SelectItem value="item">Has Item</SelectItem>
+                              <SelectItem value="not_item">Has Not Item</SelectItem>
+                            </SelectGroup>
+                            <SelectGroup>
+                              <SelectLabel>Level</SelectLabel>
+                              <SelectItem value="level">Min Level</SelectItem>
+                              <SelectItem value="not_level">Max Level</SelectItem>
+                            </SelectGroup>
+                            <SelectGroup>
+                              <SelectLabel>Currency</SelectLabel>
+                              <SelectItem value="currency">Min Currency</SelectItem>
+                              <SelectItem value="not_currency">Max Currency</SelectItem>
+                            </SelectGroup>
+                            <SelectGroup>
+                              <SelectLabel>Class</SelectLabel>
+                              <SelectItem value="class">Has Class</SelectItem>
+                              <SelectItem value="not_class">Has Not Class</SelectItem>
+                            </SelectGroup>
+                            <SelectGroup>
+                              <SelectLabel>Map</SelectLabel>
+                              <SelectItem value="tile">Has Tile</SelectItem>
+                              <SelectItem value="not_tile">Has Not Tile</SelectItem>
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
                         <Input
                           value={req.value}
                           onChange={(e) => {
@@ -1097,7 +1104,7 @@ const DialogueTreeDialog = ({
             
             {/* Dialogues - Expandable */}
             <div className="border rounded-md">
-              <button
+              <Button variant="ghost" size="sm"
                 type="button"
                 onClick={() => updateTree(activeDialogueTab, { _dlgExpanded: !activeTree._dlgExpanded })}
                 className="w-full px-3 py-2 flex items-center gap-2 text-sm font-medium hover:bg-muted/50 rounded-t-md"
@@ -1109,14 +1116,14 @@ const DialogueTreeDialog = ({
                 {activeTree._dlgExpanded 
                   ? <ChevronUp className="w-4 h-4" /> 
                   : <ChevronDown className="w-4 h-4" />}
-              </button>
+              </Button>
               {activeTree._dlgExpanded && (
                 <div className="px-3 pb-3 space-y-2">
                   {activeTree.dialogues.map((dlg, dlgIndex) => (
                     <div key={dlg.id} className="space-y-1">
                       <div className="flex gap-2 items-start">
                         <Tooltip content="Click to cycle: NPC (him=), NPC (her=), Player (you=). him and her behave the same in Flare.">
-                        <button
+                        <Button variant="ghost" size="sm"
                           type="button"
                           onClick={() => {
                             const newTrees = [...dialogueTrees];
@@ -1136,7 +1143,7 @@ const DialogueTreeDialog = ({
                           }`}
                         >
                           {dlg.speaker === 'npc' ? (dlg.key === 'her' ? 'NPC·her' : 'NPC') : 'Player'}
-                        </button>
+                        </Button>
                         </Tooltip>
                         <Input
                           value={dlg.text}
@@ -1183,7 +1190,7 @@ const DialogueTreeDialog = ({
                           </div>
                           <div className="flex items-center gap-1 flex-1">
                             <Tooltip content="Portrait side: NPC (portrait_him/her) or Player (portrait_you). Applies from this line on.">
-                              <button
+                              <Button variant="ghost" size="sm"
                                 type="button"
                                 className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground hover:text-foreground shrink-0"
                                 onClick={() => {
@@ -1198,7 +1205,7 @@ const DialogueTreeDialog = ({
                               >
                                 <Image className="w-3 h-3" />
                                 {(dlg.portraitKey || (dlg.speaker === 'player' ? 'portrait_you' : 'portrait_him')) === 'portrait_you' ? 'You' : 'NPC'}
-                              </button>
+                              </Button>
                             </Tooltip>
                             <Input
                               value={dlg.portrait || ''}
@@ -1229,7 +1236,7 @@ const DialogueTreeDialog = ({
                           </Button>
                         </div>
                       ) : (
-                        <button
+                        <Button variant="ghost" size="sm"
                           type="button"
                           className="ml-14 text-[10px] text-muted-foreground/50 hover:text-muted-foreground transition-colors"
                           onClick={() => {
@@ -1241,7 +1248,7 @@ const DialogueTreeDialog = ({
                           }}
                         >
                           + voice / portrait
-                        </button>
+                        </Button>
                       )}
                     </div>
                   ))}
@@ -1293,7 +1300,7 @@ const DialogueTreeDialog = ({
 
             {/* Rewards - Expandable */}
             <div className="border rounded-md">
-              <button
+              <Button variant="ghost" size="sm"
                 type="button"
                 onClick={() => updateTree(activeDialogueTab, { _rewExpanded: !activeTree._rewExpanded })}
                 className="w-full px-3 py-2 flex items-center gap-2 text-sm font-medium hover:bg-muted/50 rounded-t-md"
@@ -1305,7 +1312,7 @@ const DialogueTreeDialog = ({
                 {activeTree._rewExpanded 
                   ? <ChevronUp className="w-4 h-4" /> 
                   : <ChevronDown className="w-4 h-4" />}
-              </button>
+              </Button>
               {activeTree._rewExpanded && (
                 <div className="px-3 pb-3 space-y-2">
                   <Tooltip content="Items, currency, XP, or messages the player gains or loses.">
@@ -1316,26 +1323,30 @@ const DialogueTreeDialog = ({
                       rew.type === 'msg' ? 'bg-sky-500/10 border-l-2 border-l-sky-500/50' :
                       rew.type.includes('remove') ? 'bg-red-500/10 border-l-2 border-l-red-500/50' : 'bg-emerald-500/10 border-l-2 border-l-emerald-500/50'
                     }`}>
-                      <select
+                      <Select
                         value={rew.type}
-                        onChange={(e) => {
+                        onValueChange={(value) => {
                           const newTrees = [...dialogueTrees];
                           const newRews = [...(newTrees[activeDialogueTab].rewards || [])];
-                          newRews[rewIndex] = { ...newRews[rewIndex], type: e.target.value as DialogueReward['type'] };
+                          newRews[rewIndex] = { ...newRews[rewIndex], type: value as DialogueReward['type'] };
                           newTrees[activeDialogueTab] = { ...newTrees[activeDialogueTab], rewards: newRews };
                           setDialogueTrees(newTrees);
                         }}
-                        className="h-8 px-2 py-1 rounded-md border text-[11px] bg-background min-w-[110px] cursor-pointer"
                       >
-                        <option value="xp">Give XP</option>
-                        <option value="gold">Give Gold</option>
-                        <option value="item">Give Item</option>
-                        <option value="remove_gold">Take Gold</option>
-                        <option value="remove_item">Take Item</option>
-                        <option value="restore">Restore HP/MP</option>
-                        <option value="msg">Notification</option>
-                        <option value="loot">Random loot</option>
-                      </select>
+                        <SelectTrigger className="h-8 px-2 py-1 rounded-md border text-[11px] bg-background min-w-[110px] cursor-pointer">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="xp">Give XP</SelectItem>
+                          <SelectItem value="gold">Give Gold</SelectItem>
+                          <SelectItem value="item">Give Item</SelectItem>
+                          <SelectItem value="remove_gold">Take Gold</SelectItem>
+                          <SelectItem value="remove_item">Take Item</SelectItem>
+                          <SelectItem value="restore">Restore HP/MP</SelectItem>
+                          <SelectItem value="msg">Notification</SelectItem>
+                          <SelectItem value="loot">Random loot</SelectItem>
+                        </SelectContent>
+                      </Select>
                       <Input
                         value={rew.value}
                         onChange={(e) => {
@@ -1437,7 +1448,7 @@ const DialogueTreeDialog = ({
 
             {/* World Effects - Expandable (Advanced) */}
             <div className="border rounded-md">
-              <button
+              <Button variant="ghost" size="sm"
                 type="button"
                 onClick={() => updateTree(activeDialogueTab, { _wfExpanded: !activeTree._wfExpanded })}
                 className="w-full px-3 py-2 flex items-center gap-2 text-sm font-medium hover:bg-muted/50 rounded-t-md"
@@ -1450,7 +1461,7 @@ const DialogueTreeDialog = ({
                 {activeTree._wfExpanded 
                   ? <ChevronUp className="w-4 h-4" /> 
                   : <ChevronDown className="w-4 h-4" />}
-              </button>
+              </Button>
               {activeTree._wfExpanded && (
                 <div className="px-3 pb-3 space-y-2">
                   <div className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -1465,7 +1476,7 @@ const DialogueTreeDialog = ({
                   {(activeTree.worldEffects || []).map((wf, wfIndex) => (
                     <div key={wf.id || wfIndex} className="flex gap-2 items-center p-2 rounded-md bg-purple-500/10 border-l-2 border-l-purple-500/50">
                       <div className="flex flex-col shrink-0">
-                        <button
+                        <Button variant="ghost" size="sm"
                           type="button"
                           className="h-3.5 w-4 flex items-center justify-center rounded hover:bg-muted disabled:opacity-30"
                           aria-label="Move effect up"
@@ -1478,8 +1489,8 @@ const DialogueTreeDialog = ({
                           }}
                         >
                           <ChevronUp className="w-3 h-3" />
-                        </button>
-                        <button
+                        </Button>
+                        <Button variant="ghost" size="sm"
                           type="button"
                           className="h-3.5 w-4 flex items-center justify-center rounded hover:bg-muted disabled:opacity-30"
                           aria-label="Move effect down"
@@ -1492,12 +1503,12 @@ const DialogueTreeDialog = ({
                           }}
                         >
                           <ChevronDown className="w-3 h-3" />
-                        </button>
+                        </Button>
                       </div>
-                      <select
+                      <Select
                         value={wf.type}
-                        onChange={(e) => {
-                          const nextType = e.target.value as DialogueWorldEffect['type'];
+                        onValueChange={(value) => {
+                          const nextType = value as DialogueWorldEffect['type'];
                           const defaultValue =
                             nextType === 'stash' || nextType === 'save_game' || nextType === 'repeat' || nextType === 'show_on_minimap' ? 'true'
                             : nextType === 'respec' ? 'stats'
@@ -1506,16 +1517,21 @@ const DialogueTreeDialog = ({
                             : '';
                           setWorldEffect(wfIndex, { type: nextType, value: defaultValue });
                         }}
-                        className="h-8 px-2 py-1 rounded-md border text-[11px] bg-background min-w-[110px] cursor-pointer"
                       >
-                        {EFFECT_GROUPS.map((group) => (
-                          <optgroup key={group.label} label={group.label}>
-                            {group.options.map((option) => (
-                              <option key={option.value} value={option.value}>{option.label}</option>
-                            ))}
-                          </optgroup>
-                        ))}
-                      </select>
+                        <SelectTrigger className="h-8 px-2 py-1 rounded-md border text-[11px] bg-background min-w-[110px] cursor-pointer">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {EFFECT_GROUPS.map((group) => (
+                            <SelectGroup key={group.label}>
+                              <SelectLabel>{group.label}</SelectLabel>
+                              {group.options.map((option) => (
+                                <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                              ))}
+                            </SelectGroup>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       {wf.type === 'teleport' ? (
                         <div className="flex gap-2 flex-1 items-center">
                           <Select
@@ -1605,51 +1621,63 @@ const DialogueTreeDialog = ({
                         </div>
                       ) : wf.type === 'stash' ? (
                         <div className="flex gap-2 flex-1 items-center">
-                          <select
+                          <Select
                             value={wf.value === 'false' ? 'false' : 'true'}
-                            onChange={(e) => setWorldEffect(wfIndex, { value: e.target.value })}
-                            className="h-8 px-2 py-1 rounded-md border text-[11px] bg-background cursor-pointer"
+                            onValueChange={(value) => setWorldEffect(wfIndex, { value })}
                           >
-                            <option value="true">Open stash</option>
-                            <option value="false">Close stash</option>
-                          </select>
+                            <SelectTrigger className="h-8 px-2 py-1 rounded-md border text-[11px] bg-background cursor-pointer">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="true">Open stash</SelectItem>
+                              <SelectItem value="false">Close stash</SelectItem>
+                            </SelectContent>
+                          </Select>
                           <Tooltip content="stash — opens the player's stash menu during this dialog.">
                             <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
                           </Tooltip>
                         </div>
                       ) : wf.type === 'save_game' ? (
                         <div className="flex gap-2 flex-1 items-center">
-                          <select
+                          <Select
                             value={wf.value === 'true' ? 'true' : 'false'}
-                            onChange={(e) => setWorldEffect(wfIndex, { value: e.target.value })}
-                            className="h-8 px-2 py-1 rounded-md border text-[11px] bg-background cursor-pointer"
+                            onValueChange={(value) => setWorldEffect(wfIndex, { value })}
                           >
-                            <option value="true">Save game</option>
-                            <option value="false">Do not save</option>
-                          </select>
+                            <SelectTrigger className="h-8 px-2 py-1 rounded-md border text-[11px] bg-background cursor-pointer">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="true">Save game</SelectItem>
+                              <SelectItem value="false">Do not save</SelectItem>
+                            </SelectContent>
+                          </Select>
                           <Tooltip content="save_game — saves the game and sets the respawn position here.">
                             <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
                           </Tooltip>
                         </div>
                       ) : wf.type === 'respec' ? (
                         <div className="flex gap-2 flex-1 items-center">
-                          <select
+                          <Select
                             value={parseRespec(wf.value).mode}
-                            onChange={(e) => setWorldEffect(wfIndex, { value: buildRespec(e.target.value, parseRespec(wf.value).ignoreDefaults) })}
-                            className="h-8 px-2 py-1 rounded-md border text-[11px] bg-background cursor-pointer"
+                            onValueChange={(value) => setWorldEffect(wfIndex, { value: buildRespec(value, parseRespec(wf.value).ignoreDefaults) })}
                           >
-                            <option value="stats">Stats</option>
-                            <option value="powers">Powers</option>
-                            <option value="xp">XP</option>
-                          </select>
-                          <label className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
-                            <input
-                              type="checkbox"
+                            <SelectTrigger className="h-8 px-2 py-1 rounded-md border text-[11px] bg-background cursor-pointer">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="stats">Stats</SelectItem>
+                              <SelectItem value="powers">Powers</SelectItem>
+                              <SelectItem value="xp">XP</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <div className="inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                            <Checkbox
+                              id={`respec-defaults-${wfIndex}`}
                               checked={parseRespec(wf.value).ignoreDefaults}
-                              onChange={(e) => setWorldEffect(wfIndex, { value: buildRespec(parseRespec(wf.value).mode, e.target.checked) })}
+                              onCheckedChange={(checked) => setWorldEffect(wfIndex, { value: buildRespec(parseRespec(wf.value).mode, checked === true) })}
                             />
-                            Engine defaults
-                          </label>
+                            <Label htmlFor={`respec-defaults-${wfIndex}`} className="text-[10px] font-normal text-muted-foreground">Engine defaults</Label>
+                          </div>
                           <Tooltip content="respec — resets XP, stats or powers. Resetting stats also resets powers; resetting XP also resets stats.">
                             <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
                           </Tooltip>
@@ -1782,18 +1810,21 @@ const DialogueTreeDialog = ({
                             const write = (nextMode: string, list: string) => setWorldEffect(wfIndex, { value: nextMode === 'append' && list ? `${nextMode},${list}` : nextMode });
                             return (
                               <>
-                                <select
+                                <Select
                                   value={action}
-                                  onChange={(e) => write(e.target.value, rest.join(','))}
-                                  className="h-8 px-2 rounded-md border text-[11px] bg-background cursor-pointer"
-                                  aria-label="Random status action"
+                                  onValueChange={(value) => write(value, rest.join(','))}
                                 >
-                                  <option value="append">Add to pool</option>
-                                  <option value="clear">Clear pool</option>
-                                  <option value="roll">Pick one</option>
-                                  <option value="set">Set picked</option>
-                                  <option value="unset">Clear picked</option>
-                                </select>
+                                  <SelectTrigger className="h-8 px-2 rounded-md border text-[11px] bg-background cursor-pointer" aria-label="Random status action">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="append">Add to pool</SelectItem>
+                                    <SelectItem value="clear">Clear pool</SelectItem>
+                                    <SelectItem value="roll">Pick one</SelectItem>
+                                    <SelectItem value="set">Set picked</SelectItem>
+                                    <SelectItem value="unset">Clear picked</SelectItem>
+                                  </SelectContent>
+                                </Select>
                                 {action === 'append' && (
                                   <Input
                                     value={rest.join(',')}
@@ -1884,15 +1915,18 @@ const DialogueTreeDialog = ({
                               <>
                                 <Input type="number" value={path.srcX} onChange={(e) => write({ srcX: e.target.value })} placeholder="src X" className="h-7 w-16 text-xs" aria-label="Source X" />
                                 <Input type="number" value={path.srcY} onChange={(e) => write({ srcY: e.target.value })} placeholder="src Y" className="h-7 w-16 text-xs" aria-label="Source Y" />
-                                <select
+                                <Select
                                   value={path.target}
-                                  onChange={(e) => write({ target: e.target.value === 'hero' ? 'hero' : 'point' })}
-                                  className="h-8 px-2 rounded-md border text-[11px] bg-background cursor-pointer"
-                                  aria-label="Path target"
+                                  onValueChange={(value) => write({ target: value === 'hero' ? 'hero' : 'point' })}
                                 >
-                                  <option value="point">To point</option>
-                                  <option value="hero">To hero</option>
-                                </select>
+                                  <SelectTrigger className="h-8 px-2 rounded-md border text-[11px] bg-background cursor-pointer" aria-label="Path target">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="point">To point</SelectItem>
+                                    <SelectItem value="hero">To hero</SelectItem>
+                                  </SelectContent>
+                                </Select>
                                 {path.target === 'point' && (
                                   <>
                                     <Input type="number" value={path.destX} onChange={(e) => write({ destX: e.target.value })} placeholder="X" className="h-7 w-16 text-xs" aria-label="Destination X" />
@@ -1946,16 +1980,19 @@ const DialogueTreeDialog = ({
                             const write = (next: Partial<typeof level>) => setWorldEffect(wfIndex, { value: buildLevelValue(next.mode ?? level.mode, next.multiplier ?? level.multiplier, next.stat ?? level.stat) });
                             return (
                               <>
-                                <select
+                                <Select
                                   value={level.mode}
-                                  onChange={(e) => write({ mode: e.target.value })}
-                                  className="h-8 px-2 rounded-md border text-[11px] bg-background cursor-pointer"
-                                  aria-label="Level mode"
+                                  onValueChange={(value) => write({ mode: value })}
                                 >
-                                  {LEVEL_MODES.map((mode) => (
-                                    <option key={mode.value} value={mode.value}>{mode.label}</option>
-                                  ))}
-                                </select>
+                                  <SelectTrigger className="h-8 px-2 rounded-md border text-[11px] bg-background cursor-pointer" aria-label="Level mode">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {LEVEL_MODES.map((mode) => (
+                                      <SelectItem key={mode.value} value={mode.value}>{mode.label}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
                                 {level.mode !== 'default' && (
                                   <Input
                                     type="number"
@@ -2038,7 +2075,7 @@ const DialogueTreeDialog = ({
                           {filteredEffects.length === 0 ? (
                             <p className="px-3 py-2 text-xs text-muted-foreground">No matches</p>
                           ) : filteredEffects.map((option) => (
-                            <button
+                            <Button variant="ghost" size="sm"
                               key={option.value}
                               type="button"
                               className="w-full px-3 py-1.5 text-left text-xs hover:bg-muted"
@@ -2056,7 +2093,7 @@ const DialogueTreeDialog = ({
                               }}
                             >
                               {option.label}
-                            </button>
+                            </Button>
                           ))}
                         </div>
                       </div>

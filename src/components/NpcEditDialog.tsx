@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import Tooltip from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { cn } from '@/lib/utils';
 import AnimationPreview from '@/components/AnimationPreview';
 import { HelpCircle, Settings } from 'lucide-react';
 import type { MapObject } from '@/types';
@@ -106,12 +108,27 @@ const NpcEditDialog = ({
     });
   };
 
-  const setRole = (key: 'talker' | 'vendor' | 'questGiver', on: boolean) => {
+  const roleFlags = ['talker', 'questGiver', 'vendor'] as const;
+  const activeRoles = roleFlags.filter((key) => {
+    if (key === 'talker') return isTalker;
+    if (key === 'questGiver') return isQuestGiver;
+    return isVendor;
+  });
+  const setRoles = (values: string[]) => {
     const newProps = { ...(editingObject.properties || {}) };
-    if (on) newProps[key] = 'true';
-    else delete newProps[key];
+    for (const key of roleFlags) {
+      if (values.includes(key)) newProps[key] = 'true';
+      else delete newProps[key];
+    }
     setEditingObject({ ...editingObject, properties: newProps });
   };
+  const roleStateClass = (badgeClass: string) =>
+    [
+      badgeClass,
+      ...badgeClass.split(' ').map((cls) => (
+        cls.startsWith('dark:') ? `dark:data-[state=on]:${cls.slice(5)}` : `data-[state=on]:${cls}`
+      )),
+    ].join(' ');
 
   return (
     <>
@@ -150,21 +167,6 @@ const NpcEditDialog = ({
             />
           </div>
         </div>
-
-        <NpcAppearanceSection
-          projectPath={projectPath}
-          selectedAnimation={tilesetPath}
-          selectedPortrait={portraitPath}
-          stanceDirection={getEditingObjectProperty('direction', '')}
-          canUseTilesetDialog={canUseTilesetDialog}
-          hasTilesetPath={Boolean(tilesetPath)}
-          onSelectLook={applyPropertyBag}
-          onSelectPortrait={applyPropertyBag}
-          onStanceChange={(value) => updateEditingObjectProperty('direction', value)}
-          onImportTileset={() => { void handleEditingTilesetBrowse(); }}
-          onAutoDetect={() => { void handleAutoDetectAnim(); }}
-          onBrowsePortrait={() => { void handleEditingPortraitBrowse(); }}
-        />
       </section>
 
       <section className="space-y-2">
@@ -174,7 +176,14 @@ const NpcEditDialog = ({
             <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
           </Tooltip>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5">
+        <ToggleGroup
+          type="multiple"
+          variant="outline"
+          size="sm"
+          value={activeRoles}
+          onValueChange={setRoles}
+          className="flex flex-wrap items-center justify-start gap-1.5"
+        >
           {([
             {
               key: 'talker' as const,
@@ -199,16 +208,16 @@ const NpcEditDialog = ({
             },
           ]).map((role) => (
             <div key={role.key} className="inline-flex items-center gap-0.5">
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                aria-pressed={role.active}
-                className={`h-8 ${role.active ? role.badgeClass : NPC_STATIC_BADGE_CLASS}`}
-                onClick={() => setRole(role.key, !role.active)}
+              <ToggleGroupItem
+                value={role.key}
+                aria-label={role.label}
+                className={cn(
+                  'h-8',
+                  role.active ? roleStateClass(role.badgeClass) : NPC_STATIC_BADGE_CLASS,
+                )}
               >
                 {role.label}
-              </Button>
+              </ToggleGroupItem>
               <div className="h-8 w-8 shrink-0 flex items-center justify-center">
                 {role.active ? (
                   <Button
@@ -225,8 +234,23 @@ const NpcEditDialog = ({
               </div>
             </div>
           ))}
-        </div>
+        </ToggleGroup>
       </section>
+
+      <NpcAppearanceSection
+        projectPath={projectPath}
+        selectedAnimation={tilesetPath}
+        selectedPortrait={portraitPath}
+        stanceDirection={getEditingObjectProperty('direction', '')}
+        canUseTilesetDialog={canUseTilesetDialog}
+        hasTilesetPath={Boolean(tilesetPath)}
+        onSelectLook={applyPropertyBag}
+        onSelectPortrait={applyPropertyBag}
+        onStanceChange={(value) => updateEditingObjectProperty('direction', value)}
+        onImportTileset={() => { void handleEditingTilesetBrowse(); }}
+        onAutoDetect={() => { void handleAutoDetectAnim(); }}
+        onBrowsePortrait={() => { void handleEditingPortraitBrowse(); }}
+      />
 
       <section className="space-y-2 border border-border rounded-md p-3 bg-muted/20">
         <div className="w-28">

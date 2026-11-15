@@ -1,6 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { GripVertical, Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Tooltip from '@/components/ui/tooltip';
 import { InlineConfirm } from '@/components/ui/inline-confirm';
 import SearchablePalette from '@/components/ui/searchable-palette';
@@ -59,22 +62,27 @@ const ConditionChip = ({
         {editing ? (
           <>
             {isItem && items.length > 0 ? (
-              <select
-                autoFocus
-                className="h-5 max-w-[9rem] bg-transparent text-[11px] outline-none"
-                value={chip.value}
-                onChange={(e) => onChange({ ...chip, value: e.target.value })}
-                onBlur={() => setEditing(false)}
+              <Select
+                value={chip.value || '__empty__'}
+                onValueChange={(value) => {
+                  onChange({ ...chip, value: value === '__empty__' ? '' : value });
+                  setEditing(false);
+                }}
               >
-                <option value="">Item</option>
-                {items.map((item) => (
-                  <option key={item.id} value={item.id}>{item.name || item.id}</option>
-                ))}
-              </select>
+                <SelectTrigger autoFocus className="h-5 max-w-[9rem] border-0 bg-transparent px-1 text-[11px] shadow-none focus:ring-0 focus:ring-offset-0">
+                  <SelectValue placeholder="Item" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__empty__">Item</SelectItem>
+                  {items.map((item) => (
+                    <SelectItem key={item.id} value={String(item.id)}>{item.name || item.id}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             ) : (
-              <input
+              <Input
                 autoFocus
-                className="h-5 w-20 bg-transparent text-[11px] outline-none"
+                className="h-5 w-20 border-0 bg-transparent px-1 text-[11px] shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
                 type={isNumber ? 'number' : 'text'}
                 value={chip.value}
                 onChange={(e) => onChange({ ...chip, value: e.target.value })}
@@ -85,8 +93,8 @@ const ConditionChip = ({
               />
             )}
             {isItem && (
-              <input
-                className="h-5 w-8 bg-transparent text-[11px] outline-none"
+              <Input
+                className="h-5 w-8 border-0 bg-transparent px-1 text-[11px] shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
                 type="number"
                 min={1}
                 value={chip.quantity || 1}
@@ -95,13 +103,13 @@ const ConditionChip = ({
             )}
           </>
         ) : (
-          <button type="button" className="text-left" onClick={() => setEditing(true)}>
+          <Button type="button" variant="ghost" className="h-auto p-0 text-left text-[11px] font-normal" onClick={() => setEditing(true)}>
             {chipLabel(chip, ctx)}
-          </button>
+          </Button>
         )}
-        <button type="button" aria-label="Remove" className="text-muted-foreground hover:text-foreground" onClick={onRemove}>
+        <Button type="button" variant="ghost" size="icon" className="h-4 w-4 text-muted-foreground hover:text-foreground" aria-label="Remove" onClick={onRemove}>
           <X className="w-3 h-3" />
-        </button>
+        </Button>
       </span>
     </Tooltip>
   );
@@ -150,9 +158,11 @@ const QuestStepCards = ({ steps, onChange, ctx, items = [], completeStatus = '',
             {...reorder.getItemDropProps(index)}
           >
             <div className="flex items-start gap-2">
-              <button
+              <Button
                 type="button"
-                className="mt-0.5 text-muted-foreground cursor-grab active:cursor-grabbing"
+                variant="ghost"
+                size="icon"
+                className="mt-0.5 h-6 w-6 text-muted-foreground cursor-grab active:cursor-grabbing"
                 aria-label="Reorder step"
                 draggable
                 onDragStart={(e) => {
@@ -162,7 +172,7 @@ const QuestStepCards = ({ steps, onChange, ctx, items = [], completeStatus = '',
                 onDragEnd={reorder.endReorder}
               >
                 <GripVertical className="w-4 h-4" />
-              </button>
+              </Button>
               <div className="flex-1 min-w-0 space-y-2">
                 <div className="flex items-center justify-between gap-2">
                   <h5 className="text-sm font-semibold truncate">{stepCardTitle(step.quest_text, index)}</h5>
@@ -175,21 +185,23 @@ const QuestStepCards = ({ steps, onChange, ctx, items = [], completeStatus = '',
                     }}
                     message="Remove this step?"
                   >
-                    <button
+                    <Button
                       type="button"
-                      className="h-6 w-6 flex items-center justify-center rounded hover:bg-muted text-muted-foreground"
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 text-muted-foreground"
                       aria-label="Remove step"
                       onClick={() => setConfirmIndex(index)}
                     >
                       <X className="w-3.5 h-3.5" />
-                    </button>
+                    </Button>
                   </InlineConfirm>
                 </div>
-                <textarea
+                <Textarea
                   value={step.quest_text}
                   onChange={(e) => updateStep(index, { ...step, quest_text: e.target.value })}
                   placeholder="Journal text"
-                  className="w-full min-h-[72px] rounded-md border border-border bg-background px-2.5 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30"
+                  className="min-h-[72px] px-2.5 py-1.5 text-sm"
                 />
                 <div className="flex flex-wrap items-center gap-1.5">
                   {chips.map((chip) => (

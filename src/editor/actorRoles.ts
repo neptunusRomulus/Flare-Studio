@@ -29,11 +29,20 @@ const ENEMY_ROLE_OPTIONS: Array<{ key: EnemyRoleKey; label: string; badgeClass: 
   { key: 'isStationary', label: 'Stationary', badgeClass: 'bg-slate-500/20 text-slate-600 dark:text-slate-400 border-slate-500/40', description: 'Immobile enemy that controls an area with ranged attacks.' }
 ];
 
+const NPC_ROLE_META_LOOKUP: Record<NpcRoleKey, { label: string; badgeClass: string; description: string }> =
+  NPC_ROLE_OPTIONS.reduce((acc, option) => {
+    acc[option.key] = option;
+    return acc;
+  }, {} as Record<NpcRoleKey, { label: string; badgeClass: string; description: string }>);
+
 const ENEMY_ROLE_META_LOOKUP: Record<EnemyRoleKey, { label: string; badgeClass: string; description: string }> =
   ENEMY_ROLE_OPTIONS.reduce((acc, option) => {
     acc[option.key] = option;
     return acc;
   }, {} as Record<EnemyRoleKey, { label: string; badgeClass: string; description: string }>);
+
+/** Same muted classes as the sidebar "Static" tag; used for an off role card. */
+const NPC_STATIC_BADGE_CLASS = 'bg-gray-500/20 text-gray-600 dark:text-gray-400 border-gray-500/30';
 
 const EMPTY_ACTOR_ROLES: Record<ActorRoleKey, boolean> = {
   isTalker: false,
@@ -49,4 +58,4 @@ const EMPTY_ACTOR_ROLES: Record<ActorRoleKey, boolean> = {
 };
 
 export type { ActorDialogState, ActorRoleKey, EnemyRoleKey, NpcRoleKey };
-export { NPC_ROLE_OPTIONS, ENEMY_ROLE_OPTIONS, ENEMY_ROLE_META_LOOKUP, EMPTY_ACTOR_ROLES };
+export { NPC_ROLE_OPTIONS, NPC_ROLE_META_LOOKUP, NPC_STATIC_BADGE_CLASS, ENEMY_ROLE_OPTIONS, ENEMY_ROLE_META_LOOKUP, EMPTY_ACTOR_ROLES };

@@ -10,7 +10,7 @@ import { entityPlacement } from '@/components/entityPlacement';
 import { AlertTriangle, Check, GripVertical, HelpCircle, Plus, User, X } from 'lucide-react';
 import type { MapObject } from '@/types';
 import { propertyRecord, propertyText } from '@/editor/propertyText';
-import { ENEMY_ROLE_META_LOOKUP } from '@/editor/actorRoles';
+import { ENEMY_ROLE_META_LOOKUP, NPC_ROLE_META_LOOKUP, NPC_STATIC_BADGE_CLASS } from '@/editor/actorRoles';
 import { checkNpcDraftName } from '@/editor/npcDraft';
 import { npcFileForActor, npcInstanceCounts, npcInstancesForFile } from '@/editor/npcInstances';
 import ElementContextMenu from '@/components/ElementContextMenu';
@@ -337,22 +337,22 @@ const SidebarActorEntries = ({
                       {isNpcLayer && (
                         <div className="flex flex-wrap gap-1 mt-1">
                           {isTalker && (
-                            <span className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-blue-500/20 text-blue-600 dark:text-blue-400 border border-blue-500/30">
-                              Talker
+                            <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium border ${NPC_ROLE_META_LOOKUP.isTalker.badgeClass}`}>
+                              {NPC_ROLE_META_LOOKUP.isTalker.label}
                             </span>
                           )}
                           {isVendor && (
-                            <span className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
-                              Vendor
+                            <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium border ${NPC_ROLE_META_LOOKUP.isVendor.badgeClass}`}>
+                              {NPC_ROLE_META_LOOKUP.isVendor.label}
                             </span>
                           )}
                           {isQuestGiver && (
-                            <span className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30">
-                              Quest
+                            <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium border ${NPC_ROLE_META_LOOKUP.isQuestGiver.badgeClass}`}>
+                              {NPC_ROLE_META_LOOKUP.isQuestGiver.label}
                             </span>
                           )}
                           {!hasNpcRole && (
-                            <span className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium bg-gray-500/20 text-gray-600 dark:text-gray-400 border border-gray-500/30">
+                            <span className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[10px] font-medium border ${NPC_STATIC_BADGE_CLASS}`}>
                               Static
                             </span>
                           )}

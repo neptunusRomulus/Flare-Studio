@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import Tooltip from '@/components/ui/tooltip';
-import { Switch } from '@/components/ui/switch';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { askConfirm } from '@/components/ui/inline-confirm';
 import AnimationPreview from '@/components/AnimationPreview';
-import { HandCoins, HelpCircle, MessagesSquare, MessageCircleQuestionMark, Settings } from 'lucide-react';
+import { HandCoins, HelpCircle, MessagesSquare, MessageCircleQuestionMark, MoreHorizontal } from 'lucide-react';
 import type { MapObject } from '@/types';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 import type { ItemSummary } from '@/utils/items';
@@ -13,13 +14,11 @@ import NpcAssetThumb from '@/components/NpcAssetThumb';
 import NpcPropertyList from '@/components/NpcPropertyList';
 import { resolveNpcPreviewPaths } from '@/flare/npcPreviewPaths';
 import { isCustomTilesetAppearance } from '@/editor/npcPropertyCards';
+import { NPC_ROLE_META_LOOKUP, NPC_STATIC_BADGE_CLASS } from '@/editor/actorRoles';
 import {
   dialogueSummary,
-  dialogueSummaryText,
   questSummary,
-  questSummaryText,
   vendorSummary,
-  vendorSummaryText,
 } from '@/editor/roleSummary';
 
 export type NpcEditDialogProps = {
@@ -65,10 +64,13 @@ const NpcEditDialog = ({
   const showAnimPreview = Boolean(customTileset && getEditingObjectProperty('anim_render_width', ''));
 
   const roleProps = editingObject?.properties as Record<string, unknown> | undefined;
+  const dialogueTopics = dialogueSummary(roleProps).topics;
+  const vendorItems = vendorSummary(roleProps).products;
+  const questName = questSummary(roleProps)?.name;
   const roleLines = {
-    dialogue: dialogueSummaryText(dialogueSummary(roleProps)),
-    vendor: vendorSummaryText(vendorSummary(roleProps)),
-    quest: questSummaryText(questSummary(roleProps)),
+    dialogue: `${dialogueTopics} topic${dialogueTopics === 1 ? '' : 's'}`,
+    vendor: `${vendorItems} item${vendorItems === 1 ? '' : 's'}`,
+    quest: questName || 'No quest',
   };
 
   useEffect(() => {
@@ -125,6 +127,15 @@ const NpcEditDialog = ({
     if (on) newProps[key] = 'true';
     else delete newProps[key];
     setEditingObject({ ...editingObject, properties: newProps });
+  };
+
+  const addRole = (key: 'talker' | 'vendor' | 'questGiver', tab: 'dialogue' | 'vendor' | 'quest') => {
+    setRole(key, true);
+    onOpenRoleCenter(tab);
+  };
+
+  const removeRole = async (key: 'talker' | 'vendor' | 'questGiver') => {
+    if (await askConfirm('Remove this role? Settings are kept.')) setRole(key, false);
   };
 
   return (
@@ -184,7 +195,7 @@ const NpcEditDialog = ({
       <section className="space-y-2">
         <div className="flex items-center gap-1">
           <h4 className="text-sm font-semibold">Roles</h4>
-          <Tooltip content="talker / vendor / questGiver — Turning a role off hides its editor but keeps the data. Turn it back on to edit again.">
+          <Tooltip content="A removed role stays in the file. Add it again to edit.">
             <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
           </Tooltip>
         </div>
@@ -194,21 +205,21 @@ const NpcEditDialog = ({
               key: 'talker' as const,
               active: isTalker,
               icon: <MessagesSquare className="w-4 h-4 shrink-0" />,
-              label: 'Talker',
+              label: 'Dialogue',
               summary: roleLines.dialogue,
-              tip: 'talker — Player can talk to this NPC. Turning off keeps dialogue data.',
-              settingsTip: 'Dialogue settings',
+              tip: 'Player can talk to this NPC.',
               tab: 'dialogue' as const,
+              badgeClass: NPC_ROLE_META_LOOKUP.isTalker.badgeClass,
             },
             {
               key: 'vendor' as const,
               active: isVendor,
               icon: <HandCoins className="w-4 h-4 shrink-0" />,
-              label: 'Vendor',
+              label: 'Shop',
               summary: roleLines.vendor,
-              tip: 'vendor — Player can buy and sell here. Turning off keeps stock and prices.',
-              settingsTip: 'Shop settings',
+              tip: 'Player can buy and sell here.',
               tab: 'vendor' as const,
+              badgeClass: NPC_ROLE_META_LOOKUP.isVendor.badgeClass,
             },
             {
               key: 'questGiver' as const,
@@ -216,45 +227,73 @@ const NpcEditDialog = ({
               icon: <MessageCircleQuestionMark className="w-4 h-4 shrink-0" />,
               label: 'Quest',
               summary: roleLines.quest,
-              tip: 'questGiver — Player can get quests here. Turning off keeps quest settings.',
-              settingsTip: 'Quest settings',
+              tip: 'Player can get quests here.',
               tab: 'quest' as const,
+              badgeClass: NPC_ROLE_META_LOOKUP.isQuestGiver.badgeClass,
             },
           ]).map((role) => (
-            <div key={role.key} className="min-w-0 rounded-md border border-border bg-muted/20 px-2 py-1.5">
-              <div className="flex items-center gap-1.5">
+            role.active ? (
+              <div
+                key={role.key}
+                className={`relative min-w-0 rounded-md border px-2 py-1.5 ${role.badgeClass}`}
+              >
                 <Tooltip content={role.tip}>
-                  <span className="text-muted-foreground">{role.icon}</span>
+                  <button
+                    type="button"
+                    className="w-full text-left pr-5"
+                    aria-label={`Open ${role.label}`}
+                    onClick={() => onOpenRoleCenter(role.tab)}
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <span className="shrink-0">{role.icon}</span>
+                      <span className="text-sm font-medium leading-none truncate">{role.label}</span>
+                    </span>
+                    <span className="block h-3.5 mt-1 text-[10px] leading-[14px] truncate opacity-80">{role.summary}</span>
+                  </button>
                 </Tooltip>
-                <span className="text-sm font-medium leading-none truncate flex-1 min-w-0">{role.label}</span>
-                <Switch
-                  checked={role.active}
-                  onCheckedChange={(on) => setRole(role.key, on)}
-                  aria-label={role.label}
-                />
-                <div className="h-6 w-6 shrink-0 flex items-center justify-center">
-                  {role.active ? (
-                    <Tooltip content={role.settingsTip}>
+                <div className="absolute top-1 right-0.5">
+                  <Popover>
+                    <PopoverTrigger>
                       <button
                         type="button"
-                        className="h-6 w-6 flex items-center justify-center rounded-md hover:bg-muted"
-                        aria-label={role.settingsTip}
-                        onClick={() => onOpenRoleCenter(role.tab)}
+                        className="h-6 w-6 flex items-center justify-center rounded-md hover:bg-black/10 dark:hover:bg-white/10"
+                        aria-label={`${role.label} menu`}
+                        onClick={(event) => event.stopPropagation()}
                       >
-                        <Settings className="w-3.5 h-3.5" />
+                        <MoreHorizontal className="w-3.5 h-3.5" />
                       </button>
-                    </Tooltip>
-                  ) : null}
+                    </PopoverTrigger>
+                    <PopoverContent align="end" className="w-36 p-1">
+                      <button
+                        type="button"
+                        className="w-full rounded-sm px-2 py-1.5 text-left text-xs hover:bg-muted"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void removeRole(role.key);
+                        }}
+                      >
+                        Remove role
+                      </button>
+                    </PopoverContent>
+                  </Popover>
                 </div>
               </div>
-              <div className="h-3.5 mt-1">
-                {role.summary ? (
-                  <Tooltip content={role.summary}>
-                    <div className="text-[10px] leading-[14px] text-muted-foreground truncate">{role.summary}</div>
-                  </Tooltip>
-                ) : null}
-              </div>
-            </div>
+            ) : (
+              <Tooltip key={role.key} content={role.tip}>
+                <button
+                  type="button"
+                  className={`min-w-0 rounded-md border px-2 py-1.5 text-left ${NPC_STATIC_BADGE_CLASS}`}
+                  aria-label={`Add ${role.label}`}
+                  onClick={() => addRole(role.key, role.tab)}
+                >
+                  <span className="flex items-center gap-1.5">
+                    <span className="shrink-0 text-muted-foreground">{role.icon}</span>
+                    <span className="text-sm font-medium leading-none truncate">{role.label}</span>
+                  </span>
+                  <span className="block h-3.5 mt-1 text-[10px] leading-[14px] truncate">+ Add</span>
+                </button>
+              </Tooltip>
+            )
           ))}
         </div>
       </section>

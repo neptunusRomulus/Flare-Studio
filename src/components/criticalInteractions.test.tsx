@@ -4,7 +4,7 @@
  *
  * Interaction tests for the riskiest Studio UI: dialogue line edit/delete
  * without shifting later lines, InlineConfirm actually confirming, NPC role
- * switches writing the engine keys, and quest step add/reorder/delete.
+ * cards writing the engine keys, and quest step add/reorder/delete.
  */
 import React, { useEffect, useState } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -14,7 +14,7 @@ import type { QuestStep } from '@/editor/questSteps';
 import type { DialogueTree, MapObject } from '@/types';
 import type { RoleMoment } from '@/editor/roleMoments';
 import MomentChatView from './dialogue/MomentChatView';
-import { InlineConfirm } from './ui/inline-confirm';
+import { InlineConfirm, InlineConfirmHost } from './ui/inline-confirm';
 import QuestStepCards from './QuestStepCards';
 import NpcEditDialog from './NpcEditDialog';
 
@@ -199,36 +199,39 @@ describe('critical UI interactions', () => {
         return typeof value === 'string' ? value : fallback;
       };
       return (
-        <NpcEditDialog
-          editingObject={obj}
-          setEditingObject={setObj}
-          updateEditingObjectProperty={(key: string, value: string | null) => {
-            setObj((prev) => {
-              const properties = { ...(prev.properties || {}) };
-              if (value === null) delete properties[key];
-              else properties[key] = value;
-              return { ...prev, properties };
-            });
-          }}
-          updateEditingObjectBoolean={() => {}}
-          getEditingObjectProperty={get}
-          editor={null}
-          canUseTilesetDialog={false}
-          handleEditingTilesetBrowse={() => {}}
-          handleEditingPortraitBrowse={() => {}}
-          handleAutoDetectAnim={() => {}}
-          onOpenRoleCenter={() => {}}
-          itemsList={[]}
-        />
+        <>
+          <InlineConfirmHost />
+          <NpcEditDialog
+            editingObject={obj}
+            setEditingObject={setObj}
+            updateEditingObjectProperty={(key: string, value: string | null) => {
+              setObj((prev) => {
+                const properties = { ...(prev.properties || {}) };
+                if (value === null) delete properties[key];
+                else properties[key] = value;
+                return { ...prev, properties };
+              });
+            }}
+            updateEditingObjectBoolean={() => {}}
+            getEditingObjectProperty={get}
+            editor={null}
+            canUseTilesetDialog={false}
+            handleEditingTilesetBrowse={() => {}}
+            handleEditingPortraitBrowse={() => {}}
+            handleAutoDetectAnim={() => {}}
+            onOpenRoleCenter={() => {}}
+            itemsList={[]}
+          />
+        </>
       );
     }
 
     render(<Harness />);
-    const vendor = screen.getByRole('switch', { name: 'Vendor' });
-    const quest = screen.getByRole('switch', { name: 'Quest' });
-    expect(vendor.getAttribute('data-state') || vendor.getAttribute('aria-checked')).toMatch(/checked|true/);
+    expect(screen.getByRole('button', { name: 'Open Shop' })).toBeTruthy();
 
-    await user.click(vendor);
+    await user.click(screen.getByRole('button', { name: 'Shop menu' }));
+    await user.click(screen.getByRole('button', { name: 'Remove role' }));
+    await user.click(screen.getByRole('button', { name: 'Confirm' }));
     await waitFor(() => {
       expect(latest.current.properties.vendor).toBeUndefined();
     });
@@ -236,7 +239,7 @@ describe('critical UI interactions', () => {
     expect(latest.current.properties.talker).toBe('true');
     expect(latest.current.properties.him).toBe('Hello');
 
-    await user.click(quest);
+    await user.click(screen.getByRole('button', { name: 'Add Quest' }));
     await waitFor(() => {
       expect(latest.current.properties.questGiver).toBe('true');
     });

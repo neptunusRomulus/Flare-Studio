@@ -8,7 +8,7 @@ import type { ItemSummary } from '@/utils/items';
 import DialogueTreeDialog from '@/components/dialogue/DialogueTreeDialog';
 import NpcVendorSettingsDialog from '@/components/NpcVendorSettingsDialog';
 import NpcQuestSettingsDialog from '@/components/NpcQuestSettingsDialog';
-import { dialogueSummary, questSummary, vendorSummary } from '@/editor/roleSummary';
+import { NPC_ROLE_META_LOOKUP } from '@/editor/actorRoles';
 import { readQuestFlowTrees } from '@/editor/questFlow';
 import {
   addCustomMoment,
@@ -47,13 +47,13 @@ type Props = {
   dirty?: boolean;
 };
 
-const tabMeta: Record<RoleCenterTab, { label: string; tone: string; Icon: React.ComponentType<{ className?: string }> }> = {
-  dialogue: { label: 'Dialogue', tone: 'text-blue-600 dark:text-blue-400 bg-blue-500/15 border-blue-500/40', Icon: MessageSquare },
-  vendor: { label: 'Shop', tone: 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/15 border-emerald-500/40', Icon: HandCoins },
-  quest: { label: 'Quest', tone: 'text-amber-600 dark:text-amber-400 bg-amber-500/15 border-amber-500/40', Icon: MessageCircleQuestionMark },
+const tabMeta: Record<RoleCenterTab, { label: string; badgeClass: string; Icon: React.ComponentType<{ className?: string }> }> = {
+  dialogue: { label: 'Dialogue', badgeClass: NPC_ROLE_META_LOOKUP.isTalker.badgeClass, Icon: MessageSquare },
+  vendor: { label: 'Shop', badgeClass: NPC_ROLE_META_LOOKUP.isVendor.badgeClass, Icon: HandCoins },
+  quest: { label: 'Quest', badgeClass: NPC_ROLE_META_LOOKUP.isQuestGiver.badgeClass, Icon: MessageCircleQuestionMark },
 };
 
-/** One window for the three NPC roles; each tab is the same editor as before, without its own frame. */
+/** One role window at a time: no tab column, only the requested role's editor. */
 const NpcRoleCenterDialog = ({
   tab,
   onTabChange,
@@ -198,13 +198,8 @@ const NpcRoleCenterDialog = ({
 
   if (!tab) return null;
 
-
+  const { label, badgeClass, Icon } = tabMeta[tab];
   const roleProps = editingObject?.properties as Record<string, unknown> | undefined;
-  const counts: Record<RoleCenterTab, string> = {
-    dialogue: `${dialogueSummary(roleProps).topics} topics`,
-    vendor: `${vendorSummary(roleProps).products} items`,
-    quest: questSummary(roleProps)?.name || 'No quest',
-  };
 
   return (
     <div
@@ -225,8 +220,11 @@ const NpcRoleCenterDialog = ({
         className="flex items-center justify-between px-4 py-3 border-b border-border cursor-move select-none"
         onMouseDown={handleHeaderMouseDown}
       >
-        <div className="flex items-center gap-2">
-          <span className="font-semibold">{editingObject?.name || 'NPC'} roles</span>
+        <div className="flex items-center gap-2 min-w-0">
+          <span className={`inline-flex items-center justify-center rounded-md border p-1 ${badgeClass}`}>
+            <Icon className="w-4 h-4" />
+          </span>
+          <span className="font-semibold truncate">{editingObject?.name || 'NPC'} · {label}</span>
         </div>
         <div className="flex items-center gap-1">
           <Button variant="ghost" size="sm" className="w-6 h-6 p-0 hover:bg-transparent" onClick={() => onTabChange(null)}>
@@ -236,29 +234,6 @@ const NpcRoleCenterDialog = ({
       </div>
 
       <div className="flex flex-1 min-h-0">
-        <div className="w-40 shrink-0 border-r border-border p-2 space-y-1">
-          {(Object.keys(tabMeta) as RoleCenterTab[]).map((key) => {
-            const { label, tone, Icon } = tabMeta[key];
-            const active = key === tab;
-            return (
-              <button
-                key={key}
-                type="button"
-                onClick={() => onTabChange(key)}
-                className={`w-full rounded-md border px-2 py-1.5 text-left transition-colors ${
-                  active ? tone : 'border-transparent text-muted-foreground hover:bg-muted'
-                }`}
-              >
-                <span className="flex items-center gap-1.5 text-xs font-semibold">
-                  <Icon className="w-3.5 h-3.5" />
-                  {label}
-                </span>
-                <span className="text-[10px] opacity-80 truncate block">{counts[key]}</span>
-              </button>
-            );
-          })}
-        </div>
-
         <div className="flex-1 min-w-0 min-h-0 p-3 flex flex-col gap-2">
           <MomentsStrip
             moments={moments}

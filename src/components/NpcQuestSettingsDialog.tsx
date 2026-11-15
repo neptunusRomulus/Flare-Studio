@@ -543,10 +543,9 @@ const NpcQuestSettingsDialog = ({
           <Button
             variant="ghost"
             size="sm"
-            className="gap-1 text-destructive hover:text-destructive"
+            className="gap-1 text-muted-foreground hover:text-foreground"
             onClick={() => setConfirmRemove(true)}
           >
-            <Trash2 className="w-4 h-4" />
             Remove
           </Button>
         </InlineConfirm>

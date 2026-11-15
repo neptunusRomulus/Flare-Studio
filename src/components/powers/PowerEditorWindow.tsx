@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertTriangle, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import DraftInput from './DraftInput';
 import { Switch } from '@/components/ui/switch';
@@ -56,7 +57,7 @@ const Section = ({ title, children }: { title: string; children: React.ReactNode
 
 const Field = ({ label, flareKey, children }: { label: string; flareKey: string; children: React.ReactNode }) => (
   <div className="grid grid-cols-[7rem_1fr] items-center gap-2">
-    <Tooltip content={flareKey} side="left"><label className="text-xs truncate">{label}</label></Tooltip>
+    <Tooltip content={flareKey} side="left"><Label className="text-xs truncate font-normal">{label}</Label></Tooltip>
     <div className="min-w-0">{children}</div>
   </div>
 );
@@ -165,8 +166,8 @@ const PowerEditor = ({ target, data, onClose, onOpen }: Props) => {
           <div className="flex flex-wrap gap-1">
             {POWER_TYPES.map((t) => (
               <Tooltip key={t.id} content={t.tooltip}>
-                <button type="button" onClick={() => set('type', t.id)}
-                  className={`h-6 px-2 rounded-full text-[11px] ${v('type') === t.id ? 'bg-foreground text-background' : 'bg-muted hover:bg-muted/70'}`}>{t.label}</button>
+                <Button type="button" variant="ghost" aria-pressed={v('type') === t.id} onClick={() => set('type', t.id)}
+                  className={`h-6 px-2 rounded-full text-[11px] ${v('type') === t.id ? 'bg-foreground text-background hover:bg-foreground hover:text-background' : 'bg-muted hover:bg-muted/70'}`}>{t.label}</Button>
               </Tooltip>
             ))}
           </div>
@@ -210,9 +211,9 @@ const PowerEditor = ({ target, data, onClose, onOpen }: Props) => {
             const update = (patch: Partial<typeof l>) => writeFile(power.path, updateChainLink(textOf(power.path), power.blockIndex, l.key, l.index, { ...l, ...patch }));
             return (
               <div key={`${l.key}-${l.index}`} className="flex items-center gap-2">
-                <button type="button" className="w-36 flex items-center gap-1 text-xs truncate hover:underline" onClick={() => e && onOpen({ type: 'effect', id: e.id })}>
+                <Button type="button" variant="ghost" className="h-auto w-36 justify-start p-0 flex items-center gap-1 text-xs truncate hover:underline hover:bg-transparent font-normal" onClick={() => e && onOpen({ type: 'effect', id: e.id })}>
                   <KindIcon kind={k} />{effectName(l.effectId)}{l.key === 'post_effect_src' ? <span className="text-muted-foreground">(caster)</span> : null}
-                </button>
+                </Button>
                 <Tooltip content="Strength (magnitude)"><DraftInput className="h-7 w-16 text-xs" value={l.magnitude} aria-label="Strength" onChange={(ev) => update({ magnitude: ev.target.value })} /></Tooltip>
                 <Tooltip content="Duration (e.g. 5s or 500ms)"><DraftInput className="h-7 w-16 text-xs" value={l.duration} aria-label="Duration" onChange={(ev) => update({ duration: ev.target.value })} /></Tooltip>
                 <Tooltip content="Chance % (empty = always)"><DraftInput className="h-7 w-14 text-xs" value={l.chance} placeholder="100" aria-label="Chance" onChange={(ev) => update({ chance: ev.target.value })} /></Tooltip>
@@ -238,10 +239,10 @@ const PowerEditor = ({ target, data, onClose, onOpen }: Props) => {
           <Field label="Shown as" flareKey="Studio only (.flare-studio/power-kinds.json)">
             <div className="flex flex-wrap gap-1">
               {POWER_KIND_ORDER.map((k) => (
-                <button key={k} type="button" onClick={() => setKind(power.id, k as PowerKind)}
-                  className={`h-6 px-2 rounded-full text-[11px] inline-flex items-center gap-1 ${kind === k ? 'bg-foreground text-background' : 'bg-muted hover:bg-muted/70'}`}>
+                <Button key={k} type="button" variant="ghost" aria-pressed={kind === k} onClick={() => setKind(power.id, k as PowerKind)}
+                  className={`h-6 px-2 rounded-full text-[11px] inline-flex items-center gap-1 ${kind === k ? 'bg-foreground text-background hover:bg-foreground hover:text-background' : 'bg-muted hover:bg-muted/70'}`}>
                   <KindIcon kind={k} className="w-3 h-3" />{KIND_META[k].label}
-                </button>
+                </Button>
               ))}
             </div>
           </Field>
@@ -297,8 +298,8 @@ const EffectEditor = ({ target, data, onClose, onOpen }: Props) => {
         <Field label="Changes" flareKey="type">
           <div className="flex flex-wrap gap-1">
             {EFFECT_TYPES.map((t) => (
-              <button key={t} type="button" onClick={() => set('type', t)}
-                className={`h-6 px-2 rounded-full text-[11px] ${v('type') === t ? 'bg-foreground text-background' : 'bg-muted hover:bg-muted/70'}`}>{keyLabel(t)}</button>
+              <Button key={t} type="button" variant="ghost" aria-pressed={v('type') === t} onClick={() => set('type', t)}
+                className={`h-6 px-2 rounded-full text-[11px] ${v('type') === t ? 'bg-foreground text-background hover:bg-foreground hover:text-background' : 'bg-muted hover:bg-muted/70'}`}>{keyLabel(t)}</Button>
             ))}
           </div>
         </Field>
@@ -314,9 +315,9 @@ const EffectEditor = ({ target, data, onClose, onOpen }: Props) => {
               const p = project.powers.find((x) => x.name === u.name && x.path === u.path);
               return (
                 <Tooltip key={i} content={`${u.path} · ${u.key}=${effect.id},${u.magnitude},${u.duration}`}>
-                  <button type="button" className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] hover:bg-muted/70" onClick={() => p && onOpen({ type: 'power', id: p.id })}>
+                  <Button type="button" variant="ghost" className="h-auto inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] hover:bg-muted/70 font-normal" onClick={() => p && onOpen({ type: 'power', id: p.id })}>
                     {u.name}{u.key === 'remove_effect' ? <span className="text-muted-foreground">removes</span> : <span className="text-muted-foreground">{u.magnitude} · {u.duration}</span>}
-                  </button>
+                  </Button>
                 </Tooltip>
               );
             })}

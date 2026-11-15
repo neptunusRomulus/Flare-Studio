@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { useAppContext } from '@/context/AppContext';
 import { toast } from '@/hooks/use-toast';
 import {
@@ -69,9 +70,14 @@ const PowerEffectForm = () => {
       <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Power</div>
       <Input value={powerName} onChange={(event) => setPowerName(event.target.value)} placeholder="Name" className="h-8" />
       <Input value={powerId} onChange={(event) => setPowerId(event.target.value)} placeholder="id" className="h-8" />
-      <select className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm" value={powerType} onChange={(event) => setPowerType(event.target.value)}>
-        {POWER_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
-      </select>
+      <Select value={powerType} onValueChange={setPowerType}>
+        <SelectTrigger className="h-8 w-full text-sm" aria-label="Power type">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {POWER_TYPES.map((type) => <SelectItem key={type} value={type}>{type}</SelectItem>)}
+        </SelectContent>
+      </Select>
       <Input value={powerSpeed} onChange={(event) => setPowerSpeed(event.target.value)} placeholder="speed" className="h-8" />
       <Button type="button" size="sm" onClick={() => { void savePower(); }} disabled={!powerName.trim() && !powerId.trim()}>
         Write power
@@ -79,9 +85,14 @@ const PowerEffectForm = () => {
       <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Effect</div>
       <Input value={effectName} onChange={(event) => setEffectName(event.target.value)} placeholder="Name" className="h-8" />
       <Input value={effectId} onChange={(event) => setEffectId(event.target.value)} placeholder="id" className="h-8" />
-      <select className="h-8 w-full rounded-md border border-input bg-background px-2 text-sm" value={effectType} onChange={(event) => setEffectType(event.target.value)}>
-        {EFFECT_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
-      </select>
+      <Select value={effectType} onValueChange={setEffectType}>
+        <SelectTrigger className="h-8 w-full text-sm" aria-label="Effect type">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {EFFECT_TYPES.map((type) => <SelectItem key={type} value={type}>{type}</SelectItem>)}
+        </SelectContent>
+      </Select>
       <Button type="button" size="sm" variant="outline" onClick={() => { void saveEffect(); }} disabled={!effectName.trim() && !effectId.trim()}>
         Write effect
       </Button>

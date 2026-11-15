@@ -1,4 +1,6 @@
 import DraftInput from './DraftInput';
+import { Label } from '@/components/ui/label';
+import * as SliderPrimitive from '@radix-ui/react-slider';
 import Tooltip from '@/components/ui/tooltip';
 import { rawFromSlider, sliderMax, sliderStep, sliderValue, tierBand, tierOf, TIER_SOURCE } from '@/editor/powers/powerTiers';
 
@@ -16,11 +18,22 @@ const PowerSlider = ({ label, flareKey, raw, unit = '', tooltip, onChange }: Pro
   return (
     <div className="grid grid-cols-[7rem_1fr_4.5rem_5.5rem] items-center gap-2">
       <Tooltip content={`${tooltip ? `${tooltip} · ` : ''}${flareKey}`} side="left">
-        <label className="text-xs truncate">{label}</label>
+        <Label className="text-xs truncate font-normal">{label}</Label>
       </Tooltip>
-      <input type="range" aria-label={label} min={0} max={max} step={sliderStep(flareKey)} value={value ?? 0}
-        className="w-full h-1 accent-orange-500 cursor-pointer"
-        onChange={(e) => { const n = parseFloat(e.target.value); onChange(n <= 0 ? null : rawFromSlider(flareKey, n, raw)); }} />
+      <SliderPrimitive.Root
+        aria-label={label}
+        min={0}
+        max={max}
+        step={sliderStep(flareKey)}
+        value={[value ?? 0]}
+        onValueChange={(vals) => { const n = vals[0] ?? 0; onChange(n <= 0 ? null : rawFromSlider(flareKey, n, raw)); }}
+        className="relative flex w-full touch-none select-none items-center h-4 cursor-pointer"
+      >
+        <SliderPrimitive.Track className="relative h-1 w-full grow overflow-hidden rounded-full bg-muted">
+          <SliderPrimitive.Range className="absolute h-full bg-orange-500" />
+        </SliderPrimitive.Track>
+        <SliderPrimitive.Thumb className="block h-3 w-3 rounded-full border-2 border-orange-500 bg-background shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2" />
+      </SliderPrimitive.Root>
       <Tooltip content={hint || flareKey} side="top">
         <span className={`text-[11px] ${tier ? TIER_COLOR[tier] : 'text-muted-foreground/50'}`}>{tier || '—'}</span>
       </Tooltip>

@@ -2,6 +2,7 @@ import { KIND_META, POWER_KIND_ORDER, type ContentKind } from '@/editor/powers/p
 import { POWER_TEMPLATES, EFFECT_TEMPLATES } from '@/editor/powers/powerTemplates';
 import { summarizeEffect, summarizePower } from '@/editor/powers/powerSummary';
 import Tooltip from '@/components/ui/tooltip';
+import { Button } from '@/components/ui/button';
 import { KindIcon } from './kindIcon';
 
 export type TemplateChoice = { kind: ContentKind; templateId: string | null };
@@ -30,27 +31,27 @@ const TemplatePicker = ({ kind, onKind, onPick }: { kind: ContentKind; onKind: (
       <div className="flex flex-wrap gap-1">
         {KINDS.map((k) => (
           <Tooltip key={k} content={KIND_META[k].tooltip}>
-            <button type="button" onClick={() => onKind(k)}
-              className={`h-7 px-2.5 rounded-full text-xs inline-flex items-center gap-1.5 ${kind === k ? 'bg-foreground text-background' : 'bg-muted hover:bg-muted/70'}`}>
+            <Button type="button" variant="ghost" aria-pressed={kind === k} onClick={() => onKind(k)}
+              className={`h-7 px-2.5 rounded-full text-xs inline-flex items-center gap-1.5 ${kind === k ? 'bg-foreground text-background hover:bg-foreground hover:text-background' : 'bg-muted hover:bg-muted/70'}`}>
               <KindIcon kind={k} className="w-3.5 h-3.5" />{KIND_META[k].label}
-            </button>
+            </Button>
           </Tooltip>
         ))}
       </div>
       <div className="grid grid-cols-2 gap-2">
         {cards.map((c) => (
           <Tooltip key={c.id} content={`From flare-game: ${c.source}`}>
-            <button type="button" onClick={() => onPick({ kind, templateId: c.id })}
-              className="w-full text-left rounded-lg bg-muted/60 hover:bg-muted p-3 space-y-1">
+            <Button type="button" variant="ghost" onClick={() => onPick({ kind, templateId: c.id })}
+              className="w-full h-auto text-left rounded-lg bg-muted/60 hover:bg-muted p-3 space-y-1 font-normal">
               <div className="flex items-center gap-1.5 text-sm font-medium"><KindIcon kind={kind} />{c.label}</div>
               <div className="text-[11px] text-muted-foreground leading-snug">{c.summary}</div>
-            </button>
+            </Button>
           </Tooltip>
         ))}
-        <button type="button" onClick={() => onPick({ kind, templateId: null })}
-          className="text-left rounded-lg border border-dashed border-border hover:bg-muted/40 p-3 text-sm text-muted-foreground">
+        <Button type="button" variant="ghost" onClick={() => onPick({ kind, templateId: null })}
+          className="h-auto text-left rounded-lg border border-dashed border-border hover:bg-muted/40 p-3 text-sm text-muted-foreground font-normal">
           Blank {KIND_META[kind].label}
-        </button>
+        </Button>
       </div>
     </div>
   );

@@ -50,20 +50,20 @@ const PowersPanel = ({ projectPath }: { projectPath: string | null | undefined }
           return (
             <div key={g}>
               <Tooltip content={KIND_META[g].tooltip} side="left">
-                <button type="button" className="w-full flex items-center gap-2 h-7 px-1.5 rounded hover:bg-muted/50 text-xs"
+                <Button type="button" variant="ghost" className="w-full h-7 flex items-center gap-2 px-1.5 rounded hover:bg-muted/50 text-xs font-normal"
                   onClick={() => setOpen((s) => { const n = new Set(s); if (n.has(g)) n.delete(g); else n.add(g); return n; })}>
                   <ChevronRight className={`w-3 h-3 text-muted-foreground transition-transform ${expanded ? 'rotate-90' : ''}`} />
                   <KindIcon kind={g} />
                   <span className="flex-1 text-left font-medium truncate">{KIND_META[g].plural}</span>
                   <span className="text-[10px] text-muted-foreground">{rows.length}</span>
-                </button>
+                </Button>
               </Tooltip>
               {expanded && rows.map((r) => (
-                <button key={`${r.target.type}-${r.target.id}`} type="button" onClick={() => setTarget(r.target)}
-                  className={`w-full flex items-center gap-2 h-6 pl-8 pr-1.5 rounded text-xs hover:bg-muted/50 ${target?.type === r.target.type && target.id === r.target.id ? 'bg-muted' : ''}`}>
+                <Button key={`${r.target.type}-${r.target.id}`} type="button" variant="ghost" onClick={() => setTarget(r.target)}
+                  className={`w-full h-6 flex items-center gap-2 pl-8 pr-1.5 rounded text-xs hover:bg-muted/50 font-normal ${target?.type === r.target.type && target.id === r.target.id ? 'bg-muted' : ''}`}>
                   <span className="flex-1 text-left truncate">{r.name}</span>
                   {r.hint && r.hint !== r.name && <span className="text-[10px] text-muted-foreground truncate max-w-[5rem]">{r.hint}</span>}
-                </button>
+                </Button>
               ))}
             </div>
           );

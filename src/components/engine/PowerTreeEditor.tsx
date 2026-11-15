@@ -55,10 +55,10 @@ export default function PowerTreeEditor() {
       </div>
       <div className="flex gap-1 px-3 py-2 border-b border-border flex-wrap">
         {tree.tabs.map((tab, i) => (
-          <button key={i} type="button" onClick={() => setActiveTab(i)}
-            className={`h-7 px-2 rounded border text-xs ${activeTab === i ? 'bg-orange-600 text-white border-orange-600' : 'border-border text-muted-foreground'}`}>
+          <Button key={i} type="button" variant="ghost" aria-pressed={activeTab === i} onClick={() => setActiveTab(i)}
+            className={`h-7 px-2 rounded border text-xs ${activeTab === i ? 'bg-orange-600 text-white border-orange-600 hover:bg-orange-600 hover:text-white' : 'border-border text-muted-foreground'}`}>
             {tab.title || `Tab ${i}`}
-          </button>
+          </Button>
         ))}
         <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" onClick={() => update({ ...tree, tabs: [...tree.tabs, { title: 'New tab', background: '' }] })}>
           <Plus className="w-3 h-3 mr-1" />Tab

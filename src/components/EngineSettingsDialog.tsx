@@ -1,9 +1,8 @@
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import * as SliderPrimitive from '@radix-ui/react-slider';
-import { Moon, Sun, Target, X, Save, Settings, Eye, History, HelpCircle, FileText } from 'lucide-react';
+import { Moon, Sun, Target, X, Save, Settings, Eye, HelpCircle, FileText } from 'lucide-react';
 import Tooltip from '@/components/ui/tooltip';
-import UndoPersistencePanel from '@/components/UndoPersistencePanel';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
 import { createPortal } from 'react-dom';
@@ -24,9 +23,6 @@ type EngineSettingsDialogProps = {
   setShowActiveGid: Dispatch<SetStateAction<boolean>>;
   debugMode: boolean;
   setDebugMode: Dispatch<SetStateAction<boolean>>;
-  undoPersistenceEnabled?: boolean;
-  setUndoPersistenceEnabled?: Dispatch<SetStateAction<boolean>>;
-  onClearUndoHistory?: () => void;
   /** Tab to show when the dialog opens (e.g. 'display' from Help). */
   initialTab?: SettingsTab;
 };
@@ -41,9 +37,6 @@ const EngineSettingsDialog = ({
   setShowActiveGid,
   debugMode,
   setDebugMode,
-  undoPersistenceEnabled = false,
-  setUndoPersistenceEnabled,
-  onClearUndoHistory,
   initialTab
 }: EngineSettingsDialogProps) => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
@@ -63,7 +56,7 @@ const EngineSettingsDialog = ({
 
   const tabs: { id: SettingsTab; icon: React.ReactNode; label: string }[] = [
     { id: 'general', icon: <Settings className="w-4 h-4" />, label: 'General' },
-    { id: 'save', icon: <Save className="w-4 h-4" />, label: 'Save & History' },
+    { id: 'save', icon: <Save className="w-4 h-4" />, label: 'Save' },
     { id: 'display', icon: <Eye className="w-4 h-4" />, label: 'Display' },
     { id: 'files', icon: <FileText className="w-4 h-4" />, label: 'Game files' },
   ];
@@ -252,16 +245,7 @@ const EngineSettingsDialog = ({
           {/* Save Tab */}
           {activeTab === 'save' && (
             <div className="space-y-4">
-              {/* Undo Persistence Settings */}
-              {setUndoPersistenceEnabled ? (
-                <UndoPersistencePanel
-                  enabled={undoPersistenceEnabled}
-                  onEnabledChange={setUndoPersistenceEnabled}
-                  onClearHistory={onClearUndoHistory}
-                />
-              ) : (
-                <p className="text-sm text-muted-foreground">Save manually using the logo menu or Ctrl+S.</p>
-              )}
+              <p className="text-sm text-muted-foreground">Save manually using the logo menu or Ctrl+S.</p>
             </div>
           )}
 

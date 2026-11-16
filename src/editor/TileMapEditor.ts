@@ -11444,32 +11444,4 @@ export class TileMapEditor {
     // Redraw to restore the content
     this.draw();
   }
-
-  /**
-   * Get current undo/redo history state for persistence
-   */
-  public getUndoStackState(): { history: Array<{ layers: TileLayer[]; objects: MapObject[] }>; historyIndex: number } {
-    return {
-      history: this.history,
-      historyIndex: this.historyIndex
-    };
-  }
-
-  /**
-   * Restore undo/redo history state from persistence
-   */
-  public setUndoStackState(state: { history: Array<{ layers: TileLayer[]; objects: MapObject[] }>; historyIndex: number }): void {
-    if (!Array.isArray(state.history)) {
-      console.warn('Invalid history state provided to setUndoStackState');
-      return;
-    }
-
-    if (typeof state.historyIndex !== 'number' || state.historyIndex < -1) {
-      console.warn('Invalid history index provided to setUndoStackState');
-      return;
-    }
-
-    this.history = state.history;
-    this.historyIndex = state.historyIndex;
-  }
 }

@@ -9,15 +9,16 @@ const {
 const path = require("path");
 const fs = require("fs");
 const { migrateUserDataFromLegacyName } = require("./migrateUserData.cjs");
+const { debugLog } = require("./debugLog.cjs");
 
 // Before anything reads userData: package name is now flare-studio, so
 // app.getPath("userData") is ~/.config/flare-studio (or the OS equivalent).
 try {
   const migration = migrateUserDataFromLegacyName(app);
   if (migration.migrated) {
-    console.log("[userData] Copied settings from ism-tile to flare-studio");
+    debugLog("[userData] Copied settings from ism-tile to flare-studio");
   } else if (migration.skipped) {
-    console.log("[userData] Migration skipped:", migration.skipped);
+    debugLog("[userData] Migration skipped:", migration.skipped);
   }
 } catch (error) {
   console.warn("[userData] Migration failed:", error);
@@ -85,7 +86,7 @@ function writeProjectSettings(projectPath, projectName) {
   const plan = flareLaunch.planSettingsWrite(existing, projectName || path.basename(projectPath));
   if (!plan.write) return false;
   fs.writeFileSync(settingsPath, plan.content, "utf8");
-  console.log("Wrote settings.txt at", settingsPath);
+  debugLog("Wrote settings.txt at", settingsPath);
   return true;
 }
 
@@ -171,7 +172,7 @@ function migrateProjectIfNeeded(projectPath) {
     console.warn("[migrate] wrote files with per-file errors:", result.errors);
     return { migrated: true, errors: result.errors, backup: backupRoot };
   }
-  console.log("[migrate] wrote canonical project from", backupRoot);
+  debugLog("[migrate] wrote canonical project from", backupRoot);
   return { migrated: true, backup: backupRoot };
 }
 
@@ -212,7 +213,7 @@ function restoreSpawnBackup(projectPath) {
     if (!fs.existsSync(backupPath)) return false;
     fs.copyFileSync(backupPath, spawnPath);
     fs.unlinkSync(backupPath);
-    console.log("[FlareEngine] Restored original spawn.txt");
+    debugLog("[FlareEngine] Restored original spawn.txt");
     return true;
   } catch (err) {
     console.error("[FlareEngine] restore-spawn-backup error:", err);
@@ -249,7 +250,7 @@ function cleanupPlaySession(projectPath) {
       const safe = relative && !relative.startsWith("..") && !path.isAbsolute(relative);
       if (safe) {
         fs.rmSync(session.testSaveDir, { recursive: true, force: true });
-        console.log("[FlareEngine] Removed test save", session.testSaveDir);
+        debugLog("[FlareEngine] Removed test save", session.testSaveDir);
       } else {
         console.warn("[FlareEngine] Refusing to delete test save outside path_user/saves:", session.testSaveDir);
       }
@@ -461,7 +462,7 @@ ipcMainLocal.handle(
 
       // Write the file
       fs.writeFileSync(npcFilePath, content, "utf8");
-      console.log("NPC file saved:", npcFilePath);
+      debugLog("NPC file saved:", npcFilePath);
       return true;
     } catch (e) {
       console.error("write-npc-file failed:", e);
@@ -517,7 +518,7 @@ ipcMainLocal.handle("list-maps", async (event, projectPath) => {
 
           if (hasLayers && !isOldProjectConfig && !isPhantomUntitledMap) {
             maps.push(f);
-            console.log(
+            debugLog(
               "Found valid map file:",
               f,
               "name:",
@@ -527,11 +528,11 @@ ipcMainLocal.handle("list-maps", async (event, projectPath) => {
             );
           } else {
             if (isPhantomUntitledMap) {
-              console.log(
+              debugLog(
                 "Skipping phantom Untitled_Map.json (empty default map from old bug):", f
               );
             } else {
-              console.log(
+              debugLog(
                 "Skipping non-map JSON file:",
                 f,
                 "(isOldProjectConfig:",
@@ -569,7 +570,7 @@ ipcMainLocal.handle("list-maps", async (event, projectPath) => {
       }
     }
 
-    console.log("list-maps final result:", maps);
+    debugLog("list-maps final result:", maps);
     return maps;
   } catch (e) {
     console.error("list-maps failed:", e);
@@ -801,9 +802,9 @@ ipcMainLocal.handle("create-map-project", async (event, config) => {
 ipcMainLocal.handle("open-map-project", async (event, projectPath, mapName) => {
   try {
     rememberProjectRoot(projectPath);
-    console.log("=== ELECTRON LOAD DEBUG ===");
-    console.log("Loading project from:", projectPath);
-    console.log("Requested map name:", mapName);
+    debugLog("=== ELECTRON LOAD DEBUG ===");
+    debugLog("Loading project from:", projectPath);
+    debugLog("Requested map name:", mapName);
     try {
       migrateProjectIfNeeded(projectPath);
     } catch (migrateErr) {
@@ -826,7 +827,7 @@ ipcMainLocal.handle("open-map-project", async (event, projectPath, mapName) => {
         if (files.includes(rawCandidate)) {
           mapFile = rawCandidate;
         } else {
-          console.log("Requested map file not found:", candidate);
+          debugLog("Requested map file not found:", candidate);
           // Return null instead of falling back to wrong file
           return null;
         }
@@ -844,9 +845,9 @@ ipcMainLocal.handle("open-map-project", async (event, projectPath, mapName) => {
 
     if (mapFile) {
       const mapConfigPath = path.join(projectPath, mapFile);
-      console.log("Loading map file:", mapConfigPath);
+      debugLog("Loading map file:", mapConfigPath);
       const mapData = JSON.parse(fs.readFileSync(mapConfigPath, "utf8"));
-      console.log("Loaded map data:", {
+      debugLog("Loaded map data:", {
         name: mapData.name,
         tilesetImages: mapData.tilesetImages
           ? Object.keys(mapData.tilesetImages).length
@@ -909,7 +910,7 @@ ipcMainLocal.handle("open-map-project", async (event, projectPath, mapName) => {
                 ensureTilesetImages[fileName] = toDataUrl(candidatePath);
                 const relativeSource =
                   path.relative(projectPath, candidatePath) || candidatePath;
-                console.log(
+                debugLog(
                   `Embedded tileset from ${relativeSource}: ${fileName}`
                 );
                 break;
@@ -954,7 +955,7 @@ ipcMainLocal.handle("open-map-project", async (event, projectPath, mapName) => {
             mapData.tilesets = [{ name: first.name, fileName: first.name }];
             const relativeSource =
               path.relative(projectPath, first.fullPath) || first.fullPath;
-            console.log(
+            debugLog(
               `Synthesized tileset from discovered image: ${relativeSource}`
             );
           }
@@ -971,7 +972,7 @@ ipcMainLocal.handle("open-map-project", async (event, projectPath, mapName) => {
       }
 
       if (mapData.tilesetImages) {
-        console.log(
+        debugLog(
           "Tileset image files found:",
           Object.keys(mapData.tilesetImages)
         );
@@ -980,7 +981,7 @@ ipcMainLocal.handle("open-map-project", async (event, projectPath, mapName) => {
           mapData.tilesetImages
         )) {
           if (typeof imageData === "string") {
-            console.log(
+            debugLog(
               `${filename}: ${
                 imageData.length
               } chars, starts with: ${imageData.substring(0, 50)}...`
@@ -992,7 +993,7 @@ ipcMainLocal.handle("open-map-project", async (event, projectPath, mapName) => {
       return mapData;
     }
 
-    console.log("No map file found in project");
+    debugLog("No map file found in project");
     return null;
   } catch (error) {
     console.error("Error opening map project:", error);
@@ -1023,7 +1024,7 @@ ipcMainLocal.handle("save-tileset-profiles", async (event, projectPath, profiles
     };
 
     fs.writeFileSync(profilePath, JSON.stringify(profileData, null, 2));
-    console.log(`[PROFILE SAVE] Saved tileset profiles to: ${profilePath}`);
+    debugLog(`[PROFILE SAVE] Saved tileset profiles to: ${profilePath}`);
     return { success: true, path: profilePath };
   } catch (error) {
     console.error("[PROFILE SAVE] Error saving tileset profiles:", error);
@@ -1046,13 +1047,13 @@ ipcMainLocal.handle("load-tileset-profiles", async (event, projectPath) => {
     
     // If profile file doesn't exist, return null (will fall back to legacy tileset/detectedTiles)
     if (!fs.existsSync(profilePath)) {
-      console.log(`[PROFILE LOAD] Profile file not found: ${profilePath}`);
+      debugLog(`[PROFILE LOAD] Profile file not found: ${profilePath}`);
       return null;
     }
 
     const profileData = JSON.parse(fs.readFileSync(profilePath, "utf8"));
-    console.log(`[PROFILE LOAD] Loaded tileset profiles from: ${profilePath}`);
-    console.log(`[PROFILE LOAD] Profile version: ${profileData.version}, count: ${Object.keys(profileData.profiles || {}).length}`);
+    debugLog(`[PROFILE LOAD] Loaded tileset profiles from: ${profilePath}`);
+    debugLog(`[PROFILE LOAD] Profile version: ${profileData.version}, count: ${Object.keys(profileData.profiles || {}).length}`);
     
     return profileData.profiles || {};
   } catch (error) {
@@ -1066,10 +1067,10 @@ ipcMainLocal.handle("load-tileset-profiles", async (event, projectPath) => {
 ipcMainLocal.handle("save-map-project", async (event, projectPath, mapData) => {
   try {
     rememberProjectRoot(projectPath);
-    console.log("=== ELECTRON SAVE DEBUG ===");
-    console.log("Project path:", projectPath);
-    console.log("Map data received:", !!mapData);
-    console.log("Map name:", mapData?.name);
+    debugLog("=== ELECTRON SAVE DEBUG ===");
+    debugLog("Project path:", projectPath);
+    debugLog("Map data received:", !!mapData);
+    debugLog("Map name:", mapData?.name);
 
     if (!projectPath || !mapData) {
       console.error("Invalid save parameters:", {
@@ -1085,7 +1086,7 @@ ipcMainLocal.handle("save-map-project", async (event, projectPath, mapData) => {
     const mapFile = `${sanitizedName}.json`;
 
     const mapConfigPath = path.join(projectPath, mapFile);
-    console.log("Saving to:", mapConfigPath);
+    debugLog("Saving to:", mapConfigPath);
 
     // Ensure the map data has the required structure
     const completeMapData = {
@@ -1101,7 +1102,7 @@ ipcMainLocal.handle("save-map-project", async (event, projectPath, mapData) => {
       ...mapData,
     };
 
-    console.log("Complete map data structure:", {
+    debugLog("Complete map data structure:", {
       name: completeMapData.name,
       tilesetImages: Object.keys(completeMapData.tilesetImages || {}).length,
       layers: completeMapData.layers.length,
@@ -1113,17 +1114,17 @@ ipcMainLocal.handle("save-map-project", async (event, projectPath, mapData) => {
     const imagesPath = path.join(projectPath, "images");
     const tilesetsPath = path.join(imagesPath, "tilesets");
     if (mapData.tilesetImages && Object.keys(mapData.tilesetImages).length > 0) {
-      console.log(
+      debugLog(
         "Processing tileset images:",
         Object.keys(mapData.tilesetImages)
       );
       if (!fs.existsSync(imagesPath)) {
         fs.mkdirSync(imagesPath, { recursive: true });
-        console.log("Created images directory");
+        debugLog("Created images directory");
       }
       if (!fs.existsSync(tilesetsPath)) {
         fs.mkdirSync(tilesetsPath, { recursive: true });
-        console.log("Created tilesets directory");
+        debugLog("Created tilesets directory");
       }
 
       for (const [filename, imageData] of Object.entries(
@@ -1146,14 +1147,14 @@ ipcMainLocal.handle("save-map-project", async (event, projectPath, mapData) => {
           } catch (_e) { /* always write on error */ }
           if (needsWrite) {
             fs.writeFileSync(imagePath, base64Data, "base64");
-            console.log("Saved tileset image:", path.relative(projectPath, imagePath));
+            debugLog("Saved tileset image:", path.relative(projectPath, imagePath));
           } else {
-            console.log("Tileset image unchanged, skipping write:", filename);
+            debugLog("Tileset image unchanged, skipping write:", filename);
           }
         }
       }
     } else {
-      console.log("No tileset images to save");
+      debugLog("No tileset images to save");
     }
 
     // Strip base64 image data from the JSON — images are stored as separate
@@ -1164,7 +1165,7 @@ ipcMainLocal.handle("save-map-project", async (event, projectPath, mapData) => {
 
     // Write the map data (lean JSON, no embedded base64 images)
     fs.writeFileSync(mapConfigPath, JSON.stringify(jsonData, null, 2));
-    console.log("Map configuration saved successfully (tileset images stored separately)");
+    debugLog("Map configuration saved successfully (tileset images stored separately)");
 
     // Save minimap image if provided in mapData.minimap
     try {
@@ -1183,13 +1184,13 @@ ipcMainLocal.handle("save-map-project", async (event, projectPath, mapData) => {
         }
         const minimapPath = path.join(imagesPath, "minimap.png");
         fs.writeFileSync(minimapPath, minimapBase64, "base64");
-        console.log("Saved minimap to:", minimapPath);
+        debugLog("Saved minimap to:", minimapPath);
       }
     } catch (mmErr) {
       console.warn("Failed to save minimap:", mmErr);
     }
 
-    console.log("Map project saved successfully:", mapConfigPath);
+    debugLog("Map project saved successfully:", mapConfigPath);
     return true;
   } catch (error) {
     console.error("Error saving map project:", error);
@@ -1327,7 +1328,7 @@ ipcMainLocal.handle(
         const spawnFilename = options.spawn.filename || "spawn.txt";
         const spawnPath = path.join(mapsDir, spawnFilename);
         fs.writeFileSync(spawnPath, options.spawn.content, "utf8");
-        console.log("Spawn file saved:", spawnPath);
+        debugLog("Spawn file saved:", spawnPath);
       }
 
       // If exporter provided tileset images (base64 data URLs), save them to images/tilesets
@@ -1347,7 +1348,7 @@ ipcMainLocal.handle(
             options.tilesetImages
           )) {
             if (imageData && typeof imageData === "string") {
-              console.log(
+              debugLog(
                 "Export: saving tileset image",
                 filename,
                 "length",
@@ -1359,7 +1360,7 @@ ipcMainLocal.handle(
               );
               const imagePath = path.join(tilesetsPath, filename);
               fs.writeFileSync(imagePath, base64Data, "base64");
-              console.log("Export: saved tileset image to", imagePath);
+              debugLog("Export: saved tileset image to", imagePath);
             }
           }
         }
@@ -1377,14 +1378,14 @@ ipcMainLocal.handle(
           const npcsDir = path.join(projectPath, "npcs");
           if (!fs.existsSync(npcsDir)) {
             fs.mkdirSync(npcsDir, { recursive: true });
-            console.log("Created npcs directory:", npcsDir);
+            debugLog("Created npcs directory:", npcsDir);
           }
 
           for (const npcFile of options.npcFiles) {
             if (npcFile && npcFile.filename && npcFile.content) {
               const npcFilePath = path.join(npcsDir, npcFile.filename);
               fs.writeFileSync(npcFilePath, npcFile.content, "utf8");
-              console.log("Export: saved NPC file to", npcFilePath);
+              debugLog("Export: saved NPC file to", npcFilePath);
             }
           }
         }
@@ -1403,11 +1404,11 @@ ipcMainLocal.handle(
           const portraitsDir = path.join(imagesDir, "portraits");
           if (!fs.existsSync(imagesDir)) {
             fs.mkdirSync(imagesDir, { recursive: true });
-            console.log("Created images directory:", imagesDir);
+            debugLog("Created images directory:", imagesDir);
           }
           if (!fs.existsSync(portraitsDir)) {
             fs.mkdirSync(portraitsDir, { recursive: true });
-            console.log("Created portraits directory:", portraitsDir);
+            debugLog("Created portraits directory:", portraitsDir);
           }
 
           for (const portrait of options.portraitFiles) {
@@ -1415,7 +1416,7 @@ ipcMainLocal.handle(
               const destPath = path.join(portraitsDir, portrait.destFilename);
               if (fs.existsSync(portrait.sourcePath)) {
                 fs.copyFileSync(portrait.sourcePath, destPath);
-                console.log("Export: copied portrait", portrait.sourcePath, "->", destPath);
+                debugLog("Export: copied portrait", portrait.sourcePath, "->", destPath);
               } else {
                 console.warn("Export: portrait source not found:", portrait.sourcePath);
               }
@@ -1437,11 +1438,11 @@ ipcMainLocal.handle(
           const npcsImgDir = path.join(imagesDir, "npcs");
           if (!fs.existsSync(imagesDir)) {
             fs.mkdirSync(imagesDir, { recursive: true });
-            console.log("Created images directory:", imagesDir);
+            debugLog("Created images directory:", imagesDir);
           }
           if (!fs.existsSync(npcsImgDir)) {
             fs.mkdirSync(npcsImgDir, { recursive: true });
-            console.log("Created images/npcs directory:", npcsImgDir);
+            debugLog("Created images/npcs directory:", npcsImgDir);
           }
 
           for (const img of options.npcTilesetImages) {
@@ -1449,7 +1450,7 @@ ipcMainLocal.handle(
               const destPath = path.join(npcsImgDir, img.destFilename);
               if (fs.existsSync(img.sourcePath)) {
                 fs.copyFileSync(img.sourcePath, destPath);
-                console.log("Export: copied NPC tileset image", img.sourcePath, "->", destPath);
+                debugLog("Export: copied NPC tileset image", img.sourcePath, "->", destPath);
               } else {
                 console.warn("Export: NPC tileset image source not found:", img.sourcePath);
               }
@@ -1471,18 +1472,18 @@ ipcMainLocal.handle(
           const npcsAnimDir = path.join(animationsDir, "npcs");
           if (!fs.existsSync(animationsDir)) {
             fs.mkdirSync(animationsDir, { recursive: true });
-            console.log("Created animations directory:", animationsDir);
+            debugLog("Created animations directory:", animationsDir);
           }
           if (!fs.existsSync(npcsAnimDir)) {
             fs.mkdirSync(npcsAnimDir, { recursive: true });
-            console.log("Created animations/npcs directory:", npcsAnimDir);
+            debugLog("Created animations/npcs directory:", npcsAnimDir);
           }
 
           for (const animFile of options.npcAnimationFiles) {
             if (animFile && animFile.filename && animFile.content) {
               const animFilePath = path.join(npcsAnimDir, animFile.filename);
               fs.writeFileSync(animFilePath, animFile.content, "utf8");
-              console.log("Export: saved NPC animation file to", animFilePath);
+              debugLog("Export: saved NPC animation file to", animFilePath);
             }
           }
         }
@@ -1490,9 +1491,9 @@ ipcMainLocal.handle(
         console.warn("Failed to save NPC animation files:", animErr);
       }
 
-      console.log("Export files saved successfully:");
-      console.log("- Map:", mapFilePath);
-      console.log("- Tileset:", tilesetFilePath);
+      debugLog("Export files saved successfully:");
+      debugLog("- Map:", mapFilePath);
+      debugLog("- Tileset:", tilesetFilePath);
       return { success: true };
     } catch (error) {
       console.error("Error saving export files:", error);
@@ -1836,7 +1837,7 @@ function requestRendererShutdown() {
       shutdownWait = null;
       resolve();
     };
-    console.log("[Shutdown] Requesting renderer to flush pending saves");
+    debugLog("[Shutdown] Requesting renderer to flush pending saves");
     mainWindow.webContents.send("app-before-quit");
   });
 }
@@ -1916,7 +1917,7 @@ app.on("before-quit", (event) => {
 });
 
 ipcMainLocal.on("app-shutdown-complete", () => {
-  console.log("[Shutdown] Renderer finished pending saves");
+  debugLog("[Shutdown] Renderer finished pending saves");
   if (shutdownWait) shutdownWait();
 });
 
@@ -1965,7 +1966,7 @@ ipcMainLocal.handle("create-npc-file", async (event, projectPath, npcData) => {
     const npcsDir = path.join(projectPath, "npcs");
     if (!fs.existsSync(npcsDir)) {
       fs.mkdirSync(npcsDir, { recursive: true });
-      console.log("Created npcs directory:", npcsDir);
+      debugLog("Created npcs directory:", npcsDir);
     }
 
     // Sanitize NPC name for filename; append _2, _3 when that file already exists.
@@ -1983,7 +1984,7 @@ ipcMainLocal.handle("create-npc-file", async (event, projectPath, npcData) => {
     // paths.  Writing a skeleton here would be immediately overwritten on save,
     // and if save never runs the skeleton could have stale/incorrect data.
 
-    console.log("NPC filename generated:", `${sanitizedName}.txt`);
+    debugLog("NPC filename generated:", `${sanitizedName}.txt`);
     return {
       success: true,
       filePath: path.join(npcsDir, `${sanitizedName}.txt`),
@@ -2183,7 +2184,7 @@ function rebuildItemsIndex(projectPath) {
   const rendered = flareAdapter.exportItemFile(defaultItems, { append: true, includes });
   fs.writeFileSync(itemsIndexFile, rendered.text, "utf8");
   mergePowerFile(projectPath, rendered.powers);
-  console.log("Rebuilt items index:", itemsIndexFile);
+  debugLog("Rebuilt items index:", itemsIndexFile);
 }
 
 /**
@@ -2201,12 +2202,12 @@ ipcMainLocal.handle("ensure-items-folders", async (event, projectPath) => {
 
     if (!fs.existsSync(itemsDir)) {
       fs.mkdirSync(itemsDir, { recursive: true });
-      console.log("Created items directory:", itemsDir);
+      debugLog("Created items directory:", itemsDir);
     }
 
     if (!fs.existsSync(categoriesDir)) {
       fs.mkdirSync(categoriesDir, { recursive: true });
-      console.log("Created items/categories directory:", categoriesDir);
+      debugLog("Created items/categories directory:", categoriesDir);
     }
 
     // Migrate old category directories (items/categories/potions/*.txt) to files
@@ -2219,7 +2220,7 @@ ipcMainLocal.handle("ensure-items-folders", async (event, projectPath) => {
           const txtPath = path.join(categoriesDir, entry.name + ".txt");
           // Skip if the .txt file already exists
           if (fs.existsSync(txtPath)) {
-            console.log("Category .txt already exists, removing old directory:", dirPath);
+            debugLog("Category .txt already exists, removing old directory:", dirPath);
             try { fs.rmSync(dirPath, { recursive: true, force: true }); } catch {}
             continue;
           }
@@ -2236,7 +2237,7 @@ ipcMainLocal.handle("ensure-items-folders", async (event, projectPath) => {
             // Sort by id
             items.sort((a, b) => (parseInt(a.id, 10) || 0) - (parseInt(b.id, 10) || 0));
             writeCategoryFile(txtPath, items);
-            console.log("Migrated category directory to file:", entry.name, "->", txtPath);
+            debugLog("Migrated category directory to file:", entry.name, "->", txtPath);
           }
           try { fs.rmSync(dirPath, { recursive: true, force: true }); } catch {}
         }
@@ -2295,7 +2296,7 @@ color=255,232,156
 overlay_icon=1031
 `;
       fs.writeFileSync(qualitiesFile, flareAdapter.withAppend(qualitiesContent), "utf8");
-      console.log("Created qualities.txt file:", qualitiesFile);
+      debugLog("Created qualities.txt file:", qualitiesFile);
     }
 
     // Create / rebuild items.txt index
@@ -2368,7 +2369,7 @@ ipcMainLocal.handle(
 
       if (!fs.existsSync(categoryFile)) {
         fs.writeFileSync(categoryFile, "", "utf8");
-        console.log("Created item category file:", categoryFile);
+        debugLog("Created item category file:", categoryFile);
       }
 
       // Rebuild the main items index
@@ -2548,7 +2549,7 @@ ipcMainLocal.handle(
       // Rebuild the main items index
       rebuildItemsIndex(projectPath);
 
-      console.log("Item added to category:", itemData.name.trim(), "@", categoryFilePath);
+      debugLog("Item added to category:", itemData.name.trim(), "@", categoryFilePath);
       return {
         success: true,
         filePath: `${categoryFilePath}#item_${itemData.id}`,
@@ -2701,7 +2702,7 @@ ipcMainLocal.handle("write-item-file", async (event, filePath, itemData) => {
     fs.writeFileSync(categoryFilePath, merged, "utf8");
     const rendered = flareAdapter.exportItemFile([payload], { append: false });
     mergePowerFile(projectPathFromItemFile(categoryFilePath), rendered.powers);
-    console.log("Item saved:", targetId, "@", categoryFilePath);
+    debugLog("Item saved:", targetId, "@", categoryFilePath);
 
     return { success: true };
   } catch (error) {
@@ -2837,7 +2838,7 @@ ipcMainLocal.handle("delete-item-file", async (event, filePath) => {
       writeCategoryFile(categoryFilePath, filtered);
     }
 
-    console.log("Item deleted:", targetId, "@", categoryFilePath);
+    debugLog("Item deleted:", targetId, "@", categoryFilePath);
     return { success: true };
   } catch (error) {
     console.error("Error deleting item file:", error);
@@ -2910,7 +2911,7 @@ function linkMissingRequiredMods(projectPath, flarePath) {
     if (!source) continue;
     try {
       fs.symlinkSync(source, linkPath, process.platform === "win32" ? "junction" : "dir");
-      console.log(`[FlareEngine] Linked required mod ${mod} -> ${source}`);
+      debugLog(`[FlareEngine] Linked required mod ${mod} -> ${source}`);
     } catch (err) {
       console.warn(`[FlareEngine] Could not link required mod ${mod}:`, err.message);
     }
@@ -3088,7 +3089,7 @@ ipcMainLocal.handle("prepare-flare-quick-launch", async (_event, { flarePath, pr
       "utf8"
     );
 
-    console.log(`[FlareEngine] Quick launch ${target.relativePath} at ${x},${y} via --load-slot=${loadSlot} (${testPrefix})`);
+    debugLog(`[FlareEngine] Quick launch ${target.relativePath} at ${x},${y} via --load-slot=${loadSlot} (${testPrefix})`);
     return {
       success: true,
       loadSlot,
@@ -3157,7 +3158,7 @@ ipcMainLocal.handle("launch-flare-engine", async (_event, options = {}) => {
   });
 
   try {
-    console.log("[FlareEngine] Launching:", target.exePath, args.join(" "), "cwd:", target.cwd);
+    debugLog("[FlareEngine] Launching:", target.exePath, args.join(" "), "cwd:", target.cwd);
     const child = spawnProcess(target.exePath, args, {
       cwd: target.cwd,
       detached: true,
@@ -3165,7 +3166,7 @@ ipcMainLocal.handle("launch-flare-engine", async (_event, options = {}) => {
     });
     const logChunk = (prefix, chunk) => {
       const text = chunk.toString().trim();
-      if (text) console.log(`[FlareEngine] ${prefix} ${text}`);
+      if (text) debugLog(`[FlareEngine] ${prefix} ${text}`);
     };
     child.stdout?.on("data", (chunk) => logChunk("stdout", chunk));
     child.stderr?.on("data", (chunk) => logChunk("stderr", chunk));
@@ -3204,7 +3205,7 @@ ipcMainLocal.handle("install-flare", async (event, variant) => {
   flareInstallControllers.set(variant, controller);
   return flareInstaller.installFlare(variant, {
     signal: controller.signal,
-    log: (message) => console.log(message),
+    log: (message) => debugLog(message),
     onProgress: ({ received, total }) => {
       if (!sender.isDestroyed()) sender.send("install-flare-progress", { variant, received, total });
     },

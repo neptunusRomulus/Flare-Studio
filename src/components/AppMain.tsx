@@ -419,7 +419,7 @@ export default function AppMain() {
           handleDeleteMap={handleDeleteMap}
           editor={editor}
           projectPath={controls?.currentProjectPath}
-          currentMapFileId={(titleBarProps?.tabs ?? []).find((t: { id?: string }) => t.id === titleBarProps?.activeTabId)?.name || mapName}
+          currentMapFileId={(canvasCtx?.mapTabs?.tabs ?? []).find((t: { id?: string }) => t.id === canvasCtx?.mapTabs?.activeTabId)?.name || mapName}
         />
 
         <EventDialog open={eventDialogOpen} onOpenChange={setEventDialogOpen} eventLocation={eventDialogLocation} editingEventId={editingEventId} />

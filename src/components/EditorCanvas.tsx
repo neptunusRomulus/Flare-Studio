@@ -2,6 +2,7 @@ import React from 'react';
 import { entityPlacement } from '@/components/entityPlacement';
 import { normalizeTileRect } from '@/components/targetGroups';
 import CanvasTips from '@/components/CanvasTips';
+import CanvasMapTabs from '@/components/CanvasMapTabs';
 import MapInitOverlay from '@/components/MapInitOverlay';
 import MapHoverDisplay from '@/components/MapHoverDisplay';
 import NpcDeletePopup from '@/components/NpcDeletePopup';
@@ -62,6 +63,14 @@ type EditorContext = {
   handleDeleteSelection: () => void;
   handleClearSelection: () => void;
   isDarkMode: boolean;
+  mapTabs?: {
+    tabs: Array<{ id: string; name: string; tabType?: 'map' | 'enemy' }>;
+    activeTabId: string | null;
+    onSwitchTab: (tabId: string) => void;
+    onOpenMapSettings: () => void;
+    onCloseTab: (tabId: string) => void;
+    onCreateNewMap: () => void;
+  };
 };
 
 type Props = {
@@ -107,6 +116,7 @@ export default function EditorCanvas(props: Props) {
     handleFillSelection,
     handleDeleteSelection,
     handleClearSelection,
+    mapTabs,
   } = ctx;
 
   const [cursorScreenPos, setCursorScreenPos] = React.useState<{x: number, y: number} | null>(null);
@@ -529,6 +539,17 @@ export default function EditorCanvas(props: Props) {
         }
       }}
     >
+      {mapInitialized && mapTabs ? (
+        <CanvasMapTabs
+          tabs={mapTabs.tabs}
+          activeTabId={mapTabs.activeTabId}
+          onSwitchTab={mapTabs.onSwitchTab}
+          onOpenMapSettings={mapTabs.onOpenMapSettings}
+          onCloseTab={mapTabs.onCloseTab}
+          onCreateNewMap={mapTabs.onCreateNewMap}
+        />
+      ) : null}
+
       <CanvasTips
         tipsMinimized={tipsMinimized}
         setTipsMinimized={setTipsMinimized}

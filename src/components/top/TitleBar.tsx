@@ -1,23 +1,10 @@
 import React from 'react';
 // removed unused Button import
-import EditorTabs from '@/components/EditorTabs';
 import WindowControls from '@/components/WindowControls';
 import PlayButton from '@/components/PlayButton';
 import type { FlareLaunchMode } from '@/hooks/useFlareEngine';
 
-type TabEntry = {
-  id: string;
-  name: string;
-  tabType?: 'map' | 'enemy';
-};
-
 type TitleBarProps = {
-  tabs: TabEntry[];
-  activeTabId: string | null;
-  onSwitchTab: (tabId: string) => void;
-  onOpenMapSettings: () => void;
-  onCloseEnemyTab: (tabId: string) => void;
-  onCreateNewMap: () => void;
   saveStatus: 'saving' | 'saved' | 'unsaved' | 'error';
   lastSaveTime: number;
   onMinimize: () => void;
@@ -39,12 +26,6 @@ type TitleBarProps = {
 };
 
 const TitleBar = ({
-  tabs,
-  activeTabId,
-  onSwitchTab,
-  onOpenMapSettings,
-  onCloseEnemyTab,
-  onCreateNewMap,
   saveStatus,
   lastSaveTime,
   onMinimize,
@@ -107,16 +88,6 @@ const TitleBar = ({
             ? 'Shield Checking...'
             : 'Shield Pending'}
         </span>
-      </div>
-      <div className="flex-1 min-w-0">
-        <EditorTabs
-          tabs={tabs}
-          activeTabId={activeTabId}
-          onSwitchTab={onSwitchTab}
-          onOpenMapSettings={onOpenMapSettings}
-          onCloseEnemyTab={onCloseEnemyTab}
-          onCreateNewMap={onCreateNewMap}
-        />
       </div>
     </div>
     <div className="flex items-center gap-2">

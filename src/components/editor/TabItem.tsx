@@ -11,13 +11,18 @@ type Props = {
   onSwitchTab: (tabId: string) => void;
   onOpenMapSettings: () => void;
   onCloseEnemyTab: (tabId: string) => void;
+  variant?: 'default' | 'canvas';
 };
 
-export default function TabItem({ tab, activeTabId, onSwitchTab, onOpenMapSettings, onCloseEnemyTab }: Props) {
+export default function TabItem({ tab, activeTabId, onSwitchTab, onOpenMapSettings, onCloseEnemyTab, variant = 'default' }: Props) {
+  const active = tab.id === activeTabId;
+  const shell = variant === 'canvas'
+    ? `flex items-center gap-0.5 px-1.5 py-0 rounded-sm text-xs truncate max-w-[10rem] no-drag transition-colors ${active ? 'bg-black/15 text-neutral-900 dark:bg-white/20 dark:text-white' : 'bg-transparent text-neutral-700 hover:bg-black/10 dark:text-neutral-100 dark:hover:bg-white/10'}`
+    : `flex items-center gap-1 px-3 py-1 rounded-t-md border border-b-0 text-sm truncate max-w-xs no-drag transition-all duration-200 ${active ? 'bg-orange-500 text-white border-orange-500' : 'bg-transparent text-gray-600 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-neutral-700'}`;
   return (
     <div
       key={tab.id}
-      className={`flex items-center gap-1 px-3 py-1 rounded-t-md border border-b-0 text-sm truncate max-w-xs no-drag transition-all duration-200 ${tab.id === activeTabId ? 'bg-orange-500 text-white border-orange-500' : 'bg-transparent text-gray-600 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-neutral-700'}`}
+      className={shell}
     >
       <Button
         type="button"

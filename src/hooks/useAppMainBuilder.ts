@@ -36,6 +36,7 @@ import { TileMapEditor } from '@/editor/TileMapEditor';
 import type { EditorProjectData } from '@/editor/TileMapEditor';
 import type { MapObject } from '@/types';
 import { slugFileName } from '@/adapters/flare/flareAdapter.cjs';
+import { resolveSaveMapName } from '@/editor/mapSaveName';
 
 export default function useAppMainBuilder() {
   type EditorTabsType = ReturnType<typeof useEditorTabs>;
@@ -183,6 +184,24 @@ export default function useAppMainBuilder() {
   }) as EditorTabsType;
   const { tabs, activeTabId, setTabs, setActiveTabId, switchToTab, createTabFor, closeEditorTab } = editorTabs as unknown as EditorTabsType;
   activeTabForSaveRef.current = (tabs.find((t: { id: string; name: string }) => t.id === activeTabId) as { name: string } | undefined) ?? null;
+
+  const handleCloseEditorTab = useCallback(async (tabId: string) => {
+    const tab = (tabs as Array<{ id: string; name: string; tabType?: 'map' | 'enemy'; projectPath?: string | null }>).find((entry) => entry.id === tabId);
+    if (!tab) return;
+    if (tab.tabType !== 'enemy' && tab.id === activeTabId && editor && tab.projectPath) {
+      try {
+        await editor.ensureTilesetsLoaded();
+      } catch (err) {
+        console.warn('Failed to ensure tilesets loaded before closing a tab:', err);
+      }
+      const editorName = typeof editor.getMapName === 'function' ? editor.getMapName() : undefined;
+      const persistName = resolveSaveMapName(editorName, tab.name);
+      const saved = await editor.saveProjectData(tab.projectPath, persistName ? { mapName: persistName } : undefined);
+      if (saved === false) return;
+    }
+    closeEditorTab(tabId);
+  }, [activeTabId, closeEditorTab, editor, tabs]);
+
 
   // Wire up the before-create-map callback so that when the user creates a new map,
   // the CURRENT map's full state (including any imported tileset images) is saved to
@@ -902,12 +921,6 @@ export default function useAppMainBuilder() {
       handleOpenMap: (projectPath?: string) => { try { const manager = projectManager as ProjectManagerType; if (manager && typeof manager.handleOpenMap === 'function' && typeof projectPath === 'string') void manager.handleOpenMap(projectPath); } catch (e) { console.warn(e); } },
       isDarkMode,
       titleBarProps: {
-        tabs: tabs ?? [],
-        activeTabId: activeTabId ?? null,
-        onSwitchTab: (id: string) => { void switchToTab(id); },
-        onOpenMapSettings: () => setShowMapSettingsOnly(true),
-        onCloseEnemyTab: () => {},
-        onCreateNewMap: () => { if (typeof mapConfig.setShowCreateMapDialog === 'function') mapConfig.setShowCreateMapDialog(true); },
         saveStatus: 'saved',
         lastSaveTime: 0,
         onMinimize: () => {
@@ -1035,7 +1048,15 @@ export default function useAppMainBuilder() {
         tipsMinimized: appState.tipsMinimized,
         setTipsMinimized: appState.setTipsMinimized,
         setShowHelp: helpState.setShowHelp,
-        isEnemyTabActive: false,
+        isEnemyTabActive: Boolean((tabs as Array<{ id: string; tabType?: string }>).find((tab) => tab.id === activeTabId)?.tabType === 'enemy'),
+        mapTabs: {
+          tabs: tabs ?? [],
+          activeTabId: activeTabId ?? null,
+          onSwitchTab: (id: string) => { void switchToTab(id); },
+          onOpenMapSettings: () => setShowMapSettingsOnly(true),
+          onCloseTab: (id: string) => { void handleCloseEditorTab(id); },
+          onCreateNewMap: () => { if (typeof mapConfig.setShowCreateMapDialog === 'function') mapConfig.setShowCreateMapDialog(true); },
+        },
         mapWidth: mapConfig.mapWidth,
         mapHeight: mapConfig.mapHeight,
         handlePlaceActorOnMap: handlePlaceActorOnMap ?? (() => {}),

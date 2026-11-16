@@ -664,3 +664,9 @@ input[type="number"]::-webkit-outer-spin-button {
 input[type="number"] {
   -moz-appearance: textfield;
 }
+
+
+/* Map tabs: pink hanging strip at the top-center of the canvas. */
+.canvas-map-tabs {
+  filter: drop-shadow(0 1px 1px rgb(0 0 0 / 0.12));
+}

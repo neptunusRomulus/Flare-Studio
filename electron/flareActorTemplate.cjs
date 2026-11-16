@@ -25,6 +25,26 @@ function collectFlareRefs(text) {
   return [...refs];
 }
 
+/** First frame rect of a section (`frame=<facing>,<index>,<x>,<y>,<w>,<h>,...`), stance preferred. */
+function firstFrameRect(text) {
+  let section = "";
+  let fallback = null;
+  for (const raw of String(text || "").split(/\r?\n/)) {
+    const line = raw.trim();
+    if (/^\[[^\]]+\]$/.test(line)) {
+      section = line.slice(1, -1).trim().toLowerCase();
+      continue;
+    }
+    if (!line.startsWith("frame=")) continue;
+    const parts = line.slice(6).split(",").map((p) => Number(p.trim()));
+    if (parts.length < 6 || parts.slice(0, 6).some((n) => !Number.isFinite(n))) continue;
+    const rect = { x: parts[2], y: parts[3], w: parts[4], h: parts[5] };
+    if (!fallback) fallback = rect;
+    if (section === "stance") return rect;
+  }
+  return fallback;
+}
+
 /** First value of a key (e.g. "image", "animations") in a Flare text file. */
 function firstValue(text, key) {
   for (const raw of String(text || "").split(/\r?\n/)) {
@@ -63,7 +83,7 @@ function listPng(dir, fsImpl) {
  */
 function listTemplateActors(flarePath, { probe, fsImpl = fs } = {}) {
   const resolved = flareTemplate.templateTilesetDir(flarePath, probe);
-  if (resolved.error) return { ok: false, error: resolved.error, npcLooks: [], portraits: [], npcs: [], enemies: [], missing: [] };
+  if (resolved.error) return { ok: false, error: resolved.error, npcLooks: [], portraits: [], enemyLooks: [], npcs: [], enemies: [], missing: [] };
   const modDir = path.join(resolved.dataPath, "mods", flareTemplate.TEMPLATE_MOD);
   const read = (rel) => { try { return fsImpl.readFileSync(path.join(modDir, rel), "utf8"); } catch { return null; } };
   const missing = new Set();
@@ -87,6 +107,23 @@ function listTemplateActors(flarePath, { probe, fsImpl = fs } = {}) {
     portraits.push({ key: name.replace(/\.png$/i, ""), path: rel, imagePath: path.join(modDir, rel) });
   }
 
+  // Enemy sprites (animations/enemies/*.txt): the picker in Edit Enemy draws the first stance frame.
+  const enemyLooks = [];
+  for (const name of listTxt(path.join(modDir, "animations", "enemies"), fsImpl)) {
+    const rel = `animations/enemies/${name}`;
+    const text = read(rel);
+    if (text == null) continue;
+    check(rel, text);
+    const image = firstValue(text, "image");
+    enemyLooks.push({
+      key: name.replace(/\.txt$/i, ""),
+      animation: rel,
+      image,
+      imagePath: image ? path.join(modDir, image) : null,
+      frame: firstFrameRect(text),
+    });
+  }
+
   const npcs = [];
   for (const name of listTxt(path.join(modDir, "npcs"), fsImpl)) {
     const rel = `npcs/${name}`;
@@ -106,7 +143,7 @@ function listTemplateActors(flarePath, { probe, fsImpl = fs } = {}) {
       enemies.push({ key: name.replace(/\.txt$/i, ""), file: rel, raw: text, isBase });
     }
   }
-  return { ok: true, mod: flareTemplate.TEMPLATE_MOD, modDir, npcLooks, portraits, npcs, enemies, missing: [...missing].sort() };
+  return { ok: true, mod: flareTemplate.TEMPLATE_MOD, modDir, npcLooks, portraits, enemyLooks, npcs, enemies, missing: [...missing].sort() };
 }
 
-module.exports = { collectFlareRefs, firstValue, listTemplateActors };
+module.exports = { collectFlareRefs, firstFrameRect, firstValue, listTemplateActors };

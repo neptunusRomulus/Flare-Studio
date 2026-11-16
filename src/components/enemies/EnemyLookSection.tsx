@@ -1,8 +1,11 @@
 import { Input } from '@/components/ui/input';
 import { enemyPropertyTooltips } from './enemyModel';
+import EnemyAppearancePicker from '@/components/enemies/EnemyAppearancePicker';
 import { Flag, LabelWithTooltip, MoreToggle, EditorSection, enemyInputCls } from './enemyFormPrimitives';
 
 export type EnemyLookSectionProps = {
+  /** Project root, for the project's own animations/enemies and images/portraits. */
+  projectPath: string;
   animations: string; setAnimations: (v: string) => void;
   sfxAttack: string; setSfxAttack: (v: string) => void;
   sfxHit: string; setSfxHit: (v: string) => void;
@@ -24,6 +27,7 @@ export type EnemyLookSectionProps = {
 };
 
 const EnemyLookSection = ({
+  projectPath,
   animations, setAnimations,
   sfxAttack, setSfxAttack,
   sfxHit, setSfxHit,
@@ -42,8 +46,26 @@ const EnemyLookSection = ({
   corpseHasTimeout, setCorpseHasTimeout,
   corpseRenderBelow, setCorpseRenderBelow,
   lookMore, setLookMore,
-}: EnemyLookSectionProps) => (
+}: EnemyLookSectionProps) => {
+  const applyLook = (props: Record<string, string | null>) => {
+    if ('animations' in props) setAnimations(props.animations || '');
+    if ('tilesetPath' in props) setTilesetPath(props.tilesetPath || '');
+    if ('gfx' in props) setGfx(props.gfx || '');
+  };
+  const applyPortrait = (props: Record<string, string | null>) => {
+    if ('portraitPath' in props) setPortraitPath(props.portraitPath || '');
+  };
+
+  return (
     <EditorSection title="Look">
+      <EnemyAppearancePicker
+        projectPath={projectPath}
+        animations={animations}
+        tilesetPath={tilesetPath}
+        portraitPath={portraitPath}
+        onSelectLook={applyLook}
+        onSelectPortrait={applyPortrait}
+      />
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
           <LabelWithTooltip field="animations">Animations</LabelWithTooltip>
@@ -109,6 +131,7 @@ const EnemyLookSection = ({
         </div>
       </MoreToggle>
     </EditorSection>
-);
+  );
+};
 
 export default EnemyLookSection;

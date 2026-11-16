@@ -32,13 +32,18 @@ describe('template actor references', () => {
   it('lists a mod fixture and reports missing references', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'actors-'));
     const mod = path.join(root, 'mods', 'fantasycore');
-    for (const d of ['images/tilesets', 'animations/npcs', 'images/npcs', 'enemies/base']) fs.mkdirSync(path.join(mod, d), { recursive: true });
+    for (const d of ['images/tilesets', 'animations/npcs', 'images/npcs', 'images/enemies', 'enemies/base', 'animations/enemies']) fs.mkdirSync(path.join(mod, d), { recursive: true });
     fs.writeFileSync(path.join(mod, 'settings.txt'), '');
     fs.mkdirSync(path.join(mod, 'images/portraits'), { recursive: true });
     fs.writeFileSync(path.join(mod, 'animations/npcs/knight.txt'), 'image=images/npcs/knight.png\n');
     fs.writeFileSync(path.join(mod, 'images/npcs/knight.png'), '');
     fs.writeFileSync(path.join(mod, 'images/portraits/male01.png'), '');
-    fs.writeFileSync(path.join(mod, 'enemies/base/zombie.txt'), 'animations=animations/enemies/zombie.txt\n');
+    fs.writeFileSync(path.join(mod, 'images/enemies/zombie.png'), '');
+    fs.writeFileSync(
+      path.join(mod, 'animations/enemies/zombie.txt'),
+      'image=images/enemies/zombie.png\n\n[stance]\nframes=2\nduration=800ms\nframe=0,0,10,20,30,40,5,6\nframe=0,1,50,60,70,80,5,6\n',
+    );
+    fs.writeFileSync(path.join(mod, 'enemies/base/zombie.txt'), 'animations=animations/enemies/zombie.txt\nsfx_attack=soundfx/enemies/missing.ogg\n');
     const probe = { platform: 'linux', exists: (p: string) => fs.existsSync(p), isDirectory: (p: string) => fs.existsSync(p) && fs.statSync(p).isDirectory() };
     const flareTemplate = require('../../electron/flareTemplate.cjs');
     const orig = flareTemplate.templateTilesetDir;
@@ -48,8 +53,14 @@ describe('template actor references', () => {
       expect(out.ok).toBe(true);
       expect(out.npcLooks).toEqual([expect.objectContaining({ key: 'knight', animation: 'animations/npcs/knight.txt', image: 'images/npcs/knight.png' })]);
       expect(out.portraits).toEqual([expect.objectContaining({ key: 'male01', path: 'images/portraits/male01.png' })]);
+      expect(out.enemyLooks).toEqual([expect.objectContaining({
+        key: 'zombie',
+        animation: 'animations/enemies/zombie.txt',
+        image: 'images/enemies/zombie.png',
+        frame: { x: 10, y: 20, w: 30, h: 40 },
+      })]);
       expect(out.enemies).toEqual([expect.objectContaining({ key: 'zombie', file: 'enemies/base/zombie.txt', isBase: true })]);
-      expect(out.missing).toEqual(['enemies/base/zombie.txt -> animations/enemies/zombie.txt']);
+      expect(out.missing).toEqual(['enemies/base/zombie.txt -> soundfx/enemies/missing.ogg']);
     } finally {
       flareTemplate.templateTilesetDir = orig;
     }

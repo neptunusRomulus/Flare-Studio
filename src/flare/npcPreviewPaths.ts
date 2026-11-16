@@ -10,6 +10,8 @@ export type NpcPreviewInput = {
   templateImage?: string;
   tilesetSourcePath?: string;
   portraitPath?: string;
+  /** Flare's `animations` key for enemies (their sprite lives in animations/enemies/*.txt). */
+  animations?: string;
   projectPath?: string | null;
 };
 
@@ -17,6 +19,7 @@ export type NpcPreviewPaths = { sprite: string | null; portrait: string | null }
 
 type Listing = {
   npcLooks?: Array<{ animation?: string; image?: string | null; imagePath?: string | null }>;
+  enemyLooks?: Array<{ animation?: string; image?: string | null; imagePath?: string | null }>;
   portraits?: Array<{ path: string; imagePath?: string | null }>;
   modDir?: string;
 };
@@ -24,6 +27,7 @@ type Listing = {
 type PreviewApi = {
   listTemplateActors?: (flarePath: string) => Promise<Listing>;
   fileExists?: (path: string) => Promise<boolean>;
+  readFile?: (path: string) => Promise<string | null>;
 };
 
 const listingCache = new Map<string, Promise<Listing | null>>();
@@ -50,21 +54,33 @@ export async function resolveNpcPreviewPaths(
 ): Promise<NpcPreviewPaths> {
   const root = (input.projectPath || '').replace(/\\/g, '/').replace(/\/$/, '');
   const tilesetPath = input.tilesetPath || '';
+  const animations = input.animations || '';
   const templateImage = input.templateImage || '';
   const tilesetSourcePath = input.tilesetSourcePath || '';
   const portraitPath = input.portraitPath || '';
+  const lookPath = tilesetPath || animations;
 
   let sprite: string | null = null;
   if (tilesetSourcePath) sprite = tilesetSourcePath;
   else if (tilesetPath && isImageFilePath(tilesetPath)) {
     sprite = absOrJoin(root, tilesetPath);
-  } else if (templateImage || (tilesetPath && isAnimationDefinitionFilePath(tilesetPath))) {
+  } else if (templateImage || (lookPath && isAnimationDefinitionFilePath(lookPath))) {
     if (flarePath) {
       const listing = await listingFor(api, flarePath);
       if (listing) {
-        const match = listing.npcLooks?.find((l) => l.animation === tilesetPath || l.image === templateImage);
+        const looks = [...(listing.npcLooks || []), ...(listing.enemyLooks || [])];
+        const match = looks.find((l) => l.animation === lookPath || l.image === templateImage);
         sprite = match?.imagePath
           || (listing.modDir && templateImage ? `${listing.modDir.replace(/\\/g, '/')}/${templateImage}` : null);
+      }
+    }
+    // Project animations (not in the fantasycore listing): resolve their image= line.
+    if (!sprite && root && lookPath && api?.readFile) {
+      const text = await api.readFile(`${root}/${lookPath}`).catch(() => null);
+      const image = text ? /^\s*image=(.+)$/m.exec(text)?.[1]?.trim() : null;
+      if (image) {
+        const candidate = absOrJoin(root, image);
+        if (!api.fileExists || await api.fileExists(candidate)) sprite = candidate;
       }
     }
   }

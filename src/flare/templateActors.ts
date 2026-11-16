@@ -18,6 +18,14 @@ export type TemplateActorListing = {
   npcLooks: Array<{ key: string; animation: string; image: string | null; imagePath: string | null }>;
   /** fantasycore images/portraits/*.png (mod-relative path + absolute imagePath for thumbnails). */
   portraits?: Array<{ key: string; path: string; imagePath: string | null }>;
+  /** fantasycore animations/enemies/*.txt, with the first stance frame rect for thumbnails. */
+  enemyLooks?: Array<{
+    key: string;
+    animation: string;
+    image: string | null;
+    imagePath: string | null;
+    frame: { x: number; y: number; w: number; h: number } | null;
+  }>;
   npcs: Array<{ key: string; file: string; raw: string }>;
   enemies: Array<{ key: string; file: string; raw: string; isBase: boolean }>;
   missing: string[];
@@ -68,6 +76,7 @@ export function planTemplateActors(listing: TemplateActorListing): PlannedActor[
     if (e.isBase && !firstValue(e.raw, 'animations')) continue;
     if (e.isBase) {
       const rel = `enemies/${e.key}.txt`;
+      const animationsValue = firstValue(e.raw, 'animations');
       out.push({
         type: 'enemy',
         importKey: `${mod}:enemy:${e.key}`,
@@ -76,7 +85,8 @@ export function planTemplateActors(listing: TemplateActorListing): PlannedActor[
         properties: {
           include: e.file,
           categories: e.key,
-          ...(firstValue(e.raw, 'animations') ? { animations: firstValue(e.raw, 'animations') as string } : {}),
+          // `animations` is the Flare key; `tilesetPath` is Studio's look thumbnail source.
+          ...(animationsValue ? { animations: animationsValue, tilesetPath: animationsValue } : {}),
           enemyFilename: rel,
         },
         file: { rel, content: enemyFileFromBase(e.file, e.key) },

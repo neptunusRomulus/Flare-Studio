@@ -916,6 +916,7 @@ const [name, setName] = useState(() => enemy?.name || '');
 
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4 min-h-0 custom-scrollbar">
         <EnemyLookSection
+    projectPath={projectPath}
     animations={animations}
     setAnimations={setAnimations}
     sfxAttack={sfxAttack}

@@ -46,18 +46,19 @@ function NpcListThumb({ actor, projectPath }: { actor: MapObject; projectPath?: 
   const props = propertyRecord(actor.properties);
   const portraitPath = propertyText(props.portraitPath);
   const tilesetPath = propertyText(props.tilesetPath);
+  const animations = propertyText(props.animations);
   const templateImage = propertyText(props.templateImage);
   const tilesetSourcePath = propertyText(props.tilesetSourcePath);
 
   useEffect(() => {
     let cancelled = false;
     void resolveNpcPreviewPaths({
-      tilesetPath, templateImage, tilesetSourcePath, portraitPath, projectPath,
+      tilesetPath, templateImage, tilesetSourcePath, portraitPath, animations, projectPath,
     }).then((preview) => {
       if (!cancelled) setImagePath(npcListThumbPath(preview));
     });
     return () => { cancelled = true; };
-  }, [tilesetPath, templateImage, tilesetSourcePath, portraitPath, projectPath]);
+  }, [tilesetPath, templateImage, tilesetSourcePath, portraitPath, animations, projectPath]);
 
   if (!imagePath) {
     return <HelpCircle className="w-5 h-5 text-muted-foreground" />;

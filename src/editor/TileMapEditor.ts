@@ -72,6 +72,22 @@ import {
   separateBrush,
   type BrushOpsHost,
 } from './tileMap/brushOps';
+import {
+  finishActorDrag,
+  finishEventDrag,
+  getDraggableActorAt,
+  handleActorDrag,
+  handleEventDrag,
+  handleKeyDown,
+  handleKeyUp,
+  handleMouseDown,
+  handleMouseLeave,
+  handleMouseMove,
+  handleMouseUp,
+  handleWheel,
+  openHeroEditDialog,
+  type PointerInputHost,
+} from './tileMap/pointerInput';
 
 export interface LayerTilesetEntry {
   image: HTMLImageElement | null;
@@ -1221,585 +1237,55 @@ export class TileMapEditor {
   }
 
   private getDraggableActorAt(x: number, y: number): MapObject | null {
-    if (x < 0 || y < 0) return null;
-    return this.objects.find(obj => obj.x === x && obj.y === y && this.actorUsesPlaceholder(obj)) || null;
+    return getDraggableActorAt(this as unknown as PointerInputHost, x, y);
   }
 
   private handleActorDrag(x: number, y: number): void {
-    if (!this.isDraggingActor || this.draggingActorId === null) return;
-    if (x < 0 || y < 0 || x >= this.mapWidth || y >= this.mapHeight) return;
-
-    const actor = this.objects.find(obj => obj.id === this.draggingActorId);
-    if (!actor) return;
-    if (actor.x === x && actor.y === y) return;
-
-    // Stay on the last free tile; cursor feedback is applied in updateCursorForHover.
-    if (actor.type === 'npc') {
-      const conflict = this.objects.find(obj => obj.type === 'npc' && obj.id !== actor.id && obj.x === x && obj.y === y);
-      if (conflict) return;
-    }
-
-    this.updateMapObject(actor.id, { x, y }, { recordHistory: false });
+    handleActorDrag(this as unknown as PointerInputHost, x, y);
   }
 
   private handleEventDrag(x: number, y: number): void {
-    if (!this.isDraggingEvent || this.draggingEventObjectId === null) return;
-    if (x < 0 || y < 0 || x >= this.mapWidth || y >= this.mapHeight) return;
-
-    const ev = this.objects.find(obj => obj.id === this.draggingEventObjectId);
-    if (!ev) return;
-    if (ev.x === x && ev.y === y) return;
-
-    // Update position and recalculate location property
-    const updates: Partial<MapObject> = { x, y };
-    const props = { ...ev.properties };
-    if (props.location) {
-      props.location = `${x},${y},${ev.width},${ev.height}`;
-    }
-    if (props.hotspot) {
-      // Keep hotspot relative: reset to event origin
-      props.hotspot = `${x},${y},${ev.width},${ev.height}`;
-    }
-    updates.properties = props;
-    this.updateMapObject(ev.id, updates, { recordHistory: false });
+    handleEventDrag(this as unknown as PointerInputHost, x, y);
   }
 
   private handleMouseDown(event: MouseEvent): void {
-    // Prevent editing while save is in progress
-    if (this.isSaveLocked) {
-      return;
-    }
-
-    this.clickStartX = event.clientX;
-    this.clickStartY = event.clientY;
-    this.hasMovedSinceClick = false;
-
-    const { x, y } = this.eventToCanvas(event);
-
-    // Middle-button drag pans (no Space needed)
-    if (event.button === 1) {
-      event.preventDefault();
-      this.isPanning = true;
-      this.isMiddlePanning = true;
-      this.lastPanX = x;
-      this.lastPanY = y;
-      this.mapCanvas.style.cursor = 'grabbing';
-      return;
-    }
-
-    // Ignore clicks on the minimap
-    if (this.showMinimap && this.lastMiniMapBounds) {
-      const { x: mapX, y: mapY, w, h } = this.lastMiniMapBounds;
-      
-      // Check for minimap resizer click (top-left corner, including outer padding)
-      const resizerSize = 24;
-      if (x >= mapX - 5 && x <= mapX + resizerSize && y >= mapY - 5 && y <= mapY + resizerSize) {
-        this.isResizingMinimap = true;
-        this.lastMinimapResizeX = x;
-        this.lastMinimapResizeY = y;
-        return;
-      }
-      
-      if (x >= mapX - 5 && x <= mapX + w + 5 && y >= mapY - 5 && y <= mapY + h + 5) {
-        if (this.spacePressed) {
-          this.isMinimapPanning = true;
-          this.lastMinimapPanX = x;
-          this.lastMinimapPanY = y;
-          this.mapCanvas.style.cursor = 'grabbing';
-        }
-        return;
-      }
-    }
-
-    if (this.spacePressed) {
-      // Start panning
-      this.isPanning = true;
-      this.lastPanX = x;
-      this.lastPanY = y;
-      this.mapCanvas.style.cursor = 'grabbing';
-    } else {
-      // Normal tile editing or selection
-      this.isMouseDown = true;
-      const tileCoords = this.screenToTile(x, y);
-      if (tileCoords) {
-        // Check if clicking on hero position
-        if (this.isHeroAtPosition(tileCoords.x, tileCoords.y)) {
-          this.isDraggingHero = true;
-          return;
-        }
-
-        const actorAtPosition = this.getDraggableActorAt(tileCoords.x, tileCoords.y);
-        if (actorAtPosition) {
-          // Right-click on NPC/actor - show delete confirmation
-          if (event.button === 2 && actorAtPosition.type === 'npc' && this.npcRightClickCallback) {
-            this.isMouseDown = false;
-            // Get screen position of the actor for popup placement
-            const actorScreenPos = this.mapToScreen(actorAtPosition.x, actorAtPosition.y);
-            const { x: screenX, y: screenY } = canvasToClient(actorScreenPos.x, actorScreenPos.y, this.mapCanvas);
-            this.npcRightClickCallback(actorAtPosition.id, screenX, screenY);
-            return;
-          }
-          
-          // Left-click - start dragging
-          this.isDraggingActor = true;
-          this.draggingActorId = actorAtPosition.id;
-          this.actorDragOrigin = { x: actorAtPosition.x, y: actorAtPosition.y };
-          this.selectedObject = actorAtPosition;
-          this.selectedObjectId = actorAtPosition.id;
-          return;
-        }
-
-        // Check for event object at this position (single-click to drag/edit)
-        const eventsAtPosition = this.objects.filter(
-          obj => obj.type === 'event' && obj.x >= 0 && obj.y >= 0 &&
-            tileCoords.x >= obj.x && tileCoords.x < obj.x + obj.width &&
-            tileCoords.y >= obj.y && tileCoords.y < obj.y + obj.height
-        );
-        if (eventsAtPosition.length > 0 && event.button === 0) {
-          // Use hoveredEventIndex to pick the correct event when multiple share a cell
-          const idx = eventsAtPosition.length > 1 ? Math.min(this.hoveredEventIndex, eventsAtPosition.length - 1) : 0;
-          const eventAtPosition = eventsAtPosition[idx];
-          // Start dragging event - single click edit is now handled in mouseup if not dragged
-          this.isDraggingEvent = true;
-          this.draggingEventObjectId = eventAtPosition.id;
-          this.eventDragOrigin = { x: eventAtPosition.x, y: eventAtPosition.y };
-          this.selectedObject = eventAtPosition;
-          this.selectedObjectId = eventAtPosition.id;
-          return;
-        }
-
-        if (this.tool === 'tiles') {
-          if (event.button === 2 && this.cellRightClickCallback) {
-            // Right-click on tile cell - show context menu
-            this.isMouseDown = false;
-            const screenX = event.clientX;
-            const screenY = event.clientY;
-            this.cellRightClickCallback(tileCoords.x, tileCoords.y, screenX, screenY);
-            return;
-          }
-          this.handleTileClick(tileCoords.x, tileCoords.y, event.button === 2);
-        } else if (this.tool === 'selection') {
-          if (event.button === 2 && this.cellRightClickCallback) {
-            // Right-click on tile cell - show context menu
-            this.isMouseDown = false;
-            const screenX = event.clientX;
-            const screenY = event.clientY;
-            this.cellRightClickCallback(tileCoords.x, tileCoords.y, screenX, screenY);
-            return;
-          }
-          this.handleSelectionStart(tileCoords.x, tileCoords.y, event.button === 2);
-        } else if (this.tool === 'shape') {
-          if (event.button === 2 && this.cellRightClickCallback) {
-            // Right-click on tile cell - show context menu
-            this.isMouseDown = false;
-            const screenX = event.clientX;
-            const screenY = event.clientY;
-            this.cellRightClickCallback(tileCoords.x, tileCoords.y, screenX, screenY);
-            return;
-          }
-          this.handleShapeStart(tileCoords.x, tileCoords.y, event.button === 2);
-        } else if (this.tool === 'eyedropper') {
-          const sampledGid = this.handleEyedropper(tileCoords.x, tileCoords.y);
-          if (sampledGid) {
-            // Eyedropper was successful, no need to continue with mouse down
-            this.isMouseDown = false;
-          }
-        } else if (this.tool === 'stamp') {
-          if (event.button === 2 && this.cellRightClickCallback) {
-            // Right-click on tile cell - show context menu
-            this.isMouseDown = false;
-            const screenX = event.clientX;
-            const screenY = event.clientY;
-            this.cellRightClickCallback(tileCoords.x, tileCoords.y, screenX, screenY);
-            return;
-          }
-          this.handleStampClick(tileCoords.x, tileCoords.y, event.button === 2);
-        }
-      }
-    }
+    handleMouseDown(this as unknown as PointerInputHost, event);
   }
 
   private handleMouseMove(event: MouseEvent): void {
-    if (this.isMouseDown) {
-      const dx = Math.abs(event.clientX - this.clickStartX);
-      const dy = Math.abs(event.clientY - this.clickStartY);
-      if (dx > 3 || dy > 3) {
-        this.hasMovedSinceClick = true;
-      }
-    }
-
-    const { x, y } = this.eventToCanvas(event);
-
-    if (this.isResizingMinimap) {
-      this.mapCanvas.style.cursor = 'nwse-resize';
-      // The cursor moving left/up means we are pulling the top-left corner out, increasing the minimap scale
-      // The cursor moving right/down means shrinking the minimap.
-      // Easiest heuristic: drag distance along the diagonal. Or just take X diff.
-      // Actually, standard resize from top-left: dragging left makes it wider. So -deltaX or -deltaY.
-      const deltaX = x - this.lastMinimapResizeX;
-      const deltaY = y - this.lastMinimapResizeY;
-      
-      // Compute scaling based on movement. 150px is baseline width.
-      // -deltaX increases the width.
-      // Minimap width = 150 * scale. 
-      // Diff in scale = -deltaX / 150. Average with -deltaY / 120.
-      const scaleDiff = ((-deltaX / 150) + (-deltaY / 120)) / 2;
-      
-      let newScale = this.minimapWindowScale + scaleDiff;
-      // Clamp between 0.5 and 3.0 like EngineSettingsDialog
-      newScale = Math.max(0.5, Math.min(3.0, newScale));
-      
-      this.setMinimapWindowScale(newScale);
-      
-      this.lastMinimapResizeX = x;
-      this.lastMinimapResizeY = y;
-      
-      return;
-    }
-
-    if (this.showMinimap && this.lastMiniMapBounds) {
-      const { x: mapX, y: mapY } = this.lastMiniMapBounds;
-      const resizerSize = 24;
-      if (x >= mapX - 5 && x <= mapX + resizerSize && y >= mapY - 5 && y <= mapY + resizerSize) {
-        this.mapCanvas.style.cursor = 'nwse-resize';
-        // Hide object tooltip if any
-        this.hideObjectTooltip();
-        return; // Don't do tile hovering logic
-      }
-    }
-
-    if (this.isMinimapPanning && this.spacePressed) {
-      // Handle minimap panning
-      const deltaX = x - this.lastMinimapPanX;
-      const deltaY = y - this.lastMinimapPanY;
-      this.minimapPanX += deltaX;
-      this.minimapPanY += deltaY;
-      this.lastMinimapPanX = x;
-      this.lastMinimapPanY = y;
-      this.draw();
-      return;
-    } else if (this.isPanning && (this.spacePressed || this.isMiddlePanning)) {
-      // Handle panning
-      const deltaX = x - this.lastPanX;
-      const deltaY = y - this.lastPanY;
-      this.setPan(deltaX, deltaY);
-      this.lastPanX = x;
-      this.lastPanY = y;
-    } else {
-      // Normal hover and tile editing
-      const tileCoords = this.screenToTile(x, y);
-      if (tileCoords) {
-        this.hoverX = tileCoords.x;
-        this.hoverY = tileCoords.y;
-        
-        // Check if there's an object at hover position and update cursor
-        this.updateCursorForHover();
-        
-        // Update stamp preview position
-        if (this.tool === 'stamp' && this.currentStampMode === 'place' && this.activeStamp) {
-          this.stampPreview.x = tileCoords.x;
-          this.stampPreview.y = tileCoords.y;
-          this.stampPreview.visible = true;
-        }
-        
-        if (this.isMouseDown && !this.spacePressed) {
-          if (this.isDraggingHero) {
-            // Update hero position while dragging
-            this.setHeroPosition(tileCoords.x, tileCoords.y);
-          } else if (this.isDraggingActor) {
-            this.handleActorDrag(tileCoords.x, tileCoords.y);
-          } else if (this.isDraggingEvent) {
-            this.handleEventDrag(tileCoords.x, tileCoords.y);
-          } else if (this.tool === 'tiles') {
-            this.handleTileClick(tileCoords.x, tileCoords.y, false);
-          } else if (this.tool === 'stamp' && this.currentStampMode === 'place' && this.activeStamp) {
-            // Allow painting with stamp while dragging (make selection behave like a brush)
-            this.placeStamp(tileCoords.x, tileCoords.y);
-          } else if (this.isSelecting) {
-            this.handleSelectionDrag(tileCoords.x, tileCoords.y);
-          } else if (this.isDrawingShape) {
-            this.handleShapeDrag(tileCoords.x, tileCoords.y);
-          }
-        }
-      }
-    }
-    
-    this.draw();
+    handleMouseMove(this as unknown as PointerInputHost, event);
   }
 
   private finishActorDrag(): void {
-    if (!this.isDraggingActor) return;
-    const id = this.draggingActorId;
-    const origin = this.actorDragOrigin;
-    this.isDraggingActor = false;
-    this.draggingActorId = null;
-    this.actorDragOrigin = null;
-    if (id == null || !origin) return;
-    const actor = this.objects.find(obj => obj.id === id);
-    if (actor && (actor.x !== origin.x || actor.y !== origin.y)) {
-      this.saveState();
-      this.notifyObjectsChanged();
-    }
+    finishActorDrag(this as unknown as PointerInputHost);
   }
 
   private finishEventDrag(): void {
-    if (!this.isDraggingEvent) return;
-    const id = this.draggingEventObjectId;
-    const origin = this.eventDragOrigin;
-    this.isDraggingEvent = false;
-    this.draggingEventObjectId = null;
-    this.eventDragOrigin = null;
-    if (id == null || !origin) return;
-    const ev = this.objects.find(obj => obj.id === id);
-    if (ev && (ev.x !== origin.x || ev.y !== origin.y)) {
-      this.saveState();
-      this.notifyObjectsChanged();
-    }
+    finishEventDrag(this as unknown as PointerInputHost);
   }
 
   private handleMouseUp(): void {
-    if (this.isMiddlePanning) {
-      this.isMiddlePanning = false;
-      this.isPanning = false;
-      this.mapCanvas.style.cursor = this.spacePressed ? 'grab' : '';
-      return;
-    }
-    const wasClick = !this.hasMovedSinceClick;
-
-    if (this.isResizingMinimap) {
-      this.isResizingMinimap = false;
-      return;
-    }
-
-    if (this.isSelecting) {
-      this.handleSelectionEnd();
-    } else if (this.isDrawingShape) {
-      this.handleShapeEnd();
-    }
-    
-    // Stop hero dragging
-    if (this.isDraggingHero) {
-      this.isDraggingHero = false;
-      if (wasClick) {
-        this.openHeroEditDialog();
-      }
-    }
-
-    if (this.isDraggingActor) {
-      if (wasClick && this.objectEditCallback && this.draggingActorId !== null) {
-        this.objectEditCallback(this.draggingActorId);
-      }
-      this.finishActorDrag();
-    }
-
-    if (this.isDraggingEvent) {
-      if (wasClick && this.eventEditCallback && this.draggingEventObjectId !== null) {
-        this.eventEditCallback(this.draggingEventObjectId);
-      }
-      this.finishEventDrag();
-    }
-
-    if (wasClick && !this.isDraggingHero && !this.isDraggingActor && !this.isDraggingEvent) {
-      const activeLayer = this.getActiveLayer();
-      const interactiveLayers = ['enemy', 'npc', 'object', 'event', 'background'];
-      
-      if (activeLayer && interactiveLayers.includes(activeLayer.type) && this.hoverX >= 0 && this.hoverY >= 0) {
-        const objectsAtPosition = this.getObjectsAtPosition(this.hoverX, this.hoverY);
-        // Only trigger generic object edit if it isn't an event (events are handled above because they are implicitly dragged)
-        const objectAtMenu = objectsAtPosition.find(obj => obj.x === this.hoverX && obj.y === this.hoverY);
-        if (objectAtMenu && this.objectEditCallback && objectAtMenu.type !== 'event') {
-          this.objectEditCallback(objectAtMenu.id);
-        }
-      }
-    }
-
-    this.isMouseDown = false;
-    this.isPanning = false;
-    this.isMinimapPanning = false;
-    if (this.isMiddlePanning) {
-      this.isMiddlePanning = false;
-      this.mapCanvas.style.cursor = this.spacePressed ? 'grab' : '';
-    }
+    handleMouseUp(this as unknown as PointerInputHost);
   }
 
   private handleMouseLeave(): void {
-    // Hide tooltip when mouse leaves canvas
-    this.hideObjectTooltip();
-    // Reset hover coordinates
-    this.hoverX = -1;
-    this.hoverY = -1;
-    this.finishActorDrag();
-    this.finishEventDrag();
-    this.isMinimapPanning = false;
-    this.isResizingMinimap = false;
-    if (this.isMiddlePanning) {
-      this.isMiddlePanning = false;
-      this.isPanning = false;
-      this.mapCanvas.style.cursor = '';
-    }
-    this.draw();
+    handleMouseLeave(this as unknown as PointerInputHost);
   }
 
   private openHeroEditDialog(): void {
-    if (this.heroEditCallback) {
-      this.heroEditCallback(
-        this.heroX,
-        this.heroY,
-        this.mapWidth,
-        this.mapHeight,
-        (x: number, y: number) => {
-          this.setHeroPosition(x, y);
-        }
-      );
-    } else {
-      // Fallback to alert if no callback is set
-      alert(`Hero position: (${this.heroX}, ${this.heroY}). Set up hero edit dialog in React component.`);
-    }
+    openHeroEditDialog(this as unknown as PointerInputHost);
   }
 
   private handleWheel(event: WheelEvent): void {
-    event.preventDefault();
-
-    const { x: cursorX, y: cursorY } = this.eventToCanvas(event);
-    const wheelKind = classifyWheel(event);
-
-    // Check if hovering over minimap
-    if (this.showMinimap && this.lastMiniMapBounds) {
-      const { x, y, w, h } = this.lastMiniMapBounds;
-      if (cursorX >= x && cursorX <= x + w && cursorY >= y && cursorY <= y + h) {
-        const zoomFactor = event.deltaY > 0 ? 0.9 : 1.1;
-        // Clamp minimap internal zoom to reasonable values (e.g. 0.25x to 4.0x)
-        this.minimapZoom = Math.max(0.25, Math.min(4.0, this.minimapZoom * zoomFactor));
-        this.draw();
-        return; // Consume wheel event for minimap zoom
-      }
-    }
-    
-    // Touchpad two-finger scroll pans the canvas
-    if (wheelKind === 'pan') {
-      this.setPan(-event.deltaX / this.zoom, -event.deltaY / this.zoom);
-      return;
-    }
-    // Pinch (ctrl+wheel) zooms smoothly around the cursor
-    if (wheelKind === 'pinch') {
-      this.zoomAtCursor(this.zoom * pinchFactor(event.deltaY), cursorX, cursorY);
-      return;
-    }
-
-    // Check if hovering over a cell with multiple events – scroll to cycle
-    if (this.hoverX >= 0 && this.hoverY >= 0) {
-      const eventsAtHover = this.objects.filter(
-        obj => obj.type === 'event' && obj.x >= 0 && obj.y >= 0 &&
-          this.hoverX >= obj.x && this.hoverX < obj.x + obj.width &&
-          this.hoverY >= obj.y && this.hoverY < obj.y + obj.height
-      );
-      if (eventsAtHover.length > 1) {
-        if (event.deltaY > 0) {
-          this.hoveredEventIndex = (this.hoveredEventIndex + 1) % eventsAtHover.length;
-        } else {
-          this.hoveredEventIndex = (this.hoveredEventIndex - 1 + eventsAtHover.length) % eventsAtHover.length;
-        }
-        this.showObjectTooltip(eventsAtHover[this.hoveredEventIndex], eventsAtHover.length);
-        return;
-      }
-    }
-
-    // Default: modify main canvas zoom
-    const zoomFactor = event.deltaY > 0 ? 0.9 : 1.1;
-    this.setZoom(this.zoom * zoomFactor);
+    handleWheel(this as unknown as PointerInputHost, event);
   }
 
   private handleKeyDown(event: KeyboardEvent): void {
-    // Don't capture keyboard events if user is typing in an input/textarea
-    const target = event.target as HTMLElement;
-    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
-      return;
-    }
-
-    if (event.code === 'Space') {
-      event.preventDefault();
-      this.spacePressed = true;
-      this.mapCanvas.style.cursor = 'grab';
-    }
-
-    const isEnterShortcut = event.key === 'Enter' || event.code === 'Enter' || event.code === 'NumpadEnter';
-    if (isEnterShortcut) {
-      event.preventDefault();
-      this.fillSelection();
-      return;
-    }
-    
-    // Undo/Redo shortcuts
-    if (event.ctrlKey || event.metaKey) {
-      switch (event.code) {
-        case 'KeyZ':
-          event.preventDefault();
-          if (event.shiftKey) {
-            // Ctrl+Shift+Z = Redo (alternative)
-            this.redo();
-          } else {
-            // Ctrl+Z = Undo
-            this.undo();
-          }
-          break;
-        case 'KeyY':
-          // Ctrl+Y = Redo
-          event.preventDefault();
-          this.redo();
-          break;
-        case 'KeyS':
-          // Ctrl+S = Manual Save
-          event.preventDefault();
-          if (this.manualSaveCallback) {
-            this.manualSaveCallback().catch(_err => {
-              // save error handled elsewhere
-            });
-          }
-          break;
-        case 'KeyA':
-          event.preventDefault();
-          this.selectAll();
-          break;
-        case 'KeyC':
-          event.preventDefault();
-          this.copySelection();
-          break;
-        case 'KeyV':
-          event.preventDefault();
-          this.pasteSelection();
-          break;
-      }
-    }
-    
-    // Other shortcuts
-    switch (event.code) {
-      case 'Delete':
-      case 'Backspace':
-        event.preventDefault();
-        this.deleteSelection();
-        break;
-      case 'Escape':
-        event.preventDefault();
-        this.clearSelection();
-        // Also cancel shape drawing if in progress
-        if (this.isDrawingShape) {
-          this.shapeDrawing.active = false;
-          this.isDrawingShape = false;
-          this.shapeDrawing.preview = [];
-          this.draw();
-        }
-        break;
-    }
+    handleKeyDown(this as unknown as PointerInputHost, event);
   }
 
   private handleKeyUp(event: KeyboardEvent): void {
-    if (event.code === 'Space') {
-      event.preventDefault();
-      this.spacePressed = false;
-      this.isPanning = false;
-      this.isMinimapPanning = false;
-      this.mapCanvas.style.cursor = 'crosshair';
-    }
+    handleKeyUp(this as unknown as PointerInputHost, event);
   }
 
   public screenToTile(screenX: number, screenY: number): { x: number, y: number } | null {

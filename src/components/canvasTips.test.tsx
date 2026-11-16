@@ -5,13 +5,13 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import TopBar from '@/components/TopBar';
 
-function Harness({ enemy = false }: { enemy?: boolean }) {
+function Harness({ enemy = false, expanded = true }: { enemy?: boolean; expanded?: boolean }) {
   const [tipsMinimized, setTipsMinimized] = useState(true);
   const [showHelp, setShowHelp] = useState(false);
   return (
     <>
       <TopBar
-        toolbarExpanded
+        toolbarExpanded={expanded}
         containerRef={React.createRef<HTMLDivElement>()}
         onMouseEnter={() => {}}
         onMouseLeave={() => {}}
@@ -69,5 +69,21 @@ describe('canvas help in the zoom controls', () => {
     rerender(<Harness enemy />);
     expect(screen.queryByRole('button', { name: 'Show canvas help' })).not.toBeInTheDocument();
     expect(screen.queryByRole('region', { name: 'Canvas help' })).not.toBeInTheDocument();
+  });
+
+  it('collapses the zoom controls when idle and keeps the help button', async () => {
+    const user = userEvent.setup();
+    render(<Harness expanded={false} />);
+
+    // Only the help button stays clickable while the zoom group is collapsed.
+    expect(screen.getByRole('button', { name: 'Show canvas help' })).toBeInTheDocument();
+    const zoomGroup = document.querySelector('.max-w-0');
+    expect(zoomGroup?.getAttribute('aria-hidden')).toBe('true');
+    expect(zoomGroup?.className).toContain('max-w-0');
+
+    await user.click(screen.getByRole('button', { name: 'Show canvas help' }));
+    expect(screen.getByRole('region', { name: 'Canvas help' })).toHaveTextContent('to Zoom');
+    await user.click(screen.getByRole('button', { name: 'Help' }));
+    expect(screen.getByText('Full help dialog')).toBeInTheDocument();
   });
 });

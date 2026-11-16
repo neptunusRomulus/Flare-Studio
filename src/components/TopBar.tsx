@@ -55,10 +55,12 @@ const TopBar: React.FC<Props> = ({
     {play ? <PlayButton {...play} /> : null}
     <div className="relative">
       <div
-        className={`flex items-center bg-white/90 dark:bg-neutral-900/90 border border-border rounded-full shadow-lg transition-all duration-300 ease-in-out ${toolbarExpanded ? 'px-2 py-1' : 'px-1 py-1'}`}
+        className={`flex items-center bg-white/90 dark:bg-neutral-900/90 border border-border rounded-full shadow-lg transition-all duration-300 ease-in-out ${toolbarExpanded ? 'px-2 py-1 gap-1' : 'px-1 py-1 gap-0'}`}
       >
+        {/* Undo/redo/zoom hide when the toolbar is idle; the help button stays. */}
         <div
-          className={`flex items-center gap-1 transition-all duration-300 ease-out ${toolbarExpanded ? 'opacity-100' : 'opacity-90'}`}
+          aria-hidden={!toolbarExpanded}
+          className={`flex items-center gap-1 overflow-hidden transition-all duration-300 ease-out ${toolbarExpanded ? 'max-w-[15rem] opacity-100' : 'max-w-0 opacity-0 pointer-events-none'}`}
         >
           <Tooltip content="Undo (Ctrl+Z)" side="bottom">
             <Button size="sm" variant="outline" className="w-8 h-8 p-0 rounded-full" onClick={handleUndo}>
@@ -85,13 +87,13 @@ const TopBar: React.FC<Props> = ({
               <RotateCcw className="w-4 h-4" />
             </Button>
           </Tooltip>
-          {isEnemyTabActive ? null : (
-            <CanvasTipsButton
-              tipsMinimized={tipsMinimized}
-              setTipsMinimized={setTipsMinimized}
-            />
-          )}
         </div>
+        {isEnemyTabActive ? null : (
+          <CanvasTipsButton
+            tipsMinimized={tipsMinimized}
+            setTipsMinimized={setTipsMinimized}
+          />
+        )}
       </div>
       {isEnemyTabActive ? null : (
         <CanvasTipsPanel

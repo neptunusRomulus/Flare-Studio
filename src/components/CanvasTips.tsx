@@ -21,7 +21,7 @@ export function CanvasTipsButton({ tipsMinimized, setTipsMinimized }: TipsState)
         type="button"
         variant="outline"
         size="sm"
-        className="w-8 h-8 p-0 rounded-full"
+        className="w-8 h-8 p-0 rounded-full transition-transform duration-200 hover:scale-110 focus-visible:scale-110"
         onClick={() => setTipsMinimized(!tipsMinimized)}
         aria-label={tipsMinimized ? 'Show canvas help' : 'Hide canvas help'}
         aria-expanded={!tipsMinimized}
@@ -85,7 +85,7 @@ export function CanvasTipsPanel({ tipsMinimized, setTipsMinimized, setShowHelp, 
           </div>
           <span>
             <kbd className="mr-1 rounded border border-gray-300 dark:border-neutral-700 bg-gray-100 dark:bg-neutral-800 px-1.5 py-0.5 text-[10px] font-semibold tracking-wide text-gray-800 dark:text-gray-100">Mouse Wheel</kbd>
-            to Zoom In-Out
+            to Zoom
           </span>
         </div>
         <Button

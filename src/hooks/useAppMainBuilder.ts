@@ -1063,6 +1063,9 @@ export default function useAppMainBuilder() {
         handleZoomIn,
         handleZoomOut,
         handleResetZoom,
+        tipsMinimized: appState.tipsMinimized,
+        setTipsMinimized: appState.setTipsMinimized,
+        setShowHelp: helpState.setShowHelp,
         isEnemyTabActive: Boolean((tabs as Array<{ id: string; tabType?: string }>).find((tab) => tab.id === activeTabId)?.tabType === 'enemy'),
       },
       canvasCtx: {

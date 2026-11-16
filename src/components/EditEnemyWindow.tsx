@@ -29,6 +29,12 @@ import { normalizeItemsForState } from '@/utils/items';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 import ResizeHandle from '@/components/ResizeHandle';
 import LootRowsEditor from '@/components/LootRowsEditor';
+import EnemyLookSection from '@/components/enemies/EnemyLookSection';
+import EnemyBehaviorSection from '@/components/enemies/EnemyBehaviorSection';
+import EnemyLootSection from '@/components/enemies/EnemyLootSection';
+import EnemyStorySection from '@/components/enemies/EnemyStorySection';
+import { BEHAVIOR_ICONS, enemyPropertyTooltips } from '@/components/enemies/enemyModel';
+import { EditorSection, Flag, LabelWithTooltip, MoreToggle, enemyInputCls } from '@/components/enemies/enemyFormPrimitives';
 import {
   formatLootProperty,
   formatLootRow,
@@ -84,149 +90,6 @@ function enemySourceRel(enemy?: MapObject | null): string {
 
 const TIER_COLOR = { weak: 'text-muted-foreground', balanced: 'text-sky-500', strong: 'text-orange-500' } as const;
 
-const BEHAVIOR_ICONS = {
-  guard: Shield,
-  wanders: Footprints,
-  aggressive: Swords,
-  coward: Feather,
-} as const;
-
-const enemyPropertyTooltips: Record<string, string> = {
-  name: 'Name',
-  level: 'Level',
-  count: 'Number of enemies spawned together in a group.',
-  include: 'INCLUDE. Path to another enemy file to inherit properties from. e.g. enemies/base/goblin.txt',
-  rarity: 'Enemy rarity used for loot and display purposes.',
-  humanoid: 'This creature gives human traits when transformed into, such as the ability to talk with NPCs.',
-  lifeform: 'Determines whether this entity appears as living, such as displaying Dead vs Destroyed when HP reaches 0.',
-  gfx: 'Deprecated animation template. The engine rewrites this to Animations on save.',
-  animations: 'Filename of an animation definition.',
-  tilesetPath: 'Internal tileset source path for enemy rendering.',
-  portrait: 'Portrait image shown in the header card.',
-  renderLayers: 'Render layers used by this enemy animation and display.',
-  animationSlots: 'Animation slots assign animations to defined render layers.',
-  sfxAttack: 'Sound effect played when the enemy attacks.',
-  sfxHit: 'Sound effect played when the enemy is hit.',
-  sfxDie: 'Sound effect played when the enemy dies.',
-  sfxCritDie: 'Sound effect played when the enemy dies from a critical hit.',
-  sfxBlock: 'Sound effect played when the enemy blocks.',
-  sfxLevelup: 'Sound effect played when the enemy levels up.',
-  sfxLowhp: 'Sound effect played when the enemy is low on health.',
-  suppressHp: 'Hide the health bar above this enemy.',
-  corpseHasCollision: 'Dead body still blocks movement.',
-  corpseHasTimeout: 'Dead body disappears after a while.',
-  corpseRenderBelow: 'Draw the corpse under other entities.',
-  hp: 'Maximum health points for this enemy.',
-  mp: 'Maximum magic points for this enemy.',
-  speed: 'Movement or action speed for this enemy.',
-  accuracy: 'Chance to hit with attacks.',
-  avoidance: 'Chance to dodge incoming attacks.',
-  crit: 'Chance to land a critical hit.',
-  poise: 'Ability to resist stagger or interrupt effects.',
-  absorbMin: 'Minimum absorbed damage on each hit.',
-  absorbMax: 'Maximum absorbed damage on each hit.',
-  stealth: 'Stealth rating, affecting detection and surprise.',
-  reflectChance: 'Chance to reflect a portion of incoming damage.',
-  returnDamage: 'Damage returned to the attacker.',
-  hpRegen: 'Health recovered over time.',
-  mpRegen: 'Mana recovered over time.',
-  hpSteal: 'Health stolen on hit.',
-  mpSteal: 'Mana stolen on hit.',
-  xpGain: 'Bonus to XP gained.',
-  dmgMeleeMin: 'Minimum melee damage dealt by this enemy.',
-  dmgMeleeMax: 'Maximum melee damage dealt by this enemy.',
-  meleeRange: 'Effective melee attack range.',
-  dmgRangedMin: 'Minimum ranged damage dealt by this enemy.',
-  dmgRangedMax: 'Maximum ranged damage dealt by this enemy.',
-  dmgMentMin: 'Minimum mental damage dealt by this enemy.',
-  dmgMentMax: 'Maximum mental damage dealt by this enemy.',
-  cooldown: 'Time between attacks or actions.',
-  cooldownHit: 'Delay before the enemy can act again after being hit.',
-  cooldownLos: 'Extra cooldown when the enemy loses sight of its target.',
-  restingHpRegenTime: 'Delay before out-of-combat health regen starts.',
-  powersList: 'Raw power list. Editing a power row clears this so the rows are saved instead.',
-  power: 'Powers this enemy can use.',
-  passivePowers: 'A list of passive powers this creature has.',
-  powerFilter: 'Limit which powers this enemy can use.',
-  attack: 'Studio-only attack value. The engine uses melee or ranged damage instead.',
-  defense: 'Studio-only defense value. The engine uses absorb instead.',
-  combatStyle: 'How the creature enters combat. Default engages when in range, aggressive always fights, passive waits until attacked.',
-  threatRange: 'The first value is the engage radius; the second optional value is the stop distance, defaulting to double the first.',
-  fleeRange: 'The radius at which the creature begins fleeing. Defaults to half of the threat range.',
-  fleeDuration: 'How long the creature flees.',
-  fleeCooldown: 'Wait time before the creature can flee again.',
-  turnDelay: 'Duration it takes for this creature to turn and face its target in ms or s.',
-  wanderRadius: 'Map spawn only in Flare 1.15; not saved to the enemy file.',
-  waypoints: 'Map spawn only in Flare 1.15; not saved to the enemy file.',
-  waypointPause: 'Pause at each waypoint.',
-  chancePursue: 'Percentage chance the creature will chase its target.',
-  chanceFlee: 'Percentage chance the creature will run away from its target.',
-  isFacing: 'Creature can turn to face its target.',
-  isFlying: 'Creature can move over gaps and water.',
-  isIntangible: 'Creature can move through walls.',
-  xp: 'XP awarded upon death.',
-  gold: 'Not read by Flare 1.15; not saved to the enemy file. Use loot with currency instead.',
-  itemFind: 'Chance to find items on this enemy.',
-  currencyFind: 'Chance to find currency on this enemy.',
-  loot: 'Possible loot that can be dropped on death.',
-  lootCount: 'Minimum and optional maximum number of loot drops from this creature.',
-  firstDefeatLoot: 'Item dropped the first time this creature is defeated. Requires defeat status.',
-  defeatStatus: 'Campaign status set when this enemy dies.',
-  questLoot: 'Item dropped when a campaign status condition is met.',
-  convertStatus: 'Campaign status applied if this enemy is converted.',
-  script: 'Not an enemy file key in Flare 1.15; kept on the object only.',
-  vulnerable: 'Damage types or elements this enemy is vulnerable to.',
-  statPerLevel: 'Stats gained per level.',
-  statPerPrimary: 'Stats gained per primary stat.',
-  xpScaling: 'How awarded XP scales with level.',
-  resistDamageOverTime: 'Resistance to damage over time.',
-  resistSlow: 'Resistance to slow.',
-  resistStun: 'Resistance to stun.',
-  resistKnockback: 'Resistance to knockback.',
-  resistStatDebuff: 'Resistance to stat debuffs.',
-  resistDamageReflect: 'Resistance to reflected damage.',
-  resistHpSteal: 'Resistance to health steal.',
-  resistMpSteal: 'Resistance to mana steal.',
-};
-
-const LabelWithTooltip = ({ field, children, className }: { field: string; children: React.ReactNode; className?: string }) => (
-  <Label className={`text-xs text-muted-foreground font-normal flex items-center gap-1 ${className || ''}`}>
-    {children}
-    {enemyPropertyTooltips[field] ? (
-      <Tooltip content={enemyPropertyTooltips[field]} side="top">
-        <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
-      </Tooltip>
-    ) : null}
-  </Label>
-);
-
-const MoreToggle = ({ open, onToggle, children }: { open: boolean; onToggle: () => void; children: React.ReactNode }) => (
-  <div className="space-y-2">
-    <Button type="button" variant="ghost" className="h-auto p-0 text-[10px] text-muted-foreground underline underline-offset-2 hover:bg-transparent hover:text-muted-foreground" onClick={onToggle}>
-      {open ? 'Less' : 'More'}
-    </Button>
-    {open ? children : null}
-  </div>
-);
-
-const EditorSection = ({ title, children }: { title: string; children: React.ReactNode }) => (
-  <section className="space-y-2">
-    <h4 className="text-sm font-semibold">{title}</h4>
-    {children}
-  </section>
-);
-
-const Flag = ({ checked, onChange, label, tip }: { checked: boolean; onChange: (on: boolean) => void; label: string; tip?: string }) => (
-  <Label className="flex items-center gap-2 cursor-pointer font-normal">
-    <Checkbox checked={checked} onCheckedChange={(value) => onChange(value === true)} className="h-3.5 w-3.5" />
-    <span className="text-xs">{label}</span>
-    {tip ? (
-      <Tooltip content={tip} side="top">
-        <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
-      </Tooltip>
-    ) : null}
-  </Label>
-);
 
 export default function EditEnemyWindow({ open, onOpenChange, enemy, onSave, projectPath = '', inline = false, showCloseConfirm = false, onCloseDecision }: EditEnemyWindowProps) {
   const { toast } = useToast();
@@ -899,7 +762,7 @@ const [name, setName] = useState(() => enemy?.name || '');
 
   if (!open && !inline) return null;
 
-  const inputCls = 'h-7 text-xs';
+  const inputCls = enemyInputCls;
   const portraitSrc = portraitPath || null;
 
   const panel = (
@@ -1052,72 +915,44 @@ const [name, setName] = useState(() => enemy?.name || '');
       </section>
 
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4 min-h-0 custom-scrollbar">
-        <EditorSection title="Look">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <LabelWithTooltip field="animations">Animations</LabelWithTooltip>
-              <Input value={animations} onChange={(e) => setAnimations(e.target.value)} placeholder="animations/enemies/goblin.txt" className={`${inputCls} font-mono`} />
-            </div>
-            <div className="space-y-1">
-              <LabelWithTooltip field="sfxAttack">Attack sound</LabelWithTooltip>
-              <Input value={sfxAttack} onChange={(e) => setSfxAttack(e.target.value)} placeholder="soundfx/enemies/hit.ogg" className={`${inputCls} font-mono`} />
-            </div>
-            <div className="space-y-1">
-              <LabelWithTooltip field="sfxHit">Hit sound</LabelWithTooltip>
-              <Input value={sfxHit} onChange={(e) => setSfxHit(e.target.value)} placeholder="soundfx/enemies/pain.ogg" className={`${inputCls} font-mono`} />
-            </div>
-            <div className="space-y-1">
-              <LabelWithTooltip field="sfxDie">Death sound</LabelWithTooltip>
-              <Input value={sfxDie} onChange={(e) => setSfxDie(e.target.value)} placeholder="soundfx/enemies/die.ogg" className={`${inputCls} font-mono`} />
-            </div>
-          </div>
-          <MoreToggle open={lookMore} onToggle={() => setLookMore((v) => !v)}>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <LabelWithTooltip field="gfx">GFX (deprecated)</LabelWithTooltip>
-                <Input value={gfx} onChange={(e) => setGfx(e.target.value)} placeholder="Replaced by Animations on save" className={inputCls} />
-              </div>
-              <div className="space-y-1">
-                <LabelWithTooltip field="tilesetPath">Tileset source</LabelWithTooltip>
-                <Input value={tilesetPath} onChange={(e) => setTilesetPath(e.target.value)} className={`${inputCls} font-mono`} />
-              </div>
-              <div className="space-y-1">
-                <LabelWithTooltip field="portrait">Portrait path</LabelWithTooltip>
-                <Input value={portraitPath} onChange={(e) => setPortraitPath(e.target.value)} className={`${inputCls} font-mono`} />
-              </div>
-              <div className="space-y-1">
-                <LabelWithTooltip field="renderLayers">Render layers</LabelWithTooltip>
-                <Input value={renderLayers} onChange={(e) => setRenderLayers(e.target.value)} placeholder="e.g. floor,object" className={inputCls} />
-              </div>
-              <div className="space-y-1">
-                <LabelWithTooltip field="animationSlots">Animation slots</LabelWithTooltip>
-                <Input value={animationSlots} onChange={(e) => setAnimationSlots(e.target.value)} placeholder="e.g. body,weapon" className={inputCls} />
-              </div>
-              <div className="space-y-1">
-                <LabelWithTooltip field="sfxCritDie">Crit death sound</LabelWithTooltip>
-                <Input value={sfxCritDie} onChange={(e) => setSfxCritDie(e.target.value)} className={`${inputCls} font-mono`} />
-              </div>
-              <div className="space-y-1">
-                <LabelWithTooltip field="sfxBlock">Block sound</LabelWithTooltip>
-                <Input value={sfxBlock} onChange={(e) => setSfxBlock(e.target.value)} className={`${inputCls} font-mono`} />
-              </div>
-              <div className="space-y-1">
-                <LabelWithTooltip field="sfxLevelup">Level-up sound</LabelWithTooltip>
-                <Input value={sfxLevelup} onChange={(e) => setSfxLevelup(e.target.value)} className={`${inputCls} font-mono`} />
-              </div>
-              <div className="space-y-1">
-                <LabelWithTooltip field="sfxLowhp">Low HP sound</LabelWithTooltip>
-                <Input value={sfxLowhp} onChange={(e) => setSfxLowhp(e.target.value)} className={`${inputCls} font-mono`} />
-              </div>
-            </div>
-            <div className="flex flex-wrap gap-4 pt-1">
-              <Flag checked={suppressHp} onChange={setSuppressHp} label="Hide HP bar" tip={enemyPropertyTooltips.suppressHp} />
-              <Flag checked={corpseHasCollision} onChange={setCorpseHasCollision} label="Corpse blocks movement" tip={enemyPropertyTooltips.corpseHasCollision} />
-              <Flag checked={corpseHasTimeout} onChange={setCorpseHasTimeout} label="Corpse disappears" tip={enemyPropertyTooltips.corpseHasTimeout} />
-              <Flag checked={corpseRenderBelow} onChange={setCorpseRenderBelow} label="Draw corpse below" tip={enemyPropertyTooltips.corpseRenderBelow} />
-            </div>
-          </MoreToggle>
-        </EditorSection>
+        <EnemyLookSection
+    animations={animations}
+    setAnimations={setAnimations}
+    sfxAttack={sfxAttack}
+    setSfxAttack={setSfxAttack}
+    sfxHit={sfxHit}
+    setSfxHit={setSfxHit}
+    sfxDie={sfxDie}
+    setSfxDie={setSfxDie}
+    sfxCritDie={sfxCritDie}
+    setSfxCritDie={setSfxCritDie}
+    sfxBlock={sfxBlock}
+    setSfxBlock={setSfxBlock}
+    sfxLevelup={sfxLevelup}
+    setSfxLevelup={setSfxLevelup}
+    sfxLowhp={sfxLowhp}
+    setSfxLowhp={setSfxLowhp}
+    gfx={gfx}
+    setGfx={setGfx}
+    tilesetPath={tilesetPath}
+    setTilesetPath={setTilesetPath}
+    portraitPath={portraitPath}
+    setPortraitPath={setPortraitPath}
+    renderLayers={renderLayers}
+    setRenderLayers={setRenderLayers}
+    animationSlots={animationSlots}
+    setAnimationSlots={setAnimationSlots}
+    suppressHp={suppressHp}
+    setSuppressHp={setSuppressHp}
+    corpseHasCollision={corpseHasCollision}
+    setCorpseHasCollision={setCorpseHasCollision}
+    corpseHasTimeout={corpseHasTimeout}
+    setCorpseHasTimeout={setCorpseHasTimeout}
+    corpseRenderBelow={corpseRenderBelow}
+    setCorpseRenderBelow={setCorpseRenderBelow}
+    lookMore={lookMore}
+    setLookMore={setLookMore}
+        />
 
         <EditorSection title="Combat">
           <div className="flex flex-wrap gap-1.5">
@@ -1294,164 +1129,83 @@ const [name, setName] = useState(() => enemy?.name || '');
           </MoreToggle>
         </EditorSection>
 
-        <EditorSection title="Behavior">
-          <div className="grid grid-cols-4 gap-1.5">
-            {BEHAVIOR_PRESET_IDS.map((id) => {
-              const meta = BEHAVIOR_PRESET_META[id];
-              const Icon = BEHAVIOR_ICONS[id];
-              const active = behaviorPreset === id;
-              return (
-                <Button
-                  key={id}
-                  type="button"
-                  variant="ghost"
-                  onClick={() => applyBehavior(id)}
-                  className={`h-auto min-w-0 rounded-md border px-2 py-1.5 text-left hover:bg-muted/40 ${active ? 'border-orange-500 bg-muted/40' : 'border-border bg-muted/20'}`}
-                  aria-pressed={active}
-                >
-                  <div className="flex items-center gap-1.5">
-                    <Icon className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                    <span className="text-sm font-medium leading-none truncate">{meta.label}</span>
-                  </div>
-                  <div className="h-3.5 mt-1 text-[10px] leading-[14px] text-muted-foreground truncate font-normal">{meta.hint}</div>
-                </Button>
-              );
-            })}
-          </div>
-          <MoreToggle open={behaviorMore} onToggle={() => setBehaviorMore((v) => !v)}>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <LabelWithTooltip field="combatStyle">Combat style</LabelWithTooltip>
-                <Select value={combatStyle} onValueChange={(v: 'default' | 'aggressive' | 'passive') => setCombatStyle(v)}>
-                  <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="default">Default</SelectItem>
-                    <SelectItem value="aggressive">Aggressive</SelectItem>
-                    <SelectItem value="passive">Passive</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-end pb-1">
-                <Flag checked={isStationary} onChange={setIsStationary} label="Stationary" tip="stationary — Enemy does not walk." />
-              </div>
-              <div className="space-y-1"><LabelWithTooltip field="threatRange">Threat range</LabelWithTooltip><Input value={threatRange} onChange={(e) => setThreatRange(e.target.value)} className={inputCls} /></div>
-              <div className="space-y-1"><LabelWithTooltip field="fleeRange">Flee range</LabelWithTooltip><Input value={fleeRange} onChange={(e) => setFleeRange(e.target.value)} className={inputCls} /></div>
-              <div className="space-y-1"><LabelWithTooltip field="chancePursue">Chance pursue %</LabelWithTooltip><Input type="number" value={chancePursue} onChange={(e) => setChancePursue(e.target.value)} className={inputCls} /></div>
-              <div className="space-y-1"><LabelWithTooltip field="chanceFlee">Chance flee %</LabelWithTooltip><Input type="number" value={chanceFlee} onChange={(e) => setChanceFlee(e.target.value)} className={inputCls} /></div>
-              <div className="space-y-1"><LabelWithTooltip field="fleeDuration">Flee duration</LabelWithTooltip><Input value={fleeDuration} onChange={(e) => setFleeDuration(e.target.value)} placeholder="3s" className={inputCls} /></div>
-              <div className="space-y-1"><LabelWithTooltip field="fleeCooldown">Flee cooldown</LabelWithTooltip><Input value={fleeCooldown} onChange={(e) => setFleeCooldown(e.target.value)} placeholder="5s" className={inputCls} /></div>
-              <div className="space-y-1"><LabelWithTooltip field="turnDelay">Turn delay</LabelWithTooltip><Input value={turnDelay} onChange={(e) => setTurnDelay(e.target.value)} placeholder="200ms" className={inputCls} /></div>
-              <div className="space-y-1"><LabelWithTooltip field="wanderRadius">Wander radius</LabelWithTooltip><Input value={wanderRadius} onChange={(e) => setWanderRadius(e.target.value)} className={inputCls} /></div>
-              <div className="space-y-1"><LabelWithTooltip field="waypoints">Waypoints</LabelWithTooltip><Input value={waypoints} onChange={(e) => setWaypoints(e.target.value)} className={inputCls} /></div>
-              <div className="space-y-1"><LabelWithTooltip field="waypointPause">Waypoint pause</LabelWithTooltip><Input value={waypointPause} onChange={(e) => setWaypointPause(e.target.value)} className={inputCls} /></div>
-            </div>
-            <div className="flex flex-wrap gap-4">
-              <Flag checked={isFacing} onChange={setIsFacing} label="Faces target" tip={enemyPropertyTooltips.isFacing} />
-              <Flag checked={isFlying} onChange={setIsFlying} label="Flying" tip={enemyPropertyTooltips.isFlying} />
-              <Flag checked={isIntangible} onChange={setIsIntangible} label="Intangible" tip={enemyPropertyTooltips.isIntangible} />
-            </div>
-          </MoreToggle>
-        </EditorSection>
+        <EnemyBehaviorSection
+    behaviorPreset={behaviorPreset}
+    applyBehavior={applyBehavior}
+    behaviorMore={behaviorMore}
+    setBehaviorMore={setBehaviorMore}
+    combatStyle={combatStyle}
+    setCombatStyle={setCombatStyle}
+    isStationary={isStationary}
+    setIsStationary={setIsStationary}
+    threatRange={threatRange}
+    setThreatRange={setThreatRange}
+    fleeRange={fleeRange}
+    setFleeRange={setFleeRange}
+    chancePursue={chancePursue}
+    setChancePursue={setChancePursue}
+    chanceFlee={chanceFlee}
+    setChanceFlee={setChanceFlee}
+    fleeDuration={fleeDuration}
+    setFleeDuration={setFleeDuration}
+    fleeCooldown={fleeCooldown}
+    setFleeCooldown={setFleeCooldown}
+    turnDelay={turnDelay}
+    setTurnDelay={setTurnDelay}
+    wanderRadius={wanderRadius}
+    setWanderRadius={setWanderRadius}
+    waypoints={waypoints}
+    setWaypoints={setWaypoints}
+    waypointPause={waypointPause}
+    setWaypointPause={setWaypointPause}
+    isFacing={isFacing}
+    setIsFacing={setIsFacing}
+    isFlying={isFlying}
+    setIsFlying={setIsFlying}
+    isIntangible={isIntangible}
+    setIsIntangible={setIsIntangible}
+        />
 
-        <EditorSection title="Loot">
-          <div className="grid grid-cols-2 gap-2">
-            <div className="space-y-1">
-              <LabelWithTooltip field="xp">Kill XP</LabelWithTooltip>
-              <Input type="number" value={xp} onChange={(e) => setXp(e.target.value)} className={inputCls} />
-            </div>
-          </div>
-          <LootRowsEditor
-            rows={lootRows}
-            onChange={setLootRows}
-            items={lootItems}
-            summary={{
-              lootCountMin: lootCountMin ? Number(lootCountMin) : undefined,
-              lootCountMax: lootCountMax ? Number(lootCountMax) : undefined,
-              dropMax: 1,
-              expandTable: (path) => tableRows[path],
-              itemName: (id) => lootItems.find((item) => String(item.id) === id)?.name || id,
-            }}
-          />
-          <MoreToggle open={lootMore} onToggle={() => setLootMore((v) => !v)}>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <LabelWithTooltip field="lootCount">Loot count min</LabelWithTooltip>
-                <Input value={lootCountMin} onChange={(e) => setLootCountMin(e.target.value)} placeholder="Min" className={inputCls} />
-              </div>
-              <div className="space-y-1">
-                <LabelWithTooltip field="lootCount">Loot count max</LabelWithTooltip>
-                <Input value={lootCountMax} onChange={(e) => setLootCountMax(e.target.value)} placeholder="Max" className={inputCls} />
-              </div>
-              <div className="space-y-1">
-                <LabelWithTooltip field="itemFind">Item find %</LabelWithTooltip>
-                <Input value={itemFind} onChange={(e) => setItemFind(e.target.value)} className={inputCls} />
-              </div>
-              <div className="space-y-1">
-                <LabelWithTooltip field="currencyFind">Currency find %</LabelWithTooltip>
-                <Input value={currencyFind} onChange={(e) => setCurrencyFind(e.target.value)} className={inputCls} />
-              </div>
-              <div className="space-y-1 col-span-2">
-                <LabelWithTooltip field="gold">Base gold</LabelWithTooltip>
-                <Input type="number" value={gold} onChange={(e) => setGold(e.target.value)} className={inputCls} />
-              </div>
-            </div>
-          </MoreToggle>
-        </EditorSection>
+        <EnemyLootSection
+    xp={xp}
+    setXp={setXp}
+    lootRows={lootRows}
+    setLootRows={setLootRows}
+    lootItems={lootItems}
+    tableRows={tableRows}
+    lootCountMin={lootCountMin}
+    setLootCountMin={setLootCountMin}
+    lootCountMax={lootCountMax}
+    setLootCountMax={setLootCountMax}
+    itemFind={itemFind}
+    setItemFind={setItemFind}
+    currencyFind={currencyFind}
+    setCurrencyFind={setCurrencyFind}
+    gold={gold}
+    setGold={setGold}
+    lootMore={lootMore}
+    setLootMore={setLootMore}
+        />
 
-        <EditorSection title="Story">
-          <div className="space-y-2">
-            <div className="space-y-1">
-              <LabelWithTooltip field="defeatStatus">Story Flag on death</LabelWithTooltip>
-              <Input value={defeatStatus} onChange={(e) => setDefeatStatus(e.target.value)} placeholder="e.g. boss_defeated" className={`${inputCls} font-mono`} />
-            </div>
-            <div className="space-y-1">
-              <LabelWithTooltip field="questLoot">Quest loot</LabelWithTooltip>
-              <Input value={questLoot} onChange={(e) => setQuestLoot(e.target.value)} placeholder="required_status,required_not_status,item_id" className={`${inputCls} font-mono`} />
-              <Select value={questLoot.split(',').map((p) => p.trim()).slice(2).join(',')} onValueChange={handleSelectQuestLootItem}>
-                <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Select item" /></SelectTrigger>
-                <SelectContent>
-                  {lootItems.map((item) => (
-                    <SelectItem key={item.id} value={String(item.id)}>{item.name} ({item.id})</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <MoreToggle open={storyMore} onToggle={() => setStoryMore((v) => !v)}>
-            <div className="space-y-2">
-              <div className="space-y-1">
-                <LabelWithTooltip field="firstDefeatLoot">First defeat loot</LabelWithTooltip>
-                <Input value={firstDefeatLoot} onChange={(e) => setFirstDefeatLoot(e.target.value)} className={`${inputCls} font-mono`} />
-                <Select value={firstDefeatLoot} onValueChange={handleSelectFirstDefeatLootItem}>
-                  <SelectTrigger className="h-7 text-xs"><SelectValue placeholder="Select item" /></SelectTrigger>
-                  <SelectContent>
-                    {lootItems.map((item) => (
-                      <SelectItem key={item.id} value={String(item.id)}>{item.name} ({item.id})</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1">
-                <LabelWithTooltip field="convertStatus">Convert status</LabelWithTooltip>
-                <Input value={convertStatus} onChange={(e) => setConvertStatus(e.target.value)} className={`${inputCls} font-mono`} />
-              </div>
-              <div className="space-y-1">
-                <LabelWithTooltip field="script">Script</LabelWithTooltip>
-                <Input value={script} onChange={(e) => setScript(e.target.value)} className={`${inputCls} font-mono`} />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground font-normal">Raw properties</Label>
-                <Textarea
-                  value={customPropsRaw}
-                  onChange={(e) => setCustomPropsRaw(e.target.value)}
-                  className="min-h-[8rem] w-full bg-muted/10 border border-border rounded-md p-2 font-mono text-xs focus-visible:ring-1 focus-visible:ring-orange-500 focus-visible:ring-offset-0 outline-none resize-y"
-                  placeholder="KEY=VALUE"
-                />
-                <p className="text-[10px] text-muted-foreground">Keys not covered above. Written as they are.</p>
-              </div>
-            </div>
-          </MoreToggle>
-        </EditorSection>
+        <EnemyStorySection
+    defeatStatus={defeatStatus}
+    setDefeatStatus={setDefeatStatus}
+    questLoot={questLoot}
+    setQuestLoot={setQuestLoot}
+    handleSelectQuestLootItem={handleSelectQuestLootItem}
+    firstDefeatLoot={firstDefeatLoot}
+    setFirstDefeatLoot={setFirstDefeatLoot}
+    handleSelectFirstDefeatLootItem={handleSelectFirstDefeatLootItem}
+    convertStatus={convertStatus}
+    setConvertStatus={setConvertStatus}
+    script={script}
+    setScript={setScript}
+    customPropsRaw={customPropsRaw}
+    setCustomPropsRaw={setCustomPropsRaw}
+    lootItems={lootItems}
+    storyMore={storyMore}
+    setStoryMore={setStoryMore}
+        />
       </div>
 
       <Button

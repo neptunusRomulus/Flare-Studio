@@ -8809,6 +8809,13 @@ export class TileMapEditor {
     this.markAsChanged(immediate);
   }
 
+  public cancelPendingAutoSave(): void {
+    if (this.autoSaveTimeout) {
+      clearTimeout(this.autoSaveTimeout);
+      this.autoSaveTimeout = null;
+    }
+  }
+
   public setDarkMode(isDark: boolean): void {
     this.isDarkMode = isDark;
     this.draw(); // Redraw to apply new grid colors
@@ -8840,6 +8847,7 @@ export class TileMapEditor {
 
   private async performAutoSave(): Promise<void> {
     if (!this.hasUnsavedChanges) return;
+    if (this.isTabSwitching) return;
 
     try {
       this.updateSaveStatus('saving');
@@ -8857,8 +8865,9 @@ export class TileMapEditor {
         this.lastSaveTimestamp = Date.now();
         this.updateSaveStatus('saved');
       } else {
-        // No meaningful data to save yet, but don't show error
-        this.updateSaveStatus('saved');
+        // No tile data to auto-save (for example a new map that only has
+        // unplaced NPCs). Do not pretend the project was persisted.
+        this.updateSaveStatus(this.hasUnsavedChanges ? 'unsaved' : 'saved');
       }
       
       // Clear the timeout
@@ -9192,7 +9201,11 @@ export class TileMapEditor {
   }
 
   // Save complete project data
-  public async saveProjectData(projectPath: string): Promise<boolean> {
+  public async saveProjectData(projectPath: string, options?: { mapName?: string }): Promise<boolean> {
+    if (this.isTabSwitching) {
+      console.warn('saveProjectData skipped because a tab switch is in progress');
+      return false;
+    }
     try {
       // Log the state of all layer data BEFORE starting the save
       try {
@@ -9208,6 +9221,9 @@ export class TileMapEditor {
       // Use getProjectData() to ensure all data (including layerTabs) is included
       await this.ensureTilesetsLoaded();
       const projectData = this.getProjectData();
+      if (options?.mapName && options.mapName.trim()) {
+        projectData.name = options.mapName.trim();
+      }
       console.log('Project data prepared:', {
         name: projectData.name,
         tilesetCount: Object.keys(projectData.tilesetImages || {}).length,

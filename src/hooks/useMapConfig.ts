@@ -5,6 +5,7 @@ import type { EditorProjectData } from '@/editor/TileMapEditor';
 import { TileMapEditor } from '@/editor/TileMapEditor';
 import type { TileLayer } from '@/types';
 import { buildSpawnContent, computeIntermapTarget, extractSpawnIntermapValue, STARTING_MAP_INVALID_NAMES } from '@/editor/mapSpawnUtils';
+import { resolveSaveMapName } from '@/editor/mapSaveName';
 
 type MapConfigOptions = {
   editor: TileMapEditor | null;
@@ -18,6 +19,7 @@ type MapConfigOptions = {
   showBottomToolbarTemporarily: () => void;
   getCreateTabFor: () => ((name: string, projectPath: string | null, config: EditorProjectData) => void) | null;
   getBeforeCreateMap: () => (() => Promise<void>) | null;
+  getActiveTab: () => { name: string } | null;
   currentProjectPath: string | null;
   setLayers: React.Dispatch<React.SetStateAction<TileLayer[]>>;
   setActiveLayerId: React.Dispatch<React.SetStateAction<number | null>>;
@@ -46,6 +48,7 @@ const useMapConfig = ({
   showBottomToolbarTemporarily,
   getCreateTabFor,
   getBeforeCreateMap,
+  getActiveTab,
   currentProjectPath,
   setLayers,
   setActiveLayerId,
@@ -320,7 +323,9 @@ const useMapConfig = ({
             if (typeof targetEditor.ensureTilesetsLoaded === 'function') {
               await targetEditor.ensureTilesetsLoaded();
             }
-            await targetEditor.saveProjectData(currentProjectPath);
+            const editorName = typeof targetEditor.getMapName === 'function' ? targetEditor.getMapName() : undefined;
+            const persistName = resolveSaveMapName(editorName, getActiveTab()?.name);
+            await targetEditor.saveProjectData(currentProjectPath, persistName ? { mapName: persistName } : undefined);
           } catch (saveErr) {
             console.warn('Failed to save before create:', saveErr);
           }
@@ -447,6 +452,7 @@ const useMapConfig = ({
     setStamps,
     getCreateTabFor,
     getBeforeCreateMap,
+    getActiveTab,
     setEditor,
     setupAutoSave,
     showBottomToolbarTemporarily,

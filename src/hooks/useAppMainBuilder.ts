@@ -142,6 +142,8 @@ export default function useAppMainBuilder() {
     setActiveLayerId: appState.setActiveLayerId
   });
 
+  const activeTabForSaveRef = useRef<{ name: string } | null>(null);
+
   const mapConfig = useMapConfig({
     editor: editor ?? null,
     setEditor,
@@ -154,6 +156,7 @@ export default function useAppMainBuilder() {
     showBottomToolbarTemporarily: toolbarState.showBottomToolbarTemporarily,
     getCreateTabFor: () => (appState.createTabForRef?.current ?? null),
     getBeforeCreateMap: () => (appState.beforeCreateMapRef?.current ?? null),
+    getActiveTab: () => activeTabForSaveRef.current,
     currentProjectPath,
     setLayers: appState.setLayers,
     setActiveLayerId: appState.setActiveLayerId,
@@ -179,6 +182,7 @@ export default function useAppMainBuilder() {
     switchToTabHelpersRef: editorRefs.switchToTabHelpersRef
   }) as EditorTabsType;
   const { tabs, activeTabId, setTabs, setActiveTabId, switchToTab, createTabFor, closeEditorTab } = editorTabs as unknown as EditorTabsType;
+  activeTabForSaveRef.current = (tabs.find((t: { id: string; name: string }) => t.id === activeTabId) as { name: string } | undefined) ?? null;
 
   // Wire up the before-create-map callback so that when the user creates a new map,
   // the CURRENT map's full state (including any imported tileset images) is saved to
@@ -186,6 +190,7 @@ export default function useAppMainBuilder() {
   const { handleBeforeCreateMap: beforeCreateMapFn } = useBeforeCreateMap({
     editor: editor ?? null,
     activeTabId: activeTabId ?? null,
+    tabs: tabs as import('./useEditorTabs').EditorTab[],
     setTabs: setTabs as React.Dispatch<React.SetStateAction<import('./useEditorTabs').EditorTab[]>>,
     currentProjectPath
   });

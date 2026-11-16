@@ -3,6 +3,7 @@ import type { Dispatch, SetStateAction } from 'react';
 import type { EditorProjectData, TileMapEditor } from '../editor/TileMapEditor';
 import type { TileLayer, MapObject, Stamp } from '../types';
 import { computeIntermapTarget, extractSpawnIntermapValue } from '../editor/mapSpawnUtils';
+import { resolveSaveMapName } from '../editor/mapSaveName';
 
 type EditorTab = { id: string; name: string; projectPath?: string | null; config?: EditorProjectData | import('../editor/mapConfig').MapConfig | { enemy: MapObject } | null };
 
@@ -239,7 +240,9 @@ export default function useProjectLoader(params: Params) {
               if (prevTab) {
                 try {
                   if (prevTab.projectPath) {
-                    await editor.saveProjectData(prevTab.projectPath);
+                    const editorName = typeof editor.getMapName === 'function' ? editor.getMapName() : undefined;
+                    const persistName = resolveSaveMapName(editorName, prevTab.name);
+                    await editor.saveProjectData(prevTab.projectPath, persistName ? { mapName: persistName } : undefined);
                   } else {
                     await editor.ensureTilesetsLoaded();
                     const snapshot = await editor.getProjectData();

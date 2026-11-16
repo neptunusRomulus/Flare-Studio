@@ -1,8 +1,9 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import type { MutableRefObject } from 'react';
 import type { MapObject } from '@/types';
 import type { EditorProjectData, TileMapEditor } from '@/editor/TileMapEditor';
 import type { MapConfig } from '@/editor/mapConfig';
+import { resolveSaveMapName } from '@/editor/mapSaveName';
 
 export type EditorTab = {
   id: string;
@@ -39,6 +40,12 @@ const useEditorTabs = ({
 }: UseEditorTabsArgs) => {
   const [tabs, setTabs] = useState<EditorTab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
+  const editorRef = useRef(editor);
+  editorRef.current = editor;
+  const tabsRef = useRef(tabs);
+  tabsRef.current = tabs;
+  const activeTabIdRef = useRef(activeTabId);
+  activeTabIdRef.current = activeTabId;
 
   const createTabFor = useCallback((name: string, projectPath?: string | null, config?: EditorProjectData | MapConfig | { enemy: MapObject } | null) => {
     const id = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
@@ -73,10 +80,14 @@ const useEditorTabs = ({
   }, [activeTabId, setActiveTabId, setCurrentProjectPath, setTabs]);
 
   const switchToTab = useCallback(async (tabId: string) => {
+    const editor = editorRef.current;
+    const tabs = tabsRef.current;
+    const activeTabId = activeTabIdRef.current;
     if (tabId === activeTabId) return;
     const prevTab = tabs.find(t => t.id === activeTabId);
     const nextTab = tabs.find(t => t.id === tabId);
     console.log(`[TAB SWITCH] FROM: ${prevTab?.name} (${prevTab?.id}) TO: ${nextTab?.name} (${nextTab?.id})`);
+    let persistOk = !editor || !prevTab;
     try {
       if (editor && prevTab) {
         try {
@@ -85,16 +96,28 @@ const useEditorTabs = ({
           console.warn('Failed to ensure tilesets loaded before switching:', err);
         }
 
+        const editorName = typeof editor.getMapName === 'function' ? editor.getMapName() : undefined;
+        const persistName = resolveSaveMapName(editorName, prevTab.name);
         if (prevTab.projectPath) {
-          try {
-            await editor.saveProjectData(prevTab.projectPath);
-          } catch (e) {
-            console.warn('Failed to save to disk before switching tabs:', e);
-          }
+          const saved = await editor.saveProjectData(prevTab.projectPath, persistName ? { mapName: persistName } : undefined);
+          persistOk = saved !== false;
+        } else if (typeof editor.getProjectData === 'function') {
+          const snapshot = await editor.getProjectData();
+          const safeSnapshot = JSON.parse(JSON.stringify(snapshot));
+          setTabs((prev) => prev.map((t) => t.id === prevTab.id ? { ...t, config: safeSnapshot } : t));
+          persistOk = true;
+        }
+        if (persistOk && typeof editor.cancelPendingAutoSave === 'function') {
+          editor.cancelPendingAutoSave();
         }
       }
     } catch (e) {
       console.warn('Error during tab switch save:', e);
+      persistOk = false;
+    }
+    if (editor && prevTab && !persistOk) {
+      console.error('Aborting tab switch: the current map could not be saved. The new NPC/objects stay in memory on this tab.');
+      return;
     }
 
     if (!nextTab) {
@@ -204,13 +227,11 @@ const useEditorTabs = ({
       editorWithSwitch.setTabSwitching?.(false);
     }
   }, [
-    activeTabId,
-    editor,
     setActiveTabId,
     setCurrentProjectPath,
+    setTabs,
     syncMapConfigForTab,
-    switchToTabHelpersRef,
-    tabs
+    switchToTabHelpersRef
   ]);
 
   const activeTab = useMemo(() => tabs.find(t => t.id === activeTabId) || null, [tabs, activeTabId]);

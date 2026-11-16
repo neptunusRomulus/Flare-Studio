@@ -35,8 +35,8 @@ const TitleBar = ({
   appMenu,
   flareEngine
 }: TitleBarProps) => (
-  <div className="bg-gray-100 dark:bg-neutral-900 text-orange-600 dark:text-orange-400 flex justify-between items-center px-4 py-1 select-none drag-region border-b border-gray-200 dark:border-neutral-700 min-h-0">
-    <div className="flex items-center gap-3 min-w-0 flex-shrink-0">
+  <div className="bg-gray-100 dark:bg-neutral-900 text-orange-600 dark:text-orange-400 grid grid-cols-[1fr_auto_1fr] items-center px-4 py-1 select-none drag-region border-b border-gray-200 dark:border-neutral-700 min-h-0">
+    <div className="flex items-center gap-3 min-w-0 justify-self-start">
       <div className="flex items-center gap-1">
         {appMenu ?? (flareIconUrl ? (
           <img src={flareIconUrl} alt="Flare Studio Logo" className="w-4 h-6" />
@@ -69,29 +69,10 @@ const TitleBar = ({
           </>
         )}
 
-        <span
-          className={`whitespace-nowrap rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-            saveStatus === 'saved'
-              ? 'bg-green-100 text-green-700'
-              : saveStatus === 'error'
-              ? 'bg-red-100 text-red-700'
-              : saveStatus === 'saving'
-              ? 'bg-orange-100 text-orange-700'
-              : 'bg-gray-100 text-gray-700'
-          }`}
-        >
-          {saveStatus === 'saved'
-            ? 'Shield OK'
-            : saveStatus === 'error'
-            ? 'Shield Broken'
-            : saveStatus === 'saving'
-            ? 'Shield Checking...'
-            : 'Shield Pending'}
-        </span>
       </div>
     </div>
-    <div className="flex items-center gap-2">
-      {flareEngine && (
+    <div className="flex items-center justify-center no-drag">
+      {flareEngine ? (
         <PlayButton
           isRunning={flareEngine.isRunning}
           lastError={flareEngine.lastError}
@@ -101,7 +82,9 @@ const TitleBar = ({
           onLaunch={flareEngine.onLaunch}
           onConfigurePath={flareEngine.onConfigurePath}
         />
-      )}
+      ) : null}
+    </div>
+    <div className="flex items-center gap-2 justify-self-end">
       <WindowControls onMinimize={onMinimize} onMaximize={onMaximize} onClose={onClose} />
     </div>
   </div>

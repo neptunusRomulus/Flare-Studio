@@ -12,6 +12,7 @@ import useSaveErrorNotification from './useSaveErrorNotification';
 import useFileConflictDetection from './useFileConflictDetection';
 import { propertyRecord, propertyText } from '@/editor/propertyText';
 import { writeEnemyDefinition } from '@/utils/enemyFileWrite';
+import { debugLog } from '@/lib/debugLog';
 
 // Helper to safely get file stats from Electron
 const getFileStatsSafe = async (path: string) => {
@@ -139,10 +140,10 @@ export default function useManualSave(args: {
   // Initialize save sequencing for NPC/Item/Enemy coordination
   const saveSequencing = useSaveSequencing(editor ?? null, {
     onSequencingStart: () => {
-      console.log('[ManualSave] Save sequencing started');
+      debugLog('[ManualSave] Save sequencing started');
     },
     onSequencingComplete: (order) => {
-      console.log('[ManualSave] Save sequence completed in order:', order.join(' -> '));
+      debugLog('[ManualSave] Save sequence completed in order:', order.join(' -> '));
     },
     onSequencingError: (error) => {
       console.error('[ManualSave] Save sequencing error:', error);
@@ -164,12 +165,12 @@ export default function useManualSave(args: {
     // the editor holds an empty grid, and saving now would overwrite the previously-saved map
     // file with zero tile data. The auto-save will fire again after the switch completes.
     if ((editor as unknown as { getTabSwitching?: () => boolean }).getTabSwitching?.()) {
-      console.log('[ManualSave] Skipping — tab switch in progress (grid is being reloaded)');
+      debugLog('[ManualSave] Skipping — tab switch in progress (grid is being reloaded)');
       return;
     }
 
     const saveId = `manual-save-${++saveCounterRef.current}`;
-    console.log('[ManualSave] ▶ Starting save. id:', saveId, '| projectPath:', currentProjectPath, '| mapName:', typeof editor.getMapName === 'function' ? editor.getMapName() : '(unknown)');
+    debugLog('[ManualSave] ▶ Starting save. id:', saveId, '| projectPath:', currentProjectPath, '| mapName:', typeof editor.getMapName === 'function' ? editor.getMapName() : '(unknown)');
     
     const savePromise = (async () => {
       // Lock save to prevent edits during save
@@ -181,7 +182,7 @@ export default function useManualSave(args: {
 
         // Coordinate saves for NPCs, Items, Enemies to prevent data inconsistency
         // This must happen before the main project save to ensure all objects are in sync
-        console.log('[ManualSave] Coordinating NPC/Item/Enemy saves...');
+        debugLog('[ManualSave] Coordinating NPC/Item/Enemy saves...');
         const sequencingSuccess = await saveSequencing.coordinateSaveSequence();
         if (!sequencingSuccess) {
           const consistencyErrors = saveSequencing.validateSaveConsistency();
@@ -197,7 +198,7 @@ export default function useManualSave(args: {
 
         // Check for file conflicts before attempting save
         if (currentProjectPath) {
-          console.log('[ManualSave] Checking for file conflicts before save');
+          debugLog('[ManualSave] Checking for file conflicts before save');
           try {
             // Get current file stats for conflict detection
             const getFileStats = async () => {
@@ -226,7 +227,7 @@ export default function useManualSave(args: {
 
             // Only show conflict prompt if there's actually a real conflict
             if (conflictResult.hasConflict && conflictResult.severity !== 'none') {
-              console.log('[ManualSave] Actual file conflict detected, showing prompt to user');
+              debugLog('[ManualSave] Actual file conflict detected, showing prompt to user');
               const resolution = await showConflictPrompt({
                 filePath: currentProjectPath,
                 reason: conflictResult.reason || 'File was modified externally',
@@ -235,17 +236,17 @@ export default function useManualSave(args: {
               });
               
               if (resolution === 'cancel') {
-                console.log('[ManualSave] User cancelled save due to conflict');
+                debugLog('[ManualSave] User cancelled save due to conflict');
                 setLastErrorMessage('Save cancelled - file conflict detected');
                 return;
               } else if (resolution === 'reload') {
-                console.log('[ManualSave] User chose to reload external version');
+                debugLog('[ManualSave] User chose to reload external version');
                 setLastErrorMessage('Reload not yet implemented - please use File > Revert');
                 return;
               }
               // resolution === 'keep_app' or 'merge' - proceed with save
             } else {
-              console.log('[ManualSave] No file conflict detected, proceeding with save');
+              debugLog('[ManualSave] No file conflict detected, proceeding with save');
             }
           } catch (conflictErr) {
             console.warn('[ManualSave] Error during conflict check:', conflictErr);
@@ -265,16 +266,16 @@ export default function useManualSave(args: {
               const api = (typeof window !== 'undefined') ? (window as unknown as { electronAPI?: { save?: () => void } }).electronAPI : undefined;
               // Use provided currentProjectPath, or fall back to editor's stored path
               const projectPath = currentProjectPath || (editor?.getCurrentProjectPath?.() ?? null);
-              console.log('[ManualSave][JSON] Starting JSON project save. projectPath:', projectPath, '| electronAPI available:', !!api);
+              debugLog('[ManualSave][JSON] Starting JSON project save. projectPath:', projectPath, '| electronAPI available:', !!api);
               if (api && projectPath) {
-                console.log('[ManualSave][JSON] Calling saveProjectData...');
+                debugLog('[ManualSave][JSON] Calling saveProjectData...');
                 const success = await editor!.saveProjectData(projectPath);
                 await new Promise(resolve => setTimeout(resolve, 300));
                 if (!success) {
                   console.error('[ManualSave][JSON] saveProjectData returned false');
                   throw new Error('saveProjectData returned false');
                 }
-                console.log('[ManualSave][JSON] ✓ JSON project data saved to', projectPath);
+                debugLog('[ManualSave][JSON] ✓ JSON project data saved to', projectPath);
               } else {
                 console.warn('[ManualSave][JSON] Skipping Electron save — api:', !!api, 'path:', projectPath);
                 try {
@@ -296,7 +297,7 @@ export default function useManualSave(args: {
             name: 'Export Flare .txt map file to maps/ folder',
             execute: async () => {
               const projectPath = currentProjectPath || (editor?.getCurrentProjectPath?.() ?? null);
-              console.log('[ManualSave][TXT] Starting Flare .txt export. projectPath:', projectPath);
+              debugLog('[ManualSave][TXT] Starting Flare .txt export. projectPath:', projectPath);
               if (!editor) {
                 console.warn('[ManualSave][TXT] Skipping — editor is null');
                 return;
@@ -313,7 +314,7 @@ export default function useManualSave(args: {
                 return;
               }
               const mapName = typeof editor.getMapName === 'function' ? editor.getMapName() : 'Map';
-              console.log('[ManualSave][TXT] Map name:', mapName, '| Generating Flare map text...');
+              debugLog('[ManualSave][TXT] Map name:', mapName, '| Generating Flare map text...');
               const mapTxt = editor.generateFlareMapTxt({ mapName });
               const tilesetDef = editor.generateFlareTilesetDef();
               const tilesetImages: Record<string, string> = {};
@@ -393,7 +394,7 @@ export default function useManualSave(args: {
                             const copyExists = await api.fileExists(projectCopy);
                             if (copyExists) {
                               resolvedPortraitSource = projectCopy;
-                              console.log(`[ManualSave][TXT] Portrait source gone, using project copy: ${projectCopy}`);
+                              debugLog(`[ManualSave][TXT] Portrait source gone, using project copy: ${projectCopy}`);
                             } else {
                               console.warn(`[ManualSave][TXT] Portrait source not found: ${portraitSource} (project copy also missing)`);
                             }
@@ -443,7 +444,7 @@ export default function useManualSave(args: {
                             const copyExists = await api.fileExists(projectCopy);
                             if (copyExists) {
                               resolvedTilesetSource = projectCopy;
-                              console.log(`[ManualSave][TXT] Tileset source gone, using project copy: ${projectCopy}`);
+                              debugLog(`[ManualSave][TXT] Tileset source gone, using project copy: ${projectCopy}`);
                             } else {
                               console.warn(`[ManualSave][TXT] ⚠ NPC "${npcName}" sprite source not found: ${tilesetSource} (project copy also missing). NPC may be invisible in-game.`);
                             }
@@ -526,16 +527,16 @@ export default function useManualSave(args: {
                   }
                 }
                 if (npcFiles.length > 0) {
-                  console.log(`[ManualSave][TXT] Collected ${npcFiles.length} NPC files for export`);
+                  debugLog(`[ManualSave][TXT] Collected ${npcFiles.length} NPC files for export`);
                 }
                 if (portraitFiles.length > 0) {
-                  console.log(`[ManualSave][TXT] Collected ${portraitFiles.length} portrait files for copying`);
+                  debugLog(`[ManualSave][TXT] Collected ${portraitFiles.length} portrait files for copying`);
                 }
                 if (npcTilesetImages.length > 0) {
-                  console.log(`[ManualSave][TXT] Collected ${npcTilesetImages.length} NPC tileset images for copying`);
+                  debugLog(`[ManualSave][TXT] Collected ${npcTilesetImages.length} NPC tileset images for copying`);
                 }
                 if (npcAnimationFiles.length > 0) {
-                  console.log(`[ManualSave][TXT] Collected ${npcAnimationFiles.length} NPC animation definition files`);
+                  debugLog(`[ManualSave][TXT] Collected ${npcAnimationFiles.length} NPC animation definition files`);
                 }
               } catch (npcErr) {
                 console.warn('[ManualSave][TXT] Failed to collect NPC files:', npcErr);
@@ -549,18 +550,18 @@ export default function useManualSave(args: {
                     if (!wrote) console.warn('[ManualSave][TXT] Failed to write enemy file for', enemy.name || enemy.id);
                   }
                   if (enemyObjects.length > 0) {
-                    console.log(`[ManualSave][TXT] Wrote ${enemyObjects.length} enemy definition file(s)`);
+                    debugLog(`[ManualSave][TXT] Wrote ${enemyObjects.length} enemy definition file(s)`);
                   }
                 }
               } catch (enemyErr) {
                 console.warn('[ManualSave][TXT] Failed to write enemy files:', enemyErr);
               }
 
-              console.log('[ManualSave][TXT] Generated mapTxt length:', mapTxt.length, '| tilesetDef length:', tilesetDef.length);
-              console.log('[ManualSave][TXT] Calling saveExportFiles — path:', projectPath, '| mapName:', mapName);
+              debugLog('[ManualSave][TXT] Generated mapTxt length:', mapTxt.length, '| tilesetDef length:', tilesetDef.length);
+              debugLog('[ManualSave][TXT] Calling saveExportFiles — path:', projectPath, '| mapName:', mapName);
               const saveResult = await electronAPI.saveExportFiles(projectPath, mapName, mapTxt, tilesetDef, { tilesetImages, npcFiles, portraitFiles, npcTilesetImages, npcAnimationFiles });
               if (saveResult?.success) {
-                console.log('[ManualSave][TXT] ✓ Flare .txt saved to', projectPath + '/maps/' + mapName + '.txt');
+                debugLog('[ManualSave][TXT] ✓ Flare .txt saved to', projectPath + '/maps/' + mapName + '.txt');
               } else {
                 const validationDetails = saveResult?.validation?.fileResults
                   ?.map((r) => `${r.filePath}: ${[...r.errors, ...r.warnings].join('; ')}`)
@@ -588,14 +589,14 @@ export default function useManualSave(args: {
               
               // Tileset data is already included in projectData.tilesets
               // Images are in projectData.tilesetImages
-              console.log('[ManualSave] Tileset palettes:', projectData.tilesets?.length || 0, 'images');
+              debugLog('[ManualSave] Tileset palettes:', projectData.tilesets?.length || 0, 'images');
               
               // This is already saved as part of the map data
               // But we log it separately to show it's being tracked
               if (projectData.tilesets && projectData.tilesets.length > 0) {
-                console.log('[ManualSave] ✓ Tileset palettes saved:');
+                debugLog('[ManualSave] ✓ Tileset palettes saved:');
                 projectData.tilesets.forEach((ts, idx) => {
-                  console.log(`  [${idx}] ${ts.fileName || 'unknown'} (layer: ${ts.layerType})`);
+                  debugLog(`  [${idx}] ${ts.fileName || 'unknown'} (layer: ${ts.layerType})`);
                 });
               }
             },
@@ -616,18 +617,18 @@ export default function useManualSave(args: {
               
               // Layer tabs structure
               if (projectData.layerTabs) {
-                console.log('[ManualSave] ✓ Map tabs saved:');
+                debugLog('[ManualSave] ✓ Map tabs saved:');
                 Object.entries(projectData.layerTabs).forEach(([layerType, tabs]) => {
-                  console.log(`  Layer ${layerType}: ${tabs.length} tabs`);
+                  debugLog(`  Layer ${layerType}: ${tabs.length} tabs`);
                   tabs.forEach((tab, idx) => {
-                    console.log(`    - Tab ${idx + 1} (${tab.name || 'unnamed'}): id=${tab.id}`);
+                    debugLog(`    - Tab ${idx + 1} (${tab.name || 'unnamed'}): id=${tab.id}`);
                   });
                 });
               }
               
               // Active layer tab info
               if (projectData.layerActiveTabId) {
-                console.log('[ManualSave] ✓ Active tabs saved:', JSON.stringify(projectData.layerActiveTabId));
+                debugLog('[ManualSave] ✓ Active tabs saved:', JSON.stringify(projectData.layerActiveTabId));
               }
             },
             rollback: async () => {
@@ -647,15 +648,15 @@ export default function useManualSave(args: {
               
               // Layer information
               if (projectData.layers && projectData.layers.length > 0) {
-                console.log('[ManualSave] ✓ Layer information saved:');
+                debugLog('[ManualSave] ✓ Layer information saved:');
                 projectData.layers.forEach((layer, idx) => {
-                  console.log(`  Layer ${idx + 1}: ${layer.name} (type: ${layer.type}, id: ${layer.id})`);
-                  console.log(`    - Visible: ${layer.visible}, Opacity: ${layer.opacity}`);
-                  console.log(`    - Dimensions: ${layer.width}x${layer.height}`);
+                  debugLog(`  Layer ${idx + 1}: ${layer.name} (type: ${layer.type}, id: ${layer.id})`);
+                  debugLog(`    - Visible: ${layer.visible}, Opacity: ${layer.opacity}`);
+                  debugLog(`    - Dimensions: ${layer.width}x${layer.height}`);
                 });
               }
               
-              console.log('[ManualSave] ✓ Active layer: id=${projectData.activeLayerId}');
+              debugLog('[ManualSave] ✓ Active layer: id=${projectData.activeLayerId}');
             },
             rollback: async () => {
               // Layer info rollback is handled with map data
@@ -673,7 +674,7 @@ export default function useManualSave(args: {
                   if (typeof api.saveSettings === 'function') {
                     // Get current settings from persistence hook would be ideal
                     // For now, just log that we're saving
-                    console.log('[ManualSave] ✓ Settings & preferences saved');
+                    debugLog('[ManualSave] ✓ Settings & preferences saved');
                   }
                 }
               } catch (err) {
@@ -724,10 +725,10 @@ export default function useManualSave(args: {
             };
 
             registerFileConflictSave(currentProjectPath, currentFileSize, { getFileStats });
-            console.log('[ManualSave] Updated file conflict tracking after successful save');
+            debugLog('[ManualSave] Updated file conflict tracking after successful save');
           }
           
-          console.log(
+          debugLog(
             `[ManualSave] ✅ Complete save successful! All components saved:` +
             `\n  • Map painting data & Layer info` +
             `\n  • Tileset palettes & Images` +

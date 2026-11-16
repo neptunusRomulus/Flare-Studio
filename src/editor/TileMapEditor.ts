@@ -32,6 +32,7 @@ import {
   undoIndex,
 } from './mapGrid';
 import { mapHeaderForExport, type MapPresentation } from './studioDrafts';
+import { debugLog, setDebugLogEnabled } from '@/lib/debugLog';
 
 interface LayerTilesetEntry {
   image: HTMLImageElement | null;
@@ -349,11 +350,11 @@ export class TileMapEditor {
     // Mark as changed to trigger autosave
     this.markAsChanged(true);
     
-    console.log(`Merged ${brushIds.length} brushes into new brush at position ${firstBrushIndex}`);
+    debugLog(`Merged ${brushIds.length} brushes into new brush at position ${firstBrushIndex}`);
   }
 
   public separateBrush(brushId: number): void {
-    console.log(`separateBrush called with brushId: ${brushId}`);
+    debugLog(`separateBrush called with brushId: ${brushId}`);
     
     const brushData = this.detectedTileData.get(brushId);
     if (!brushData) {
@@ -361,7 +362,7 @@ export class TileMapEditor {
       throw new Error(`Brush ${brushId} not found`);
     }
     
-    console.log(`Separating brush ${brushId} with data:`, brushData);
+    debugLog(`Separating brush ${brushId} with data:`, brushData);
     
     // Convert Map to array to work with positions
     const brushArray = Array.from(this.detectedTileData.entries());
@@ -392,11 +393,11 @@ export class TileMapEditor {
         const imageData = tempCtx.getImageData(0, 0, brushData.width, brushData.height);
         const data = imageData.data;
         
-        console.log(`Analyzing brush area: ${brushData.width}x${brushData.height}`);
+        debugLog(`Analyzing brush area: ${brushData.width}x${brushData.height}`);
         
         // First, try to find vertical separation lines (gaps between objects)
         const verticalGaps = this.tileDetector.findVerticalGaps(data, brushData.width, brushData.height);
-        console.log(`Found vertical gaps:`, verticalGaps);
+        debugLog(`Found vertical gaps:`, verticalGaps);
         
         if (verticalGaps.length > 0) {
           // Use vertical gaps to separate objects
@@ -445,13 +446,13 @@ export class TileMapEditor {
                 continue;
               }
               
-              console.log(`Starting flood fill at pixel (${x}, ${y})`);
+              debugLog(`Starting flood fill at pixel (${x}, ${y})`);
               const objectData = this.tileDetector.floodFillObjectDataInRegion(
                 data, brushData.width, brushData.height, x, y, visited
               );
               
               if (objectData && brushData.width >= 8 && brushData.height >= 8) {
-                console.log(`Found valid connected component:`, objectData);
+                debugLog(`Found valid connected component:`, objectData);
                 // Adjust coordinates back to original image space
                 newBrushes.push({
                   sourceX: brushData.sourceX + objectData.bounds.x,
@@ -460,7 +461,7 @@ export class TileMapEditor {
                   height: objectData.bounds.height
                 });
               } else if (objectData) {
-                console.log(`Found invalid connected component (too small):`, objectData);
+                debugLog(`Found invalid connected component (too small):`, objectData);
               }
             }
           }
@@ -468,11 +469,11 @@ export class TileMapEditor {
       }
     }
     
-    console.log(`Found ${newBrushes.length} new brushes from separation:`, newBrushes);
+    debugLog(`Found ${newBrushes.length} new brushes from separation:`, newBrushes);
     
     // Check if we actually found multiple objects
     if (newBrushes.length <= 1) {
-      console.log(`No separation needed - only found ${newBrushes.length} component(s)`);
+      debugLog(`No separation needed - only found ${newBrushes.length} component(s)`);
       return; // Don't separate if we only found one component or none
     }
     
@@ -493,12 +494,12 @@ export class TileMapEditor {
     // Mark as changed to trigger autosave
     this.markAsChanged(true);
     
-    console.log(`Separated brush ${brushId} into ${newBrushes.length} new brushes`);
+    debugLog(`Separated brush ${brushId} into ${newBrushes.length} new brushes`);
   }
 
   public removeBrush(brushId: number): void {
-    console.log(`removeBrush called with brushId: ${brushId}`);
-    console.log(`detectedTileData keys before removal:`, Array.from(this.detectedTileData.keys()));
+    debugLog(`removeBrush called with brushId: ${brushId}`);
+    debugLog(`detectedTileData keys before removal:`, Array.from(this.detectedTileData.keys()));
     
     if (!this.detectedTileData.has(brushId)) {
       
@@ -507,11 +508,11 @@ export class TileMapEditor {
     
     // Convert Map to array to work with positions
     const brushArray = Array.from(this.detectedTileData.entries());
-    console.log(`brushArray before filtering:`, brushArray.map(([id, _]) => id));
+    debugLog(`brushArray before filtering:`, brushArray.map(([id, _]) => id));
     
     // Remove the brush with the specified ID
     const filteredArray = brushArray.filter(([id]) => id !== brushId);
-    console.log(`filteredArray after filtering:`, filteredArray.map(([id, _]) => id));
+    debugLog(`filteredArray after filtering:`, filteredArray.map(([id, _]) => id));
     
     // Rebuild the map with sequential IDs
     this.detectedTileData.clear();
@@ -519,7 +520,7 @@ export class TileMapEditor {
       this.detectedTileData.set(index, data);
     });
     
-    console.log(`detectedTileData keys after rebuild:`, Array.from(this.detectedTileData.keys()));
+    debugLog(`detectedTileData keys after rebuild:`, Array.from(this.detectedTileData.keys()));
     
     // Rebuild the tile palette to show the changes
     this.createTilePalette(true);
@@ -527,7 +528,7 @@ export class TileMapEditor {
     // Mark as changed to trigger autosave
     this.markAsChanged(true);
     
-    console.log(`Removed brush ${brushId}`);
+    debugLog(`Removed brush ${brushId}`);
   }
 
   public reorderBrush(fromIndex: number, toIndex: number): void {
@@ -554,7 +555,7 @@ export class TileMapEditor {
     // Mark as changed to trigger autosave
     this.markAsChanged(true);
     
-    console.log(`Reordered brush from index ${fromIndex} to ${toIndex}`);
+    debugLog(`Reordered brush from index ${fromIndex} to ${toIndex}`);
   }
 
   private ctx!: CanvasRenderingContext2D;
@@ -2875,6 +2876,7 @@ export class TileMapEditor {
 
   public toggleDebugMode(): void {
     this.debugMode = !this.debugMode;
+    setDebugLogEnabled(this.debugMode);
     this.draw();
   }
 
@@ -5012,19 +5014,19 @@ export class TileMapEditor {
       const currentBrushTool = brushToolElement?.getAttribute('data-brush-tool') || 'none';
 
       if (currentBrushTool === 'merge') {
-        console.log('Handling merge tool selection (no auto-merge)');
+        debugLog('Handling merge tool selection (no auto-merge)');
         this.handleBrushMerge(tileIndex, wrapper);
         return;
       }
 
       if (currentBrushTool === 'separate') {
-        console.log('Handling separate tool');
+        debugLog('Handling separate tool');
         this.handleBrushSeparate(tileIndex);
         return;
       }
 
       if (currentBrushTool === 'remove') {
-        console.log('Handling remove tool');
+        debugLog('Handling remove tool');
         this.handleBrushRemove(tileIndex);
         return;
       }
@@ -5034,23 +5036,23 @@ export class TileMapEditor {
       if (isCtrl) {
         if (this.multiSelectedBrushes.has(tileIndex)) {
           this.multiSelectedBrushes.delete(tileIndex);
-          console.log(`[PALETTE] Ctrl+Click: deselected tile ${tileIndex}, multiSelectedBrushes.size now = ${this.multiSelectedBrushes.size}`);
+          debugLog(`[PALETTE] Ctrl+Click: deselected tile ${tileIndex}, multiSelectedBrushes.size now = ${this.multiSelectedBrushes.size}`);
         } else {
           this.multiSelectedBrushes.add(tileIndex);
-          console.log(`[PALETTE] Ctrl+Click: selected tile ${tileIndex}, multiSelectedBrushes.size now = ${this.multiSelectedBrushes.size}`);
+          debugLog(`[PALETTE] Ctrl+Click: selected tile ${tileIndex}, multiSelectedBrushes.size now = ${this.multiSelectedBrushes.size}`);
         }
 
         if (this.multiSelectedBrushes.size === 1) {
           const only = Array.from(this.multiSelectedBrushes.values())[0];
           this.setCurrentLayerActiveGid(only);
         }
-        console.log(`[PALETTE] Current multiSelectedBrushes: [${Array.from(this.multiSelectedBrushes.values()).join(',')}]`);
+        debugLog(`[PALETTE] Current multiSelectedBrushes: [${Array.from(this.multiSelectedBrushes.values()).join(',')}]`);
         this.updateActiveTile();
         return;
       }
 
       // Single selection: clear multi-selection and select this tile
-      console.log(`[PALETTE] Single click on tile ${tileIndex}, clearing multiSelectedBrushes (was size=${this.multiSelectedBrushes.size})`);
+      debugLog(`[PALETTE] Single click on tile ${tileIndex}, clearing multiSelectedBrushes (was size=${this.multiSelectedBrushes.size})`);
       this.multiSelectedBrushes.clear();
       this.setCurrentLayerActiveGid(tileIndex);
       this.updateActiveTile();
@@ -5303,7 +5305,7 @@ export class TileMapEditor {
             tab.detectedTiles = new Map(layerTileMap);
           }
         }
-        console.log(`Stored ${layerTileMap.size} newly detected tiles for layer type: ${activeLayer.type}`);
+        debugLog(`Stored ${layerTileMap.size} newly detected tiles for layer type: ${activeLayer.type}`);
       }
     }
     
@@ -5443,7 +5445,7 @@ export class TileMapEditor {
       removeOverlay.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        console.log(`Remove overlay clicked for tile index: ${tile.index}`);
+        debugLog(`Remove overlay clicked for tile index: ${tile.index}`);
         this.handleBrushRemove(tile.index);
       });
       
@@ -5610,12 +5612,12 @@ export class TileMapEditor {
   }
 
   private performMerge(firstTileIndex: number, secondTileIndex: number): void {
-    console.log(`Merging tiles ${firstTileIndex} and ${secondTileIndex}`);
+    debugLog(`Merging tiles ${firstTileIndex} and ${secondTileIndex}`);
     
     try {
       // Call the editor's merge brush method
       this.mergeBrushes([firstTileIndex, secondTileIndex]);
-      console.log(`Successfully merged brushes ${firstTileIndex} and ${secondTileIndex}`);
+      debugLog(`Successfully merged brushes ${firstTileIndex} and ${secondTileIndex}`);
     } catch (_error) { void _error; }
   }
 
@@ -5624,7 +5626,7 @@ export class TileMapEditor {
   }
 
   private handleBrushRemove(tileIndex: number): void {
-    console.log(`handleBrushRemove called with tileIndex: ${tileIndex}`);
+    debugLog(`handleBrushRemove called with tileIndex: ${tileIndex}`);
     this.dispatchBrushEvent('remove', tileIndex);
   }
 
@@ -5861,7 +5863,7 @@ export class TileMapEditor {
       try {
         for (const layer of this.tileLayers) {
           const nonZero = layer.data.reduce((acc, v) => acc + (v && v > 0 ? 1 : 0), 0);
-          console.log(`clearMapGrid: before clear layer=${layer.name} id=${layer.id} nonZero=${nonZero}`);
+          debugLog(`clearMapGrid: before clear layer=${layer.name} id=${layer.id} nonZero=${nonZero}`);
         }
       } catch (e) { void e; }
 
@@ -5881,7 +5883,7 @@ export class TileMapEditor {
       try {
         for (const layer of this.tileLayers) {
           const nonZero = layer.data.reduce((acc, v) => acc + (v && v > 0 ? 1 : 0), 0);
-          console.log(`clearMapGrid: after clear layer=${layer.name} id=${layer.id} nonZero=${nonZero}`);
+          debugLog(`clearMapGrid: after clear layer=${layer.name} id=${layer.id} nonZero=${nonZero}`);
         }
       } catch (e) { void e; }
       this.draw();
@@ -6534,9 +6536,9 @@ export class TileMapEditor {
    * are placed in the order they were selected.
    */
   private buildStampFromMultiSelection(): Stamp | null {
-    console.log(`[STAMP] buildStampFromMultiSelection called, multiSelectedBrushes=[${Array.from(this.multiSelectedBrushes.values()).join(',')}]`);
+    debugLog(`[STAMP] buildStampFromMultiSelection called, multiSelectedBrushes=[${Array.from(this.multiSelectedBrushes.values()).join(',')}]`);
     if (this.multiSelectedBrushes.size === 0) {
-      console.log(`[STAMP] No brushes selected, returning null`);
+      debugLog(`[STAMP] No brushes selected, returning null`);
       return null;
     }
     const gids = Array.from(this.multiSelectedBrushes.values());
@@ -6553,7 +6555,7 @@ export class TileMapEditor {
 
     }
 
-    console.log(`[STAMP] Built stamp with ${tiles.length} tiles, ${cols}x${rows} layout`);
+    debugLog(`[STAMP] Built stamp with ${tiles.length} tiles, ${cols}x${rows} layout`);
 
     return {
       id: `multiselection-${Date.now()}`,
@@ -6568,27 +6570,27 @@ export class TileMapEditor {
     const stamp = this.buildStampFromMultiSelection();
     if (!stamp) return;
 
-    console.log(`placeMultiSelectionAt: starting at gridX=${gridX} gridY=${gridY} with ${stamp.tiles.length} tiles`);
+    debugLog(`placeMultiSelectionAt: starting at gridX=${gridX} gridY=${gridY} with ${stamp.tiles.length} tiles`);
 
     // Place each tile relative to gridX/gridY
     for (const t of stamp.tiles) {
       const targetX = gridX + t.x;
       const targetY = gridY + t.y;
       if (targetX < 0 || targetY < 0 || targetX >= this.mapWidth || targetY >= this.mapHeight) {
-        console.log(`  [SKIP] tile at (${targetX}, ${targetY}) is out of bounds`);
+        debugLog(`  [SKIP] tile at (${targetX}, ${targetY}) is out of bounds`);
         continue;
       }
       const index = targetY * this.mapWidth + targetX;
       const layer = this.tileLayers.find(l => l.id === (t.layerId || this.activeLayerId));
       if (layer) {
         const oldValue = layer.data[index];
-        console.log(`  [PLACE] layer=${layer.name} (${targetX},${targetY}) index=${index} oldValue=${oldValue} newValue=${t.tileId}`);
+        debugLog(`  [PLACE] layer=${layer.name} (${targetX},${targetY}) index=${index} oldValue=${oldValue} newValue=${t.tileId}`);
         
         // Remove any existing sprite/object at this position so the new stamp replaces it
         try {
           const existing = layer.data[index];
           if (existing && existing > 0) {
-            console.log(`    [REMOVE_OBJECT] removing sprite object at (${targetX}, ${targetY})`);
+            debugLog(`    [REMOVE_OBJECT] removing sprite object at (${targetX}, ${targetY})`);
             this.removeSpriteObjectAt(layer.type, targetX, targetY);
           }
         } catch (e) { 
@@ -6597,7 +6599,7 @@ export class TileMapEditor {
         }
 
         layer.data[index] = t.tileId;
-        console.log(`    [VERIFY] after set: layer.data[${index}] = ${layer.data[index]}`);
+        debugLog(`    [VERIFY] after set: layer.data[${index}] = ${layer.data[index]}`);
 
         // Record which tileset (tab) this painted cell came from so tabs don't collide
         try {
@@ -7003,7 +7005,7 @@ export class TileMapEditor {
   // Layer-specific tileset management - now scoped per active tab
   public setLayerTileset(layerType: string, file: File, options?: { skipApply?: boolean }): void {
     if (layerType === COLLISION_LAYER_TYPE) return;
-    console.log('setLayerTileset called', { layerType, fileName: file.name, options });
+    debugLog('setLayerTileset called', { layerType, fileName: file.name, options });
     const gidSnapshotBefore = this.snapshotLayerGids();
     const image = new Image();
     image.onload = () => {
@@ -7033,13 +7035,13 @@ export class TileMapEditor {
       const activeTab = tabs.find(t => t.id === activeTabId);
       
       if (activeTab) {
-        console.log(`setLayerTileset: storing tileset in tab ${activeTabId} for layer ${layerType}`);
+        debugLog(`setLayerTileset: storing tileset in tab ${activeTabId} for layer ${layerType}`);
         activeTab.tileset = tilesetEntry;
         if (!options || !options.skipApply) {
           // Also update the shared layerTilesets for immediate display
           this.layerTilesets.set(layerType, tilesetEntry);
         } else {
-          console.log('setLayerTileset: skipApply requested - not applying tileset to shared layer state');
+          debugLog('setLayerTileset: skipApply requested - not applying tileset to shared layer state');
         }
       } else {
         // Fallback to shared state if no active tab (shouldn't happen normally)
@@ -7054,7 +7056,7 @@ export class TileMapEditor {
           this.updateCurrentTileset(layerType);
         }
       } else {
-        console.log('setLayerTileset: not updating current tileset due to skipApply');
+        debugLog('setLayerTileset: not updating current tileset due to skipApply');
       }
 
       const gidSnapshotAfter = this.snapshotLayerGids();
@@ -7442,7 +7444,7 @@ export class TileMapEditor {
       if (!found?.text) return null;
       const tiles = parseTilesetDefTiles(found.text);
       if (tiles.size > 0) {
-        console.log(`Loaded ${tiles.size} tiles from ${found.path}`);
+        debugLog(`Loaded ${tiles.size} tiles from ${found.path}`);
       }
       return tiles.size > 0 ? tiles : null;
     } catch (err) {
@@ -7454,10 +7456,10 @@ export class TileMapEditor {
   public removeLayerTab(layerType: string, tabId: number): void {
     const tabs = this.layerTabs.get(layerType) || [];
     const idx = tabs.findIndex(t => t.id === tabId);
-    console.info(`removeLayerTab called for layer=${layerType} tabId=${tabId} (found idx=${idx})`);
+    debugLog(`removeLayerTab called for layer=${layerType} tabId=${tabId} (found idx=${idx})`);
     if (idx !== -1) {
       const removed = tabs.splice(idx, 1);
-      console.info('removeLayerTab removed:', removed);
+      debugLog('removeLayerTab removed:', removed);
       this.layerTabs.set(layerType, tabs);
       // Remap any painted cells that referenced the removed tab's tileset
       try {
@@ -7602,7 +7604,7 @@ export class TileMapEditor {
       
       this.createTilePalette();
     } else {
-      console.log('updateCurrentTileset: no tileset for layer', layerType);
+      debugLog('updateCurrentTileset: no tileset for layer', layerType);
       // Clear current tileset if no tileset for this layer type
       this.tilesetImage = null;
       this.tilesetFileName = null;
@@ -7693,11 +7695,11 @@ export class TileMapEditor {
     // Create and download tilesetdefs/tileset.txt
     this.downloadFile(tilesetDef, 'tileset.txt', 'text/plain');
     
-    console.log('Flare-compatible map exported successfully!');
-    console.log('📁 Files exported:');
-    console.log('  • map.txt (place in maps/ folder)');
-    console.log('  • tileset.txt (place in tilesetdefs/ folder)');
-    console.log('🎮 Format: Fully compatible with Flare Engine');
+    debugLog('Flare-compatible map exported successfully!');
+    debugLog('📁 Files exported:');
+    debugLog('  • map.txt (place in maps/ folder)');
+    debugLog('  • tileset.txt (place in tilesetdefs/ folder)');
+    debugLog('🎮 Format: Fully compatible with Flare Engine');
     
     // Log global tileset mapping for debugging
     this.logGlobalTilesetMapping();
@@ -7705,11 +7707,11 @@ export class TileMapEditor {
 
   // Debug helper: Log the global tileset mapping
   private logGlobalTilesetMapping(): void {
-    console.log('??? Global Tileset Mapping:');
+    debugLog('??? Global Tileset Mapping:');
     const globalTilesets = this.collectGlobalTilesets();
     for (const tileset of globalTilesets) {
       const endOffset = tileset.offset + tileset.count - 1;
-      console.log(`  ${tileset.fileName} (${tileset.layerType}): IDs ${tileset.offset}-${endOffset} (${tileset.count} tiles)`);
+      debugLog(`  ${tileset.fileName} (${tileset.layerType}): IDs ${tileset.offset}-${endOffset} (${tileset.count} tiles)`);
     }
   }
 
@@ -8646,7 +8648,7 @@ export class TileMapEditor {
             const dir = path.dirname(imagePath);
             const outPath = path.join(dir, tilesetDefName);
             fs.writeFileSync(outPath, content, 'utf8');
-            console.log('Tileset defs saved to', outPath);
+            debugLog('Tileset defs saved to', outPath);
           } else {
             // Missing fs/path functions, fallback to download
             this.downloadFile(content, tilesetDefName, 'text/plain');
@@ -9213,7 +9215,7 @@ export class TileMapEditor {
           const nonZero = layer.data.filter(v => v > 0).length;
           if (nonZero > 0) {
             const activeTabId = this.layerActiveTabId.get(layer.type);
-            console.log(`[SAVE-PRE] layer="${layer.type}" has ${nonZero} painted tiles, activeTab=${activeTabId}`);
+            debugLog(`[SAVE-PRE] layer="${layer.type}" has ${nonZero} painted tiles, activeTab=${activeTabId}`);
           }
         }
       } catch (_e) { void _e; }
@@ -9224,7 +9226,7 @@ export class TileMapEditor {
       if (options?.mapName && options.mapName.trim()) {
         projectData.name = options.mapName.trim();
       }
-      console.log('Project data prepared:', {
+      debugLog('Project data prepared:', {
         name: projectData.name,
         tilesetCount: Object.keys(projectData.tilesetImages || {}).length,
         layerCount: (projectData.layers || []).length,
@@ -9251,7 +9253,7 @@ export class TileMapEditor {
         if (success) this.markAsSaved();
         return success;
       } else {
-        console.log('Falling back to localStorage save...');
+        debugLog('Falling back to localStorage save...');
         // Fallback for web - just save to localStorage
         this.saveToLocalStorage();
         this.markAsSaved();
@@ -9279,7 +9281,7 @@ export class TileMapEditor {
         if (activeTab && layer) {
           // Save the current layer's painted tiles to the active tab
           activeTab.data = [...layer.data];
-          console.log(`[SAVE-SYNC] Synced painting data for tab ${activeTabId} (${activeTab.data.filter(v => v > 0).length} painted tiles)`);
+          debugLog(`[SAVE-SYNC] Synced painting data for tab ${activeTabId} (${activeTab.data.filter(v => v > 0).length} painted tiles)`);
         }
       }
     }
@@ -9302,7 +9304,7 @@ export class TileMapEditor {
     for (const [layerType, tileset] of this.layerTilesets.entries()) {
       // Skip this layer if it has tabs with tilesets - they'll be saved with unique keys below
       if (layersWithTabTilesets.has(layerType)) {
-        console.log('getProjectData: skipping layerTilesets entry (has tab tilesets)', { layerType });
+        debugLog('getProjectData: skipping layerTilesets entry (has tab tilesets)', { layerType });
         continue;
       }
       const fileName = tileset.fileName || null;
@@ -9312,16 +9314,16 @@ export class TileMapEditor {
       // Extract just the filename (not full path) for the key in tilesetImages
       const justFileName = fileName ? fileName.split('/').pop()?.split('\\').pop() || fileName : null;
 
-      console.log('getProjectData: examining tileset entry', { layerType, fileName, justFileName, hasImage, hasPreloaded: !!preloaded, sourcePath: tileset.sourcePath });
+      debugLog('getProjectData: examining tileset entry', { layerType, fileName, justFileName, hasImage, hasPreloaded: !!preloaded, sourcePath: tileset.sourcePath });
 
       // If no fileName available skip
       if (!justFileName) {
-        console.log('getProjectData: skipping tileset (no fileName)', { layerType });
+        debugLog('getProjectData: skipping tileset (no fileName)', { layerType });
         continue;
       }
       // Skip internal files (collision etc)
       if (this.isInternalTilesetFile(justFileName)) {
-        console.log('getProjectData: skipping internal tileset file', { layerType, justFileName });
+        debugLog('getProjectData: skipping internal tileset file', { layerType, justFileName });
         continue;
       }
 
@@ -9331,7 +9333,7 @@ export class TileMapEditor {
       else if (preloaded) imageToUse = preloaded as HTMLImageElement;
 
       if (!imageToUse) {
-        console.log('getProjectData: no image available for tileset, skipping', { layerType, justFileName });
+        debugLog('getProjectData: no image available for tileset, skipping', { layerType, justFileName });
         continue;
       }
 
@@ -9380,7 +9382,7 @@ export class TileMapEditor {
           detectedTiles: Array.from(this.detectedTileData.entries())
         });
       } else {
-        console.log('getProjectData: legacy tileset file present but no image available', { file: this.tilesetFileName });
+        debugLog('getProjectData: legacy tileset file present but no image available', { file: this.tilesetFileName });
       }
     }
 
@@ -9425,7 +9427,7 @@ export class TileMapEditor {
           // Save per-tab painting data
           if (t.data && t.data.length > 0) {
             ser.data = [...t.data];
-            console.log(`[SAVE] Tab ${t.id} (${t.name}): saving ${t.data.filter(v => v > 0).length} painted tiles`);
+            debugLog(`[SAVE] Tab ${t.id} (${t.name}): saving ${t.data.filter(v => v > 0).length} painted tiles`);
           }
           
           if (t.tileset) {
@@ -9447,7 +9449,7 @@ export class TileMapEditor {
               try {
                 // Always save with unique key (overwrite if exists)
                 tilesetImages[uniqueKey] = this.canvasToDataURL(t.tileset.image as HTMLImageElement);
-                console.log(`[SAVE] Saving tileset image with key: ${uniqueKey}`);
+                debugLog(`[SAVE] Saving tileset image with key: ${uniqueKey}`);
               } catch { void 0; }
             }
 
@@ -9506,7 +9508,7 @@ export class TileMapEditor {
     try {
       const imageKeys = Object.keys(projectData.tilesetImages || {});
       const imgSummary = imageKeys.map(k => ({ file: k, size: (projectData.tilesetImages?.[k]?.length ?? 0) }));
-      console.log('getProjectData: summary', { tilesetCount: tilesets.length, tilesetImageCount: imageKeys.length, imgSummary });
+      debugLog('getProjectData: summary', { tilesetCount: tilesets.length, tilesetImageCount: imageKeys.length, imgSummary });
     } catch (_err) {
       void _err;
     }
@@ -9528,11 +9530,11 @@ export class TileMapEditor {
     // Phase 1: Serialize asset records and object instances
     if (this.assetRecords.size > 0) {
       projectData.assetRecords = Array.from(this.assetRecords.values());
-      console.log(`[SAVE] Serialized ${projectData.assetRecords.length} asset records`);
+      debugLog(`[SAVE] Serialized ${projectData.assetRecords.length} asset records`);
     }
     if (this.objectInstances.size > 0) {
       projectData.objectInstances = Array.from(this.objectInstances.values());
-      console.log(`[SAVE] Serialized ${projectData.objectInstances.length} object instances`);
+      debugLog(`[SAVE] Serialized ${projectData.objectInstances.length} object instances`);
     }
     if (this.paintMode) {
       projectData.paintMode = this.paintMode;
@@ -9701,7 +9703,7 @@ export class TileMapEditor {
     this.assetRecords.set(asset.id, asset);
     // Asset footprint/category edits can affect indexed bounds; rebuild to avoid stale occupancy.
     this.rebuildObjectInstanceSpatialIndex();
-    console.log(`[ASSET] Added asset record: ${asset.id} (${asset.name || 'unnamed'})`);
+    debugLog(`[ASSET] Added asset record: ${asset.id} (${asset.name || 'unnamed'})`);
   }
 
   /**
@@ -9780,7 +9782,7 @@ export class TileMapEditor {
   public setPaintMode(mode: PaintMode): void {
     if (this.paintMode !== mode) {
       this.paintMode = mode;
-      console.log(`[PAINT] Paint mode changed to: ${mode}`);
+      debugLog(`[PAINT] Paint mode changed to: ${mode}`);
     }
   }
 
@@ -9937,7 +9939,7 @@ export class TileMapEditor {
           if (existing && existing.src === dataUrl && existing.complete) continue;
           const img = new Image();
           img.onload = () => {
-            console.log('Preloaded tileset image:', file, img.width + 'x' + img.height);
+            debugLog('Preloaded tileset image:', file, img.width + 'x' + img.height);
             this._preloadedTilesetImages.set(file, img);
           };
           img.onerror = () => {
@@ -10348,12 +10350,12 @@ export class TileMapEditor {
   }
 
   private createObjectFromTile(x: number, y: number, layerType: string, _gid: number): void {
-    console.log(`Creating object from tile at (${x}, ${y}) for layer type: ${layerType}`);
+    debugLog(`Creating object from tile at (${x}, ${y}) for layer type: ${layerType}`);
     
     // Check if there's already an object at this position
     const existingObject = this.objects.find(obj => obj.x === x && obj.y === y);
     if (existingObject) {
-      console.log(`Found existing object at (${x}, ${y}), updating instead of creating new one`);
+      debugLog(`Found existing object at (${x}, ${y}), updating instead of creating new one`);
       // Update existing object instead of creating a new one
       const updates: Partial<MapObject> = {
         name: `${layerType}_${x}_${y}`,
@@ -10372,16 +10374,16 @@ export class TileMapEditor {
     } else if (layerType === 'enemy' || layerType === 'object') {
       objectType = 'enemy';
     } else {
-      console.log(`Unsupported layer type: ${layerType}`);
+      debugLog(`Unsupported layer type: ${layerType}`);
       return; // Unsupported layer type
     }
 
-    console.log(`Creating new ${objectType} object at (${x}, ${y})`);
+    debugLog(`Creating new ${objectType} object at (${x}, ${y})`);
 
     // Create the object using the existing addMapObject method
     const newObject = this.addMapObject(objectType, x, y, 1, 1);
     
-    console.log(`Created object with ID: ${newObject.id}`);
+    debugLog(`Created object with ID: ${newObject.id}`);
     
     // Set appropriate defaults based on type
     const updates: Partial<MapObject> = {
@@ -10437,7 +10439,7 @@ export class TileMapEditor {
       // Store the tileset entry in project-level storage
       // The image reference is preserved (not cloned) for performance
       this.projectTilesets.set(layerType, tilesetEntry);
-      console.log(`[PROJECT] Saved tileset for layer "${layerType}" to project storage`);
+      debugLog(`[PROJECT] Saved tileset for layer "${layerType}" to project storage`);
     }
   }
 
@@ -10451,7 +10453,7 @@ export class TileMapEditor {
       const layer = this.tileLayers.find(l => l.type === layerType);
       if (layer) {
         this.layerTilesets.set(layerType, tilesetEntry);
-        console.log(`[PROJECT] Restored tileset for layer "${layerType}" from project storage`);
+        debugLog(`[PROJECT] Restored tileset for layer "${layerType}" from project storage`);
       }
     }
   }
@@ -10655,12 +10657,12 @@ export class TileMapEditor {
       try {
         const imgKeys = projectData.tilesetImages ? Object.keys(projectData.tilesetImages) : [];
         const imgInfo = imgKeys.map(k => ({ file: k, size: projectData.tilesetImages?.[k]?.length ?? 0 }));
-        console.log('loadProjectData: incoming tileset summary', { tilesetsProvided: Array.isArray(projectData.tilesets) ? projectData.tilesets.length : 0, tilesetImageCount: imgKeys.length, imgInfo });
+        debugLog('loadProjectData: incoming tileset summary', { tilesetsProvided: Array.isArray(projectData.tilesets) ? projectData.tilesets.length : 0, tilesetImageCount: imgKeys.length, imgInfo });
       } catch (_e) { void _e; }
 
       // Phase 0: Check schema version for backward-compatibility
       const schemaVersion = projectData.dataSchemaVersion || '1.0'; // Default to legacy if missing
-      console.log(`[MIGRATION] Loading project with schema version: ${schemaVersion} (revision: ${projectData.dataSchemaRevision ?? 'undefined'})`);
+      debugLog(`[MIGRATION] Loading project with schema version: ${schemaVersion} (revision: ${projectData.dataSchemaRevision ?? 'undefined'})`);
       if (!projectData.dataSchemaVersion) {
         console.warn('[MIGRATION] Legacy map detected (no schema version). Will load using legacy tileset/detectedTiles data.');
       }
@@ -11159,25 +11161,25 @@ export class TileMapEditor {
       
       // Load object data if available
       const normalizedObjects = this.normalizeLoadedObjects(projectData.objects);
-      console.log('Loading objects:', normalizedObjects.length);
+      debugLog('Loading objects:', normalizedObjects.length);
       this.objects = normalizedObjects;
       this.nextObjectId = this.calculateNextObjectId(normalizedObjects);
       this.notifyObjectsChanged();
       
       // Set dimensions if provided
       if (projectData.width && projectData.height) {
-        console.log('Setting map dimensions:', projectData.width, 'x', projectData.height);
+        debugLog('Setting map dimensions:', projectData.width, 'x', projectData.height);
         this.mapWidth = projectData.width;
         this.mapHeight = projectData.height;
       }
       
       // Load hero position if provided, otherwise default to (0,0)
       if (projectData.heroX !== undefined && projectData.heroY !== undefined) {
-        console.log('Loading hero position:', projectData.heroX, ',', projectData.heroY);
+        debugLog('Loading hero position:', projectData.heroX, ',', projectData.heroY);
         this.heroX = Math.max(0, Math.min(projectData.heroX, this.mapWidth - 1));
         this.heroY = Math.max(0, Math.min(projectData.heroY, this.mapHeight - 1));
       } else {
-        console.log('No hero position found, defaulting to (0,0)');
+        debugLog('No hero position found, defaulting to (0,0)');
         this.heroX = 0;
         this.heroY = 0;
       }
@@ -11289,7 +11291,7 @@ export class TileMapEditor {
         this.paintMode = projectData.paintMode;
       }
 
-      console.log('Project data loaded successfully');
+      debugLog('Project data loaded successfully');
       this.draw();
     } catch (_error) { void _error; }
   }
@@ -11297,10 +11299,10 @@ export class TileMapEditor {
   // Load tileset from data URL
   public async loadTilesetFromDataURL(dataURL: string, fileName: string, sourcePath?: string): Promise<void> {
     return new Promise((resolve, reject) => {
-      console.log('Loading tileset from dataURL:', fileName, 'SourcePath:', sourcePath);
+      debugLog('Loading tileset from dataURL:', fileName, 'SourcePath:', sourcePath);
       const img = new Image();
       img.onload = () => {
-        console.log('Tileset image loaded successfully:', img.width, 'x', img.height);
+        debugLog('Tileset image loaded successfully:', img.width, 'x', img.height);
         
         // Store the tileset image and properties
         this.tilesetImage = img;
@@ -11312,7 +11314,7 @@ export class TileMapEditor {
         this.tilesetRows = Math.floor(img.height / this.tileSizeY);
         this.tileCount = this.tilesetColumns * this.tilesetRows;
         
-        console.log('Tileset properties:', {
+        debugLog('Tileset properties:', {
           columns: this.tilesetColumns,
           rows: this.tilesetRows,
           tileCount: this.tileCount
@@ -11321,7 +11323,7 @@ export class TileMapEditor {
         // Get the current active layer type
         const activeLayer = this.tileLayers.find(l => l.id === this.activeLayerId);
         if (activeLayer) {
-          console.log('Setting tileset for active layer type:', activeLayer.type);
+          debugLog('Setting tileset for active layer type:', activeLayer.type);
           
           const newTilesetInfo = {
             image: img,
@@ -11337,7 +11339,7 @@ export class TileMapEditor {
           
           // IMPORTANT: Also save to project-level storage to persist across maps
           this.projectTilesets.set(activeLayer.type, newTilesetInfo);
-          console.log(`[PROJECT] Imported and saved tileset "${fileName}" for layer "${activeLayer.type}" to project storage`);
+          debugLog(`[PROJECT] Imported and saved tileset "${fileName}" for layer "${activeLayer.type}" to project storage`);
           
           // Also update the active tab's tileset
           const tabs = this.layerTabs.get(activeLayer.type) || [];
@@ -11351,7 +11353,7 @@ export class TileMapEditor {
           
           // Check if this layer already has saved tile data
           const hasLayerTileData = this.layerTileData.has(activeLayer.type);
-          console.log(`Layer ${activeLayer.type} has existing tile data:`, hasLayerTileData);
+          debugLog(`Layer ${activeLayer.type} has existing tile data:`, hasLayerTileData);
           
           if (!hasLayerTileData) {
             // Clear the global detected tile data for fresh detection
@@ -11367,7 +11369,7 @@ export class TileMapEditor {
             }
           }
         } else {
-          console.log('No active layer found, storing as global tileset');
+          debugLog('No active layer found, storing as global tileset');
         }
         
         // Preserve existing detected tile mapping if it was loaded from project data  
@@ -11376,17 +11378,17 @@ export class TileMapEditor {
         // Create the tile palette (preserve order if mapping exists)
         this.createTilePalette(hasLayerTileData);
         
-        console.log('Tile detection completed, detected tiles:', this.detectedTileData.size);
+        debugLog('Tile detection completed, detected tiles:', this.detectedTileData.size);
         
         this.draw();
-        console.log('Tileset loaded and palette created');
+        debugLog('Tileset loaded and palette created');
         try {
           // Also store the loaded image into the preloaded cache so snapshots
           // and saves that rely on `_preloadedTilesetImages` will include this
           // tileset even if the live `layerTilesets` reference is mutated later.
           if (fileName) {
             this._preloadedTilesetImages.set(fileName, img);
-            console.log('Cached loaded tileset into preloaded cache:', fileName);
+            debugLog('Cached loaded tileset into preloaded cache:', fileName);
           }
         } catch (_e) { void _e; }
         resolve();
@@ -11401,11 +11403,11 @@ export class TileMapEditor {
 
   // Debug method to log layer data
   public debugLayerData(): void {
-    console.log('=== LAYER DATA DEBUG ===');
+    debugLog('=== LAYER DATA DEBUG ===');
     for (const layer of this.tileLayers) {
       const nonZeroTiles = layer.data.filter(gid => gid > 0).length;
       const layerTileset = this.layerTilesets.get(layer.type);
-      console.log(`Layer ${layer.name} (${layer.type}): ${nonZeroTiles} painted tiles, has tileset: ${!!layerTileset?.image}`);
+      debugLog(`Layer ${layer.name} (${layer.type}): ${nonZeroTiles} painted tiles, has tileset: ${!!layerTileset?.image}`);
     }
   }
 

@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Plus, FolderOpen, Grid3X3, Folder, Minus, Square, X } from 'lucide-react';
-import flareIconUrl from '/brand/flare-studio-icon-small.svg?url';
+import { Plus, FolderOpen, Grid3X3, Folder } from 'lucide-react';
 import flareLogoUrl from '/brand/flare-studio-lockup-stacked-light.svg?url';
 import flareLogoDarkUrl from '/brand/flare-studio-lockup-stacked.svg?url';
 import FlareInstallButtons from '@/components/FlareInstallButtons';
+import FloatingBrandMark from '@/components/brand/FloatingBrandMark';
+import WindowControlBar from '@/components/WindowControlBar';
 import { getStoredFlarePath, FLARE_PATH_EVENT } from '@/flare/flarePathStore';
 import ProjectStartToggle from '@/components/ProjectStartToggle';
 import { isTemplateAvailable, queueTemplateImport, type ProjectStart } from '@/flare/projectTemplate';
@@ -313,48 +314,11 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
 
   if (showCreateForm) {
     return (
-      <div className={`min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-neutral-900 dark:to-neutral-800 flex flex-col ${isDarkMode ? 'dark' : ''}`}>
-        {/* Custom Title Bar */}
-        <div className="bg-gray-100 dark:bg-neutral-900 text-orange-600 dark:text-orange-400 flex justify-between items-center px-4 py-1 select-none drag-region border-b border-gray-200 dark:border-neutral-700">
-          <div className="flex items-center gap-2">
-            <img 
-              src={flareIconUrl} 
-              alt="Flare Studio Logo" 
-              className="w-5 h-5"
-            />
-            <span className="text-sm font-semibold">Flare Studio</span>
-          </div>
-          <div className="flex no-drag">
-            <Button 
-              type="button"
-              variant="ghost"
-              onClick={handleMinimize}
-              className="h-auto text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
-              aria-label="Minimize"
-            >
-              <Minus className="w-4 h-4" />
-            </Button>
-            <Button 
-              type="button"
-              variant="ghost"
-              onClick={handleMaximize}
-              className="h-auto text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
-              aria-label="Maximize"
-            >
-              <Square className="w-4 h-4" />
-            </Button>
-            <Button 
-              type="button"
-              variant="ghost"
-              onClick={handleClose}
-              className="h-auto text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
-              aria-label="Close"
-            >
-              <X className="w-4 h-4" />
-            </Button>
-          </div>
-        </div>
-        
+      <div className={`relative min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-neutral-900 dark:to-neutral-800 flex flex-col ${isDarkMode ? 'dark' : ''}`}>
+        {/* Zen mode like the editor: no title bar, the window buttons hide at the top edge. */}
+        <WindowControlBar onMinimize={handleMinimize} onMaximize={handleMaximize} onClose={handleClose} />
+        <FloatingBrandMark />
+
         <div className="flex-1 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-neutral-900 rounded-lg shadow-xl p-8 w-full max-w-md">
           <div className="text-center mb-6">
@@ -425,51 +389,14 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
   }
 
   return (
-    <div className={`h-screen overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100 dark:from-neutral-900 dark:to-neutral-800 flex flex-col ${isDarkMode ? 'dark' : ''}`}>
-      {/* Custom Title Bar */}
-      <div className="bg-gray-100 dark:bg-neutral-900 text-orange-600 dark:text-orange-400 flex justify-between items-center px-4 py-1 select-none drag-region border-b border-gray-200 dark:border-neutral-700">
-        <div className="flex items-center gap-1">
-          <img 
-            src={flareIconUrl} 
-            alt="Flare Studio Logo" 
-            className="w-5 h-5"
-          />
-          <span className="text-sm font-semibold">Flare Studio</span>
-        </div>
-          <div className="flex no-drag">
-            <Button 
-              type="button"
-              variant="ghost"
-              onClick={handleMinimize}
-              className="h-auto text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
-              aria-label="Minimize"
-            >
-              <Minus className="w-4 h-4" />
-            </Button>
-            <Button 
-              type="button"
-              variant="ghost"
-              onClick={handleMaximize}
-              className="h-auto text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
-              aria-label="Maximize"
-            >
-              <Square className="w-4 h-4" />
-            </Button>
-            <Button 
-              type="button"
-              variant="ghost"
-              onClick={handleClose}
-              className="h-auto text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 hover:bg-gray-200 dark:hover:bg-neutral-700 px-3 py-1 text-sm rounded transition-colors"
-              aria-label="Close"
-            >
-              <X className="w-4 h-4" />
-            </Button>
-          </div>
-      </div>
-      
+    <div className={`relative h-screen overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100 dark:from-neutral-900 dark:to-neutral-800 flex flex-col ${isDarkMode ? 'dark' : ''}`}>
+      {/* Zen mode like the editor: no title bar, the window buttons hide at the top edge. */}
+      <WindowControlBar onMinimize={handleMinimize} onMaximize={handleMaximize} onClose={handleClose} />
+      <FloatingBrandMark />
+
       <div className="flex flex-1 min-h-0 overflow-hidden">
   {/* Left Sidebar - Recent Maps (scroll confined here) */}
-  <div className="w-80 bg-white dark:bg-neutral-900 border-r border-slate-200 dark:border-neutral-700 p-6 flex flex-col h-full">
+  <div className="w-80 bg-white dark:bg-neutral-900 border-r border-slate-200 dark:border-neutral-700 p-6 pt-16 flex flex-col h-full">
           <div className="mb-4 flex items-center justify-between">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Recent Projects</h3>
           </div>

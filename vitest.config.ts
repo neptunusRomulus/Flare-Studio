@@ -3,9 +3,11 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   resolve: {
-    alias: {
-      '@': resolve(__dirname, './src'),
-    },
+    alias: [
+      { find: '@', replacement: resolve(__dirname, './src') },
+      // `/brand/*.svg?url` imports are public-dir asset URLs; the Vitest runner denies them.
+      { find: /^\/brand\/.*\.svg\?url$/, replacement: resolve(__dirname, './src/test/svgUrlStub.ts') },
+    ],
   },
   test: {
     environment: 'node',

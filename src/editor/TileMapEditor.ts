@@ -9248,11 +9248,13 @@ export class TileMapEditor {
           version: projectData.version || '1.0'
         };
         const success = await window.electronAPI.saveMapProject(projectPath, safeProjectData);
+        if (success) this.markAsSaved();
         return success;
       } else {
         console.log('Falling back to localStorage save...');
         // Fallback for web - just save to localStorage
         this.saveToLocalStorage();
+        this.markAsSaved();
         return true;
       }
     } catch (_error) {

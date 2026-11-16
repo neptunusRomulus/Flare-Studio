@@ -170,20 +170,12 @@ export default function AppMain() {
   }, [isStartingMap, updateStartingMap]);
   const { handleManualSave, isManuallySaving } = useManualSaveSetup(editor, controls?.currentProjectPath, undefined, onAfterSave);
 
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  useEffect(() => {
-    if (!editor) return;
-    editor.setSaveStatusCallback((status: string) => {
-      setHasUnsavedChanges(status === 'unsaved' || status === 'error');
-    });
-  }, [editor]);
-
   const enhancedControls = useMemo(() => ({
     ...(controls ?? {}),
     handleManualSave,
     isManuallySaving,
-    hasUnsavedChanges
-  }), [controls, handleManualSave, isManuallySaving, hasUnsavedChanges]);
+    hasUnsavedChanges: Boolean(controls?.hasUnsavedChanges)
+  }), [controls, handleManualSave, isManuallySaving]);
 
   const hasMap = canvasCtx.mapInitialized;
 

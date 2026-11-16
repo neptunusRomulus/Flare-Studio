@@ -260,7 +260,7 @@ const EngineSettingsDialog = ({
                   onClearHistory={onClearUndoHistory}
                 />
               ) : (
-                <p className="text-sm text-muted-foreground">Save manually using the Save button in the title bar or Ctrl+S.</p>
+                <p className="text-sm text-muted-foreground">Save manually using the logo menu or Ctrl+S.</p>
               )}
             </div>
           )}

@@ -31,6 +31,9 @@ type MainMenuDialogProps = {
   onOpenSettings?: () => void;
   /** 'below' opens under the anchor (title bar); default 'above'. */
   placement?: 'above' | 'below';
+  onSave?: () => void;
+  hasUnsavedChanges?: boolean;
+  isSaving?: boolean;
 };
 
 const MainMenuDialog: React.FC<MainMenuDialogProps> = ({
@@ -47,7 +50,10 @@ const MainMenuDialog: React.FC<MainMenuDialogProps> = ({
   onOpenSettings,
   placement = 'above',
   onExport,
-  onCheckUpdates
+  onCheckUpdates,
+  onSave,
+  hasUnsavedChanges = false,
+  isSaving = false,
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
   const [savingAndQuitting, setSavingAndQuitting] = useState(false);
@@ -106,9 +112,18 @@ const MainMenuDialog: React.FC<MainMenuDialogProps> = ({
     separator?: boolean;
     loading?: boolean;
     variant?: 'default' | 'danger' | 'muted';
+    showUnsavedDot?: boolean;
   };
 
   const menuItems: MenuItem[] = [
+    ...(onSave ? [{
+      label: 'Save',
+      icon: <Save className="w-3 h-3" />,
+      onClick: () => { onSave(); onClose(); },
+      disabled: !hasProject || isSaving,
+      loading: isSaving,
+      showUnsavedDot: hasUnsavedChanges && !isSaving,
+    }] : []),
     {
       label: 'Save & Quit Project',
       icon: <Save className="w-3 h-3" />,
@@ -219,7 +234,7 @@ const MainMenuDialog: React.FC<MainMenuDialogProps> = ({
                 type="button"
                 variant="ghost"
                 key={item.label}
-                className={`h-auto w-full text-left px-2.5 py-1.5 text-[11px] flex items-center gap-2 transition-colors rounded-none ${
+                className={`h-auto w-full justify-start text-left px-2.5 py-1.5 text-[11px] flex items-center gap-2 transition-colors rounded-none ${
                   isDisabled
                     ? 'opacity-40 cursor-not-allowed'
                     : 'hover:bg-gray-100 dark:hover:bg-neutral-800'
@@ -228,7 +243,10 @@ const MainMenuDialog: React.FC<MainMenuDialogProps> = ({
                 disabled={isDisabled}
               >
                 {item.loading ? <Loader2 className="w-3 h-3 animate-spin flex-shrink-0" /> : <span className="flex-shrink-0">{item.icon}</span>}
-                <span>{item.label}</span>
+                <span className="flex-1 text-left">{item.label}</span>
+                {item.showUnsavedDot ? (
+                  <span className="w-2 h-2 shrink-0 rounded-full bg-red-500" aria-label="Unsaved changes" />
+                ) : null}
               </Button>
             );
           })}

@@ -145,6 +145,42 @@ export default function useAppMainBuilder() {
 
   const activeTabForSaveRef = useRef<{ name: string } | null>(null);
 
+  const [saveStatus, setSaveStatusState] = useState<'saving' | 'saved' | 'unsaved' | 'error'>('saved');
+  const [lastSaveTime, setLastSaveTime] = useState(0);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const applySaveStatus = useCallback((status: 'saving' | 'saved' | 'unsaved' | 'error') => {
+    setSaveStatusState(status);
+    setHasUnsavedChanges(status === 'unsaved' || status === 'error');
+    if (status === 'saved') setLastSaveTime(Date.now());
+  }, []);
+  const handleSaveStatus = useCallback((status: React.SetStateAction<'saving' | 'saved' | 'unsaved' | 'error'>) => {
+    if (typeof status === 'function') {
+      setSaveStatusState((prev) => {
+        const next = status(prev);
+        setHasUnsavedChanges(next === 'unsaved' || next === 'error');
+        if (next === 'saved') setLastSaveTime(Date.now());
+        return next;
+      });
+      return;
+    }
+    applySaveStatus(status);
+  }, [applySaveStatus]);
+
+  useEffect(() => {
+    const prev = editorRefs.editorOptsRef.current ?? {};
+    editorRefs.editorOptsRef.current = {
+      ...prev,
+      setSaveStatus: handleSaveStatus,
+      setHasUnsavedChanges,
+    };
+  }, [editorRefs.editorOptsRef, handleSaveStatus]);
+
+  useEffect(() => {
+    if (!editor) return;
+    editor.setSaveStatusCallback(applySaveStatus);
+  }, [editor, applySaveStatus]);
+
+
   const mapConfig = useMapConfig({
     editor: editor ?? null,
     setEditor,
@@ -168,8 +204,8 @@ export default function useAppMainBuilder() {
     setBrushTool: () => {},
     setShowSeparateDialog: () => {},
     setBrushToSeparate: () => {},
-    setSaveStatus: () => {},
-    setHasUnsavedChanges: () => {},
+    setSaveStatus: handleSaveStatus,
+    setHasUnsavedChanges,
     setHasSelection: toolbarState.setHasSelection,
     setSelectionCount: toolbarState.setSelectionCount
   });
@@ -439,8 +475,8 @@ export default function useAppMainBuilder() {
     setReservedMapNames: mapConfig.setReservedMapNames,
     setHasSelection: toolbarState.setHasSelection,
     setSelectionCount: toolbarState.setSelectionCount,
-    setHasUnsavedChanges: () => {},
-    setSaveStatus: () => {},
+    setHasUnsavedChanges,
+    setSaveStatus: handleSaveStatus,
     setCreateMapError: mapConfig.setCreateMapError,
     setShowCreateMapDialog: mapConfig.setShowCreateMapDialog,
     setShowWelcome: appState.setShowWelcome,
@@ -909,7 +945,7 @@ export default function useAppMainBuilder() {
       handleManualSave: async () => { if (pmForDefaults?.handleManualSave) await pmForDefaults.handleManualSave(); },
       isManuallySaving: false,
       isPreparingNewMap: false,
-      hasUnsavedChanges: false,
+      hasUnsavedChanges,
       setShowSettings: setShowSettings,
       uiHelpers: undefined,
       toast: undefined
@@ -921,8 +957,8 @@ export default function useAppMainBuilder() {
       handleOpenMap: (projectPath?: string) => { try { const manager = projectManager as ProjectManagerType; if (manager && typeof manager.handleOpenMap === 'function' && typeof projectPath === 'string') void manager.handleOpenMap(projectPath); } catch (e) { console.warn(e); } },
       isDarkMode,
       titleBarProps: {
-        saveStatus: 'saved',
-        lastSaveTime: 0,
+        saveStatus,
+        lastSaveTime,
         onMinimize: () => {
           try { window?.electronAPI?.minimize?.(); } catch (e) { console.warn('Minimize failed', e); }
         },

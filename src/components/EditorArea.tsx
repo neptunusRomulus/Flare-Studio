@@ -28,9 +28,10 @@ type Props = {
   canvasCtx: React.ComponentProps<typeof EditorCanvas>['ctx'];
   bottomToolbarProps: React.ComponentProps<typeof EditorCanvas>['bottomToolbarProps'];
   isDarkMode: boolean;
+  overlay?: React.ReactNode;
 };
 
-const EditorArea: React.FC<Props> = ({ topBarProps, canvasCtx, bottomToolbarProps, isDarkMode }) => {
+const EditorArea: React.FC<Props> = ({ topBarProps, canvasCtx, bottomToolbarProps, isDarkMode, overlay }) => {
   return (
     <section className="flex-1 min-w-0 flex flex-col relative">
       <TopBar
@@ -52,6 +53,7 @@ const EditorArea: React.FC<Props> = ({ topBarProps, canvasCtx, bottomToolbarProp
         play={topBarProps.play}
       />
 
+      {overlay}
       <EditorCanvas ctx={canvasCtx} bottomToolbarProps={bottomToolbarProps} isDarkMode={isDarkMode} />
     </section>
   );

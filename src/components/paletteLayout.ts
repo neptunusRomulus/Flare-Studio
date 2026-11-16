@@ -3,6 +3,21 @@ export const PALETTE_PANEL_MIN = 260;
 export const PALETTE_PANEL_MAX = 900;
 export const PALETTE_PANEL_KEY = 'flare.paletteDockWidth';
 
+/** Thin vertical icon rail on the right edge (layout width, so the canvas stops at the rail). */
+export const SIDEBAR_RAIL_WIDTH = 44;
+/**
+ * Floating card top inset: Play + zoom sit at top-2 (~8px) with ~40px controls.
+ * The card starts below that group; the help panel may overlap the card and stays above it (z-index).
+ */
+export const PALETTE_CARD_TOP = 56;
+/**
+ * Floating card bottom inset: the canvas-drawn minimap is 120×150 at scale 1, plus 10px
+ * padding, 5px outer pad and a small gap. Keeps the card from covering the minimap.
+ */
+export const PALETTE_CARD_BOTTOM = 148;
+/** Gap between the floating card and the rail / canvas edge. */
+export const PALETTE_CARD_GAP = 8;
+
 export const DRAWING_LAYER_TYPES = ['background', 'collision', 'object'];
 export function isDrawingLayer(type: string | null | undefined): boolean {
   return !!type && DRAWING_LAYER_TYPES.includes(type);

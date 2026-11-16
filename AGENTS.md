@@ -29,15 +29,15 @@
 - Studio calls Flare powers "Statuses".
 
 ## Current layout
-- No left sidebar. Right dock always visible.
-- Main switch at top: Map | Entities | Content | Game Settings; sub-switch directly under it (Ground/Object/Collision; NPC/Enemy/Event; Items/Statuses/Quests). See `src/components/MapTargetSwitch.tsx`, `src/components/targetGroups.ts`, `src/components/EntityDock.tsx`.
-- Tab cycles sub-targets; Shift+Tab cycles main layers.
-- Map and Entities sub-switch buttons: corner eye = visibility, mouse wheel = opacity (per sub-target).
+- No left sidebar. Right edge: a thin always-visible icon rail (`src/components/PaletteRail.tsx`, `SIDEBAR_RAIL_WIDTH`); clicking an icon opens the list as a floating card over the canvas (`src/components/PaletteCard.tsx`, draggable width in `localStorage`); clicking the active icon again (or Escape) closes the card and frees the canvas.
+- Rail order = Map (Ground/Object/Collision), Entities (NPC/Enemy/Event), Content (Items/Books/Statuses/Quests), Game Settings. See `src/components/targetGroups.ts` (`railGroups`).
+- Tab cycles sub-targets; Shift+Tab cycles main layers (`src/hooks/useSidebarTabHotkeys.ts`).
+- Rail visibility icons (map/entities only): corner eye = visibility, mouse wheel = opacity (per sub-target).
 - Title bar: Flare Studio mark (`src/components/brand/BrandMark.tsx`) = app menu (incl. Engine Settings; `src/components/AppControls.tsx`, `MainMenuDialog.tsx`), Save button next to it.
 - Brand: sources in `assets/brand/` (regenerate with `scripts/brand/`), app icons in `build/icons/`, runtime copies in `public/brand/`. Chakra Petch is for the logo only.
 - GID readout only in Debug Mode. Minimap bottom-left.
 - Content > Quests: the Quest Map (`src/components/QuestMapView.tsx`, graph in `src/editor/questMap.ts`) replaces the map view; the network button next to "+ Quest" toggles it. Read-only: quests, the NPCs and map events that start/advance/end (NPCs also: talk about) them, and quest unlocks, linked by statuses. Dragged card positions live only in the Studio sidecar `content/quest-map.json`.
-- Entities: add button directly under the sub-switch. Add dialogs have no coordinates: position is instance data set by placing on the map. Unplaced = -1,-1, shown as "Not placed", not exported to the map (`src/editor/entityPlacementRules.ts`).
+- Entities: "+" in the list header. Add dialogs have no coordinates: position is instance data set by placing on the map. Unplaced = -1,-1, shown as "Not placed", not exported to the map (`src/editor/entityPlacementRules.ts`).
 
 ## Data safety
 - Saving merges into existing Flare files: keep unknown keys, repeated keys, INCLUDE/APPEND lines, comments, section and `[dialog]` order.

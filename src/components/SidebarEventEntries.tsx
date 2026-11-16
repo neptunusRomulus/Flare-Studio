@@ -3,7 +3,8 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import Tooltip from '@/components/ui/tooltip';
 import { entityPlacement } from '@/components/entityPlacement';
-import { GripVertical, HelpCircle, Plus, MousePointerClick, MapPinPlus, MapPinMinus, LogIn, LogOut, SquareCheckBig, Repeat2 } from 'lucide-react';
+import { GripVertical, HelpCircle, MousePointerClick, MapPinPlus, MapPinMinus, LogIn, LogOut, SquareCheckBig, Repeat2 } from 'lucide-react';
+import ListAddButton from '@/components/ListAddButton';
 import type { MapObject } from '@/types';
 import ElementContextMenu from '@/components/ElementContextMenu';
 import ListItemTooltip from '@/components/ListItemTooltip';
@@ -68,26 +69,10 @@ const SidebarEventEntries = ({
 
   return (
   <>
-    {/* Add button sits right under the sub-switch, above the list */}
       {isEventLayer && (
-        <div className="flex justify-center py-2">
-          <Tooltip content="Add Event" side="bottom">
-            <Button
-              variant="default"
-              size="sm"
-              aria-label="Add Event"
-              className="text-xs px-3 py-1 h-7 shadow-sm bg-orange-500 hover:bg-orange-600 text-white border-orange-500"
-              onClick={(event) => {
-                event.stopPropagation();
-                event.preventDefault();
-                console.log('[UI] Add Event button clicked');
-                onAddEvent();
-              }}
-            >
-              <Plus className="w-3 h-3 mr-1" />
-              Event
-            </Button>
-          </Tooltip>
+        <div className="flex items-center justify-between gap-2 px-1 py-1.5">
+          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Events</div>
+          <ListAddButton label="Add Event" onClick={() => { console.log('[UI] Add Event button clicked'); onAddEvent(); }} />
         </div>
       )}
     {isEventLayer && (

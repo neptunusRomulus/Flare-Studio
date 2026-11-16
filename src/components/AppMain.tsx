@@ -7,7 +7,6 @@ import { loadingOverlay } from '@/components/loadingOverlayStore';
 import { useAppContext } from '../context/AppContext';
 import WelcomeScreen from '../components/WelcomeScreen';
 import AppShell from '@/components/AppShell';
-import MainLayerSwitch from '@/components/MainLayerSwitch';
 import DockFooter from '@/components/DockFooter';
 import AppControls from '@/components/AppControls';
 import SidebarGameSettingsArea from '@/components/SidebarGameSettingsArea';
@@ -333,30 +332,12 @@ export default function AppMain() {
       />
 
       <main className="flex flex-1 min-h-0">
-        <div className="relative flex flex-1 min-w-0 min-h-0">
-          <EditorArea topBarProps={enhancedTopBarProps} canvasCtx={canvasCtx} bottomToolbarProps={bottomToolbarProps} isDarkMode={isDarkMode} />
-          {showQuestMap && (
-            <QuestMapContainer
-              editor={editor}
-              quests={rules.rulesList ?? []}
-              projectPath={controls?.currentProjectPath}
-              mapName={mapName}
-              onOpenQuest={(id) => rules.handleEditRule?.(id)}
-              onOpenNpc={(id) => actors?.handleEditObject?.(id)}
-              onClose={toggleQuestMap}
-            />
-          )}
-          {showBookEditor && <BookEditorView projectPath={controls?.currentProjectPath} />}
-          {showMenuEditor && <MenuEditorView projectPath={controls?.currentProjectPath} />}
-        </div>
-
         <PaletteDock
           {...tileset}
           mapLayers={layersObj?.layers}
           onSelectLayer={layersObj?.handleSetActiveLayer}
           open={shouldShowRightSidebar({ hasMap })}
           layerVisibility={layerVisibility}
-          header={<MainLayerSwitch layers={layersObj?.layers ?? []} activeLayer={tileset.activeLayer} onSelectLayer={layersObj?.handleSetActiveLayer ?? (() => {})} />}
           footer={<DockFooter exportStatus={exportStatus} />}
           currentProjectPath={controls?.currentProjectPath}
           content={groupOfType(tileset.activeLayer?.type) === ENTITY_GROUP ? (
@@ -383,7 +364,26 @@ export default function AppMain() {
           ) : tileset.activeLayer?.type === 'gameSettings' ? (
             <SidebarGameSettingsArea />
           ) : !tileset.activeLayer ? null : undefined}
-        />
+        >
+          {(overlay) => (
+            <div className="relative flex flex-1 min-w-0 min-h-0">
+              <EditorArea topBarProps={enhancedTopBarProps} canvasCtx={canvasCtx} bottomToolbarProps={bottomToolbarProps} isDarkMode={isDarkMode} overlay={overlay} />
+              {showQuestMap && (
+                <QuestMapContainer
+                  editor={editor}
+                  quests={rules.rulesList ?? []}
+                  projectPath={controls?.currentProjectPath}
+                  mapName={mapName}
+                  onOpenQuest={(id) => rules.handleEditRule?.(id)}
+                  onOpenNpc={(id) => actors?.handleEditObject?.(id)}
+                  onClose={toggleQuestMap}
+                />
+              )}
+              {showBookEditor && <BookEditorView projectPath={controls?.currentProjectPath} />}
+              {showMenuEditor && <MenuEditorView projectPath={controls?.currentProjectPath} />}
+            </div>
+          )}
+        </PaletteDock>
 
         <EngineStudioWindows />
 

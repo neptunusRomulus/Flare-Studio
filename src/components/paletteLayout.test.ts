@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { clampPanelWidth, fitZoom, clientToImage, isDrawingLayer, PALETTE_PANEL_MIN } from './paletteLayout';
+import { clampPanelWidth, fitZoom, clientToImage, isDrawingLayer, PALETTE_PANEL_MIN, SIDEBAR_RAIL_WIDTH, PALETTE_CARD_TOP, PALETTE_CARD_BOTTOM } from './paletteLayout';
 
 describe('palette dock layout', () => {
   it('clamps width', () => {
@@ -20,5 +20,10 @@ describe('palette dock layout', () => {
   it('drawing layers', () => {
     expect(isDrawingLayer('collision')).toBe(true);
     expect(isDrawingLayer('npc')).toBe(false);
+  });
+  it('leaves room for the rail, zoom group and minimap', () => {
+    expect(SIDEBAR_RAIL_WIDTH).toBe(44);
+    expect(PALETTE_CARD_TOP).toBeGreaterThanOrEqual(48);
+    expect(PALETTE_CARD_BOTTOM).toBeGreaterThanOrEqual(120 + 10 + 5);
   });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { CONTENT_GROUP, ENTITY_GROUP, MAP_GROUP, collapseTargetGroups, cycleInGroup, groupOfType, normalizeTileRect, tabTargetFor, mainTabTargetFor } from './targetGroups';
+import { CONTENT_GROUP, ENTITY_GROUP, MAP_GROUP, collapseTargetGroups, cycleInGroup, groupOfType, normalizeTileRect, railGroups, tabTargetFor, mainTabTargetFor, visibilityTargets } from './targetGroups';
 import { groupLayers, layerGroupIndex } from './layerGroups';
 
 const div = { tagName: 'DIV', closest: () => null };
@@ -57,5 +57,34 @@ describe('target groups', () => {
     expect(normalizeTileRect({ x: 5, y: 7 }, { x: 2, y: 3 }, 20, 20)).toEqual({ x: 2, y: 3, width: 4, height: 5 });
     expect(normalizeTileRect({ x: 4, y: 4 }, { x: 4, y: 4 }, 20, 20)).toEqual({ x: 4, y: 4, width: 1, height: 1 });
     expect(normalizeTileRect({ x: -3, y: 2 }, { x: 25, y: 2 }, 20, 10)).toEqual({ x: 0, y: 2, width: 20, height: 1 });
+  });
+  it('rail groups only list targets that exist, in Map / Entities / Content / Game Settings order', () => {
+    const groups = railGroups([
+      { type: 'background' },
+      { type: 'collision' },
+      { type: 'npc' },
+      { type: 'event' },
+      { type: 'items' },
+      { type: 'gameSettings' },
+    ]);
+    expect(groups.map((g) => g.id)).toEqual(['map', 'entities', 'content', 'gameSettings']);
+    expect(groups[0].targets.map((t) => t.type)).toEqual(['background', 'collision']);
+    expect(groups[1].targets.map((t) => t.type)).toEqual(['npc', 'event']);
+    expect(groups[2].targets.map((t) => t.type)).toEqual(['items']);
+    expect(groups[2].label).toBe('Content');
+  });
+  it('rail visibility icons cover Map and Entities only', () => {
+    const targets = visibilityTargets([
+      { type: 'background' },
+      { type: 'object' },
+      { type: 'collision' },
+      { type: 'npc' },
+      { type: 'enemy' },
+      { type: 'event' },
+      { type: 'items' },
+      { type: 'rules' },
+      { type: 'gameSettings' },
+    ]);
+    expect(targets.map((t) => t.type)).toEqual(['background', 'object', 'collision', 'npc', 'enemy', 'event']);
   });
 });

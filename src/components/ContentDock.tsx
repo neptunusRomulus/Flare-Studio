@@ -1,11 +1,9 @@
 import React from 'react';
 import type { TileLayer } from '@/types';
-import MapTargetSwitch from '@/components/MapTargetSwitch';
 import SidebarItemsArea from '@/components/SidebarItemsArea';
 import SidebarStatusesArea from '@/components/SidebarStatusesArea';
 import SidebarRulesArea from '@/components/SidebarRulesArea';
 import SidebarBooksArea from '@/components/SidebarBooksArea';
-import { CONTENT_GROUP } from '@/components/targetGroups';
 
 type Props = {
   layers: TileLayer[];
@@ -22,8 +20,6 @@ const ContentDock: React.FC<Props> = ({ layers, activeLayer, onSelectLayer, item
   const type = activeLayer?.type;
   return (
     <div className="flex flex-col flex-1 min-h-0">
-      {/* Sub-switch right under the main switch (tree-like); list fills the space below */}
-      <MapTargetSwitch group={CONTENT_GROUP} layers={layers} activeLayer={activeLayer} onSelectLayer={onSelectLayer} />
       <div className="flex flex-col flex-1 min-h-0 overflow-y-auto">
         {type === 'items' && <SidebarItemsArea {...items} />}
         {type === 'books' && <SidebarBooksArea projectPath={projectPath} />}

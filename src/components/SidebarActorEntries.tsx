@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Tooltip from '@/components/ui/tooltip';
 import { entityPlacement } from '@/components/entityPlacement';
-import { AlertTriangle, Check, GripVertical, HelpCircle, Plus, User, X } from 'lucide-react';
+import { AlertTriangle, Check, GripVertical, HelpCircle, User, X } from 'lucide-react';
+import ListAddButton from '@/components/ListAddButton';
 import type { MapObject } from '@/types';
 import { propertyRecord, propertyText } from '@/editor/propertyText';
 import { ENEMY_ROLE_META_LOOKUP, NPC_ROLE_META_LOOKUP, NPC_STATIC_BADGE_CLASS } from '@/editor/actorRoles';
@@ -151,46 +152,16 @@ const SidebarActorEntries = ({
 
   return (
   <>
-    {/* Add button sits right under the sub-switch, above the list */}
     {isNpcLayer && (
-      <div className="flex justify-center py-2">
-        <Tooltip content="Add NPC" side="bottom">
-          <Button
-            variant="default"
-            size="sm"
-            aria-label="Add NPC"
-            className="text-xs px-3 py-1 h-7 shadow-sm bg-orange-500 hover:bg-orange-600 text-white border-orange-500"
-            onClick={(event) => {
-              event.stopPropagation();
-              event.preventDefault();
-              openDraft();
-            }}
-          >
-            <Plus className="w-3 h-3 mr-1" />
-            NPC
-          </Button>
-        </Tooltip>
+      <div className="flex items-center justify-between gap-2 px-1 py-1.5">
+        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">NPCs</div>
+        <ListAddButton label="Add NPC" onClick={openDraft} />
       </div>
     )}
     {isEnemyLayer && (
-      <div className="flex justify-center py-2">
-        <Tooltip content="Add Enemy" side="bottom">
-          <Button
-            variant="default"
-            size="sm"
-            aria-label="Add Enemy"
-            className="text-xs px-3 py-1 h-7 shadow-sm bg-orange-500 hover:bg-orange-600 text-white border-orange-500"
-            onClick={(event) => {
-              event.stopPropagation();
-              event.preventDefault();
-              console.log('[UI] Add Enemy button clicked');
-              onAddEnemy();
-            }}
-          >
-            <Plus className="w-3 h-3 mr-1" />
-            Enemy
-          </Button>
-        </Tooltip>
+      <div className="flex items-center justify-between gap-2 px-1 py-1.5">
+        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Enemies</div>
+        <ListAddButton label="Add Enemy" onClick={() => { console.log('[UI] Add Enemy button clicked'); onAddEnemy(); }} />
       </div>
     )}
     {(isNpcLayer || isEnemyLayer) && (

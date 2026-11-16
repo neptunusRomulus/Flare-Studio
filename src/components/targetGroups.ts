@@ -125,3 +125,40 @@ export function mainLayerTargetId(main: string, layers: Array<{ id: number; type
   const l = layers.find(x => x.type === want) ?? g.targets.map(t => layers.find(x => x.type === t)).find(Boolean);
   return l ? l.id : null;
 }
+
+/** Leaf tabs shown on the vertical right-sidebar rail, grouped as they are today. */
+export function railGroups(layers: Array<{ type: string }>): Array<{
+  id: string;
+  label: string;
+  help: string;
+  targets: Array<{ type: string; label: string }>;
+}> {
+  const out: Array<{ id: string; label: string; help: string; targets: Array<{ type: string; label: string }> }> = [];
+  for (const g of TARGET_GROUPS) {
+    const targets = g.targets
+      .filter((t) => layers.some((l) => l.type === t))
+      .map((t) => ({ type: t, label: g.labels[t] }));
+    if (targets.length) out.push({ id: g.id, label: g.label, help: g.help, targets });
+  }
+  if (layers.some((l) => l.type === 'gameSettings')) {
+    out.push({
+      id: 'gameSettings',
+      label: 'Game Settings',
+      help: 'Shift+Tab: switch main layers.',
+      targets: [{ type: 'gameSettings', label: 'Game Settings' }],
+    });
+  }
+  return out;
+}
+
+/** Layers that still have visibility / opacity controls (Map + Entities). */
+export function visibilityTargets(layers: Array<{ type: string }>): Array<{ type: string; label: string }> {
+  const out: Array<{ type: string; label: string }> = [];
+  for (const g of TARGET_GROUPS) {
+    if (g.hasVisibility === false) continue;
+    for (const t of g.targets) {
+      if (layers.some((l) => l.type === t)) out.push({ type: t, label: g.labels[t] });
+    }
+  }
+  return out;
+}

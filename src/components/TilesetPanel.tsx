@@ -1,5 +1,5 @@
 import React from 'react';
-import MapTargetSwitch, { type LayerVisibilityControls } from '@/components/MapTargetSwitch';
+import type { LayerVisibilityControls } from '@/components/MapTargetSwitch';
 import TilesetPalette from '@/components/TilesetPalette';
 import BrushToolbar from '@/components/BrushToolbar';
 import type { TileLayer } from '@/types';
@@ -71,10 +71,6 @@ const TilesetPanel: React.FC<Props> = ({
 
   return (
     <>
-      {mapLayers && onSelectLayer && (
-        <MapTargetSwitch layers={mapLayers} activeLayer={activeLayer} onSelectLayer={onSelectLayer} visibility={layerVisibility} />
-      )}
-
       <TilesetPalette editor={editor} activeLayer={activeLayer} tabTick={tabTick} setTabTick={setTabTick} brushTool={brushTool} stampsState={stampsState} fitToWidth={fitToWidth} />
 
       <BrushToolbar

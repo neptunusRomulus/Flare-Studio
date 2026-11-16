@@ -1,8 +1,20 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import TilesetPanel from '@/components/TilesetPanel';
-import { clampPanelWidth, PALETTE_PANEL_DEFAULT, PALETTE_PANEL_KEY } from '@/components/paletteLayout';
+import PaletteRail from '@/components/PaletteRail';
+import PaletteCard from '@/components/PaletteCard';
+import { clampPanelWidth, PALETTE_PANEL_DEFAULT, PALETTE_PANEL_KEY, SIDEBAR_RAIL_WIDTH } from '@/components/paletteLayout';
+import { useSidebarTabHotkeys } from '@/hooks/useSidebarTabHotkeys';
+import type { TileLayer } from '@/types';
 
-type Props = React.ComponentProps<typeof TilesetPanel> & { open: boolean; content?: React.ReactNode; header?: React.ReactNode; footer?: React.ReactNode };
+type Overlay = React.ReactNode;
+type Children = React.ReactNode | ((overlay: Overlay) => React.ReactNode);
+
+type Props = React.ComponentProps<typeof TilesetPanel> & {
+  open: boolean;
+  content?: React.ReactNode;
+  footer?: React.ReactNode;
+  children?: Children;
+};
 
 export const DOCK_ANIM_MS = 220;
 
@@ -19,16 +31,25 @@ function readWidth(): number {
   }
 }
 
-/** Right-side dock: main layer switch (header), the active layer's panel, app controls (footer). */
-const PaletteDock: React.FC<Props> = ({ open, content, header, footer, ...props }) => {
+/**
+ * Hybrid right sidebar: a thin always-visible icon rail, plus a floating list card
+ * over the canvas (opened by clicking a rail tab, closed by clicking the active tab again).
+ */
+const PaletteDock: React.FC<Props> = ({ open, content, footer, children, ...props }) => {
+  const layers = (props.mapLayers ?? []) as TileLayer[];
+  const activeLayer = props.activeLayer ?? null;
+  const onSelectLayer = props.onSelectLayer ?? (() => {});
   const [width, setWidth] = useState<number>(readWidth);
-  // Initial mount: no animation (also avoids a slide behind the loading overlay)
+  const [cardOpen, setCardOpen] = useState(true);
   const [rendered, setRendered] = useState(open);
   const [shown, setShown] = useState(open);
-  const [dragging, setDragging] = useState(false);
+
+  useSidebarTabHotkeys(layers, activeLayer, onSelectLayer);
+
   useEffect(() => {
     if (open) {
       setRendered(true);
+      setCardOpen(true);
       const r = requestAnimationFrame(() => requestAnimationFrame(() => setShown(true)));
       return () => cancelAnimationFrame(r);
     }
@@ -36,72 +57,70 @@ const PaletteDock: React.FC<Props> = ({ open, content, header, footer, ...props 
     const t = setTimeout(() => setRendered(false), prefersReducedMotion() ? 0 : DOCK_ANIM_MS);
     return () => clearTimeout(t);
   }, [open]);
-  const drag = useRef<{ startX: number; startW: number } | null>(null);
+
+  // Escape closes the floating list, keeping the rail (and the canvas underneath) as is.
+  useEffect(() => {
+    if (!open || !cardOpen) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      const target = event.target as HTMLElement | null;
+      const tag = (target?.tagName || '').toUpperCase();
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target?.isContentEditable) return;
+      if (target?.closest('[role="dialog"],[role="alertdialog"]')) return;
+      setCardOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, cardOpen]);
 
   useEffect(() => {
-    const onResize = () => setWidth(w => clampPanelWidth(w, window.innerWidth));
+    const onResize = () => setWidth((w) => clampPanelWidth(w, window.innerWidth));
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
 
-  const onPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    drag.current = { startX: e.clientX, startW: width };
-    setDragging(true);
-  }, [width]);
-
-  const onPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    if (!drag.current) return;
-    setWidth(clampPanelWidth(drag.current.startW + (drag.current.startX - e.clientX), window.innerWidth));
-  }, []);
-
-  const onPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    if (!drag.current) return;
-    drag.current = null;
-    setDragging(false);
-    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
-    setWidth(w => {
-      try { localStorage.setItem(PALETTE_PANEL_KEY, String(w)); } catch { /* ignore */ }
-      return w;
+  const onWidthChange = useCallback((next: number | ((current: number) => number)) => {
+    setWidth((current) => {
+      const value = typeof next === 'function' ? next(current) : next;
+      return clampPanelWidth(value, window.innerWidth);
     });
   }, []);
 
-  if (!rendered) return null;
-  const ms = dragging || prefersReducedMotion() ? 0 : DOCK_ANIM_MS;
-  const ease = shown ? 'cubic-bezier(0, 0, 0.2, 1)' : 'cubic-bezier(0.4, 0, 1, 1)';
+  const ms = prefersReducedMotion() ? 0 : DOCK_ANIM_MS;
+  const overlay = rendered ? (
+    <PaletteCard
+      open={Boolean(shown && cardOpen)}
+      width={width}
+      onWidthChange={onWidthChange}
+      footer={footer}
+      animMs={ms}
+    >
+      {content === undefined ? <TilesetPanel {...props} fitToWidth /> : content}
+    </PaletteCard>
+  ) : null;
+
   return (
-    <div
-      className="h-full min-h-0 flex-shrink-0 overflow-hidden"
-      style={{ width: shown ? width : 0, transition: ms ? `width ${ms}ms ${ease}` : 'none' }}
-      aria-hidden={!open}
-    >
-    <aside
-      className="relative ml-auto h-full min-h-0 border-l border-border bg-muted/30 flex flex-col"
-      style={{
-        width,
-        transform: shown ? 'translateX(0)' : 'translateX(100%)',
-        opacity: shown ? 1 : 0,
-        transition: ms ? `transform ${ms}ms ${ease}, opacity ${ms}ms ${ease}` : 'none',
-      }}
-    >
-      <div
-        role="separator"
-        aria-orientation="vertical"
-        aria-label="Resize palette"
-        className="absolute top-0 left-0 h-full w-2 -ml-1 z-10 cursor-col-resize touch-none hover:bg-border/40"
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
-      />
-      <div className="flex flex-col flex-1 min-h-0 p-2">
-        {header}
-        {content === undefined ? <TilesetPanel {...props} fitToWidth /> : content}
-        {footer}
-      </div>
-    </aside>
-    </div>
+    <>
+      {typeof children === 'function' ? children(overlay) : children}
+      {rendered ? (
+        <div
+          className="h-full min-h-0 flex-shrink-0 overflow-hidden"
+          style={{ width: shown ? SIDEBAR_RAIL_WIDTH : 0, transition: ms ? `width ${ms}ms cubic-bezier(0, 0, 0.2, 1)` : 'none' }}
+          aria-hidden={!open}
+        >
+          <PaletteRail
+            layers={layers}
+            activeLayer={activeLayer}
+            onSelectLayer={onSelectLayer}
+            cardOpen={cardOpen && shown}
+            onCardOpenChange={setCardOpen}
+            visibility={props.layerVisibility}
+            shown={shown}
+            animMs={ms}
+          />
+        </div>
+      ) : null}
+    </>
   );
 };
 

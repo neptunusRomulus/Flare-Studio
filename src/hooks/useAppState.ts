@@ -11,7 +11,7 @@ export default function useAppState() {
   const [showAddLayerDropdown, setShowAddLayerDropdown] = useState(false);
   const [layersPanelExpanded, setLayersPanelExpanded] = useState(false);
   const [hoveredLayerId, setHoveredLayerId] = useState<number | null>(null);
-  const [tipsMinimized, setTipsMinimized] = useState(false);
+  const [tipsMinimized, setTipsMinimized] = useState(true);
   const [tabTick, setTabTick] = useState(0);
 
   const [pendingMapConfig, setPendingMapConfig] = useState<EditorProjectData | null>(null);

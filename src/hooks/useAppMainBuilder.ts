@@ -1036,7 +1036,8 @@ export default function useAppMainBuilder() {
         handleRedo,
         handleZoomIn,
         handleZoomOut,
-        handleResetZoom
+        handleResetZoom,
+        isEnemyTabActive: Boolean((tabs as Array<{ id: string; tabType?: string }>).find((tab) => tab.id === activeTabId)?.tabType === 'enemy'),
       },
       canvasCtx: {
         editor: editor,

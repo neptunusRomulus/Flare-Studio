@@ -15,6 +15,10 @@ type TopBarProps = {
   handleZoomIn: () => void;
   handleZoomOut: () => void;
   handleResetZoom: () => void;
+  tipsMinimized: boolean;
+  setTipsMinimized: (v: boolean) => void;
+  setShowHelp: (v: boolean) => void;
+  isEnemyTabActive: boolean;
 };
 
 type Props = {
@@ -39,6 +43,10 @@ const EditorArea: React.FC<Props> = ({ topBarProps, canvasCtx, bottomToolbarProp
         handleZoomIn={topBarProps.handleZoomIn}
         handleZoomOut={topBarProps.handleZoomOut}
         handleResetZoom={topBarProps.handleResetZoom}
+        tipsMinimized={topBarProps.tipsMinimized}
+        setTipsMinimized={topBarProps.setTipsMinimized}
+        setShowHelp={topBarProps.setShowHelp}
+        isEnemyTabActive={topBarProps.isEnemyTabActive}
       />
 
       <EditorCanvas ctx={canvasCtx} bottomToolbarProps={bottomToolbarProps} isDarkMode={isDarkMode} />

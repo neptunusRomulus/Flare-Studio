@@ -13,26 +13,23 @@ type Props = {
 const CanvasTips: React.FC<Props> = ({ tipsMinimized, setTipsMinimized, setShowHelp, isEnemyTabActive }) => {
   if (isEnemyTabActive) return null;
   return (
-    <div className="absolute top-4 left-4 z-20">
-      <div
-        className={`absolute inset-0 transition-all duration-300 ${tipsMinimized ? 'opacity-100 scale-100 pointer-events-auto' : 'opacity-0 scale-75 pointer-events-none'}`}
-      >
-        <Tooltip content="Click to see help" side="right">
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            className="w-8 h-8 flex items-center justify-center bg-white dark:bg-neutral-900 rounded-full border border-border shadow-lg hover:bg-gray-100 dark:hover:bg-neutral-800 transition-all duration-200 hover:scale-105"
-            onClick={() => setTipsMinimized(false)}
-            aria-label="Show help tips"
-          >
-            <HelpCircle className="w-4 h-4 text-gray-600 dark:text-gray-300" />
-          </Button>
-        </Tooltip>
-      </div>
+    <div className="relative">
+      <Tooltip content="Canvas help" side="bottom">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="w-8 h-8 p-0 rounded-full"
+          onClick={() => setTipsMinimized(!tipsMinimized)}
+          aria-label={tipsMinimized ? 'Show canvas help' : 'Hide canvas help'}
+          aria-expanded={!tipsMinimized}
+        >
+          <HelpCircle className="w-4 h-4" />
+        </Button>
+      </Tooltip>
 
       <div
-        className={`p-3 bg-white/90 dark:bg-neutral-900/90 backdrop-blur-sm rounded-lg border border-border shadow-lg transition-all duration-300 origin-top-left ${tipsMinimized ? 'opacity-0 scale-75 pointer-events-none' : 'opacity-100 scale-100 pointer-events-auto'}`}
+        className={`absolute right-0 top-full z-30 mt-2 w-max p-3 bg-white/90 dark:bg-neutral-900/90 backdrop-blur-sm rounded-lg border border-border shadow-lg transition-all duration-300 origin-top-right ${tipsMinimized ? 'pointer-events-none scale-75 opacity-0' : 'pointer-events-auto scale-100 opacity-100'}`}
       >
         <Button
           variant="ghost"

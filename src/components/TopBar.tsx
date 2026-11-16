@@ -2,6 +2,7 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import Tooltip from '@/components/ui/tooltip';
 import { Undo2, Redo2, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
+import CanvasTips from '@/components/CanvasTips';
 
 type Props = {
   toolbarExpanded: boolean;
@@ -15,6 +16,10 @@ type Props = {
   handleZoomIn: () => void;
   handleZoomOut: () => void;
   handleResetZoom: () => void;
+  tipsMinimized: boolean;
+  setTipsMinimized: (v: boolean) => void;
+  setShowHelp: (v: boolean) => void;
+  isEnemyTabActive: boolean;
 };
 
 const TopBar: React.FC<Props> = ({
@@ -28,7 +33,11 @@ const TopBar: React.FC<Props> = ({
   handleRedo,
   handleZoomIn,
   handleZoomOut,
-  handleResetZoom
+  handleResetZoom,
+  tipsMinimized,
+  setTipsMinimized,
+  setShowHelp,
+  isEnemyTabActive,
 }) => (
   <div
     ref={containerRef}
@@ -71,6 +80,12 @@ const TopBar: React.FC<Props> = ({
             <RotateCcw className="w-4 h-4" />
           </Button>
         </Tooltip>
+        <CanvasTips
+          tipsMinimized={tipsMinimized}
+          setTipsMinimized={setTipsMinimized}
+          setShowHelp={setShowHelp}
+          isEnemyTabActive={isEnemyTabActive}
+        />
       </div>
     </div>
   </div>

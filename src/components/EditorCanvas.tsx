@@ -1,7 +1,6 @@
 import React from 'react';
 import { entityPlacement } from '@/components/entityPlacement';
 import { normalizeTileRect } from '@/components/targetGroups';
-import CanvasTips from '@/components/CanvasTips';
 import CanvasMapTabs from '@/components/CanvasMapTabs';
 import MapInitOverlay from '@/components/MapInitOverlay';
 import MapHoverDisplay from '@/components/MapHoverDisplay';
@@ -27,9 +26,6 @@ type EditorContext = {
   setDraggingNpcId: (id: number | null) => void;
   draggingEventId: number | null;
   setDraggingEventId: (id: number | null) => void;
-  tipsMinimized: boolean;
-  setTipsMinimized: (v: boolean) => void;
-  setShowHelp: (v: boolean) => void;
   isEnemyTabActive: boolean;
   mapWidth: number;
   mapHeight: number;
@@ -89,9 +85,6 @@ export default function EditorCanvas(props: Props) {
     setDraggingNpcId,
     draggingEventId,
     setDraggingEventId,
-    tipsMinimized,
-    setTipsMinimized,
-    setShowHelp,
     isEnemyTabActive,
     mapWidth,
     mapHeight,
@@ -550,12 +543,6 @@ export default function EditorCanvas(props: Props) {
         />
       ) : null}
 
-      <CanvasTips
-        tipsMinimized={tipsMinimized}
-        setTipsMinimized={setTipsMinimized}
-        setShowHelp={setShowHelp}
-        isEnemyTabActive={isEnemyTabActive}
-      />
 
       <canvas
         ref={canvasRef}

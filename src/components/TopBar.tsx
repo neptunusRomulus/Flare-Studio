@@ -95,12 +95,12 @@ const TopBar: React.FC<Props> = ({
           />
         )}
       </div>
-      {isEnemyTabActive ? null : (
+      {isEnemyTabActive || !toolbarExpanded ? null : (
         <CanvasTipsPanel
           tipsMinimized={tipsMinimized}
           setTipsMinimized={setTipsMinimized}
           setShowHelp={setShowHelp}
-          className="absolute inset-x-0 top-full"
+          className="absolute right-0 top-full"
         />
       )}
     </div>

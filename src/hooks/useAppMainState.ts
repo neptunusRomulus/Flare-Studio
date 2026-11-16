@@ -139,6 +139,14 @@ export default function useAppMainState() {
   const toolbarState = useToolbarState();
   const helpState = useHelpState();
 
+  // Collapsing the zoom controls closes the canvas tips too (same as pressing its X):
+  // a panel under a 40px pill is unreadable, and it should not pop back on the next hover.
+  const { tipsMinimized, setTipsMinimized } = appState;
+  const toolbarExpanded = toolbarState.toolbarExpanded;
+  useEffect(() => {
+    if (!toolbarExpanded && !tipsMinimized) setTipsMinimized(true);
+  }, [toolbarExpanded, tipsMinimized, setTipsMinimized]);
+
   const [showActiveGid, setShowActiveGid] = useState<boolean>(true);
   const [debugMode, setDebugMode] = useState<boolean>(false);
   const [currentProjectPath, setCurrentProjectPath] = useState<string | null>(null);

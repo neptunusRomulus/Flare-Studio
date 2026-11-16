@@ -39,7 +39,7 @@ export function CanvasTipsPanel({ tipsMinimized, setTipsMinimized, setShowHelp, 
       role="region"
       aria-label="Canvas help"
       className={cn(
-        'relative z-30 mt-2 w-full p-3 bg-white/90 dark:bg-neutral-900/90 backdrop-blur-sm rounded-lg border border-border shadow-lg',
+        'relative z-30 mt-2 w-56 p-3 bg-white/90 dark:bg-neutral-900/90 backdrop-blur-sm rounded-lg border border-border shadow-lg',
         className,
       )}
     >

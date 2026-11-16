@@ -46,9 +46,10 @@ describe('canvas help in the zoom controls', () => {
     expect(panel).toHaveTextContent('Left Click');
     expect(panel).toHaveTextContent('to Paint');
     expect(panel.className).toContain('absolute');
-    expect(panel.className).toContain('inset-x-0');
+    expect(panel.className).toContain('right-0');
     expect(panel.className).toContain('top-full');
-    expect(panel.className).toContain('w-full');
+    // Fixed width: the panel must not squish with the collapsing capsule.
+    expect(panel.className).toContain('w-56');
 
     const group = panel.parentElement;
     expect(group).not.toBeNull();
@@ -71,8 +72,7 @@ describe('canvas help in the zoom controls', () => {
     expect(screen.queryByRole('region', { name: 'Canvas help' })).not.toBeInTheDocument();
   });
 
-  it('collapses the zoom controls when idle and keeps the help button', async () => {
-    const user = userEvent.setup();
+  it('collapses the zoom controls when idle and keeps only the help button', async () => {
     render(<Harness expanded={false} />);
 
     // Only the help button stays clickable while the zoom group is collapsed.
@@ -81,9 +81,18 @@ describe('canvas help in the zoom controls', () => {
     expect(zoomGroup?.getAttribute('aria-hidden')).toBe('true');
     expect(zoomGroup?.className).toContain('max-w-0');
 
+    // A collapsed toolbar has no room for the tips: they must not open under the pill.
+    expect(screen.queryByRole('region', { name: 'Canvas help' })).not.toBeInTheDocument();
+  });
+
+  it('closes the tips as soon as the zoom controls collapse', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(<Harness />);
+
     await user.click(screen.getByRole('button', { name: 'Show canvas help' }));
-    expect(screen.getByRole('region', { name: 'Canvas help' })).toHaveTextContent('to Zoom');
-    await user.click(screen.getByRole('button', { name: 'Help' }));
-    expect(screen.getByText('Full help dialog')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Canvas help' })).toBeInTheDocument();
+
+    rerender(<Harness expanded={false} />);
+    expect(screen.queryByRole('region', { name: 'Canvas help' })).not.toBeInTheDocument();
   });
 });

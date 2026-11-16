@@ -88,6 +88,19 @@ import {
   openHeroEditDialog,
   type PointerInputHost,
 } from './tileMap/pointerInput';
+import {
+  handleEyedropper,
+  handleSelectionDrag,
+  handleSelectionEnd,
+  handleSelectionStart,
+  handleShapeDrag,
+  handleShapeEnd,
+  handleShapeStart,
+  handleStampClick,
+  handleTileClick,
+  screenToTile,
+  type ToolInputHost,
+} from './tileMap/toolInput';
 
 export interface LayerTilesetEntry {
   image: HTMLImageElement | null;
@@ -1289,382 +1302,46 @@ export class TileMapEditor {
   }
 
   public screenToTile(screenX: number, screenY: number): { x: number, y: number } | null {
-    // Convert screen coordinates to world coordinates first
-    const worldCoords = this.screenToWorld(screenX, screenY);
-    
-    // Cast a ray from the mouse position to find which tile diamond it hits
-    return this.raycastToTile(worldCoords.x, worldCoords.y);
+    return screenToTile(this as unknown as ToolInputHost, screenX, screenY);
   }
 
   private handleStampClick(x: number, y: number, isRightClick: boolean): void {
-    if (isRightClick) {
-      // Right-click clears stamp preview
-      this.stampPreview.visible = false;
-      this.draw();
-      return;
-    }
-
-    if (this.currentStampMode === 'create') {
-      // Start selection for creating a stamp
-      this.handleSelectionStart(x, y, isRightClick);
-    } else if (this.currentStampMode === 'place' && this.activeStamp) {
-      // Place the active stamp
-      this.placeStamp(x, y);
-    }
+    handleStampClick(this as unknown as ToolInputHost, x, y, isRightClick);
   }
 
   private handleTileClick(x: number, y: number, isRightClick: boolean): void {
-    // Prevent editing while save is in progress
-    if (this.isSaveLocked) {
-      return;
-    }
-
-    if (this.activeLayerId !== null) {
-      const layer = this.tileLayers.find(l => l.id === this.activeLayerId);
-      if (layer) {
-        const effectivePaintMode = this.getEffectivePaintModeForLayer(layer.type);
-        const index = y * this.mapWidth + x;
-        const currentValue = layer.data[index];
-        let newValue: number;
-
-        // Get the active GID for the current layer
-        const currentLayerActiveGid = this.getCurrentLayerActiveGid();
-
-        // Determine the action based on right-click or current tool
-        if (isRightClick) {
-          // Right-click always acts as eraser
-          // Phase 4: Paint mode affects what gets erased
-          if (effectivePaintMode === 'object') {
-            // Object mode: only remove ObjectInstances at this position
-            const instancesToRemove = this.getAllObjectInstances()
-              .filter(inst => inst.gridX === x && inst.gridY === y && inst.layerId === layer.id.toString());
-            for (const inst of instancesToRemove) {
-              this.removeObjectInstance(inst.id);
-            }
-            this.saveState();
-            this.markAsChanged();
-            return; // Don't write to layer.data in object mode
-          } else {
-            // Ground mode: erase from layer.data and remove sprite objects
-            newValue = 0;
-            // Also remove any sprite object at this position
-            this.removeSpriteObjectAt(layer.type, x, y);
-          }
-        } else {
-          // Left-click behavior depends on current tool
-          switch (this.currentTool) {
-            case 'brush':
-              // Don't paint if no tile is selected (activeGid is 0)
-              if (currentLayerActiveGid === 0 && this.multiSelectedBrushes.size === 0) {
-                console.warn(`[PAINT-BLOCKED] GID=0 for layer type="${layer.type}" activeLayerId=${this.activeLayerId} layerActiveGid=${JSON.stringify(Object.fromEntries(this.layerActiveGid))} activeGid=${this.activeGid}`);
-                return; // Exit early, don't paint anything
-              }
-
-              // Check if brush stroke is within selection
-              if (!this.isInSelection(x, y)) {
-                return; // Can't paint outside selection
-              }
-
-              // If multiple brushes are selected, stamp them as a block
-              if (this.multiSelectedBrushes.size > 1) {
-                this.saveState();
-                this.placeMultiSelectionAt(x, y);
-                this.markAsChanged();
-                return;
-              }
-
-              newValue = currentLayerActiveGid;
-              break;
-            case 'eraser':
-              // Check if erase stroke is within selection
-              if (!this.isInSelection(x, y)) {
-                return; // Can't erase outside selection
-              }
-              // Phase 4: Paint mode affects eraser behavior
-              if (effectivePaintMode === 'object') {
-                // Object mode eraser: only remove ObjectInstances
-                const instancesToRemove = this.getAllObjectInstances()
-                  .filter(inst => inst.gridX === x && inst.gridY === y && inst.layerId === layer.id.toString());
-                if (instancesToRemove.length > 0) {
-                  this.saveState();
-                  for (const inst of instancesToRemove) {
-                    this.removeObjectInstance(inst.id);
-                  }
-                  this.markAsChanged();
-                }
-                return; // Skip ground layer erasing in object mode
-              } else {
-                // Ground mode eraser: erase from layer.data and remove sprite objects
-                newValue = 0;
-                // Also remove any sprite object at this position
-                this.removeSpriteObjectAt(layer.type, x, y);
-              }
-              break;
-            case 'bucket':
-              // Don't bucket fill if no tile is selected (activeGid is 0)
-              if (currentLayerActiveGid === 0) {
-                return; // Exit early, don't paint anything
-              }
-              // Bucket fill uses a different approach
-              if (currentValue !== currentLayerActiveGid) {
-                this.saveState();
-                this.bucketFill(layer, x, y, currentLayerActiveGid);
-                this.markAsChanged();
-                this.draw(); // Immediately reflect changes
-              }
-              return; // Exit early for bucket fill
-            default:
-              // Don't paint if no tile is selected (activeGid is 0)
-              if (currentLayerActiveGid === 0) {
-                return; // Exit early, don't paint anything
-              }
-              newValue = currentLayerActiveGid;
-              break;
-          }
-        }
-        
-        // Only save state and apply change if the value is actually changing
-        if (currentValue !== newValue) {
-          this.saveState();
-          
-          // Phase 4: Paint mode branching
-          if (effectivePaintMode === 'object' && newValue > 0) {
-            // Object mode: create ObjectInstance instead of painting to layer.data
-            // Don't destructively clear neighboring cells - user must explicitly request that
-            const asset = this.resolveOrCreateAssetRecordForGid(newValue, layer.type);
-            if (asset) {
-              const instance: ObjectInstance = {
-                id: `obj_${this.nextObjectInstanceId++}`,
-                assetRecordId: asset.id,
-                gridX: x,
-                gridY: y,
-                layerId: layer.id.toString(),
-                properties: {}
-              };
-              this.addObjectInstance(instance);
-            } else {
-              console.warn(`[PAINT-MODE] Object mode: asset not found for GID ${newValue}`);
-            }
-            this.markAsChanged();
-          } else if (effectivePaintMode === 'ground' || newValue === 0) {
-            // Ground mode: paint to layer.data as normal (or erase)
-            // Always try to remove any sprite object at this position when painting a new tile
-            // This ensures single tile painting removes multi-tile sprites that cover this cell
-            // Note: sprite objects set layer.data to 0, so we can't rely on currentValue > 0
-            this.removeSpriteObjectAt(layer.type, x, y);
-            
-            layer.data[index] = newValue;
-            // Record which tileset (tab) this painted cell came from so tabs don't collide
-            try {
-              const layerType = layer.type;
-              let arr = this.layerCellTilesetKey.get(layerType);
-              if (!arr) {
-                arr = new Array(this.mapWidth * this.mapHeight).fill(null);
-                this.layerCellTilesetKey.set(layerType, arr);
-              }
-              // Determine current active tab tileset fileName if available
-              let tilesetFileName: string | null = null;
-              const activeTabId = this.layerActiveTabId.get(layerType);
-              const tabs = this.layerTabs.get(layerType) || [];
-              if (activeTabId) {
-                const tab = tabs.find(t => t.id === activeTabId);
-                if (tab && tab.tileset && tab.tileset.fileName) tilesetFileName = tab.tileset.fileName;
-              }
-              // Fallback to layer tileset or global tileset
-              if (!tilesetFileName) {
-                const lt = this.layerTilesets.get(layerType);
-                if (lt && lt.fileName) tilesetFileName = lt.fileName;
-              }
-              if (!tilesetFileName && this.tilesetFileName) tilesetFileName = this.tilesetFileName;
-              arr[index] = tilesetFileName;
-            } catch (_e) { void _e; }
-            
-            this.markAsChanged();
-          }
-          
-          // Legacy map-object creation/removal applies to event/enemy/npc layers only.
-          // Object layer now uses ObjectInstances and should not create placeholder map objects.
-          if (layer.type === 'event' || layer.type === 'enemy' || layer.type === 'npc') {
-            if (newValue > 0) {
-              // Create object when placing tile
-              this.createObjectFromTile(x, y, layer.type, newValue);
-            } else {
-              // Remove object when erasing tile
-              this.removeObjectAtPosition(x, y);
-            }
-          }
-          
-          this.markAsChanged();
-          this.draw(); // Immediately reflect changes
-        }
-      }
-    }
+    handleTileClick(this as unknown as ToolInputHost, x, y, isRightClick);
   }
 
   // Selection event handlers
   private handleSelectionStart(x: number, y: number, isRightClick: boolean): void {
-    if (isRightClick) {
-      // Right-click clears selection
-      this.clearSelection();
-      return;
-    }
-
-    const layer = this.tileLayers.find(l => l.id === this.activeLayerId);
-    if (!layer) return;
-
-    this.selection.startX = x;
-    this.selection.startY = y;
-    this.selection.endX = x;
-    this.selection.endY = y;
-
-    // Multi-cell toggles a single cell and keeps existing selection for non-adjacent picks.
-    if (this.currentSelectionTool === 'multi-cell') {
-      this.toggleSelectionCell(layer, x, y);
-      this.draw();
-    // For instant selection tools (magic wand, same tile), execute immediately
-    } else if (this.currentSelectionTool === 'magic-wand') {
-      this.selectMagicWand(layer, x, y);
-      this.draw();
-    } else if (this.currentSelectionTool === 'same-tile') {
-      this.selectSameTile(layer, x, y);
-      this.draw();
-    } else {
-      // For drag-based tools (rectangular, circular), start selection
-      this.isSelecting = true;
-    }
+    handleSelectionStart(this as unknown as ToolInputHost, x, y, isRightClick);
   }
 
   private handleSelectionDrag(x: number, y: number): void {
-    if (!this.isSelecting) return;
-
-    this.selection.endX = x;
-    this.selection.endY = y;
-    this.draw(); // Update preview
+    handleSelectionDrag(this as unknown as ToolInputHost, x, y);
   }
 
   private handleSelectionEnd(): void {
-    if (!this.isSelecting) return;
-
-    const layer = this.tileLayers.find(l => l.id === this.activeLayerId);
-    if (!layer) return;
-
-    // Execute the selection based on tool type
-    if (this.currentSelectionTool === 'rectangular') {
-      this.selectRectangular(layer, this.selection.startX, this.selection.startY, this.selection.endX, this.selection.endY);
-    } else if (this.currentSelectionTool === 'circular') {
-      this.selectCircular(layer, this.selection.startX, this.selection.startY, this.selection.endX, this.selection.endY);
-    }
-
-    this.isSelecting = false;
-    this.draw();
+    handleSelectionEnd(this as unknown as ToolInputHost);
   }
 
   // Shape event handlers
   private handleShapeStart(x: number, y: number, isRightClick: boolean): void {
-    if (isRightClick) {
-      // Right-click cancels shape drawing
-      this.shapeDrawing.active = false;
-      this.isDrawingShape = false;
-      this.draw();
-      return;
-    }
-
-    this.shapeDrawing.active = true;
-    this.shapeDrawing.startX = x;
-    this.shapeDrawing.startY = y;
-    this.shapeDrawing.endX = x;
-    this.shapeDrawing.endY = y;
-    this.shapeDrawing.preview = [];
-    this.isDrawingShape = true;
+    handleShapeStart(this as unknown as ToolInputHost, x, y, isRightClick);
   }
 
   private handleShapeDrag(x: number, y: number): void {
-    if (!this.isDrawingShape) return;
-
-    this.shapeDrawing.endX = x;
-    this.shapeDrawing.endY = y;
-
-    // Update preview based on shape type
-    switch (this.currentShapeTool) {
-      case 'rectangle':
-        this.shapeDrawing.preview = this.drawRectangleShape(
-          this.shapeDrawing.startX, this.shapeDrawing.startY,
-          this.shapeDrawing.endX, this.shapeDrawing.endY
-        );
-        break;
-      case 'circle':
-        this.shapeDrawing.preview = this.drawCircleShape(
-          this.shapeDrawing.startX, this.shapeDrawing.startY,
-          this.shapeDrawing.endX, this.shapeDrawing.endY
-        );
-        break;
-      case 'line':
-        this.shapeDrawing.preview = this.drawLineShape(
-          this.shapeDrawing.startX, this.shapeDrawing.startY,
-          this.shapeDrawing.endX, this.shapeDrawing.endY
-        );
-        break;
-    }
-
-    this.draw(); // Update preview
+    handleShapeDrag(this as unknown as ToolInputHost, x, y);
   }
 
   private handleShapeEnd(): void {
-    if (!this.isDrawingShape) return;
-
-    const layer = this.tileLayers.find(l => l.id === this.activeLayerId);
-    if (!layer) return;
-
-    // Get the active GID for the current layer
-    const currentLayerActiveGid = this.getCurrentLayerActiveGid();
-
-    // Apply the shape to the layer
-    if (this.shapeDrawing.preview.length > 0 && currentLayerActiveGid > 0) {
-      this.saveState();
-      
-      this.shapeDrawing.preview.forEach(point => {
-        const index = point.y * this.mapWidth + point.x;
-        layer.data[index] = currentLayerActiveGid;
-      });
-
-      this.markAsChanged();
-    }
-
-    this.shapeDrawing.active = false;
-    this.isDrawingShape = false;
-    this.shapeDrawing.preview = [];
-    this.draw();
+    handleShapeEnd(this as unknown as ToolInputHost);
   }
 
   // Eyedropper functionality
   private handleEyedropper(x: number, y: number): number | null {
-    const layer = this.tileLayers.find(l => l.id === this.activeLayerId);
-    if (!layer) return null;
-
-    if (x >= 0 && x < this.mapWidth && y >= 0 && y < this.mapHeight) {
-      const index = y * this.mapWidth + x;
-      const gid = layer.data[index];
-      
-      if (gid > 0) {
-        // Set the active GID for the current layer
-        this.setCurrentLayerActiveGid(gid);
-        this.updateTilePaletteSelection();
-        
-        // Switch back to brush tool automatically
-        this.tool = 'tiles';
-        this.currentTool = 'brush';
-        this.mapCanvas.style.cursor = 'crosshair';
-        
-        // Notify the UI that we switched back to brush
-        if (this.eyedropperCallback) {
-          this.eyedropperCallback();
-        }
-        
-        return gid;
-      }
-    }
-    
-    return null;
+    return handleEyedropper(this as unknown as ToolInputHost, x, y);
   }
 
   public updateTilePaletteSelection(): void {

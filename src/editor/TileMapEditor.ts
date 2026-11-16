@@ -33,8 +33,23 @@ import {
 } from './mapGrid';
 import { mapHeaderForExport, type MapPresentation } from './studioDrafts';
 import { debugLog, setDebugLogEnabled } from '@/lib/debugLog';
+import {
+  clearTilePalette,
+  getActiveLayerTabId,
+  getCurrentLayerActiveGid,
+  getDetectedTileInfo,
+  getDetectedTilesForLayer,
+  getLayerTabs,
+  refreshTilePalette,
+  setActiveGid,
+  setActiveGidCallback,
+  setCurrentLayerActiveGid,
+  updateActiveGid,
+  updateTilePaletteSelection,
+  type PaletteTabsHost,
+} from './tileMap/paletteTabs';
 
-interface LayerTilesetEntry {
+export interface LayerTilesetEntry {
   image: HTMLImageElement | null;
   fileName: string | null;
   columns: number;
@@ -224,72 +239,27 @@ export class TileMapEditor {
 
   // Force regeneration of tile palette with current settings
   public refreshTilePalette(preserveOrder: boolean = false): void {
-    if (this.tilesetImage) {
-      this.createTilePalette(preserveOrder);
-
-      // After palette is created, ensure any tab tileset origin overlay is rendered for user placement
-      try {
-        const container = document.getElementById('tilesContainer');
-        if (container) {
-          // Remove any leftover overlays or full-image/grid nodes, since
-          // the palette rendering path now owns adding the grid/image.
-          const prev = container.querySelectorAll('.tileset-overlay, .tileset-grid-overlay, .tileset-full-image, .tileset-grid-spacer');
-          prev.forEach(n => n.remove());
-        }
-      } catch (_e) { void _e; }
-    }
+    refreshTilePalette(this as unknown as PaletteTabsHost, preserveOrder);
   }
 
   // Get information about detected tiles for debugging
   public getDetectedTileInfo(): Array<{gid: number, width: number, height: number, sourceX: number, sourceY: number}> {
-    const tileInfo: Array<{gid: number, width: number, height: number, sourceX: number, sourceY: number}> = [];
-    this.detectedTileData.forEach((data, gid) => {
-      tileInfo.push({
-        gid,
-        width: data.width,
-        height: data.height,
-        sourceX: data.sourceX,
-        sourceY: data.sourceY
-      });
-    });
-    return tileInfo.sort((a, b) => a.gid - b.gid);
+    return getDetectedTileInfo(this as unknown as PaletteTabsHost);
   }
 
   // Get detected tiles for a specific layer (for per-layer save/load)
   public getDetectedTilesForLayer(layerType: string): Array<[number, { sourceX: number; sourceY: number; width: number; height: number }]> {
-    const layerTiles = this.layerTileData.get(layerType);
-    if (layerTiles) {
-      return Array.from(layerTiles.entries());
-    }
-    return [];
+    return getDetectedTilesForLayer(this as unknown as PaletteTabsHost, layerType);
   }
 
   // Get the active GID for the current layer
   private getCurrentLayerActiveGid(): number {
-    const activeLayer = this.tileLayers.find(l => l.id === this.activeLayerId);
-    if (activeLayer) {
-      return this.layerActiveGid.get(activeLayer.type) || 0;
-    }
-    return 0;
+    return getCurrentLayerActiveGid(this as unknown as PaletteTabsHost);
   }
 
   // Set the active GID for the current layer
   private setCurrentLayerActiveGid(gid: number): void {
-    const activeLayer = this.tileLayers.find(l => l.id === this.activeLayerId);
-    if (activeLayer) {
-      this.layerActiveGid.set(activeLayer.type, gid);
-      // Update global activeGid for UI consistency
-      this.activeGid = gid;
-      if (this.activeGidCallback) {
-        try {
-          this.activeGidCallback(this.activeGid);
-        } catch (_e) { void _e; }
-      }
-      // Clear any multi-tile selection when a single tile is selected
-      this.clearSelection();
-      // Force redraw to ensure selection highlight is cleared
-      this.draw();
-    }
+    setCurrentLayerActiveGid(this as unknown as PaletteTabsHost, gid);
   }
 
   // Brush management methods
@@ -1118,37 +1088,17 @@ export class TileMapEditor {
 
   // Internal helper to update activeGid and notify callback
   private updateActiveGid(gid: number): void {
-    this.activeGid = gid;
-    if (this.activeGidCallback) {
-      try {
-        this.activeGidCallback(this.activeGid);
-      } catch (_e) { void _e; }
-    }
+    updateActiveGid(this as unknown as PaletteTabsHost, gid);
   }
 
   // Allow external code (React) to observe active GID changes
   public setActiveGidCallback(cb: ((gid: number) => void) | null): void {
-    this.activeGidCallback = cb;
-    // Immediately notify with current value if callback provided
-    if (cb) {
-      try {
-        cb(this.activeGid);
-      } catch (_e) { void _e; }
-    }
+    setActiveGidCallback(this as unknown as PaletteTabsHost, cb);
   }
 
   // Public method to set the active GID for the current layer
   public setActiveGid(gid: number): void {
-    // Hide stamp preview when selecting a single tile
-    this.stampPreview.visible = false;
-    // Clear multi-selected brushes so single tile painting works correctly
-    this.multiSelectedBrushes.clear();
-    // Clear active stamp so we use single tile painting, not stamp placement
-    this.activeStamp = null;
-    this.currentStampMode = 'select';
-    // Set tool to tiles mode for brush painting
-    this.tool = 'tiles';
-    this.setCurrentLayerActiveGid(gid);
+    setActiveGid(this as unknown as PaletteTabsHost, gid);
   }
 
   private initializeCanvas(): void {
@@ -2459,23 +2409,7 @@ export class TileMapEditor {
   }
 
   public updateTilePaletteSelection(): void {
-    // Update the active GID display
-    const activeGidSpan = document.getElementById('activeGid');
-    if (activeGidSpan) {
-      activeGidSpan.textContent = this.activeGid.toString();
-    }
-
-    // Update tile palette visual selection
-    const tiles = document.querySelectorAll('.tile-palette .tile');
-    tiles.forEach((tile, index) => {
-      const tileElement = tile as HTMLElement;
-      if (index === this.activeGid - 1) {
-        tileElement.classList.add('selected');
-        tileElement.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      } else {
-        tileElement.classList.remove('selected');
-      }
-    });
+    updateTilePaletteSelection(this as unknown as PaletteTabsHost);
   }
 
   private draw(): void {
@@ -7107,7 +7041,7 @@ export class TileMapEditor {
   }
 
   public getLayerTabs(layerType: string) {
-    return this.layerTabs.get(layerType) || [];
+    return getLayerTabs(this as unknown as PaletteTabsHost, layerType);
   }
 
   public setActiveLayerTab(layerType: string, tabId: number): void {
@@ -7501,17 +7435,7 @@ export class TileMapEditor {
   }
 
   public getActiveLayerTabId(layerType: string): number | null {
-    const activeId = this.layerActiveTabId.get(layerType);
-    if (typeof activeId === 'number') return activeId;
-
-    const tabs = this.layerTabs.get(layerType) || [];
-    if (tabs.length > 0) {
-      const fallbackId = tabs[0].id;
-      this.layerActiveTabId.set(layerType, fallbackId);
-      return fallbackId;
-    }
-
-    return null;
+    return getActiveLayerTabId(this as unknown as PaletteTabsHost, layerType);
   }
 
   public updateCurrentTileset(layerType: string): void {
@@ -7618,11 +7542,7 @@ export class TileMapEditor {
   }
 
   private clearTilePalette(): void {
-    const container = document.getElementById('tilesContainer');
-    if (container) {
-      container.innerHTML = '';
-    }
-    this.hideCollisionBrushTooltip(true);
+    clearTilePalette(this as unknown as PaletteTabsHost);
   }
 
   public clearLayer(): void {

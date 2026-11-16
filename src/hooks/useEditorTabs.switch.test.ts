@@ -214,3 +214,64 @@ describe('switchToTab unplaced NPC persistence', () => {
     ]));
   });
 });
+
+
+function dispatchTabCycle(shift = false, target: EventTarget = window) {
+  const event = new KeyboardEvent('keydown', {
+    key: 'Tab',
+    ctrlKey: true,
+    shiftKey: shift,
+    bubbles: true,
+    cancelable: true,
+  });
+  target.dispatchEvent(event);
+  return event;
+}
+
+describe('Ctrl+Tab cycles editor tabs', () => {
+  it('moves to the next tab, then wraps, through switchToTab', async () => {
+    const { editor, hook } = createHarness('m1');
+    const [m1, m2, m3] = await createTabs(hook, ['m1', 'm2', 'm3']);
+    expect(hook.result.current.activeTabId).toBe(m3.id);
+
+    await act(async () => { dispatchTabCycle(); });
+    expect(hook.result.current.activeTabId).toBe(m1.id);
+    expect(editor.saveProjectData).toHaveBeenCalled();
+
+    await act(async () => { dispatchTabCycle(); });
+    expect(hook.result.current.activeTabId).toBe(m2.id);
+
+    await act(async () => { dispatchTabCycle(true); });
+    expect(hook.result.current.activeTabId).toBe(m1.id);
+  });
+
+  it('aborts when the leaving tab cannot be saved', async () => {
+    const { editor, hook } = createHarness('m1');
+    const [m1, m2] = await createTabs(hook, ['m1', 'm2']);
+    editor.setTabSwitching(true);
+    await act(async () => { dispatchTabCycle(); });
+    expect(hook.result.current.activeTabId).toBe(m2.id);
+    expect(m1.id).not.toBe(m2.id);
+  });
+
+  it('does not switch while typing in an input or a dialog', async () => {
+    const { hook } = createHarness('m1');
+    const [, m2] = await createTabs(hook, ['m1', 'm2']);
+    expect(hook.result.current.activeTabId).toBe(m2.id);
+
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    await act(async () => { dispatchTabCycle(false, input); });
+    expect(hook.result.current.activeTabId).toBe(m2.id);
+    input.remove();
+
+    const dialog = document.createElement('div');
+    dialog.setAttribute('role', 'dialog');
+    const button = document.createElement('button');
+    dialog.appendChild(button);
+    document.body.appendChild(dialog);
+    await act(async () => { dispatchTabCycle(false, button); });
+    expect(hook.result.current.activeTabId).toBe(m2.id);
+    dialog.remove();
+  });
+});

@@ -57,20 +57,23 @@ test('play dropdown opens and menu items are visible for a loaded project', asyn
     await window.getByRole('button', { name: /Open Existing Project/i }).click();
     await expect(window.locator('canvas').first()).toBeVisible({ timeout: 15000 });
 
-    const playButton = window.getByRole('button', { name: /^Play$/i }).first();
+    const playButton = window.getByRole('button', { name: 'Play Current Map' }).first();
     await expect(playButton).toBeVisible({ timeout: 15000 });
-    await playButton.click();
 
-    const playCurrentMap = window.locator('button:has-text("Play Current Map")').first();
+    const moreOptions = window.getByRole('button', { name: 'More play options' });
+    await expect(moreOptions).toBeVisible({ timeout: 15000 });
+    await moreOptions.click();
+
+    const playCurrentMap = window.locator('button:has-text("Play Current Map")').nth(1);
     const newGame = window.locator('button:has-text("New Game")').first();
-    const mainMenu = window.locator('button:has-text("Flare Main Menu")').first();
 
     await expect(playCurrentMap).toBeVisible({ timeout: 15000 });
     await expect(newGame).toBeVisible({ timeout: 15000 });
-    await expect(mainMenu).toBeVisible({ timeout: 15000 });
+    await expect(window.locator('button:has-text("Flare Main Menu")')).toHaveCount(0);
 
     await newGame.click();
-    await expect(window.getByRole('button', { name: /Play Current Map/i })).toHaveCount(0, { timeout: 15000 });
+    await expect(window.getByRole('button', { name: 'More play options' })).toBeVisible({ timeout: 15000 });
+    await expect(window.locator('button:has-text("New Game")')).toHaveCount(0, { timeout: 15000 });
   } finally {
     await electronApp.close();
     await stopViteServer(viteProcess);

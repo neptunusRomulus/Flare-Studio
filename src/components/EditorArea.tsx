@@ -1,5 +1,6 @@
 import React from 'react';
 import TopBar from '@/components/TopBar';
+import type { PlayButtonProps } from '@/components/PlayButton';
 import EditorCanvas from '@/components/EditorCanvas';
 import type { MapObject } from '@/types';
 
@@ -19,6 +20,7 @@ type TopBarProps = {
   setTipsMinimized: (v: boolean) => void;
   setShowHelp: (v: boolean) => void;
   isEnemyTabActive: boolean;
+  play?: PlayButtonProps;
 };
 
 type Props = {
@@ -47,6 +49,7 @@ const EditorArea: React.FC<Props> = ({ topBarProps, canvasCtx, bottomToolbarProp
         setTipsMinimized={topBarProps.setTipsMinimized}
         setShowHelp={topBarProps.setShowHelp}
         isEnemyTabActive={topBarProps.isEnemyTabActive}
+        play={topBarProps.play}
       />
 
       <EditorCanvas ctx={canvasCtx} bottomToolbarProps={bottomToolbarProps} isDarkMode={isDarkMode} />

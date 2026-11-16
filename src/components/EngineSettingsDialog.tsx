@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import * as SliderPrimitive from '@radix-ui/react-slider';
-import { Moon, Sun, Target, X, Save, Settings, Eye, HelpCircle, FileText } from 'lucide-react';
+import { Moon, Sun, Target, X, Save, Settings, Eye, HelpCircle, FileText, Play, FolderOpen } from 'lucide-react';
 import Tooltip from '@/components/ui/tooltip';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
@@ -11,7 +11,7 @@ import ResizeHandle from '@/components/ResizeHandle';
 import { useDisplayScale } from '@/hooks/useInterfaceScale';
 import { openEngineStudio } from '@/components/studio/engineStudio';
 
-type SettingsTab = 'general' | 'save' | 'display' | 'files';
+type SettingsTab = 'general' | 'save' | 'display' | 'files' | 'flare';
 
 type EngineSettingsDialogProps = {
   open: boolean;
@@ -23,6 +23,10 @@ type EngineSettingsDialogProps = {
   setShowActiveGid: Dispatch<SetStateAction<boolean>>;
   debugMode: boolean;
   setDebugMode: Dispatch<SetStateAction<boolean>>;
+  flarePath?: string | null;
+  isFlareRunning?: boolean;
+  onConfigureFlarePath?: () => void;
+  onLaunchFlareMainMenu?: () => void;
   /** Tab to show when the dialog opens (e.g. 'display' from Help). */
   initialTab?: SettingsTab;
 };
@@ -37,6 +41,10 @@ const EngineSettingsDialog = ({
   setShowActiveGid,
   debugMode,
   setDebugMode,
+  flarePath,
+  isFlareRunning,
+  onConfigureFlarePath,
+  onLaunchFlareMainMenu,
   initialTab
 }: EngineSettingsDialogProps) => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
@@ -56,6 +64,7 @@ const EngineSettingsDialog = ({
 
   const tabs: { id: SettingsTab; icon: React.ReactNode; label: string }[] = [
     { id: 'general', icon: <Settings className="w-4 h-4" />, label: 'General' },
+    { id: 'flare', icon: <Play className="w-4 h-4" />, label: 'Flare' },
     { id: 'save', icon: <Save className="w-4 h-4" />, label: 'Save' },
     { id: 'display', icon: <Eye className="w-4 h-4" />, label: 'Display' },
     { id: 'files', icon: <FileText className="w-4 h-4" />, label: 'Game files' },
@@ -238,6 +247,44 @@ const EngineSettingsDialog = ({
                 <p className="text-xs text-gray-500 mt-1">
                   Changes the dimensions of the minimap UI box.
                 </p>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'flare' && (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label className="block text-sm font-medium">Flare engine</Label>
+                <p className="text-xs text-muted-foreground">
+                  Launch the engine title screen or choose the Flare executable used for playtesting.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={isFlareRunning || !onLaunchFlareMainMenu}
+                  onClick={() => onLaunchFlareMainMenu?.()}
+                  className="w-full justify-start"
+                >
+                  <Play className="h-4 w-4" />
+                  Flare Main Menu
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={!onConfigureFlarePath}
+                  onClick={() => onConfigureFlarePath?.()}
+                  className="w-full justify-start"
+                >
+                  <FolderOpen className="h-4 w-4" />
+                  {flarePath ? 'Change Flare Location…' : 'Set Flare Location…'}
+                </Button>
+                {flarePath ? (
+                  <p className="truncate text-xs text-muted-foreground" title={flarePath}>{flarePath}</p>
+                ) : (
+                  <p className="text-xs text-amber-600 dark:text-amber-400">Select flare.exe to enable play.</p>
+                )}
               </div>
             </div>
           )}

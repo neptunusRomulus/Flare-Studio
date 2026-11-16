@@ -297,20 +297,24 @@ export default function AppMain() {
     if (layer) { try { void layersObj?.handleSetActiveLayer?.(layer.id); } catch { /* ignore */ } }
   }, [controls, layersObj, handleHelpClose]);
 
-  // Merge flare engine state into titleBarProps
+  const playProps = useMemo(() => ({
+    isRunning: flareEngine.isRunning,
+    lastError: flareEngine.lastError,
+    hasProject: !!controls?.currentProjectPath,
+    hasMap,
+    onLaunch: flareEngine.launch,
+  }), [flareEngine.isRunning, flareEngine.lastError, flareEngine.launch, controls?.currentProjectPath, hasMap]);
+
+  // Merge the logo menu into titleBarProps
   const enhancedTitleBarProps = useMemo(() => ({
     ...titleBarProps,
     appMenu: showPanels && controls ? <AppControls {...enhancedControls} iconUrl={titleBarProps?.flareIconUrl} /> : undefined,
-    flareEngine: {
-      isRunning: flareEngine.isRunning,
-      lastError: flareEngine.lastError,
-      hasProject: !!controls?.currentProjectPath,
-      hasMap,
-      flarePath: flareEngine.flarePath,
-      onLaunch: flareEngine.launch,
-      onConfigurePath: flareEngine.configureFlarePath,
-    },
-  }), [titleBarProps, flareEngine.isRunning, flareEngine.lastError, flareEngine.launch, flareEngine.flarePath, flareEngine.configureFlarePath, controls?.currentProjectPath, hasMap, showPanels, controls, enhancedControls]);
+  }), [titleBarProps, showPanels, controls, enhancedControls]);
+
+  const enhancedTopBarProps = useMemo(() => ({
+    ...topBarProps,
+    play: playProps,
+  }), [topBarProps, playProps]);
 
   if (showWelcome) {
     return (
@@ -330,7 +334,7 @@ export default function AppMain() {
 
       <main className="flex flex-1 min-h-0">
         <div className="relative flex flex-1 min-w-0 min-h-0">
-          <EditorArea topBarProps={topBarProps} canvasCtx={canvasCtx} bottomToolbarProps={bottomToolbarProps} isDarkMode={isDarkMode} />
+          <EditorArea topBarProps={enhancedTopBarProps} canvasCtx={canvasCtx} bottomToolbarProps={bottomToolbarProps} isDarkMode={isDarkMode} />
           {showQuestMap && (
             <QuestMapContainer
               editor={editor}
@@ -394,6 +398,10 @@ export default function AppMain() {
           setShowActiveGid={setShowActiveGid}
           debugMode={debugMode}
           setDebugMode={setDebugMode}
+          flarePath={flareEngine.flarePath}
+          isFlareRunning={flareEngine.isRunning}
+          onConfigureFlarePath={flareEngine.configureFlarePath}
+          onLaunchFlareMainMenu={() => { void flareEngine.launch('main-menu'); }}
         />
 
         <MapSettingsDialog

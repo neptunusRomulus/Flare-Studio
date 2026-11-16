@@ -267,7 +267,7 @@ export default function EditorCanvas(props: Props) {
   return (
     <div
       ref={canvasAreaRef}
-      className={`bg-gray-100 flex-1 min-h-0 flex overflow-hidden relative ring-inset ${draggingNpcId || draggingEventId || armedEntity ? 'ring-2 ring-orange-500' : 'ring-1 ring-orange-600 dark:ring-orange-400'}`}
+      className="bg-gray-100 flex-1 min-h-0 flex overflow-hidden relative"
       style={armedEntity ? { cursor: 'crosshair' } : undefined}
       onMouseDownCapture={(e) => {
         // Click-to-place from the Entities dock (runs before the editor's own canvas handlers)
@@ -547,7 +547,7 @@ export default function EditorCanvas(props: Props) {
       <canvas
         ref={canvasRef}
         id="mapCanvas"
-        className="tile-canvas flex-1 canvas-fade"
+        className={`tile-canvas flex-1 canvas-fade outline outline-orange-600 ${draggingNpcId || draggingEventId || armedEntity ? 'outline-2 -outline-offset-2 outline-orange-500' : 'outline-1 -outline-offset-1'}`}
       />
 
       <MapInitOverlay mapInitialized={mapInitialized} handleOpenCreateMapDialog={handleOpenCreateMapDialog} isPreparingNewMap={isPreparingNewMap} />

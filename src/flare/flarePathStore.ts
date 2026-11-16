@@ -1,6 +1,6 @@
 /**
  * The saved Flare executable path (localStorage 'flarePath').
- * Play, "Change Flare Location..." and the Welcome screen installer share it.
+ * Play, Engine Settings, and the Welcome screen installer share it.
  * Writers dispatch FLARE_PATH_EVENT so mounted hooks pick up the new value.
  */
 export const FLARE_PATH_KEY = 'flarePath';

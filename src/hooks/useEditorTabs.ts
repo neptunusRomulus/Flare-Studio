@@ -1,9 +1,10 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { MutableRefObject } from 'react';
 import type { MapObject } from '@/types';
 import type { EditorProjectData, TileMapEditor } from '@/editor/TileMapEditor';
 import type { MapConfig } from '@/editor/mapConfig';
 import { resolveSaveMapName } from '@/editor/mapSaveName';
+import { isTypingOrDialogTarget, matchEditorTabCycleShortcut, nextEditorTabId } from '@/editor/tabCycle';
 
 export type EditorTab = {
   id: string;
@@ -233,6 +234,21 @@ const useEditorTabs = ({
     syncMapConfigForTab,
     switchToTabHelpersRef
   ]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const direction = matchEditorTabCycleShortcut(event);
+      if (!direction) return;
+      if (isTypingOrDialogTarget(event.target)) return;
+      const nextId = nextEditorTabId(tabsRef.current, activeTabIdRef.current, direction);
+      if (!nextId) return;
+      event.preventDefault();
+      event.stopPropagation();
+      void switchToTab(nextId);
+    };
+    window.addEventListener('keydown', onKeyDown, true);
+    return () => window.removeEventListener('keydown', onKeyDown, true);
+  }, [switchToTab]);
 
   const activeTab = useMemo(() => tabs.find(t => t.id === activeTabId) || null, [tabs, activeTabId]);
   const isEnemyTabActive = !!activeTab && activeTab.tabType === 'enemy';

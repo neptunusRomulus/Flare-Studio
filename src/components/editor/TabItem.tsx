@@ -1,49 +1,47 @@
-import React from 'react';
 import { Button } from '@/components/ui/button';
+import { ToggleGroupItem } from '@/components/ui/toggle-group';
 import Tooltip from '@/components/ui/tooltip';
 import { Settings, X } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 type TabEntry = { id: string; name: string; tabType?: 'map' | 'enemy' };
 
 type Props = {
   tab: TabEntry;
   activeTabId: string | null;
-  onSwitchTab: (tabId: string) => void;
   onOpenMapSettings: () => void;
   onCloseEnemyTab: (tabId: string) => void;
-  variant?: 'default' | 'canvas';
 };
 
-export default function TabItem({ tab, activeTabId, onSwitchTab, onOpenMapSettings, onCloseEnemyTab, variant = 'default' }: Props) {
+export default function TabItem({ tab, activeTabId, onOpenMapSettings, onCloseEnemyTab }: Props) {
   const active = tab.id === activeTabId;
-  const shell = variant === 'canvas'
-    ? `flex items-center gap-0.5 px-1.5 py-0 rounded-sm text-xs truncate max-w-[10rem] no-drag transition-colors ${active ? 'bg-black/15 text-neutral-900 dark:bg-white/20 dark:text-white' : 'bg-transparent text-neutral-700 hover:bg-black/10 dark:text-neutral-100 dark:hover:bg-white/10'}`
-    : `flex items-center gap-1 px-3 py-1 rounded-t-md border border-b-0 text-sm truncate max-w-xs no-drag transition-all duration-200 ${active ? 'bg-orange-500 text-white border-orange-500' : 'bg-transparent text-gray-600 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-neutral-700'}`;
   return (
-    <div
-      key={tab.id}
-      className={shell}
-    >
-      <Button
-        type="button"
-        variant="ghost"
-        onClick={() => { onSwitchTab(tab.id); }}
-        className="h-auto truncate px-0 py-0 hover:bg-transparent"
+    <div className="flex min-w-0 items-center">
+      <ToggleGroupItem
+        value={tab.id}
+        size="sm"
         title={tab.name}
+        aria-label={tab.name}
+        className={cn(
+          'h-6 max-w-[10rem] shrink gap-1 rounded-md px-2 text-xs font-medium shadow-none no-drag',
+          'bg-transparent text-orange-50 hover:bg-orange-500 hover:text-white',
+          'data-[state=on]:bg-orange-800 data-[state=on]:text-white data-[state=on]:hover:bg-orange-800 data-[state=on]:hover:text-white',
+          'focus-visible:ring-orange-300 focus-visible:ring-offset-0 dark:focus-visible:ring-orange-200',
+        )}
       >
-        {tab.name}
-      </Button>
-      {tab.id === activeTabId && tab.tabType !== 'enemy' && (
+        <span className="truncate">{tab.name}</span>
+      </ToggleGroupItem>
+      {active && tab.tabType !== 'enemy' && (
         <Tooltip content="Edit Map Settings" side="bottom">
           <Button
             type="button"
             variant="ghost"
             size="icon"
             onClick={(event) => { event.stopPropagation(); onOpenMapSettings(); }}
-            className="flex-shrink-0 w-4 h-4 flex items-center justify-center rounded p-0 h-4"
+            className="h-5 w-5 shrink-0 rounded-md p-0 text-orange-50 hover:bg-orange-500 hover:text-white"
             aria-label="Edit Map Settings"
           >
-            <Settings className="w-3 h-3" />
+            <Settings className="h-3 w-3" />
           </Button>
         </Tooltip>
       )}
@@ -52,12 +50,12 @@ export default function TabItem({ tab, activeTabId, onSwitchTab, onOpenMapSettin
           type="button"
           variant="ghost"
           size="icon"
-          onClick={(event) => { event.stopPropagation(); if (tab.id !== activeTabId) onSwitchTab(tab.id); onCloseEnemyTab(tab.id); }}
-          className="flex-shrink-0 w-4 h-4 flex items-center justify-center rounded hover:bg-black/10 dark:hover:bg-white/10 p-0 h-4"
+          onClick={(event) => { event.stopPropagation(); onCloseEnemyTab(tab.id); }}
+          className="h-5 w-5 shrink-0 rounded-md p-0 text-orange-50 hover:bg-orange-500 hover:text-white"
           aria-label="Close enemy tab"
           title="Close"
         >
-          <X className="w-3 h-3" />
+          <X className="h-3 w-3" />
         </Button>
       )}
     </div>

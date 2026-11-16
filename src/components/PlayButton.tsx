@@ -1,172 +1,92 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import Tooltip from '@/components/ui/tooltip';
 import type { FlareLaunchMode } from '@/hooks/useFlareEngine';
+import { ChevronDown, Play } from 'lucide-react';
 
-interface PlayButtonProps {
+export type PlayButtonProps = {
   isRunning: boolean;
   lastError: string | null;
   hasProject: boolean;
   hasMap: boolean;
-  flarePath: string | null;
   onLaunch: (mode: FlareLaunchMode) => void;
-  onConfigurePath: () => void;
-}
+};
 
-const PlayButton: React.FC<PlayButtonProps> = ({ isRunning, lastError, hasProject, hasMap, flarePath, onLaunch, onConfigurePath }) => {
+/** Round green play control. Main click launches the current map; the chevron opens New Game. */
+export default function PlayButton({ isRunning, lastError, hasProject, hasMap, onLaunch }: PlayButtonProps) {
   const [open, setOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const canPlayMap = hasProject && hasMap && !isRunning;
+  const canNewGame = hasProject && !isRunning;
+  const playClass = isRunning
+    ? 'bg-orange-400 hover:bg-orange-400 text-white cursor-wait'
+    : 'bg-green-500 hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-500 text-white';
 
-  // Close dropdown on outside click
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
-
-  // Close on Escape
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
-    };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [open]);
-
-  const handleSelect = (mode: FlareLaunchMode) => {
+  const launch = (mode: FlareLaunchMode) => {
     setOpen(false);
     onLaunch(mode);
   };
 
   return (
-    <div ref={menuRef} className="relative no-drag">
-      {/* Main play button */}
-      <Button
-        type="button"
-        variant="ghost"
-        onClick={() => setOpen(prev => !prev)}
-        disabled={isRunning}
-        className={`h-auto 
-          flex items-center gap-1 px-2.5 py-0.5 rounded text-xs font-semibold transition-all
-          ${isRunning
-            ? 'bg-orange-200 dark:bg-orange-900 text-orange-600 dark:text-orange-300 cursor-wait'
-            : 'bg-green-500 hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-500 text-white cursor-pointer'
-          }
-        `}
-        title={isRunning ? 'Flare engine is running' : 'Launch Flare engine'}
-      >
-        {isRunning ? (
-          <>
-            <span className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
-            <span>Running</span>
-          </>
-        ) : (
-          <>
-            {/* Play triangle icon */}
-            <svg width="10" height="12" viewBox="0 0 10 12" fill="currentColor" className="flex-shrink-0">
-              <polygon points="0,0 10,6 0,12" />
-            </svg>
-            <span>Play</span>
-            {/* Dropdown caret */}
-            <svg width="8" height="5" viewBox="0 0 8 5" fill="currentColor" className="ml-0.5 opacity-70">
-              <polygon points="0,0 8,0 4,5" />
-            </svg>
-          </>
-        )}
-      </Button>
-
-      {/* Dropdown menu */}
-      {open && !isRunning && (
-        <div className="absolute top-full left-0 mt-1 z-50 min-w-[200px] bg-white dark:bg-neutral-800 border border-gray-200 dark:border-neutral-600 rounded-md shadow-lg py-1 text-sm">
-          <Button
-        type="button"
-        variant="ghost"
-            onClick={() => handleSelect('current-map')}
-            disabled={!hasProject || !hasMap}
-            className="h-auto w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-neutral-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 rounded-none"
-          >
-            <svg width="10" height="12" viewBox="0 0 10 12" fill="currentColor" className="text-green-500 flex-shrink-0">
-              <polygon points="0,0 10,6 0,12" />
-            </svg>
-            <div>
-              <div className="font-medium text-gray-800 dark:text-gray-200">Play Current Map</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">Save &amp; launch into this map</div>
-            </div>
-          </Button>
-
-          <Button
-        type="button"
-        variant="ghost"
-            onClick={() => handleSelect('new-game')}
-            disabled={!hasProject}
-            className="h-auto w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-neutral-700 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 rounded-none"
-          >
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-blue-500 flex-shrink-0">
-              <rect x="1" y="1" width="10" height="10" rx="2" />
-            </svg>
-            <div>
-              <div className="font-medium text-gray-800 dark:text-gray-200">New Game</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">Save &amp; play from beginning</div>
-            </div>
-          </Button>
-
-          <div className="border-t border-gray-200 dark:border-neutral-600 my-1" />
-
-          <Button
-        type="button"
-        variant="ghost"
-            onClick={() => handleSelect('main-menu')}
-            className="h-auto w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-neutral-700 flex items-center gap-2 rounded-none"
-          >
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" className="text-orange-500 flex-shrink-0">
-              <circle cx="6" cy="6" r="5" />
-            </svg>
-            <div>
-              <div className="font-medium text-gray-800 dark:text-gray-200">Flare Main Menu</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">Launch engine title screen</div>
-            </div>
-          </Button>
-
-          {lastError && (
-            <>
-              <div className="border-t border-gray-200 dark:border-neutral-600 my-1" />
-              <div className="px-3 py-1.5 text-xs text-red-500">{lastError}</div>
-            </>
+    <div className="flex items-center no-drag">
+      <Tooltip content={isRunning ? 'Flare engine is running' : 'Play Current Map'} side="bottom">
+        <Button
+          type="button"
+          size="icon"
+          disabled={isRunning}
+          onClick={() => { if (canPlayMap) launch('current-map'); }}
+          aria-label={isRunning ? 'Flare engine is running' : 'Play Current Map'}
+          className={`h-8 w-8 rounded-l-full rounded-r-none shadow-sm ${playClass}`}
+        >
+          {isRunning ? (
+            <span className="h-2 w-2 rounded-full bg-white animate-pulse" />
+          ) : (
+            <Play className="h-4 w-4 fill-current" />
           )}
-
-          <div className="border-t border-gray-200 dark:border-neutral-600 my-1" />
-
+        </Button>
+      </Tooltip>
+      <Popover open={open} onOpenChange={(next) => { if (!isRunning) setOpen(next); }}>
+        <PopoverTrigger asChild>
           <Button
-        type="button"
-        variant="ghost"
-            onClick={() => { setOpen(false); onConfigurePath(); }}
-            className="h-auto w-full text-left px-3 py-1.5 hover:bg-gray-100 dark:hover:bg-neutral-700 flex items-center gap-2 rounded-none"
+            type="button"
+            size="icon"
+            disabled={isRunning}
+            aria-label="More play options"
+            className={`h-8 w-6 rounded-l-none rounded-r-full border-l border-white/25 shadow-sm ${playClass}`}
           >
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-gray-500 flex-shrink-0">
-              <path d="M10.5 6.5v3a1 1 0 01-1 1h-7a1 1 0 01-1-1v-7a1 1 0 011-1h3" />
-              <path d="M8 1.5h2.5V4" />
-              <path d="M5.5 6.5L10.5 1.5" />
-            </svg>
+            <ChevronDown className="h-3.5 w-3.5" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent align="end" side="bottom" className="w-56 p-1">
+          <Button
+            type="button"
+            variant="ghost"
+            disabled={!canPlayMap}
+            onClick={() => launch('current-map')}
+            className="h-auto w-full justify-start rounded-sm px-2 py-1.5 text-left"
+          >
             <div>
-              <div className="font-medium text-gray-800 dark:text-gray-200">
-                {flarePath ? 'Change Flare Location...' : 'Set Flare Location...'}
-              </div>
-              {flarePath ? (
-                <div className="text-xs text-gray-400 dark:text-gray-500 truncate max-w-[220px]" title={flarePath}>{flarePath}</div>
-              ) : (
-                <div className="text-xs text-amber-500">Select flare.exe to enable play</div>
-              )}
+              <div className="font-medium">Play Current Map</div>
+              <div className="text-xs text-muted-foreground">Save and launch into this map</div>
             </div>
           </Button>
-        </div>
-      )}
+          <Button
+            type="button"
+            variant="ghost"
+            disabled={!canNewGame}
+            onClick={() => launch('new-game')}
+            className="h-auto w-full justify-start rounded-sm px-2 py-1.5 text-left"
+          >
+            <div>
+              <div className="font-medium">New Game</div>
+              <div className="text-xs text-muted-foreground">Save and play from the beginning</div>
+            </div>
+          </Button>
+          {lastError ? (
+            <p className="px-2 py-1.5 text-xs text-destructive">{lastError}</p>
+          ) : null}
+        </PopoverContent>
+      </Popover>
     </div>
   );
-};
-
-export default PlayButton;
+}

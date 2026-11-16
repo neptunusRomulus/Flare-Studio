@@ -120,7 +120,7 @@ const MainMenuDialog: React.FC<MainMenuDialogProps> = ({
       label: 'Save',
       icon: <Save className="w-3 h-3" />,
       onClick: () => { onSave(); onClose(); },
-      disabled: !hasProject || isSaving,
+      disabled: !hasProject || isSaving || !hasUnsavedChanges,
       loading: isSaving,
       showUnsavedDot: hasUnsavedChanges && !isSaving,
     }] : []),
@@ -245,7 +245,11 @@ const MainMenuDialog: React.FC<MainMenuDialogProps> = ({
                 {item.loading ? <Loader2 className="w-3 h-3 animate-spin flex-shrink-0" /> : <span className="flex-shrink-0">{item.icon}</span>}
                 <span className="flex-1 text-left">{item.label}</span>
                 {item.showUnsavedDot ? (
-                  <span className="w-2 h-2 shrink-0 rounded-full bg-red-500" aria-label="Unsaved changes" />
+                  <span
+                    className="w-2 h-2 shrink-0 rounded-full bg-red-500"
+                    aria-hidden="true"
+                    data-save-state="unsaved"
+                  />
                 ) : null}
               </Button>
             );

@@ -14,7 +14,6 @@ type TitleBarProps = {
 
 const TitleBar = ({
   saveStatus,
-  lastSaveTime,
   onMinimize,
   onMaximize,
   onClose,
@@ -29,32 +28,22 @@ const TitleBar = ({
         ) : null)}
         <span className="text-sm font-semibold text-orange-600 dark:text-orange-400 whitespace-nowrap">Flare Studio</span>
       </div>
-      <div className="flex items-center gap-2 text-xs mx-4 min-w-[90px]">
-        {saveStatus === 'saving' && (
-          <>
-            <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse flex-shrink-0"></div>
-            <span className="text-orange-600 whitespace-nowrap">Saving...</span>
-          </>
-        )}
-        {saveStatus === 'saved' && lastSaveTime > 0 && (
-          <>
-            <div className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></div>
-            <span className="text-green-600 whitespace-nowrap">Saved</span>
-          </>
-        )}
-        {saveStatus === 'error' && (
-          <>
-            <div className="w-2 h-2 bg-red-500 rounded-full flex-shrink-0"></div>
-            <span className="text-red-600 whitespace-nowrap">Save Error</span>
-          </>
-        )}
-        {saveStatus === 'unsaved' && (
-          <>
-            <div className="w-2 h-2 bg-gray-400 rounded-full flex-shrink-0"></div>
-            <span className="text-gray-500 whitespace-nowrap">Unsaved</span>
-          </>
-        )}
-      </div>
+      {(saveStatus === 'saving' || saveStatus === 'error') && (
+        <div className="flex items-center gap-2 text-xs mx-4">
+          {saveStatus === 'saving' && (
+            <>
+              <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse flex-shrink-0"></div>
+              <span className="text-orange-600 whitespace-nowrap">Saving...</span>
+            </>
+          )}
+          {saveStatus === 'error' && (
+            <>
+              <div className="w-2 h-2 bg-red-500 rounded-full flex-shrink-0"></div>
+              <span className="text-red-600 whitespace-nowrap">Save Error</span>
+            </>
+          )}
+        </div>
+      )}
     </div>
     <div className="flex items-center gap-2">
       <WindowControls onMinimize={onMinimize} onMaximize={onMaximize} onClose={onClose} />

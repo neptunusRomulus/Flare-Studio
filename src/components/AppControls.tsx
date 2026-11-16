@@ -36,7 +36,7 @@ const AppControls: React.FC<Props> = ({
 
   return (
     <div className="flex items-center gap-1 no-drag">
-      <Tooltip content={hasUnsavedChanges ? 'Unsaved changes — open the menu to save (Ctrl+S)' : 'Menu'} side="bottom">
+      <Tooltip content={hasUnsavedChanges ? 'Unsaved changes — open the menu to save (Ctrl+S)' : 'Menu — all changes saved'} side="bottom">
         <Button
           ref={btnRef}
           type="button"
@@ -62,8 +62,20 @@ const AppControls: React.FC<Props> = ({
             aria-hidden="true"
             className="w-2.5 h-2.5 shrink-0 text-muted-foreground opacity-0 -translate-y-0.5 transition duration-150 ease-out group-hover:opacity-100 group-hover:translate-y-0 group-focus-visible:opacity-100 group-aria-expanded:opacity-100 group-aria-expanded:translate-y-0 group-aria-expanded:rotate-180 motion-reduce:transition-none"
           />
-          {hasUnsavedChanges && !isManuallySaving && (
-            <span className="absolute -top-0.5 left-3.5 w-2 h-2 bg-red-500 rounded-full border border-background pointer-events-none" />
+          {hasUnsavedChanges ? (
+            <span
+              className="absolute -top-0.5 left-3.5 w-2 h-2 bg-red-500 rounded-full border border-background pointer-events-none"
+              role="img"
+              aria-label="Unsaved changes"
+              data-save-state="unsaved"
+            />
+          ) : (
+            <span
+              className="absolute -top-0.5 left-3.5 w-2 h-2 bg-green-500 rounded-full border border-background pointer-events-none"
+              role="img"
+              aria-label="All changes saved"
+              data-save-state="saved"
+            />
           )}
         </Button>
       </Tooltip>

@@ -245,7 +245,7 @@ describe('enemy file blank-line round trip (flare-game samples)', () => {
   });
 });
 
-describe('applyEnemyFileUpdates (Save as preset)', () => {
+describe('applyEnemyFileUpdates', () => {
   const src = [
     'INCLUDE enemies/base/goblin.txt',
     'INCLUDE enemies/base/boss.txt',

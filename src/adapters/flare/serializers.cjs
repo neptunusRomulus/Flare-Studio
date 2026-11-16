@@ -395,7 +395,7 @@ function includesFromEnemyText(content) {
 /**
  * Update an existing enemy file in place: replace the INCLUDE list and unique keys,
  * keep comments, unknown keys, and repeated keys (stat=, power=, sfx_*=).
- * Used by "Save as preset" so it does not rebuild the file from the form alone.
+ * Used when writing an enemy definition so it does not rebuild the file from the form alone.
  * `fields` values update keys that appear at most once; repeated keys are left as they are.
  * `listFields` replaces every line of a repeated key (loot=) in file order; omit the key to leave it alone.
  * When `content` is empty, builds a new file from `includes`, optional `header`, `lines`, and `fields`.

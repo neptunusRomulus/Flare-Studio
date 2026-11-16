@@ -442,50 +442,6 @@ ipcMainLocal.handle("clear-crash-backup", async (_event, projectPath) => {
   }
 });
 
-// Enemy preset management
-ipcMainLocal.handle("list-enemies", async (event, projectPath) => {
-  try {
-    if (!projectPath) return [];
-    const enemiesDir = path.join(projectPath, "enemies");
-    if (!fs.existsSync(enemiesDir)) return [];
-
-    const files = fs.readdirSync(enemiesDir);
-    return files
-      .filter((f) => f.toLowerCase().endsWith(".txt"))
-      .map((f) => `enemies/${f}`);
-  } catch (e) {
-    console.error("list-enemies failed:", e);
-    return [];
-  }
-});
-
-ipcMainLocal.handle(
-  "save-enemy-preset",
-  async (event, projectPath, filename, content) => {
-    try {
-      if (!projectPath || !filename || !content) return false;
-
-      // Ensure enemies folder exists
-      const enemiesDir = path.join(projectPath, "enemies");
-      if (!fs.existsSync(enemiesDir)) {
-        fs.mkdirSync(enemiesDir, { recursive: true });
-      }
-
-      const base = path.basename(String(filename)).replace(/\.txt$/i, "");
-      const safeName = `${flareAdapter.slugFileName(base)}.txt`;
-      const normalized = flareAdapter.normalizeEnemyText(content);
-
-      const filePath = path.join(enemiesDir, safeName);
-      fs.writeFileSync(filePath, normalized.text, "utf8");
-      console.log("Enemy preset saved:", filePath);
-      return true;
-    } catch (e) {
-      console.error("save-enemy-preset failed:", e);
-      return false;
-    }
-  }
-);
-
 // NPC file management
 ipcMainLocal.handle(
   "write-npc-file",

@@ -16,11 +16,11 @@ import { statsFromStrength, strengthFromStats, strengthLabel, STRENGTH_TIERS, ty
 import { behaviorPresetFromValues, valuesFromBehaviorPreset, BEHAVIOR_PRESET_IDS, BEHAVIOR_PRESET_META, type BehaviorPresetId } from '@/editor/enemyBehaviorPresets';
 import { dropFromLootRows, summarizeEnemy } from '@/editor/enemySummary';
 import type { MapObject } from '@/types';
-import { applyEnemyFileUpdates, includesFromEnemyText } from '@/adapters/flare/flareAdapter.cjs';
+import { includesFromEnemyText } from '@/adapters/flare/flareAdapter.cjs';
 import { propertyRecord, propertyText } from '@/editor/propertyText';
 import { ENEMY_STAT_IDS, enemyFilePath, formatStatProperty, statsFromProperties } from '@/utils/enemyFileHydrate';
 import { writeEnemyDefinition } from '@/utils/enemyFileWrite';
-import { canonicalIdentity, displayIdentity } from '@/editor/identityRename';
+import { canonicalIdentity } from '@/editor/identityRename';
 import { renameIfNameChanged, uniqueSlugFromName } from '@/editor/identityFromName';
 import { loadProjectTextMap } from '@/editor/projectFiles';
 import { useToast } from '@/hooks/use-toast';
@@ -48,8 +48,6 @@ interface EditEnemyWindowProps {
   showCloseConfirm?: boolean;
   onCloseDecision?: (decision: 'save' | 'discard' | 'cancel') => void;
 }
-
-const ENEMY_FILE_UNSUPPORTED_KEYS = ['gold', 'wander_radius', 'waypoints', 'script'];
 
 const ENEMY_FORM_KEYS: string[] = [
   'tilesetPath', 'portraitPath', 'gfx', 'render_layers', 'animation_slots', 'animations', 'suppress_hp',
@@ -258,25 +256,6 @@ const [name, setName] = useState(() => enemy?.name || '');
   const [isLifeform, setIsLifeform] = useState<boolean>(() => (enemy?.properties?.lifeform === 'false' ? false : true));
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [newCatInput, setNewCatInput] = useState('');
-  const [presets, setPresets] = useState<string[]>([]);
-  const [isLoadingPresets, setIsLoadingPresets] = useState(false);
-
-  useEffect(() => {
-    const fetchPresets = async () => {
-      if (open && projectPath && window.electronAPI?.listEnemies) {
-        setIsLoadingPresets(true);
-        try {
-          const list = await window.electronAPI.listEnemies(projectPath);
-          setPresets(list);
-        } catch (e) {
-          console.error('Failed to fetch presets:', e);
-        } finally {
-          setIsLoadingPresets(false);
-        }
-      }
-    };
-    fetchPresets();
-  }, [open, projectPath]);
 
   useEffect(() => {
     if (!open) return;
@@ -291,233 +270,6 @@ const [name, setName] = useState(() => enemy?.name || '');
     }).catch(() => { /* keep property includes */ });
     return () => { cancelled = true; };
   }, [open, projectPath, enemy]);
-
-
-  const handleSaveAsPreset = async () => {
-    if (!projectPath || !window.electronAPI?.saveEnemyPreset) return;
-    if (!name.trim()) return;
-
-    const previousPath = propertyText(enemy?.properties?.enemyFilename) || propertyText(enemy?.properties?.sourcePath);
-    const files = await loadProjectTextMap(projectPath);
-    let allocated = previousPath
-      ? uniqueSlugFromName(files, 'enemy', name, previousPath)
-      : uniqueSlugFromName(files, 'enemy', name);
-    if (previousPath) {
-      const renamed = await renameIfNameChanged(projectPath, 'enemy', previousPath, name);
-      if (renamed.ok) allocated = displayIdentity('enemy', renamed.nextId);
-    }
-    const filename = `${allocated.split('/').pop()}.txt`;
-
-    const includePaths = includes.map((s) => s.trim()).filter(Boolean);
-
-    const lines: string[] = [];
-    lines.push(`name=${name}`);
-    
-    if (category) {
-      // Categories should be comma separated lists.
-      lines.push(`categories=${category}`);
-    }
-
-    if (level !== undefined && level !== null) lines.push(`level=${level}`);
-    if (rarity) lines.push(`rarity=${rarity}`);
-    if (xp) lines.push(`xp=${xp}`);
-    
-    // Core Stats (Standard key=value)
-    if (speed) lines.push(`speed=${speed}`);
-    if (cooldown) lines.push(`cooldown=${cooldown}`);
-    if (turnDelay) lines.push(`turn_delay=${turnDelay}`);
-    if (waypointPause) lines.push(`waypoint_pause=${waypointPause}`);
-    
-    // Core Stats (stat=id,value)
-    if (hp) lines.push(`stat=hp,${hp}`);
-    if (mp) lines.push(`stat=mp,${mp}`);
-    if (accuracy) lines.push(`stat=accuracy,${accuracy}`);
-    if (avoidance) lines.push(`stat=avoidance,${avoidance}`);
-    if (crit) lines.push(`stat=crit,${crit}`);
-    if (poise) lines.push(`stat=poise,${poise}`);
-    if (stealth) lines.push(`stat=stealth,${stealth}`);
-    if (absorbMin) lines.push(`stat=absorb_min,${absorbMin}`);
-    if (absorbMax) lines.push(`stat=absorb_max,${absorbMax}`);
-    
-    // Damage stats
-    if (dmgMeleeMin) lines.push(`stat=dmg_melee_min,${dmgMeleeMin}`);
-    if (dmgMeleeMax) lines.push(`stat=dmg_melee_max,${dmgMeleeMax}`);
-    if (dmgRangedMin) lines.push(`stat=dmg_ranged_min,${dmgRangedMin}`);
-    if (dmgRangedMax) lines.push(`stat=dmg_ranged_max,${dmgRangedMax}`);
-
-    // Utility stats
-    if (reflectChance) lines.push(`stat=reflect_chance,${reflectChance}`);
-    if (returnDamage) lines.push(`stat=return_damage,${returnDamage}`);
-    if (currencyFind) lines.push(`stat=currency_find,${currencyFind}`);
-    if (itemFind) lines.push(`stat=item_find,${itemFind}`);
-
-    // Ranges & Behavior
-    if (meleeRange) lines.push(`melee_range=${meleeRange}`);
-    if (threatRange) lines.push(`threat_range=${threatRange}`);
-    if (fleeRange) lines.push(`flee_range=${fleeRange}`);
-    if (fleeDuration) lines.push(`flee_duration=${fleeDuration}`);
-    if (fleeCooldown) lines.push(`flee_cooldown=${fleeCooldown}`);
-    if (chancePursue) lines.push(`chance_pursue=${chancePursue}`);
-    if (chanceFlee) lines.push(`chance_flee=${chanceFlee}`);
-    if (combatStyle) lines.push(`combat_style=${combatStyle}`);
-
-    // Flags
-    if (isFacing) lines.push(`facing=true`);
-    if (isFlying) lines.push(`flying=true`);
-    if (isIntangible) lines.push(`intangible=true`);
-    if (isHumanoid) lines.push(`humanoid=true`);
-    if (!isLifeform) lines.push(`lifeform=false`);
-    
-    // Visuals & Audio
-    if (gfx) lines.push(`gfx=${gfx}`);
-    if (animations) lines.push(`animations=${animations}`);
-    if (renderLayers) lines.push(`render_layers=${renderLayers}`);
-    if (animationSlots) lines.push(`animation_slots=${animationSlots}`);
-    
-    // Powers
-    // Flare formats power as: power=state,power_id,chance
-    if (powers && Array.isArray(powers)) {
-       powers.forEach((p) => {
-         if (p.id) lines.push(`power=${p.state || 'melee'},${p.id},${p.chance || 100}`);
-       });
-    }
-
-    if (passivePowers) lines.push(`passive_powers=${passivePowers}`);
-    if (cooldownHit) lines.push(`cooldown_hit=${cooldownHit}`);
-    if (powerFilter) lines.push(`power_filter=${powerFilter}`);
-
-    // Loot
-    const savedLootCount = buildLootCount();
-    if (savedLootCount) lines.push(`loot_count=${savedLootCount}`);
-    if (firstDefeatLoot) lines.push(`first_defeat_loot=${firstDefeatLoot}`);
-    if (questLoot) lines.push(`quest_loot=${questLoot}`);
-    if (defeatStatus) lines.push(`defeat_status=${defeatStatus}`);
-
-    // Flare 1.15 StatBlock does not read these keys; wander_radius/waypoints belong on the map spawn
-    const notSaved = new Set<string>();
-    if (gold) notSaved.add('gold');
-    if (wanderRadius) notSaved.add('wander_radius');
-    if (waypoints) notSaved.add('waypoints');
-    if (script) notSaved.add('script');
-    const customLines = (customPropsRaw || '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean)
-      .filter((line) => {
-        const key = line.split('=')[0].trim();
-        if (ENEMY_FILE_UNSUPPORTED_KEYS.includes(key)) { notSaved.add(key); return false; }
-        return true;
-      });
-    lines.push(...customLines);
-
-    let source = '';
-    const raw = (enemy as MapObject & { _raw?: string } | null | undefined)?._raw;
-    if (typeof raw === 'string' && raw) source = raw;
-    else {
-      const rel = enemySourceRel(enemy);
-      if (rel && window.electronAPI?.readFile) {
-        const path = `${projectPath.replace(/\\/g, '/')}/${rel.replace(/\\/g, '/').replace(/^\//, '')}`;
-        source = (await window.electronAPI.readFile(path)) || '';
-      }
-    }
-
-    const uniqueFields: Record<string, string> = {};
-    if (name) uniqueFields.name = name;
-    if (category) uniqueFields.categories = category;
-    if (level !== undefined && level !== null) uniqueFields.level = String(level);
-    if (rarity) uniqueFields.rarity = rarity;
-    if (xp) uniqueFields.xp = xp;
-    if (speed) uniqueFields.speed = speed;
-    if (cooldown) uniqueFields.cooldown = cooldown;
-    if (turnDelay) uniqueFields.turn_delay = turnDelay;
-    if (waypointPause) uniqueFields.waypoint_pause = waypointPause;
-    if (meleeRange) uniqueFields.melee_range = meleeRange;
-    if (threatRange) uniqueFields.threat_range = threatRange;
-    if (fleeRange) uniqueFields.flee_range = fleeRange;
-    if (fleeDuration) uniqueFields.flee_duration = fleeDuration;
-    if (fleeCooldown) uniqueFields.flee_cooldown = fleeCooldown;
-    if (chancePursue) uniqueFields.chance_pursue = chancePursue;
-    if (chanceFlee) uniqueFields.chance_flee = chanceFlee;
-    if (combatStyle) uniqueFields.combat_style = combatStyle;
-    if (isFacing) uniqueFields.facing = 'true';
-    if (isFlying) uniqueFields.flying = 'true';
-    if (isIntangible) uniqueFields.intangible = 'true';
-    if (isHumanoid) uniqueFields.humanoid = 'true';
-    if (!isLifeform) uniqueFields.lifeform = 'false';
-    if (gfx) uniqueFields.gfx = gfx;
-    if (animations) uniqueFields.animations = animations;
-    if (renderLayers) uniqueFields.render_layers = renderLayers;
-    if (animationSlots) uniqueFields.animation_slots = animationSlots;
-    if (passivePowers) uniqueFields.passive_powers = passivePowers;
-    if (cooldownHit) uniqueFields.cooldown_hit = cooldownHit;
-    if (powerFilter) uniqueFields.power_filter = powerFilter;
-    const presetLootCount = buildLootCount();
-    if (presetLootCount) uniqueFields.loot_count = presetLootCount;
-    if (firstDefeatLoot) uniqueFields.first_defeat_loot = firstDefeatLoot;
-    if (questLoot) uniqueFields.quest_loot = questLoot;
-    if (defeatStatus) uniqueFields.defeat_status = defeatStatus;
-
-    const lootValues = lootRows.filter((row) => row.id.trim()).map((row) => formatLootRow(row));
-    const presetStats: Record<string, string> = {
-      hp, mp,
-      hp_regen: hpRegen, mp_regen: mpRegen, accuracy, avoidance, crit, poise, stealth,
-      absorb_min: absorbMin, absorb_max: absorbMax, xp_gain: xpGain,
-      currency_find: currencyFind, item_find: itemFind,
-      reflect_chance: reflectChance, return_damage: returnDamage,
-      hp_steal: hpSteal, mp_steal: mpSteal,
-      resist_damage_over_time: resistDamageOverTime, resist_slow: resistSlow,
-      resist_stun: resistStun, resist_knockback: resistKnockback,
-      resist_stat_debuff: resistStatDebuff, resist_damage_reflect: resistDamageReflect,
-      dmg_melee_min: dmgMeleeMin, dmg_melee_max: dmgMeleeMax,
-      dmg_ranged_min: dmgRangedMin, dmg_ranged_max: dmgRangedMax,
-      dmg_ment_min: dmgMentMin, dmg_ment_max: dmgMentMax,
-      resist_hp_steal: resistHpSteal, resist_mp_steal: resistMpSteal,
-    };
-    const presetStatText = formatStatProperty(
-      { ...statsFromProperties(enemy?.properties as Record<string, unknown> | undefined), ...presetStats },
-      (enemy?.properties as Record<string, unknown> | undefined)?.stat,
-    );
-    const listFields: Record<string, string[]> = {};
-    if (formatLootProperty(lootRows) !== formatLootProperty(originalLoot) || !source.trim()) {
-      listFields.loot = lootValues;
-    }
-    if (presetStatText || propertyText(enemy?.properties?.stat)) {
-      listFields.stat = presetStatText ? presetStatText.split('\n') : [];
-    }
-    const { text: content, warnings } = source.trim()
-      ? applyEnemyFileUpdates(source, { includes: includePaths, fields: uniqueFields, listFields })
-      : applyEnemyFileUpdates('', {
-          header: '# Enemy file generated by Flare Studio',
-          includes: includePaths,
-          lines,
-          listFields,
-        });
-    for (const w of warnings) {
-      for (const key of ENEMY_FILE_UNSUPPORTED_KEYS) {
-        if (w.includes(key)) notSaved.add(key);
-      }
-    }
-
-    try {
-      const success = await window.electronAPI.saveEnemyPreset(projectPath, filename, content);
-      if (success) {
-        const list = await window.electronAPI.listEnemies(projectPath);
-        setPresets(list);
-        setIncludes([`enemies/${filename}`]);
-        toast({
-          title: 'Enemy file saved',
-          description: `Enemy saved to enemies/${filename}`,
-          variant: 'default',
-        });
-        if (notSaved.size > 0) {
-          toast({
-            title: 'Some fields were not saved',
-            description: `${[...notSaved].join(', ')}: not enemy file keys in Flare 1.15. Set wander radius and waypoints on the map spawn.`,
-            variant: 'destructive',
-          });
-        }
-      }
-    } catch (e) {
-      console.error('Failed to save enemy file:', e);
-    }
-  };
 
   const selectedCategories = category.split(',').map(s => s.trim()).filter(Boolean);
 

@@ -110,9 +110,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("rename-project-file", fromPath, toPath),
   readDir: (dirPath) => ipcRenderer.invoke("read-dir", dirPath),
   getProjectFolder: () => ipcRenderer.invoke("get-project-folder"),
-  listEnemies: (projectPath) => ipcRenderer.invoke("list-enemies", projectPath),
-  saveEnemyPreset: (projectPath, filename, content) =>
-    ipcRenderer.invoke("save-enemy-preset", projectPath, filename, content),
   // Menu event listeners
   onMenuNewMap: (callback) =>
     ipcRenderer.on("menu-new-map", (_e) => callback && callback()),

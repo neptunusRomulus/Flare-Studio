@@ -104,8 +104,6 @@ declare global {
       readItemFile: (filePath: string) => Promise<{ success: boolean; data?: Record<string, unknown>; error?: string }>;
       writeItemFile: (filePath: string, itemData: Record<string, unknown>) => Promise<{ success: boolean; error?: string }>;
       deleteItemFile: (filePath: string) => Promise<{ success: boolean; error?: string }>;
-      listEnemies: (projectPath: string) => Promise<string[]>;
-      saveEnemyPreset: (projectPath: string, filename: string, content: string) => Promise<boolean>;
       // Generic filesystem helpers for renderer
       createFolderIfNotExists: (folderPath: string) => Promise<boolean>;
       readFile: (filePath: string) => Promise<string | null>;

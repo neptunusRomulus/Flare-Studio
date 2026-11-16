@@ -547,7 +547,14 @@ export default function EditorCanvas(props: Props) {
       <canvas
         ref={canvasRef}
         id="mapCanvas"
-        className={`tile-canvas flex-1 canvas-fade outline outline-orange-600 ${draggingNpcId || draggingEventId || armedEntity ? 'outline-2 -outline-offset-2 outline-orange-500' : 'outline-1 -outline-offset-1'}`}
+        className="tile-canvas flex-1 canvas-fade"
+      />
+
+      {/* Inner stroke as a separate overlay: the canvas is resized and composited on every
+          dock resize, and an outline on it drops out or fades on the left edge. */}
+      <div
+        aria-hidden
+        className={`pointer-events-none absolute inset-0 z-[5] ring-inset ${draggingNpcId || draggingEventId || armedEntity ? 'ring-2 ring-orange-500' : 'ring-1 ring-orange-600 dark:ring-orange-400'}`}
       />
 
       <MapInitOverlay mapInitialized={mapInitialized} handleOpenCreateMapDialog={handleOpenCreateMapDialog} isPreparingNewMap={isPreparingNewMap} />

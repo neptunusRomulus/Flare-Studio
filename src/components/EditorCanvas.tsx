@@ -274,7 +274,7 @@ export default function EditorCanvas(props: Props) {
   return (
     <div
       ref={canvasAreaRef}
-      className={`bg-gray-100 flex-1 min-h-0 flex overflow-hidden relative ${draggingNpcId || draggingEventId || armedEntity ? 'ring-2 ring-orange-500 ring-inset' : ''}`}
+      className={`bg-gray-100 flex-1 min-h-0 flex overflow-hidden relative ring-inset ${draggingNpcId || draggingEventId || armedEntity ? 'ring-2 ring-orange-500' : 'ring-1 ring-orange-600 dark:ring-orange-400'}`}
       style={armedEntity ? { cursor: 'crosshair' } : undefined}
       onMouseDownCapture={(e) => {
         // Click-to-place from the Entities dock (runs before the editor's own canvas handlers)

@@ -554,7 +554,7 @@ export default function EditorCanvas(props: Props) {
 
       <MapHoverDisplay hoverCoords={hoverCoords} showActiveGid={showActiveGid} activeGidValue={activeGidValue} hoverGidValue={hoverGidValue} isEnemyTabActive={isEnemyTabActive}
         debugMode={debugMode}
-        left={(() => { const b = editorRef.current?.getLastMiniMapBounds?.(); return b ? b.x + b.w + 12 : 16; })()} />
+        left={16} />
 
       <NpcDeletePopup npcDeletePopup={npcDeletePopup} onConfirm={handleDeleteMapNpcInstance} onDuplicate={handleDuplicateMapNpcInstance} onCancel={() => setNpcDeletePopup(null)} />
 

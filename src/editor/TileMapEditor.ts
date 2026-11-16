@@ -4324,11 +4324,11 @@ export class TileMapEditor {
   private drawMiniMap(): void {
     if (!this.showMinimap) return;
 
-    // Minimap dimensions and position (bottom-left corner of the canvas; the right dock sits to the right)
+    // Minimap dimensions and position (bottom-right corner of the canvas)
     const minimapWidth = Math.floor(150 * this.minimapWindowScale);
     const minimapHeight = Math.floor(120 * this.minimapWindowScale);
     const padding = 10;
-    let x = padding;
+    let x = this.mapCanvas.width - minimapWidth - padding;
     let y = this.mapCanvas.height - minimapHeight - padding;
     // Clamp inside canvas to avoid drawing outside if the canvas is smaller
     x = Math.max(0, Math.min(this.mapCanvas.width - minimapWidth, x));

@@ -9,7 +9,7 @@ type Props = {
   isEnemyTabActive: boolean;
   /** Readout is a debug aid: only shown while Engine Settings > Debug Mode is on. */
   debugMode?: boolean;
-  /** Left offset in px (kept clear of the bottom-left minimap). */
+  /** Left offset in px (stays on the left; the minimap is bottom-right). */
   left?: number;
 };
 

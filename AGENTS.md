@@ -33,7 +33,8 @@
 - Rail order = Map (Ground/Object/Collision), Entities (NPC/Enemy/Event), Content (Items/Books/Statuses/Quests), Game Settings. See `src/components/targetGroups.ts` (`railGroups`).
 - Tab cycles sub-targets; Shift+Tab cycles main layers (`src/hooks/useSidebarTabHotkeys.ts`).
 - Rail visibility icons (map/entities only): corner eye = visibility, mouse wheel = opacity (per sub-target).
-- Title bar: Flare Studio mark (`src/components/brand/BrandMark.tsx`) = app menu (incl. Engine Settings; `src/components/AppControls.tsx`, `MainMenuDialog.tsx`), Save button next to it.
+- Zen mode: no title bar. The canvas starts at y=0; the Flare Studio mark (`src/components/brand/BrandMark.tsx`) is a round floating button top-left of the canvas = app menu (incl. Engine Settings; `src/components/AppControls.tsx`, `MainMenuDialog.tsx`). Save feedback (Saving… / Save failed) lives in that button's tooltip.
+- Window buttons (minimize/maximize/close) are hidden: `src/components/WindowControlBar.tsx` slides a slim drag-region bar down when the pointer touches the top 6px edge and hides it ~600ms after leaving (`WINDOW_BAR_HOT_ZONE`, `WINDOW_BAR_HIDE_MS`). Same IPC (`minimize` / `maximize` / `close`).
 - Brand: sources in `assets/brand/` (regenerate with `scripts/brand/`), app icons in `build/icons/`, runtime copies in `public/brand/`. Chakra Petch is for the logo only.
 - GID readout only in Debug Mode. Minimap bottom-left.
 - Content > Quests: the Quest Map (`src/components/QuestMapView.tsx`, graph in `src/editor/questMap.ts`) replaces the map view; the network button next to "+ Quest" toggles it. Read-only: quests, the NPCs and map events that start/advance/end (NPCs also: talk about) them, and quest unlocks, linked by statuses. Dragged card positions live only in the Studio sidecar `content/quest-map.json`.

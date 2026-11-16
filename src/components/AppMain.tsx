@@ -6,7 +6,7 @@ import LoadingOverlay from '@/components/LoadingOverlay';
 import { loadingOverlay } from '@/components/loadingOverlayStore';
 import { useAppContext } from '../context/AppContext';
 import WelcomeScreen from '../components/WelcomeScreen';
-import AppShell from '@/components/AppShell';
+import WindowControlBar from '@/components/WindowControlBar';
 import DockFooter from '@/components/DockFooter';
 import AppControls from '@/components/AppControls';
 import SidebarGameSettingsArea from '@/components/SidebarGameSettingsArea';
@@ -304,11 +304,13 @@ export default function AppMain() {
     onLaunch: flareEngine.launch,
   }), [flareEngine.isRunning, flareEngine.lastError, flareEngine.launch, controls?.currentProjectPath, hasMap]);
 
-  // Merge the logo menu into titleBarProps
-  const enhancedTitleBarProps = useMemo(() => ({
-    ...titleBarProps,
-    appMenu: showPanels && controls ? <AppControls {...enhancedControls} iconUrl={titleBarProps?.flareIconUrl} /> : undefined,
-  }), [titleBarProps, showPanels, controls, enhancedControls]);
+  // The old title bar is gone: the logo menu floats top-left over the canvas.
+  const appMenu = useMemo(
+    () => showPanels && controls
+      ? <AppControls {...enhancedControls} saveStatus={titleBarProps?.saveStatus} />
+      : undefined,
+    [showPanels, controls, enhancedControls, titleBarProps],
+  );
 
   const enhancedTopBarProps = useMemo(() => ({
     ...topBarProps,
@@ -326,9 +328,11 @@ export default function AppMain() {
   }
 
   return (
-    <div className="h-screen bg-background text-foreground flex flex-col overflow-hidden">
-      <AppShell
-        titleBarProps={enhancedTitleBarProps}
+    <div className="relative h-screen bg-background text-foreground flex flex-col overflow-hidden">
+      <WindowControlBar
+        onMinimize={titleBarProps?.onMinimize ?? (() => {})}
+        onMaximize={titleBarProps?.onMaximize ?? (() => {})}
+        onClose={titleBarProps?.onClose ?? (() => {})}
       />
 
       <main className="flex flex-1 min-h-0">
@@ -367,7 +371,7 @@ export default function AppMain() {
         >
           {(overlay) => (
             <div className="relative flex flex-1 min-w-0 min-h-0">
-              <EditorArea topBarProps={enhancedTopBarProps} canvasCtx={canvasCtx} bottomToolbarProps={bottomToolbarProps} isDarkMode={isDarkMode} overlay={overlay} />
+              <EditorArea topBarProps={enhancedTopBarProps} canvasCtx={canvasCtx} bottomToolbarProps={bottomToolbarProps} isDarkMode={isDarkMode} overlay={overlay} appMenu={appMenu} />
               {showQuestMap && (
                 <QuestMapContainer
                   editor={editor}

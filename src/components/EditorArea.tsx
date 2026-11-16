@@ -29,11 +29,19 @@ type Props = {
   bottomToolbarProps: React.ComponentProps<typeof EditorCanvas>['bottomToolbarProps'];
   isDarkMode: boolean;
   overlay?: React.ReactNode;
+  /** Floating round logo menu, top-left of the canvas (replaces the old title bar). */
+  appMenu?: React.ReactNode;
 };
 
-const EditorArea: React.FC<Props> = ({ topBarProps, canvasCtx, bottomToolbarProps, isDarkMode, overlay }) => {
+const EditorArea: React.FC<Props> = ({ topBarProps, canvasCtx, bottomToolbarProps, isDarkMode, overlay, appMenu }) => {
   return (
     <section className="flex-1 min-w-0 flex flex-col relative">
+      {appMenu ? (
+        <div className="absolute top-2 left-2 z-10">
+          {appMenu}
+        </div>
+      ) : null}
+
       <TopBar
         toolbarExpanded={topBarProps.toolbarExpanded}
         containerRef={topBarProps.containerRef}

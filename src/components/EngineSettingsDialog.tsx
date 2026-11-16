@@ -27,7 +27,6 @@ type EngineSettingsDialogProps = {
   undoPersistenceEnabled?: boolean;
   setUndoPersistenceEnabled?: Dispatch<SetStateAction<boolean>>;
   onClearUndoHistory?: () => void;
-  undoStorageSizeKB?: number;
   /** Tab to show when the dialog opens (e.g. 'display' from Help). */
   initialTab?: SettingsTab;
 };
@@ -45,7 +44,6 @@ const EngineSettingsDialog = ({
   undoPersistenceEnabled = false,
   setUndoPersistenceEnabled,
   onClearUndoHistory,
-  undoStorageSizeKB,
   initialTab
 }: EngineSettingsDialogProps) => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
@@ -260,7 +258,6 @@ const EngineSettingsDialog = ({
                   enabled={undoPersistenceEnabled}
                   onEnabledChange={setUndoPersistenceEnabled}
                   onClearHistory={onClearUndoHistory}
-                  storageSizeKB={undoStorageSizeKB}
                 />
               ) : (
                 <p className="text-sm text-muted-foreground">Save manually using the Save button in the title bar or Ctrl+S.</p>

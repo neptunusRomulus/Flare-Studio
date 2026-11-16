@@ -12,26 +12,25 @@ import AppMain from './components/AppMain';
 import { InlineConfirmHost } from './components/ui/inline-confirm';
 import useAppController from './hooks/useAppController';
 import useInterfaceScale from './hooks/useInterfaceScale';
+import type { AppMainSidebarDeps } from './hooks/useAppMainSidebarDeps';
+import type { AssembledSidebar } from './hooks/useAssembledSidebar';
+import type useAppMainBuilder from './hooks/useAppMainBuilder';
 
-function sidebarRecord(value: unknown): Record<string, unknown> {
-  if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
-    return value as Record<string, unknown>;
-  }
-  return {};
-}
+/** The app-wide context object assembled from the sidebar deps. */
+type AppMainCtx = ReturnType<ReturnType<typeof useAppMainBuilder>['buildAppMainCtxFromSidebar']>;
 
-function AppMainWrapper({ 
-  sidebarDeps, 
+function AppMainWrapper({
+  sidebarDeps,
   buildAppMainCtxFromSidebar
-}: { 
-  sidebarDeps: unknown; 
-  buildAppMainCtxFromSidebar: (s: Record<string, unknown> | null) => Record<string, unknown>;
+}: {
+  sidebarDeps: AppMainSidebarDeps;
+  buildAppMainCtxFromSidebar: (s: AssembledSidebar) => AppMainCtx;
 }) {
   return (
-    <SidebarProvider deps={useSidebarDeps(sidebarRecord(sidebarDeps))}>
-      {(assembledSidebar: unknown) => {
+    <SidebarProvider deps={useSidebarDeps(sidebarDeps)}>
+      {(assembledSidebar) => {
         // Build context directly on each render - getting fresh state from useAppMainBuilder hooks
-        const appCtx = buildAppMainCtxFromSidebar(assembledSidebar as Record<string, unknown> | null);
+        const appCtx = buildAppMainCtxFromSidebar(assembledSidebar);
         return (
           <AppProvider value={appCtx}>
             <AppMain />

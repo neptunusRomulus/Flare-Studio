@@ -2,7 +2,8 @@ import { useMemo } from 'react';
 import type { ImportReviewData } from './useAppMainState';
 import { toast } from '@/hooks/use-toast';
 
-type ProjectManagerView = {
+/** The slice of the project manager that the sidebar reads. */
+export type ProjectManagerView = {
   projectMaps?: string[];
   handleOpenMapFromMapsFolder?: (filename: string) => Promise<void>;
   handleManualSave?: () => Promise<void>;
@@ -12,6 +13,11 @@ type ProjectManagerView = {
   isManuallySaving?: boolean;
   saveProgress?: number;
 };
+
+/** Narrow the project manager once instead of casting at every read. */
+function asProjectManagerView(value: unknown): ProjectManagerView {
+  return value !== null && typeof value === 'object' ? (value as ProjectManagerView) : {};
+}
 
 type AppMainState = ReturnType<typeof import('./useAppMainState').default>;
 type ObjectEditing = ReturnType<typeof import('./useObjectEditing').default>;
@@ -135,28 +141,29 @@ export default function useAppMainSidebarDeps(args: AppMainSidebarDepsInput) {
   } = args;
 
   const sidebarDeps = useMemo(() => {
-    const projectMapsList = (projectManagerRecord as ProjectManagerView)?.projectMaps ?? [];
+    const pm = asProjectManagerView(projectManagerRecord);
+    const projectMapsList = pm.projectMaps ?? [];
     const handleOpenMapFromMapsFolderFn =
-      typeof (projectManagerRecord as ProjectManagerView)?.handleOpenMapFromMapsFolder === 'function'
-        ? (projectManagerRecord as ProjectManagerView).handleOpenMapFromMapsFolder!
+      typeof pm.handleOpenMapFromMapsFolder === 'function'
+        ? pm.handleOpenMapFromMapsFolder
         : async () => undefined;
     const handleManualSaveFn =
-      typeof (projectManagerRecord as ProjectManagerView)?.handleManualSave === 'function'
-        ? (projectManagerRecord as ProjectManagerView).handleManualSave!
+      typeof pm.handleManualSave === 'function'
+        ? pm.handleManualSave
         : async () => undefined;
     const refreshProjectMapsFn =
-      typeof (projectManagerRecord as ProjectManagerView)?.refreshProjectMaps === 'function'
-        ? (projectManagerRecord as ProjectManagerView).refreshProjectMaps!
+      typeof pm.refreshProjectMaps === 'function'
+        ? pm.refreshProjectMaps
         : async () => undefined;
-    const isExportingValue = Boolean((projectManagerRecord as ProjectManagerView)?.isExporting);
+    const isExportingValue = Boolean(pm.isExporting);
     const exportProgressValue =
-      typeof (projectManagerRecord as ProjectManagerView)?.exportProgress === 'number'
-        ? (projectManagerRecord as ProjectManagerView).exportProgress!
+      typeof pm.exportProgress === 'number'
+        ? pm.exportProgress
         : 0;
-    const isManuallySavingValue = Boolean((projectManagerRecord as ProjectManagerView)?.isManuallySaving);
+    const isManuallySavingValue = Boolean(pm.isManuallySaving);
     const saveProgressValue =
-      typeof (projectManagerRecord as ProjectManagerView)?.saveProgress === 'number'
-        ? (projectManagerRecord as ProjectManagerView).saveProgress!
+      typeof pm.saveProgress === 'number'
+        ? pm.saveProgress
         : 0;
 
     return {
@@ -373,3 +380,6 @@ export default function useAppMainSidebarDeps(args: AppMainSidebarDepsInput) {
   ]);
   return sidebarDeps;
 }
+
+/** The sidebar dependency bag passed from the main builder into the providers. */
+export type AppMainSidebarDeps = ReturnType<typeof useAppMainSidebarDeps>;

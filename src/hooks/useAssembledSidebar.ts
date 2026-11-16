@@ -75,5 +75,9 @@ export default function useAssembledSidebar(params: unknown) {
     layers: unknown;
     maps: ReturnType<typeof useMapsSidebar>;
     tileset: ReturnType<typeof useTilesetSidebar>['tileset'];
+    layersObj: unknown;
   };
 }
+
+/** The assembled sidebar handed to the main context builder. */
+export type AssembledSidebar = ReturnType<typeof useAssembledSidebar>;

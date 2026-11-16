@@ -20,7 +20,7 @@ import useNpcDrag from './useNpcDrag';
 import useEventDrag from './useEventDrag';
 import useObjectEditing from './useObjectEditing';
 import useAppMainObjectCommands from './useAppMainObjectCommands';
-import useAppMainSidebarDeps from './useAppMainSidebarDeps';
+import useAppMainSidebarDeps, { type ProjectManagerView } from './useAppMainSidebarDeps';
 import useVendorDialogs from './useVendorDialogs';
 import useClearLayerHandler from './useClearLayerHandler';
 import { normalizeItemsForState } from '@/utils/items';
@@ -41,16 +41,6 @@ import { resolveSaveMapName } from '@/editor/mapSaveName';
 export default function useAppMainBuilder() {
   type EditorTabsType = ReturnType<typeof useEditorTabs>;
   type ProjectManagerType = ReturnType<typeof useProjectManager>;
-  type ProjectManagerView = {
-    projectMaps?: string[];
-    handleOpenMapFromMapsFolder?: (filename: string) => Promise<void>;
-    handleManualSave?: () => Promise<void>;
-    refreshProjectMaps?: () => Promise<void>;
-    isExporting?: boolean;
-    exportProgress?: number;
-    isManuallySaving?: boolean;
-    saveProgress?: number;
-  };
 
   const {
     editorRefs,
@@ -702,7 +692,7 @@ export default function useAppMainBuilder() {
     }
   };
 
-  type AssembledSidebar = Record<string, unknown> | null;
+  type AssembledSidebar = import('./useAssembledSidebar').AssembledSidebar;
 
   const [showSettings, setShowSettings] = useState(false);
   const [showMapSettingsOnly, setShowMapSettingsOnly] = useState(false);
@@ -838,8 +828,8 @@ export default function useAppMainBuilder() {
     if (editor.getDebugMode() !== debugMode) editor.toggleDebugMode();
   }, [editor, debugMode]);
 
-  function buildAppMainCtxFromSidebar(assembledSidebar: AssembledSidebar): Record<string, unknown> {
-    const sb = (assembledSidebar ?? {}) as Record<string, unknown>;
+  function buildAppMainCtxFromSidebar(assembledSidebar: AssembledSidebar) {
+    const sb = assembledSidebar;
 
     const defaultEditor = editor ?? null;
 
@@ -1369,7 +1359,7 @@ export default function useAppMainBuilder() {
         }
         } as Record<string, unknown>;
         // Inject projectMaps into dialogCtx for DialogsContainer
-        const controls = (sb['controls'] as Record<string, unknown> | undefined) ?? {};
+        const controls = (sb as { controls?: Record<string, unknown> }).controls ?? {};
         const maps = (controls.projectMaps as string[] | undefined) ?? [];
         if (Array.isArray(maps)) {
           dialogCtx.projectMaps = maps;
@@ -1485,7 +1475,7 @@ export default function useAppMainBuilder() {
       handleSaveLootGroupEdit: itemsHook.handleSaveLootGroupEdit,
       onDeleteItem: handleDeleteItem,
       tooltip: null
-    } as Record<string, unknown>;
+    };
   }
 
   // Note: When state (showImportReview, importReviewData) changes, this hook triggers a re-render

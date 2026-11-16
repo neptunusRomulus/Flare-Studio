@@ -1,26 +1,26 @@
 import React, { createContext, useContext } from 'react';
-import useAssembledSidebar from '../hooks/useAssembledSidebar';
+import useAssembledSidebar, { type AssembledSidebar } from '../hooks/useAssembledSidebar';
 
-const SidebarContext = createContext<Record<string, unknown> | null>(null);
+const SidebarContext = createContext<AssembledSidebar | null>(null);
 
 type SidebarProviderProps = {
   deps: Record<string, unknown>;
-  children: React.ReactNode | ((assembledSidebar: unknown) => React.ReactNode);
+  children: React.ReactNode | ((assembledSidebar: AssembledSidebar) => React.ReactNode);
 };
 
 export const SidebarProvider = ({ deps, children }: SidebarProviderProps) => {
-  const assembledSidebar = useAssembledSidebar(deps as unknown);
+  const assembledSidebar = useAssembledSidebar(deps);
 
   const provider = (
-    <SidebarContext.Provider value={assembledSidebar as Record<string, unknown>}>
-      {typeof children === 'function' ? (children as (assembledSidebar: unknown) => React.ReactNode)(assembledSidebar) : children}
+    <SidebarContext.Provider value={assembledSidebar}>
+      {typeof children === 'function' ? children(assembledSidebar) : children}
     </SidebarContext.Provider>
   );
 
   return provider;
 };
 
-export function useSidebarContext() {
+export function useSidebarContext(): AssembledSidebar {
   const ctx = useContext(SidebarContext);
   if (!ctx) throw new Error('useSidebarContext must be used within SidebarProvider');
   return ctx;

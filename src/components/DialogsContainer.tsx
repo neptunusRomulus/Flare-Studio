@@ -16,6 +16,7 @@ import { AnchoredConfirm } from '@/components/ui/inline-confirm';
 import SaveErrorNotificationPanel from '@/components/SaveErrorNotificationPanel';
 import EditEnemyWindow from '@/components/EditEnemyWindow';
 import QuestEditDialogContainer from '@/components/QuestEditDialogContainer';
+import type { MapObject } from '@/types';
 
 
 /** Nested dialogsCtx drops top-level handlers like onDeleteItem; copy them back. */
@@ -29,7 +30,8 @@ export function dialogCtxForContainers(ctx: unknown): unknown {
 }
 
 // The dialog context is a large, aggregated object assembled in App.tsx.
-// It's acceptable to allow a broad shape here; keep the exception narrow.
+// Only the fields this file reads are typed; each dialog container narrows its
+// own slice internally.
 export default function DialogsContainer({ ctx }: { ctx: unknown }) {
   // Allow a local cast here to avoid cascading type churn across many dialog props.
   type LocalSeparateCtx = {
@@ -39,8 +41,17 @@ export default function DialogsContainer({ ctx }: { ctx: unknown }) {
     actorDialogState?: unknown;
     itemDialogState?: unknown;
   };
+  /** The fields EditEnemyWindow reads out of the aggregated dialog context. */
+  type EnemyEditorCtx = {
+    showEnemyEditor?: boolean;
+    setShowEnemyEditor?: (open: boolean) => void;
+    editingObject?: MapObject | null;
+    handleUpdateObject?: (obj: MapObject) => void;
+    currentProjectPath?: string | null;
+  };
   const local = ctx as LocalSeparateCtx;
   const dialogCtx = dialogCtxForContainers(ctx);
+  const enemyCtx = dialogCtx as EnemyEditorCtx;
 
   // If no dialog context was assembled, avoid mounting dialog components
   // which expect many nested fields — return nothing until ctx is populated.
@@ -56,36 +67,36 @@ export default function DialogsContainer({ ctx }: { ctx: unknown }) {
         onConfirm={local.confirmSeparateBrush ?? (() => {})}
       />
 
-      <VendorDialogsContainer ctx={dialogCtx as any} />
+      <VendorDialogsContainer ctx={dialogCtx} />
 
-      <RuleDialogContainer ctx={dialogCtx as any} />
+      <RuleDialogContainer ctx={dialogCtx} />
 
-      <AbilityDialogContainer ctx={dialogCtx as any} />
+      <AbilityDialogContainer ctx={dialogCtx} />
 
-      <ActorDialogContainer ctx={dialogCtx as any} />
+      <ActorDialogContainer ctx={dialogCtx} />
 
-      <ItemDialogContainer ctx={dialogCtx as any} />
-      <ItemEditDialogContainer ctx={dialogCtx as any} />
-      <LootGroupEditDialogContainer ctx={dialogCtx as any} />
+      <ItemDialogContainer ctx={dialogCtx} />
+      <ItemEditDialogContainer ctx={dialogCtx} />
+      <LootGroupEditDialogContainer ctx={dialogCtx} />
 
-      <ObjectManagementDialogContainer ctx={dialogCtx as any} />
-      <QuestEditDialogContainer ctx={dialogCtx as any} />
+      <ObjectManagementDialogContainer ctx={dialogCtx} />
+      <QuestEditDialogContainer ctx={dialogCtx} />
 
-      <DialogueTreeDialogContainer ctx={dialogCtx as any} />
+      <DialogueTreeDialogContainer ctx={dialogCtx} />
 
-      <MapDialogsContainer ctx={dialogCtx as any} />
+      <MapDialogsContainer ctx={dialogCtx} />
 
-      <ImportReviewModalContainer ctx={dialogCtx as any} />
+      <ImportReviewModalContainer ctx={dialogCtx} />
 
-      <OverwriteExportDialogContainer ctx={dialogCtx as any} />
-      <ExportSuccessModalContainer ctx={dialogCtx as any} />
+      <OverwriteExportDialogContainer ctx={dialogCtx} />
+      <ExportSuccessModalContainer ctx={dialogCtx} />
 
       <EditEnemyWindow
-        open={(dialogCtx as any).showEnemyEditor}
-        onOpenChange={(dialogCtx as any).setShowEnemyEditor}
-        enemy={(dialogCtx as any).editingObject}
-        onSave={(dialogCtx as any).handleUpdateObject}
-        projectPath={(dialogCtx as any).currentProjectPath}
+        open={enemyCtx.showEnemyEditor ?? false}
+        onOpenChange={enemyCtx.setShowEnemyEditor}
+        enemy={enemyCtx.editingObject}
+        onSave={enemyCtx.handleUpdateObject}
+        projectPath={enemyCtx.currentProjectPath ?? undefined}
       />
     </>
   );

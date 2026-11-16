@@ -2,7 +2,7 @@ import React from 'react';
 import ActorDialog from '@/components/ActorDialog';
 import type { ActorDialogState, ActorRoleKey } from '@/editor/actorRoles';
 
-type ActorDialogCtx = {
+export type ActorDialogCtx = {
   actorDialogState: ActorDialogState | null;
   actorDialogError?: string | null;
   handleCloseActorDialog: () => void;
@@ -11,8 +11,8 @@ type ActorDialogCtx = {
   handleActorSubmit: (editAfter?: boolean) => Promise<void> | void;
 };
 
-export default function ActorDialogContainer({ ctx }: { ctx: ActorDialogCtx }) {
-  const c = ctx;
+export default function ActorDialogContainer({ ctx }: { ctx: unknown }) {
+  const c = ctx as ActorDialogCtx;
   return (
     <ActorDialog
       actorDialogState={c.actorDialogState ?? null}

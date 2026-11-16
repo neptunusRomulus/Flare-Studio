@@ -101,6 +101,22 @@ import {
   screenToTile,
   type ToolInputHost,
 } from './tileMap/toolInput';
+import {
+  draw,
+  drawActiveEventPreview,
+  drawActiveHotspotPreview,
+  drawCircularSelectionPreview,
+  drawCollisionOverlay,
+  drawDebugInfo,
+  drawEventDragHover,
+  drawGrid,
+  drawHover,
+  drawNpcDragHover,
+  drawRectangularSelectionPreview,
+  drawSelection,
+  drawShapePreview,
+  type RenderOverlaysHost,
+} from './tileMap/renderOverlays';
 
 export interface LayerTilesetEntry {
   image: HTMLImageElement | null;
@@ -1349,136 +1365,11 @@ export class TileMapEditor {
   }
 
   private draw(): void {
-    // Clear canvas
-    this.ctx.clearRect(0, 0, this.mapCanvas.width, this.mapCanvas.height);
-    
-    // Save context state
-    this.ctx.save();
-    
-    // Apply zoom and pan transformations to the drawing context
-    // Note: We don't apply transformations here since they're already applied in mapToScreen()
-    
-    // Draw grid
-    this.drawGrid();
-    
-    // Draw tiles
-    this.drawTiles();
-
-    // Draw hover
-    if (this.hoverX >= 0 && this.hoverY >= 0) {
-      this.drawHover();
-    }
-    
-    // Draw NPC drag hover (external drag-drop from NPC list)
-    if (this.npcDragHoverX >= 0 && this.npcDragHoverY >= 0) {
-      this.drawNpcDragHover();
-    }
-
-    // Draw event drag hover (external drag-drop from Event list)
-    if (this.eventDragHoverX >= 0 && this.eventDragHoverY >= 0) {
-      this.drawEventDragHover();
-    }
-    
-    // Draw selection
-    this.drawSelection();
-    
-    // Draw hero position marker
-    this.drawHeroPosition();
-
-    // Draw NPC/enemy placeholders when no tile assigned
-    this.drawActorPlaceholders();
-
-    // Draw events when event layer is active
-    this.drawEvents();
-
-    // Draw shape preview
-    this.drawShapePreview();
-
-    // Draw active event preview if interacting with EventDialog
-    this.drawActiveEventPreview();
-
-    // Draw active hotspot preview (pink overlay)
-    this.drawActiveHotspotPreview();
-
-    // Draw collision overlay last so collision borders are always on top.
-    this.drawCollisionOverlay();
-    
-    // Restore context state
-    this.ctx.restore();
-    
-    // Update mini map (not affected by zoom/pan)
-    this.drawMiniMap();
-    
-    // Draw stamp preview
-    this.drawStampPreview();
-    
-    // Draw debug info if enabled
-    this.drawDebugInfo();
+    draw(this as unknown as RenderOverlaysHost);
   }
 
   private drawCollisionOverlay(): void {
-    const collisionLayer = this.tileLayers.find(l => l.type === COLLISION_LAYER_TYPE && l.visible);
-    if (!collisionLayer) return;
-
-    const halfTileX = (this.tileSizeX / 2) * this.zoom;
-    const halfTileY = (this.tileSizeY / 2) * this.zoom;
-
-    this.ctx.save();
-    this.ctx.globalAlpha = 1;
-    this.ctx.lineWidth = Math.max(1, Math.min(2.5, 1.4 / this.zoom));
-
-    for (let y = 0; y < this.mapHeight; y++) {
-      for (let x = 0; x < this.mapWidth; x++) {
-        const index = y * this.mapWidth + x;
-        const gid = collisionLayer.data[index];
-        if (gid <= 0) continue;
-
-        const p = this.mapToScreen(x, y);
-
-        this.ctx.beginPath();
-        this.ctx.moveTo(p.x, p.y - halfTileY);
-        this.ctx.lineTo(p.x + halfTileX, p.y);
-        this.ctx.lineTo(p.x, p.y + halfTileY);
-        this.ctx.lineTo(p.x - halfTileX, p.y);
-        this.ctx.closePath();
-
-        this.ctx.lineWidth = 2;
-        this.ctx.setLineDash([]);
-        this.ctx.globalAlpha = 1;
-
-        switch (gid) {
-          case 1:
-            // full bold white stroke + 30% white fill overlay
-            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-            this.ctx.strokeStyle = 'rgba(255, 255, 255, 1)';
-            this.ctx.fill();
-            break;
-          case 2:
-            // full bold white dashed stroke + 30% white fill overlay
-            this.ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-            this.ctx.strokeStyle = 'rgba(255, 255, 255, 1)';
-            this.ctx.setLineDash([6, 4]);
-            this.ctx.fill();
-            break;
-          case 3:
-            // half opacity bold white stroke
-            this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-            break;
-          case 4:
-            // half opacity bold white dashed stroke
-            this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-            this.ctx.setLineDash([6, 4]);
-            break;
-          default:
-            this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-            break;
-        }
-
-        this.ctx.stroke();
-      }
-    }
-
-    this.ctx.restore();
+    drawCollisionOverlay(this as unknown as RenderOverlaysHost);
   }
 
   // Coordinate transformation methods for isometric rendering with zoom and pan
@@ -1696,52 +1587,7 @@ export class TileMapEditor {
 
   // Debug methods
   private drawDebugInfo(): void {
-    if (!this.debugMode) return;
-    
-    // Draw diamond boundaries for all tiles using EXACTLY the same logic as drawHover
-    this.ctx.strokeStyle = 'rgba(255, 0, 0, 0.5)';
-    this.ctx.lineWidth = 1;
-    
-    for (let tileY = 0; tileY < this.mapHeight; tileY++) {
-      for (let tileX = 0; tileX < this.mapWidth; tileX++) {
-        // Use the exact same positioning logic as drawHover
-        const screenPos = this.mapToScreen(tileX, tileY);
-        const halfTileX = (this.tileSizeX / 2) * this.zoom;
-        const halfTileY = (this.tileSizeY / 2) * this.zoom;
-        
-        // Draw diamond shape using the same exact pattern as hover
-        this.ctx.beginPath();
-        this.ctx.moveTo(screenPos.x, screenPos.y - halfTileY); // Top
-        this.ctx.lineTo(screenPos.x + halfTileX, screenPos.y); // Right
-        this.ctx.lineTo(screenPos.x, screenPos.y + halfTileY); // Bottom
-        this.ctx.lineTo(screenPos.x - halfTileX, screenPos.y); // Left
-        this.ctx.closePath();
-        this.ctx.stroke();
-        
-        // ALSO draw where the tile image would actually be positioned
-        this.ctx.strokeStyle = 'rgba(0, 255, 0, 0.5)';
-        this.ctx.lineWidth = 1;
-        
-  // Calculate where the tile image is actually drawn (matching drawTile logic)
-  const scaledTileX = this.tileSizeX * this.zoom;
-  const scaledTileY = this.tileSizeY * this.zoom;
-  const groundY = screenPos.y + halfTileY;
-  const destX = screenPos.x - (scaledTileX / 2);
-  const destY = groundY - scaledTileY;
-        
-        // Draw rectangle showing where the tile image is actually placed
-        this.ctx.strokeRect(destX, destY, scaledTileX, scaledTileY);
-        
-        // Reset color for coordinates
-        this.ctx.strokeStyle = 'rgba(255, 0, 0, 0.5)';
-        
-        // Draw tile coordinates
-        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-        this.ctx.font = '10px Arial';
-        this.ctx.textAlign = 'center';
-        this.ctx.fillText(`${tileX},${tileY}`, screenPos.x, screenPos.y);
-      }
-    }
+    drawDebugInfo(this as unknown as RenderOverlaysHost);
   }
 
   public toggleDebugMode(): void {
@@ -1899,30 +1745,7 @@ export class TileMapEditor {
   }
 
   private drawGrid(): void {
-    // Use different grid colors based on dark mode
-    this.ctx.strokeStyle = this.isDarkMode ? '#666' : '#999';
-    this.ctx.lineWidth = Math.max(1, Math.min(3, 2 / this.zoom)); // Make lines more visible
-    this.ctx.globalAlpha = 0.8; // Slightly transparent
-    
-    // Draw diamond-shaped grid cells for isometric view
-    for (let mapY = 0; mapY < this.mapHeight; mapY++) {
-      for (let mapX = 0; mapX < this.mapWidth; mapX++) {
-        const screenPos = this.mapToScreen(mapX, mapY);
-        const halfTileX = (this.tileSizeX / 2) * this.zoom;
-        const halfTileY = (this.tileSizeY / 2) * this.zoom;
-        
-        // Draw diamond outline for each cell
-        this.ctx.beginPath();
-        this.ctx.moveTo(screenPos.x, screenPos.y - halfTileY); // Top
-        this.ctx.lineTo(screenPos.x + halfTileX, screenPos.y); // Right
-        this.ctx.lineTo(screenPos.x, screenPos.y + halfTileY); // Bottom
-        this.ctx.lineTo(screenPos.x - halfTileX, screenPos.y); // Left
-        this.ctx.closePath();
-        this.ctx.stroke();
-      }
-    }
-    
-    this.ctx.globalAlpha = 1; // Reset alpha
+    drawGrid(this as unknown as RenderOverlaysHost);
   }
 
   // Object layers that need special rendering (Y-sorted, bottom-center anchor)
@@ -2391,151 +2214,16 @@ export class TileMapEditor {
   }
 
   private drawHover(): void {
-    const screenPos = this.mapToScreen(this.hoverX, this.hoverY);
-    const halfTileX = (this.tileSizeX / 2) * this.zoom;
-    const halfTileY = (this.tileSizeY / 2) * this.zoom;
-    
-    // Check if we're hovering over an object on an interactive layer
-    const activeLayer = this.getActiveLayer();
-    const interactiveLayers = ['enemy', 'npc', 'object', 'event', 'background'];
-    const hasObjectAtPosition = activeLayer && 
-                               interactiveLayers.includes(activeLayer.type) && 
-                               this.getObjectsAtPosition(this.hoverX, this.hoverY).length > 0;
-    
-    if (hasObjectAtPosition) {
-      // Draw orange glow effect for objects
-      this.ctx.save();
-      
-      // Create orange glow with multiple layers
-      const glowLayers = [
-        { color: 'rgba(255, 107, 0, 0.1)', width: 8 },
-        { color: 'rgba(255, 107, 0, 0.2)', width: 6 },
-        { color: 'rgba(255, 107, 0, 0.3)', width: 4 },
-        { color: 'rgba(255, 107, 0, 0.5)', width: 2 }
-      ];
-      
-      // Draw glow layers from largest to smallest
-      glowLayers.forEach(layer => {
-        this.ctx.strokeStyle = layer.color;
-        this.ctx.lineWidth = Math.max(1, Math.min(layer.width, layer.width / this.zoom));
-        this.ctx.shadowColor = '#ff6b00';
-        this.ctx.shadowBlur = Math.max(2, Math.min(10, layer.width / this.zoom));
-        
-        this.ctx.beginPath();
-        this.ctx.moveTo(screenPos.x, screenPos.y - halfTileY); // Top
-        this.ctx.lineTo(screenPos.x + halfTileX, screenPos.y); // Right
-        this.ctx.lineTo(screenPos.x, screenPos.y + halfTileY); // Bottom
-        this.ctx.lineTo(screenPos.x - halfTileX, screenPos.y); // Left
-        this.ctx.closePath();
-        this.ctx.stroke();
-      });
-      
-      // Draw bright orange border
-      this.ctx.shadowColor = 'transparent';
-      this.ctx.shadowBlur = 0;
-      this.ctx.strokeStyle = '#ff6b00';
-      this.ctx.lineWidth = Math.max(1, Math.min(3, 3 / this.zoom));
-      
-      this.ctx.beginPath();
-      this.ctx.moveTo(screenPos.x, screenPos.y - halfTileY); // Top
-      this.ctx.lineTo(screenPos.x + halfTileX, screenPos.y); // Right
-      this.ctx.lineTo(screenPos.x, screenPos.y + halfTileY); // Bottom
-      this.ctx.lineTo(screenPos.x - halfTileX, screenPos.y); // Left
-      this.ctx.closePath();
-      this.ctx.stroke();
-      
-      this.ctx.restore();
-    } else {
-      // Hover outline: per drawing target colour (Map layer), blue elsewhere
-      const t = activeLayer?.type;
-      this.ctx.strokeStyle = t && t in MAP_TARGET_CURSOR ? MAP_TARGET_CURSOR[t as keyof typeof MAP_TARGET_CURSOR] : '#007acc';
-      this.ctx.lineWidth = Math.max(1, Math.min(3, 2 / this.zoom)); // Scale line width inversely with zoom, but constrain to 1-3px
-      
-      this.ctx.beginPath();
-      this.ctx.moveTo(screenPos.x, screenPos.y - halfTileY); // Top
-      this.ctx.lineTo(screenPos.x + halfTileX, screenPos.y); // Right
-      this.ctx.lineTo(screenPos.x, screenPos.y + halfTileY); // Bottom
-      this.ctx.lineTo(screenPos.x - halfTileX, screenPos.y); // Left
-      this.ctx.closePath();
-      this.ctx.stroke();
-    }
+    drawHover(this as unknown as RenderOverlaysHost);
   }
 
   // Draw NPC drag hover highlight (same blue effect as regular hover)
   private drawNpcDragHover(): void {
-    const screenPos = this.mapToScreen(this.npcDragHoverX, this.npcDragHoverY);
-    const halfTileX = (this.tileSizeX / 2) * this.zoom;
-    const halfTileY = (this.tileSizeY / 2) * this.zoom;
-    
-    // Blue hover outline - same as default hover
-    this.ctx.strokeStyle = '#007acc';
-    this.ctx.lineWidth = Math.max(1, Math.min(3, 2 / this.zoom));
-    
-    this.ctx.beginPath();
-    this.ctx.moveTo(screenPos.x, screenPos.y - halfTileY); // Top
-    this.ctx.lineTo(screenPos.x + halfTileX, screenPos.y); // Right
-    this.ctx.lineTo(screenPos.x, screenPos.y + halfTileY); // Bottom
-    this.ctx.lineTo(screenPos.x - halfTileX, screenPos.y); // Left
-    this.ctx.closePath();
-    this.ctx.stroke();
+    drawNpcDragHover(this as unknown as RenderOverlaysHost);
   }
 
   private drawEventDragHover(): void {
-    const screenPos = this.mapToScreen(this.eventDragHoverX, this.eventDragHoverY);
-    const halfTileX = (this.tileSizeX / 2) * this.zoom;
-    const halfTileY = (this.tileSizeY / 2) * this.zoom;
-
-    this.ctx.save();
-
-    // Orange filled diamond
-    this.ctx.fillStyle = 'rgba(249, 115, 22, 0.7)';
-    this.ctx.beginPath();
-    this.ctx.moveTo(screenPos.x, screenPos.y - halfTileY);
-    this.ctx.lineTo(screenPos.x + halfTileX, screenPos.y);
-    this.ctx.lineTo(screenPos.x, screenPos.y + halfTileY);
-    this.ctx.lineTo(screenPos.x - halfTileX, screenPos.y);
-    this.ctx.closePath();
-    this.ctx.fill();
-
-    // Orange border
-    this.ctx.strokeStyle = '#ea580c';
-    this.ctx.lineWidth = Math.max(1, Math.min(2, 2 / this.zoom));
-    this.ctx.beginPath();
-    this.ctx.moveTo(screenPos.x, screenPos.y - halfTileY);
-    this.ctx.lineTo(screenPos.x + halfTileX, screenPos.y);
-    this.ctx.lineTo(screenPos.x, screenPos.y + halfTileY);
-    this.ctx.lineTo(screenPos.x - halfTileX, screenPos.y);
-    this.ctx.closePath();
-    this.ctx.stroke();
-
-    // White clock icon at center
-    const iconSize = Math.max(8, Math.min(16, 12 * this.zoom));
-    const cx = screenPos.x;
-    const cy = screenPos.y;
-    const r = iconSize / 2;
-
-    this.ctx.strokeStyle = '#ffffff';
-    this.ctx.lineWidth = Math.max(1, Math.min(2, 1.5 * this.zoom));
-    this.ctx.lineCap = 'round';
-
-    // Clock circle
-    this.ctx.beginPath();
-    this.ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    this.ctx.stroke();
-
-    // Hour hand (12 o'clock)
-    this.ctx.beginPath();
-    this.ctx.moveTo(cx, cy);
-    this.ctx.lineTo(cx, cy - r * 0.6);
-    this.ctx.stroke();
-
-    // Minute hand (3 o'clock)
-    this.ctx.beginPath();
-    this.ctx.moveTo(cx, cy);
-    this.ctx.lineTo(cx + r * 0.5, cy);
-    this.ctx.stroke();
-
-    this.ctx.restore();
+    drawEventDragHover(this as unknown as RenderOverlaysHost);
   }
 
   private drawEvents(): void {
@@ -2658,223 +2346,27 @@ export class TileMapEditor {
   }
 
   private drawSelection(): void {
-    // Draw selection preview for drag-based tools
-    if (this.isSelecting && (this.currentSelectionTool === 'rectangular' || this.currentSelectionTool === 'circular')) {
-      this.ctx.strokeStyle = '#ff6b00';
-      this.ctx.lineWidth = Math.max(1, Math.min(2, 2 / this.zoom));
-      this.ctx.setLineDash([5, 5]);
-
-      if (this.currentSelectionTool === 'rectangular') {
-        this.drawRectangularSelectionPreview();
-      } else if (this.currentSelectionTool === 'circular') {
-        this.drawCircularSelectionPreview();
-      }
-
-      this.ctx.setLineDash([]); // Reset line dash
-    }
-
-    // Draw active selection
-    if (this.selection.active && this.selection.tiles.length > 0) {
-      // Draw light blue fill for selected tiles
-      this.ctx.fillStyle = 'rgba(59, 130, 246, 0.2)';
-      this.ctx.strokeStyle = '#007acc';
-      this.ctx.lineWidth = Math.max(1, Math.min(2.5, 2.5 / this.zoom));
-      
-      // Draw outline around each selected tile
-      this.selection.tiles.forEach(tile => {
-        const screenPos = this.mapToScreen(tile.x, tile.y);
-        const halfTileX = (this.tileSizeX / 2) * this.zoom;
-        const halfTileY = (this.tileSizeY / 2) * this.zoom;
-        
-        this.ctx.beginPath();
-        this.ctx.moveTo(screenPos.x, screenPos.y - halfTileY); // Top
-        this.ctx.lineTo(screenPos.x + halfTileX, screenPos.y); // Right
-        this.ctx.lineTo(screenPos.x, screenPos.y + halfTileY); // Bottom
-        this.ctx.lineTo(screenPos.x - halfTileX, screenPos.y); // Left
-        this.ctx.closePath();
-        this.ctx.fill();
-        this.ctx.stroke();
-      });
-    }
+    drawSelection(this as unknown as RenderOverlaysHost);
   }
 
   private drawRectangularSelectionPreview(): void {
-    const minX = Math.min(this.selection.startX, this.selection.endX);
-    const maxX = Math.max(this.selection.startX, this.selection.endX);
-    const minY = Math.min(this.selection.startY, this.selection.endY);
-    const maxY = Math.max(this.selection.startY, this.selection.endY);
-
-    for (let y = minY; y <= maxY; y++) {
-      for (let x = minX; x <= maxX; x++) {
-        if (x >= 0 && x < this.mapWidth && y >= 0 && y < this.mapHeight) {
-          const screenPos = this.mapToScreen(x, y);
-          const halfTileX = (this.tileSizeX / 2) * this.zoom;
-          const halfTileY = (this.tileSizeY / 2) * this.zoom;
-          
-          this.ctx.beginPath();
-          this.ctx.moveTo(screenPos.x, screenPos.y - halfTileY); // Top
-          this.ctx.lineTo(screenPos.x + halfTileX, screenPos.y); // Right
-          this.ctx.lineTo(screenPos.x, screenPos.y + halfTileY); // Bottom
-          this.ctx.lineTo(screenPos.x - halfTileX, screenPos.y); // Left
-          this.ctx.closePath();
-          this.ctx.stroke();
-        }
-      }
-    }
+    drawRectangularSelectionPreview(this as unknown as RenderOverlaysHost);
   }
 
   private drawCircularSelectionPreview(): void {
-    const radius = Math.sqrt(Math.pow(this.selection.endX - this.selection.startX, 2) + Math.pow(this.selection.endY - this.selection.startY, 2));
-
-    for (let y = 0; y < this.mapHeight; y++) {
-      for (let x = 0; x < this.mapWidth; x++) {
-        const distance = Math.sqrt(Math.pow(x - this.selection.startX, 2) + Math.pow(y - this.selection.startY, 2));
-        if (distance <= radius) {
-          const screenPos = this.mapToScreen(x, y);
-          const halfTileX = (this.tileSizeX / 2) * this.zoom;
-          const halfTileY = (this.tileSizeY / 2) * this.zoom;
-          
-          this.ctx.beginPath();
-          this.ctx.moveTo(screenPos.x, screenPos.y - halfTileY); // Top
-          this.ctx.lineTo(screenPos.x + halfTileX, screenPos.y); // Right
-          this.ctx.lineTo(screenPos.x, screenPos.y + halfTileY); // Bottom
-          this.ctx.lineTo(screenPos.x - halfTileX, screenPos.y); // Left
-          this.ctx.closePath();
-          this.ctx.stroke();
-        }
-      }
-    }
+    drawCircularSelectionPreview(this as unknown as RenderOverlaysHost);
   }
 
   private drawActiveEventPreview(): void {
-    if (!this.activeEventPreview) return;
-    const { x, y, width, height } = this.activeEventPreview;
-
-    const w = Math.max(1, width);
-    const h = Math.max(1, height);
-
-    const halfTileX = (this.tileSizeX / 2) * this.zoom;
-    const halfTileY = (this.tileSizeY / 2) * this.zoom;
-
-    this.ctx.save();
-    
-    // Draw the full area with lighter transparency
-    if (w > 1 || h > 1) {
-      const c1 = this.mapToScreen(x, y);
-      const c2 = this.mapToScreen(x + w - 1, y);
-      const c3 = this.mapToScreen(x + w - 1, y + h - 1);
-      const c4 = this.mapToScreen(x, y + h - 1);
-
-      this.ctx.beginPath();
-      this.ctx.moveTo(c1.x, c1.y - halfTileY); // Top
-      this.ctx.lineTo(c2.x + halfTileX, c2.y); // Right
-      this.ctx.lineTo(c3.x, c3.y + halfTileY); // Bottom
-      this.ctx.lineTo(c4.x - halfTileX, c4.y); // Left
-      this.ctx.closePath();
-
-      this.ctx.fillStyle = 'rgba(255, 165, 0, 0.2)';
-      this.ctx.fill();
-
-      this.ctx.strokeStyle = 'rgba(255, 140, 0, 0.4)';
-      this.ctx.lineWidth = Math.max(1, 1 * this.zoom);
-      this.ctx.stroke();
-    }
-
-    // Draw the single cell (x,y) with stronger overlay
-    const origin = this.mapToScreen(x, y);
-    this.ctx.beginPath();
-    this.ctx.moveTo(origin.x, origin.y - halfTileY); // Top
-    this.ctx.lineTo(origin.x + halfTileX, origin.y); // Right
-    this.ctx.lineTo(origin.x, origin.y + halfTileY); // Bottom
-    this.ctx.lineTo(origin.x - halfTileX, origin.y); // Left
-    this.ctx.closePath();
-
-    this.ctx.fillStyle = 'rgba(255, 165, 0, 0.6)';
-    this.ctx.fill();
-
-    this.ctx.strokeStyle = 'rgba(255, 140, 0, 0.9)';
-    this.ctx.lineWidth = Math.max(2, 2 * this.zoom);
-    this.ctx.stroke();
-
-    this.ctx.restore();
+    drawActiveEventPreview(this as unknown as RenderOverlaysHost);
   }
 
   private drawActiveHotspotPreview(): void {
-    if (!this.activeHotspotPreview) return;
-    const { x, y, width, height } = this.activeHotspotPreview;
-
-    const w = Math.max(1, width);
-    const h = Math.max(1, height);
-
-    const halfTileX = (this.tileSizeX / 2) * this.zoom;
-    const halfTileY = (this.tileSizeY / 2) * this.zoom;
-
-    this.ctx.save();
-    
-    // Draw the full area with lighter pink transparency
-    if (w > 1 || h > 1) {
-      const c1 = this.mapToScreen(x, y);
-      const c2 = this.mapToScreen(x + w - 1, y);
-      const c3 = this.mapToScreen(x + w - 1, y + h - 1);
-      const c4 = this.mapToScreen(x, y + h - 1);
-
-      this.ctx.beginPath();
-      this.ctx.moveTo(c1.x, c1.y - halfTileY); // Top
-      this.ctx.lineTo(c2.x + halfTileX, c2.y); // Right
-      this.ctx.lineTo(c3.x, c3.y + halfTileY); // Bottom
-      this.ctx.lineTo(c4.x - halfTileX, c4.y); // Left
-      this.ctx.closePath();
-
-      this.ctx.fillStyle = 'rgba(236, 72, 153, 0.2)';
-      this.ctx.fill();
-
-      this.ctx.strokeStyle = 'rgba(219, 39, 119, 0.4)';
-      this.ctx.lineWidth = Math.max(1, 1 * this.zoom);
-      this.ctx.stroke();
-    }
-
-    // Draw the single cell (x,y) with stronger pink overlay
-    const origin = this.mapToScreen(x, y);
-    this.ctx.beginPath();
-    this.ctx.moveTo(origin.x, origin.y - halfTileY); // Top
-    this.ctx.lineTo(origin.x + halfTileX, origin.y); // Right
-    this.ctx.lineTo(origin.x, origin.y + halfTileY); // Bottom
-    this.ctx.lineTo(origin.x - halfTileX, origin.y); // Left
-    this.ctx.closePath();
-
-    this.ctx.fillStyle = 'rgba(236, 72, 153, 0.6)';
-    this.ctx.fill();
-
-    this.ctx.strokeStyle = 'rgba(219, 39, 119, 0.9)';
-    this.ctx.lineWidth = Math.max(2, 2 * this.zoom);
-    this.ctx.stroke();
-
-    this.ctx.restore();
+    drawActiveHotspotPreview(this as unknown as RenderOverlaysHost);
   }
 
   private drawShapePreview(): void {
-    if (!this.isDrawingShape || this.shapeDrawing.preview.length === 0) return;
-
-    this.ctx.strokeStyle = '#0099ff';
-    this.ctx.lineWidth = Math.max(1, Math.min(2, 2 / this.zoom));
-    this.ctx.setLineDash([3, 3]);
-
-    // Draw preview outline around each tile in the shape
-    this.shapeDrawing.preview.forEach(point => {
-      const screenPos = this.mapToScreen(point.x, point.y);
-      const halfTileX = (this.tileSizeX / 2) * this.zoom;
-      const halfTileY = (this.tileSizeY / 2) * this.zoom;
-      
-      this.ctx.beginPath();
-      this.ctx.moveTo(screenPos.x, screenPos.y - halfTileY); // Top
-      this.ctx.lineTo(screenPos.x + halfTileX, screenPos.y); // Right
-      this.ctx.lineTo(screenPos.x, screenPos.y + halfTileY); // Bottom
-      this.ctx.lineTo(screenPos.x - halfTileX, screenPos.y); // Left
-      this.ctx.closePath();
-      this.ctx.stroke();
-    });
-
-    this.ctx.setLineDash([]); // Reset line dash
+    drawShapePreview(this as unknown as RenderOverlaysHost);
   }
 
   private drawHeroPosition(): void {

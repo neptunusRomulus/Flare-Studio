@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { ToggleGroup } from '@/components/ui/toggle-group';
 import Tooltip from '@/components/ui/tooltip';
@@ -17,6 +18,8 @@ type Props = {
   onOpenMapSettings: () => void;
   onCloseTab: (tabId: string) => void;
   onCreateNewMap: () => void;
+  /** Floating logo menu; parks just left of the strip and follows it as the strip grows. */
+  appMenu?: ReactNode;
 };
 
 /** Orange map-tab strip, flush under the mapCanvas inner stroke. Square top, rounded bottom. */
@@ -27,12 +30,18 @@ export default function CanvasMapTabs({
   onOpenMapSettings,
   onCloseTab,
   onCreateNewMap,
+  appMenu,
 }: Props) {
   if (tabs.length === 0) return null;
 
   return (
     <div className="pointer-events-none absolute top-px left-1/2 z-20 flex -translate-x-1/2 justify-center">
-      <div className="pointer-events-auto flex h-8 max-w-[min(100%,42rem)] items-center gap-0.5 rounded-none rounded-b-lg bg-orange-600 px-1.5 pb-0.5 shadow-sm">
+      <div className="pointer-events-auto relative flex h-8 max-w-[min(100%,42rem)] items-center gap-0.5 rounded-none rounded-b-lg bg-orange-600 px-1.5 pb-0.5 shadow-sm">
+        {appMenu ? (
+          <div className="absolute right-full top-1/2 mr-2 mt-px -translate-y-1/2">
+            {appMenu}
+          </div>
+        ) : null}
         <ToggleGroup
           type="single"
           value={activeTabId ?? ''}

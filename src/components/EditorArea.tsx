@@ -34,9 +34,12 @@ type Props = {
 };
 
 const EditorArea: React.FC<Props> = ({ topBarProps, canvasCtx, bottomToolbarProps, isDarkMode, overlay, appMenu }) => {
+  // With map tabs showing, the logo parks next to the tab strip instead of the canvas corner.
+  const logoInTabStrip = Boolean(canvasCtx.mapInitialized && canvasCtx.mapTabs && canvasCtx.mapTabs.tabs.length > 0);
+
   return (
     <section className="flex-1 min-w-0 flex flex-col relative">
-      {appMenu ? (
+      {appMenu && !logoInTabStrip ? (
         <div className="absolute top-2 left-2 z-10">
           {appMenu}
         </div>
@@ -62,7 +65,7 @@ const EditorArea: React.FC<Props> = ({ topBarProps, canvasCtx, bottomToolbarProp
       />
 
       {overlay}
-      <EditorCanvas ctx={canvasCtx} bottomToolbarProps={bottomToolbarProps} isDarkMode={isDarkMode} />
+      <EditorCanvas ctx={canvasCtx} bottomToolbarProps={bottomToolbarProps} isDarkMode={isDarkMode} appMenu={logoInTabStrip ? appMenu : undefined} />
     </section>
   );
 };

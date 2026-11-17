@@ -304,7 +304,7 @@ export default function AppMain() {
     onLaunch: flareEngine.launch,
   }), [flareEngine.isRunning, flareEngine.lastError, flareEngine.launch, controls?.currentProjectPath, hasMap]);
 
-  // The old title bar is gone: the logo menu floats top-left over the canvas.
+  // The old title bar is gone: the logo menu floats next to the map-tab strip (top-left when there is none).
   const appMenu = useMemo(
     () => showPanels && controls
       ? <AppControls {...enhancedControls} saveStatus={titleBarProps?.saveStatus} />

@@ -33,7 +33,7 @@
 - Rail order = Map (Ground/Object/Collision), Entities (NPC/Enemy/Event), Content (Items/Books/Statuses/Quests), Game Settings. See `src/components/targetGroups.ts` (`railGroups`).
 - Tab cycles sub-targets; Shift+Tab cycles main layers (`src/hooks/useSidebarTabHotkeys.ts`).
 - Rail visibility icons (map/entities only): corner eye = visibility, mouse wheel = opacity (per sub-target).
-- Zen mode: no title bar. The canvas starts at y=0; the Flare Studio mark (`src/components/brand/BrandMark.tsx`) is a round floating button top-left of the canvas = app menu (incl. Engine Settings; `src/components/AppControls.tsx`, `MainMenuDialog.tsx`). Save feedback (Saving… / Save failed) lives in that button's tooltip.
+- Zen mode: no title bar. The canvas starts at y=0; the Flare Studio mark (`src/components/brand/BrandMark.tsx`) is a round floating button parked just left of the map-tab strip (`src/components/CanvasMapTabs.tsx`, follows the strip as it widens) or top-left of the canvas when no strip shows = app menu (incl. Engine Settings; `src/components/AppControls.tsx`, `MainMenuDialog.tsx`). Save feedback (Saving… / Save failed) lives in that button's tooltip.
 - Window buttons (minimize/maximize/close) are hidden: `src/components/WindowControlBar.tsx` slides a slim drag-region bar down when the pointer touches the top 6px edge and hides it ~600ms after leaving (`WINDOW_BAR_HOT_ZONE`, `WINDOW_BAR_HIDE_MS`). Same IPC (`minimize` / `maximize` / `close`).
 - Brand: sources in `assets/brand/` (regenerate with `scripts/brand/`), app icons in `build/icons/`, runtime copies in `public/brand/`. Chakra Petch is for the logo only.
 - GID readout only in Debug Mode. Minimap bottom-left.

@@ -73,10 +73,12 @@ type Props = {
   ctx: EditorContext;
   bottomToolbarProps: BottomToolbarProps;
   isDarkMode: boolean;
+  /** Floating logo menu; sits just left of the map-tab strip when the strip is showing. */
+  appMenu?: React.ReactNode;
 };
 
 export default function EditorCanvas(props: Props) {
-  const { ctx, bottomToolbarProps, isDarkMode } = props;
+  const { ctx, bottomToolbarProps, isDarkMode, appMenu } = props;
   const canvasAreaRef = React.useRef<HTMLDivElement | null>(null);
   const {
     editor,
@@ -540,6 +542,7 @@ export default function EditorCanvas(props: Props) {
           onOpenMapSettings={mapTabs.onOpenMapSettings}
           onCloseTab={mapTabs.onCloseTab}
           onCreateNewMap={mapTabs.onCreateNewMap}
+          appMenu={appMenu}
         />
       ) : null}
 

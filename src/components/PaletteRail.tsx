@@ -1,15 +1,13 @@
 import React from 'react';
 import { HelpCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Toggle } from '@/components/ui/toggle';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import Tooltip from '@/components/ui/tooltip';
 import type { TileLayer } from '@/types';
 import type { LayerVisibilityControls } from '@/components/MapTargetSwitch';
-import { visibilityTooltip } from '@/components/MapTargetSwitch';
 import { GROUP_ICON, TARGET_ICON } from '@/components/targetIcons';
-import { groupOfType, railGroups, rememberGroupTarget, visibilityTargets } from '@/components/targetGroups';
-import { isMapTarget, mapTargetTooltip, rememberTarget } from '@/components/mapTargets';
+import { groupOfType, railGroups, railHelpFor, railTypeOf, rememberGroupTarget, visibilityTargets } from '@/components/targetGroups';
+import { isMapTarget, rememberTarget } from '@/components/mapTargets';
 import { SIDEBAR_RAIL_WIDTH } from '@/components/paletteLayout';
 
 type Props = {
@@ -23,6 +21,16 @@ type Props = {
   animMs: number;
 };
 
+function railIconTooltip(label: string, selected: boolean, cardOpen: boolean, layer: TileLayer | undefined, hasVisibility: boolean): string {
+  const base = selected && cardOpen ? `${label} · click to close` : label;
+  if (!hasVisibility || !layer) return base;
+  const parts = [base];
+  if (!layer.visible) parts.push('hidden');
+  const opacity = Math.round((1 - (layer.transparency || 0)) * 100);
+  if (opacity < 100) parts.push(`opacity ${opacity}%`);
+  return parts.join(' · ');
+}
+
 const PaletteRail: React.FC<Props> = ({
   layers,
   activeLayer,
@@ -34,10 +42,10 @@ const PaletteRail: React.FC<Props> = ({
   animMs,
 }) => {
   const groups = railGroups(layers);
-  const visItems = visibility ? visibilityTargets(layers) : [];
+  const visTypes = new Set(visibility ? visibilityTargets(layers).map((item) => item.type) : []);
   const activeType = activeLayer?.type ?? '';
-  const activeHelp = groupOfType(activeType)?.help
-    ?? (activeType === 'gameSettings' || activeType === 'worldSettings' || activeType === 'strings' || activeType === 'titles' || activeType === 'stats' || activeType === 'powerTree' ? 'Shift+Tab: switch main layers.' : 'Tab: switch targets. Shift+Tab: switch main layers.');
+  const railActiveType = railTypeOf(activeType) ?? '';
+  const activeHelp = railHelpFor(activeType);
 
   const selectTarget = (type: string) => {
     const layer = layers.find((item) => item.type === type);
@@ -67,9 +75,13 @@ const PaletteRail: React.FC<Props> = ({
             <ToggleGroup
               type="single"
               orientation="vertical"
-              value={activeType}
+              value={railActiveType}
               onValueChange={(value) => {
                 if (!value) {
+                  if (activeType === 'strings') {
+                    selectTarget('gameSettings');
+                    return;
+                  }
                   onCardOpenChange(!cardOpen);
                   return;
                 }
@@ -80,8 +92,11 @@ const PaletteRail: React.FC<Props> = ({
             >
               {group.targets.map((target) => {
                 const Icon = TARGET_ICON[target.type] ?? GROUP_ICON[target.type] ?? GROUP_ICON[group.id];
-                const selected = target.type === activeType;
-                const tip = selected && cardOpen ? `${target.label} · click to close` : target.label;
+                const selected = target.type === railActiveType;
+                const layer = layers.find((item) => item.type === target.type);
+                const hasVisibility = visTypes.has(target.type);
+                const hidden = Boolean(hasVisibility && layer && !layer.visible);
+                const tip = railIconTooltip(target.label, selected, cardOpen, layer, hasVisibility);
                 return (
                   <Tooltip key={target.type} content={tip} side="left">
                     <ToggleGroupItem
@@ -90,7 +105,24 @@ const PaletteRail: React.FC<Props> = ({
                       aria-pressed={selected}
                       aria-expanded={selected && cardOpen}
                       title={target.label}
-                      className={`h-8 w-8 p-0 min-w-0 rounded-md ${selected ? 'bg-orange-600 text-white hover:bg-orange-600 hover:text-white data-[state=on]:bg-orange-600 data-[state=on]:text-white' : 'text-muted-foreground'}`}
+                      onPointerDown={(event) => {
+                        if (!(event.ctrlKey || event.metaKey) || !visibility || !layer || !hasVisibility) return;
+                        event.preventDefault();
+                        event.stopPropagation();
+                        visibility.onToggleVisibility(layer.id);
+                      }}
+                      onClick={(event) => {
+                        if (!(event.ctrlKey || event.metaKey) || !hasVisibility) return;
+                        event.preventDefault();
+                        event.stopPropagation();
+                      }}
+                      onWheel={(event) => {
+                        if (!visibility || !layer || !hasVisibility) return;
+                        event.preventDefault();
+                        event.stopPropagation();
+                        visibility.onTransparencyChange(layer.id, event.deltaY > 0 ? 0.1 : -0.1);
+                      }}
+                      className={`h-8 w-8 p-0 min-w-0 rounded-md ${hidden ? 'opacity-40' : ''} ${selected ? 'bg-orange-600 text-white hover:bg-orange-600 hover:text-white data-[state=on]:bg-orange-600 data-[state=on]:text-white' : 'text-muted-foreground'}`}
                     >
                       {Icon ? <Icon className="w-4 h-4" /> : null}
                       <span className="sr-only">{target.label}</span>
@@ -103,38 +135,17 @@ const PaletteRail: React.FC<Props> = ({
         ))}
       </div>
 
-      {visItems.length > 0 && visibility ? (
-        <div className="flex-shrink-0 w-full flex flex-col items-center gap-0.5 py-1.5 border-t border-border/80">
-          {visItems.map((item) => {
-            const layer = layers.find((entry) => entry.type === item.type);
-            if (!layer) return null;
-            const Icon = TARGET_ICON[item.type];
-            const visible = layer.visible;
-            const tooltip = mapTargetTooltip(item.type, visibilityTooltip(item.label, visible, layer.transparency || 0));
-            return (
-              <Tooltip key={item.type} content={tooltip} side="left">
-                <Toggle
-                  size="sm"
-                  pressed={visible}
-                  aria-label={`${visible ? 'Hide' : 'Show'} ${item.label}`}
-                  aria-pressed={visible}
-                  onPressedChange={() => visibility.onToggleVisibility(layer.id)}
-                  onWheel={(event) => {
-                    event.preventDefault();
-                    visibility.onTransparencyChange(layer.id, event.deltaY > 0 ? 0.1 : -0.1);
-                  }}
-                  className={`h-7 w-7 min-w-0 p-0 rounded-md text-muted-foreground data-[state=on]:bg-transparent data-[state=on]:text-foreground ${visible ? '' : 'opacity-40'}`}
-                >
-                  {Icon ? <Icon className="w-3.5 h-3.5" /> : null}
-                </Toggle>
-              </Tooltip>
-            );
-          })}
-        </div>
-      ) : null}
-
       <div className="flex-shrink-0 w-full flex justify-center py-1.5 border-t border-border/80">
-        <Tooltip content={activeHelp} side="left">
+        <Tooltip
+          content={(
+            <div className="space-y-0.5">
+              {activeHelp.split('\n').map((line) => (
+                <div key={line}>{line}</div>
+              ))}
+            </div>
+          )}
+          side="left"
+        >
           <Button
             type="button"
             variant="ghost"

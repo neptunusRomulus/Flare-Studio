@@ -1,5 +1,5 @@
 import type React from 'react';
-import { Image as MapImage, Box, Grid, Map as MapIcon, Users, Locate, Clock, Shapes, Sword, Tag, GitBranch, Library, Settings, BookOpen, Globe, Languages, Award, Gauge, Network } from 'lucide-react';
+import { Image as MapImage, Box, Grid, Map as MapIcon, Users, User, Locate, Clock, Shapes, Sword, Tag, GitBranch, Library, Settings, BookOpen, Globe, Languages, Award, Gauge, Network } from 'lucide-react';
 
 type IconC = React.ComponentType<{ className?: string }>;
 /** Icons per target layer type (same icons the old sidebar rows used). */
@@ -7,6 +7,8 @@ export const TARGET_ICON: Record<string, IconC> = {
   background: MapImage, object: Box, collision: Grid,
   npc: Users, enemy: Locate, event: Clock,
   items: Sword, books: BookOpen, status: Tag, rules: GitBranch,
+  gameSettings: Settings, worldSettings: Globe,
+  titles: Award, stats: Gauge, powerTree: Network,
 };
 /** Icons for the main layer switch at the top of the right dock. */
-export const GROUP_ICON: Record<string, IconC> = { map: MapIcon, entities: Shapes, content: Library, gameSettings: Settings, worldSettings: Globe, strings: Languages, titles: Award, stats: Gauge, powerTree: Network };
+export const GROUP_ICON: Record<string, IconC> = { map: MapIcon, entities: Shapes, content: Library, settings: Settings, character: User, gameSettings: Settings, worldSettings: Globe, strings: Languages, titles: Award, stats: Gauge, powerTree: Network };

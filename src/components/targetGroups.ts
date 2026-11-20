@@ -4,7 +4,7 @@
  */
 import { MAP_TARGETS, MAP_TARGET_LABEL, MAP_TAB_HELP } from '@/components/mapTargets';
 
-export type TargetGroupId = 'map' | 'entities' | 'content';
+export type TargetGroupId = 'map' | 'entities' | 'content' | 'settings' | 'character';
 export type TargetGroup = {
   id: TargetGroupId;
   label: string;
@@ -31,7 +31,28 @@ export const CONTENT_GROUP: TargetGroup = {
   help: 'Tab: switch Items, Books, Statuses and Quests. Shift+Tab: switch main layers.',
   hasVisibility: false,
 };
-export const TARGET_GROUPS: TargetGroup[] = [MAP_GROUP, ENTITY_GROUP, CONTENT_GROUP];
+export const SETTINGS_GROUP: TargetGroup = {
+  id: 'settings',
+  label: 'Settings',
+  targets: ['gameSettings', 'worldSettings'],
+  labels: { gameSettings: 'UI Settings', worldSettings: 'World Settings' },
+  help: 'Tab: switch UI Settings and World Settings. Shift+Tab: switch main layers.',
+  hasVisibility: false,
+};
+export const CHARACTER_GROUP: TargetGroup = {
+  id: 'character',
+  label: 'Character',
+  targets: ['titles', 'stats', 'powerTree'],
+  labels: { titles: 'Titles', stats: 'Stats', powerTree: 'Power Tree' },
+  help: 'Tab: switch Titles, Stats and Power Tree. Shift+Tab: switch main layers.',
+  hasVisibility: false,
+};
+export const TARGET_GROUPS: TargetGroup[] = [MAP_GROUP, ENTITY_GROUP, CONTENT_GROUP, SETTINGS_GROUP, CHARACTER_GROUP];
+
+/** Localization lives inside UI Settings; Tab treats it as that card. */
+export function railTypeOf(type: string | null | undefined): string | null | undefined {
+  return type === 'strings' ? 'gameSettings' : type;
+}
 
 export function groupOfType(t: string | null | undefined): TargetGroup | null {
   return (t && TARGET_GROUPS.find(g => g.targets.includes(t))) || null;
@@ -60,12 +81,13 @@ function tabAllowed(e: TabKey, target: TabTarget): boolean {
 /** Tab (forward only) cycles targets inside the group of the active layer. Shift+Tab is for main layers. */
 export function tabTargetFor(e: TabKey, activeType: string | null | undefined, target: TabTarget): string | null {
   if (e.shiftKey || !tabAllowed(e, target)) return null;
-  const g = groupOfType(activeType);
-  if (!g || !activeType) return null;
-  return cycleInGroup(g, activeType, false);
+  const type = railTypeOf(activeType);
+  const g = groupOfType(type);
+  if (!g || !type) return null;
+  return cycleInGroup(g, type, false);
 }
 
-/** Shift+Tab cycles main layers Map → Entities → Content → UI Settings → World Settings → Map (skipping unavailable ones). */
+/** Shift+Tab cycles main layers Map → Entities → Content → Settings → Character → Map (skipping unavailable ones). */
 export function mainTabTargetFor(e: TabKey, activeType: string | null | undefined, target: TabTarget, available: string[]): string | null {
   if (!e.shiftKey || !tabAllowed(e, target) || available.length === 0) return null;
   const cur = mainLayerOf(activeType);
@@ -89,7 +111,7 @@ export function collapseTargetGroups<L extends { type?: string }>(layers: L[]): 
   return out;
 }
 
-const last: Record<string, string> = { map: 'background', entities: 'npc', content: 'items' };
+const last: Record<string, string> = { map: 'background', entities: 'npc', content: 'items', settings: 'gameSettings', character: 'titles' };
 export function rememberGroupTarget(g: TargetGroup, t: string): void { last[g.id] = t; }
 export function lastGroupTarget(g: TargetGroup): string { return last[g.id] ?? g.targets[0]; }
 
@@ -101,39 +123,24 @@ export function normalizeTileRect(a: { x: number; y: number }, b: { x: number; y
   return { x: x1, y: y1, width: x2 - x1 + 1, height: y2 - y1 + 1 };
 }
 
-/** Singleton settings tabs on the right rail (not part of a target group). Internal ids stay stable. */
-export const SETTINGS_RAIL: Array<{ id: string; label: string; help: string }> = [
-  { id: 'gameSettings', label: 'UI Settings', help: 'Shift+Tab: switch main layers.' },
-  { id: 'worldSettings', label: 'World Settings', help: 'Shift+Tab: switch main layers.' },
-  { id: 'strings', label: 'Strings', help: 'Shift+Tab: switch main layers.' },
-  { id: 'titles', label: 'Titles', help: 'Shift+Tab: switch main layers.' },
-  { id: 'stats', label: 'Stats', help: 'Shift+Tab: switch main layers.' },
-  { id: 'powerTree', label: 'Power Tree', help: 'Shift+Tab: switch main layers.' },
-];
-
-/** Main layers shown at the top of the right dock. */
+/** Main layers shown at the top of the right dock / cycled with Shift+Tab. */
 export const MAIN_LAYERS: Array<{ id: string; label: string }> = [
   { id: 'map', label: 'Map' },
   { id: 'entities', label: 'Entities' },
   { id: 'content', label: 'Content' },
-  { id: 'gameSettings', label: 'UI Settings' },
-  { id: 'worldSettings', label: 'World Settings' },
-  { id: 'strings', label: 'Strings' },
-  { id: 'titles', label: 'Titles' },
-  { id: 'stats', label: 'Stats' },
-  { id: 'powerTree', label: 'Power Tree' },
+  { id: 'settings', label: 'Settings' },
+  { id: 'character', label: 'Character' },
 ];
 
 /** Main layer of a real layer type (unknown non-group types count as Map, like the old sidebar grouping). */
 export function mainLayerOf(type: string | null | undefined): string | null {
   if (!type) return null;
-  if (SETTINGS_RAIL.some((s) => s.id === type)) return type;
+  if (type === 'strings') return 'settings';
   return groupOfType(type)?.id ?? 'map';
 }
 
 /** Real layer id to activate for a main layer: the group's last-used target, else its first existing target. */
 export function mainLayerTargetId(main: string, layers: Array<{ id: number; type: string }>): number | null {
-  if (SETTINGS_RAIL.some((s) => s.id === main)) return layers.find(l => l.type === main)?.id ?? null;
   const g = TARGET_GROUPS.find(x => x.id === main);
   if (!g) return null;
   const want = lastGroupTarget(g);
@@ -155,16 +162,6 @@ export function railGroups(layers: Array<{ type: string }>): Array<{
       .map((t) => ({ type: t, label: g.labels[t] }));
     if (targets.length) out.push({ id: g.id, label: g.label, help: g.help, targets });
   }
-  for (const setting of SETTINGS_RAIL) {
-    if (layers.some((l) => l.type === setting.id)) {
-      out.push({
-        id: setting.id,
-        label: setting.label,
-        help: setting.help,
-        targets: [{ type: setting.id, label: setting.label }],
-      });
-    }
-  }
   return out;
 }
 
@@ -178,4 +175,16 @@ export function visibilityTargets(layers: Array<{ type: string }>): Array<{ type
     }
   }
   return out;
+}
+
+export const VISIBILITY_HELP_LINES = [
+  'Ctrl+Click: hide/unhide',
+  'Mouse wheel: adjust opacity',
+] as const;
+
+/** Bottom ? tip: the active group's Tab/Shift+Tab help, plus the Map/Entities visibility gestures. */
+export function railHelpFor(activeType: string | null | undefined): string {
+  const groupHelp = groupOfType(railTypeOf(activeType))?.help
+    ?? 'Tab: switch targets. Shift+Tab: switch main layers.';
+  return [groupHelp, ...VISIBILITY_HELP_LINES].join('\n');
 }

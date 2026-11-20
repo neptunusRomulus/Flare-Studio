@@ -32,6 +32,7 @@ import { scanProjectStrings } from '@/editor/stringScan';
 
 type Props = {
   projectPath?: string | null;
+  onBack?: () => void;
 };
 
 function clonePo(file: PoFile): PoFile {
@@ -42,7 +43,7 @@ function clonePo(file: PoFile): PoFile {
   };
 }
 
-const StringEditorView: React.FC<Props> = ({ projectPath }) => {
+const StringEditorView: React.FC<Props> = ({ projectPath, onBack }) => {
   const [languages, setLanguages] = useState<LanguageEntry[]>(ensureSourceLanguage([]));
   const [selected, setSelected] = useState(SOURCE_LANGUAGE);
   const [pos, setPos] = useState<Record<string, PoFile>>({});
@@ -243,8 +244,11 @@ const StringEditorView: React.FC<Props> = ({ projectPath }) => {
     <div className="flex flex-col flex-1 min-h-0 gap-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
+          {onBack ? (
+            <Button type="button" size="sm" variant="ghost" className="h-7 px-2 mb-1 text-xs" onClick={onBack}>Back to UI Settings</Button>
+          ) : null}
           <FieldHint hint="English is the source language. Add other languages, scan the project, then translate. Engine UI files (engine.*.po) are not included.">
-            <div className="text-sm font-semibold">Strings</div>
+            <div className="text-sm font-semibold">Localization</div>
           </FieldHint>
         </div>
         <div className="flex flex-wrap items-center gap-2">

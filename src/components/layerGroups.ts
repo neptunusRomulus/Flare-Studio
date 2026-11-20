@@ -3,12 +3,8 @@ const GROUPS: string[][] = [
   ['collision', 'object', 'background'],
   ['npc', 'enemy', 'event'],
   ['items', 'books', 'status', 'rules'],
-  ['gameSettings'],
-  ['worldSettings'],
-  ['strings'],
-  ['titles'],
-  ['stats'],
-  ['powerTree'],
+  ['gameSettings', 'worldSettings', 'strings'],
+  ['titles', 'stats', 'powerTree'],
 ];
 
 export function layerGroupIndex(type: string | undefined): number {

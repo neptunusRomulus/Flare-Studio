@@ -25,6 +25,7 @@ describe('UI Settings dock panel', () => {
   it('is labeled UI Settings and no longer hosts the World editors', () => {
     const html = renderToStaticMarkup(<AppProvider value={{ currentProjectPath: null }}><SidebarGameSettingsArea /></AppProvider>);
     expect(html).toContain('UI Settings');
+    expect(html).toContain('Localization');
     expect(html).not.toContain('Game Settings');
     expect(html).not.toContain('Cutscene');
     expect(html).not.toContain('Language catalog');

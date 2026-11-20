@@ -11,34 +11,33 @@ const layers = [L(1, 'background'), L(2, 'object'), L(3, 'collision'), L(4, 'npc
 const noop = () => {};
 
 describe('main layer switch', () => {
-  it('orders Map | Entities | Content | UI Settings | World Settings | Strings | Titles | Stats', () => {
-    expect(MAIN_LAYERS.map(m => m.label)).toEqual(['Map', 'Entities', 'Content', 'UI Settings', 'World Settings', 'Strings', 'Titles', 'Stats', 'Power Tree']);
+  it('orders Map | Entities | Content | Settings | Character', () => {
+    expect(MAIN_LAYERS.map(m => m.label)).toEqual(['Map', 'Entities', 'Content', 'Settings', 'Character']);
   });
   it('maps layer types to main layers', () => {
     expect(mainLayerOf('collision')).toBe('map');
     expect(mainLayerOf('event')).toBe('entities');
     expect(mainLayerOf('rules')).toBe('content');
-    expect(mainLayerOf('gameSettings')).toBe('gameSettings');
-    expect(mainLayerOf('worldSettings')).toBe('worldSettings');
-    expect(mainLayerOf('strings')).toBe('strings');
-    expect(mainLayerOf('titles')).toBe('titles');
-    expect(mainLayerOf('stats')).toBe('stats');
+    expect(mainLayerOf('gameSettings')).toBe('settings');
+    expect(mainLayerOf('worldSettings')).toBe('settings');
+    expect(mainLayerOf('strings')).toBe('settings');
+    expect(mainLayerOf('titles')).toBe('character');
+    expect(mainLayerOf('stats')).toBe('character');
+    expect(mainLayerOf('powerTree')).toBe('character');
     expect(mainLayerOf(null)).toBeNull();
   });
   it('activates the last-used target of a group', () => {
     expect(mainLayerTargetId('content', layers)).toBe(7);
     rememberGroupTarget(ENTITY_GROUP, 'enemy');
     expect(mainLayerTargetId('entities', layers)).toBe(5);
-    expect(mainLayerTargetId('gameSettings', layers)).toBe(10);
-    expect(mainLayerTargetId('worldSettings', layers)).toBe(11);
-    expect(mainLayerTargetId('strings', layers)).toBe(12);
-    expect(mainLayerTargetId('titles', layers)).toBe(13);
-    expect(mainLayerTargetId('stats', layers)).toBe(14);
-    expect(mainLayerTargetId('gameSettings', layers.slice(0, 3))).toBeNull();
+    expect(mainLayerTargetId('settings', layers)).toBe(10);
+    expect(mainLayerTargetId('character', layers)).toBe(13);
+    expect(mainLayerTargetId('settings', layers.slice(0, 3))).toBeNull();
+    expect(mainLayerTargetId('character', layers.slice(0, 3))).toBeNull();
   });
-  it('renders nine square buttons with the active one pressed', () => {
+  it('renders five square buttons with the active one pressed', () => {
     const html = renderToStaticMarkup(<MainLayerSwitch layers={layers} activeLayer={layers[7]} onSelectLayer={noop} />);
-    expect((html.match(/aria-pressed/g) || []).length).toBe(9);
+    expect((html.match(/aria-pressed/g) || []).length).toBe(5);
     expect(html).toContain('aria-label="Content" aria-pressed="true"');
   });
 });

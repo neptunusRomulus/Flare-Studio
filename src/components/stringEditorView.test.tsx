@@ -5,7 +5,7 @@ import { AppProvider } from '@/context/AppContext';
 import SidebarStringsArea from './SidebarStringsArea';
 import StringEditorView from './StringEditorView';
 
-describe('Strings editor', () => {
+describe('Localization editor', () => {
   it('renders the wide-panel editor when no project is open', () => {
     const html = renderToStaticMarkup(
       <AppProvider value={{ currentProjectPath: null }}>
@@ -14,7 +14,8 @@ describe('Strings editor', () => {
         </div>
       </AppProvider>,
     );
-    expect(html).toContain('Strings');
+    expect(html).toContain('Localization');
+    expect(html).toContain('Back to UI Settings');
     expect(html).toContain('Add language');
     expect(html).toContain('Open a project to edit strings.');
     expect(html).toContain('engine.*.po');

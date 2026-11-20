@@ -1108,7 +1108,7 @@ export class TileMapEditor {
     };
     ensure(GAME_SETTINGS_LAYER_TYPE, 'UI Settings');
     ensure(WORLD_SETTINGS_LAYER_TYPE, 'World Settings');
-    ensure(STRING_SETTINGS_LAYER_TYPE, 'Strings');
+    ensure(STRING_SETTINGS_LAYER_TYPE, 'Localization');
     ensure(TITLES_LAYER_TYPE, 'Titles');
     ensure(STATS_LAYER_TYPE, 'Stats');
     ensure(POWER_TREE_LAYER_TYPE, 'Power Tree');
@@ -1116,7 +1116,7 @@ export class TileMapEditor {
 
   private createDefaultLayers(): void {
 
-      // Create default layers (Rules -> Statuses -> Actions -> Items -> NPC -> Enemy -> Event -> Collision -> Object -> Background -> UI Settings -> World Settings -> Strings -> Titles -> Stats -> Power Tree)
+      // Create default layers (Rules -> Statuses -> Actions -> Items -> NPC -> Enemy -> Event -> Collision -> Object -> Background -> UI Settings -> World Settings -> Localization -> Titles -> Stats -> Power Tree)
       this.tileLayers = [
         {
           id: 1,
@@ -1224,7 +1224,7 @@ export class TileMapEditor {
         },
         {
           id: 14,
-          name: 'Strings',
+          name: 'Localization',
           type: STRING_SETTINGS_LAYER_TYPE,
           data: new Array(this.mapWidth * this.mapHeight).fill(0),
           visible: true,

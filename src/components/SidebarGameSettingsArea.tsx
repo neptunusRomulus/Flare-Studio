@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button';
 import { FieldHint } from '@/components/ui/field-hint';
 import { TileSizeForm } from './studio/studioEditors';
 import { openEngineStudio } from '@/components/studio/engineStudio';
+import { openSettingsLayer } from '@/components/studio/openSettingsLayer';
 
 /** Right-rail UI Settings card: menu layout lives on the canvas; tile size and Engine Studio entry points are here. */
 export default function SidebarGameSettingsArea() {
@@ -11,6 +12,7 @@ export default function SidebarGameSettingsArea() {
         <div className="text-sm font-semibold">UI Settings</div>
       </FieldHint>
       <TileSizeForm />
+      <Button type="button" variant="outline" className="h-7 px-2 justify-start text-xs" onClick={() => openSettingsLayer('strings')}>Localization</Button>
       <div className="space-y-1">
         <div className="text-xs font-medium">Engine data</div>
         <div className="flex flex-col gap-1">

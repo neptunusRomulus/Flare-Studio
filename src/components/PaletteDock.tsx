@@ -4,6 +4,7 @@ import PaletteRail from '@/components/PaletteRail';
 import PaletteCard from '@/components/PaletteCard';
 import { clampPanelWidth, PALETTE_PANEL_DEFAULT, PALETTE_PANEL_KEY, SIDEBAR_RAIL_WIDTH } from '@/components/paletteLayout';
 import { useSidebarTabHotkeys } from '@/hooks/useSidebarTabHotkeys';
+import { OPEN_SETTINGS_LAYER_EVENT } from '@/components/studio/openSettingsLayer';
 import type { TileLayer } from '@/types';
 
 type Overlay = React.ReactNode;
@@ -45,6 +46,19 @@ const PaletteDock: React.FC<Props> = ({ open, content, footer, children, ...prop
   const [shown, setShown] = useState(open);
 
   useSidebarTabHotkeys(layers, activeLayer, onSelectLayer);
+
+  useEffect(() => {
+    const onOpen = (event: Event) => {
+      const type = (event as CustomEvent<{ type?: string }>).detail?.type;
+      if (!type) return;
+      const layer = layers.find((item) => item.type === type);
+      if (!layer) return;
+      onSelectLayer(layer.id);
+      setCardOpen(true);
+    };
+    window.addEventListener(OPEN_SETTINGS_LAYER_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_SETTINGS_LAYER_EVENT, onOpen);
+  }, [layers, onSelectLayer]);
 
   useEffect(() => {
     if (open) {

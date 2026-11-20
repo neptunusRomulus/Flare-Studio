@@ -2,3 +2,4 @@ export const INTERNAL_TILESET_FILENAMES = new Set<string>(['collision-tile.png',
 export const COLLISION_LAYER_TYPE = 'collision';
 export const GAME_SETTINGS_LAYER_TYPE = 'gameSettings';
 export const WORLD_SETTINGS_LAYER_TYPE = 'worldSettings';
+export const STRING_SETTINGS_LAYER_TYPE = 'strings';

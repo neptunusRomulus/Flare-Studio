@@ -23,6 +23,7 @@ const EDITOR_LAYER_TYPES = new Set([
   "event",
   "gamesettings",
   "worldsettings",
+  "strings",
 ]);
 
 function isEditorOnlyLayerType(type) {

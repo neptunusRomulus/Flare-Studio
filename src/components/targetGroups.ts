@@ -105,6 +105,7 @@ export function normalizeTileRect(a: { x: number; y: number }, b: { x: number; y
 export const SETTINGS_RAIL: Array<{ id: string; label: string; help: string }> = [
   { id: 'gameSettings', label: 'UI Settings', help: 'Shift+Tab: switch main layers.' },
   { id: 'worldSettings', label: 'World Settings', help: 'Shift+Tab: switch main layers.' },
+  { id: 'strings', label: 'Strings', help: 'Shift+Tab: switch main layers.' },
 ];
 
 /** Main layers shown at the top of the right dock. */
@@ -114,6 +115,7 @@ export const MAIN_LAYERS: Array<{ id: string; label: string }> = [
   { id: 'content', label: 'Content' },
   { id: 'gameSettings', label: 'UI Settings' },
   { id: 'worldSettings', label: 'World Settings' },
+  { id: 'strings', label: 'Strings' },
 ];
 
 /** Main layer of a real layer type (unknown non-group types count as Map, like the old sidebar grouping). */

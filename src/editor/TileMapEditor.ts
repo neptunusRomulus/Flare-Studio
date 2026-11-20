@@ -261,7 +261,7 @@ export interface EditorProjectData {
   paintMode?: PaintMode;  // Current paint mode (ground/object)
 }
 
-import { COLLISION_LAYER_TYPE, GAME_SETTINGS_LAYER_TYPE, INTERNAL_TILESET_FILENAMES, WORLD_SETTINGS_LAYER_TYPE } from './tileMap/constants';
+import { COLLISION_LAYER_TYPE, GAME_SETTINGS_LAYER_TYPE, INTERNAL_TILESET_FILENAMES, STRING_SETTINGS_LAYER_TYPE, WORLD_SETTINGS_LAYER_TYPE } from './tileMap/constants';
 
 export class TileMapEditor {
   public isStartingMap: boolean = false;
@@ -1087,7 +1087,7 @@ export class TileMapEditor {
     this.mapCanvas.tabIndex = 0;
   }
 
-  /** Make sure UI Settings and World Settings exist on maps saved before those layers existed. */
+  /** Make sure UI Settings, World Settings and Strings exist on maps saved before those layers existed. */
   private ensureSettingsLayers(): void {
     const ensure = (type: string, name: string) => {
       const existing = this.tileLayers.find((layer) => layer.type === type);
@@ -1108,11 +1108,12 @@ export class TileMapEditor {
     };
     ensure(GAME_SETTINGS_LAYER_TYPE, 'UI Settings');
     ensure(WORLD_SETTINGS_LAYER_TYPE, 'World Settings');
+    ensure(STRING_SETTINGS_LAYER_TYPE, 'Strings');
   }
 
   private createDefaultLayers(): void {
 
-      // Create default layers (Rules -> Statuses -> Actions -> Items -> NPC -> Enemy -> Event -> Collision -> Object -> Background -> UI Settings -> World Settings)
+      // Create default layers (Rules -> Statuses -> Actions -> Items -> NPC -> Enemy -> Event -> Collision -> Object -> Background -> UI Settings -> World Settings -> Strings)
       this.tileLayers = [
         {
           id: 1,
@@ -1217,12 +1218,20 @@ export class TileMapEditor {
           data: new Array(this.mapWidth * this.mapHeight).fill(0),
           visible: true,
           transparency: 1.0
+        },
+        {
+          id: 14,
+          name: 'Strings',
+          type: STRING_SETTINGS_LAYER_TYPE,
+          data: new Array(this.mapWidth * this.mapHeight).fill(0),
+          visible: true,
+          transparency: 1.0
         }
       ];
 
       // Set the background layer as active by default
       this.activeLayerId = 8;
-      this.nextLayerId = 14;
+      this.nextLayerId = 15;
       this.sortLayersByPriority();
     // Initialize layer tabs for background and object with one tab each
     try {

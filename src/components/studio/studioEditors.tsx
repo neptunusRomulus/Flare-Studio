@@ -569,7 +569,6 @@ export function StudioWorldPanel() {
   return (
     <div className="space-y-3">
       <CutsceneEditor />
-      <LanguagePotEditor />
       <ParallaxEditor />
       <FogEditor />
       <ProcgenEditor />

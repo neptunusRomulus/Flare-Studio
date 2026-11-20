@@ -70,7 +70,7 @@ export type ProcgenDraft = {
 
 export type ProjectFile = { path: string; content: string };
 
-const TEXT_KEYS = new Set(['name', 'title', 'description', 'quest_text', 'caption', 'text', 'tooltip', 'msg', 'book']);
+export const TEXT_KEYS = new Set(['name', 'title', 'description', 'quest_text', 'caption', 'text', 'tooltip', 'msg', 'book']);
 
 export function emptyMapPresentation(): MapPresentation {
   return {

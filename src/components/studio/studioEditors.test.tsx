@@ -5,7 +5,6 @@ import { AppProvider } from '@/context/AppContext';
 import {
   CutsceneEditor,
   FogEditor,
-  LanguagePotEditor,
   MapPresentationFields,
   ParallaxEditor,
   ProcgenEditor,
@@ -37,13 +36,6 @@ describe('studio editor screens', () => {
     expect(html).toContain('Write cutscene');
     expect(html).toContain('Add scene');
     expect(html).toContain('Add vscroll');
-  });
-
-  it('renders the language catalog editor', () => {
-    const html = render(<LanguagePotEditor />);
-    expect(html).toContain('Language catalog');
-    expect(html).toContain('Scan project');
-    expect(html).toContain('Write catalog');
   });
 
   it('renders the parallax editor', () => {
@@ -80,7 +72,6 @@ describe('studio editor screens', () => {
     expect(PROCGEN_TYPES).toContain('door_west_east');
     const panel = render(<StudioWorldPanel />);
     expect(panel).toContain('Cutscene');
-    expect(panel).toContain('Language catalog');
     expect(panel).toContain('Parallax');
     expect(panel).toContain('Fog of war');
     expect(panel).toContain('Procedural rules');

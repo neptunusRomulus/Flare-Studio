@@ -10,10 +10,12 @@ type Props = {
   children: React.ReactNode;
   footer?: React.ReactNode;
   animMs: number;
+  /** Span most of the canvas (used by the Strings translation table). */
+  wide?: boolean;
 };
 
 /** Floating list card over the canvas, anchored to the rail and inset clear of zoom / minimap. */
-const PaletteCard: React.FC<Props> = ({ open, width, onWidthChange, children, footer, animMs }) => {
+const PaletteCard: React.FC<Props> = ({ open, width, onWidthChange, children, footer, animMs, wide }) => {
   const [dragging, setDragging] = useState(false);
   const drag = useRef<{ startX: number; startW: number } | null>(null);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -54,14 +56,15 @@ const PaletteCard: React.FC<Props> = ({ open, width, onWidthChange, children, fo
   return (
     <Card
       ref={cardRef}
-      aria-label="Sidebar list"
+      aria-label={wide ? "Strings panel" : "Sidebar list"}
       aria-hidden={!open}
       className="absolute z-[5] flex flex-col min-h-0 overflow-hidden rounded-xl bg-white/90 dark:bg-neutral-900/90 backdrop-blur-sm border border-border shadow-lg"
       style={{
         top: `calc(${PALETTE_CARD_TOP}px + var(--window-controls-offset, 0px))`,
         bottom: PALETTE_CARD_BOTTOM,
         right: PALETTE_CARD_GAP,
-        width,
+        left: wide ? 24 : undefined,
+        width: wide ? undefined : width,
         opacity: open ? 1 : 0,
         transform: open ? 'translateX(0)' : 'translateX(16px)',
         pointerEvents: open ? undefined : 'none',
@@ -70,6 +73,7 @@ const PaletteCard: React.FC<Props> = ({ open, width, onWidthChange, children, fo
           : 'none',
       }}
     >
+      {wide ? null : (
       <div
         role="separator"
         aria-orientation="vertical"
@@ -80,6 +84,7 @@ const PaletteCard: React.FC<Props> = ({ open, width, onWidthChange, children, fo
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
       />
+      )}
       <div className="flex flex-col flex-1 min-h-0 p-2">
         {children}
         {footer}

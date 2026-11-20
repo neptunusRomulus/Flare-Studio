@@ -6,6 +6,7 @@ import { RetryStrategyProvider } from './context/RetryStrategyContext';
 import { SaveTransactionProvider } from './context/SaveTransactionContext';
 import { ConflictResolutionProvider } from './context/ConflictResolutionContext';
 import { SaveErrorProvider } from './context/SaveErrorContext';
+import { StudioHintsProvider } from './context/StudioHintsContext';
 import useSidebarDeps from './hooks/useSidebarDeps';
 import { AppProvider } from './context/AppContext';
 import AppMain from './components/AppMain';
@@ -46,6 +47,7 @@ export default function App() {
   const { toolbarValue, sidebarDeps, buildAppMainCtxFromSidebar } = useAppController();
 
   return (
+    <StudioHintsProvider>
     <SaveErrorProvider>
       <RetryStrategyProvider initialConfig={{ maxRetries: 3, initialDelayMs: 500 }}>
         <SaveTransactionProvider>
@@ -60,5 +62,6 @@ export default function App() {
         </SaveTransactionProvider>
       </RetryStrategyProvider>
     </SaveErrorProvider>
+    </StudioHintsProvider>
   );
 }

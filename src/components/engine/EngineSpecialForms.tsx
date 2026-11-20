@@ -13,6 +13,11 @@ import {
   serializeClassesFile,
   type HeroClassEntry,
 } from '@/editor/heroClasses';
+import {
+  emptyEquipFlag,
+  parseEquipFlags,
+  serializeEquipFlags,
+} from '@/editor/equipFlags';
 
 type TextProps = { text: string; onChange: (text: string) => void };
 
@@ -251,3 +256,37 @@ export function ClassHeroForm({
     </div>
   );
 }
+
+export function EquipFlagsForm({ text, onChange }: { text: string; onChange: (text: string) => void }) {
+  const file = parseEquipFlags(text);
+  const write = (flags: typeof file.flags) => onChange(serializeEquipFlags({ header: file.header, flags }, text));
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <FieldHint hint="[flag] blocks in engine/equip_flags.txt. The engine keys are id (the identifier items use) and name (the displayed label). The default-mod example still shows name/description; those are not the keys Flare reads. Empty name is omitted. Leading comments and APPEND are kept.">
+          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Equipment flags</div>
+        </FieldHint>
+        <Button type="button" size="sm" variant="outline" onClick={() => write([...file.flags, emptyEquipFlag()])}>
+          <Plus className="w-3 h-3 mr-1" />
+          Add flag
+        </Button>
+      </div>
+      {file.flags.length === 0 ? (
+        <p className="text-xs text-muted-foreground">No equipment flags.</p>
+      ) : file.flags.map((flag, index) => (
+        <div key={index} className="flex flex-wrap items-end gap-2">
+          <div className="space-y-1">
+            <HintLabel className="text-[11px] font-normal text-muted-foreground" hint="Identifier used by items. Must come first in the block.">id</HintLabel>
+            <Input aria-label={`Equip flag id ${index + 1}`} width="id" className="h-7 text-xs" value={flag.id} onChange={(event) => write(file.flags.map((row, i) => (i === index ? { ...row, id: event.target.value } : row)))} />
+          </div>
+          <div className="space-y-1">
+            <HintLabel className="text-[11px] font-normal text-muted-foreground" hint="Displayed name of this equip flag.">name</HintLabel>
+            <Input aria-label={`Equip flag name ${index + 1}`} width="name" className="h-7 text-xs" value={flag.name} onChange={(event) => write(file.flags.map((row, i) => (i === index ? { ...row, name: event.target.value } : row)))} />
+          </div>
+          <Button type="button" size="sm" variant="outline" onClick={() => write(file.flags.filter((_, i) => i !== index))}>Remove</Button>
+        </div>
+      ))}
+    </div>
+  );
+}
+

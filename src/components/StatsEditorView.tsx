@@ -37,7 +37,8 @@ import {
 } from '@/editor/statsTitles';
 import { COMBAT_PATH, HERO_LAYERS_PATH, HERO_OPTIONS_PATH, XP_TABLE_PATH, collectSectionIds } from '@/editor/engineForms';
 import { CLASSES_PATH } from '@/editor/heroClasses';
-import { ClassHeroForm, HeroLayersForm, HeroOptionsForm, XpTableForm } from '@/components/engine/EngineSpecialForms';
+import { EQUIP_FLAGS_PATH } from '@/editor/equipFlags';
+import { ClassHeroForm, EquipFlagsForm, HeroLayersForm, HeroOptionsForm, XpTableForm } from '@/components/engine/EngineSpecialForms';
 import { CombatSettingsForm, DamageTypesForm } from '@/components/engine/CombatAndDamageForms';
 
 type Props = { projectPath?: string | null };
@@ -57,10 +58,11 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
   const [combatText, setCombatText] = useState('');
   const [xpText, setXpText] = useState('');
   const [damageSourceText, setDamageSourceText] = useState('');
-  const [pane, setPane] = useState<'stats' | 'combat' | 'damage' | 'xp' | 'classes' | 'appearance'>('stats');
+  const [pane, setPane] = useState<'stats' | 'combat' | 'damage' | 'xp' | 'classes' | 'appearance' | 'equip'>('stats');
   const [classesText, setClassesText] = useState('');
   const [heroOptionsText, setHeroOptionsText] = useState('');
   const [heroLayersText, setHeroLayersText] = useState('');
+  const [equipFlagsText, setEquipFlagsText] = useState('');
   const [itemIds, setItemIds] = useState<Set<string>>(new Set());
   const [powerIds, setPowerIds] = useState<Set<string>>(new Set());
   const [addOpen, setAddOpen] = useState(false);
@@ -83,6 +85,7 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
       setClassesText('');
       setHeroOptionsText('');
       setHeroLayersText('');
+      setEquipFlagsText('');
       setItemIds(new Set());
       setPowerIds(new Set());
       setSourceKind('empty');
@@ -91,7 +94,7 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
     }
     const fs = { readFile: window.electronAPI.readFile };
     const flarePath = getStoredFlarePath();
-    const [primaryFile, statsFile, resourceFile, damageFile, combatFile, xpFile, classesFile, heroOptionsFile, heroLayersFile] = await Promise.all([
+    const [primaryFile, statsFile, resourceFile, damageFile, combatFile, xpFile, classesFile, heroOptionsFile, heroLayersFile, equipFlagsFile] = await Promise.all([
       loadEngineFileWithFallback({ projectPath, relative: PRIMARY_STATS_PATH, flarePath, fs }),
       loadEngineFileWithFallback({ projectPath, relative: HERO_STATS_PATH, flarePath, fs }),
       loadEngineFileWithFallback({ projectPath, relative: RESOURCE_STATS_PATH, flarePath, fs }),
@@ -101,6 +104,7 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
       loadEngineFileWithFallback({ projectPath, relative: CLASSES_PATH, flarePath, fs }),
       loadEngineFileWithFallback({ projectPath, relative: HERO_OPTIONS_PATH, flarePath, fs }),
       loadEngineFileWithFallback({ projectPath, relative: HERO_LAYERS_PATH, flarePath, fs }),
+      loadEngineFileWithFallback({ projectPath, relative: EQUIP_FLAGS_PATH, flarePath, fs }),
     ]);
     const parsedPrimaries = parsePrimaryStats(primaryFile.text);
     setPrimaries(parsedPrimaries.length ? parsedPrimaries : DEFAULT_PRIMARY_STATS);
@@ -113,6 +117,7 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
     setClassesText(classesFile.text);
     setHeroOptionsText(heroOptionsFile.text);
     setHeroLayersText(heroLayersFile.text);
+    setEquipFlagsText(equipFlagsFile.text);
     try {
       const projectFiles = await loadProjectTextMap(projectPath);
       setItemIds(collectSectionIds(projectFiles, ['item']));
@@ -262,6 +267,7 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
       if (classesText.trim()) files.push({ path: CLASSES_PATH, content: classesText.endsWith('\n') ? classesText : `${classesText}\n` });
       if (heroOptionsText.trim()) files.push({ path: HERO_OPTIONS_PATH, content: heroOptionsText.endsWith('\n') ? heroOptionsText : `${heroOptionsText}\n` });
       if (heroLayersText.trim()) files.push({ path: HERO_LAYERS_PATH, content: heroLayersText.endsWith('\n') ? heroLayersText : `${heroLayersText}\n` });
+      if (equipFlagsText.trim()) files.push({ path: EQUIP_FLAGS_PATH, content: equipFlagsText.endsWith('\n') ? equipFlagsText : `${equipFlagsText}\n` });
       if (damageTypes.length || damageSourceText.trim()) {
         files.push({ path: DAMAGE_TYPES_PATH, content: serializeDamageTypes(damageTypes, damageSourceText) });
       }
@@ -284,9 +290,9 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <FieldHint hint={
-            sourceKind === 'project' ? 'Editing project overrides. Primary stats can be added; core derived keys (hp, mp, accuracy, and the rest of Stats.cpp) are fixed — you can set their values, not invent new core keys. Extra MP-like pools go under Resource stats. Combat limits, damage types, the XP table, classes and hero appearance are edited in this card.'
+            sourceKind === 'project' ? 'Editing project overrides. Primary stats can be added; core derived keys (hp, mp, accuracy, and the rest of Stats.cpp) are fixed — you can set their values, not invent new core keys. Extra MP-like pools go under Resource stats. Combat, damage types, the XP table, classes, hero appearance and equipment flags are edited in this card.'
             : sourceKind === 'mod' ? `Loaded from a required mod or default (${sourceLabel}). Save writes project overrides. Primary stats can be added; core derived keys are fixed. Extra MP-like pools go under Resource stats.`
-            : 'Primary stats can be added; they are not hardcoded. Core derived keys (hp, mp, accuracy, and the rest of Stats.cpp) are fixed — you can set their values, not invent new core keys. Extra MP-like pools go under Resource stats. Combat limits, damage types, the XP table, classes and hero appearance are edited in this card. No project stat files yet: empty fields use Flare engine defaults until you save.'
+            : 'Primary stats can be added; they are not hardcoded. Core derived keys (hp, mp, accuracy, and the rest of Stats.cpp) are fixed — you can set their values, not invent new core keys. Extra MP-like pools go under Resource stats. Combat, damage types, the XP table, classes, hero appearance and equipment flags are edited in this card. No project stat files yet: empty fields use Flare engine defaults until you save.'
           }>
             <div className="text-sm font-semibold">Stats</div>
           </FieldHint>
@@ -302,6 +308,7 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
             { id: 'xp', label: 'XP table' },
             { id: 'classes', label: 'Classes' },
             { id: 'appearance', label: 'Appearance' },
+            { id: 'equip', label: 'Equip flags' },
           ] as const).map((item) => (
             <Button
               key={item.id}
@@ -335,6 +342,8 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
               <HeroOptionsForm text={heroOptionsText} onChange={(next) => { setHeroOptionsText(next); mark(); }} />
               <HeroLayersForm text={heroLayersText} onChange={(next) => { setHeroLayersText(next); mark(); }} />
             </div>
+          ) : pane === 'equip' ? (
+            <EquipFlagsForm text={equipFlagsText} onChange={(next) => { setEquipFlagsText(next); mark(); }} />
           ) : (
           <>
           <section className="rounded-lg border border-border p-3 space-y-2">

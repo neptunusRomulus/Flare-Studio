@@ -12,7 +12,7 @@ import {
 } from '@/adapters/flare/flareAdapter.cjs';
 import { loadProjectTextMap, projectRoot, saveConfigDocument } from '@/editor/projectFiles';
 import { collectSectionIds } from '@/editor/engineForms';
-import { ClassHeroForm, HeroLayersForm, HeroOptionsForm, LootSettingsForm, XpTableForm } from '@/components/engine/EngineSpecialForms';
+import { ClassHeroForm, EquipFlagsForm, HeroLayersForm, HeroOptionsForm, LootSettingsForm, XpTableForm } from '@/components/engine/EngineSpecialForms';
 import { registerProblemOpener } from '@/editor/projectProblems';
 import { FieldHint } from '@/components/ui/field-hint';
 
@@ -342,6 +342,7 @@ export function EngineConfigEditor({ initialFile }: { initialFile?: string } = {
               {activeTab === 'loot.txt' && <LootSettingsForm text={fileContents[activeTab] || ''} onChange={(text) => updateFileText(activeTab, text)} />}
               {activeTab === 'hero_options.txt' && <HeroOptionsForm text={fileContents[activeTab] || ''} onChange={(text) => updateFileText(activeTab, text)} />}
               {activeTab === 'hero_layers.txt' && <HeroLayersForm text={fileContents[activeTab] || ''} onChange={(text) => updateFileText(activeTab, text)} />}
+              {activeTab === 'equip_flags.txt' && <EquipFlagsForm text={fileContents[activeTab] || ''} onChange={(text) => updateFileText(activeTab, text)} />}
               {activeTab === 'classes.txt' && (
                 <ClassHeroForm
                   text={fileContents[activeTab] || ''}
@@ -360,7 +361,7 @@ export function EngineConfigEditor({ initialFile }: { initialFile?: string } = {
                 onAddSection={addSection}
                 onSave={() => saveConfig(activeTab)}
                 hasUnsavedChanges={hasUnsavedChanges[activeTab]}
-                hideGeneric={['xp_table.txt', 'hero_options.txt', 'hero_layers.txt', 'classes.txt'].includes(activeTab)}
+                hideGeneric={['xp_table.txt', 'hero_options.txt', 'hero_layers.txt', 'classes.txt', 'equip_flags.txt'].includes(activeTab)}
               />
             </div>
           )}

@@ -151,6 +151,8 @@ export function collectSectionIds(files: Record<string, string>, sections: strin
 
 export const COMBAT_PATH = 'engine/combat.txt';
 export const XP_TABLE_PATH = 'engine/xp_table.txt';
+export const HERO_OPTIONS_PATH = 'engine/hero_options.txt';
+export const HERO_LAYERS_PATH = 'engine/hero_layers.txt';
 
 export type CombatSettings = {
   absorb_percent: string;

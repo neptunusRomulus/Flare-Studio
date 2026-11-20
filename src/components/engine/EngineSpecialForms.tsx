@@ -83,18 +83,18 @@ export function HeroOptionsForm({ text, onChange }: TextProps) {
   };
   return (
     <div className="space-y-2">
-      <FieldHint hint="Appearance choices on the new-hero screen (option=index,base,head,portrait,name).">
-        <div className="grid grid-cols-[4rem_6rem_7rem_1fr_7rem_auto] gap-1 text-[11px] text-muted-foreground">
-          <span>Index</span><span>Base</span><span>Head</span><span>Portrait</span><span>Name</span><span />
+      <FieldHint hint="New-hero appearances in engine/hero_options.txt (option=index,base,head,portrait,name). base is a folder in images/avatar; head is a png in that folder; portrait is a filename; name is the default hero name.">
+        <div className="flex flex-wrap items-end gap-1 text-[11px] text-muted-foreground">
+          <span className="w-20">index</span><span className="w-36">base</span><span className="w-36">head</span><span className="w-full max-w-md">portrait</span><span className="w-44">name</span>
         </div>
       </FieldHint>
       {rows.map((row, i) => (
-        <div key={i} className="grid grid-cols-[4rem_6rem_7rem_1fr_7rem_auto] gap-1">
-          <Input className="h-6 text-xs" value={row.index} onChange={(e) => setRow(i, { index: e.target.value })} />
-          <Input className="h-6 text-xs" value={row.base} onChange={(e) => setRow(i, { base: e.target.value })} />
-          <Input className="h-6 text-xs" value={row.head} onChange={(e) => setRow(i, { head: e.target.value })} />
-          <Input className="h-6 text-xs" value={row.portrait} onChange={(e) => setRow(i, { portrait: e.target.value })} />
-          <Input className="h-6 text-xs" value={row.name} onChange={(e) => setRow(i, { name: e.target.value })} />
+        <div key={i} className="flex flex-wrap items-center gap-1">
+          <Input aria-label={`Hero option index ${i + 1}`} width="num" className="h-6 text-xs" value={row.index} onChange={(e) => setRow(i, { index: e.target.value })} />
+          <Input aria-label={`Hero option base ${i + 1}`} width="id" className="h-6 text-xs" value={row.base} onChange={(e) => setRow(i, { base: e.target.value })} />
+          <Input aria-label={`Hero option head ${i + 1}`} width="id" className="h-6 text-xs" value={row.head} onChange={(e) => setRow(i, { head: e.target.value })} />
+          <Input aria-label={`Hero option portrait ${i + 1}`} width="path" className="h-6 text-xs" value={row.portrait} onChange={(e) => setRow(i, { portrait: e.target.value })} />
+          <Input aria-label={`Hero option name ${i + 1}`} width="name" className="h-6 text-xs" value={row.name} onChange={(e) => setRow(i, { name: e.target.value })} />
           <Button type="button" variant="ghost" size="icon" className="h-6 w-6" aria-label="Remove option" onClick={() => onChange(serializeHeroOptions(rows.filter((_, j) => j !== i), text))}>
             <Trash2 className="w-3 h-3" />
           </Button>
@@ -114,13 +114,13 @@ export function HeroLayersForm({ text, onChange }: TextProps) {
   };
   return (
     <div className="space-y-2">
-      <FieldHint hint="Draw order of equipment layers per facing (layer=direction,types…).">
-        <div className="text-xs font-medium">Hero layers</div>
+      <FieldHint hint="Draw order of equipment layers per facing (layer=direction,types…). Deprecated: Flare now loads render_layers from engine/stats.txt. This file is still read for older mods.">
+        <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Hero layers</div>
       </FieldHint>
       {rows.map((row, i) => (
-        <div key={i} className="grid grid-cols-[5rem_1fr_auto] gap-1">
-          <Input className="h-6 text-xs" value={row.direction} onChange={(e) => setRow(i, { direction: e.target.value })} />
-          <Input className="h-6 text-xs" value={row.types} onChange={(e) => setRow(i, { types: e.target.value })} />
+        <div key={i} className="flex flex-wrap items-center gap-1">
+          <Input aria-label={`Hero layer direction ${i + 1}`} width="short" className="h-6 text-xs" value={row.direction} onChange={(e) => setRow(i, { direction: e.target.value })} />
+          <Input aria-label={`Hero layer types ${i + 1}`} width="path" className="h-6 text-xs" value={row.types} onChange={(e) => setRow(i, { types: e.target.value })} />
           <Button type="button" variant="ghost" size="icon" className="h-6 w-6" aria-label="Remove layer" onClick={() => onChange(serializeHeroLayers(rows.filter((_, j) => j !== i), text))}>
             <Trash2 className="w-3 h-3" />
           </Button>

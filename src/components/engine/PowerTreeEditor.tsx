@@ -35,7 +35,20 @@ import {
 } from '@/editor/powerTree';
 import { useAppContext } from '@/context/AppContext';
 import SearchablePalette from '@/components/ui/searchable-palette';
-import PowerTreeNodeFields, { type PowerOption } from '@/components/engine/PowerTreeNodeFields';
+import PowerTreeNodeFields from '@/components/engine/PowerTreeNodeFields';
+import {
+  POWER_DEFINITIONS_PATH,
+  appendNewPowerDefinition,
+  applyPowerName,
+  defaultPowerName,
+  formatPowerLabel,
+  isPlaceholderPowerName,
+  loadPowerRefs,
+  nextNumericPowerId,
+  projectPathForPower,
+  type PowerRef,
+} from '@/editor/powerCatalog';
+
 import PowerTreeCanvas from '@/components/engine/PowerTreeCanvas';
 import PowerEditorWindow, { type PowerTarget } from '@/components/powers/PowerEditorWindow';
 import { usePowerProjectFiles } from '@/components/powers/usePowerProjectFiles';
@@ -47,35 +60,6 @@ import {
 } from '@/editor/menuLayout';
 
 
-function collectPowerOptions(files: Record<string, string>): PowerOption[] {
-  const byId = new Map<string, string>();
-  for (const [path, text] of Object.entries(files)) {
-    if (!/^powers\//i.test(path) || /^powers\/trees\//i.test(path)) continue;
-    let id = '';
-    let name = '';
-    let inSection = false;
-    for (const line of String(text || '').split(/\r?\n/)) {
-      const header = line.match(/^\[(.+)\]\s*$/);
-      if (header) {
-        if (inSection && id && !byId.has(id)) byId.set(id, name);
-        inSection = /^(power|upgrade)$/i.test(header[1].trim());
-        id = '';
-        name = '';
-        continue;
-      }
-      if (!inSection) continue;
-      const kv = line.match(/^([A-Za-z0-9_]+)=(.*)$/);
-      if (!kv) continue;
-      if (kv[1] === 'id') id = kv[2].trim();
-      if (kv[1] === 'name' && !name) name = kv[2].trim();
-    }
-    if (inSection && id && !byId.has(id)) byId.set(id, name);
-  }
-  return [...byId.entries()]
-    .map(([id, name]) => ({ id, name }))
-    .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
-}
-
 export default function PowerTreeEditor() {
   const ctx = useAppContext();
   const projectPath = typeof ctx.currentProjectPath === 'string' ? ctx.currentProjectPath : null;
@@ -85,7 +69,7 @@ export default function PowerTreeEditor() {
   const [tree, setTree] = useState<PowerTreeFile>(emptyTree());
   const [activeTab, setActiveTab] = useState(0);
   const [powerIds, setPowerIds] = useState<Set<string>>(new Set());
-  const [powerOptions, setPowerOptions] = useState<PowerOption[]>([]);
+  const [powerOptions, setPowerOptions] = useState<PowerRef[]>([]);
   const [primaries, setPrimaries] = useState<PrimaryStat[]>(DEFAULT_PRIMARY_STATS);
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -112,7 +96,17 @@ export default function PowerTreeEditor() {
     setPathDraft(nextPath);
     setTree(parsePowerTree(files[nextPath] || ''));
     setPowerIds(collectSectionIds(files, ['power', 'upgrade']));
-    setPowerOptions(collectPowerOptions(files));
+    const catalog = await loadPowerRefs({
+      projectPath,
+      flarePath: getStoredFlarePath(),
+      projectFiles: files,
+      fs: {
+        readFile: window.electronAPI.readFile,
+        readDir: window.electronAPI.readDir,
+      },
+    });
+    setPowerOptions(catalog);
+
     setDirty(false);
     setActiveTab(0);
     const flarePath = getStoredFlarePath();
@@ -227,12 +221,68 @@ export default function PowerTreeEditor() {
     setSelectedIndex(null);
   };
 
-  const addPower = (id = '') => {
+  const labelOf = (id?: string, fallbackName = '') => {
+    const ref = id ? powerOptions.find((item) => item.id === id) : undefined;
+    return formatPowerLabel({ id: id || '', name: ref?.name || fallbackName });
+  };
+
+  const addPower = async (id = '') => {
     const position = `${layout.tabArea.x},${layout.tabArea.y}`;
-    const node = id ? updateNode(emptyPower(String(activeTab), position), { id }) : emptyPower(String(activeTab), position);
+    let nextId = id.trim();
+    if (!nextId) {
+      if (!projectPath) {
+        const node = emptyPower(String(activeTab), position);
+        const nextIndex = tree.items.length;
+        update({ ...tree, items: [...tree.items, node] });
+        setSelectedIndex(nextIndex);
+        return;
+      }
+      const known = [
+        ...powerOptions.map((item) => item.id),
+        ...tree.items.map((item) => (item.kind === 'power' || item.kind === 'upgrade' ? item.id : '')),
+      ];
+      nextId = nextNumericPowerId(known);
+      const name = defaultPowerName(nextId);
+      const defPath = POWER_DEFINITIONS_PATH;
+      const files = await loadProjectTextMap(projectPath);
+      const nextText = appendNewPowerDefinition(files[defPath] || '', nextId, name);
+      const saved = await writeProjectFiles(projectPath, [{ path: defPath, content: nextText }]);
+      if (!saved) {
+        toast({ title: 'Could not create power', description: `Failed to write ${defPath}`, variant: 'destructive' });
+        return;
+      }
+      setPowerOptions((current) => (
+        current.some((item) => item.id === nextId)
+          ? current
+          : [...current, { id: nextId, name, path: defPath, source: 'project' as const }]
+      ));
+      setPowerIds((current) => new Set([...current, nextId]));
+      void powerFiles.reload();
+    }
+    const node = updateNode(emptyPower(String(activeTab), position), { id: nextId });
     const nextIndex = tree.items.length;
     update({ ...tree, items: [...tree.items, node] });
     setSelectedIndex(nextIndex);
+  };
+
+  const savePowerName = async (id: string, name: string) => {
+    if (!projectPath || !id) return;
+    const ref = powerOptions.find((item) => item.id === id);
+    const defPath = projectPathForPower(ref);
+    const files = await loadProjectTextMap(projectPath);
+    const nextText = applyPowerName(files[defPath] || '', id, name);
+    const saved = await writeProjectFiles(projectPath, [{ path: defPath, content: nextText }]);
+    if (!saved) {
+      toast({ title: 'Could not rename power', description: `Failed to write ${defPath}`, variant: 'destructive' });
+      return;
+    }
+    setPowerOptions((current) => {
+      const next = current.some((item) => item.id === id)
+        ? current.map((item) => (item.id === id ? { ...item, name, path: defPath, source: 'project' as const } : item))
+        : [...current, { id, name, path: defPath, source: 'project' as const }];
+      return next;
+    });
+    void powerFiles.reload();
   };
 
   const removePower = (powerIndex: number) => {
@@ -319,6 +369,7 @@ export default function PowerTreeEditor() {
               layout={layout}
               menuArt={menuArt}
               tabArt={tabArt}
+              names={Object.fromEntries(powerOptions.map((item) => [item.id, item.name]))}
               selectedIndex={selectedIndex}
               onSelect={setSelectedIndex}
               onMove={(index, position) => {
@@ -368,7 +419,7 @@ export default function PowerTreeEditor() {
                 placeholder="Search powers…"
                 entries={options.map((item) => ({
                   id: item.id,
-                  label: item.name ? `${item.name} (${item.id})` : item.id,
+                  label: formatPowerLabel(item),
                   searchText: `${item.name} ${item.id}`,
                 }))}
                 onSelect={(id) => addPower(id)}
@@ -387,7 +438,7 @@ export default function PowerTreeEditor() {
                   className={`h-6 px-2 text-[11px] ${selectedIndex === power.index ? 'bg-orange-600 text-white hover:bg-orange-600 hover:text-white' : ''}`}
                   onClick={() => setSelectedIndex(power.index)}
                 >
-                  {power.id || 'Power'}
+                  {labelOf(power.id)}
                 </Button>
               ))}
             </div>
@@ -396,7 +447,7 @@ export default function PowerTreeEditor() {
           {selected ? (
             <div className="rounded-md border border-border/60 p-3 space-y-2">
               <div className="flex items-center justify-between gap-2">
-                <div className="text-xs font-medium truncate">{selected.id || 'Power'}</div>
+                <div className="text-xs font-medium truncate">{labelOf(selected.id)}</div>
                 <div className="flex items-center gap-1">
                   {selected.id ? (
                     <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setPowerTarget({ type: 'power', id: selected.id })}>
@@ -408,6 +459,34 @@ export default function PowerTreeEditor() {
                   </Button>
                 </div>
               </div>
+              <div>
+                <HintLabel className="text-xs font-normal" hint="name — the name stored on the power definition in powers/powers.txt. The tree itself only stores the id.">Name</HintLabel>
+                <Input
+                  width="name"
+                  className="h-7 text-xs"
+                  value={powerOptions.find((item) => item.id === selected.id)?.name || ''}
+                  placeholder={selected.id ? defaultPowerName(selected.id) : 'Name'}
+                  aria-label="Power name"
+                  onChange={(e) => {
+                    const name = e.target.value;
+                    const id = selected.id;
+                    if (!id) return;
+                    setPowerOptions((current) => {
+                      const defPath = projectPathForPower(current.find((item) => item.id === id));
+                      if (current.some((item) => item.id === id)) {
+                        return current.map((item) => (item.id === id ? { ...item, name } : item));
+                      }
+                      return [...current, { id, name, path: defPath, source: 'project' }];
+                    });
+                  }}
+                  onBlur={(e) => {
+                    if (selected.id) void savePowerName(selected.id, e.target.value.trim());
+                  }}
+                />
+              </div>
+              {selected.id && isPlaceholderPowerName(powerOptions.find((item) => item.id === selected.id)?.name) ? (
+                <p className="text-[11px] text-amber-500">This power still has a placeholder name.</p>
+              ) : null}
               {selected.id && powerIds.size && unknownIds(selected.id, powerIds).length > 0 ? (
                 <p className="text-[11px] text-amber-500">Unknown power id: {unknownIds(selected.id, powerIds).join(', ')}</p>
               ) : null}

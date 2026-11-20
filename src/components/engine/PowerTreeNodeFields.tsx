@@ -6,6 +6,7 @@ import { HintLabel } from '@/components/ui/field-hint';
 import SearchablePalette from '@/components/ui/searchable-palette';
 import type { PrimaryStat } from '@/editor/statsTitles';
 import { parsePosition, updateNode, type PowerTreeNode } from '@/editor/powerTree';
+import { formatPowerLabel } from '@/editor/powerCatalog';
 import { Plus, Trash2 } from 'lucide-react';
 
 export type PowerOption = { id: string; name: string };
@@ -37,7 +38,7 @@ export default function PowerTreeNodeFields({
   onChangeUpgrades?: (ids: string[]) => void;
 }) {
   const patch = (next: Parameters<typeof updateNode>[1]) => onChange(updateNode(node, next));
-  const entries = powerOptions.map((p) => ({ id: p.id, label: p.name ? `${p.name} (${p.id})` : p.id, searchText: `${p.name} ${p.id}` }));
+  const entries = powerOptions.map((p) => ({ id: p.id, label: formatPowerLabel(p), searchText: `${p.name} ${p.id}` }));
   const pos = parsePosition(node.position);
   const usedPowerIds = new Set(node.requires_power);
   const statIds = new Set(primaries.map((s) => s.id));

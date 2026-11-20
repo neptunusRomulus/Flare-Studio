@@ -3,6 +3,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { HintLabel } from '@/components/ui/field-hint';
 import { menuToTabPoint, type PowersMenuLayout, tabToMenuPosition } from '@/editor/menuLayout';
 import { parsePosition, powersOnTab, type PowerTreeFile, type PowerTreeNode } from '@/editor/powerTree';
+import { formatPowerLabel } from '@/editor/powerCatalog';
 
 const ICON = 32;
 const GRID = 16;
@@ -18,6 +19,7 @@ export default function PowerTreeCanvas({
   layout,
   menuArt,
   tabArt,
+  names,
   selectedIndex,
   onSelect,
   onMove,
@@ -27,6 +29,7 @@ export default function PowerTreeCanvas({
   layout: PowersMenuLayout;
   menuArt: string | null;
   tabArt: string | null;
+  names?: Record<string, string>;
   selectedIndex: number | null;
   onSelect: (index: number | null) => void;
   onMove: (index: number, position: string) => void;
@@ -114,7 +117,7 @@ export default function PowerTreeCanvas({
         onPointerDown={() => onSelect(null)}
       >
         <div
-          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 overflow-hidden bg-black/40"
+          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 overflow-hidden bg-black/40 pb-4"
           style={{ width, height }}
         >
           {menuArt ? (
@@ -154,7 +157,7 @@ export default function PowerTreeCanvas({
               <button
                 key={power.index}
                 type="button"
-                className={`absolute flex items-center justify-center text-[9px] leading-tight font-mono text-center px-0.5 overflow-hidden rounded-sm border cursor-grab active:cursor-grabbing select-none ${
+                className={`absolute flex items-center justify-center text-[9px] leading-tight font-mono text-center overflow-visible rounded-sm border cursor-grab active:cursor-grabbing select-none ${
                   selected ? 'border-orange-500 ring-2 ring-orange-500 bg-orange-950/80 text-orange-50' : 'border-border bg-background/90 text-foreground'
                 }`}
                 style={{
@@ -163,7 +166,7 @@ export default function PowerTreeCanvas({
                   width: ICON * scale,
                   height: ICON * scale,
                 }}
-                title={power.id || 'Power'}
+                title={formatPowerLabel({ id: power.id, name: names?.[power.id] || '' })}
                 onPointerDown={(event) => {
                   event.stopPropagation();
                   event.currentTarget.setPointerCapture(event.pointerId);
@@ -175,7 +178,10 @@ export default function PowerTreeCanvas({
                 onPointerUp={endDrag}
                 onPointerCancel={endDrag}
               >
-                {power.id || '?'}
+                <span className="pointer-events-none truncate px-0.5">{names?.[power.id] || power.id || '?'}</span>
+                <span className="pointer-events-none absolute left-1/2 top-full z-10 mt-0.5 max-w-[7rem] -translate-x-1/2 truncate rounded bg-background/90 px-0.5 text-[9px] leading-tight text-foreground">
+                  {formatPowerLabel({ id: power.id, name: names?.[power.id] || '' })}
+                </span>
               </button>
             );
           })}

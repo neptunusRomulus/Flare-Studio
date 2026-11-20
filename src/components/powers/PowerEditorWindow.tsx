@@ -150,7 +150,10 @@ const PowerEditor = ({ target, data, onClose, onOpen }: Props) => {
       <div className="space-y-1">
         <div className="flex items-center gap-2">
           <Tooltip content={`${KIND_META[kind].tooltip} · id=${power.id}`} side="bottom"><span><KindIcon kind={kind} className="w-5 h-5" /></span></Tooltip>
-          <DraftInput className="h-8 text-sm font-semibold border-0 shadow-none px-1 focus:ring-0" value={v('name')} placeholder={power.name || 'Name'} aria-label="Name" onChange={(e) => set('name', e.target.value)} />
+          <div className="min-w-0 flex-1">
+            <HintLabel className="text-xs font-medium" hint="name — shown in the power tree, action bar and tooltips.">Name</HintLabel>
+            <DraftInput className="h-8 text-sm font-semibold" width="name" value={v('name')} placeholder={`New Power ${power.id}`} aria-label="Name" onChange={(e) => set('name', e.target.value)} />
+          </div>
           <span className={`text-[11px] whitespace-nowrap ${KIND_META[kind].color}`}>{KIND_META[kind].label}</span>
           <InlineConfirm open={confirmDelete} onCancel={() => setConfirmDelete(false)} message={`Delete? ${deleteImpact(usedBy)}`}
             onConfirm={() => { writeFile(power.path, removeBlock(textOf(power.path), 'power', power.blockIndex), true); setKind(power.id, null); setConfirmDelete(false); onClose(); }}>

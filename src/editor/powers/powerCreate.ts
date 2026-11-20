@@ -22,7 +22,7 @@ export function createFromTemplate(
   const t = POWER_TEMPLATES.find((p) => p.id === templateId && p.kind === kind);
   const id = nextPowerId(project);
   const path = fileForNewPower(kind, project.powers.map((p) => p.path));
-  const keys: Array<[string, string]> = t ? [...t.keys] : [['name', 'New power'], ['type', 'fixed']];
+  const keys: Array<[string, string]> = t ? [...t.keys] : [['name', `New Power ${id}`], ['type', 'fixed']];
   const writes: CreateResult['writes'] = [];
   if (t?.effect) {
     const et = EFFECT_TEMPLATES.find((e) => e.id === t.effect!.template);

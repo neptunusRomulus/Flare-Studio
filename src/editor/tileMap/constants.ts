@@ -5,3 +5,4 @@ export const WORLD_SETTINGS_LAYER_TYPE = 'worldSettings';
 export const STRING_SETTINGS_LAYER_TYPE = 'strings';
 export const TITLES_LAYER_TYPE = 'titles';
 export const STATS_LAYER_TYPE = 'stats';
+export const POWER_TREE_LAYER_TYPE = 'powerTree';

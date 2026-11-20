@@ -261,7 +261,7 @@ export interface EditorProjectData {
   paintMode?: PaintMode;  // Current paint mode (ground/object)
 }
 
-import { COLLISION_LAYER_TYPE, GAME_SETTINGS_LAYER_TYPE, INTERNAL_TILESET_FILENAMES, STATS_LAYER_TYPE, STRING_SETTINGS_LAYER_TYPE, TITLES_LAYER_TYPE, WORLD_SETTINGS_LAYER_TYPE } from './tileMap/constants';
+import { COLLISION_LAYER_TYPE, GAME_SETTINGS_LAYER_TYPE, INTERNAL_TILESET_FILENAMES, POWER_TREE_LAYER_TYPE, STATS_LAYER_TYPE, STRING_SETTINGS_LAYER_TYPE, TITLES_LAYER_TYPE, WORLD_SETTINGS_LAYER_TYPE } from './tileMap/constants';
 
 export class TileMapEditor {
   public isStartingMap: boolean = false;
@@ -1111,11 +1111,12 @@ export class TileMapEditor {
     ensure(STRING_SETTINGS_LAYER_TYPE, 'Strings');
     ensure(TITLES_LAYER_TYPE, 'Titles');
     ensure(STATS_LAYER_TYPE, 'Stats');
+    ensure(POWER_TREE_LAYER_TYPE, 'Power Tree');
   }
 
   private createDefaultLayers(): void {
 
-      // Create default layers (Rules -> Statuses -> Actions -> Items -> NPC -> Enemy -> Event -> Collision -> Object -> Background -> UI Settings -> World Settings -> Strings -> Titles -> Stats)
+      // Create default layers (Rules -> Statuses -> Actions -> Items -> NPC -> Enemy -> Event -> Collision -> Object -> Background -> UI Settings -> World Settings -> Strings -> Titles -> Stats -> Power Tree)
       this.tileLayers = [
         {
           id: 1,
@@ -1244,12 +1245,20 @@ export class TileMapEditor {
           data: new Array(this.mapWidth * this.mapHeight).fill(0),
           visible: true,
           transparency: 1.0
+        },
+        {
+          id: 17,
+          name: 'Power Tree',
+          type: POWER_TREE_LAYER_TYPE,
+          data: new Array(this.mapWidth * this.mapHeight).fill(0),
+          visible: true,
+          transparency: 1.0
         }
       ];
 
       // Set the background layer as active by default
       this.activeLayerId = 8;
-      this.nextLayerId = 17;
+      this.nextLayerId = 18;
       this.sortLayersByPriority();
     // Initialize layer tabs for background and object with one tab each
     try {

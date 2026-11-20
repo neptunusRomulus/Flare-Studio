@@ -6,7 +6,7 @@ import type { FlareEvent, FlareEnemy, FlareNPC } from './flare';
 export interface TileLayer {
   id: number;
   name: string;
-  type: 'background' | 'object' | 'collision' | 'event' | 'enemy' | 'npc' | 'items' | 'books' | 'status' | 'rules' | 'actions' | 'gameSettings' | 'worldSettings' | 'strings' | 'titles' | 'stats' | (string & {});
+  type: 'background' | 'object' | 'collision' | 'event' | 'enemy' | 'npc' | 'items' | 'books' | 'status' | 'rules' | 'actions' | 'gameSettings' | 'worldSettings' | 'strings' | 'titles' | 'stats' | 'powerTree' | (string & {});
   data: number[];
   visible: boolean;
   transparency?: number; // 0-1, where 1 is fully opaque

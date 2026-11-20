@@ -14,6 +14,7 @@ import SidebarWorldSettingsArea from '@/components/SidebarWorldSettingsArea';
 import SidebarStringsArea from '@/components/SidebarStringsArea';
 import SidebarTitlesArea from '@/components/SidebarTitlesArea';
 import SidebarStatsArea from '@/components/SidebarStatsArea';
+import SidebarPowerTreeArea from '@/components/SidebarPowerTreeArea';
 import PaletteDock from '@/components/PaletteDock';
 import { shouldShowPanels, shouldShowRightSidebar } from '@/hooks/preMapEditor';
 import EngineSettingsDialog from '@/components/EngineSettingsDialog';
@@ -366,6 +367,8 @@ export default function AppMain() {
             <SidebarTitlesArea />
           ) : tileset.activeLayer?.type === 'stats' ? (
             <SidebarStatsArea />
+          ) : tileset.activeLayer?.type === 'powerTree' ? (
+            <SidebarPowerTreeArea />
           ) : !tileset.activeLayer ? null : undefined}
         >
           {(overlay) => (

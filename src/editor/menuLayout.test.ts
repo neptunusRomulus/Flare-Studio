@@ -7,6 +7,11 @@ import {
   formatPos,
   mergeMenuPos,
   parseMenuText,
+  parsePowersMenuLayout,
+  menuToTabPoint,
+  tabToMenuPosition,
+  DEFAULT_POWERS_MENU_POS,
+  DEFAULT_POWERS_TAB_AREA,
   parsePos,
   parseResolutionsText,
   posFromScreen,
@@ -132,5 +137,15 @@ describe('visibleMenuFiles', () => {
   it('shows every panel when asked', () => {
     const files = MAIN_MENU_FILES.map((name) => `menus/${name}`);
     expect(visibleMenuFiles(files, '', true).size).toBe(files.length);
+  });
+
+  it('reads tab_area from menus/powers.txt and falls back to Fantasy Core', () => {
+    const text = 'pos=0,-35,640,832\nalign=center\ntab_area=64,60,512,672\n';
+    const parsed = parseMenuText(text, 'menus/powers.txt');
+    expect(parsed.tabArea).toEqual({ x: 64, y: 60, w: 512, h: 672 });
+    expect(parsePowersMenuLayout('')).toEqual({ pos: DEFAULT_POWERS_MENU_POS, tabArea: DEFAULT_POWERS_TAB_AREA, background: undefined });
+    expect(menuToTabPoint({ x: 96, y: 136 }, DEFAULT_POWERS_TAB_AREA)).toEqual({ x: 32, y: 76 });
+    expect(tabToMenuPosition({ x: 32, y: 76 }, DEFAULT_POWERS_TAB_AREA, 0)).toBe('96,136');
+    expect(tabToMenuPosition({ x: 32, y: 68 }, DEFAULT_POWERS_TAB_AREA, 16)).toBe('96,128');
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { candidateEnginePaths, loadEngineFileWithFallback, parseProjectRequires } from './engineFileFallback';
+import { candidateEnginePaths, loadEngineFileWithFallback, parseProjectRequires, resolveExistingPath } from './engineFileFallback';
 
 describe('engine file fallback', () => {
   it('parses project requires and prefers a later complete file over default', async () => {
@@ -48,5 +48,25 @@ describe('engine file fallback', () => {
     expect(loaded).toMatchObject({ source: 'project', label: 'project' });
     expect(loaded.text).toContain('title=Hero');
     expect(loaded.text).not.toContain('title=Default');
+  });
+
+  it('resolves an existing asset from the project before mods', async () => {
+    const exists = new Set(['/proj/images/menus/powers.png']);
+    const found = await resolveExistingPath({
+      projectPath: '/proj',
+      relative: 'images/menus/powers.png',
+      flarePath: '/opt/flare-engine',
+      requires: ['fantasycore'],
+      fileExists: async (abs) => exists.has(abs),
+    });
+    expect(found).toBe('/proj/images/menus/powers.png');
+    const fallback = await resolveExistingPath({
+      projectPath: '/proj',
+      relative: 'images/menus/powers.png',
+      flarePath: '/opt/flare-engine',
+      requires: ['fantasycore'],
+      fileExists: async (abs) => abs === '/opt/flare-game/mods/fantasycore/images/menus/powers.png',
+    });
+    expect(fallback).toBe('/opt/flare-game/mods/fantasycore/images/menus/powers.png');
   });
 });

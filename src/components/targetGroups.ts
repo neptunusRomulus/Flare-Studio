@@ -108,6 +108,7 @@ export const SETTINGS_RAIL: Array<{ id: string; label: string; help: string }> =
   { id: 'strings', label: 'Strings', help: 'Shift+Tab: switch main layers.' },
   { id: 'titles', label: 'Titles', help: 'Shift+Tab: switch main layers.' },
   { id: 'stats', label: 'Stats', help: 'Shift+Tab: switch main layers.' },
+  { id: 'powerTree', label: 'Power Tree', help: 'Shift+Tab: switch main layers.' },
 ];
 
 /** Main layers shown at the top of the right dock. */
@@ -120,6 +121,7 @@ export const MAIN_LAYERS: Array<{ id: string; label: string }> = [
   { id: 'strings', label: 'Strings' },
   { id: 'titles', label: 'Titles' },
   { id: 'stats', label: 'Stats' },
+  { id: 'powerTree', label: 'Power Tree' },
 ];
 
 /** Main layer of a real layer type (unknown non-group types count as Map, like the old sidebar grouping). */

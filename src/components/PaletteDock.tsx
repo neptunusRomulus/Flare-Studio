@@ -94,7 +94,7 @@ const PaletteDock: React.FC<Props> = ({ open, content, footer, children, ...prop
       onWidthChange={onWidthChange}
       footer={footer}
       animMs={ms}
-      wide={activeLayer?.type === 'strings' || activeLayer?.type === 'titles' || activeLayer?.type === 'stats'}
+      wide={activeLayer?.type === 'strings' || activeLayer?.type === 'titles' || activeLayer?.type === 'stats' || activeLayer?.type === 'powerTree'}
     >
       {content === undefined ? <TilesetPanel {...props} fitToWidth /> : content}
     </PaletteCard>

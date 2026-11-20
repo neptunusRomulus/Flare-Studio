@@ -96,3 +96,35 @@ export async function loadEngineFileWithFallback(opts: {
   }
   return { text, source, label };
 }
+
+/** First existing copy of a mod-relative asset (project, then required mods, then default). */
+export async function resolveExistingPath(opts: {
+  projectPath: string;
+  relative: string;
+  flarePath: string | null;
+  fileExists: (abs: string) => Promise<boolean>;
+  readFile?: (abs: string) => Promise<string | null | undefined>;
+  requires?: string[];
+}): Promise<string | null> {
+  const root = projectRoot(opts.projectPath);
+  let requires = opts.requires;
+  if (!requires) {
+    requires = opts.readFile
+      ? parseProjectRequires(await readText({ readFile: opts.readFile }, `${root}/project.json`))
+      : [];
+  }
+  const paths = candidateEnginePaths({
+    projectRoot: root,
+    flarePath: opts.flarePath,
+    requires,
+    relative: opts.relative,
+  });
+  for (const path of paths) {
+    try {
+      if (await opts.fileExists(path)) return path;
+    } catch {
+      /* skip unreadable candidates */
+    }
+  }
+  return null;
+}

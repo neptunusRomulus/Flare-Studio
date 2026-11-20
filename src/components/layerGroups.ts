@@ -8,6 +8,7 @@ const GROUPS: string[][] = [
   ['strings'],
   ['titles'],
   ['stats'],
+  ['powerTree'],
 ];
 
 export function layerGroupIndex(type: string | undefined): number {

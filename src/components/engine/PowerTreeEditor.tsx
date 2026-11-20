@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { FieldHint, HintLabel } from '@/components/ui/field-hint';
 import { toast } from '@/hooks/use-toast';
 import { collectSectionIds, unknownIds } from '@/editor/engineForms';
-import { loadEngineFileWithFallback } from '@/editor/engineFileFallback';
+import { loadEngineFileWithFallback, resolveExistingPath } from '@/editor/engineFileFallback';
 import { loadProjectTextMap, writeProjectFiles } from '@/editor/projectFiles';
 import { getStoredFlarePath } from '@/flare/flarePathStore';
 import {
@@ -36,6 +36,16 @@ import {
 import { useAppContext } from '@/context/AppContext';
 import SearchablePalette from '@/components/ui/searchable-palette';
 import PowerTreeNodeFields, { type PowerOption } from '@/components/engine/PowerTreeNodeFields';
+import PowerTreeCanvas from '@/components/engine/PowerTreeCanvas';
+import PowerEditorWindow, { type PowerTarget } from '@/components/powers/PowerEditorWindow';
+import { usePowerProjectFiles } from '@/components/powers/usePowerProjectFiles';
+import {
+  parsePowersMenuLayout,
+  DEFAULT_POWERS_MENU_POS,
+  DEFAULT_POWERS_TAB_AREA,
+  type PowersMenuLayout,
+} from '@/editor/menuLayout';
+
 
 function collectPowerOptions(files: Record<string, string>): PowerOption[] {
   const byId = new Map<string, string>();
@@ -79,6 +89,13 @@ export default function PowerTreeEditor() {
   const [primaries, setPrimaries] = useState<PrimaryStat[]>(DEFAULT_PRIMARY_STATS);
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [layout, setLayout] = useState<PowersMenuLayout>({ pos: DEFAULT_POWERS_MENU_POS, tabArea: DEFAULT_POWERS_TAB_AREA });
+  const [menuArt, setMenuArt] = useState<string | null>(null);
+  const [tabArt, setTabArt] = useState<string | null>(null);
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [powerTarget, setPowerTarget] = useState<PowerTarget | null>(null);
+  const powerFiles = usePowerProjectFiles(projectPath);
+
 
   const load = useCallback(async (preferredPath?: string) => {
     if (!projectPath || !window.electronAPI?.readFile) {
@@ -107,6 +124,27 @@ export default function PowerTreeEditor() {
     });
     const parsed = parsePrimaryStats(primaryFile.text);
     setPrimaries(parsed.length ? parsed : DEFAULT_PRIMARY_STATS);
+    const api = window.electronAPI;
+    const [menuFile, art] = await Promise.all([
+      loadEngineFileWithFallback({
+        projectPath,
+        relative: 'menus/powers.txt',
+        flarePath,
+        fs: { readFile: api.readFile },
+      }),
+      api.fileExists
+        ? resolveExistingPath({
+            projectPath,
+            relative: 'images/menus/powers.png',
+            flarePath,
+            fileExists: api.fileExists,
+            readFile: api.readFile,
+          })
+        : Promise.resolve(null),
+    ]);
+    setLayout(parsePowersMenuLayout(menuFile.text));
+    setMenuArt(art ? `file://${art}` : null);
+    setSelectedIndex(null);
   }, [projectPath]);
 
   useEffect(() => { void load(); }, [load]);
@@ -144,6 +182,28 @@ export default function PowerTreeEditor() {
   const tabs = tabItems(tree);
   const active = tabs[activeTab] || tabs[0];
   const tabPowers = powersOnTab(tree, activeTab);
+  const selected = selectedIndex != null && tree.items[selectedIndex]?.kind === 'power'
+    ? tree.items[selectedIndex] as PowerTreeNode
+    : null;
+
+  useEffect(() => {
+    const rel = (active?.background || tree.background || '').trim();
+    if (!rel || rel === 'images/menus/powers.png' || !projectPath || !window.electronAPI?.fileExists) {
+      setTabArt(null);
+      return;
+    }
+    let cancelled = false;
+    void resolveExistingPath({
+      projectPath,
+      relative: rel,
+      flarePath: getStoredFlarePath(),
+      fileExists: window.electronAPI.fileExists,
+      readFile: window.electronAPI.readFile,
+    }).then((abs) => {
+      if (!cancelled) setTabArt(abs ? `file://${abs}` : null);
+    });
+    return () => { cancelled = true; };
+  }, [projectPath, active?.background, tree.background]);
   const options = useMemo(() => {
     const known = new Map(powerOptions.map((item) => [item.id, item]));
     tree.items.forEach((item) => {
@@ -164,16 +224,25 @@ export default function PowerTreeEditor() {
     if (!item) return;
     update({ ...tree, items: tree.items.filter((_, i) => i !== item.index) });
     setActiveTab((current) => Math.max(0, current === index ? index - 1 : current > index ? current - 1 : current));
+    setSelectedIndex(null);
   };
 
   const addPower = (id = '') => {
-    const node = id ? updateNode(emptyPower(String(activeTab), '0,0'), { id }) : emptyPower(String(activeTab), '0,0');
+    const position = `${layout.tabArea.x},${layout.tabArea.y}`;
+    const node = id ? updateNode(emptyPower(String(activeTab), position), { id }) : emptyPower(String(activeTab), position);
+    const nextIndex = tree.items.length;
     update({ ...tree, items: [...tree.items, node] });
+    setSelectedIndex(nextIndex);
   };
 
   const removePower = (powerIndex: number) => {
     const drop = new Set([powerIndex, ...ownedUpgradeIndexes(tree, powerIndex)]);
     update({ ...tree, items: tree.items.filter((_, i) => !drop.has(i)) });
+    setSelectedIndex((current) => {
+      if (current == null) return null;
+      if (drop.has(current)) return null;
+      return current - [...drop].filter((index) => index < current).length;
+    });
   };
 
   return (
@@ -230,7 +299,7 @@ export default function PowerTreeEditor() {
             type="button"
             variant="ghost"
             aria-pressed={activeTab === i}
-            onClick={() => setActiveTab(i)}
+            onClick={() => { setActiveTab(i); setSelectedIndex((current) => (current != null && Number((tree.items[current] as PowerTreeNode).tab || 0) === i ? current : null)); }}
             className={`h-7 px-2 rounded border text-xs ${activeTab === i ? 'bg-orange-600 text-white border-orange-600 hover:bg-orange-600 hover:text-white' : 'border-border text-muted-foreground'}`}
           >
             {tab.title || `Tab ${i}`}
@@ -241,66 +310,122 @@ export default function PowerTreeEditor() {
         </Button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-3 space-y-3">
-        {!tabs.length ? (
-          <p className="text-xs text-muted-foreground">Add a tab to start this tree.</p>
-        ) : null}
-
-        {active ? (
-          <div className="flex flex-wrap items-end gap-2">
-            <div>
-              <HintLabel className="text-xs font-normal" hint="tab.title — label shown on this tab.">Tab title</HintLabel>
-              <Input
-                width="name"
-                className="h-7 text-xs"
-                value={active.title}
-                onChange={(e) => update(replaceItem(tree, active.index, updateTab(active, { title: e.target.value })))}
-              />
-            </div>
-            <div>
-              <HintLabel className="text-xs font-normal" hint="tab.background — optional image for this tab. If empty, the top-level background is used.">Tab background</HintLabel>
-              <Input
-                width="path"
-                className="h-7 text-xs"
-                value={active.background}
-                onChange={(e) => update(replaceItem(tree, active.index, updateTab(active, { background: e.target.value })))}
-              />
-            </div>
-            <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" onClick={() => removeTab(activeTab)}>
-              <Trash2 className="w-3 h-3 mr-1" />Remove tab
-            </Button>
-          </div>
-        ) : null}
-
-        {tabPowers.map((power) => {
-          const missing = power.id && powerIds.size ? unknownIds(power.id, powerIds) : [];
-          const upgradeIndexes = ownedUpgradeIndexes(tree, power.index);
-          return (
-            <div key={power.index} className="rounded-md border border-border/60 p-3 space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <div className="text-xs font-medium truncate">{power.id || 'Power'}</div>
-                <Button type="button" variant="ghost" size="icon" className="h-7 w-7" aria-label="Remove power" onClick={() => removePower(power.index)}>
-                  <Trash2 className="w-3 h-3" />
-                </Button>
+      <div className="flex-1 min-h-0 flex">
+        <div className="flex-1 min-w-0 min-h-0 p-3">
+          {tabs.length ? (
+            <PowerTreeCanvas
+              tree={tree}
+              tabIndex={activeTab}
+              layout={layout}
+              menuArt={menuArt}
+              tabArt={tabArt}
+              selectedIndex={selectedIndex}
+              onSelect={setSelectedIndex}
+              onMove={(index, position) => {
+                const item = tree.items[index];
+                if (item?.kind !== 'power') return;
+                update(replaceItem(tree, index, updateNode(item, { position })));
+              }}
+            />
+          ) : (
+            <p className="text-xs text-muted-foreground">Add a tab to start this tree.</p>
+          )}
+        </div>
+        <div className="w-[22rem] shrink-0 border-l border-border overflow-y-auto p-3 space-y-3">
+          {active ? (
+            <div className="flex flex-wrap items-end gap-2">
+              <div>
+                <HintLabel className="text-xs font-normal" hint="tab.title — label shown on this tab.">Tab title</HintLabel>
+                <Input
+                  width="name"
+                  className="h-7 text-xs"
+                  value={active.title}
+                  onChange={(e) => update(replaceItem(tree, active.index, updateTab(active, { title: e.target.value })))}
+                />
               </div>
-              {missing.length > 0 && (
-                <p className="text-[11px] text-amber-500">Unknown power id: {missing.join(', ')}</p>
-              )}
+              <div>
+                <HintLabel className="text-xs font-normal" hint="tab.background — optional image for this tab. If empty, the top-level background is used.">Tab background</HintLabel>
+                <Input
+                  width="path"
+                  className="h-7 text-xs"
+                  value={active.background}
+                  onChange={(e) => update(replaceItem(tree, active.index, updateTab(active, { background: e.target.value })))}
+                />
+              </div>
+              <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" onClick={() => removeTab(activeTab)}>
+                <Trash2 className="w-3 h-3 mr-1" />Remove tab
+              </Button>
+            </div>
+          ) : null}
+
+          {tabs.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-2">
+              <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" onClick={() => addPower()}>
+                <Plus className="w-3 h-3 mr-1" />Power
+              </Button>
+              <SearchablePalette
+                buttonLabel="Add from list"
+                placeholder="Search powers…"
+                entries={options.map((item) => ({
+                  id: item.id,
+                  label: item.name ? `${item.name} (${item.id})` : item.id,
+                  searchText: `${item.name} ${item.id}`,
+                }))}
+                onSelect={(id) => addPower(id)}
+              />
+            </div>
+          ) : null}
+
+          {tabPowers.length > 0 ? (
+            <div className="flex flex-wrap gap-1">
+              {tabPowers.map((power) => (
+                <Button
+                  key={power.index}
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className={`h-6 px-2 text-[11px] ${selectedIndex === power.index ? 'bg-orange-600 text-white hover:bg-orange-600 hover:text-white' : ''}`}
+                  onClick={() => setSelectedIndex(power.index)}
+                >
+                  {power.id || 'Power'}
+                </Button>
+              ))}
+            </div>
+          ) : null}
+
+          {selected ? (
+            <div className="rounded-md border border-border/60 p-3 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-xs font-medium truncate">{selected.id || 'Power'}</div>
+                <div className="flex items-center gap-1">
+                  {selected.id ? (
+                    <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setPowerTarget({ type: 'power', id: selected.id })}>
+                      Edit definition
+                    </Button>
+                  ) : null}
+                  <Button type="button" variant="ghost" size="icon" className="h-7 w-7" aria-label="Remove power" onClick={() => removePower(selectedIndex!)}>
+                    <Trash2 className="w-3 h-3" />
+                  </Button>
+                </div>
+              </div>
+              {selected.id && powerIds.size && unknownIds(selected.id, powerIds).length > 0 ? (
+                <p className="text-[11px] text-amber-500">Unknown power id: {unknownIds(selected.id, powerIds).join(', ')}</p>
+              ) : null}
               <PowerTreeNodeFields
-                node={power}
+                node={selected}
                 primaries={primaries}
                 powerOptions={options}
                 showPlacement
                 showUpgrades
-                upgradeIds={power.upgrades}
-                onChange={(next) => update(replaceItem(tree, power.index, next))}
-                onChangeUpgrades={(ids) => update(setPowerUpgrades(tree, power.index, ids))}
+                upgradeIds={selected.upgrades}
+                onChange={(next) => update(replaceItem(tree, selectedIndex!, next))}
+                onChangeUpgrades={(ids) => update(setPowerUpgrades(tree, selectedIndex!, ids))}
               />
-              {upgradeIndexes.length > 0 ? (
+              {ownedUpgradeIndexes(tree, selectedIndex!).length > 0 ? (
                 <details className="rounded border border-border/40 p-2">
-                  <summary className="text-xs cursor-pointer">Upgrade requirements ({upgradeIndexes.length})</summary>
+                  <summary className="text-xs cursor-pointer">Upgrade requirements ({ownedUpgradeIndexes(tree, selectedIndex!).length})</summary>
                   <div className="mt-2 space-y-3">
-                    {upgradeIndexes.map((index) => {
+                    {ownedUpgradeIndexes(tree, selectedIndex!).map((index) => {
                       const upgrade = tree.items[index] as PowerTreeNode;
                       return (
                         <div key={index} className="space-y-1">
@@ -318,27 +443,14 @@ export default function PowerTreeEditor() {
                 </details>
               ) : null}
             </div>
-          );
-        })}
-
-        {tabs.length > 0 ? (
-          <div className="flex items-center gap-2">
-            <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" onClick={() => addPower()}>
-              <Plus className="w-3 h-3 mr-1" />Power
-            </Button>
-            <SearchablePalette
-              buttonLabel="Add from list"
-              placeholder="Search powers…"
-              entries={options.map((item) => ({
-                id: item.id,
-                label: item.name ? `${item.name} (${item.id})` : item.id,
-                searchText: `${item.name} ${item.id}`,
-              }))}
-              onSelect={(id) => addPower(id)}
-            />
-          </div>
-        ) : null}
+          ) : tabs.length ? (
+            <p className="text-xs text-muted-foreground">Select a power on the canvas to edit it.</p>
+          ) : null}
+        </div>
       </div>
+      {powerTarget ? (
+        <PowerEditorWindow target={powerTarget} data={powerFiles} onClose={() => setPowerTarget(null)} onOpen={setPowerTarget} />
+      ) : null}
     </div>
   );
 }

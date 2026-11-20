@@ -206,9 +206,14 @@ export type MenuPanel = {
   pos: Rect;
   align: MenuAlign;
   background?: string;
+  tabArea?: Rect;
   /** Original file text, for merge. */
   text: string;
 };
+
+/** Fantasy Core menus/powers.txt when the project has no override. */
+export const DEFAULT_POWERS_MENU_POS: Rect = { x: 0, y: -35, w: 640, h: 832 };
+export const DEFAULT_POWERS_TAB_AREA: Rect = { x: 64, y: 60, w: 512, h: 672 };
 
 const HEADER_KEYS = new Set(['pos', 'align', 'background', 'soundfx_open', 'soundfx_close', 'enabled']);
 
@@ -216,6 +221,7 @@ export function parseMenuText(content: string, file = ''): MenuPanel {
   let pos = { x: 0, y: 0, w: 0, h: 0 };
   let align: MenuAlign = 'topleft';
   let background: string | undefined;
+  let tabArea: Rect | undefined;
   for (const raw of String(content || '').replace(/\r/g, '').split('\n')) {
     const line = raw.trim();
     if (!line || line.startsWith('#') || line.startsWith('[')) continue;
@@ -226,10 +232,32 @@ export function parseMenuText(content: string, file = ''): MenuPanel {
     if (key === 'pos') pos = parsePos(value);
     else if (key === 'align') align = parseAlignment(value);
     else if (key === 'background') background = value;
+    else if (key === 'tab_area') tabArea = parsePos(value);
   }
   const base = file.replace(/^.*\//, '').replace(/\.txt$/, '');
   const name = base.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) || 'Menu';
-  return { file, name, pos, align, background, text: String(content || '') };
+  return { file, name, pos, align, background, tabArea, text: String(content || '') };
+}
+
+export type PowersMenuLayout = { pos: Rect; tabArea: Rect; background?: string };
+
+/** Read menus/powers.txt, falling back to Fantasy Core pos/tab_area. */
+export function parsePowersMenuLayout(content: string): PowersMenuLayout {
+  const panel = parseMenuText(content, 'menus/powers.txt');
+  const pos = panel.pos.w > 0 && panel.pos.h > 0 ? panel.pos : DEFAULT_POWERS_MENU_POS;
+  const tabArea = panel.tabArea && panel.tabArea.w > 0 && panel.tabArea.h > 0 ? panel.tabArea : DEFAULT_POWERS_TAB_AREA;
+  return { pos, tabArea, background: panel.background };
+}
+
+/** Convert a power position (relative to menu pos) into a point inside tab_area. */
+export function menuToTabPoint(position: { x: number; y: number }, tabArea: Rect): { x: number; y: number } {
+  return { x: position.x - tabArea.x, y: position.y - tabArea.y };
+}
+
+/** Convert a point inside tab_area back to a menu-relative position string. */
+export function tabToMenuPosition(point: { x: number; y: number }, tabArea: Rect, snap = 0): string {
+  const snapValue = (n: number) => (snap > 0 ? Math.round(n / snap) * snap : Math.round(n));
+  return `${snapValue(point.x + tabArea.x)},${snapValue(point.y + tabArea.y)}`;
 }
 
 /** Rewrite only the pos= line; leave every other line untouched. */

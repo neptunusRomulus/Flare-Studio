@@ -261,7 +261,7 @@ export interface EditorProjectData {
   paintMode?: PaintMode;  // Current paint mode (ground/object)
 }
 
-import { COLLISION_LAYER_TYPE, GAME_SETTINGS_LAYER_TYPE, INTERNAL_TILESET_FILENAMES } from './tileMap/constants';
+import { COLLISION_LAYER_TYPE, GAME_SETTINGS_LAYER_TYPE, INTERNAL_TILESET_FILENAMES, WORLD_SETTINGS_LAYER_TYPE } from './tileMap/constants';
 
 export class TileMapEditor {
   public isStartingMap: boolean = false;
@@ -1087,8 +1087,32 @@ export class TileMapEditor {
     this.mapCanvas.tabIndex = 0;
   }
 
+  /** Make sure UI Settings and World Settings exist on maps saved before those layers existed. */
+  private ensureSettingsLayers(): void {
+    const ensure = (type: string, name: string) => {
+      const existing = this.tileLayers.find((layer) => layer.type === type);
+      if (existing) {
+        if (type === GAME_SETTINGS_LAYER_TYPE && existing.name === 'Game Settings') existing.name = name;
+        return;
+      }
+      const maxId = this.tileLayers.reduce((max, layer) => Math.max(max, layer.id), 0);
+      this.tileLayers.push({
+        id: maxId + 1,
+        name,
+        type,
+        data: new Array(this.mapWidth * this.mapHeight).fill(0),
+        visible: true,
+        transparency: 1.0,
+      });
+      this.nextLayerId = Math.max(this.nextLayerId, maxId + 2);
+    };
+    ensure(GAME_SETTINGS_LAYER_TYPE, 'UI Settings');
+    ensure(WORLD_SETTINGS_LAYER_TYPE, 'World Settings');
+  }
+
   private createDefaultLayers(): void {
-      // Create all 9 layers in the correct order (Rules -> Statuses -> Actions -> Items -> NPC -> Enemy -> Event -> Collision -> Object -> Background -> Game Settings)
+
+      // Create default layers (Rules -> Statuses -> Actions -> Items -> NPC -> Enemy -> Event -> Collision -> Object -> Background -> UI Settings -> World Settings)
       this.tileLayers = [
         {
           id: 1,
@@ -1180,8 +1204,16 @@ export class TileMapEditor {
         },
         {
           id: 11,
-          name: 'Game Settings',
-          type: 'gameSettings',
+          name: 'UI Settings',
+          type: GAME_SETTINGS_LAYER_TYPE,
+          data: new Array(this.mapWidth * this.mapHeight).fill(0),
+          visible: true,
+          transparency: 1.0
+        },
+        {
+          id: 13,
+          name: 'World Settings',
+          type: WORLD_SETTINGS_LAYER_TYPE,
           data: new Array(this.mapWidth * this.mapHeight).fill(0),
           visible: true,
           transparency: 1.0
@@ -1190,7 +1222,7 @@ export class TileMapEditor {
 
       // Set the background layer as active by default
       this.activeLayerId = 8;
-      this.nextLayerId = 13;
+      this.nextLayerId = 14;
       this.sortLayersByPriority();
     // Initialize layer tabs for background and object with one tab each
     try {
@@ -6882,6 +6914,8 @@ export class TileMapEditor {
       } else {
         this.createDefaultLayers();
       }
+
+      this.ensureSettingsLayers();
 
       // Restore per-cell slot references
       try {

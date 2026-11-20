@@ -65,7 +65,7 @@ export function tabTargetFor(e: TabKey, activeType: string | null | undefined, t
   return cycleInGroup(g, activeType, false);
 }
 
-/** Shift+Tab cycles main layers Map → Entities → Content → Game Settings → Map (skipping unavailable ones). */
+/** Shift+Tab cycles main layers Map → Entities → Content → UI Settings → World Settings → Map (skipping unavailable ones). */
 export function mainTabTargetFor(e: TabKey, activeType: string | null | undefined, target: TabTarget, available: string[]): string | null {
   if (!e.shiftKey || !tabAllowed(e, target) || available.length === 0) return null;
   const cur = mainLayerOf(activeType);
@@ -101,24 +101,31 @@ export function normalizeTileRect(a: { x: number; y: number }, b: { x: number; y
   return { x: x1, y: y1, width: x2 - x1 + 1, height: y2 - y1 + 1 };
 }
 
+/** Singleton settings tabs on the right rail (not part of a target group). Internal ids stay stable. */
+export const SETTINGS_RAIL: Array<{ id: string; label: string; help: string }> = [
+  { id: 'gameSettings', label: 'UI Settings', help: 'Shift+Tab: switch main layers.' },
+  { id: 'worldSettings', label: 'World Settings', help: 'Shift+Tab: switch main layers.' },
+];
+
 /** Main layers shown at the top of the right dock. */
 export const MAIN_LAYERS: Array<{ id: string; label: string }> = [
   { id: 'map', label: 'Map' },
   { id: 'entities', label: 'Entities' },
   { id: 'content', label: 'Content' },
-  { id: 'gameSettings', label: 'Game Settings' },
+  { id: 'gameSettings', label: 'UI Settings' },
+  { id: 'worldSettings', label: 'World Settings' },
 ];
 
 /** Main layer of a real layer type (unknown non-group types count as Map, like the old sidebar grouping). */
 export function mainLayerOf(type: string | null | undefined): string | null {
   if (!type) return null;
-  if (type === 'gameSettings') return 'gameSettings';
+  if (SETTINGS_RAIL.some((s) => s.id === type)) return type;
   return groupOfType(type)?.id ?? 'map';
 }
 
 /** Real layer id to activate for a main layer: the group's last-used target, else its first existing target. */
 export function mainLayerTargetId(main: string, layers: Array<{ id: number; type: string }>): number | null {
-  if (main === 'gameSettings') return layers.find(l => l.type === 'gameSettings')?.id ?? null;
+  if (SETTINGS_RAIL.some((s) => s.id === main)) return layers.find(l => l.type === main)?.id ?? null;
   const g = TARGET_GROUPS.find(x => x.id === main);
   if (!g) return null;
   const want = lastGroupTarget(g);
@@ -140,13 +147,15 @@ export function railGroups(layers: Array<{ type: string }>): Array<{
       .map((t) => ({ type: t, label: g.labels[t] }));
     if (targets.length) out.push({ id: g.id, label: g.label, help: g.help, targets });
   }
-  if (layers.some((l) => l.type === 'gameSettings')) {
-    out.push({
-      id: 'gameSettings',
-      label: 'Game Settings',
-      help: 'Shift+Tab: switch main layers.',
-      targets: [{ type: 'gameSettings', label: 'Game Settings' }],
-    });
+  for (const setting of SETTINGS_RAIL) {
+    if (layers.some((l) => l.type === setting.id)) {
+      out.push({
+        id: setting.id,
+        label: setting.label,
+        help: setting.help,
+        targets: [{ type: setting.id, label: setting.label }],
+      });
+    }
   }
   return out;
 }

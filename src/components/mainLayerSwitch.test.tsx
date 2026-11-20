@@ -7,18 +7,19 @@ import MapTargetSwitch, { visibilityTooltip } from './MapTargetSwitch';
 import type { TileLayer } from '@/types';
 
 const L = (id: number, type: string, visible = true, transparency = 0) => ({ id, type, name: type, data: [], visible, transparency }) as unknown as TileLayer;
-const layers = [L(1, 'background'), L(2, 'object'), L(3, 'collision'), L(4, 'npc'), L(5, 'enemy'), L(6, 'event', false, 0.3), L(7, 'items'), L(8, 'status'), L(9, 'rules'), L(10, 'gameSettings')];
+const layers = [L(1, 'background'), L(2, 'object'), L(3, 'collision'), L(4, 'npc'), L(5, 'enemy'), L(6, 'event', false, 0.3), L(7, 'items'), L(8, 'status'), L(9, 'rules'), L(10, 'gameSettings'), L(11, 'worldSettings')];
 const noop = () => {};
 
 describe('main layer switch', () => {
-  it('orders Map | Entities | Content | Game Settings', () => {
-    expect(MAIN_LAYERS.map(m => m.label)).toEqual(['Map', 'Entities', 'Content', 'Game Settings']);
+  it('orders Map | Entities | Content | UI Settings | World Settings', () => {
+    expect(MAIN_LAYERS.map(m => m.label)).toEqual(['Map', 'Entities', 'Content', 'UI Settings', 'World Settings']);
   });
   it('maps layer types to main layers', () => {
     expect(mainLayerOf('collision')).toBe('map');
     expect(mainLayerOf('event')).toBe('entities');
     expect(mainLayerOf('rules')).toBe('content');
     expect(mainLayerOf('gameSettings')).toBe('gameSettings');
+    expect(mainLayerOf('worldSettings')).toBe('worldSettings');
     expect(mainLayerOf(null)).toBeNull();
   });
   it('activates the last-used target of a group', () => {
@@ -26,11 +27,12 @@ describe('main layer switch', () => {
     rememberGroupTarget(ENTITY_GROUP, 'enemy');
     expect(mainLayerTargetId('entities', layers)).toBe(5);
     expect(mainLayerTargetId('gameSettings', layers)).toBe(10);
+    expect(mainLayerTargetId('worldSettings', layers)).toBe(11);
     expect(mainLayerTargetId('gameSettings', layers.slice(0, 3))).toBeNull();
   });
-  it('renders four square buttons with the active one pressed', () => {
+  it('renders five square buttons with the active one pressed', () => {
     const html = renderToStaticMarkup(<MainLayerSwitch layers={layers} activeLayer={layers[7]} onSelectLayer={noop} />);
-    expect((html.match(/aria-pressed/g) || []).length).toBe(4);
+    expect((html.match(/aria-pressed/g) || []).length).toBe(5);
     expect(html).toContain('aria-label="Content" aria-pressed="true"');
   });
 });

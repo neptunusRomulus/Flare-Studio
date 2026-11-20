@@ -6,7 +6,7 @@ import { mainLayerOf, mainLayerTargetId, mainTabTargetFor, MAIN_LAYERS } from '@
 
 type Props = { layers: TileLayer[]; activeLayer: TileLayer | null; onSelectLayer: (id: number) => void };
 
-/** Map | Entities | Content | Game Settings switch at the top of the right dock. */
+/** Map | Entities | Content | UI Settings | World Settings switch at the top of the right dock. */
 const MainLayerSwitch: React.FC<Props> = ({ layers, activeLayer, onSelectLayer }) => {
   const available = MAIN_LAYERS.filter(m => mainLayerTargetId(m.id, layers) !== null);
   const select = (key: string) => {

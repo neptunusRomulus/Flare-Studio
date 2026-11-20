@@ -10,7 +10,7 @@ function Probe({ deps }: { deps: Record<string, unknown> }) {
   return <pre>{JSON.stringify(sb.gameSettings ?? null)}</pre>;
 }
 
-describe('Game Settings dock panel', () => {
+describe('UI Settings dock panel', () => {
   it('keeps the Game Settings flag through sidebar assembly', () => {
     const html = renderToStaticMarkup(<Probe deps={{ gameSettings: { isGameSettingsLayer: true } }} />);
     expect(html).toContain('isGameSettingsLayer&quot;:true');
@@ -22,18 +22,14 @@ describe('Game Settings dock panel', () => {
     expect(html).not.toContain('No tileset loaded');
   });
 
-  it('mounts the World section with the previously unwired studio editors', () => {
+  it('is labeled UI Settings and no longer hosts the World editors', () => {
     const html = renderToStaticMarkup(<AppProvider value={{ currentProjectPath: null }}><SidebarGameSettingsArea /></AppProvider>);
-    expect(html).toContain('World');
-    expect(html).toContain('Cutscene');
-    expect(html).toContain('Language catalog');
-    expect(html).toContain('Parallax');
-    expect(html).toContain('Fog of war');
-    expect(html).toContain('Procedural rules');
-    expect(html).toContain('Write cutscene');
-    expect(html).toContain('Write catalog');
-    expect(html).toContain('Write parallax');
-    expect(html).toContain('Write fog mask');
-    expect(html).toContain('Write rules');
+    expect(html).toContain('UI Settings');
+    expect(html).not.toContain('Game Settings');
+    expect(html).not.toContain('Cutscene');
+    expect(html).not.toContain('Language catalog');
+    expect(html).not.toContain('Parallax');
+    expect(html).not.toContain('Fog of war');
+    expect(html).not.toContain('Procedural rules');
   });
 });

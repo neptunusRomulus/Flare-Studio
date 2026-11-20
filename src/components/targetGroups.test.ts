@@ -16,31 +16,33 @@ describe('target groups', () => {
     expect(tabTargetFor({ key: 'Tab' }, 'object', div)).toBe('collision');
     expect(tabTargetFor({ key: 'Tab', shiftKey: true }, 'npc', div)).toBeNull();
     expect(tabTargetFor({ key: 'Tab' }, 'gameSettings', div)).toBeNull();
+    expect(tabTargetFor({ key: 'Tab' }, 'worldSettings', div)).toBeNull();
     expect(tabTargetFor({ key: 'Tab' }, 'rules', div)).toBe('items');
     expect(tabTargetFor({ key: 'Tab' }, 'items', div)).toBe('books');
     expect(tabTargetFor({ key: 'Tab' }, 'npc', { tagName: 'TEXTAREA' })).toBeNull();
     expect(tabTargetFor({ key: 'Tab' }, 'npc', { tagName: 'DIV', closest: () => ({}) })).toBeNull();
   });
-  it('Shift+Tab cycles main layers Map -> Entities -> Content -> Game Settings -> Map', () => {
-    const all = ['map', 'entities', 'content', 'gameSettings'];
+  it('Shift+Tab cycles main layers Map -> Entities -> Content -> UI Settings -> World Settings -> Map', () => {
+    const all = ['map', 'entities', 'content', 'gameSettings', 'worldSettings'];
     const sh = { key: 'Tab', shiftKey: true };
     expect(mainTabTargetFor(sh, 'collision', div, all)).toBe('entities');
     expect(mainTabTargetFor(sh, 'event', div, all)).toBe('content');
     expect(mainTabTargetFor(sh, 'status', div, all)).toBe('gameSettings');
-    expect(mainTabTargetFor(sh, 'gameSettings', div, all)).toBe('map');
+    expect(mainTabTargetFor(sh, 'gameSettings', div, all)).toBe('worldSettings');
+    expect(mainTabTargetFor(sh, 'worldSettings', div, all)).toBe('map');
     expect(mainTabTargetFor(sh, 'items', div, ['map', 'entities', 'content'])).toBe('map');
     expect(mainTabTargetFor({ key: 'Tab' }, 'npc', div, all)).toBeNull();
     expect(mainTabTargetFor(sh, 'npc', { tagName: 'INPUT' }, all)).toBeNull();
     expect(mainTabTargetFor(sh, 'npc', { tagName: 'DIV', closest: () => ({}) }, all)).toBeNull();
     expect(MAP_GROUP.help).toBe('Tab: switch Ground, Object and Collision. Shift+Tab: switch main layers.');
   });
-  it('sidebar: [Map] | [Entities] | [Items, Statuses, Quests] | [Game Settings]', () => {
-    const types = ['gameSettings', 'rules', 'event', 'status', 'items', 'enemy', 'npc', 'object', 'collision', 'background'];
+  it('sidebar: [Map] | [Entities] | [Items, Statuses, Quests] | [UI Settings] | [World Settings]', () => {
+    const types = ['worldSettings', 'gameSettings', 'rules', 'event', 'status', 'items', 'enemy', 'npc', 'object', 'collision', 'background'];
     const entries = collapseTargetGroups(groupLayers(types.map((type, id) => ({ id, type }))));
     const names = entries.map(e => e.kind === 'group' ? e.group.label : e.layer.type);
-    expect(names).toEqual(['Map', 'Entities', 'Content', 'gameSettings']);
+    expect(names).toEqual(['Map', 'Entities', 'Content', 'gameSettings', 'worldSettings']);
     const groupIdx = entries.map(e => layerGroupIndex(e.kind === 'group' ? e.targets[0].type : e.layer.type));
-    expect(groupIdx).toEqual([0, 1, 2, 3]);
+    expect(groupIdx).toEqual([0, 1, 2, 3, 4]);
     expect(groupOfType('event')).toBe(ENTITY_GROUP);
     expect(groupOfType('collision')).toBe(MAP_GROUP);
   });
@@ -58,7 +60,7 @@ describe('target groups', () => {
     expect(normalizeTileRect({ x: 4, y: 4 }, { x: 4, y: 4 }, 20, 20)).toEqual({ x: 4, y: 4, width: 1, height: 1 });
     expect(normalizeTileRect({ x: -3, y: 2 }, { x: 25, y: 2 }, 20, 10)).toEqual({ x: 0, y: 2, width: 20, height: 1 });
   });
-  it('rail groups only list targets that exist, in Map / Entities / Content / Game Settings order', () => {
+  it('rail groups only list targets that exist, in Map / Entities / Content / UI Settings / World Settings order', () => {
     const groups = railGroups([
       { type: 'background' },
       { type: 'collision' },
@@ -66,8 +68,11 @@ describe('target groups', () => {
       { type: 'event' },
       { type: 'items' },
       { type: 'gameSettings' },
+      { type: 'worldSettings' },
     ]);
-    expect(groups.map((g) => g.id)).toEqual(['map', 'entities', 'content', 'gameSettings']);
+    expect(groups.map((g) => g.id)).toEqual(['map', 'entities', 'content', 'gameSettings', 'worldSettings']);
+    expect(groups[3].label).toBe('UI Settings');
+    expect(groups[4].label).toBe('World Settings');
     expect(groups[0].targets.map((t) => t.type)).toEqual(['background', 'collision']);
     expect(groups[1].targets.map((t) => t.type)).toEqual(['npc', 'event']);
     expect(groups[2].targets.map((t) => t.type)).toEqual(['items']);
@@ -84,6 +89,7 @@ describe('target groups', () => {
       { type: 'items' },
       { type: 'rules' },
       { type: 'gameSettings' },
+      { type: 'worldSettings' },
     ]);
     expect(targets.map((t) => t.type)).toEqual(['background', 'object', 'collision', 'npc', 'enemy', 'event']);
   });

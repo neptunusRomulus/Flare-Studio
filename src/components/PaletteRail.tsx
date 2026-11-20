@@ -37,7 +37,7 @@ const PaletteRail: React.FC<Props> = ({
   const visItems = visibility ? visibilityTargets(layers) : [];
   const activeType = activeLayer?.type ?? '';
   const activeHelp = groupOfType(activeType)?.help
-    ?? (activeType === 'gameSettings' ? 'Shift+Tab: switch main layers.' : 'Tab: switch targets. Shift+Tab: switch main layers.');
+    ?? (activeType === 'gameSettings' || activeType === 'worldSettings' ? 'Shift+Tab: switch main layers.' : 'Tab: switch targets. Shift+Tab: switch main layers.');
 
   const selectTarget = (type: string) => {
     const layer = layers.find((item) => item.type === type);

@@ -10,6 +10,7 @@ import WindowControlBar from '@/components/WindowControlBar';
 import DockFooter from '@/components/DockFooter';
 import AppControls from '@/components/AppControls';
 import SidebarGameSettingsArea from '@/components/SidebarGameSettingsArea';
+import SidebarWorldSettingsArea from '@/components/SidebarWorldSettingsArea';
 import PaletteDock from '@/components/PaletteDock';
 import { shouldShowPanels, shouldShowRightSidebar } from '@/hooks/preMapEditor';
 import EngineSettingsDialog from '@/components/EngineSettingsDialog';
@@ -367,6 +368,8 @@ export default function AppMain() {
             />
           ) : tileset.activeLayer?.type === 'gameSettings' ? (
             <SidebarGameSettingsArea />
+          ) : tileset.activeLayer?.type === 'worldSettings' ? (
+            <SidebarWorldSettingsArea />
           ) : !tileset.activeLayer ? null : undefined}
         >
           {(overlay) => (

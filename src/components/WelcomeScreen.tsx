@@ -343,7 +343,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
 
             <ProjectStartToggle value={projectStart} onChange={setProjectStart} templateAvailable={templateAvailable} />
 
-            <p className="text-xs text-muted-foreground">Tiles are 192×96 isometric and the game builds on fantasycore. You can change the tile size later in Game Settings.</p>
+            <p className="text-xs text-muted-foreground">Tiles are 192×96 isometric and the game builds on fantasycore. You can change the tile size later in UI Settings.</p>
 
             <div>
               <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">

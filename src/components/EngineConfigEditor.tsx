@@ -344,10 +344,8 @@ export function EngineConfigEditor({ initialFile }: { initialFile?: string } = {
               {activeTab === 'hero_layers.txt' && <HeroLayersForm text={fileContents[activeTab] || ''} onChange={(text) => updateFileText(activeTab, text)} />}
               {activeTab === 'classes.txt' && (
                 <ClassHeroForm
-                  fileName={activeTab}
-                  sections={parsedData[activeTab] || []}
-                  onFieldChange={handleFieldChange}
-                  onSetNamedField={handleSetNamedField}
+                  text={fileContents[activeTab] || ''}
+                  onChange={(text) => updateFileText(activeTab, text)}
                   itemIds={itemIds}
                   powerIds={powerIds}
                 />
@@ -362,7 +360,7 @@ export function EngineConfigEditor({ initialFile }: { initialFile?: string } = {
                 onAddSection={addSection}
                 onSave={() => saveConfig(activeTab)}
                 hasUnsavedChanges={hasUnsavedChanges[activeTab]}
-                hideGeneric={['xp_table.txt', 'hero_options.txt', 'hero_layers.txt'].includes(activeTab)}
+                hideGeneric={['xp_table.txt', 'hero_options.txt', 'hero_layers.txt', 'classes.txt'].includes(activeTab)}
               />
             </div>
           )}

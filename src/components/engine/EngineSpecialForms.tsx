@@ -7,6 +7,12 @@ import {
   serializeHeroLayers, serializeHeroOptions, serializeXpTable, unknownIds, upsertLootSettings,
   type HeroLayer, type HeroOption, type XpRow,
 } from '@/editor/engineForms';
+import {
+  emptyHeroClass,
+  parseClassesFile,
+  serializeClassesFile,
+  type HeroClassEntry,
+} from '@/editor/heroClasses';
 
 type TextProps = { text: string; onChange: (text: string) => void };
 
@@ -127,68 +133,121 @@ export function HeroLayersForm({ text, onChange }: TextProps) {
   );
 }
 
-const CLASS_FIELDS: Array<{ key: string; label: string; tip: string; kind?: 'item' | 'power' | 'power-bar' }> = [
-  { key: 'name', label: 'Name', tip: 'name — must be first in the file' },
-  { key: 'description', label: 'Description', tip: 'description' },
-  { key: 'equipment', label: 'Starting equipment', tip: 'equipment — comma-separated item ids', kind: 'item' },
-  { key: 'equipment_set', label: 'Starting set', tip: 'equipment_set — item ids in a set', kind: 'item' },
-  { key: 'carried', label: 'Carried items', tip: 'carried — item ids in inventory', kind: 'item' },
-  { key: 'powers', label: 'Starting powers', tip: 'powers — power ids the hero knows', kind: 'power' },
-  { key: 'actionbar', label: 'Action bar', tip: 'actionbar — 12 slots; 0 is empty', kind: 'power-bar' },
-  { key: 'default_power_tab', label: 'Default power tab', tip: 'default_power_tab — power tree tab index' },
-  { key: 'power_tree', label: 'Power tree', tip: 'power_tree — path to a powers/trees/*.txt file. If empty, Flare loads powers/trees/default.txt.' },
+
+const CLASS_FIELD_META: Array<{ key: keyof HeroClassEntry['scalars']; tip: string; width: 'name' | 'path' | 'num' | 'id'; kind?: 'item' | 'power' | 'power-bar' }> = [
+  { key: 'name', tip: 'Displayed name of the class. Must be first in the block; the engine uses it as the class id.', width: 'name' },
+  { key: 'description', tip: 'A description of this class.', width: 'path' },
+  { key: 'currency', tip: 'Starting currency for this class.', width: 'num' },
+  { key: 'equipment', tip: 'Comma-separated item ids that are equipped at the start.', width: 'path', kind: 'item' },
+  { key: 'carried', tip: 'Comma-separated item ids placed in inventory at the start.', width: 'path', kind: 'item' },
+  { key: 'powers', tip: 'Comma-separated power ids unlocked at the start.', width: 'path', kind: 'power' },
+  { key: 'actionbar', tip: 'Power ids for the action bar slots. 0 is an empty slot.', width: 'path', kind: 'power-bar' },
+  { key: 'campaign', tip: 'Comma-separated campaign statuses set when starting this class.', width: 'path' },
+  { key: 'power_tree', tip: 'Path to a powers/trees/*.txt file. If empty, Flare loads powers/trees/default.txt.', width: 'path' },
+  { key: 'hero_options', tip: 'Comma-separated indices of hero_options this class can use.', width: 'path' },
+  { key: 'default_power_tab', tip: 'Index of the tab to open in the Powers menu.', width: 'num' },
 ];
 
-type ClassSection = { type: string; fields: Array<{ key: string; value: string; comment?: string }> };
-
 export function ClassHeroForm({
-  sections, onFieldChange, onSetNamedField, fileName, itemIds, powerIds,
+  text,
+  onChange,
+  itemIds,
+  powerIds,
 }: {
-  sections: ClassSection[];
-  fileName: string;
-  onFieldChange: (fileName: string, sectionIndex: number, fieldIndex: number, key: string, value: string) => void;
-  onSetNamedField?: (fileName: string, sectionIndex: number, key: string, value: string) => void;
-  itemIds: Set<string>;
-  powerIds: Set<string>;
+  text: string;
+  onChange: (text: string) => void;
+  itemIds?: Set<string>;
+  powerIds?: Set<string>;
 }) {
+  const file = parseClassesFile(text);
+  const write = (classes: HeroClassEntry[]) => onChange(serializeClassesFile({ header: file.header, classes }, text));
+  const setClass = (index: number, next: HeroClassEntry) => write(file.classes.map((entry, i) => (i === index ? next : entry)));
+  const setScalar = (index: number, key: keyof HeroClassEntry['scalars'], value: string) => {
+    const entry = file.classes[index];
+    setClass(index, { ...entry, scalars: { ...entry.scalars, [key]: value } });
+  };
+
   return (
     <div className="space-y-4">
-      <FieldHint hint="Starting gear, powers and action bar for each class. Unknown item or power ids are flagged.">
-        <div className="text-xs font-medium">Classes</div>
-      </FieldHint>
-      {sections.map((section, sectionIndex) => {
-        if (section.type && section.type !== 'class') return null;
-        const valueOf = (key: string) => section.fields.find((f) => f.key === key)?.value || '';
-        const setValue = (key: string, value: string) => {
-          if (onSetNamedField) {
-            onSetNamedField(fileName, sectionIndex, key, value);
-            return;
-          }
-          const fieldIndex = section.fields.findIndex((f) => f.key === key);
-          if (fieldIndex >= 0) onFieldChange(fileName, sectionIndex, fieldIndex, 'value', value);
-        };
-        return (
-          <div key={sectionIndex} className="border border-border/50 rounded-md p-3 space-y-2">
-            <div className="text-sm font-medium">{valueOf('name') || 'Class'}</div>
-            {CLASS_FIELDS.map((field) => {
-              const value = valueOf(field.key);
-              const known = field.kind === 'item' ? itemIds : field.kind === 'power' || field.kind === 'power-bar' ? powerIds : null;
-              const missing = known && known.size ? unknownIds(value, known, { allowZero: field.kind === 'power-bar' }) : [];
-              if (!value && !['name', 'equipment', 'powers', 'actionbar', 'power_tree'].includes(field.key) && section.fields.every((f) => f.key !== field.key)) return null;
-              return (
-                <div key={field.key} className="space-y-0.5">
-                  <Field label={field.label} tip={field.tip}>
-                    <Input className="h-7 text-xs" width={field.key === 'power_tree' ? 'path' : field.key === 'default_power_tab' ? 'num' : 'name'} value={value} onChange={(e) => setValue(field.key, e.target.value)} disabled={section.fields.every((f) => f.key !== field.key) && field.key !== 'name' && field.key !== 'power_tree'} />
-                  </Field>
-                  {missing.length > 0 && (
-                    <p className="text-[11px] text-amber-500 pl-[9rem]">Unknown {field.kind === 'item' ? 'item' : 'power'} id: {missing.join(', ')}</p>
-                  )}
-                </div>
-              );
-            })}
+      <div className="flex items-center justify-between gap-2">
+        <FieldHint hint="Starting gear, powers, primaries and the power tree for each [class] in engine/classes.txt. Empty keys are not written. Comments above the first class are kept.">
+          <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Classes</div>
+        </FieldHint>
+        <Button type="button" size="sm" variant="outline" onClick={() => write([...file.classes, emptyHeroClass()])}>
+          <Plus className="w-3 h-3 mr-1" />
+          Add class
+        </Button>
+      </div>
+      {file.classes.length === 0 ? (
+        <p className="text-xs text-muted-foreground">No classes yet. Add one, or save after loading a mod fallback.</p>
+      ) : file.classes.map((entry, index) => (
+        <div key={index} className="rounded-md border border-border p-3 space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-sm font-medium">{entry.scalars.name || 'New class'}</div>
+            <Button type="button" size="sm" variant="outline" onClick={() => write(file.classes.filter((_, i) => i !== index))}>
+              <Trash2 className="w-3 h-3 mr-1" />
+              Remove
+            </Button>
           </div>
-        );
-      })}
+          {CLASS_FIELD_META.map((field) => {
+            const value = entry.scalars[field.key];
+            const known = field.kind === 'item' ? itemIds : field.kind === 'power' || field.kind === 'power-bar' ? powerIds : undefined;
+            const missing = known && known.size ? unknownIds(value, known, { allowZero: field.kind === 'power-bar' }) : [];
+            return (
+              <div key={field.key} className="space-y-0.5">
+                <Field label={field.key} tip={field.tip}>
+                  <Input className="h-7 text-xs" width={field.width} value={value} onChange={(event) => setScalar(index, field.key, event.target.value)} />
+                </Field>
+                {missing.length > 0 ? (
+                  <p className="text-[11px] text-amber-500 pl-[9rem]">Unknown {field.kind === 'item' ? 'item' : 'power'} id: {missing.join(', ')}</p>
+                ) : null}
+              </div>
+            );
+          })}
+          <div className="space-y-1">
+            <div className="flex items-center justify-between gap-2">
+              <HintLabel className="text-xs font-normal" hint="primary=stat,value — starting points in a primary stat from engine/primary_stats.txt.">primary</HintLabel>
+              <Button type="button" size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setClass(index, { ...entry, primaries: [...entry.primaries, { stat: '', value: '' }] })}>
+                <Plus className="w-3 h-3 mr-1" />Add
+              </Button>
+            </div>
+            {entry.primaries.map((primary, primaryIndex) => (
+              <div key={primaryIndex} className="flex flex-wrap items-center gap-2">
+                <Input aria-label={`Class ${index + 1} primary stat ${primaryIndex + 1}`} width="id" className="h-7 text-xs" value={primary.stat} onChange={(event) => {
+                  const primaries = entry.primaries.map((row, i) => (i === primaryIndex ? { ...row, stat: event.target.value } : row));
+                  setClass(index, { ...entry, primaries });
+                }} />
+                <Input aria-label={`Class ${index + 1} primary value ${primaryIndex + 1}`} width="num" className="h-7 text-xs" value={primary.value} onChange={(event) => {
+                  const primaries = entry.primaries.map((row, i) => (i === primaryIndex ? { ...row, value: event.target.value } : row));
+                  setClass(index, { ...entry, primaries });
+                }} />
+                <Button type="button" size="sm" variant="outline" onClick={() => setClass(index, { ...entry, primaries: entry.primaries.filter((_, i) => i !== primaryIndex) })}>Remove</Button>
+              </div>
+            ))}
+          </div>
+          <div className="space-y-1">
+            <div className="flex items-center justify-between gap-2">
+              <HintLabel className="text-xs font-normal" hint="equipment_set=set_id,item ids — starting items for one equipment set. The set id must be greater than 0.">equipment_set</HintLabel>
+              <Button type="button" size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setClass(index, { ...entry, equipment_sets: [...entry.equipment_sets, { setId: '', items: '' }] })}>
+                <Plus className="w-3 h-3 mr-1" />Add
+              </Button>
+            </div>
+            {entry.equipment_sets.map((set, setIndex) => (
+              <div key={setIndex} className="flex flex-wrap items-center gap-2">
+                <Input aria-label={`Class ${index + 1} equipment set id ${setIndex + 1}`} width="num" className="h-7 text-xs" value={set.setId} onChange={(event) => {
+                  const equipment_sets = entry.equipment_sets.map((row, i) => (i === setIndex ? { ...row, setId: event.target.value } : row));
+                  setClass(index, { ...entry, equipment_sets });
+                }} />
+                <Input aria-label={`Class ${index + 1} equipment set items ${setIndex + 1}`} width="path" className="h-7 text-xs" value={set.items} onChange={(event) => {
+                  const equipment_sets = entry.equipment_sets.map((row, i) => (i === setIndex ? { ...row, items: event.target.value } : row));
+                  setClass(index, { ...entry, equipment_sets });
+                }} />
+                <Button type="button" size="sm" variant="outline" onClick={() => setClass(index, { ...entry, equipment_sets: entry.equipment_sets.filter((_, i) => i !== setIndex) })}>Remove</Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

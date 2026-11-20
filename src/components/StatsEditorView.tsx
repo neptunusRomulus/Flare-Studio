@@ -7,7 +7,7 @@ import { FieldHint, HintLabel } from '@/components/ui/field-hint';
 import { Switch } from '@/components/ui/switch';
 import { toast } from '@/hooks/use-toast';
 import { getStoredFlarePath } from '@/flare/flarePathStore';
-import { writeProjectFiles } from '@/editor/projectFiles';
+import { loadProjectTextMap, writeProjectFiles } from '@/editor/projectFiles';
 import { loadEngineFileWithFallback } from '@/editor/engineFileFallback';
 import {
   CORE_STATS,
@@ -35,8 +35,9 @@ import {
   type PrimaryStat,
   type ResourceStat,
 } from '@/editor/statsTitles';
-import { COMBAT_PATH, XP_TABLE_PATH } from '@/editor/engineForms';
-import { XpTableForm } from '@/components/engine/EngineSpecialForms';
+import { COMBAT_PATH, XP_TABLE_PATH, collectSectionIds } from '@/editor/engineForms';
+import { CLASSES_PATH } from '@/editor/heroClasses';
+import { ClassHeroForm, XpTableForm } from '@/components/engine/EngineSpecialForms';
 import { CombatSettingsForm, DamageTypesForm } from '@/components/engine/CombatAndDamageForms';
 
 type Props = { projectPath?: string | null };
@@ -56,7 +57,10 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
   const [combatText, setCombatText] = useState('');
   const [xpText, setXpText] = useState('');
   const [damageSourceText, setDamageSourceText] = useState('');
-  const [pane, setPane] = useState<'stats' | 'combat' | 'damage' | 'xp'>('stats');
+  const [pane, setPane] = useState<'stats' | 'combat' | 'damage' | 'xp' | 'classes'>('stats');
+  const [classesText, setClassesText] = useState('');
+  const [itemIds, setItemIds] = useState<Set<string>>(new Set());
+  const [powerIds, setPowerIds] = useState<Set<string>>(new Set());
   const [addOpen, setAddOpen] = useState(false);
   const [addId, setAddId] = useState('');
   const [addName, setAddName] = useState('');
@@ -74,19 +78,23 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
       setCombatText('');
       setXpText('');
       setDamageSourceText('');
+      setClassesText('');
+      setItemIds(new Set());
+      setPowerIds(new Set());
       setSourceKind('empty');
       setDirty(false);
       return;
     }
     const fs = { readFile: window.electronAPI.readFile };
     const flarePath = getStoredFlarePath();
-    const [primaryFile, statsFile, resourceFile, damageFile, combatFile, xpFile] = await Promise.all([
+    const [primaryFile, statsFile, resourceFile, damageFile, combatFile, xpFile, classesFile] = await Promise.all([
       loadEngineFileWithFallback({ projectPath, relative: PRIMARY_STATS_PATH, flarePath, fs }),
       loadEngineFileWithFallback({ projectPath, relative: HERO_STATS_PATH, flarePath, fs }),
       loadEngineFileWithFallback({ projectPath, relative: RESOURCE_STATS_PATH, flarePath, fs }),
       loadEngineFileWithFallback({ projectPath, relative: DAMAGE_TYPES_PATH, flarePath, fs }),
       loadEngineFileWithFallback({ projectPath, relative: COMBAT_PATH, flarePath, fs }),
       loadEngineFileWithFallback({ projectPath, relative: XP_TABLE_PATH, flarePath, fs }),
+      loadEngineFileWithFallback({ projectPath, relative: CLASSES_PATH, flarePath, fs }),
     ]);
     const parsedPrimaries = parsePrimaryStats(primaryFile.text);
     setPrimaries(parsedPrimaries.length ? parsedPrimaries : DEFAULT_PRIMARY_STATS);
@@ -96,6 +104,15 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
     setDamageSourceText(damageFile.text);
     setCombatText(combatFile.text);
     setXpText(xpFile.text);
+    setClassesText(classesFile.text);
+    try {
+      const projectFiles = await loadProjectTextMap(projectPath);
+      setItemIds(collectSectionIds(projectFiles, ['item']));
+      setPowerIds(collectSectionIds(projectFiles, ['power', 'upgrade']));
+    } catch {
+      setItemIds(new Set());
+      setPowerIds(new Set());
+    }
     setSourceKind(statsFile.source === 'project' || primaryFile.source === 'project' ? 'project' : (statsFile.source === 'mod' || primaryFile.source === 'mod' ? 'mod' : 'empty'));
     setSourceLabel(statsFile.label || primaryFile.label);
     setDirty(false);
@@ -234,6 +251,7 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
       ];
       if (combatText.trim()) files.push({ path: COMBAT_PATH, content: combatText.endsWith('\n') ? combatText : `${combatText}\n` });
       if (xpText.trim()) files.push({ path: XP_TABLE_PATH, content: xpText.endsWith('\n') ? xpText : `${xpText}\n` });
+      if (classesText.trim()) files.push({ path: CLASSES_PATH, content: classesText.endsWith('\n') ? classesText : `${classesText}\n` });
       if (damageTypes.length || damageSourceText.trim()) {
         files.push({ path: DAMAGE_TYPES_PATH, content: serializeDamageTypes(damageTypes, damageSourceText) });
       }
@@ -256,9 +274,9 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <FieldHint hint={
-            sourceKind === 'project' ? 'Editing project overrides. Primary stats can be added; core derived keys (hp, mp, accuracy, and the rest of Stats.cpp) are fixed — you can set their values, not invent new core keys. Extra MP-like pools go under Resource stats. Combat limits, damage types and the XP table are edited in this card.'
+            sourceKind === 'project' ? 'Editing project overrides. Primary stats can be added; core derived keys (hp, mp, accuracy, and the rest of Stats.cpp) are fixed — you can set their values, not invent new core keys. Extra MP-like pools go under Resource stats. Combat limits, damage types, the XP table and classes are edited in this card.'
             : sourceKind === 'mod' ? `Loaded from a required mod or default (${sourceLabel}). Save writes project overrides. Primary stats can be added; core derived keys are fixed. Extra MP-like pools go under Resource stats.`
-            : 'Primary stats can be added; they are not hardcoded. Core derived keys (hp, mp, accuracy, and the rest of Stats.cpp) are fixed — you can set their values, not invent new core keys. Extra MP-like pools go under Resource stats. Combat limits, damage types and the XP table are edited in this card. No project stat files yet: empty fields use Flare engine defaults until you save.'
+            : 'Primary stats can be added; they are not hardcoded. Core derived keys (hp, mp, accuracy, and the rest of Stats.cpp) are fixed — you can set their values, not invent new core keys. Extra MP-like pools go under Resource stats. Combat limits, damage types, the XP table and classes are edited in this card. No project stat files yet: empty fields use Flare engine defaults until you save.'
           }>
             <div className="text-sm font-semibold">Stats</div>
           </FieldHint>
@@ -272,6 +290,7 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
             { id: 'combat', label: 'Combat' },
             { id: 'damage', label: 'Damage types' },
             { id: 'xp', label: 'XP table' },
+            { id: 'classes', label: 'Classes' },
           ] as const).map((item) => (
             <Button
               key={item.id}
@@ -298,6 +317,8 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
             <DamageTypesForm types={damageTypes} onChange={(next) => { setDamageTypes(next); mark(); }} />
           ) : pane === 'xp' ? (
             <XpTableForm text={xpText} onChange={(next) => { setXpText(next); mark(); }} />
+          ) : pane === 'classes' ? (
+            <ClassHeroForm text={classesText} onChange={(next) => { setClassesText(next); mark(); }} itemIds={itemIds} powerIds={powerIds} />
           ) : (
           <>
           <section className="rounded-lg border border-border p-3 space-y-2">

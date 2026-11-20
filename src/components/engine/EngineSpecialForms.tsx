@@ -62,20 +62,50 @@ export function LootSettingsForm({ text, onChange }: TextProps) {
   const set = (key: keyof typeof loot, value: string) => onChange(upsertLootSettings(text, { [key]: value }));
   return (
     <div className="space-y-2">
-      <FieldHint hint="Currency name and vendor price ratios from engine/loot.txt. Other loot keys stay in the generic list below if you add them.">
-        <div className="text-xs font-medium">Loot</div>
+      <FieldHint hint="engine/loot.txt. Empty keys are not written. Comments and unknown keys are kept. vendor_ratio and vendor_ratio_buyback are deprecated.">
+        <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Loot</div>
       </FieldHint>
-      <Field label="Currency name" tip="currency_name">
+      <Field label="currency_name" tip="Displayed name of currency.">
         <Input width="name" className="h-7 text-xs" value={loot.currency_name} onChange={(e) => set('currency_name', e.target.value)} />
       </Field>
-      <Field label="Vendor buy ratio" tip="vendor_ratio_buy — multiplier for the Buy tab. Default 1.0.">
+      <Field label="vendor_ratio_buy" tip="Global multiplier for item prices on the Buy tab. Default 1.0.">
         <Input width="num" className="h-7 text-xs" value={loot.vendor_ratio_buy} onChange={(e) => set('vendor_ratio_buy', e.target.value)} />
       </Field>
-      <Field label="Vendor sell ratio" tip="vendor_ratio_sell — what vendors pay for your items.">
+      <Field label="vendor_ratio_sell" tip="Multiplier for what vendors pay and for the Sell tab. Default 0.25.">
         <Input width="num" className="h-7 text-xs" value={loot.vendor_ratio_sell} onChange={(e) => set('vendor_ratio_sell', e.target.value)} />
       </Field>
-      <Field label="Sell used items" tip="vendor_ratio_sell_old — price for items you previously sold.">
+      <Field label="vendor_ratio_sell_old" tip="Sell-tab price after the player leaves the map or quits. Falls back to vendor_ratio_sell.">
         <Input width="num" className="h-7 text-xs" value={loot.vendor_ratio_sell_old} onChange={(e) => set('vendor_ratio_sell_old', e.target.value)} />
+      </Field>
+      <Field label="tooltip_margin" tip="Vertical offset of the loot tooltip from the loot itself.">
+        <Input width="num" className="h-7 text-xs" value={loot.tooltip_margin} onChange={(e) => set('tooltip_margin', e.target.value)} />
+      </Field>
+      <Field label="autopickup_currency" tip="Enable autopickup for currency.">
+        <Input width="short" className="h-7 text-xs" value={loot.autopickup_currency} onChange={(e) => set('autopickup_currency', e.target.value)} />
+      </Field>
+      <Field label="autopickup_range" tip="Minimum distance the player must be from loot to trigger autopickup.">
+        <Input width="num" className="h-7 text-xs" value={loot.autopickup_range} onChange={(e) => set('autopickup_range', e.target.value)} />
+      </Field>
+      <Field label="sfx_loot" tip="Sound effect played when loot drops.">
+        <Input width="path" className="h-7 text-xs" value={loot.sfx_loot} onChange={(e) => set('sfx_loot', e.target.value)} />
+      </Field>
+      <Field label="drop_max" tip="Maximum number of random item stacks that can drop at once.">
+        <Input width="num" className="h-7 text-xs" value={loot.drop_max} onChange={(e) => set('drop_max', e.target.value)} />
+      </Field>
+      <Field label="drop_radius" tip="Distance in tiles from the origin that loot can drop.">
+        <Input width="num" className="h-7 text-xs" value={loot.drop_radius} onChange={(e) => set('drop_radius', e.target.value)} />
+      </Field>
+      <Field label="hide_radius" tip="If an entity is within this radius of a piece of loot, the label is hidden unless highlighted.">
+        <Input width="num" className="h-7 text-xs" value={loot.hide_radius} onChange={(e) => set('hide_radius', e.target.value)} />
+      </Field>
+      <Field label="extended_items_offset" tip="Starting item ID for extended items. 0 (default) places them after the last items/items.txt id.">
+        <Input width="num" className="h-7 text-xs" value={loot.extended_items_offset} onChange={(e) => set('extended_items_offset', e.target.value)} />
+      </Field>
+      <Field label="vendor_ratio" tip="Deprecated in v1.12.85. Use vendor_ratio_sell instead.">
+        <Input width="num" className="h-7 text-xs" value={loot.vendor_ratio} onChange={(e) => set('vendor_ratio', e.target.value)} />
+      </Field>
+      <Field label="vendor_ratio_buyback" tip="Deprecated in v1.12.85. Use vendor_ratio_sell_old instead.">
+        <Input width="num" className="h-7 text-xs" value={loot.vendor_ratio_buyback} onChange={(e) => set('vendor_ratio_buyback', e.target.value)} />
       </Field>
     </div>
   );

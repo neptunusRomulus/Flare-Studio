@@ -4,10 +4,20 @@ export type XpRow = { level: string; xp: string };
 export type HeroOption = { index: string; base: string; head: string; portrait: string; name: string };
 export type HeroLayer = { direction: string; types: string };
 export type LootSettings = {
+  tooltip_margin: string;
+  autopickup_currency: string;
+  autopickup_range: string;
   currency_name: string;
   vendor_ratio_buy: string;
   vendor_ratio_sell: string;
   vendor_ratio_sell_old: string;
+  sfx_loot: string;
+  drop_max: string;
+  drop_radius: string;
+  hide_radius: string;
+  vendor_ratio: string;
+  vendor_ratio_buyback: string;
+  extended_items_offset: string;
 };
 
 export function parseXpTable(text: string): XpRow[] {
@@ -34,11 +44,19 @@ export function serializeXpTable(rows: XpRow[], previous = ''): string {
 }
 
 const LOOT_KEYS: Array<keyof LootSettings> = [
+  'tooltip_margin', 'autopickup_currency', 'autopickup_range',
   'currency_name', 'vendor_ratio_buy', 'vendor_ratio_sell', 'vendor_ratio_sell_old',
+  'sfx_loot', 'drop_max', 'drop_radius', 'hide_radius',
+  'vendor_ratio', 'vendor_ratio_buyback', 'extended_items_offset',
 ];
 
 export function parseLootSettings(text: string): LootSettings {
-  const out: LootSettings = { currency_name: '', vendor_ratio_buy: '', vendor_ratio_sell: '', vendor_ratio_sell_old: '' };
+  const out: LootSettings = {
+    tooltip_margin: '', autopickup_currency: '', autopickup_range: '',
+    currency_name: '', vendor_ratio_buy: '', vendor_ratio_sell: '', vendor_ratio_sell_old: '',
+    sfx_loot: '', drop_max: '', drop_radius: '', hide_radius: '',
+    vendor_ratio: '', vendor_ratio_buyback: '', extended_items_offset: '',
+  };
   for (const raw of String(text || '').split('\n')) {
     const eq = raw.trim().indexOf('=');
     if (eq <= 0) continue;
@@ -52,15 +70,17 @@ export function upsertLootSettings(text: string, patch: Partial<LootSettings>): 
   const next = { ...parseLootSettings(text), ...patch };
   const seen = new Set<string>();
   const rows = String(text || '').split('\n');
-  const out = rows.map((raw) => {
+  const out = rows.flatMap((raw) => {
     const trimmed = raw.trim();
     const eq = trimmed.indexOf('=');
-    if (eq <= 0) return raw;
+    if (eq <= 0) return [raw];
     const key = trimmed.slice(0, eq).trim() as keyof LootSettings;
-    if (!LOOT_KEYS.includes(key)) return raw;
+    if (!LOOT_KEYS.includes(key)) return [raw];
     seen.add(key);
+    const value = String(next[key] ?? '').trim();
+    if (!value) return [];
     const indent = raw.slice(0, raw.length - raw.trimStart().length);
-    return `${indent}${key}=${next[key] ?? ''}`;
+    return [`${indent}${key}=${value}`];
   });
   const missing = LOOT_KEYS.filter((k) => !seen.has(k) && String(next[k] ?? '').trim());
   if (missing.length) {

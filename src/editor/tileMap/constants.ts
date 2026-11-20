@@ -3,3 +3,5 @@ export const COLLISION_LAYER_TYPE = 'collision';
 export const GAME_SETTINGS_LAYER_TYPE = 'gameSettings';
 export const WORLD_SETTINGS_LAYER_TYPE = 'worldSettings';
 export const STRING_SETTINGS_LAYER_TYPE = 'strings';
+export const TITLES_LAYER_TYPE = 'titles';
+export const STATS_LAYER_TYPE = 'stats';

@@ -24,6 +24,8 @@ const EDITOR_LAYER_TYPES = new Set([
   "gamesettings",
   "worldsettings",
   "strings",
+  "titles",
+  "stats",
 ]);
 
 function isEditorOnlyLayerType(type) {

@@ -261,7 +261,7 @@ export interface EditorProjectData {
   paintMode?: PaintMode;  // Current paint mode (ground/object)
 }
 
-import { COLLISION_LAYER_TYPE, GAME_SETTINGS_LAYER_TYPE, INTERNAL_TILESET_FILENAMES, STRING_SETTINGS_LAYER_TYPE, WORLD_SETTINGS_LAYER_TYPE } from './tileMap/constants';
+import { COLLISION_LAYER_TYPE, GAME_SETTINGS_LAYER_TYPE, INTERNAL_TILESET_FILENAMES, STATS_LAYER_TYPE, STRING_SETTINGS_LAYER_TYPE, TITLES_LAYER_TYPE, WORLD_SETTINGS_LAYER_TYPE } from './tileMap/constants';
 
 export class TileMapEditor {
   public isStartingMap: boolean = false;
@@ -1087,7 +1087,7 @@ export class TileMapEditor {
     this.mapCanvas.tabIndex = 0;
   }
 
-  /** Make sure UI Settings, World Settings and Strings exist on maps saved before those layers existed. */
+  /** Make sure settings rail layers exist on maps saved before those layers existed. */
   private ensureSettingsLayers(): void {
     const ensure = (type: string, name: string) => {
       const existing = this.tileLayers.find((layer) => layer.type === type);
@@ -1109,11 +1109,13 @@ export class TileMapEditor {
     ensure(GAME_SETTINGS_LAYER_TYPE, 'UI Settings');
     ensure(WORLD_SETTINGS_LAYER_TYPE, 'World Settings');
     ensure(STRING_SETTINGS_LAYER_TYPE, 'Strings');
+    ensure(TITLES_LAYER_TYPE, 'Titles');
+    ensure(STATS_LAYER_TYPE, 'Stats');
   }
 
   private createDefaultLayers(): void {
 
-      // Create default layers (Rules -> Statuses -> Actions -> Items -> NPC -> Enemy -> Event -> Collision -> Object -> Background -> UI Settings -> World Settings -> Strings)
+      // Create default layers (Rules -> Statuses -> Actions -> Items -> NPC -> Enemy -> Event -> Collision -> Object -> Background -> UI Settings -> World Settings -> Strings -> Titles -> Stats)
       this.tileLayers = [
         {
           id: 1,
@@ -1226,12 +1228,28 @@ export class TileMapEditor {
           data: new Array(this.mapWidth * this.mapHeight).fill(0),
           visible: true,
           transparency: 1.0
+        },
+        {
+          id: 15,
+          name: 'Titles',
+          type: TITLES_LAYER_TYPE,
+          data: new Array(this.mapWidth * this.mapHeight).fill(0),
+          visible: true,
+          transparency: 1.0
+        },
+        {
+          id: 16,
+          name: 'Stats',
+          type: STATS_LAYER_TYPE,
+          data: new Array(this.mapWidth * this.mapHeight).fill(0),
+          visible: true,
+          transparency: 1.0
         }
       ];
 
       // Set the background layer as active by default
       this.activeLayerId = 8;
-      this.nextLayerId = 15;
+      this.nextLayerId = 17;
       this.sortLayersByPriority();
     // Initialize layer tabs for background and object with one tab each
     try {

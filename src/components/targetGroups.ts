@@ -106,6 +106,8 @@ export const SETTINGS_RAIL: Array<{ id: string; label: string; help: string }> =
   { id: 'gameSettings', label: 'UI Settings', help: 'Shift+Tab: switch main layers.' },
   { id: 'worldSettings', label: 'World Settings', help: 'Shift+Tab: switch main layers.' },
   { id: 'strings', label: 'Strings', help: 'Shift+Tab: switch main layers.' },
+  { id: 'titles', label: 'Titles', help: 'Shift+Tab: switch main layers.' },
+  { id: 'stats', label: 'Stats', help: 'Shift+Tab: switch main layers.' },
 ];
 
 /** Main layers shown at the top of the right dock. */
@@ -116,6 +118,8 @@ export const MAIN_LAYERS: Array<{ id: string; label: string }> = [
   { id: 'gameSettings', label: 'UI Settings' },
   { id: 'worldSettings', label: 'World Settings' },
   { id: 'strings', label: 'Strings' },
+  { id: 'titles', label: 'Titles' },
+  { id: 'stats', label: 'Stats' },
 ];
 
 /** Main layer of a real layer type (unknown non-group types count as Map, like the old sidebar grouping). */

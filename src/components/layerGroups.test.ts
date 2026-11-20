@@ -3,9 +3,9 @@ import { groupLayers, layerGroupIndex } from './layerGroups';
 
 describe('layer groups', () => {
   it('orders layers into the settings groups after content', () => {
-    const types = ['strings', 'worldSettings', 'gameSettings', 'rules', 'event', 'status', 'items', 'enemy', 'npc', 'object', 'collision', 'background'];
+    const types = ['stats', 'titles', 'strings', 'worldSettings', 'gameSettings', 'rules', 'event', 'status', 'items', 'enemy', 'npc', 'object', 'collision', 'background'];
     expect(groupLayers(types.map(type => ({ type }))).map(l => l.type)).toEqual(
-      ['collision', 'object', 'background', 'npc', 'enemy', 'event', 'items', 'status', 'rules', 'gameSettings', 'worldSettings', 'strings']);
+      ['collision', 'object', 'background', 'npc', 'enemy', 'event', 'items', 'status', 'rules', 'gameSettings', 'worldSettings', 'strings', 'titles', 'stats']);
   });
   it('puts unknown layer types in the drawing group', () => {
     expect(layerGroupIndex('fog')).toBe(0);

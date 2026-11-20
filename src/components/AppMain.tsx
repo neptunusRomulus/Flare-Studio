@@ -12,6 +12,8 @@ import AppControls from '@/components/AppControls';
 import SidebarGameSettingsArea from '@/components/SidebarGameSettingsArea';
 import SidebarWorldSettingsArea from '@/components/SidebarWorldSettingsArea';
 import SidebarStringsArea from '@/components/SidebarStringsArea';
+import SidebarTitlesArea from '@/components/SidebarTitlesArea';
+import SidebarStatsArea from '@/components/SidebarStatsArea';
 import PaletteDock from '@/components/PaletteDock';
 import { shouldShowPanels, shouldShowRightSidebar } from '@/hooks/preMapEditor';
 import EngineSettingsDialog from '@/components/EngineSettingsDialog';
@@ -360,6 +362,10 @@ export default function AppMain() {
             <SidebarWorldSettingsArea />
           ) : tileset.activeLayer?.type === 'strings' ? (
             <SidebarStringsArea />
+          ) : tileset.activeLayer?.type === 'titles' ? (
+            <SidebarTitlesArea />
+          ) : tileset.activeLayer?.type === 'stats' ? (
+            <SidebarStatsArea />
           ) : !tileset.activeLayer ? null : undefined}
         >
           {(overlay) => (

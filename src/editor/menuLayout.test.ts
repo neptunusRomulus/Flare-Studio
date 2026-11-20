@@ -11,6 +11,9 @@ import {
   parseResolutionsText,
   posFromScreen,
   viewSize,
+  isHudMenu,
+  visibleMenuFiles,
+  MAIN_MENU_FILES,
 } from './menuLayout';
 
 function readFlareGameFile(...rels: string[]): string | null {
@@ -97,5 +100,37 @@ virtual_height=960,1080,1440
       virtualHeights: [960, 1080, 1440],
     });
     expect(formatPos(parsePos('4,4,512,32'))).toBe('4,4,512,32');
+  });
+});
+
+describe('visibleMenuFiles', () => {
+  it('treats the HUD bars and plates as always-on', () => {
+    expect(isHudMenu('menus/hp.txt')).toBe(true);
+    expect(isHudMenu('minimap.txt')).toBe(true);
+    expect(isHudMenu('menus/inventory.txt')).toBe(false);
+    expect(isHudMenu('vendor.txt')).toBe(false);
+  });
+
+  it('shows only the HUD until a non-HUD menu is selected', () => {
+    const files = MAIN_MENU_FILES.map((name) => `menus/${name}`);
+    const visible = visibleMenuFiles(files, '', false);
+    expect([...visible].map((f) => f.replace(/^menus\//, '')).sort()).toEqual([
+      'actionbar.txt', 'activeeffects.txt', 'enemy.txt', 'hp.txt', 'hudlog.txt', 'minimap.txt', 'mp.txt', 'xp.txt',
+    ]);
+    expect(visible.has('menus/inventory.txt')).toBe(false);
+  });
+
+  it('adds the selected page without bringing the other exclusive menus', () => {
+    const files = MAIN_MENU_FILES.map((name) => `menus/${name}`);
+    const visible = visibleMenuFiles(files, 'menus/inventory.txt', false);
+    expect(visible.has('menus/inventory.txt')).toBe(true);
+    expect(visible.has('menus/hp.txt')).toBe(true);
+    expect(visible.has('menus/character.txt')).toBe(false);
+    expect(visible.has('menus/vendor.txt')).toBe(false);
+  });
+
+  it('shows every panel when asked', () => {
+    const files = MAIN_MENU_FILES.map((name) => `menus/${name}`);
+    expect(visibleMenuFiles(files, '', true).size).toBe(files.length);
   });
 });

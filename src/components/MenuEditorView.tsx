@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as R
 import { Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Tooltip from '@/components/ui/tooltip';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import {
   alignToScreenEdge,
   DEFAULT_RESOLUTIONS,
@@ -11,6 +13,7 @@ import {
   parseResolutionsText,
   posFromScreen,
   viewSize,
+  visibleMenuFiles,
   type MenuPanel,
   type Resolutions,
 } from '@/editor/menuLayout';
@@ -36,6 +39,7 @@ const MenuEditorView = ({ projectPath }: Props) => {
   const [selected, setSelected] = useState('');
   const [dirty, setDirty] = useState<Record<string, MenuPanel>>({});
   const [scale, setScale] = useState(1);
+  const [showAll, setShowAll] = useState(false);
   const frameRef = useRef<HTMLDivElement>(null);
   const view = useMemo(() => viewSize(screen.w, screen.h, resolutions), [screen, resolutions]);
 
@@ -86,6 +90,10 @@ const MenuEditorView = ({ projectPath }: Props) => {
   }, [view.viewW, view.viewH]);
 
   const current = (file: string) => dirty[file] || panels.find((panel) => panel.file === file);
+  const shown = useMemo(
+    () => visibleMenuFiles(panels.map((panel) => panel.file), selected, showAll),
+    [panels, selected, showAll],
+  );
 
   const startDrag = (panel: MenuPanel, event: ReactMouseEvent, screenRect: { x: number; y: number }) => {
     event.preventDefault();
@@ -142,6 +150,17 @@ const MenuEditorView = ({ projectPath }: Props) => {
         <div className="text-[11px] text-muted-foreground ml-2">
           view {view.viewW}×{view.viewH}
         </div>
+        <div className="flex items-center gap-2 ml-3">
+          <Switch
+            id="menu-show-all"
+            checked={showAll}
+            onCheckedChange={setShowAll}
+            className="scale-75"
+          />
+          <Tooltip content="Off: HUD plus the selected menu, like in the game. On: every panel at once (they may overlap).">
+            <Label htmlFor="menu-show-all" className="text-[11px] font-normal text-muted-foreground">Show all panels</Label>
+          </Tooltip>
+        </div>
         <Tooltip content="Write pos= for moved panels. Other keys stay as they are.">
           <Button type="button" size="sm" className="h-7 ml-auto" disabled={!Object.keys(dirty).length} onClick={() => void save()}>
             <Save className="w-3.5 h-3.5" />
@@ -155,7 +174,7 @@ const MenuEditorView = ({ projectPath }: Props) => {
               key={panel.file}
               type="button"
               variant="ghost"
-              className={`h-auto w-full text-left rounded px-2 py-1 text-[11px] ${selected === panel.file ? 'bg-muted' : 'hover:bg-muted/60'}`}
+              className={`h-auto w-full text-left rounded px-2 py-1 text-[11px] ${selected === panel.file ? 'bg-muted' : 'hover:bg-muted/60'} ${shown.has(panel.file) ? '' : 'opacity-50'}`}
               onClick={() => setSelected(panel.file)}
             >
               {panel.name}
@@ -172,6 +191,7 @@ const MenuEditorView = ({ projectPath }: Props) => {
             >
               {panels.map((base) => {
                 const panel = current(base.file) as MenuPanel;
+                if (!shown.has(panel.file)) return null;
                 const rect = alignToScreenEdge(panel.pos, panel.align, view.viewW, view.viewH, resolutions.frameW, resolutions.frameH);
                 return (
                   <div
@@ -179,7 +199,7 @@ const MenuEditorView = ({ projectPath }: Props) => {
                     onMouseDown={(e) => startDrag(panel, e, { x: rect.x, y: rect.y })}
                     onClick={() => setSelected(panel.file)}
                     className={`absolute border text-[10px] leading-tight px-1 py-0.5 overflow-hidden cursor-move ${selected === panel.file ? 'border-amber-400 bg-amber-400/20 text-amber-50' : 'border-white/40 bg-black/40 text-white/90'}`}
-                    style={{ left: rect.x, top: rect.y, width: Math.max(rect.w, 8), height: Math.max(rect.h, 8) }}
+                    style={{ left: rect.x, top: rect.y, width: Math.max(rect.w, 8), height: Math.max(rect.h, 8), zIndex: selected === panel.file ? 2 : 1 }}
                     title={`${panel.file}  pos=${panel.pos.x},${panel.pos.y}  align=${panel.align}`}
                   >
                     {panel.name}

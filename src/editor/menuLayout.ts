@@ -271,4 +271,35 @@ export const MAIN_MENU_FILES = [
   'talker.txt',
 ];
 
+/** Menus that stay on screen together in Flare (bars, minimap, combat log, enemy plate). */
+export const HUD_MENU_FILES = new Set([
+  'actionbar.txt',
+  'hp.txt',
+  'mp.txt',
+  'xp.txt',
+  'minimap.txt',
+  'hudlog.txt',
+  'activeeffects.txt',
+  'enemy.txt',
+]);
+
+export function menuFileName(file: string): string {
+  return file.replace(/\\/g, '/').replace(/^.*\//, '');
+}
+
+export function isHudMenu(file: string): boolean {
+  return HUD_MENU_FILES.has(menuFileName(file));
+}
+
+/**
+ * Game-like preview: HUD panels stay visible; other menus show one at a time
+ * (the selected one). `showAll` restores the stacked “every panel at once” view.
+ */
+export function visibleMenuFiles(files: string[], selected: string, showAll: boolean): Set<string> {
+  if (showAll) return new Set(files);
+  const visible = new Set(files.filter(isHudMenu));
+  if (selected) visible.add(selected);
+  return visible;
+}
+
 export { HEADER_KEYS };

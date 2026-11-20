@@ -77,6 +77,33 @@ describe('FlareAdapter golden files', () => {
     expect(again.text).toBe(exported.text);
   });
 
+  it('writes background before object so the hero is not covered, and omits studio-only layers', () => {
+    const exported = exportMapText({
+      width: 1,
+      height: 1,
+      heroX: 0,
+      heroY: 0,
+      layers: [
+        { type: 'collision', rows: [[1]] },
+        { type: 'object', rows: [[2]] },
+        { type: 'background', rows: [[3]] },
+        { type: 'books', rows: [[4]] },
+        { type: 'worldSettings', rows: [[5]] },
+        { type: 'gameSettings', rows: [[6]] },
+      ],
+    });
+    expect(exported.errors).toEqual([]);
+    const types = [...exported.text.matchAll(/^type=(.*)$/gm)].map((match) => match[1]);
+    expect(types).toEqual(['collision', 'background', 'object']);
+    expect(types.indexOf('background')).toBeLessThan(types.indexOf('object'));
+    expect(exported.text).toMatch(/type=background\nformat=dec\ndata=\n3\n/);
+    expect(exported.text).toMatch(/type=object\nformat=dec\ndata=\n2\n/);
+    expect(exported.text).toMatch(/type=collision\nformat=dec\ndata=\n1\n/);
+    expect(exported.text).not.toContain('type=books');
+    expect(exported.text).not.toContain('type=worldSettings');
+    expect(exported.text).not.toContain('type=gameSettings');
+  });
+
   it('keeps Tiled tilewidth, tileheight and orientation on the map header', () => {
     const text = fs.readFileSync(path.resolve(process.cwd(), 'tests/fixtures/flare-maps/tiled_header.txt'), 'utf8');
     const imported = importMapText(text) as {

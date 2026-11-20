@@ -10,6 +10,8 @@ export function tilePixelOffset(
   tileSizeY: number
 ): { offsetX: number; offsetY: number };
 export function formatCurrency(value: unknown): string;
+export const EDITOR_LAYER_TYPES: Set<string>;
+export function isEditorOnlyLayerType(type: unknown): boolean;
 export function exportMapText(map: Record<string, unknown>): { text: string; errors: string[] };
 export function exportTilesetText(def: Record<string, unknown>): string;
 export function exportTilesetConfig(tile?: { width?: number; height?: number; orientation?: string }): string;

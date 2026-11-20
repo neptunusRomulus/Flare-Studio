@@ -432,6 +432,7 @@ module.exports = {
   legacyMapFileName,
   toIntFlare,
   EDITOR_LAYER_TYPES: serializers.EDITOR_LAYER_TYPES,
+  isEditorOnlyLayerType: serializers.isEditorOnlyLayerType,
   exportMapText: serializers.exportMapText,
   exportEventLines: serializers.exportEventLines,
   exportTilesetText: serializers.exportTilesetText,

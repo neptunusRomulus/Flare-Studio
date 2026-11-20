@@ -17,11 +17,17 @@ const EDITOR_LAYER_TYPES = new Set([
   "status",
   "actions",
   "items",
+  "books",
   "npc",
   "enemy",
   "event",
   "gamesettings",
+  "worldsettings",
 ]);
+
+function isEditorOnlyLayerType(type) {
+  return EDITOR_LAYER_TYPES.has(String(type || "").toLowerCase());
+}
 
 function linesOf(value) {
   if (value == null || value === "") return [];
@@ -35,8 +41,21 @@ function pushKey(lines, key, value) {
   }
 }
 
+function isBackgroundLayerType(type) {
+  const name = String(type || "").toLowerCase();
+  return name === "background" || name.startsWith("background");
+}
+
+/**
+ * Flare draws layers in file order. Entities are interleaved with the layer
+ * named "object": everything before it is below the hero, everything after it
+ * is above. Collision is stripped from the render list after load. Studio
+ * sometimes stored background after object (and leaked editor-only layers
+ * such as books); move misplaced background* layers to just before object
+ * and omit editor-only types. Overlay layers such as snowtop stay after object.
+ */
 function ensureObjectAndCollision(layers) {
-  const list = (layers || []).filter((layer) => layer && layer.type && !EDITOR_LAYER_TYPES.has(String(layer.type).toLowerCase()));
+  const list = (layers || []).filter((layer) => layer && layer.type && !isEditorOnlyLayerType(layer.type));
   const types = new Set(list.map((layer) => layer.type));
   if (!types.has("object")) {
     const collisionAt = list.findIndex((layer) => layer.type === "collision");
@@ -45,7 +64,17 @@ function ensureObjectAndCollision(layers) {
     else list.push(objectLayer);
   }
   if (!types.has("collision")) list.push({ type: "collision", rows: [] });
-  return list;
+
+  const objectAt = list.findIndex((layer) => layer.type === "object");
+  if (objectAt < 0) return list;
+  const misplaced = [];
+  const kept = [];
+  list.slice(objectAt + 1).forEach((layer) => {
+    if (isBackgroundLayerType(layer.type)) misplaced.push(layer);
+    else kept.push(layer);
+  });
+  if (misplaced.length === 0) return list;
+  return [...list.slice(0, objectAt), ...misplaced, list[objectAt], ...kept];
 }
 
 function blankRows(width, height) {
@@ -1053,6 +1082,7 @@ function importMapText(content) {
 
 module.exports = {
   EDITOR_LAYER_TYPES,
+  isEditorOnlyLayerType,
   dialogCategory,
   exportMapText,
   exportEventLines,

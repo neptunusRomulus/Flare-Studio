@@ -19,7 +19,7 @@ import { findSlotForCellKey, mergeLegacySlotData, clearSlotCells, type SlotLike 
 import { parseTilesetDefTiles, tileDrawTopLeft } from './tilesetDef';
 import { assignExportOffsets } from './tilesetIds';
 import { TileDetector } from './tileDetection';
-import { exportMapText, importMapText, slugFileName, tilePixelOffset } from '../adapters/flare/flareAdapter.cjs';
+import { exportMapText, importMapText, isEditorOnlyLayerType, slugFileName, tilePixelOffset } from '../adapters/flare/flareAdapter.cjs';
 import { clipboardFromTiles, pasteTileGrid, type TileClipboard } from './tileClipboard';
 import { stampFromSelection } from './stampTiles';
 import {
@@ -3873,7 +3873,7 @@ export class TileMapEditor {
   }
 
   private isFlareTileLayer(type: string): boolean {
-    return !['rules', 'status', 'actions', 'items', 'npc', 'enemy', 'event', 'gamesettings'].includes(type.toLowerCase());
+    return !isEditorOnlyLayerType(type);
   }
 
   private layerRowsForExport(layer: TileLayer): number[][] {

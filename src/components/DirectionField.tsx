@@ -2,7 +2,8 @@ import React from 'react';
 import Tooltip from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { ArrowUp, ArrowUpRight, ArrowRight, ArrowDownRight, ArrowDown, ArrowDownLeft, ArrowLeft, ArrowUpLeft, HelpCircle } from 'lucide-react';
+import { ArrowUp, ArrowUpRight, ArrowRight, ArrowDownRight, ArrowDown, ArrowDownLeft, ArrowLeft, ArrowUpLeft } from 'lucide-react';
+import { HintIcon } from '@/components/ui/field-hint';
 
 type DirectionFieldProps = {
   value: string;
@@ -34,9 +35,7 @@ const DirectionField = ({
       <div className="flex items-center gap-1 mb-1">
         {label ? <Label className="text-xs text-muted-foreground font-normal">{label}</Label> : null}
         {tooltip && (
-          <Tooltip content={tooltip}>
-            <HelpCircle className="w-3 h-3 text-muted-foreground" />
-          </Tooltip>
+          <HintIcon hint={tooltip} className="w-3 h-3 text-muted-foreground" />
         )}
       </div>
     )}

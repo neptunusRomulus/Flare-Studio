@@ -74,7 +74,7 @@ const HelpDialog = ({ open, onClose, onGo, canGo }: HelpDialogProps) => {
               ref={searchRef}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search help…"
+              width="full" placeholder="Search help…"
               aria-label="Search help"
               className="h-8 pl-8 text-sm"
             />

@@ -124,15 +124,11 @@ const ActorDialog = ({
                       );
                     })}
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {actorDialogState.type === 'npc'
-                      ? hasRoleSelection
-                        ? 'Select one or more roles for this NPC.'
-                        : 'Static NPC with no interaction.'
-                      : hasRoleSelection
-                        ? 'Pick one or more enemy types.'
-                        : 'No behavior selected; enemy is unassigned.'}
-                  </p>
+                  {!hasRoleSelection ? (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {actorDialogState.type === 'npc' ? 'Static NPC with no interaction.' : 'No behavior selected; enemy is unassigned.'}
+                    </p>
+                  ) : null}
                 </>
               );
             })()}

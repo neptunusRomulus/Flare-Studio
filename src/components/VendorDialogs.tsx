@@ -3,9 +3,9 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import Tooltip from '@/components/ui/tooltip';
 import type { ItemResourceSubtype, ItemRole } from '@/editor/itemRoles';
-import { Gift, HelpCircle, Package, Save, Sparkles, X } from 'lucide-react';
+import { Gift, Package, Save, Sparkles, X } from 'lucide-react';
+import { FieldHint, HintIcon } from '@/components/ui/field-hint';
 
 type ItemSummary = {
   id: number;
@@ -119,10 +119,14 @@ const VendorDialogs = (props: VendorDialogsProps) => {
         <DialogContent className="max-w-4xl w-full z-[9999]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Gift className="w-5 h-5 text-amber-500" />
-              Unlockable Items
+              <FieldHint hint="Add status-based stock. Each requirement creates its own stock list.">
+                <span className="flex items-center gap-2">
+                  <Gift className="w-5 h-5 text-amber-500" />
+                  Unlockable Items
+                </span>
+              </FieldHint>
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="sr-only">
               Add status-based stock. Each requirement creates its own stock list.
             </DialogDescription>
           </DialogHeader>
@@ -233,10 +237,14 @@ const VendorDialogs = (props: VendorDialogsProps) => {
         <DialogContent className="max-w-4xl w-full z-[9999]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-purple-500" />
-              Random Offers
+              <FieldHint hint="Pick random offer candidates with chance and quantity ranges.">
+                <span className="flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-purple-500" />
+                  Random Offers
+                </span>
+              </FieldHint>
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="sr-only">
               Pick random offer candidates with chance and quantity ranges.
             </DialogDescription>
           </DialogHeader>
@@ -325,9 +333,7 @@ const VendorDialogs = (props: VendorDialogsProps) => {
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground">Min item number</span>
-                <Tooltip content="How many of these items can appear in total?">
-                  <HelpCircle className="w-4 h-4 text-muted-foreground" />
-                </Tooltip>
+                <HintIcon hint={"How many of these items can appear in total?"} className="w-4 h-4 text-muted-foreground" />
                 <Input
                   type="number"
                   className="h-8 w-20 text-xs"
@@ -338,9 +344,7 @@ const VendorDialogs = (props: VendorDialogsProps) => {
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground">Max item number</span>
-                <Tooltip content="How many of these items can appear in total?">
-                  <HelpCircle className="w-4 h-4 text-muted-foreground" />
-                </Tooltip>
+                <HintIcon hint={"How many of these items can appear in total?"} className="w-4 h-4 text-muted-foreground" />
                 <Input
                   type="number"
                   className="h-8 w-20 text-xs"
@@ -366,10 +370,14 @@ const VendorDialogs = (props: VendorDialogsProps) => {
         <DialogContent className="max-w-3xl w-full z-[9999]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Package className="w-5 h-5 text-emerald-500" />
-              Always Available Items
+              <FieldHint hint="Select items to keep in this vendor's shop and set their quantities.">
+                <span className="flex items-center gap-2">
+                  <Package className="w-5 h-5 text-emerald-500" />
+                  Always Available Items
+                </span>
+              </FieldHint>
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="sr-only">
               Select items to keep in this vendor&apos;s shop and set their quantities.
             </DialogDescription>
           </DialogHeader>

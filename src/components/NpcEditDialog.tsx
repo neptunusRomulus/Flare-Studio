@@ -1,10 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import Tooltip from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { cn } from '@/lib/utils';
 import AnimationPreview from '@/components/AnimationPreview';
-import { HelpCircle, Settings } from 'lucide-react';
+import { Settings } from 'lucide-react';
 import type { MapObject } from '@/types';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 import type { ItemSummary } from '@/utils/items';
@@ -15,6 +14,7 @@ import NpcPropertyList from '@/components/NpcPropertyList';
 import { resolveNpcPreviewPaths } from '@/flare/npcPreviewPaths';
 import { isCustomTilesetAppearance } from '@/editor/npcPropertyCards';
 import { NPC_ROLE_META_LOOKUP, NPC_STATIC_BADGE_CLASS } from '@/editor/actorRoles';
+import { FieldHint } from '@/components/ui/field-hint';
 
 export type NpcEditDialogProps = {
   editingObject: MapObject;
@@ -150,10 +150,7 @@ const NpcEditDialog = ({
 
       <section className="space-y-2">
         <div className="flex items-center gap-1">
-          <h4 className="text-sm font-semibold">Roles</h4>
-          <Tooltip content="Turning a role off keeps its settings.">
-            <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
-          </Tooltip>
+          <FieldHint hint={"Turning a role off keeps its settings."}><h4 className="text-sm font-semibold">Roles</h4></FieldHint>
         </div>
         <ToggleGroup
           type="multiple"

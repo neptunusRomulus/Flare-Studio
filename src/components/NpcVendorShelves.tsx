@@ -3,9 +3,10 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import Tooltip from '@/components/ui/tooltip';
 import NpcAssetThumb from '@/components/NpcAssetThumb';
-import { HelpCircle, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import type { ItemSummary } from '@/utils/items';
 import { useAppContext } from '@/context/AppContext';
+import { HintIcon } from '@/components/ui/field-hint';
 import {
   effectiveVendorRatio,
   parseVendorShelves,
@@ -182,9 +183,7 @@ const NpcVendorShelves = ({ properties, itemsList, updateProperty }: Props) => {
             {shelf.tables.map((table) => (
               <div key={`${shelf.kind}-${table}`} className="flex items-center gap-2 rounded-md border border-border/60 bg-muted/20 p-1.5">
                 <span className="text-xs font-mono truncate flex-1">{table}</span>
-                <Tooltip content="Loot table or inline loot; edit the raw line in Advanced.">
-                  <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
-                </Tooltip>
+                <HintIcon hint={"Loot table or inline loot; edit the raw line in Advanced."} className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
               </div>
             ))}
           </div>

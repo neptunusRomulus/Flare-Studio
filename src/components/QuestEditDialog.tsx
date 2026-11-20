@@ -4,12 +4,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import Tooltip from '@/components/ui/tooltip';
-import { HelpCircle, X, Save } from 'lucide-react';
+import { X, Save } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 import { type QuestDraft } from '@/hooks/useAppMainState';
 import { askConfirm } from '@/components/ui/inline-confirm';
 import QuestStepCards from '@/components/QuestStepCards';
+import { HintIcon } from '@/components/ui/field-hint';
 import {
   completeStatusKey,
   flattenFirstStep,
@@ -131,9 +132,7 @@ const QuestEditDialog = ({ open, onOpenChange, questDraft, setQuestDraft, onSave
           <div>
             <Label className="flex items-center gap-2 text-sm font-medium mb-1">
               Name
-              <Tooltip content="name — Shown in the quest log.">
-                <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
-              </Tooltip>
+              <HintIcon hint={"name — Shown in the quest log."} className="w-4 h-4 text-muted-foreground cursor-pointer" />
             </Label>
             <Input
               value={questDraft.name}

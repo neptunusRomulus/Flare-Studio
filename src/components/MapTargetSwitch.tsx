@@ -1,12 +1,12 @@
 import React, { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import Tooltip from '@/components/ui/tooltip';
-import { HelpCircle, Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import type { TileLayer } from '@/types';
 import { MAP_GROUP, groupOfType, rememberGroupTarget, tabTargetFor, type TargetGroup } from '@/components/targetGroups';
 import { rememberTarget, isMapTarget, mapTargetTooltip } from '@/components/mapTargets';
 import { TARGET_ICON } from '@/components/targetIcons';
 import SlidingSwitch, { type SwitchItem } from '@/components/SlidingSwitch';
+import { HintIcon } from '@/components/ui/field-hint';
 
 /** Per-layer visibility and opacity (wheel) controls, used by the rail layer icons. */
 export type LayerVisibilityControls = {
@@ -88,9 +88,7 @@ const MapTargetSwitch: React.FC<Props> = ({ group = MAP_GROUP, layers, activeLay
   return (
     <div className="flex items-center justify-center gap-1.5 pb-2">
       <SlidingSwitch items={items} selected={current} onSelect={select} ariaLabel={group.label} />
-      <Tooltip content={group.help}>
-        <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" aria-hidden />
-      </Tooltip>
+      <HintIcon hint={group.help} className="w-4 h-4 text-muted-foreground cursor-help" />
     </div>
   );
 };

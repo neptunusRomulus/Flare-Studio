@@ -5,11 +5,10 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import Tooltip from '@/components/ui/tooltip';
 import { InlineConfirm } from '@/components/ui/inline-confirm';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 import { toast } from '@/hooks/use-toast';
-import { Check, HelpCircle, Plus, Save, Trash2, X } from 'lucide-react';
+import { Check, Plus, Save, Trash2, X } from 'lucide-react';
 import type { DialogueTree } from '@/types';
 import type { ItemSummary } from '@/utils/items';
 import ResizeHandle from '@/components/ResizeHandle';
@@ -25,6 +24,7 @@ import {
 import { canonicalJson, contentSlug, importQuestText, mergeQuestText } from '@/adapters/flare/flareAdapter.cjs';
 import { projectRoot, writeProjectFiles } from '@/editor/projectFiles';
 import QuestStepCards from '@/components/QuestStepCards';
+import { FieldHint, HintIcon, HintLabel } from '@/components/ui/field-hint';
 import {
   alignStepsWithRole,
   createFirstStep,
@@ -243,12 +243,7 @@ const NpcQuestSettingsDialog = ({
   };
 
   const fieldLabel = (label: string, tooltip: string) => (
-    <Label className="flex items-center gap-1 text-sm font-medium mb-1">
-      {label}
-      <Tooltip content={tooltip}>
-        <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
-      </Tooltip>
-    </Label>
+    <HintLabel className="flex items-center gap-1 text-sm font-medium mb-1" hint={tooltip}>{label}</HintLabel>
   );
 
   const frame = (
@@ -307,10 +302,7 @@ const NpcQuestSettingsDialog = ({
 
         <section className="rounded-md border border-border p-3 space-y-2">
           <div className="flex items-center gap-1">
-            <h4 className="text-sm font-semibold">Quest flow</h4>
-            <Tooltip content="Flare has no quest keys: the journal entry requires the accept status, and the turn-in topic sets the complete status. Each step here writes those statuses.">
-              <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
-            </Tooltip>
+            <FieldHint hint={"Flare has no quest keys: the journal entry requires the accept status, and the turn-in topic sets the complete status. Each step here writes those statuses."}><h4 className="text-sm font-semibold">Quest flow</h4></FieldHint>
           </div>
           <div className="flex items-stretch gap-1">
             {[
@@ -343,9 +335,7 @@ const NpcQuestSettingsDialog = ({
                 <div className="flex-1 min-w-0 rounded-md border border-border bg-muted/20 p-1.5">
                   <div className={`text-[10px] font-semibold ${step.tone} flex items-center gap-1`}>
                     {index + 1}. {step.title}
-                    <Tooltip content={step.hint}>
-                      <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
-                    </Tooltip>
+                    <HintIcon hint={step.hint} className="w-3 h-3 text-muted-foreground cursor-help" />
                   </div>
                   <Input
                     className="h-7 mt-1 text-xs font-mono"
@@ -362,20 +352,18 @@ const NpcQuestSettingsDialog = ({
             <div className="flex-1 min-w-0 rounded-md border border-border bg-muted/20 p-1.5">
               <div className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
                 4. Done
-                <Tooltip content="Status set after the reward when one-time reward is on; a second turn-in is blocked by it.">
-                  <HelpCircle className="w-3 h-3 text-muted-foreground cursor-help" />
-                </Tooltip>
+                <HintIcon hint={"Status set after the reward when one-time reward is on; a second turn-in is blocked by it."} className="w-3 h-3 text-muted-foreground cursor-help" />
               </div>
               <div className="h-7 mt-1 flex items-center text-xs font-mono truncate text-muted-foreground">
                 {flow.oneTimeReward ? `${contentSlug(flow.questId || flow.questName, 'quest')}_rewarded` : '—'}
               </div>
             </div>
           </div>
-          <p className="text-[11px] text-muted-foreground">
-            {flow.turnInMode === 'complete'
-              ? 'Turn-in waits for the Ready status; the NPC only completes the quest once gameplay sets it.'
-              : 'Turn-in works as soon as the quest is accepted and sets the Ready status itself.'}
-          </p>
+          <FieldHint hint={flow.turnInMode === 'complete'
+            ? 'Turn-in waits for the Ready status; the NPC only completes the quest once gameplay sets it.'
+            : 'Turn-in works as soon as the quest is accepted and sets the Ready status itself.'}>
+            <div className="text-xs font-medium">Turn-in mode</div>
+          </FieldHint>
         </section>
 
         <section className="rounded-md border border-border p-3 space-y-3">
@@ -505,10 +493,7 @@ const NpcQuestSettingsDialog = ({
               checked={flow.oneTimeReward}
               onCheckedChange={(checked) => set('oneTimeReward', checked === true)}
             />
-            <Label htmlFor="quest-one-time-reward" className="text-sm font-normal">One-time reward</Label>
-            <Tooltip content={`Adds a status guard (${flow.questId || 'quest'}_rewarded / complete status) so the reward cannot be claimed twice.`}>
-              <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
-            </Tooltip>
+            <HintLabel htmlFor="quest-one-time-reward" className="text-sm font-normal" hint={`Adds a status guard (${flow.questId || 'quest'}_rewarded / complete status) so the reward cannot be claimed twice.`}>One-time reward</HintLabel>
           </div>
         </section>
 
@@ -519,10 +504,7 @@ const NpcQuestSettingsDialog = ({
               checked={writeJournal}
               onCheckedChange={(checked) => setWriteJournal(checked === true)}
             />
-            <Label htmlFor="quest-write-journal" className="text-sm font-medium">Write quest log entry</Label>
-            <Tooltip content="Creates or merges quests/<id>.txt. Accept and turn-in statuses line up with the steps. Other keys and comments stay.">
-              <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
-            </Tooltip>
+            <HintLabel htmlFor="quest-write-journal" className="text-sm font-medium" hint={"Creates or merges quests/<id>.txt. Accept and turn-in statuses line up with the steps. Other keys and comments stay."}>Write quest log entry</HintLabel>
           </div>
           {writeJournal && (
             <QuestStepCards

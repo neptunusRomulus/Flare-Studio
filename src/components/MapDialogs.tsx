@@ -2,11 +2,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import Tooltip from '@/components/ui/tooltip';
-import { HelpCircle, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 import ResizeHandle from '@/components/ResizeHandle';
+import { HintLabel } from '@/components/ui/field-hint';
 
 type HeroEditData = {
   currentX: number;
@@ -163,12 +163,9 @@ const MapDialogs = ({
             </div>
             <div className="flex items-center gap-2 rounded-md border border-border px-3 py-2">
               <div className="flex items-center gap-2">
-                <Label htmlFor="starting-map-checkbox" className="text-sm font-medium text-muted-foreground">
+                <HintLabel htmlFor="starting-map-checkbox" className="text-sm font-medium text-muted-foreground" hint={"If this map is the map that players will start the game then mark this option"}>
                   Starting Map
-                </Label>
-                <Tooltip content="If this map is the map that players will start the game then mark this option">
-                  <HelpCircle className="h-4 w-4 text-muted-foreground" aria-hidden />
-                </Tooltip>
+                </HintLabel>
               </div>
               <Checkbox
                 id="starting-map-checkbox"

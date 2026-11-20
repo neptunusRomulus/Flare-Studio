@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import Tooltip from '@/components/ui/tooltip';
-import { Check, ChevronDown, ChevronUp, HelpCircle, Image, Sparkles, User } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, Image, Sparkles, User } from 'lucide-react';
 import { getStoredFlarePath } from '@/flare/flarePathStore';
 import {
   appearanceSelectionProps,
@@ -14,6 +14,7 @@ import {
 } from '@/flare/npcAppearance';
 import NpcAssetThumb from '@/components/NpcAssetThumb';
 import DirectionField from '@/components/DirectionField';
+import { HintIcon } from '@/components/ui/field-hint';
 
 type Props = {
   projectPath: string | null;
@@ -144,9 +145,7 @@ const NpcAppearanceSection = ({
           >
             {looksExpanded ? <ChevronUp className="w-4 h-4 shrink-0" /> : <ChevronDown className="w-4 h-4 shrink-0" />}
             <span>Appearance</span>
-            <Tooltip content="Pick a sprite from fantasycore (or the project). Custom imports still work below.">
-              <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
-            </Tooltip>
+            <HintIcon hint={"Pick a sprite from fantasycore (or the project). Custom imports still work below."} className="w-3.5 h-3.5 text-muted-foreground" />
           </Button>
         </CollapsibleTrigger>
         <CollapsibleContent>
@@ -220,9 +219,7 @@ const NpcAppearanceSection = ({
                 >
                   {portraitsExpanded ? <ChevronUp className="w-4 h-4 shrink-0" /> : <ChevronDown className="w-4 h-4 shrink-0" />}
                   <span>Portrait</span>
-                  <Tooltip content="Dialog portrait shown when talking to this NPC.">
-                    <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
-                  </Tooltip>
+                  <HintIcon hint={"Dialog portrait shown when talking to this NPC."} className="w-3.5 h-3.5 text-muted-foreground" />
                 </Button>
               </CollapsibleTrigger>
               <CollapsibleContent>

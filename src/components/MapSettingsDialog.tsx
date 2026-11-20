@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import Tooltip from '@/components/ui/tooltip';
-import { HelpCircle, X, Save, Trash2 } from 'lucide-react';
+import { X, Save, Trash2 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
@@ -14,6 +14,7 @@ import { AnchoredConfirm } from '@/components/ui/inline-confirm';
 import ResizeHandle from '@/components/ResizeHandle';
 import { toast } from '@/hooks/use-toast';
 import { renameIfNameChanged } from '@/editor/identityFromName';
+import { HintLabel } from '@/components/ui/field-hint';
 
 type MapSettingsDialogProps = {
   open: boolean;
@@ -166,12 +167,9 @@ const MapSettingsDialog = ({
           </div>
           <div className="flex items-center gap-2 rounded-md border border-border px-3 py-2">
             <div className="flex items-center gap-2">
-              <Label htmlFor="starting-map-checkbox-modal" className="text-sm font-medium text-muted-foreground">
+              <HintLabel htmlFor="starting-map-checkbox-modal" className="text-sm font-medium text-muted-foreground" hint={"If this map is the map that players will start the game then mark this option"}>
                 Starting Map
-              </Label>
-              <Tooltip content="If this map is the map that players will start the game then mark this option">
-                <HelpCircle className="h-4 w-4 text-muted-foreground" aria-hidden />
-              </Tooltip>
+              </HintLabel>
             </div>
             <Checkbox
               id="starting-map-checkbox-modal"

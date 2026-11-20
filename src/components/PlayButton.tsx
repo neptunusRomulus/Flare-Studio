@@ -4,6 +4,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import Tooltip from '@/components/ui/tooltip';
 import type { FlareLaunchMode } from '@/hooks/useFlareEngine';
 import { ChevronDown, Play } from 'lucide-react';
+import { FieldHint } from '@/components/ui/field-hint';
 
 export type PlayButtonProps = {
   isRunning: boolean;
@@ -65,10 +66,9 @@ export default function PlayButton({ isRunning, lastError, hasProject, hasMap, o
             onClick={() => launch('current-map')}
             className="h-auto w-full justify-start rounded-sm px-2 py-1.5 text-left"
           >
-            <div>
+            <FieldHint hint="Save and launch into this map">
               <div className="font-medium">Play Current Map</div>
-              <div className="text-xs text-muted-foreground">Save and launch into this map</div>
-            </div>
+            </FieldHint>
           </Button>
           <Button
             type="button"
@@ -77,10 +77,9 @@ export default function PlayButton({ isRunning, lastError, hasProject, hasMap, o
             onClick={() => launch('new-game')}
             className="h-auto w-full justify-start rounded-sm px-2 py-1.5 text-left"
           >
-            <div>
+            <FieldHint hint="Save and play from the beginning">
               <div className="font-medium">New Game</div>
-              <div className="text-xs text-muted-foreground">Save and play from the beginning</div>
-            </div>
+            </FieldHint>
           </Button>
           {lastError ? (
             <p className="px-2 py-1.5 text-xs text-destructive">{lastError}</p>

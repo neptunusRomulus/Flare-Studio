@@ -1,11 +1,11 @@
 import React from 'react';
-import { HelpCircle, LogIn } from 'lucide-react';
+import { LogIn } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
-import Tooltip from '@/components/ui/tooltip';
 import EventSectionShell from './EventSectionShell';
 import type { EventItemOption, EventSectionProps } from './eventDialogModel';
+import { HintLabel } from '@/components/ui/field-hint';
 
 type Props = EventSectionProps & {
   inventoryItems: EventItemOption[];
@@ -73,10 +73,7 @@ export default function EventActionsSection({
         {/* Inventory and Loot Effects */}
         <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <Label className="text-xs font-medium text-foreground/80">Inventory & Loot Effects</Label>
-            <Tooltip content="Take or give items, currency, or item groups when this event triggers">
-              <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
-            </Tooltip>
+            <HintLabel className="text-xs font-medium text-foreground/80" hint={"Take or give items, currency, or item groups when this event triggers"}>Inventory & Loot Effects</HintLabel>
           </div>
           <div className="overflow-hidden rounded-md border border-border">
             <table className="min-w-full text-left text-xs">
@@ -102,7 +99,7 @@ export default function EventActionsSection({
                           rewards: { ...prev.rewards, rewardCurrency: Math.max(0, parseInt(e.target.value) || 0) },
                         }))
                       }
-                      className="h-7 text-xs w-full"
+                      className="h-7 text-xs"
                     />
                   </td>
                 </tr>
@@ -120,7 +117,7 @@ export default function EventActionsSection({
                           rewards: { ...prev.rewards, removeCurrency: Math.max(0, parseInt(e.target.value) || 0) },
                         }))
                       }
-                      className="h-7 text-xs w-full"
+                      className="h-7 text-xs"
                     />
                   </td>
                 </tr>
@@ -136,7 +133,7 @@ export default function EventActionsSection({
                         }))
                       }
                     >
-                      <SelectTrigger className="h-8 text-xs w-full">
+                      <SelectTrigger className="h-8 text-xs">
                         <SelectValue placeholder="Select item" />
                       </SelectTrigger>
                       <SelectContent>
@@ -160,7 +157,7 @@ export default function EventActionsSection({
                           rewards: { ...prev.rewards, rewardItemQuantity: Math.max(1, parseInt(e.target.value) || 1) },
                         }))
                       }
-                      className="h-7 text-xs w-full"
+                      className="h-7 text-xs"
                     />
                   </td>
                 </tr>
@@ -176,7 +173,7 @@ export default function EventActionsSection({
                         }))
                       }
                     >
-                      <SelectTrigger className="h-8 text-xs w-full">
+                      <SelectTrigger className="h-8 text-xs">
                         <SelectValue placeholder="Select item" />
                       </SelectTrigger>
                       <SelectContent>
@@ -200,7 +197,7 @@ export default function EventActionsSection({
                           rewards: { ...prev.rewards, removeItemQuantity: Math.max(1, parseInt(e.target.value) || 1) },
                         }))
                       }
-                      className="h-7 text-xs w-full"
+                      className="h-7 text-xs"
                     />
                   </td>
                 </tr>
@@ -216,7 +213,7 @@ export default function EventActionsSection({
                         }))
                       }
                     >
-                      <SelectTrigger className="h-8 text-xs w-full">
+                      <SelectTrigger className="h-8 text-xs">
                         <SelectValue placeholder="Select loot group" />
                       </SelectTrigger>
                       <SelectContent>
@@ -242,7 +239,7 @@ export default function EventActionsSection({
                         }))
                       }
                     >
-                      <SelectTrigger className="h-8 text-xs w-full">
+                      <SelectTrigger className="h-8 text-xs">
                         <SelectValue placeholder="Select loot group" />
                       </SelectTrigger>
                       <SelectContent>
@@ -266,7 +263,7 @@ export default function EventActionsSection({
                           rewards: { ...prev.rewards, rewardLootCountMin: Math.max(1, parseInt(e.target.value) || 1) },
                         }))
                       }
-                      className="h-7 text-xs w-full"
+                      className="h-7 text-xs"
                       placeholder="Min"
                     />
                     <Input
@@ -279,7 +276,7 @@ export default function EventActionsSection({
                           rewards: { ...prev.rewards, rewardLootCountMax: Math.max(1, parseInt(e.target.value) || 1) },
                         }))
                       }
-                      className="h-7 text-xs w-full"
+                      className="h-7 text-xs"
                       placeholder="Max"
                     />
                   </td>

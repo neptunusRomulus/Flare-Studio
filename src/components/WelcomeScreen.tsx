@@ -11,6 +11,7 @@ import WindowControlBar from '@/components/WindowControlBar';
 import { getStoredFlarePath, FLARE_PATH_EVENT } from '@/flare/flarePathStore';
 import ProjectStartToggle from '@/components/ProjectStartToggle';
 import { isTemplateAvailable, queueTemplateImport, type ProjectStart } from '@/flare/projectTemplate';
+import { FieldHint } from '@/components/ui/field-hint';
 
 interface WelcomeScreenProps {
   onCreateNewMap: (config: MapConfig, projectPath?: string) => void;
@@ -343,7 +344,9 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
 
             <ProjectStartToggle value={projectStart} onChange={setProjectStart} templateAvailable={templateAvailable} />
 
-            <p className="text-xs text-muted-foreground">Tiles are 192×96 isometric and the game builds on fantasycore. You can change the tile size later in UI Settings.</p>
+            <FieldHint hint="Tiles are 192×96 isometric and the game builds on fantasycore. You can change the tile size later in UI Settings.">
+              <div className="text-sm font-medium">New project</div>
+            </FieldHint>
 
             <div>
               <Label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">

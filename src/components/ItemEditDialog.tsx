@@ -9,7 +9,7 @@ import Tooltip from '@/components/ui/tooltip';
 import EditorPropertyList from '@/components/EditorPropertyList';
 import { extraItemPropertyKeys, ITEM_EXTRA_CATALOG } from '@/editor/itemFileHydrate';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
-import { Apple, Book, Box, Check, ChevronDown, ChevronRight, Coins, Folder, Gift, HelpCircle, Key, Layers, Save, Shield, Sparkles, Sword, Tag, Trash2, Volume2, X, Zap } from 'lucide-react';
+import { Apple, Book, Box, Check, ChevronDown, ChevronRight, Coins, Folder, Gift, Key, Layers, Save, Shield, Sparkles, Sword, Tag, Trash2, Volume2, X, Zap } from 'lucide-react';
 import { ITEM_ROLE_META, ITEM_ROLE_SELECTIONS, RESOURCE_SUBTYPE_META } from '@/editor/itemRoles'
 import { bookRelPath, DEFAULT_BOOK_TEMPLATE } from '@/editor/bookFile'
 import { OPEN_BOOK_EVENT } from '@/components/BookEditorView';
@@ -20,6 +20,7 @@ import { loadTextFiles } from '@/editor/powers/powerFiles';
 import { projectRoot } from '@/editor/projectFiles';
 import { askConfirm } from '@/components/ui/inline-confirm';
 import ResizeHandle from '@/components/ResizeHandle';
+import { FieldHint, HintIcon } from '@/components/ui/field-hint';
 
 const EMPTY_POWER = '__empty__';
 
@@ -320,9 +321,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
               <div>
                 <div className="flex items-center gap-1">
                   <Label className="text-xs text-muted-foreground font-normal">Quality (Rarity)</Label>
-                  <Tooltip content="Controls rarity color & overlay; does not affect stats." side="right">
-                    <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
-                  </Tooltip>
+                  <HintIcon hint={"Controls rarity color & overlay; does not affect stats."} side="right" className="w-3.5 h-3.5 text-muted-foreground" />
                 </div>
                 {(() => {
                   const qualityOptions = [
@@ -389,9 +388,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-medium">Stash</span>
-                      <Tooltip content="Where this can be stored?" side="right">
-                        <HelpCircle className="w-4 h-4 text-muted-foreground" />
-                      </Tooltip>
+                      <HintIcon hint={"Where this can be stored?"} side="right" className="w-4 h-4 text-muted-foreground" />
                     </div>
                     <div className="flex flex-col gap-1">
                       <Label className="flex items-center gap-2 text-xs font-normal text-foreground">
@@ -432,9 +429,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
                   <div>
                     <div className="flex items-center gap-1">
                       <Label className="text-xs text-muted-foreground font-normal">Buy Price</Label>
-                      <Tooltip content="0 = vendors won't buy this item (unsellable)." side="right">
-                        <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
-                      </Tooltip>
+                      <HintIcon hint={"0 = vendors won't buy this item (unsellable)."} side="right" className="w-3.5 h-3.5 text-muted-foreground" />
                     </div>
                     <Input
                       type="text"
@@ -454,9 +449,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
                           <div className="flex items-center gap-2">
                             <div className="flex items-center gap-1">
                               <Label className="text-xs text-muted-foreground font-normal">Sell Price</Label>
-                              <Tooltip content="0 = use automatic sell price (price * vendor_ratio_sell)." side="right">
-                                <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
-                              </Tooltip>
+                              <HintIcon hint={"0 = use automatic sell price (price * vendor_ratio_sell)."} side="right" className="w-3.5 h-3.5 text-muted-foreground" />
                             </div>
                             <Label className="flex items-center gap-1 text-[11px] font-normal text-muted-foreground">
                               <Checkbox
@@ -506,9 +499,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
                 <div>
                   <div className="flex items-center gap-1">
                     <Label className="text-xs text-muted-foreground font-normal">Max stack size</Label>
-                    <Tooltip content="Maximum items per stack. 1 = no stacking." side="right">
-                      <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
-                    </Tooltip>
+                    <HintIcon hint={"Maximum items per stack. 1 = no stacking."} side="right" className="w-3.5 h-3.5 text-muted-foreground" />
                   </div>
                   <Input
                     type="text"
@@ -532,22 +523,22 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
                 const meta = RESOURCE_SUBTYPE_META[key];
                 const isActive = editingItem.resourceSubtype === key;
                 return (
-                  <Button
-                    key={key}
-                    type="button"
-                    variant="outline"
-                    aria-pressed={isActive}
-                    onClick={() => updateEditingItemField('resourceSubtype', key)}
-                    className={`h-auto text-left border rounded-md px-3 py-2 transition-colors ${isActive ? 'border-purple-500 bg-purple-500/10 ring-1 ring-purple-500/30' : 'border-border hover:bg-muted/60'}`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${meta.badgeClass}`}>
-                        {meta.label}
-                      </span>
-                      <Check className={`w-4 h-4 transition-opacity ${isActive ? 'opacity-100 text-purple-500' : 'opacity-0'}`} />
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1 leading-snug">{meta.hint}</p>
-                  </Button>
+                  <FieldHint key={key} hint={meta.hint}>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      aria-pressed={isActive}
+                      onClick={() => updateEditingItemField('resourceSubtype', key)}
+                      className={`h-auto text-left border rounded-md px-3 py-2 transition-colors ${isActive ? 'border-purple-500 bg-purple-500/10 ring-1 ring-purple-500/30' : 'border-border hover:bg-muted/60'}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${meta.badgeClass}`}>
+                          {meta.label}
+                        </span>
+                        <Check className={`w-4 h-4 transition-opacity ${isActive ? 'opacity-100 text-purple-500' : 'opacity-0'}`} />
+                      </div>
+                    </Button>
+                  </FieldHint>
                 );
               })}
             </div>

@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AlertTriangle, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import DraftInput from './DraftInput';
 import { Switch } from '@/components/ui/switch';
@@ -27,6 +26,7 @@ import type { ContentKind } from '@/editor/powers/powerKinds';
 import type { PowerProjectFiles } from './usePowerProjectFiles';
 import { renameIfNameChanged } from '@/editor/identityFromName';
 import { displayIdentity } from '@/editor/identityRename';
+import { HintLabel } from '@/components/ui/field-hint';
 
 export type PowerTarget = { type: 'power' | 'effect' | 'flag' | 'new'; id: string };
 
@@ -57,7 +57,7 @@ const Section = ({ title, children }: { title: string; children: React.ReactNode
 
 const Field = ({ label, flareKey, children }: { label: string; flareKey: string; children: React.ReactNode }) => (
   <div className="grid grid-cols-[7rem_1fr] items-center gap-2">
-    <Tooltip content={flareKey} side="left"><Label className="text-xs truncate font-normal">{label}</Label></Tooltip>
+    <HintLabel className="text-xs truncate font-normal" hint={flareKey} side="left">{label}</HintLabel>
     <div className="min-w-0">{children}</div>
   </div>
 );

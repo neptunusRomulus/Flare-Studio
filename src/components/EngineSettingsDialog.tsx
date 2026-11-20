@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import * as SliderPrimitive from '@radix-ui/react-slider';
-import { Moon, Sun, Target, X, Save, Settings, Eye, HelpCircle, FileText, Play, FolderOpen } from 'lucide-react';
+import { Moon, Sun, Target, X, Save, Settings, Eye, FileText, Play, FolderOpen } from 'lucide-react';
 import Tooltip from '@/components/ui/tooltip';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
@@ -10,6 +10,7 @@ import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 import ResizeHandle from '@/components/ResizeHandle';
 import { useDisplayScale } from '@/hooks/useInterfaceScale';
 import { openEngineStudio } from '@/components/studio/engineStudio';
+import { FieldHint, HintLabel } from '@/components/ui/field-hint';
 
 type SettingsTab = 'general' | 'save' | 'display' | 'files' | 'flare';
 
@@ -255,10 +256,7 @@ const EngineSettingsDialog = ({
           {activeTab === 'flare' && (
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label className="block text-sm font-medium">Flare engine</Label>
-                <p className="text-xs text-muted-foreground">
-                  Launch the engine title screen or choose the Flare executable used for playtesting.
-                </p>
+                <HintLabel className="block text-sm font-medium" hint="Launch the engine title screen or choose the Flare executable used for playtesting.">Flare engine</HintLabel>
               </div>
               <div className="space-y-2">
                 <Button
@@ -303,10 +301,7 @@ const EngineSettingsDialog = ({
               <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-1 min-w-0">
-                    <Label className="text-sm font-medium">Interface size</Label>
-                    <Tooltip content="Scales the whole window. Ctrl + / Ctrl - to change, Ctrl 0 to reset.">
-                      <HelpCircle className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                    </Tooltip>
+                    <HintLabel className="text-sm font-medium" hint={"Scales the whole window. Ctrl + / Ctrl - to change, Ctrl 0 to reset."}>Interface size</HintLabel>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     <Button type="button" variant="outline" size="icon" className="h-7 w-7 rounded-md border border-border text-sm hover:bg-muted" aria-label="Smaller interface" onClick={() => stepInterfaceScale(-1)}>−</Button>
@@ -333,10 +328,7 @@ const EngineSettingsDialog = ({
                 </SliderPrimitive.Root>
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-1 min-w-0">
-                    <Label className="text-sm font-medium">Text size</Label>
-                    <Tooltip content="Scales text only, on top of interface size.">
-                      <HelpCircle className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                    </Tooltip>
+                    <HintLabel className="text-sm font-medium" hint={"Scales text only, on top of interface size."}>Text size</HintLabel>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     <Button type="button" variant="outline" size="icon" className="h-7 w-7 rounded-md border border-border text-sm hover:bg-muted" aria-label="Smaller text" onClick={() => setTextScale(textScale - 10)}>−</Button>

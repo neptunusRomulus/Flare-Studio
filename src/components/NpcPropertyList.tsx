@@ -4,12 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import Tooltip from '@/components/ui/tooltip';
 import DirectionField from '@/components/DirectionField';
-import { FolderOpen, HelpCircle, X } from 'lucide-react';
+import { FolderOpen, X } from 'lucide-react';
 import SearchablePalette from '@/components/ui/searchable-palette';
 import type { MapObject } from '@/types';
 import { sectionsFromNpcText, type KeyValue } from '@/utils/npcFileUpdate';
+import { FieldHint } from '@/components/ui/field-hint';
 import {
   filterPropertyCatalog,
   isCustomTilesetAppearance,
@@ -45,12 +45,11 @@ const CardShell = ({
   children: React.ReactNode;
 }) => (
   <div className="flex items-start gap-2 rounded-md border border-border bg-muted/20 px-2.5 py-2 text-xs">
-    <Tooltip content={tip}>
+    <FieldHint hint={tip}>
       <div className="flex-1 min-w-0 flex flex-wrap items-center gap-x-1 gap-y-1 leading-relaxed">
         {children}
-        <HelpCircle className="w-3 h-3 text-muted-foreground shrink-0" />
       </div>
-    </Tooltip>
+    </FieldHint>
     <Button
       type="button"
       variant="ghost"

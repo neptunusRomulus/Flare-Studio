@@ -1,7 +1,7 @@
 import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import Tooltip from '@/components/ui/tooltip';
+import { FieldHint, HintLabel } from '@/components/ui/field-hint';
 import {
   parseHeroLayers, parseHeroOptions, parseLootSettings, parseXpTable,
   serializeHeroLayers, serializeHeroOptions, serializeXpTable, unknownIds, upsertLootSettings,
@@ -12,7 +12,7 @@ type TextProps = { text: string; onChange: (text: string) => void };
 
 const Field = ({ label, tip, children }: { label: string; tip: string; children: React.ReactNode }) => (
   <div className="grid grid-cols-[9rem_1fr] items-center gap-2">
-    <Tooltip content={tip}><span className="text-xs truncate">{label}</span></Tooltip>
+    <HintLabel className="text-xs truncate font-normal" hint={tip}>{label}</HintLabel>
     {children}
   </div>
 );
@@ -25,10 +25,11 @@ export function XpTableForm({ text, onChange }: TextProps) {
   };
   return (
     <div className="space-y-2">
-      <p className="text-[11px] text-muted-foreground">XP needed to reach each level (level=N,XP).</p>
-      <div className="grid grid-cols-[5rem_1fr_auto] gap-1 text-[11px] text-muted-foreground">
-        <span>Level</span><span>XP</span><span />
-      </div>
+      <FieldHint hint="XP needed to reach each level (level=N,XP).">
+        <div className="grid grid-cols-[5rem_1fr_auto] gap-1 text-[11px] text-muted-foreground">
+          <span>Level</span><span>XP</span><span />
+        </div>
+      </FieldHint>
       {rows.map((row, i) => (
         <div key={i} className="grid grid-cols-[5rem_1fr_auto] gap-1">
           <Input className="h-6 text-xs" value={row.level} onChange={(e) => setRow(i, { level: e.target.value })} />
@@ -50,18 +51,20 @@ export function LootSettingsForm({ text, onChange }: TextProps) {
   const set = (key: keyof typeof loot, value: string) => onChange(upsertLootSettings(text, { [key]: value }));
   return (
     <div className="space-y-2">
-      <p className="text-[11px] text-muted-foreground">Currency name and vendor price ratios from engine/loot.txt. Other loot keys stay in the generic list below if you add them.</p>
+      <FieldHint hint="Currency name and vendor price ratios from engine/loot.txt. Other loot keys stay in the generic list below if you add them.">
+        <div className="text-xs font-medium">Loot</div>
+      </FieldHint>
       <Field label="Currency name" tip="currency_name">
-        <Input className="h-7 text-xs" value={loot.currency_name} onChange={(e) => set('currency_name', e.target.value)} />
+        <Input width="name" className="h-7 text-xs" value={loot.currency_name} onChange={(e) => set('currency_name', e.target.value)} />
       </Field>
       <Field label="Vendor buy ratio" tip="vendor_ratio_buy — multiplier for the Buy tab. Default 1.0.">
-        <Input className="h-7 text-xs" value={loot.vendor_ratio_buy} onChange={(e) => set('vendor_ratio_buy', e.target.value)} />
+        <Input width="num" className="h-7 text-xs" value={loot.vendor_ratio_buy} onChange={(e) => set('vendor_ratio_buy', e.target.value)} />
       </Field>
       <Field label="Vendor sell ratio" tip="vendor_ratio_sell — what vendors pay for your items.">
-        <Input className="h-7 text-xs" value={loot.vendor_ratio_sell} onChange={(e) => set('vendor_ratio_sell', e.target.value)} />
+        <Input width="num" className="h-7 text-xs" value={loot.vendor_ratio_sell} onChange={(e) => set('vendor_ratio_sell', e.target.value)} />
       </Field>
       <Field label="Sell used items" tip="vendor_ratio_sell_old — price for items you previously sold.">
-        <Input className="h-7 text-xs" value={loot.vendor_ratio_sell_old} onChange={(e) => set('vendor_ratio_sell_old', e.target.value)} />
+        <Input width="num" className="h-7 text-xs" value={loot.vendor_ratio_sell_old} onChange={(e) => set('vendor_ratio_sell_old', e.target.value)} />
       </Field>
     </div>
   );
@@ -74,10 +77,11 @@ export function HeroOptionsForm({ text, onChange }: TextProps) {
   };
   return (
     <div className="space-y-2">
-      <p className="text-[11px] text-muted-foreground">Appearance choices on the new-hero screen (option=index,base,head,portrait,name).</p>
-      <div className="grid grid-cols-[4rem_6rem_7rem_1fr_7rem_auto] gap-1 text-[11px] text-muted-foreground">
-        <span>Index</span><span>Base</span><span>Head</span><span>Portrait</span><span>Name</span><span />
-      </div>
+      <FieldHint hint="Appearance choices on the new-hero screen (option=index,base,head,portrait,name).">
+        <div className="grid grid-cols-[4rem_6rem_7rem_1fr_7rem_auto] gap-1 text-[11px] text-muted-foreground">
+          <span>Index</span><span>Base</span><span>Head</span><span>Portrait</span><span>Name</span><span />
+        </div>
+      </FieldHint>
       {rows.map((row, i) => (
         <div key={i} className="grid grid-cols-[4rem_6rem_7rem_1fr_7rem_auto] gap-1">
           <Input className="h-6 text-xs" value={row.index} onChange={(e) => setRow(i, { index: e.target.value })} />
@@ -104,7 +108,9 @@ export function HeroLayersForm({ text, onChange }: TextProps) {
   };
   return (
     <div className="space-y-2">
-      <p className="text-[11px] text-muted-foreground">Draw order of equipment layers per facing (layer=direction,types…).</p>
+      <FieldHint hint="Draw order of equipment layers per facing (layer=direction,types…).">
+        <div className="text-xs font-medium">Hero layers</div>
+      </FieldHint>
       {rows.map((row, i) => (
         <div key={i} className="grid grid-cols-[5rem_1fr_auto] gap-1">
           <Input className="h-6 text-xs" value={row.direction} onChange={(e) => setRow(i, { direction: e.target.value })} />
@@ -145,7 +151,9 @@ export function ClassHeroForm({
 }) {
   return (
     <div className="space-y-4">
-      <p className="text-[11px] text-muted-foreground">Starting gear, powers and action bar for each class. Unknown item or power ids are flagged.</p>
+      <FieldHint hint="Starting gear, powers and action bar for each class. Unknown item or power ids are flagged.">
+        <div className="text-xs font-medium">Classes</div>
+      </FieldHint>
       {sections.map((section, sectionIndex) => {
         if (section.type && section.type !== 'class') return null;
         const valueOf = (key: string) => section.fields.find((f) => f.key === key)?.value || '';

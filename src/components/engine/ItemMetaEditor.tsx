@@ -6,6 +6,7 @@ import { toast } from '@/hooks/use-toast';
 import { engineTextFromSections, sectionsFromEngineText } from '@/adapters/flare/flareAdapter.cjs';
 import { loadConfigDocument, saveConfigDocument } from '@/editor/projectFiles';
 import { useAppContext } from '@/context/AppContext';
+import { FieldHint } from '@/components/ui/field-hint';
 
 const FILES = [
   { path: 'items/types.txt', label: 'Types', section: 'type' },
@@ -78,7 +79,9 @@ export default function ItemMetaEditor({ initialFile }: { initialFile?: string }
         <Button size="sm" className="h-7 text-xs" onClick={() => void save()} disabled={!dirty[active]}>Save</Button>
       </div>
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
-        <p className="text-[11px] text-muted-foreground">{meta.path} — short id/name forms. Extra keys stay editable.</p>
+        <FieldHint hint={`${meta.path} — short id/name forms. Extra keys stay editable.`}>
+          <div className="text-xs font-mono text-muted-foreground">{meta.path}</div>
+        </FieldHint>
         {sections.map((section, si) => (
           <div key={si} className="border border-border/50 rounded-md p-2 space-y-1">
             <div className="text-[11px] font-mono text-muted-foreground">[{section.type || meta.section}]</div>

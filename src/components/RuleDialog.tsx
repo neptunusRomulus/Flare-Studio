@@ -7,6 +7,7 @@ import Tooltip from '@/components/ui/tooltip';
 import { GitBranch, Shield, User } from 'lucide-react';
 import { RULE_ACTION_GROUPS, RULE_TRIGGER_LOOKUP } from '@/editor/ruleOptions';
 import type { RuleStartType } from '@/editor/ruleOptions';
+import { FieldHint } from '@/components/ui/field-hint';
 
 type RuleTriggerOption = {
   id: string;
@@ -67,10 +68,14 @@ const RuleDialog = ({
     <DialogContent className="max-w-xl w-[520px]">
       <DialogHeader>
         <DialogTitle className="flex items-center gap-2">
-          <GitBranch className="w-5 h-5 text-orange-500" />
-          Add Rule
+          <FieldHint hint="Give the rule a name and pick how it begins.">
+            <span className="flex items-center gap-2">
+              <GitBranch className="w-5 h-5 text-orange-500" />
+              Add Rule
+            </span>
+          </FieldHint>
         </DialogTitle>
-        <DialogDescription>Give the rule a name and pick how it begins.</DialogDescription>
+        <DialogDescription className="sr-only">Give the rule a name and pick how it begins.</DialogDescription>
       </DialogHeader>
 
       <div className="space-y-4">
@@ -185,11 +190,12 @@ const RuleDialog = ({
                   const GroupIcon = group.icon;
                   return (
                     <div key={group.id} className="rounded-md border border-border bg-muted/50 px-3 py-3">
-                      <div className="flex items-center gap-2 text-sm font-semibold">
-                        <GroupIcon className="w-4 h-4 text-orange-500" />
-                        {group.title}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">{group.tooltip}</p>
+                      <FieldHint hint={group.tooltip}>
+                        <div className="flex items-center gap-2 text-sm font-semibold">
+                          <GroupIcon className="w-4 h-4 text-orange-500" />
+                          {group.title}
+                        </div>
+                      </FieldHint>
                       <div className="mt-3 flex flex-wrap gap-2">
                         {group.actions.map((action) => {
                           const ActionIcon = action.icon;

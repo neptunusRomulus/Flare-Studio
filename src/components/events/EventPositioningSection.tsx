@@ -1,11 +1,12 @@
 import React from 'react';
-import { HelpCircle, MapPinPlus } from 'lucide-react';
+import { MapPinPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import Tooltip from '@/components/ui/tooltip';
 import { ACTIVATION_COLORS } from '@/editor/eventActivationColors';
 import EventSectionShell from './EventSectionShell';
+import { HintLabel } from '@/components/ui/field-hint';
 import {
   ACTIVATION_CONFIG,
   ACTIVATION_OPTIONS,
@@ -53,10 +54,7 @@ export default function EventPositioningSection({
         {/* Activation */}
         <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <Label className="text-xs font-medium text-foreground/80">Activation</Label>
-            <Tooltip content="When this event executes">
-              <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
-            </Tooltip>
+            <HintLabel className="text-xs font-medium text-foreground/80" hint={"When this event executes"}>Activation</HintLabel>
           </div>
           <div className="flex flex-wrap gap-1 items-start">
             {ACTIVATION_OPTIONS.map(activation => {
@@ -107,10 +105,7 @@ export default function EventPositioningSection({
           {/* Location and Size */}
           <div className={`space-y-2 transition-opacity ${!isLocEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
             <div className="flex items-center gap-2">
-              <Label className="text-xs font-medium text-foreground/80">Location and Size</Label>
-              <Tooltip content="Defines the physical area of the event">
-                <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
-              </Tooltip>
+              <HintLabel className="text-xs font-medium text-foreground/80" hint={"Defines the physical area of the event"}>Location and Size</HintLabel>
             </div>
             <div className="grid grid-cols-4 gap-2">
               <div>
@@ -136,7 +131,7 @@ export default function EventPositioningSection({
                       },
                     }))
                   }
-                  className="h-7 text-xs w-full"
+                  className="h-7 text-xs"
                 />
               </div>
               <div>
@@ -162,7 +157,7 @@ export default function EventPositioningSection({
                       },
                     }))
                   }
-                  className="h-7 text-xs w-full"
+                  className="h-7 text-xs"
                 />
               </div>
               <div>
@@ -184,7 +179,7 @@ export default function EventPositioningSection({
                       },
                     }))
                   }
-                  className="h-7 text-xs w-full"
+                  className="h-7 text-xs"
                 />
               </div>
               <div>
@@ -206,7 +201,7 @@ export default function EventPositioningSection({
                       },
                     }))
                   }
-                  className="h-7 text-xs w-full"
+                  className="h-7 text-xs"
                 />
               </div>
             </div>
@@ -215,10 +210,7 @@ export default function EventPositioningSection({
           {/* Hotspot */}
           <div className={`space-y-2 transition-opacity ${!isHotspotEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
             <div className="flex items-center gap-2">
-              <Label className="text-xs font-medium text-foreground/80">Hotspot</Label>
-              <Tooltip content="Property determines the specific clickable area for an interaction">
-                <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
-              </Tooltip>
+              <HintLabel className="text-xs font-medium text-foreground/80" hint={"Property determines the specific clickable area for an interaction"}>Hotspot</HintLabel>
             </div>
             <div className="grid grid-cols-4 gap-2">
               <div>
@@ -300,10 +292,7 @@ export default function EventPositioningSection({
           {/* Cooldown */}
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <Label className="text-xs font-medium text-foreground/80">Cooldown (ms)</Label>
-              <Tooltip content="Adds a waiting period between activations">
-                <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
-              </Tooltip>
+              <HintLabel className="text-xs font-medium text-foreground/80" hint={"Adds a waiting period between activations"}>Cooldown (ms)</HintLabel>
             </div>
             <div className="flex items-center gap-3">
               <div className="flex-1 relative">
@@ -347,10 +336,7 @@ export default function EventPositioningSection({
           {/* Delay */}
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <Label className="text-xs font-medium text-foreground/80">Delay (ms)</Label>
-              <Tooltip content="Postpones the event's execution after it is triggered">
-                <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
-              </Tooltip>
+              <HintLabel className="text-xs font-medium text-foreground/80" hint={"Postpones the event's execution after it is triggered"}>Delay (ms)</HintLabel>
             </div>
             <div className="flex items-center gap-3">
               <div className="flex-1 relative">

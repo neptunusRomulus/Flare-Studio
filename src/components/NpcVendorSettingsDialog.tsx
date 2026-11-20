@@ -7,14 +7,14 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Input } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import Tooltip from '@/components/ui/tooltip';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 import { parseRandomStockCount } from '@/utils/parsers';
-import { Gift, HandCoins, HelpCircle, Hammer, Package, Save, Sparkles, ChevronDown, X } from 'lucide-react';
+import { Gift, HandCoins, Hammer, Package, Save, Sparkles, ChevronDown, X } from 'lucide-react';
 import type { ItemSummary } from '@/utils/items';
 import { parseVendorTabs, formatVendorTabs, type VendorTab } from '@/utils/npcFileUpdate';
 import NpcVendorShelves from '@/components/NpcVendorShelves';
 import ResizeHandle from '@/components/ResizeHandle';
+import { HintIcon } from '@/components/ui/field-hint';
 
 /** Flare 1.15 NPC.cpp craft keys; repeatable ones take one value per line. */
 const CRAFT_FIELDS = [
@@ -202,9 +202,7 @@ const NpcVendorSettingsDialog = ({
                 <div>
                   <Label className="flex items-center gap-2 text-sm font-medium mb-1">
                     Vendor Requires Status
-                    <Tooltip content="vendor_requires_status — The player must have these statuses in order to use this NPC as a vendor.">
-                      <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
-                    </Tooltip>
+                    <HintIcon hint={"vendor_requires_status — The player must have these statuses in order to use this NPC as a vendor."} className="w-4 h-4 text-muted-foreground cursor-pointer" />
                   </Label>
                   <Input
                     className="h-10 text-sm"
@@ -216,9 +214,7 @@ const NpcVendorSettingsDialog = ({
                 <div>
                   <Label className="flex items-center gap-2 text-sm font-medium mb-1">
                     Vendor Requires Not Status
-                    <Tooltip content="vendor_requires_not_status — The player must not have these statuses in order to use this NPC as a vendor.">
-                      <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
-                    </Tooltip>
+                    <HintIcon hint={"vendor_requires_not_status — The player must not have these statuses in order to use this NPC as a vendor."} className="w-4 h-4 text-muted-foreground cursor-pointer" />
                   </Label>
                   <Input
                     className="h-10 text-sm"
@@ -261,9 +257,7 @@ const NpcVendorSettingsDialog = ({
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-2 text-sm font-semibold text-foreground whitespace-nowrap">
                         <span>{section.title}</span>
-                        <Tooltip content={section.tooltip}>
-                          <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
-                        </Tooltip>
+                        <HintIcon hint={section.tooltip} className="w-4 h-4 text-muted-foreground cursor-pointer" />
                       </div>
                       <div className="flex items-center gap-2 flex-nowrap">
                         {section.stockType === 'random' && (
@@ -309,9 +303,7 @@ const NpcVendorSettingsDialog = ({
                             ))}
                           </SelectContent>
                         </Select>
-                        <Tooltip content={section.buttonTooltip}>
-                          <HelpCircle className="w-5 h-5 text-muted-foreground cursor-pointer" />
-                        </Tooltip>
+                        <HintIcon hint={section.buttonTooltip} className="w-5 h-5 text-muted-foreground cursor-pointer" />
                       </div>
                     </div>
                   </div>
@@ -343,9 +335,7 @@ const NpcVendorSettingsDialog = ({
                 <div className="grid gap-2">
                   <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                     <span>Buy Ratio</span>
-                    <Tooltip content="vendor_ratio_buy — Multiplier for item prices for the vendor.">
-                      <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
-                    </Tooltip>
+                    <HintIcon hint={"vendor_ratio_buy — Multiplier for item prices for the vendor."} className="w-4 h-4 text-muted-foreground cursor-pointer" />
                   </div>
                   <div className="flex items-center gap-3">
                     <Input
@@ -378,9 +368,7 @@ const NpcVendorSettingsDialog = ({
                 <div className="grid gap-2">
                   <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                     <span>Sell Ratio</span>
-                    <Tooltip content="vendor_ratio_sell — Multiplier for item prices for the vendor.">
-                      <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
-                    </Tooltip>
+                    <HintIcon hint={"vendor_ratio_sell — Multiplier for item prices for the vendor."} className="w-4 h-4 text-muted-foreground cursor-pointer" />
                   </div>
                   <div className="flex items-center gap-3">
                     <Input
@@ -413,9 +401,7 @@ const NpcVendorSettingsDialog = ({
                 <div className="grid gap-2">
                   <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                     <span>Buy Back Ratio</span>
-                    <Tooltip content="vendor_ratio_sell_old — Multiplier for items you sold previously, after you leave the shop and come back.">
-                      <HelpCircle className="w-4 h-4 text-muted-foreground cursor-pointer" />
-                    </Tooltip>
+                    <HintIcon hint={"vendor_ratio_sell_old — Multiplier for items you sold previously, after you leave the shop and come back."} className="w-4 h-4 text-muted-foreground cursor-pointer" />
                   </div>
                   <div className="flex items-center gap-3">
                     <Input
@@ -479,9 +465,7 @@ const NpcVendorSettingsDialog = ({
                     <Label htmlFor={`vendor-tab-${tab}`} className="text-xs font-normal capitalize">{tab}</Label>
                   </div>
                 ))}
-                <Tooltip content="vendor_tab_enabled — Buy and Sell are on by default, Craft is off.">
-                  <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
-                </Tooltip>
+                <HintIcon hint={"vendor_tab_enabled — Buy and Sell are on by default, Craft is off."} className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
                 {(['vendor_gamble_buy', 'vendor_gamble_craft'] as const).map((key) => (
                   <div key={key} className="inline-flex items-center gap-1.5">
                     <Checkbox
@@ -493,17 +477,13 @@ const NpcVendorSettingsDialog = ({
                     <Label htmlFor={key} className="text-xs font-normal">{key === 'vendor_gamble_buy' ? 'Gamble Buy' : 'Gamble Craft'}</Label>
                   </div>
                 ))}
-                <Tooltip content="vendor_gamble_buy / vendor_gamble_craft — Hide damage, absorb and bonuses of randomized items on that tab until purchase.">
-                  <HelpCircle className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
-                </Tooltip>
+                <HintIcon hint={"vendor_gamble_buy / vendor_gamble_craft — Hide damage, absorb and bonuses of randomized items on that tab until purchase."} className="w-3.5 h-3.5 text-muted-foreground cursor-help" />
               </div>
               {CRAFT_FIELDS.map((field) => (
                 <div key={field.key} className="grid grid-cols-[9rem_1fr] items-start gap-2">
                   <span className="flex items-center gap-1 text-xs text-muted-foreground pt-1.5">
                     {field.label}
-                    <Tooltip content={field.tooltip}>
-                      <HelpCircle className="w-3 h-3 cursor-help" />
-                    </Tooltip>
+                    <HintIcon hint={field.tooltip} className="w-3 h-3 cursor-help" />
                   </span>
                   {field.multiline ? (
                     <Textarea

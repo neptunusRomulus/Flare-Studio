@@ -1,6 +1,5 @@
 import { useContext, useEffect, useState, type ReactNode } from 'react';
 import { Coins, Flag, Gift, Package, Plus, Sparkles, X } from 'lucide-react';
-import Tooltip from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
@@ -9,6 +8,7 @@ import { joinStatusList, splitStatusList } from '@/editor/questSteps';
 import AppContext from '@/context/AppContext';
 import { loadProjectTextMap } from '@/editor/projectFiles';
 import { findTurnInTarget, listMapEvents } from '@/editor/questRewards';
+import { FieldHint } from '@/components/ui/field-hint';
 
 export type WhenDoneRewards = {
   set_status?: string;
@@ -74,7 +74,9 @@ const WhenDoneRow = ({ completeStatus, onCompleteStatusChange, rewards = {}, onR
         <IconButton label="Loot" tip="reward_loot" icon={Gift} active={!!rewards.reward_loot} onClick={() => toggle('loot')} />
       </div>
       {turnIn ? (
-        <p className="text-[11px] text-muted-foreground">Rewards go to the turn-in dialog {turnIn}.</p>
+        <FieldHint hint={`Rewards go to the turn-in dialog ${turnIn}.`}>
+          <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Turn-in {turnIn}</div>
+        </FieldHint>
       ) : (
         <div className="space-y-1">
           <p className="text-[11px] text-muted-foreground">No turn-in NPC dialog found. Pick a map event to write reward_xp, reward_item, and set_status.</p>
@@ -91,7 +93,7 @@ const WhenDoneRow = ({ completeStatus, onCompleteStatusChange, rewards = {}, onR
               onRewardsChange({ ...rewards, event_path: path, event_key: key });
             }}
           >
-            <SelectTrigger className="h-6 w-full text-[11px]">
+            <SelectTrigger className="h-6 text-[11px]">
               <SelectValue placeholder="Map event" />
             </SelectTrigger>
             <SelectContent>
@@ -216,7 +218,7 @@ const IconButton = ({
   active: boolean;
   onClick: () => void;
 }) => (
-  <Tooltip content={tip}>
+  <FieldHint hint={tip}>
     <Button
       type="button"
       variant="outline"
@@ -228,7 +230,7 @@ const IconButton = ({
     >
       <Icon className="w-3.5 h-3.5" />
     </Button>
-  </Tooltip>
+  </FieldHint>
 );
 
 export default WhenDoneRow;

@@ -14,6 +14,7 @@ import { loadProjectTextMap, projectRoot, saveConfigDocument } from '@/editor/pr
 import { collectSectionIds } from '@/editor/engineForms';
 import { ClassHeroForm, HeroLayersForm, HeroOptionsForm, LootSettingsForm, XpTableForm } from '@/components/engine/EngineSpecialForms';
 import { registerProblemOpener } from '@/editor/projectProblems';
+import { FieldHint } from '@/components/ui/field-hint';
 
 export interface ParsedSection {
   type: string;
@@ -238,8 +239,9 @@ export function EngineConfigEditor({ initialFile }: { initialFile?: string } = {
         <div className="flex items-center gap-3">
           <FileText className="w-5 h-5 text-accent" />
           <div>
-            <h2 className="text-sm font-semibold text-foreground">Engine Configuration Editor</h2>
-            <p className="text-xs text-muted-foreground">Edit {ENGINE_CONFIG_FILES.length} engine config files</p>
+            <FieldHint hint={`Edit ${ENGINE_CONFIG_FILES.length} engine config files`}>
+              <h2 className="text-sm font-semibold text-foreground">Engine Configuration Editor</h2>
+            </FieldHint>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -267,7 +269,7 @@ export function EngineConfigEditor({ initialFile }: { initialFile?: string } = {
           <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             type="text"
-            placeholder="Search config files..."
+            width="full" placeholder="Search config files..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             className="pl-8 text-xs h-7"

@@ -36,7 +36,7 @@ const PowersPanel = ({ projectPath }: { projectPath: string | null | undefined }
   return (
     <div className="flex flex-col flex-1 min-h-0">
       <div className="flex items-center gap-1 px-1 pt-1">
-        <Input className="h-7 text-xs" placeholder="Search…" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search powers" />
+        <Input className="h-7 text-xs" width="full" placeholder="Search…" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search powers" />
         <Tooltip content="Reload from disk" side="bottom">
           <Button size="icon" variant="ghost" className="h-7 w-7 shrink-0 text-muted-foreground" aria-label="Reload" onClick={() => void data.reload()}>
             <RefreshCw className={`w-3.5 h-3.5 ${data.loading ? 'animate-spin' : ''}`} />

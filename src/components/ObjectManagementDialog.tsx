@@ -4,9 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { ItemSummary } from '@/utils/items';
-import { ArrowUp, ArrowUpRight, ArrowRight, ArrowDownRight, ArrowDown, ArrowDownLeft, ArrowLeft, ArrowUpLeft, HelpCircle, Save, Trash2, User, X } from 'lucide-react';
+import { ArrowUp, ArrowUpRight, ArrowRight, ArrowDownRight, ArrowDown, ArrowDownLeft, ArrowLeft, ArrowUpLeft, Save, Trash2, User, X } from 'lucide-react';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
-import Tooltip from '@/components/ui/tooltip';
 import EventEditDialog from '@/components/EventEditDialog';
 import NpcInstanceEditDialog from '@/components/NpcInstanceEditDialog';
 import NpcQuestSettingsDialog from '@/components/NpcQuestSettingsDialog';
@@ -16,6 +15,7 @@ import type { DialogueTree, MapObject } from '@/types';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 import { InlineConfirm } from '@/components/ui/inline-confirm';
 import ResizeHandle from '@/components/ResizeHandle';
+import { FieldHint, HintLabel } from '@/components/ui/field-hint';
 
 type ObjectManagementDialogProps = {
   showObjectDialog: boolean;
@@ -252,7 +252,7 @@ const ObjectManagementDialog = ({
 
               <div>
                 <div>
-                  <Label className="text-xs text-muted-foreground font-normal">Size</Label>
+                  <HintLabel className="text-xs text-muted-foreground font-normal" hint="Width and height used in the enemy location block.">Size</HintLabel>
                   <div className="flex items-center gap-1 mt-1">
                     <Input
                       type="number"
@@ -270,16 +270,12 @@ const ObjectManagementDialog = ({
                       className="h-8 w-20 px-1 text-center"
                     />
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">Width and height used in the enemy location block.</p>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label className="text-xs text-muted-foreground font-normal">Wander Radius</Label>
-                  <Tooltip content="Radius in tiles this enemy can move from its spawn location.">
-                    <HelpCircle className="w-3 h-3 text-muted-foreground ml-1" />
-                  </Tooltip>
+                  <HintLabel className="text-xs text-muted-foreground font-normal" hint={"Radius in tiles this enemy can move from its spawn location."}>Wander Radius</HintLabel>
                   <Input
                     type="number"
                     value={editingObject.wander_radius ?? 0}
@@ -292,10 +288,7 @@ const ObjectManagementDialog = ({
                   />
                 </div>
                 <div>
-                  <Label className="text-xs text-muted-foreground font-normal">Waypoints</Label>
-                  <Tooltip content="Optional patrol path: x1,y1;x2,y2;...">
-                    <HelpCircle className="w-3 h-3 text-muted-foreground ml-1" />
-                  </Tooltip>
+                  <HintLabel className="text-xs text-muted-foreground font-normal" hint={"Optional patrol path: x1,y1;x2,y2;..."}>Waypoints</HintLabel>
                   <Input
                     className="h-8 mt-1"
                     value={getEditingObjectProperty('waypoints', '')}
@@ -307,10 +300,7 @@ const ObjectManagementDialog = ({
 
               <div>
                 <div className="flex items-center gap-1 mb-1">
-                  <Label className="text-xs text-muted-foreground font-normal">Direction</Label>
-                  <Tooltip content="The facing direction when this enemy spawns on the map.">
-                    <HelpCircle className="w-3 h-3 text-muted-foreground" />
-                  </Tooltip>
+                  <HintLabel className="text-xs text-muted-foreground font-normal" hint={"The facing direction when this enemy spawns on the map."}>Direction</HintLabel>
                 </div>
                 <div className="grid grid-cols-3 gap-1 w-[fit-content]">
                   {([

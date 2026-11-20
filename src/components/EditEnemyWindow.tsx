@@ -9,7 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import * as SliderPrimitive from '@radix-ui/react-slider';
-import { Sword, HelpCircle, X, Save, Plus, FolderOpen, Shield, Footprints, Swords, Feather } from 'lucide-react';
+import { Sword, X, Save, Plus, FolderOpen, Shield, Footprints, Swords, Feather } from 'lucide-react';
 import NameField from '@/components/NameField';
 import NpcAssetThumb from '@/components/NpcAssetThumb';
 import { statsFromStrength, strengthFromStats, strengthLabel, STRENGTH_TIERS, type StrengthTier } from '@/editor/enemyStrength';
@@ -35,6 +35,7 @@ import EnemyLootSection from '@/components/enemies/EnemyLootSection';
 import EnemyStorySection from '@/components/enemies/EnemyStorySection';
 import { BEHAVIOR_ICONS, enemyPropertyTooltips } from '@/components/enemies/enemyModel';
 import { EditorSection, Flag, LabelWithTooltip, MoreToggle, enemyInputCls } from '@/components/enemies/enemyFormPrimitives';
+import { HintIcon } from '@/components/ui/field-hint';
 import {
   formatLootProperty,
   formatLootRow,
@@ -866,7 +867,7 @@ const [name, setName] = useState(() => enemy?.name || '');
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground font-normal flex items-center gap-1">
               Shared file
-              <Tooltip content={enemyPropertyTooltips.include}><HelpCircle className="w-3 h-3" /></Tooltip>
+              <HintIcon hint={enemyPropertyTooltips.include} className="w-3 h-3" />
             </Label>
             <div className="space-y-1.5">
               {includes.map((path, index) => (

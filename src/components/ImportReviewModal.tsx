@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label';
 import type { AssetRecord, TilesetProfile } from '@/types';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 import ResizeHandle from '@/components/ResizeHandle';
+import { FieldHint } from '@/components/ui/field-hint';
 
 type AssetOriginPreset =
   | 'top-left'
@@ -186,16 +187,15 @@ export const ImportReviewModal: React.FC<ImportReviewModalProps> = ({
           {/* Fixed tile size info */}
           <div className="bg-muted/30 p-3 rounded-md border border-border">
             <div className="flex items-center justify-between gap-2">
-              <Label className="text-xs font-semibold uppercase tracking-wide text-foreground">
-                Tile Size
-              </Label>
+              <FieldHint hint="Project tile size from tileset settings. Use merge/separate tools to adjust tile boundaries after import.">
+                <Label className="text-xs font-semibold uppercase tracking-wide text-foreground">
+                  Tile Size
+                </Label>
+              </FieldHint>
               <span className="text-xs font-mono bg-background px-2 py-0.5 rounded border border-border text-foreground">
                 {tileWidth}x{tileHeight}
               </span>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Project tile size from tileset settings. Use merge/separate tools to adjust tile boundaries after import.
-            </p>
           </div>
 
           <div className="space-y-3">

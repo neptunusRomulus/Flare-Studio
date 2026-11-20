@@ -8,6 +8,7 @@ import { collectSectionIds, unknownIds } from '@/editor/engineForms';
 import { loadProjectTextMap, writeProjectFiles } from '@/editor/projectFiles';
 import { parsePowerTree, POWER_TREE_PATH, serializePowerTree, type PowerTreeFile, type PowerTreeTab } from '@/editor/powerTree';
 import { useAppContext } from '@/context/AppContext';
+import { FieldHint } from '@/components/ui/field-hint';
 
 export default function PowerTreeEditor() {
   const ctx = useAppContext();
@@ -74,7 +75,9 @@ export default function PowerTreeEditor() {
             }} />
           </div>
         )}
-        <p className="text-[11px] text-muted-foreground">Powers on this tab (tab=, position=x,y, requires_power).  Other keys are kept when you save.</p>
+        <FieldHint hint="Powers on this tab (tab=, position=x,y, requires_power). Other keys are kept when you save.">
+          <div className="text-xs font-medium">Powers on this tab</div>
+        </FieldHint>
         {tabNodes.map((node) => {
           const missing = unknownIds(node.requires_power, powerIds);
           const idMissing = node.id && powerIds.size > 0 && !powerIds.has(node.id);

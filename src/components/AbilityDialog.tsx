@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Zap } from 'lucide-react';
+import { FieldHint } from '@/components/ui/field-hint';
 
 type AbilityDialogProps = {
   open: boolean;
@@ -25,10 +26,14 @@ const AbilityDialog = ({ open, abilityNameInput, onNameChange, onClose, onCreate
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Zap className="w-5 h-5 text-orange-500" />
-            Add Ability
+            <FieldHint hint="Create a new ability for the Actions layer.">
+              <span className="flex items-center gap-2">
+                <Zap className="w-5 h-5 text-orange-500" />
+                Add Ability
+              </span>
+            </FieldHint>
           </DialogTitle>
-          <DialogDescription>Create a new ability for the Actions layer.</DialogDescription>
+          <DialogDescription className="sr-only">Create a new ability for the Actions layer.</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">

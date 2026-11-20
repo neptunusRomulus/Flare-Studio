@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import Tooltip from '@/components/ui/tooltip';
-import { Check, ChevronDown, ChevronUp, HelpCircle } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp } from 'lucide-react';
 import NpcAssetThumb from '@/components/NpcAssetThumb';
 import SpriteFrameThumb from '@/components/SpriteFrameThumb';
 import {
@@ -13,6 +13,7 @@ import {
   type EnemyLookOption,
 } from '@/flare/enemyAppearance';
 import { portraitSelectionProps, type NpcPortraitOption } from '@/flare/npcAppearance';
+import { HintIcon } from '@/components/ui/field-hint';
 
 type Props = {
   projectPath: string;
@@ -64,9 +65,7 @@ const EnemyAppearancePicker = ({
           >
             {looksExpanded ? <ChevronUp className="w-4 h-4 shrink-0" /> : <ChevronDown className="w-4 h-4 shrink-0" />}
             <span>Sprite</span>
-            <Tooltip content="Pick an enemy sprite from fantasycore (or the project). Sets animations on save.">
-              <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
-            </Tooltip>
+            <HintIcon hint={"Pick an enemy sprite from fantasycore (or the project). Sets animations on save."} className="w-3.5 h-3.5 text-muted-foreground" />
           </Button>
         </CollapsibleTrigger>
         <CollapsibleContent>
@@ -104,9 +103,7 @@ const EnemyAppearancePicker = ({
           >
             {portraitsExpanded ? <ChevronUp className="w-4 h-4 shrink-0" /> : <ChevronDown className="w-4 h-4 shrink-0" />}
             <span>Portrait</span>
-            <Tooltip content="Optional portrait for this enemy, shown in Studio lists.">
-              <HelpCircle className="w-3.5 h-3.5 text-muted-foreground" />
-            </Tooltip>
+            <HintIcon hint={"Optional portrait for this enemy, shown in Studio lists."} className="w-3.5 h-3.5 text-muted-foreground" />
           </Button>
         </CollapsibleTrigger>
         <CollapsibleContent>

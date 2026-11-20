@@ -1,11 +1,10 @@
 import React from 'react';
-import { HelpCircle, Repeat2 } from 'lucide-react';
+import { Repeat2 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import Tooltip from '@/components/ui/tooltip';
 import EventSectionShell from './EventSectionShell';
 import type { EventSectionProps } from './eventDialogModel';
+import { HintLabel } from '@/components/ui/field-hint';
 
 type Props = EventSectionProps;
 
@@ -25,10 +24,7 @@ export default function EventEngineSection({ eventData, setEventData, expandedSe
         {/* Chance */}
         <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <Label className="text-xs font-medium text-foreground/80">Chance (%)</Label>
-            <Tooltip content="Sets a percentage chance for the event to fire">
-              <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
-            </Tooltip>
+            <HintLabel className="text-xs font-medium text-foreground/80" hint={"Sets a percentage chance for the event to fire"}>Chance (%)</HintLabel>
           </div>
           <div className="flex items-center gap-3">
             <Input
@@ -74,21 +70,15 @@ export default function EventEngineSection({ eventData, setEventData, expandedSe
             }
             className="h-4 w-4"
           />
-          <Label htmlFor="autoSave" className="text-xs font-medium text-foreground/80">
+          <HintLabel htmlFor="autoSave" className="text-xs font-medium text-foreground/80" hint={"Automatically saves the game and updates the respawn point"}>
             Auto Save Game
-          </Label>
-          <Tooltip content="Automatically saves the game and updates the respawn point">
-            <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
-          </Tooltip>
+          </HintLabel>
         </div>
 
         {/* Script */}
         <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <Label className="text-xs font-medium text-foreground/80">Script File</Label>
-            <Tooltip content="Calls an external script file for complex logic">
-              <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
-            </Tooltip>
+            <HintLabel className="text-xs font-medium text-foreground/80" hint={"Calls an external script file for complex logic"}>Script File</HintLabel>
           </div>
           <Input
             value={eventData.engine.script}

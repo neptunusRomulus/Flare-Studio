@@ -5,13 +5,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Sheet, Save, X, Tag, Layers, Shield, Check, HelpCircle, Search, ChevronDown, ChevronRight } from 'lucide-react';
+import { Sheet, Save, X, Tag, Layers, Shield, Check, Search, ChevronDown, ChevronRight } from 'lucide-react';
 import Tooltip from '@/components/ui/tooltip';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 import type { ItemSummary } from '@/utils/items';
 import ResizeHandle from '@/components/ResizeHandle';
 import LootChancePicker from '@/components/LootChancePicker';
 import LootRowsEditor from '@/components/LootRowsEditor';
+import { HintLabel } from '@/components/ui/field-hint';
 import {
   formatLootChance,
   formatLootRow,
@@ -290,10 +291,7 @@ function LootGroupEditDialog(props: LootGroupEditDialogProps) {
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <Label className="text-xs font-medium text-muted-foreground">Name</Label>
-                  <Tooltip content="Set the display name for this item group. This name helps generate the loot group ID and file name.">
-                    <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
-                  </Tooltip>
+                  <HintLabel className="text-xs font-medium text-muted-foreground" hint={"Set the display name for this item group. This name helps generate the loot group ID and file name."}>Name</HintLabel>
                 </div>
                 <Input
                   value={name}
@@ -304,10 +302,7 @@ function LootGroupEditDialog(props: LootGroupEditDialogProps) {
               </div>
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <Label className="text-xs font-medium text-muted-foreground">Description (optional)</Label>
-                  <Tooltip content="Optional notes or author-facing description for this loot group.">
-                    <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
-                  </Tooltip>
+                  <HintLabel className="text-xs font-medium text-muted-foreground" hint={"Optional notes or author-facing description for this loot group."}>Description (optional)</HintLabel>
                 </div>
                 <Input
                   value={description}
@@ -319,10 +314,7 @@ function LootGroupEditDialog(props: LootGroupEditDialogProps) {
             </div>
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <Label className="text-xs font-medium text-muted-foreground">Loot Group ID</Label>
-                <Tooltip content="This ID is automatically generated from the group name and cannot be edited directly.">
-                  <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
-                </Tooltip>
+                <HintLabel className="text-xs font-medium text-muted-foreground" hint={"This ID is automatically generated from the group name and cannot be edited directly."}>Loot Group ID</HintLabel>
               </div>
               <Input value={generatedId} readOnly className="h-10 bg-muted/10 text-muted-foreground" />
             </div>
@@ -332,17 +324,14 @@ function LootGroupEditDialog(props: LootGroupEditDialogProps) {
             <div className="grid gap-3 md:grid-cols-2">
               <div className="space-y-2 md:col-span-2">
                 <div className="flex items-center gap-2">
-                  <Label className="text-xs font-medium text-muted-foreground">Search items</Label>
-                  <Tooltip content="Filter the user-created items list by ID, name, or category.">
-                    <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
-                  </Tooltip>
+                  <HintLabel className="text-xs font-medium text-muted-foreground" hint={"Filter the user-created items list by ID, name, or category."}>Search items</HintLabel>
                 </div>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     value={searchQuery}
                     onChange={(event) => setSearchQuery(event.target.value)}
-                    placeholder="Search by ID, name, category"
+                    width="full" placeholder="Search by ID, name, category"
                     className="h-10 pl-10"
                   />
                 </div>
@@ -416,10 +405,7 @@ function LootGroupEditDialog(props: LootGroupEditDialogProps) {
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <Label className="text-xs font-medium text-muted-foreground">requires_status</Label>
-                  <Tooltip content="Enter a campaign status ID that must be active for this loot to drop.">
-                    <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
-                  </Tooltip>
+                  <HintLabel className="text-xs font-medium text-muted-foreground" hint={"Enter a campaign status ID that must be active for this loot to drop."}>requires_status</HintLabel>
                 </div>
                 <Input
                   value={requiresStatus}
@@ -430,10 +416,7 @@ function LootGroupEditDialog(props: LootGroupEditDialogProps) {
               </div>
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <Label className="text-xs font-medium text-muted-foreground">requires_level</Label>
-                  <Tooltip content="Specify a player level range in the form min,max for this loot to be eligible.">
-                    <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
-                  </Tooltip>
+                  <HintLabel className="text-xs font-medium text-muted-foreground" hint={"Specify a player level range in the form min,max for this loot to be eligible."}>requires_level</HintLabel>
                 </div>
                 <Input
                   value={requiresLevel}
@@ -444,10 +427,7 @@ function LootGroupEditDialog(props: LootGroupEditDialogProps) {
               </div>
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <Label className="text-xs font-medium text-muted-foreground">quantity_per_level</Label>
-                  <Tooltip content="Enter a min,max pair to add scaled quantity based on player level.">
-                    <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
-                  </Tooltip>
+                  <HintLabel className="text-xs font-medium text-muted-foreground" hint={"Enter a min,max pair to add scaled quantity based on player level."}>quantity_per_level</HintLabel>
                 </div>
                 <Input
                   value={quantityPerLevel}
@@ -458,10 +438,7 @@ function LootGroupEditDialog(props: LootGroupEditDialogProps) {
               </div>
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <Label className="text-xs font-medium text-muted-foreground">Default chance</Label>
-                  <Tooltip content="loot chance used when a row has no chance of its own. Always is fixed.">
-                    <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
-                  </Tooltip>
+                  <HintLabel className="text-xs font-medium text-muted-foreground" hint={"loot chance used when a row has no chance of its own. Always is fixed."}>Default chance</HintLabel>
                 </div>
                 <LootChancePicker value={defaultChance} onChange={handleDefaultChance} />
               </div>

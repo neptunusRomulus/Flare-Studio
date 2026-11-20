@@ -136,16 +136,18 @@ const CLASS_FIELDS: Array<{ key: string; label: string; tip: string; kind?: 'ite
   { key: 'powers', label: 'Starting powers', tip: 'powers — power ids the hero knows', kind: 'power' },
   { key: 'actionbar', label: 'Action bar', tip: 'actionbar — 12 slots; 0 is empty', kind: 'power-bar' },
   { key: 'default_power_tab', label: 'Default power tab', tip: 'default_power_tab — power tree tab index' },
+  { key: 'power_tree', label: 'Power tree', tip: 'power_tree — path to a powers/trees/*.txt file. If empty, Flare loads powers/trees/default.txt.' },
 ];
 
 type ClassSection = { type: string; fields: Array<{ key: string; value: string; comment?: string }> };
 
 export function ClassHeroForm({
-  sections, onFieldChange, fileName, itemIds, powerIds,
+  sections, onFieldChange, onSetNamedField, fileName, itemIds, powerIds,
 }: {
   sections: ClassSection[];
   fileName: string;
   onFieldChange: (fileName: string, sectionIndex: number, fieldIndex: number, key: string, value: string) => void;
+  onSetNamedField?: (fileName: string, sectionIndex: number, key: string, value: string) => void;
   itemIds: Set<string>;
   powerIds: Set<string>;
 }) {
@@ -158,6 +160,10 @@ export function ClassHeroForm({
         if (section.type && section.type !== 'class') return null;
         const valueOf = (key: string) => section.fields.find((f) => f.key === key)?.value || '';
         const setValue = (key: string, value: string) => {
+          if (onSetNamedField) {
+            onSetNamedField(fileName, sectionIndex, key, value);
+            return;
+          }
           const fieldIndex = section.fields.findIndex((f) => f.key === key);
           if (fieldIndex >= 0) onFieldChange(fileName, sectionIndex, fieldIndex, 'value', value);
         };
@@ -168,11 +174,11 @@ export function ClassHeroForm({
               const value = valueOf(field.key);
               const known = field.kind === 'item' ? itemIds : field.kind === 'power' || field.kind === 'power-bar' ? powerIds : null;
               const missing = known && known.size ? unknownIds(value, known, { allowZero: field.kind === 'power-bar' }) : [];
-              if (!value && !['name', 'equipment', 'powers', 'actionbar'].includes(field.key) && section.fields.every((f) => f.key !== field.key)) return null;
+              if (!value && !['name', 'equipment', 'powers', 'actionbar', 'power_tree'].includes(field.key) && section.fields.every((f) => f.key !== field.key)) return null;
               return (
                 <div key={field.key} className="space-y-0.5">
                   <Field label={field.label} tip={field.tip}>
-                    <Input className="h-7 text-xs" value={value} onChange={(e) => setValue(field.key, e.target.value)} disabled={section.fields.every((f) => f.key !== field.key) && field.key !== 'name'} />
+                    <Input className="h-7 text-xs" width={field.key === 'power_tree' ? 'path' : field.key === 'default_power_tab' ? 'num' : 'name'} value={value} onChange={(e) => setValue(field.key, e.target.value)} disabled={section.fields.every((f) => f.key !== field.key) && field.key !== 'name' && field.key !== 'power_tree'} />
                   </Field>
                   {missing.length > 0 && (
                     <p className="text-[11px] text-amber-500 pl-[9rem]">Unknown {field.kind === 'item' ? 'item' : 'power'} id: {missing.join(', ')}</p>

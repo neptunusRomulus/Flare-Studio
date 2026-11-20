@@ -182,6 +182,21 @@ export function EngineConfigEditor({ initialFile }: { initialFile?: string } = {
     });
   };
 
+  const handleSetNamedField = (fileName: string, sectionIndex: number, key: string, value: string) => {
+    setParsedData(prev => {
+      const sections = [...(prev[fileName] || [])];
+      const section = { ...sections[sectionIndex] };
+      const fields = [...section.fields];
+      const fieldIndex = fields.findIndex((field) => field.key === key);
+      if (fieldIndex >= 0) fields[fieldIndex] = { ...fields[fieldIndex], value };
+      else fields.push({ key, value });
+      section.fields = fields;
+      sections[sectionIndex] = section;
+      rememberSections(fileName, sections);
+      return { ...prev, [fileName]: sections };
+    });
+  };
+
   const addField = (fileName: string, sectionIndex: number) => {
     setParsedData(prev => {
       const sections = [...(prev[fileName] || [])];
@@ -332,6 +347,7 @@ export function EngineConfigEditor({ initialFile }: { initialFile?: string } = {
                   fileName={activeTab}
                   sections={parsedData[activeTab] || []}
                   onFieldChange={handleFieldChange}
+                  onSetNamedField={handleSetNamedField}
                   itemIds={itemIds}
                   powerIds={powerIds}
                 />

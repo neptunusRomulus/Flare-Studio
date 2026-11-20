@@ -148,3 +148,110 @@ export function collectSectionIds(files: Record<string, string>, sections: strin
   }
   return ids;
 }
+
+export const COMBAT_PATH = 'engine/combat.txt';
+export const XP_TABLE_PATH = 'engine/xp_table.txt';
+
+export type CombatSettings = {
+  absorb_percent: string;
+  resist_percent: string;
+  block_percent: string;
+  avoidance_percent: string;
+  miss_damage_percent: string;
+  crit_damage_percent: string;
+  overhit_damage_percent: string;
+  resource_round_method: string;
+  offscreen_enemy_encounters: string;
+  poise_style: string;
+};
+
+export const COMBAT_KEYS: Array<keyof CombatSettings> = [
+  'absorb_percent',
+  'resist_percent',
+  'block_percent',
+  'avoidance_percent',
+  'miss_damage_percent',
+  'crit_damage_percent',
+  'overhit_damage_percent',
+  'resource_round_method',
+  'offscreen_enemy_encounters',
+  'poise_style',
+];
+
+export const COMBAT_RANGE_KEYS = [
+  'absorb_percent',
+  'resist_percent',
+  'block_percent',
+  'avoidance_percent',
+  'miss_damage_percent',
+  'crit_damage_percent',
+  'overhit_damage_percent',
+] as const;
+
+export function emptyCombatSettings(): CombatSettings {
+  return {
+    absorb_percent: '',
+    resist_percent: '',
+    block_percent: '',
+    avoidance_percent: '',
+    miss_damage_percent: '',
+    crit_damage_percent: '',
+    overhit_damage_percent: '',
+    resource_round_method: '',
+    offscreen_enemy_encounters: '',
+    poise_style: '',
+  };
+}
+
+export function parseCombatSettings(text: string): CombatSettings {
+  const out = emptyCombatSettings();
+  for (const raw of String(text || '').split('\n')) {
+    const trimmed = raw.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const eq = trimmed.indexOf('=');
+    if (eq <= 0) continue;
+    const key = trimmed.slice(0, eq).trim() as keyof CombatSettings;
+    if (COMBAT_KEYS.includes(key)) out[key] = trimmed.slice(eq + 1).trim();
+  }
+  return out;
+}
+
+/** Update known combat keys in place; keep comments and unknown keys. Empty values remove the key. */
+export function upsertCombatSettings(text: string, patch: Partial<CombatSettings>): string {
+  const next = { ...parseCombatSettings(text), ...patch };
+  const seen = new Set<string>();
+  const rows = String(text || '').split('\n');
+  const out: string[] = [];
+  for (const raw of rows) {
+    const trimmed = raw.trim();
+    if (!trimmed || trimmed.startsWith('#')) {
+      out.push(raw);
+      continue;
+    }
+    const eq = trimmed.indexOf('=');
+    if (eq <= 0) {
+      out.push(raw);
+      continue;
+    }
+    const key = trimmed.slice(0, eq).trim() as keyof CombatSettings;
+    if (!COMBAT_KEYS.includes(key)) {
+      out.push(raw);
+      continue;
+    }
+    seen.add(key);
+    const value = String(next[key] ?? '').trim();
+    if (!value) continue;
+    const indent = raw.slice(0, raw.length - raw.trimStart().length);
+    out.push(`${indent}${key}=${value}`);
+  }
+  const missing = COMBAT_KEYS.filter((key) => !seen.has(key) && String(next[key] ?? '').trim());
+  if (missing.length) {
+    let insertAt = out.length;
+    while (insertAt > 0 && out[insertAt - 1].trim() === '') insertAt -= 1;
+    out.splice(insertAt, 0, ...missing.map((key) => `${key}=${next[key]}`));
+  }
+  let joined = out.join('\n');
+  if (text.endsWith('\n') && !joined.endsWith('\n')) joined += '\n';
+  if (!text && joined && !joined.endsWith('\n')) joined += '\n';
+  return joined;
+}

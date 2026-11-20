@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import {
   CORE_STAT_KEYS,
+  damageTypeStatIds,
   parseDamageTypes,
+  serializeDamageTypes,
   parseHeroStats,
   parsePrimaryStats,
   parseResourceStats,
@@ -115,14 +117,20 @@ describe('damage_types.txt and resource_stats.txt', () => {
   it('fills default min/max/resist ids the way the engine does', () => {
     const defaults = parseDamageTypes(DEFAULT_DAMAGE);
     expect(defaults.map((type) => type.id)).toEqual(['melee', 'ranged', 'ment']);
-    expect(defaults[0]).toMatchObject({ min: 'dmg_melee_min', max: 'dmg_melee_max', resist: 'melee_resist' });
+    expect(defaults[0]).toMatchObject({ min: 'dmg_melee_min', max: 'dmg_melee_max', resist: '' });
+    expect(damageTypeStatIds(defaults[0])).toMatchObject({ min: 'dmg_melee_min', max: 'dmg_melee_max', resist: 'melee_resist' });
     const empyrean = parseDamageTypes(EMPYREAN_DAMAGE);
     expect(empyrean.find((type) => type.id === 'fire')).toMatchObject({
       min: 'dmg_fire_min',
       max: 'dmg_fire_max',
-      resist: 'fire_resist',
+      name_short: 'Fire',
+      elemental: 'true',
     });
+    expect(damageTypeStatIds(empyrean.find((type) => type.id === 'fire')!)).toMatchObject({ resist: 'fire_resist' });
     expect(empyrean.find((type) => type.id === 'scroll')?.min).toBe('scroll_min');
+    expect(serializeDamageTypes(defaults, DEFAULT_DAMAGE)).toContain('id=melee');
+    expect(serializeDamageTypes(empyrean, EMPYREAN_DAMAGE).startsWith('APPEND')).toBe(true);
+    expect(parseDamageTypes(serializeDamageTypes(empyrean, EMPYREAN_DAMAGE))).toEqual(empyrean);
   });
 
   it('treats the default resource file as empty and round-trips a new pool', () => {

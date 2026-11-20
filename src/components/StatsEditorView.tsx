@@ -16,6 +16,7 @@ import {
   HERO_STATS_PATH,
   PRIMARY_STATS_PATH,
   RESOURCE_STATS_PATH,
+  damageTypeStatIds,
   emptyHeroStats,
   emptyResourceStat,
   normalizeStatId,
@@ -25,6 +26,7 @@ import {
   parseResourceStats,
   renamePrimaryInHeroStats,
   resourceStatIds,
+  serializeDamageTypes,
   serializeHeroStats,
   serializePrimaryStats,
   serializeResourceStats,
@@ -33,6 +35,9 @@ import {
   type PrimaryStat,
   type ResourceStat,
 } from '@/editor/statsTitles';
+import { COMBAT_PATH, XP_TABLE_PATH } from '@/editor/engineForms';
+import { XpTableForm } from '@/components/engine/EngineSpecialForms';
+import { CombatSettingsForm, DamageTypesForm } from '@/components/engine/CombatAndDamageForms';
 
 type Props = { projectPath?: string | null };
 
@@ -48,6 +53,10 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
   const [showResist, setShowResist] = useState(false);
+  const [combatText, setCombatText] = useState('');
+  const [xpText, setXpText] = useState('');
+  const [damageSourceText, setDamageSourceText] = useState('');
+  const [pane, setPane] = useState<'stats' | 'combat' | 'damage' | 'xp'>('stats');
   const [addOpen, setAddOpen] = useState(false);
   const [addId, setAddId] = useState('');
   const [addName, setAddName] = useState('');
@@ -62,23 +71,31 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
       setHero(emptyHeroStats());
       setResources([]);
       setDamageTypes([]);
+      setCombatText('');
+      setXpText('');
+      setDamageSourceText('');
       setSourceKind('empty');
       setDirty(false);
       return;
     }
     const fs = { readFile: window.electronAPI.readFile };
     const flarePath = getStoredFlarePath();
-    const [primaryFile, statsFile, resourceFile, damageFile] = await Promise.all([
+    const [primaryFile, statsFile, resourceFile, damageFile, combatFile, xpFile] = await Promise.all([
       loadEngineFileWithFallback({ projectPath, relative: PRIMARY_STATS_PATH, flarePath, fs }),
       loadEngineFileWithFallback({ projectPath, relative: HERO_STATS_PATH, flarePath, fs }),
       loadEngineFileWithFallback({ projectPath, relative: RESOURCE_STATS_PATH, flarePath, fs }),
       loadEngineFileWithFallback({ projectPath, relative: DAMAGE_TYPES_PATH, flarePath, fs }),
+      loadEngineFileWithFallback({ projectPath, relative: COMBAT_PATH, flarePath, fs }),
+      loadEngineFileWithFallback({ projectPath, relative: XP_TABLE_PATH, flarePath, fs }),
     ]);
     const parsedPrimaries = parsePrimaryStats(primaryFile.text);
     setPrimaries(parsedPrimaries.length ? parsedPrimaries : DEFAULT_PRIMARY_STATS);
     setHero(statsFile.text.trim() ? parseHeroStats(statsFile.text) : emptyHeroStats());
     setResources(parseResourceStats(resourceFile.text));
     setDamageTypes(parseDamageTypes(damageFile.text));
+    setDamageSourceText(damageFile.text);
+    setCombatText(combatFile.text);
+    setXpText(xpFile.text);
     setSourceKind(statsFile.source === 'project' || primaryFile.source === 'project' ? 'project' : (statsFile.source === 'mod' || primaryFile.source === 'mod' ? 'mod' : 'empty'));
     setSourceLabel(statsFile.label || primaryFile.label);
     setDirty(false);
@@ -94,10 +111,11 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
       percent: stat.percent,
     }));
     for (const type of damageTypes) {
+      const ids = damageTypeStatIds(type);
       list.push(
-        { key: type.min, name: `${type.name || type.id} (Min.)`, group: 'damage', percent: false },
-        { key: type.max, name: `${type.name || type.id} (Max.)`, group: 'damage', percent: false },
-        { key: type.resist, name: `Resist (${type.name || type.id})`, group: 'damage', percent: true },
+        { key: ids.min, name: `${type.name || type.id} (Min.)`, group: 'damage', percent: false },
+        { key: ids.max, name: `${type.name || type.id} (Max.)`, group: 'damage', percent: false },
+        { key: ids.resist, name: `Resist (${type.name || type.id})`, group: 'damage', percent: true },
       );
     }
     for (const resource of resources) {
@@ -214,6 +232,11 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
         { path: HERO_STATS_PATH, content: serializeHeroStats(hero) },
         { path: RESOURCE_STATS_PATH, content: serializeResourceStats(resources) },
       ];
+      if (combatText.trim()) files.push({ path: COMBAT_PATH, content: combatText.endsWith('\n') ? combatText : `${combatText}\n` });
+      if (xpText.trim()) files.push({ path: XP_TABLE_PATH, content: xpText.endsWith('\n') ? xpText : `${xpText}\n` });
+      if (damageTypes.length || damageSourceText.trim()) {
+        files.push({ path: DAMAGE_TYPES_PATH, content: serializeDamageTypes(damageTypes, damageSourceText) });
+      }
       const saved = await writeProjectFiles(projectPath, files);
       if (!saved) {
         toast({ title: 'Save failed', description: 'Could not write the engine stat files.', variant: 'destructive' });
@@ -222,7 +245,7 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
       setPrimaries(cleaned);
       setDirty(false);
       setSourceKind('project');
-      toast({ title: 'Saved', description: `Wrote ${PRIMARY_STATS_PATH}, ${HERO_STATS_PATH} and ${RESOURCE_STATS_PATH}.` });
+      toast({ title: 'Saved', description: `Wrote ${files.map((file) => file.path).join(', ')}.` });
     } finally {
       setBusy(false);
     }
@@ -233,20 +256,50 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <FieldHint hint={
-            sourceKind === 'project' ? 'Editing project overrides. Primary stats can be added; core derived keys (hp, mp, accuracy, and the rest of Stats.cpp) are fixed — you can set their values, not invent new core keys. Extra MP-like pools go under Resource stats. Damage-type stats come from engine/damage_types.txt (Engine data files).'
+            sourceKind === 'project' ? 'Editing project overrides. Primary stats can be added; core derived keys (hp, mp, accuracy, and the rest of Stats.cpp) are fixed — you can set their values, not invent new core keys. Extra MP-like pools go under Resource stats. Combat limits, damage types and the XP table are edited in this card.'
             : sourceKind === 'mod' ? `Loaded from a required mod or default (${sourceLabel}). Save writes project overrides. Primary stats can be added; core derived keys are fixed. Extra MP-like pools go under Resource stats.`
-            : 'Primary stats can be added; they are not hardcoded. Core derived keys (hp, mp, accuracy, and the rest of Stats.cpp) are fixed — you can set their values, not invent new core keys. Extra MP-like pools go under Resource stats. Damage-type stats come from engine/damage_types.txt (Engine data files). No project stat files yet: empty fields use Flare engine defaults until you save.'
+            : 'Primary stats can be added; they are not hardcoded. Core derived keys (hp, mp, accuracy, and the rest of Stats.cpp) are fixed — you can set their values, not invent new core keys. Extra MP-like pools go under Resource stats. Combat limits, damage types and the XP table are edited in this card. No project stat files yet: empty fields use Flare engine defaults until you save.'
           }>
             <div className="text-sm font-semibold">Stats</div>
           </FieldHint>
         </div>
         <Button type="button" size="sm" onClick={() => { void save(); }} disabled={!projectPath || busy || !dirty}>{dirty ? 'Save' : 'Saved'}</Button>
       </div>
+      {projectPath ? (
+        <div className="flex flex-wrap gap-1">
+          {([
+            { id: 'stats', label: 'Stats' },
+            { id: 'combat', label: 'Combat' },
+            { id: 'damage', label: 'Damage types' },
+            { id: 'xp', label: 'XP table' },
+          ] as const).map((item) => (
+            <Button
+              key={item.id}
+              type="button"
+              size="sm"
+              variant={pane === item.id ? 'default' : 'outline'}
+              aria-pressed={pane === item.id}
+              className={pane === item.id ? 'h-7 bg-orange-600 text-white hover:bg-orange-600 hover:text-white' : 'h-7'}
+              onClick={() => setPane(item.id)}
+            >
+              {item.label}
+            </Button>
+          ))}
+        </div>
+      ) : null}
 
       {!projectPath ? (
         <p className="text-sm text-muted-foreground">Open a project to edit stats.</p>
       ) : (
         <div className="flex-1 min-h-0 overflow-auto space-y-4 pr-1">
+          {pane === 'combat' ? (
+            <CombatSettingsForm text={combatText} onChange={(next) => { setCombatText(next); mark(); }} />
+          ) : pane === 'damage' ? (
+            <DamageTypesForm types={damageTypes} onChange={(next) => { setDamageTypes(next); mark(); }} />
+          ) : pane === 'xp' ? (
+            <XpTableForm text={xpText} onChange={(next) => { setXpText(next); mark(); }} />
+          ) : (
+          <>
           <section className="rounded-lg border border-border p-3 space-y-2">
             <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Level-up points</div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -380,6 +433,8 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
               </div>
             </div>
           </section>
+          </>
+          )}
         </div>
       )}
 

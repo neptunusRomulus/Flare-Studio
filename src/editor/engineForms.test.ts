@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  collectSectionIds, parseHeroLayers, parseHeroOptions, parseLootSettings, parseXpTable,
-  serializeHeroLayers, serializeHeroOptions, serializeXpTable, unknownIds, upsertLootSettings,
+  collectSectionIds, parseCombatSettings, parseHeroLayers, parseHeroOptions, parseLootSettings, parseXpTable,
+  serializeHeroLayers, serializeHeroOptions, serializeXpTable, unknownIds, upsertCombatSettings, upsertLootSettings,
 } from './engineForms';
 
 describe('engineForms', () => {
@@ -26,6 +26,17 @@ describe('engineForms', () => {
     const layers = parseHeroLayers('layer=SW,main,feet,legs\n');
     expect(layers[0]).toEqual({ direction: 'SW', types: 'main,feet,legs' });
     expect(serializeHeroLayers(layers)).toBe('layer=SW,main,feet,legs\n');
+  });
+
+  it('upserts combat keys while keeping comments', () => {
+    const commented = '#absorb_percent=0,90\n#resist_percent=0,90\n';
+    expect(parseCombatSettings(commented)).toMatchObject({ absorb_percent: '', resist_percent: '' });
+    expect(upsertCombatSettings(commented, {})).toBe(commented);
+    const empyrean = 'absorb_percent=0,90\nresist_percent=0,90\nblock_percent=0,100\n';
+    const next = upsertCombatSettings(empyrean, { crit_damage_percent: '200,200', absorb_percent: '0,80' });
+    expect(parseCombatSettings(next)).toMatchObject({ absorb_percent: '0,80', resist_percent: '0,90', crit_damage_percent: '200,200' });
+    expect(upsertCombatSettings(next, { crit_damage_percent: '' })).not.toContain('crit_damage_percent');
+    expect(upsertCombatSettings('# keep\nabsorb_percent=0,90\n', { absorb_percent: '1,2' })).toContain('# keep');
   });
 
   it('collects ids and reports unknown actionbar/equipment entries, ignoring 0', () => {

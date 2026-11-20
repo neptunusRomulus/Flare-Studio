@@ -167,11 +167,27 @@ export const RESOURCE_STAT_KEYS: Array<keyof ResourceStat> = [
 export type DamageType = {
   id: string;
   name: string;
+  name_short: string;
+  description: string;
   min: string;
   max: string;
   resist: string;
   elemental: string;
 };
+
+export function emptyDamageType(): DamageType {
+  return { id: '', name: '', name_short: '', description: '', min: '', max: '', resist: '', elemental: '' };
+}
+
+/** Engine default stat ids when min/max/resist are omitted in engine/damage_types.txt. */
+export function damageTypeStatIds(type: DamageType): { min: string; max: string; resist: string } {
+  const id = type.id.trim();
+  return {
+    min: type.min.trim() || (id ? `dmg_${id}_min` : ''),
+    max: type.max.trim() || (id ? `dmg_${id}_max` : ''),
+    resist: type.resist.trim() || (id ? `${id}_resist` : ''),
+  };
+}
 
 export function emptyResourceStat(): ResourceStat {
   return {
@@ -511,7 +527,7 @@ export function parseDamageTypes(text: string): DamageType[] {
     const line = raw.trim();
     if (!line || line.startsWith('#') || line === 'APPEND') continue;
     if (/^\[damage_type\]$/i.test(line)) {
-      current = { id: '', name: '', min: '', max: '', resist: '', elemental: '' };
+      current = emptyDamageType();
       list.push(current);
       continue;
     }
@@ -519,19 +535,35 @@ export function parseDamageTypes(text: string): DamageType[] {
     if (eq <= 0 || !current) continue;
     const key = line.slice(0, eq).trim();
     const value = line.slice(eq + 1).trim();
-    if (key === 'id') current.id = value;
-    else if (key === 'name') current.name = value;
-    else if (key === 'min') current.min = value;
-    else if (key === 'max') current.max = value;
-    else if (key === 'resist') current.resist = value;
-    else if (key === 'elemental') current.elemental = value;
+    if (key === 'id' || key === 'name' || key === 'name_short' || key === 'description' || key === 'min' || key === 'max' || key === 'resist' || key === 'elemental') {
+      current[key] = value;
+    }
   }
-  return list.filter((type) => type.id).map((type) => ({
-    ...type,
-    min: type.min || `dmg_${type.id}_min`,
-    max: type.max || `dmg_${type.id}_max`,
-    resist: type.resist || `${type.id}_resist`,
-  }));
+  return list.filter((type) => type.id);
+}
+
+const DAMAGE_TYPE_KEYS: Array<keyof DamageType> = ['id', 'name', 'name_short', 'description', 'min', 'max', 'resist', 'elemental'];
+
+/** Write [damage_type] blocks; keep leading comments and APPEND from the previous text. */
+export function serializeDamageTypes(types: DamageType[], previous = ''): string {
+  const prefix: string[] = [];
+  for (const raw of String(previous || '').split('\n')) {
+    const line = raw.trim();
+    if (/^\[damage_type\]$/i.test(line)) break;
+    if (line.startsWith('#') || line === 'APPEND' || line === '') prefix.push(raw);
+    else break;
+  }
+  while (prefix.length && prefix[prefix.length - 1].trim() === '') prefix.pop();
+  const blocks = types.filter((type) => type.id.trim()).map((type) => {
+    const lines = ['[damage_type]'];
+    for (const key of DAMAGE_TYPE_KEYS) {
+      const value = String(type[key] ?? '').trim();
+      if (key === 'id' || value) lines.push(`${key}=${value}`);
+    }
+    return lines.join('\n');
+  });
+  const parts = [...prefix, ...blocks];
+  return `${parts.join('\n').replace(/\n+$/, '')}\n`;
 }
 
 export function resourceStatIds(resource: ResourceStat): string[] {

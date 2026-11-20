@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import * as SliderPrimitive from '@radix-ui/react-slider';
-import { Moon, Sun, Target, X, Save, Settings, Eye, HelpCircle, FileText, Play, FolderOpen } from 'lucide-react';
+import { Moon, Sun, Target, X, Save, Settings, Eye, HelpCircle, FileText, Play, FolderOpen, Globe } from 'lucide-react';
 import Tooltip from '@/components/ui/tooltip';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
 import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
@@ -10,8 +10,9 @@ import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 import ResizeHandle from '@/components/ResizeHandle';
 import { useDisplayScale } from '@/hooks/useInterfaceScale';
 import { openEngineStudio } from '@/components/studio/engineStudio';
+import { StudioWorldPanel } from '@/components/studio/studioEditors';
 
-type SettingsTab = 'general' | 'save' | 'display' | 'files' | 'flare';
+type SettingsTab = 'general' | 'save' | 'display' | 'files' | 'flare' | 'world';
 
 type EngineSettingsDialogProps = {
   open: boolean;
@@ -65,6 +66,7 @@ const EngineSettingsDialog = ({
   const tabs: { id: SettingsTab; icon: React.ReactNode; label: string }[] = [
     { id: 'general', icon: <Settings className="w-4 h-4" />, label: 'General' },
     { id: 'flare', icon: <Play className="w-4 h-4" />, label: 'Flare' },
+    { id: 'world', icon: <Globe className="w-4 h-4" />, label: 'World' },
     { id: 'save', icon: <Save className="w-4 h-4" />, label: 'Save' },
     { id: 'display', icon: <Eye className="w-4 h-4" />, label: 'Display' },
     { id: 'files', icon: <FileText className="w-4 h-4" />, label: 'Game files' },
@@ -109,6 +111,7 @@ const EngineSettingsDialog = ({
               <Button
                 type="button"
                 variant="ghost"
+                aria-label={tab.label}
                 aria-pressed={activeTab === tab.id}
                 onClick={() => setActiveTab(tab.id)}
                 className={`h-auto p-2 rounded-md transition-colors ${
@@ -385,6 +388,16 @@ const EngineSettingsDialog = ({
                 </div>
                 <p className="text-xs text-gray-500 mt-1">Toggle whether the Active GID badge is visible next to the hover coordinates.</p>
               </div>
+            </div>
+          )}
+
+          {activeTab === 'world' && (
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Cutscenes, language catalog, parallax, fog of war and procedural map rules. Open a project, then use Load/Write on each block.
+                The same editors are in the right-rail Game Settings card (open a map, then the Game Settings icon) and on the Game Settings canvas World tab.
+              </p>
+              <StudioWorldPanel />
             </div>
           )}
 

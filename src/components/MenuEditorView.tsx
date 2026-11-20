@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import Tooltip from '@/components/ui/tooltip';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { StudioWorldPanel } from '@/components/studio/studioEditors';
 import {
   alignToScreenEdge,
   DEFAULT_RESOLUTIONS,
@@ -40,6 +41,7 @@ const MenuEditorView = ({ projectPath }: Props) => {
   const [dirty, setDirty] = useState<Record<string, MenuPanel>>({});
   const [scale, setScale] = useState(1);
   const [showAll, setShowAll] = useState(false);
+  const [pane, setPane] = useState<'menus' | 'world'>('menus');
   const frameRef = useRef<HTMLDivElement>(null);
   const view = useMemo(() => viewSize(screen.w, screen.h, resolutions), [screen, resolutions]);
 
@@ -125,48 +127,81 @@ const MenuEditorView = ({ projectPath }: Props) => {
     await load();
   };
 
-  if (!root) {
-    return <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">Open a project to edit menus.</div>;
-  }
-
   return (
     <div className="absolute inset-0 z-20 flex flex-col bg-background">
       <div className="flex items-center gap-2 border-b border-border px-3 py-2">
-        <div className="text-sm font-semibold">Menus</div>
-        <div className="flex items-center gap-1 ml-2">
-          {RESOLUTIONS.map((entry) => (
-            <Button
-              key={entry.label}
-              type="button"
-              size="sm"
-              variant={screen.label === entry.label ? 'default' : 'outline'}
-              className="h-7 text-xs"
-              onClick={() => setScreen(entry)}
-            >
-              {entry.label}
-            </Button>
-          ))}
-        </div>
-        <div className="text-[11px] text-muted-foreground ml-2">
-          view {view.viewW}×{view.viewH}
-        </div>
-        <div className="flex items-center gap-2 ml-3">
-          <Switch
-            id="menu-show-all"
-            checked={showAll}
-            onCheckedChange={setShowAll}
-            className="scale-75"
-          />
-          <Tooltip content="Off: HUD plus the selected menu, like in the game. On: every panel at once (they may overlap).">
-            <Label htmlFor="menu-show-all" className="text-[11px] font-normal text-muted-foreground">Show all panels</Label>
-          </Tooltip>
-        </div>
-        <Tooltip content="Write pos= for moved panels. Other keys stay as they are.">
-          <Button type="button" size="sm" className="h-7 ml-auto" disabled={!Object.keys(dirty).length} onClick={() => void save()}>
-            <Save className="w-3.5 h-3.5" />
+        <div className="flex items-center gap-1">
+          <Button
+            type="button"
+            size="sm"
+            variant={pane === 'menus' ? 'default' : 'ghost'}
+            aria-pressed={pane === 'menus'}
+            className="h-7 text-xs"
+            onClick={() => setPane('menus')}
+          >
+            Menus
           </Button>
-        </Tooltip>
+          <Button
+            type="button"
+            size="sm"
+            variant={pane === 'world' ? 'default' : 'ghost'}
+            aria-pressed={pane === 'world'}
+            className="h-7 text-xs"
+            onClick={() => setPane('world')}
+          >
+            World
+          </Button>
+        </div>
+        {pane === 'menus' && (
+          <>
+            <div className="flex items-center gap-1 ml-2">
+              {RESOLUTIONS.map((entry) => (
+                <Button
+                  key={entry.label}
+                  type="button"
+                  size="sm"
+                  variant={screen.label === entry.label ? 'default' : 'outline'}
+                  className="h-7 text-xs"
+                  onClick={() => setScreen(entry)}
+                >
+                  {entry.label}
+                </Button>
+              ))}
+            </div>
+            <div className="text-[11px] text-muted-foreground ml-2">
+              view {view.viewW}×{view.viewH}
+            </div>
+            <div className="flex items-center gap-2 ml-3">
+              <Switch
+                id="menu-show-all"
+                checked={showAll}
+                onCheckedChange={setShowAll}
+                className="scale-75"
+              />
+              <Tooltip content="Off: HUD plus the selected menu, like in the game. On: every panel at once (they may overlap).">
+                <Label htmlFor="menu-show-all" className="text-[11px] font-normal text-muted-foreground">Show all panels</Label>
+              </Tooltip>
+            </div>
+            <Tooltip content="Write pos= for moved panels. Other keys stay as they are.">
+              <Button type="button" size="sm" className="h-7 ml-auto" disabled={!root || !Object.keys(dirty).length} onClick={() => void save()}>
+                <Save className="w-3.5 h-3.5" />
+              </Button>
+            </Tooltip>
+          </>
+        )}
       </div>
+      {pane === 'world' ? (
+        <div className="flex-1 overflow-y-auto p-4">
+          <div className="max-w-2xl space-y-3">
+            <p className="text-[11px] text-muted-foreground">
+              Cutscenes, language catalog, parallax, fog of war and procedural map rules. Open a project, then use Load/Write on each block.
+            </p>
+            <StudioWorldPanel />
+          </div>
+        </div>
+      ) : !root ? (
+        <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">Open a project to edit menus.</div>
+      ) : (
       <div className="flex flex-1 min-h-0">
         <div className="w-44 overflow-y-auto border-r border-border p-2 space-y-0.5">
           {panels.map((panel) => (
@@ -210,6 +245,7 @@ const MenuEditorView = ({ projectPath }: Props) => {
           </div>
         </div>
       </div>
+      )}
     </div>
   );
 };

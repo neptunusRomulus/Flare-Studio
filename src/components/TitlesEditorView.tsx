@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { FieldHint } from '@/components/ui/field-hint';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
 import { getStoredFlarePath } from '@/flare/flarePathStore';
@@ -91,15 +92,13 @@ const TitlesEditorView: React.FC<Props> = ({ projectPath }) => {
     <div className="flex flex-col flex-1 min-h-0 gap-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <div className="text-sm font-semibold">Titles</div>
-          <p className="text-[11px] text-muted-foreground">
-            Character-screen titles from engine/titles.txt. Flare uses the first matching title, so keep stricter or higher-level titles at the top.
-          </p>
-          {projectPath ? (
-            <p className="text-[11px] text-muted-foreground mt-1">
-              {sourceKind === 'project' ? 'Editing the project file.' : sourceKind === 'mod' ? `Loaded from a required mod or default (${sourceLabel}). Save writes a project override.` : 'No titles file found. Save will create engine/titles.txt in the project.'}
-            </p>
-          ) : null}
+          <FieldHint hint={
+            sourceKind === 'project' ? 'Editing the project file. Character-screen titles from engine/titles.txt. Flare uses the first matching title, so keep stricter or higher-level titles at the top.'
+            : sourceKind === 'mod' ? `Loaded from a required mod or default (${sourceLabel}). Save writes a project override. Flare uses the first matching title, so keep stricter or higher-level titles at the top.`
+            : 'Character-screen titles from engine/titles.txt. Flare uses the first matching title, so keep stricter or higher-level titles at the top. No titles file found yet; Save will create engine/titles.txt in the project.'
+          }>
+            <div className="text-sm font-semibold">Titles</div>
+          </FieldHint>
         </div>
         <div className="flex gap-2">
           <Button type="button" size="sm" variant="outline" onClick={() => { setTitles((current) => [...current, emptyTitle()]); setDirty(true); }} disabled={!projectPath}>Add title</Button>
@@ -131,17 +130,17 @@ const TitlesEditorView: React.FC<Props> = ({ projectPath }) => {
               ) : titles.map((row, index) => (
                 <tr key={index} className="border-t border-border align-top">
                   <td className="p-2 text-muted-foreground">{index + 1}</td>
-                  <td className="p-2"><Input aria-label={`Title ${index + 1}`} value={row.title} onChange={(event) => update(index, { title: event.target.value })} className="h-8" /></td>
-                  <td className="p-2"><Input aria-label={`Level ${index + 1}`} value={row.level} onChange={(event) => update(index, { level: event.target.value })} className="h-8" /></td>
-                  <td className="p-2"><Input aria-label={`Power ${index + 1}`} value={row.power} onChange={(event) => update(index, { power: event.target.value })} className="h-8" /></td>
-                  <td className="p-2"><Input aria-label={`Requires status ${index + 1}`} value={row.requires_status} onChange={(event) => update(index, { requires_status: event.target.value })} className="h-8" placeholder="status ids" /></td>
-                  <td className="p-2"><Input aria-label={`Requires not status ${index + 1}`} value={row.requires_not_status} onChange={(event) => update(index, { requires_not_status: event.target.value })} className="h-8" placeholder="status ids" /></td>
+                  <td className="p-2"><Input aria-label={`Title ${index + 1}`} width="name" value={row.title} onChange={(event) => update(index, { title: event.target.value })} className="h-8" /></td>
+                  <td className="p-2"><Input aria-label={`Level ${index + 1}`} width="num" value={row.level} onChange={(event) => update(index, { level: event.target.value })} className="h-8" /></td>
+                  <td className="p-2"><Input aria-label={`Power ${index + 1}`} width="id" value={row.power} onChange={(event) => update(index, { power: event.target.value })} className="h-8" /></td>
+                  <td className="p-2"><Input aria-label={`Requires status ${index + 1}`} width="id" value={row.requires_status} onChange={(event) => update(index, { requires_status: event.target.value })} className="h-8" placeholder="status ids" /></td>
+                  <td className="p-2"><Input aria-label={`Requires not status ${index + 1}`} width="id" value={row.requires_not_status} onChange={(event) => update(index, { requires_not_status: event.target.value })} className="h-8" placeholder="status ids" /></td>
                   <td className="p-2">
-                    <Input list={`primary-stats-${index}`} aria-label={`Primary stat ${index + 1}`} value={row.primary_stat_1} onChange={(event) => update(index, { primary_stat_1: event.target.value })} className="h-8" />
+                    <Input list={`primary-stats-${index}`} aria-label={`Primary stat ${index + 1}`} width="id" value={row.primary_stat_1} onChange={(event) => update(index, { primary_stat_1: event.target.value })} className="h-8" />
                     <datalist id={`primary-stats-${index}`}>{primaryIds.map((id) => <option key={id} value={id} />)}</datalist>
                   </td>
                   <td className="p-2">
-                    <Input list={`primary-stats-2-${index}`} aria-label={`Second primary ${index + 1}`} value={row.primary_stat_2} onChange={(event) => update(index, { primary_stat_2: event.target.value })} className="h-8" />
+                    <Input list={`primary-stats-2-${index}`} aria-label={`Second primary ${index + 1}`} width="id" value={row.primary_stat_2} onChange={(event) => update(index, { primary_stat_2: event.target.value })} className="h-8" />
                     <datalist id={`primary-stats-2-${index}`}>{primaryIds.map((id) => <option key={id} value={id} />)}</datalist>
                   </td>
                   <td className="p-2">

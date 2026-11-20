@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { FieldHint } from '@/components/ui/field-hint';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -242,10 +243,9 @@ const StringEditorView: React.FC<Props> = ({ projectPath }) => {
     <div className="flex flex-col flex-1 min-h-0 gap-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <div className="text-sm font-semibold">Strings</div>
-          <p className="text-[11px] text-muted-foreground">
-            English is the source language. Add other languages, scan the project, then translate. Engine UI files (engine.*.po) are not included.
-          </p>
+          <FieldHint hint="English is the source language. Add other languages, scan the project, then translate. Engine UI files (engine.*.po) are not included.">
+            <div className="text-sm font-semibold">Strings</div>
+          </FieldHint>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button type="button" size="sm" variant="outline" onClick={() => setAddOpen(true)} disabled={!projectPath}>Add language</Button>
@@ -282,7 +282,7 @@ const StringEditorView: React.FC<Props> = ({ projectPath }) => {
             )}
             <div className="flex-1 min-w-[160px] space-y-1">
               <Label className="text-[11px] text-muted-foreground font-normal" htmlFor="string-search">Search</Label>
-              <Input id="string-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search source or translation" className="h-8" />
+              <Input id="string-search" width="full" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search source or translation" className="h-8" />
             </div>
             <div className="flex items-center gap-2 pb-1.5">
               <Switch id="string-untranslated" checked={untranslatedOnly} onCheckedChange={(checked) => setUntranslatedOnly(checked === true)} disabled={selected === SOURCE_LANGUAGE} />
@@ -351,19 +351,21 @@ const StringEditorView: React.FC<Props> = ({ projectPath }) => {
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Add language</DialogTitle>
-            <DialogDescription>Adds a language to engine/languages.txt. Translations are stored in languages/data.*.po.</DialogDescription>
+            <FieldHint hint="Adds a language to engine/languages.txt. Translations are stored in languages/data.*.po.">
+              <DialogTitle>Add language</DialogTitle>
+            </FieldHint>
+            <DialogDescription className="sr-only">Adds a language to engine/languages.txt. Translations are stored in languages/data.*.po.</DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
             <Label htmlFor="add-lang-code">Code</Label>
-            <Input id="add-lang-code" value={addCode} onChange={(event) => {
+            <Input id="add-lang-code" width="short" value={addCode} onChange={(event) => {
               const value = event.target.value;
               setAddCode(value);
               const code = normalizeLanguageCode(value);
               if (code && !addName) setAddName(defaultLanguageName(code));
             }} placeholder="tr" className="h-8" />
             <Label htmlFor="add-lang-name">Display name</Label>
-            <Input id="add-lang-name" value={addName} onChange={(event) => setAddName(event.target.value)} placeholder="Türkçe" className="h-8" />
+            <Input id="add-lang-name" width="name" value={addName} onChange={(event) => setAddName(event.target.value)} placeholder="Türkçe" className="h-8" />
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
@@ -375,8 +377,10 @@ const StringEditorView: React.FC<Props> = ({ projectPath }) => {
       <Dialog open={removeOpen} onOpenChange={setRemoveOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Remove {selectedName}?</DialogTitle>
-            <DialogDescription>
+            <FieldHint hint={`This removes ${selected} from engine/languages.txt. The languages/data.${selected}.po file stays on disk and will be reused if you add the language again. English cannot be removed.`}>
+              <DialogTitle>Remove {selectedName}?</DialogTitle>
+            </FieldHint>
+            <DialogDescription className="sr-only">
               This removes {selected} from engine/languages.txt. The languages/data.{selected}.po file stays on disk and will be reused if you add the language again. English cannot be removed.
             </DialogDescription>
           </DialogHeader>

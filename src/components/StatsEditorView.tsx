@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { FieldHint, HintLabel } from '@/components/ui/field-hint';
 import { Switch } from '@/components/ui/switch';
 import { toast } from '@/hooks/use-toast';
 import { getStoredFlarePath } from '@/flare/flarePathStore';
@@ -231,15 +232,13 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
     <div className="flex flex-col flex-1 min-h-0 gap-3">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <div className="text-sm font-semibold">Stats</div>
-          <p className="text-[11px] text-muted-foreground">
-            Primary stats can be added; they are not hardcoded. Core derived keys (hp, mp, accuracy, and the rest of Stats.cpp) are fixed — you can set their values, not invent new core keys. Extra MP-like pools go under Resource stats. Damage-type stats come from engine/damage_types.txt (Engine data files).
-          </p>
-          {projectPath ? (
-            <p className="text-[11px] text-muted-foreground mt-1">
-              {sourceKind === 'project' ? 'Editing project overrides.' : sourceKind === 'mod' ? `Loaded from a required mod or default (${sourceLabel}). Save writes project overrides.` : 'No project stat files yet. Empty fields use Flare engine defaults until you save.'}
-            </p>
-          ) : null}
+          <FieldHint hint={
+            sourceKind === 'project' ? 'Editing project overrides. Primary stats can be added; core derived keys (hp, mp, accuracy, and the rest of Stats.cpp) are fixed — you can set their values, not invent new core keys. Extra MP-like pools go under Resource stats. Damage-type stats come from engine/damage_types.txt (Engine data files).'
+            : sourceKind === 'mod' ? `Loaded from a required mod or default (${sourceLabel}). Save writes project overrides. Primary stats can be added; core derived keys are fixed. Extra MP-like pools go under Resource stats.`
+            : 'Primary stats can be added; they are not hardcoded. Core derived keys (hp, mp, accuracy, and the rest of Stats.cpp) are fixed — you can set their values, not invent new core keys. Extra MP-like pools go under Resource stats. Damage-type stats come from engine/damage_types.txt (Engine data files). No project stat files yet: empty fields use Flare engine defaults until you save.'
+          }>
+            <div className="text-sm font-semibold">Stats</div>
+          </FieldHint>
         </div>
         <Button type="button" size="sm" onClick={() => { void save(); }} disabled={!projectPath || busy || !dirty}>{dirty ? 'Save' : 'Saved'}</Button>
       </div>
@@ -252,16 +251,16 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
             <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Level-up points</div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <div className="space-y-1">
-                <Label className="text-[11px] font-normal text-muted-foreground" htmlFor="stat-points">stat_points_per_level</Label>
-                <Input id="stat-points" value={hero.scalars.stat_points_per_level} onChange={(event) => setScalar('stat_points_per_level', event.target.value)} className="h-8" />
+                <HintLabel className="text-[11px] font-normal text-muted-foreground" htmlFor="stat-points" hint="Stat points awarded each level.">stat_points_per_level</HintLabel>
+                <Input id="stat-points" width="num" value={hero.scalars.stat_points_per_level} onChange={(event) => setScalar('stat_points_per_level', event.target.value)} className="h-8" />
               </div>
               <div className="space-y-1">
-                <Label className="text-[11px] font-normal text-muted-foreground" htmlFor="power-points">power_points_per_level</Label>
-                <Input id="power-points" value={hero.scalars.power_points_per_level} onChange={(event) => setScalar('power_points_per_level', event.target.value)} className="h-8" />
+                <HintLabel className="text-[11px] font-normal text-muted-foreground" htmlFor="power-points" hint="Power points awarded each level.">power_points_per_level</HintLabel>
+                <Input id="power-points" width="num" value={hero.scalars.power_points_per_level} onChange={(event) => setScalar('power_points_per_level', event.target.value)} className="h-8" />
               </div>
               <div className="space-y-1">
-                <Label className="text-[11px] font-normal text-muted-foreground" htmlFor="max-points">max_points_per_stat</Label>
-                <Input id="max-points" value={hero.scalars.max_points_per_stat} onChange={(event) => setScalar('max_points_per_stat', event.target.value)} className="h-8" placeholder="engine default if empty" />
+                <HintLabel className="text-[11px] font-normal text-muted-foreground" htmlFor="max-points" hint="Maximum points that can be put into one primary stat. Leave empty to use the engine default.">max_points_per_stat</HintLabel>
+                <Input id="max-points" width="num" value={hero.scalars.max_points_per_stat} onChange={(event) => setScalar('max_points_per_stat', event.target.value)} className="h-8" placeholder="auto" />
               </div>
             </div>
             <div className="flex flex-wrap gap-4 pt-1">
@@ -278,15 +277,16 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
 
           <section className="rounded-lg border border-border p-3 space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Primary stats</div>
+              <FieldHint hint="Renaming an id only updates bonuses in stats.txt here. Classes, items, powers and titles that use the old id must be edited separately.">
+                <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Primary stats</div>
+              </FieldHint>
               <Button type="button" size="sm" variant="outline" onClick={() => setAddOpen(true)}>Add primary</Button>
             </div>
-            <p className="text-[11px] text-muted-foreground">Renaming an id only updates bonuses in stats.txt here. Classes, items, powers and titles that use the old id must be edited separately.</p>
             <div className="space-y-2">
               {primaries.map((stat, index) => (
                 <div key={index} className="flex flex-wrap items-center gap-2">
-                  <Input aria-label={`Primary id ${index + 1}`} value={stat.id} onChange={(event) => renamePrimary(index, 'id', event.target.value)} className="h-8 w-36" />
-                  <Input aria-label={`Primary name ${index + 1}`} value={stat.name} onChange={(event) => renamePrimary(index, 'name', event.target.value)} className="h-8 flex-1 min-w-[8rem]" />
+                  <Input aria-label={`Primary id ${index + 1}`} width="id" value={stat.id} onChange={(event) => renamePrimary(index, 'id', event.target.value)} className="h-8" />
+                  <Input aria-label={`Primary name ${index + 1}`} width="name" value={stat.name} onChange={(event) => renamePrimary(index, 'name', event.target.value)} className="h-8" />
                   <Button type="button" size="sm" variant="outline" onClick={() => { setPrimaries((current) => current.filter((_, statIndex) => statIndex !== index)); mark(); }}>Remove</Button>
                 </div>
               ))}
@@ -317,14 +317,15 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
                   {visibleRows.map((row) => (
                     <tr key={row.key} className="border-t border-border">
                       <td className="p-2">
-                        <div>{row.name}</div>
-                        <div className="text-[10px] text-muted-foreground font-mono">{row.key}{row.percent ? ' (%)' : ''}</div>
+                        <FieldHint hint={`${row.key}${row.percent ? ' (%)' : ''}`}>
+                          <div>{row.name}</div>
+                        </FieldHint>
                       </td>
-                      <td className="p-2"><Input aria-label={`${row.key} base`} value={hero.base[row.key] ?? ''} onChange={(event) => setBase(row.key, event.target.value)} className="h-8" /></td>
-                      <td className="p-2"><Input aria-label={`${row.key} per level`} value={hero.perLevel[row.key] ?? ''} onChange={(event) => setPerLevel(row.key, event.target.value)} className="h-8" /></td>
+                      <td className="p-2"><Input aria-label={`${row.key} base`} width="num" value={hero.base[row.key] ?? ''} onChange={(event) => setBase(row.key, event.target.value)} className="h-8" /></td>
+                      <td className="p-2"><Input aria-label={`${row.key} per level`} width="num" value={hero.perLevel[row.key] ?? ''} onChange={(event) => setPerLevel(row.key, event.target.value)} className="h-8" /></td>
                       {primaries.map((stat) => (
                         <td key={`${row.key}-${stat.id}`} className="p-2">
-                          <Input aria-label={`${row.key} per ${stat.id}`} value={perPrimaryValue(stat.id, row.key)} onChange={(event) => setPerPrimary(stat.id, row.key, event.target.value)} className="h-8" />
+                          <Input aria-label={`${row.key} per ${stat.id}`} width="num" value={perPrimaryValue(stat.id, row.key)} onChange={(event) => setPerPrimary(stat.id, row.key, event.target.value)} className="h-8" />
                         </td>
                       ))}
                     </tr>
@@ -336,12 +337,13 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
 
           <section className="rounded-lg border border-border p-3 space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Resource stats</div>
+              <FieldHint hint="Optional extra pools besides HP and MP (for example stamina). Each one creates base/regen/steal keys you can grow in the table above.">
+                <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Resource stats</div>
+              </FieldHint>
               <Button type="button" size="sm" variant="outline" onClick={() => setResourceOpen(true)}>Add resource</Button>
             </div>
-            <p className="text-[11px] text-muted-foreground">Optional extra pools besides HP and MP (for example stamina). Each one creates base/regen/steal keys you can grow in the table above.</p>
             {resources.length === 0 ? (
-              <p className="text-xs text-muted-foreground">No extra resources. Default Flare only uses HP and MP.</p>
+              <p className="text-xs text-muted-foreground">No extra resources.</p>
             ) : resources.map((resource, index) => (
               <div key={resource.stat_base || index} className="flex items-center justify-between gap-2 rounded-md border border-border px-2 py-1.5">
                 <div className="text-sm">{resource.text_base || resource.stat_base}</div>
@@ -352,30 +354,31 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
           </section>
 
           <section className="rounded-lg border border-border p-3 space-y-2">
-            <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Other hero fields</div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <FieldHint hint={hero.trailing ? 'The existing [render_layers] (or other) section is kept as-is when you save.' : 'Movement, sounds and other hero stats from engine/stats.txt.'}>
+              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Other stats</div>
+            </FieldHint>
+            <div className="flex flex-wrap items-end gap-3">
               <div className="space-y-1">
                 <Label className="text-[11px] font-normal text-muted-foreground" htmlFor="hero-speed">speed</Label>
-                <Input id="hero-speed" value={hero.scalars.speed} onChange={(event) => setScalar('speed', event.target.value)} className="h-8" />
+                <Input id="hero-speed" width="num" value={hero.scalars.speed} onChange={(event) => setScalar('speed', event.target.value)} className="h-8" />
               </div>
               <div className="space-y-1">
                 <Label className="text-[11px] font-normal text-muted-foreground" htmlFor="hero-step">sfx_step</Label>
-                <Input id="hero-step" value={hero.scalars.sfx_step} onChange={(event) => setScalar('sfx_step', event.target.value)} className="h-8" />
+                <Input id="hero-step" width="id" value={hero.scalars.sfx_step} onChange={(event) => setScalar('sfx_step', event.target.value)} className="h-8" />
               </div>
               <div className="space-y-1">
-                <Label className="text-[11px] font-normal text-muted-foreground" htmlFor="hero-cooldown">cooldown</Label>
-                <Input id="hero-cooldown" value={hero.scalars.cooldown} onChange={(event) => setScalar('cooldown', event.target.value)} className="h-8" placeholder="66ms default" />
+                <HintLabel className="text-[11px] font-normal text-muted-foreground" htmlFor="hero-cooldown" hint="Global attack cooldown. Defaults to 66ms if empty.">cooldown</HintLabel>
+                <Input id="hero-cooldown" width="short" value={hero.scalars.cooldown} onChange={(event) => setScalar('cooldown', event.target.value)} className="h-8" placeholder="66ms" />
               </div>
               <div className="space-y-1">
                 <Label className="text-[11px] font-normal text-muted-foreground" htmlFor="hero-cooldown-hit">cooldown_hit</Label>
-                <Input id="hero-cooldown-hit" value={hero.scalars.cooldown_hit} onChange={(event) => setScalar('cooldown_hit', event.target.value)} className="h-8" />
+                <Input id="hero-cooldown-hit" width="short" value={hero.scalars.cooldown_hit} onChange={(event) => setScalar('cooldown_hit', event.target.value)} className="h-8" />
               </div>
-              <div className="space-y-1 sm:col-span-2">
+              <div className="space-y-1">
                 <Label className="text-[11px] font-normal text-muted-foreground" htmlFor="hero-categories">categories</Label>
-                <Input id="hero-categories" value={hero.scalars.categories} onChange={(event) => setScalar('categories', event.target.value)} className="h-8" />
+                <Input id="hero-categories" width="name" value={hero.scalars.categories} onChange={(event) => setScalar('categories', event.target.value)} className="h-8" />
               </div>
             </div>
-            {hero.trailing ? <p className="text-[11px] text-muted-foreground">The existing [render_layers] (or other) section is kept as-is when you save.</p> : null}
           </section>
         </div>
       )}
@@ -383,14 +386,16 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Add primary stat</DialogTitle>
-            <DialogDescription>Writes a new [stat] block in engine/primary_stats.txt. The id is what other files (classes, items, titles) will use.</DialogDescription>
+            <FieldHint hint="Writes a new [stat] block in engine/primary_stats.txt. The id is what other files (classes, items, titles) will use.">
+              <DialogTitle>Add primary stat</DialogTitle>
+            </FieldHint>
+            <DialogDescription className="sr-only">Writes a new [stat] block in engine/primary_stats.txt. The id is what other files (classes, items, titles) will use.</DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
             <Label htmlFor="add-primary-id">Id</Label>
-            <Input id="add-primary-id" value={addId} onChange={(event) => setAddId(event.target.value)} placeholder="spirit" className="h-8" />
+            <Input id="add-primary-id" width="id" value={addId} onChange={(event) => setAddId(event.target.value)} placeholder="spirit" className="h-8" />
             <Label htmlFor="add-primary-name">Display name</Label>
-            <Input id="add-primary-name" value={addName} onChange={(event) => setAddName(event.target.value)} placeholder="Spirit" className="h-8" />
+            <Input id="add-primary-name" width="name" value={addName} onChange={(event) => setAddName(event.target.value)} placeholder="Spirit" className="h-8" />
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setAddOpen(false)}>Cancel</Button>
@@ -402,16 +407,18 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
       <Dialog open={resourceOpen} onOpenChange={setResourceOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Add resource stat</DialogTitle>
-            <DialogDescription>Creates an extra MP-like pool in engine/resource_stats.txt. Empty related keys are filled with standard suffixes.</DialogDescription>
+            <FieldHint hint="Creates an extra MP-like pool in engine/resource_stats.txt. Empty related keys are filled with standard suffixes.">
+              <DialogTitle>Add resource stat</DialogTitle>
+            </FieldHint>
+            <DialogDescription className="sr-only">Creates an extra MP-like pool in engine/resource_stats.txt. Empty related keys are filled with standard suffixes.</DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
             <Label htmlFor="resource-base">stat_base</Label>
-            <Input id="resource-base" value={draftResource.stat_base} onChange={(event) => setDraftResource((current) => ({ ...current, stat_base: event.target.value }))} placeholder="stamina" className="h-8" />
+            <Input id="resource-base" width="id" value={draftResource.stat_base} onChange={(event) => setDraftResource((current) => ({ ...current, stat_base: event.target.value }))} placeholder="stamina" className="h-8" />
             <Label htmlFor="resource-text">text_base (display name)</Label>
-            <Input id="resource-text" value={draftResource.text_base} onChange={(event) => setDraftResource((current) => ({ ...current, text_base: event.target.value }))} placeholder="Max Stamina" className="h-8" />
+            <Input id="resource-text" width="name" value={draftResource.text_base} onChange={(event) => setDraftResource((current) => ({ ...current, text_base: event.target.value }))} placeholder="Max Stamina" className="h-8" />
             <Label htmlFor="resource-menu">menu_filename (optional)</Label>
-            <Input id="resource-menu" value={draftResource.menu_filename} onChange={(event) => setDraftResource((current) => ({ ...current, menu_filename: event.target.value }))} placeholder="menus/resource_stamina.txt" className="h-8" />
+            <Input id="resource-menu" width="path" value={draftResource.menu_filename} onChange={(event) => setDraftResource((current) => ({ ...current, menu_filename: event.target.value }))} placeholder="menus/resource_stamina.txt" className="h-8" />
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setResourceOpen(false)}>Cancel</Button>

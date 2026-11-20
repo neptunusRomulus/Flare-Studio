@@ -15,6 +15,5 @@ describe('Titles and Stats rail editors', () => {
     const stats = renderToStaticMarkup(<AppProvider value={{ currentProjectPath: null }}><SidebarStatsArea /></AppProvider>);
     expect(stats).toContain('Stats');
     expect(stats).toContain('Open a project to edit stats.');
-    expect(stats).toContain('Primary stats can be added');
   });
 });

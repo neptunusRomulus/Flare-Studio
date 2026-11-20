@@ -4,6 +4,7 @@ import Tooltip from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { FieldHint } from '@/components/ui/field-hint';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { useAppContext } from '@/context/AppContext';
@@ -33,7 +34,7 @@ import {
   type TileDraft,
 } from '@/editor/studioDrafts';
 
-const selectClass = 'h-8 w-full rounded-md border border-input bg-background px-2 text-sm';
+const selectClass = 'h-8 rounded-md border border-input bg-background px-2 text-sm';
 
 type StudioEditor = {
   getGroundTileSize?: () => { width: number; height: number; orientation: string };
@@ -210,28 +211,28 @@ export function CutsceneEditor() {
   return (
     <div className="space-y-2 rounded-lg border border-border p-3">
       <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Cutscene</div>
-      <Input value={slug} onChange={(event) => setSlug(event.target.value)} placeholder="id" className="h-8" aria-label="Cutscene id" />
-      <Input value={draft.music || ''} onChange={(event) => setDraft({ ...draft, music: event.target.value })} placeholder="music" className="h-8" aria-label="Cutscene music" />
-      <Input value={draft.caption_margins || ''} onChange={(event) => setDraft({ ...draft, caption_margins: event.target.value })} placeholder="caption_margins" className="h-8" aria-label="Caption margins" />
-      <Input value={draft.caption_background || ''} onChange={(event) => setDraft({ ...draft, caption_background: event.target.value })} placeholder="caption_background" className="h-8" aria-label="Caption background" />
-      <Input value={draft.vscroll_speed || ''} onChange={(event) => setDraft({ ...draft, vscroll_speed: event.target.value })} placeholder="vscroll_speed" className="h-8" aria-label="Vscroll speed" />
-      <Input value={draft.menu_backgrounds || ''} onChange={(event) => setDraft({ ...draft, menu_backgrounds: event.target.value })} placeholder="menu_backgrounds" className="h-8" aria-label="Menu backgrounds" />
+      <Input value={slug} onChange={(event) => setSlug(event.target.value)} placeholder="id" width="id" className="h-8" aria-label="Cutscene id" />
+      <Input value={draft.music || ''} onChange={(event) => setDraft({ ...draft, music: event.target.value })} placeholder="music" width="path" className="h-8" aria-label="Cutscene music" />
+      <Input value={draft.caption_margins || ''} onChange={(event) => setDraft({ ...draft, caption_margins: event.target.value })} placeholder="caption_margins" width="short" className="h-8" aria-label="Caption margins" />
+      <Input value={draft.caption_background || ''} onChange={(event) => setDraft({ ...draft, caption_background: event.target.value })} placeholder="caption_background" width="path" className="h-8" aria-label="Caption background" />
+      <Input value={draft.vscroll_speed || ''} onChange={(event) => setDraft({ ...draft, vscroll_speed: event.target.value })} placeholder="vscroll_speed" width="short" className="h-8" aria-label="Vscroll speed" />
+      <Input value={draft.menu_backgrounds || ''} onChange={(event) => setDraft({ ...draft, menu_backgrounds: event.target.value })} placeholder="menu_backgrounds" width="path" className="h-8" aria-label="Menu backgrounds" />
       {draft.scenes.map((scene, index) => (
         <div key={`scene-${index}`} className="space-y-1 rounded-md border border-border p-2">
           <div className="text-xs text-muted-foreground">Scene</div>
-          <Input value={scene.caption || ''} onChange={(event) => setScene(index, { caption: event.target.value })} placeholder="caption" className="h-8" aria-label={`Scene ${index + 1} caption`} />
-          <Input value={scene.image || ''} onChange={(event) => setScene(index, { image: event.target.value })} placeholder="image" className="h-8" aria-label={`Scene ${index + 1} image`} />
-          <Input value={scene.pause || ''} onChange={(event) => setScene(index, { pause: event.target.value })} placeholder="pause" className="h-8" aria-label={`Scene ${index + 1} pause`} />
-          <Input value={scene.soundfx || ''} onChange={(event) => setScene(index, { soundfx: event.target.value })} placeholder="soundfx" className="h-8" aria-label={`Scene ${index + 1} soundfx`} />
+          <Input value={scene.caption || ''} onChange={(event) => setScene(index, { caption: event.target.value })} placeholder="caption" width="name" className="h-8" aria-label={`Scene ${index + 1} caption`} />
+          <Input value={scene.image || ''} onChange={(event) => setScene(index, { image: event.target.value })} placeholder="image" width="path" className="h-8" aria-label={`Scene ${index + 1} image`} />
+          <Input value={scene.pause || ''} onChange={(event) => setScene(index, { pause: event.target.value })} placeholder="pause" width="short" className="h-8" aria-label={`Scene ${index + 1} pause`} />
+          <Input value={scene.soundfx || ''} onChange={(event) => setScene(index, { soundfx: event.target.value })} placeholder="soundfx" width="path" className="h-8" aria-label={`Scene ${index + 1} soundfx`} />
         </div>
       ))}
       <Button type="button" size="sm" variant="outline" onClick={() => setDraft({ ...draft, scenes: [...draft.scenes, { caption: '', image: '', pause: '', soundfx: '' }] })}>Add scene</Button>
       {draft.vscroll.map((scroll, index) => (
         <div key={`scroll-${index}`} className="space-y-1 rounded-md border border-border p-2">
           <div className="text-xs text-muted-foreground">Vscroll</div>
-          <Input value={scroll.text || ''} onChange={(event) => setDraft({ ...draft, vscroll: draft.vscroll.map((entry, entryIndex) => entryIndex === index ? { ...entry, text: event.target.value } : entry) })} placeholder="text" className="h-8" aria-label={`Vscroll ${index + 1} text`} />
-          <Input value={scroll.image || ''} onChange={(event) => setDraft({ ...draft, vscroll: draft.vscroll.map((entry, entryIndex) => entryIndex === index ? { ...entry, image: event.target.value } : entry) })} placeholder="image" className="h-8" aria-label={`Vscroll ${index + 1} image`} />
-          <Input value={scroll.separator || ''} onChange={(event) => setDraft({ ...draft, vscroll: draft.vscroll.map((entry, entryIndex) => entryIndex === index ? { ...entry, separator: event.target.value } : entry) })} placeholder="separator" className="h-8" aria-label={`Vscroll ${index + 1} separator`} />
+          <Input value={scroll.text || ''} onChange={(event) => setDraft({ ...draft, vscroll: draft.vscroll.map((entry, entryIndex) => entryIndex === index ? { ...entry, text: event.target.value } : entry) })} placeholder="text" width="name" className="h-8" aria-label={`Vscroll ${index + 1} text`} />
+          <Input value={scroll.image || ''} onChange={(event) => setDraft({ ...draft, vscroll: draft.vscroll.map((entry, entryIndex) => entryIndex === index ? { ...entry, image: event.target.value } : entry) })} placeholder="image" width="path" className="h-8" aria-label={`Vscroll ${index + 1} image`} />
+          <Input value={scroll.separator || ''} onChange={(event) => setDraft({ ...draft, vscroll: draft.vscroll.map((entry, entryIndex) => entryIndex === index ? { ...entry, separator: event.target.value } : entry) })} placeholder="separator" width="short" className="h-8" aria-label={`Vscroll ${index + 1} separator`} />
         </div>
       ))}
       <Button type="button" size="sm" variant="outline" onClick={() => setDraft({ ...draft, vscroll: [...draft.vscroll, { text: '', image: '', separator: '' }] })}>Add vscroll</Button>
@@ -338,14 +339,14 @@ export function ParallaxEditor({ editor }: { editor?: StudioEditor | null }) {
   return (
     <div className="space-y-2 rounded-lg border border-border p-3">
       <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Parallax</div>
-      <Input value={slug} onChange={(event) => setSlug(event.target.value)} placeholder="id" className="h-8" aria-label="Parallax id" />
+      <Input value={slug} onChange={(event) => setSlug(event.target.value)} placeholder="id" width="id" className="h-8" aria-label="Parallax id" />
       {layers.map((layer, index) => (
         <div key={`layer-${index}`} className="space-y-1 rounded-md border border-border p-2">
           <div className="text-xs text-muted-foreground">Layer</div>
-          <Input value={layer.image || ''} onChange={(event) => updateLayer(index, { image: event.target.value })} placeholder="image" className="h-8" aria-label={`Parallax ${index + 1} image`} />
-          <Input value={layer.speed || ''} onChange={(event) => updateLayer(index, { speed: event.target.value })} placeholder="speed" className="h-8" aria-label={`Parallax ${index + 1} speed`} />
-          <Input value={layer.fixed_speed || ''} onChange={(event) => updateLayer(index, { fixed_speed: event.target.value })} placeholder="fixed_speed" className="h-8" aria-label={`Parallax ${index + 1} fixed speed`} />
-          <Input value={layer.map_layer || ''} onChange={(event) => updateLayer(index, { map_layer: event.target.value })} placeholder="map_layer" className="h-8" aria-label={`Parallax ${index + 1} map layer`} />
+          <Input value={layer.image || ''} onChange={(event) => updateLayer(index, { image: event.target.value })} placeholder="image" width="path" className="h-8" aria-label={`Parallax ${index + 1} image`} />
+          <Input value={layer.speed || ''} onChange={(event) => updateLayer(index, { speed: event.target.value })} placeholder="speed" width="short" className="h-8" aria-label={`Parallax ${index + 1} speed`} />
+          <Input value={layer.fixed_speed || ''} onChange={(event) => updateLayer(index, { fixed_speed: event.target.value })} placeholder="fixed_speed" width="short" className="h-8" aria-label={`Parallax ${index + 1} fixed speed`} />
+          <Input value={layer.map_layer || ''} onChange={(event) => updateLayer(index, { map_layer: event.target.value })} placeholder="map_layer" width="id" className="h-8" aria-label={`Parallax ${index + 1} map layer`} />
         </div>
       ))}
       <Button type="button" size="sm" variant="outline" onClick={() => setLayers([...layers, { image: '', speed: '', fixed_speed: '', map_layer: '' }])}>Add layer</Button>
@@ -415,12 +416,12 @@ export function FogEditor({ editor }: { editor?: StudioEditor | null }) {
   return (
     <div className="space-y-2 rounded-lg border border-border p-3">
       <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Fog of war</div>
-      <Input value={mask.radius || ''} onChange={(event) => setMask({ ...mask, radius: event.target.value })} placeholder="radius" className="h-8" aria-label="Fog radius" />
-      <Input value={mask.bits_per_tile || ''} onChange={(event) => setMask({ ...mask, bits_per_tile: event.target.value })} placeholder="bits_per_tile" className="h-8" aria-label="Bits per tile" />
-      <Input value={mask.color_dark || ''} onChange={(event) => setMask({ ...mask, color_dark: event.target.value })} placeholder="color_dark" className="h-8" aria-label="Color dark" />
-      <Input value={mask.color_fog || ''} onChange={(event) => setMask({ ...mask, color_fog: event.target.value })} placeholder="color_fog" className="h-8" aria-label="Color fog" />
-      <Input value={mask.tileset_dark || ''} onChange={(event) => setMask({ ...mask, tileset_dark: event.target.value })} placeholder="tileset_dark" className="h-8" aria-label="Tileset dark" />
-      <Input value={mask.tileset_fog || ''} onChange={(event) => setMask({ ...mask, tileset_fog: event.target.value })} placeholder="tileset_fog" className="h-8" aria-label="Tileset fog" />
+      <Input value={mask.radius || ''} onChange={(event) => setMask({ ...mask, radius: event.target.value })} placeholder="radius" width="num" className="h-8" aria-label="Fog radius" />
+      <Input value={mask.bits_per_tile || ''} onChange={(event) => setMask({ ...mask, bits_per_tile: event.target.value })} placeholder="bits_per_tile" width="num" className="h-8" aria-label="Bits per tile" />
+      <Input value={mask.color_dark || ''} onChange={(event) => setMask({ ...mask, color_dark: event.target.value })} placeholder="color_dark" width="short" className="h-8" aria-label="Color dark" />
+      <Input value={mask.color_fog || ''} onChange={(event) => setMask({ ...mask, color_fog: event.target.value })} placeholder="color_fog" width="short" className="h-8" aria-label="Color fog" />
+      <Input value={mask.tileset_dark || ''} onChange={(event) => setMask({ ...mask, tileset_dark: event.target.value })} placeholder="tileset_dark" width="path" className="h-8" aria-label="Tileset dark" />
+      <Input value={mask.tileset_fog || ''} onChange={(event) => setMask({ ...mask, tileset_fog: event.target.value })} placeholder="tileset_fog" width="path" className="h-8" aria-label="Tileset fog" />
       <Textarea aria-label="Fog bits" value={bitsText} onChange={(event) => setBitsText(event.target.value)} placeholder="bit lines" className="h-16 w-full rounded-md border border-input bg-background px-2 py-1 text-sm" />
       <Textarea aria-label="Fog tiles" value={tilesText} onChange={(event) => setTilesText(event.target.value)} placeholder="tile lines" className="h-16 w-full rounded-md border border-input bg-background px-2 py-1 text-sm" />
       <Textarea aria-label="Fog mask data" value={mask.data || ''} onChange={(event) => setMask({ ...mask, data: event.target.value })} placeholder="mask data" className="h-16 w-full rounded-md border border-input bg-background px-2 py-1 text-sm" />
@@ -489,8 +490,10 @@ export function ProcgenEditor() {
 
   return (
     <div className="space-y-2 rounded-lg border border-border p-3">
-      <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Procedural rules</div>
-      <Input value={slug} onChange={(event) => setSlug(event.target.value)} placeholder="id" className="h-8" aria-label="Procgen id" />
+      <FieldHint hint={`Event procgen_filename points at ${procgenRelativePath(slug)}. Chunk type stays on the map header.`}>
+        <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Procedural rules</div>
+      </FieldHint>
+      <Input width="id" value={slug} onChange={(event) => setSlug(event.target.value)} placeholder="id" className="h-8" aria-label="Procgen id" />
       {PROCGEN_FIELDS.map(([key, label]) => (
         <Input
           key={key}
@@ -502,7 +505,6 @@ export function ProcgenEditor() {
         />
       ))}
       <Textarea aria-label="Procgen chunks" value={chunksText} onChange={(event) => setChunksText(event.target.value)} placeholder="chunk filenames" className="h-16 w-full rounded-md border border-input bg-background px-2 py-1 text-sm" />
-      <p className="text-xs text-muted-foreground">Event <span className="font-mono">procgen_filename</span> points at {procgenRelativePath(slug)}. Chunk type stays on the map header.</p>
       <div className="flex gap-2">
         <Button type="button" size="sm" variant="outline" onClick={() => { void load(); }}>Load rules</Button>
         <Button type="button" size="sm" onClick={() => { void save(); }}>Write rules</Button>
@@ -525,7 +527,7 @@ export function MapPresentationFields({
     <div className="space-y-2 rounded-lg border border-border p-3">
       <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Map header</div>
       <Label className="block text-xs text-muted-foreground font-normal" htmlFor="map-parallax">Parallax layers</Label>
-      <Input id="map-parallax" value={value.parallax} onChange={(event) => set({ parallax: event.target.value })} placeholder="maps/parallax/sky.txt" className="h-8" />
+      <Input id="map-parallax" width="path" value={value.parallax} onChange={(event) => set({ parallax: event.target.value })} placeholder="maps/parallax/sky.txt" className="h-8" />
       <Label className="block text-xs text-muted-foreground font-normal" htmlFor="header-fogofwar">Fog of war</Label>
       <Select value={value.fogofwar || '__empty__'} onValueChange={(next) => set({ fogofwar: next === '__empty__' ? '' : next })}>
         <SelectTrigger id="header-fogofwar" className={selectClass}>
@@ -559,8 +561,8 @@ export function MapPresentationFields({
           {PROCGEN_TYPES.map((type) => <SelectItem key={type || 'none'} value={type || '__empty__'}>{type || 'none'}</SelectItem>)}
         </SelectContent>
       </Select>
-      <Input value={value.procgen_unique_status} onChange={(event) => set({ procgen_unique_status: event.target.value })} placeholder="procgen_unique_status" className="h-8" aria-label="Procgen unique status" />
-      <Input value={value.procgen_reset_status} onChange={(event) => set({ procgen_reset_status: event.target.value })} placeholder="procgen_reset_status" className="h-8" aria-label="Procgen reset status" />
+      <Input value={value.procgen_unique_status} onChange={(event) => set({ procgen_unique_status: event.target.value })} placeholder="procgen_unique_status" width="id" className="h-8" aria-label="Procgen unique status" />
+      <Input value={value.procgen_reset_status} onChange={(event) => set({ procgen_reset_status: event.target.value })} placeholder="procgen_reset_status" width="id" className="h-8" aria-label="Procgen reset status" />
     </div>
   );
 }

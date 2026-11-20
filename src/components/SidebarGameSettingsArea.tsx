@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button';
+import { FieldHint } from '@/components/ui/field-hint';
 import { TileSizeForm } from './studio/studioEditors';
 import { openEngineStudio } from '@/components/studio/engineStudio';
 
@@ -6,8 +7,9 @@ import { openEngineStudio } from '@/components/studio/engineStudio';
 export default function SidebarGameSettingsArea() {
   return (
     <div className="flex-1 overflow-y-auto p-2 space-y-3">
-      <div className="text-sm font-semibold">UI Settings</div>
-      <p className="text-[11px] text-muted-foreground">HUD and menu panels (menus/*.txt) are edited on the canvas. Drag a panel to write its pos=; other keys stay as they are.</p>
+      <FieldHint hint="HUD and menu panels (menus/*.txt) are edited on the canvas. Drag a panel to write its pos=; other keys stay as they are.">
+        <div className="text-sm font-semibold">UI Settings</div>
+      </FieldHint>
       <TileSizeForm />
       <div className="space-y-1">
         <div className="text-xs font-medium">Engine data</div>

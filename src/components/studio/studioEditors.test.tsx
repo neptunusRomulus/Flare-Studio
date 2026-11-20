@@ -58,7 +58,7 @@ describe('studio editor screens', () => {
     expect(html).toContain('Procedural rules');
     expect(html).toContain('Write rules');
     expect(html).toContain('doors_max');
-    expect(html).toContain('procgen_filename');
+    expect(html).toContain('data-studio-hint');
     expect(html).not.toContain('procgen_chunks');
   });
 

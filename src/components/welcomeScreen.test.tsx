@@ -45,12 +45,18 @@ describe('welcome screen zen mode', () => {
     expect(pill.querySelector('[aria-label="Close"]')).not.toBeNull();
   });
 
-  it('drops the "Flare Studio" title text but keeps the floating round mark', () => {
+  it('drops the "Flare Studio" title text but keeps the floating rounded-square mark', () => {
     renderWelcome();
     expect(screen.queryByText('Flare Studio')).toBeNull();
     const mark = document.querySelector('.brand-mark');
     expect(mark).not.toBeNull();
-    expect(mark?.closest('.rounded-full')).not.toBeNull();
+    expect(mark?.classList.contains('h-7')).toBe(true);
+    expect(mark?.classList.contains('w-7')).toBe(true);
+    expect(mark?.closest('.rounded-full')).toBeNull();
+    expect(mark?.getAttribute('class')).toContain('rounded-[18.75%]');
+    const wrap = mark?.closest('.floats-below-window-bar');
+    expect(wrap?.className).toContain('top-2');
+    expect(wrap?.className).toContain('left-2');
   });
 
   it('shows no app menu button when there is no project open', () => {

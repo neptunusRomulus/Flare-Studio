@@ -1,5 +1,6 @@
 import React from 'react';
 import TopBar from '@/components/TopBar';
+import { BRAND_MARK_INSET_CLASS } from '@/components/brand/BrandMark';
 import type { PlayButtonProps } from '@/components/PlayButton';
 import EditorCanvas from '@/components/EditorCanvas';
 import type { MapObject } from '@/types';
@@ -29,7 +30,7 @@ type Props = {
   bottomToolbarProps: React.ComponentProps<typeof EditorCanvas>['bottomToolbarProps'];
   isDarkMode: boolean;
   overlay?: React.ReactNode;
-  /** Floating round logo menu, top-left of the canvas (replaces the old title bar). */
+  /** Floating rounded-square logo menu, inset from the top-left of the canvas (replaces the old title bar). */
   appMenu?: React.ReactNode;
 };
 
@@ -40,7 +41,7 @@ const EditorArea: React.FC<Props> = ({ topBarProps, canvasCtx, bottomToolbarProp
   return (
     <section className="flex-1 min-w-0 flex flex-col relative">
       {appMenu && !logoInTabStrip ? (
-        <div className="floats-below-window-bar absolute top-2 left-2 z-10">
+        <div className={`floats-below-window-bar absolute ${BRAND_MARK_INSET_CLASS} z-10`}>
           {appMenu}
         </div>
       ) : null}

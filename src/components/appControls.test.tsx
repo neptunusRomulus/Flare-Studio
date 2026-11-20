@@ -18,14 +18,16 @@ describe('floating logo menu button', () => {
     expect(html).not.toContain('Engine Settings');
   });
 
-  it('is a round floating button in the zoom / Play control style instead of a title-bar button', () => {
+  it('uses the rounded-square mark itself as the button, with no circular chrome or title-bar styles', () => {
     const html = renderToStaticMarkup(<AppControls {...props} hasUnsavedChanges={false} />);
-    expect(html).toContain('rounded-full');
-    expect(html).toContain('h-9 w-9');
-    expect(html).toContain('bg-white/90');
-    expect(html).toContain('dark:bg-neutral-900/90');
-    expect(html).toContain('shadow-lg');
+    expect(html).toContain('rounded-[18.75%]');
+    expect(html).toContain('h-7 w-7');
     expect(html).toContain('no-drag');
+    expect(html).toContain('hover:brightness-110');
+    expect(html).toContain('focus-visible:ring-orange-500');
+    expect(html).not.toContain('rounded-full');
+    expect(html).not.toContain('bg-white/90');
+    expect(html).not.toContain('shadow-lg');
     // No title text next to the mark, and no green "saved" dot.
     expect(html).not.toContain('Flare Studio');
     expect(html).not.toContain('bg-green-500');

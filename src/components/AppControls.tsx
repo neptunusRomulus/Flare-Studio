@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import Tooltip from '@/components/ui/tooltip';
 import MainMenuDialog from '@/components/MainMenuDialog';
-import BrandMark from '@/components/brand/BrandMark';
+import BrandMark, { BRAND_MARK_RADIUS_CLASS, BRAND_MARK_SIZE_CLASS } from '@/components/brand/BrandMark';
 
 type Props = {
   currentProjectPath: string | null;
@@ -34,7 +34,7 @@ export function menuTooltip(hasUnsavedChanges: boolean, saveStatus?: 'saving' | 
   return 'Menu — all changes saved';
 }
 
-/** Floating round Flare Studio mark: opens the main app menu (Save, Engine Settings, help…). */
+/** Floating rounded-square Flare Studio mark: the mark itself is the menu button (Save, Engine Settings, help…). */
 const AppControls: React.FC<Props> = ({
   currentProjectPath, onSaveAndQuit, onQuit, onShowProjectFolder, onShowHelp, onSaveAsCopy, onRestart, onExport, onCheckUpdates,
   handleManualSave, isManuallySaving, isPreparingNewMap, hasUnsavedChanges, setShowSettings, saveStatus,
@@ -49,11 +49,11 @@ const AppControls: React.FC<Props> = ({
         <Button
           ref={btnRef}
           type="button"
-          variant="outline"
+          variant="ghost"
           size="icon"
           aria-label="Menu"
           aria-expanded={menuOpen}
-          className="relative group no-click-effect h-9 w-9 rounded-full border-border bg-white/90 shadow-lg outline-none focus-visible:ring-1 focus-visible:ring-orange-500 hover:bg-white dark:bg-neutral-900/90 dark:hover:bg-neutral-900"
+          className={`relative group no-click-effect ${BRAND_MARK_SIZE_CLASS} ${BRAND_MARK_RADIUS_CLASS} border-0 bg-transparent p-0 shadow-none outline-none hover:bg-transparent hover:brightness-110 focus-visible:ring-2 focus-visible:ring-orange-500 focus-visible:ring-offset-2`}
           onClick={() => {
             const btn = btnRef.current;
             if (btn) {
@@ -65,7 +65,7 @@ const AppControls: React.FC<Props> = ({
         >
           {/* Hover/press hint that a menu opens: flame lifts, mark presses. Fixed size, so no layout shift. */}
           <BrandMark
-            className="w-5 h-5 shrink-0 transition-transform duration-150 ease-out group-active:scale-90 motion-reduce:transition-none motion-reduce:transform-none"
+            className={`${BRAND_MARK_SIZE_CLASS} shrink-0 ${BRAND_MARK_RADIUS_CLASS} transition-transform duration-150 ease-out group-active:scale-90 motion-reduce:transition-none motion-reduce:transform-none`}
             flameClassName="transition-transform duration-150 ease-out group-hover:scale-110 group-hover:-skew-x-3 group-aria-expanded:scale-110 motion-reduce:transition-none motion-reduce:transform-none"
           />
           {hasUnsavedChanges ? (

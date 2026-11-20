@@ -6,6 +6,13 @@ export const BRAND_EMBER = '#E8602C';
 /** Flame of the small-size mark; must match assets/brand/flare-studio-icon-small.svg. */
 export const BRAND_FLAME_SMALL_D = 'M256 466 C 232 436, 138 384, 136 290 C 134 208, 198 150, 240 98 C 250 86, 258 68, 262 44 C 296 100, 316 152, 314 210 C 334 196, 350 176, 360 146 C 388 190, 392 246, 382 294 C 366 376, 306 430, 256 466 Z';
 
+/** Corner radius of the 512×512 mark (rx=96 → 18.75%). Use this on the clickable logo so the focus ring follows the mark. */
+export const BRAND_MARK_RADIUS_CLASS = 'rounded-[18.75%]';
+/** Display size of the floating logo mark (28px). */
+export const BRAND_MARK_SIZE_CLASS = 'h-7 w-7';
+/** Canvas-corner inset for the logo (8px from the top and left edges). */
+export const BRAND_MARK_INSET_CLASS = 'top-2 left-2';
+
 /** The Flare Studio mark as inline SVG so parts of it (the flame) can animate. */
 const BrandMark: React.FC<{ className?: string; flameClassName?: string }> = ({ className, flameClassName }) => (
   <svg viewBox="0 0 512 512" className={`brand-mark ${className ?? ''}`} aria-hidden="true" focusable="false">

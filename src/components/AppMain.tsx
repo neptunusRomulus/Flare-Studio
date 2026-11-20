@@ -193,7 +193,7 @@ export default function AppMain() {
   const showBookEditor = tileset.activeLayer?.type === 'books';
   const showMenuEditor = tileset.activeLayer?.type === 'gameSettings';
 
-  // Per-layer visibility (corner eye) / opacity (wheel) on the Map and Entities sub-switch buttons
+  // Per-layer visibility (rail layer icons) / opacity (wheel) on the Map and Entities rail icons
   const layerVisibility = useMemo(() => layersObj ? {
     onToggleVisibility: layersObj.handleToggleLayerVisibility,
     onTransparencyChange: layersObj.handleLayerTransparencyChange,

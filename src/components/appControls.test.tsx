@@ -26,8 +26,11 @@ describe('floating logo menu button', () => {
     expect(html).toContain('dark:bg-neutral-900/90');
     expect(html).toContain('shadow-lg');
     expect(html).toContain('no-drag');
-    // No title text next to the mark.
+    // No title text next to the mark, and no green "saved" dot.
     expect(html).not.toContain('Flare Studio');
+    expect(html).not.toContain('bg-green-500');
+    expect(html).not.toContain('data-save-state="saved"');
+    expect(html).not.toContain('All changes saved');
   });
 
   it('moves the title-bar save feedback into the button tooltip', () => {

@@ -37,11 +37,12 @@ describe('welcome screen zen mode', () => {
     // Only the hover-reveal bar is a drag region now.
     expect(document.querySelectorAll('.drag-region')).toHaveLength(1);
     expect(bar.classList.contains('drag-region')).toBe(true);
-    // The bar carries the three window buttons (hidden and inert until hovered).
-    expect(bar.querySelector('[aria-label="Minimize"]')).not.toBeNull();
-    expect(bar.querySelector('[aria-label="Maximize"]')).not.toBeNull();
-    expect(bar.querySelector('[aria-label="Close"]')).not.toBeNull();
-    expect(bar.querySelectorAll('.no-drag')).toHaveLength(1);
+    // The buttons live in a compact no-drag pill; the rest of the strip is the drag region.
+    const pill = screen.getByTestId('window-control-pill');
+    expect(pill.classList.contains('no-drag')).toBe(true);
+    expect(pill.querySelector('[aria-label="Minimize"]')).not.toBeNull();
+    expect(pill.querySelector('[aria-label="Maximize"]')).not.toBeNull();
+    expect(pill.querySelector('[aria-label="Close"]')).not.toBeNull();
   });
 
   it('drops the "Flare Studio" title text but keeps the floating round mark', () => {

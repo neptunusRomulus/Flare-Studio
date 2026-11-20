@@ -8,7 +8,7 @@ import { rememberTarget, isMapTarget, mapTargetTooltip } from '@/components/mapT
 import { TARGET_ICON } from '@/components/targetIcons';
 import SlidingSwitch, { type SwitchItem } from '@/components/SlidingSwitch';
 
-/** Per-layer visibility (corner eye) and opacity (wheel) on the sub-switch buttons. */
+/** Per-layer visibility and opacity (wheel) controls, used by the rail layer icons. */
 export type LayerVisibilityControls = {
   onToggleVisibility: (id: number) => void;
   onTransparencyChange: (id: number, delta: number) => void;

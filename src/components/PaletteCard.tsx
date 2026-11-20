@@ -58,7 +58,7 @@ const PaletteCard: React.FC<Props> = ({ open, width, onWidthChange, children, fo
       aria-hidden={!open}
       className="absolute z-[5] flex flex-col min-h-0 overflow-hidden rounded-xl bg-white/90 dark:bg-neutral-900/90 backdrop-blur-sm border border-border shadow-lg"
       style={{
-        top: PALETTE_CARD_TOP,
+        top: `calc(${PALETTE_CARD_TOP}px + var(--window-controls-offset, 0px))`,
         bottom: PALETTE_CARD_BOTTOM,
         right: PALETTE_CARD_GAP,
         width,
@@ -66,7 +66,7 @@ const PaletteCard: React.FC<Props> = ({ open, width, onWidthChange, children, fo
         transform: open ? 'translateX(0)' : 'translateX(16px)',
         pointerEvents: open ? undefined : 'none',
         transition: ms
-          ? `opacity ${ms}ms cubic-bezier(0, 0, 0.2, 1), transform ${ms}ms cubic-bezier(0, 0, 0.2, 1)`
+          ? `opacity ${ms}ms cubic-bezier(0, 0, 0.2, 1), transform ${ms}ms cubic-bezier(0, 0, 0.2, 1), top ${ms}ms cubic-bezier(0, 0, 0.2, 1)`
           : 'none',
       }}
     >

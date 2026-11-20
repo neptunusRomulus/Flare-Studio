@@ -2,7 +2,12 @@
 import React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
-import WindowControlBar, { WINDOW_BAR_HIDE_MS, WINDOW_BAR_HOT_ZONE } from '@/components/WindowControlBar';
+import WindowControlBar, {
+  WINDOW_BAR_HEIGHT_PX,
+  WINDOW_BAR_HIDE_MS,
+  WINDOW_BAR_HOT_ZONE,
+  WINDOW_BAR_OFFSET_VAR,
+} from '@/components/WindowControlBar';
 
 const noop = () => {};
 
@@ -10,9 +15,17 @@ function bar() {
   return screen.getByTestId('window-control-bar');
 }
 
+function offset() {
+  return document.documentElement.style.getPropertyValue(WINDOW_BAR_OFFSET_VAR);
+}
+
 describe('zen window control bar', () => {
   beforeEach(() => { vi.useFakeTimers(); });
-  afterEach(() => { cleanup(); vi.useRealTimers(); });
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+    document.documentElement.style.removeProperty(WINDOW_BAR_OFFSET_VAR);
+  });
 
   it('stays hidden and inert until the pointer touches the top edge', () => {
     render(<WindowControlBar onMinimize={noop} onMaximize={noop} onClose={noop} />);
@@ -22,7 +35,7 @@ describe('zen window control bar', () => {
     expect(bar().className).toContain('opacity-0');
   });
 
-  it('slides down from the very top edge and is a drag region with no-drag buttons', () => {
+  it('slides a compact top-right pill and keeps a full-width drag region with no-drag buttons', () => {
     render(<WindowControlBar onMinimize={noop} onMaximize={noop} onClose={noop} />);
     fireEvent.mouseMove(window, { clientY: WINDOW_BAR_HOT_ZONE });
 
@@ -30,7 +43,33 @@ describe('zen window control bar', () => {
     expect(bar().hasAttribute('inert')).toBe(false);
     expect(bar().className).toContain('drag-region');
     expect(bar().className).toContain('translate-y-0');
-    expect(bar().querySelector('.no-drag')).not.toBeNull();
+    // The strip itself has no solid full-width background; only the pill does.
+    expect(bar().className).not.toContain('bg-white/90');
+    expect(bar().className).not.toContain('border-b');
+    const pill = screen.getByTestId('window-control-pill');
+    expect(pill.className).toContain('rounded-full');
+    expect(pill.className).toContain('no-drag');
+    expect(pill.className).toContain('bg-white/90');
+    expect(pill.querySelector('.no-drag, button')).not.toBeNull();
+  });
+
+  it('shifts floating chrome down via a CSS variable while the bar is open', () => {
+    render(<WindowControlBar onMinimize={noop} onMaximize={noop} onClose={noop} />);
+    expect(offset()).toBe('');
+    fireEvent.mouseMove(window, { clientY: 0 });
+    expect(offset()).toBe(`${WINDOW_BAR_HEIGHT_PX}px`);
+
+    fireEvent.mouseMove(window, { clientY: 200 });
+    act(() => { vi.advanceTimersByTime(WINDOW_BAR_HIDE_MS); });
+    expect(offset()).toBe('0px');
+  });
+
+  it('clears the CSS variable when the bar unmounts', () => {
+    const { unmount } = render(<WindowControlBar onMinimize={noop} onMaximize={noop} onClose={noop} />);
+    fireEvent.mouseMove(window, { clientY: 0 });
+    expect(offset()).toBe(`${WINDOW_BAR_HEIGHT_PX}px`);
+    unmount();
+    expect(offset()).toBe('');
   });
 
   it('stays up below the hot zone, then closes about 600ms after the pointer leaves', () => {

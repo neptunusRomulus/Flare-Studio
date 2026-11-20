@@ -26,10 +26,12 @@ const menuProps = {
 };
 
 describe('save state indicators', () => {
-  it('shows a green dot on the logo when everything is saved', () => {
+  it('shows no status dot on the logo when everything is saved', () => {
     render(<AppControls {...props} hasUnsavedChanges={false} />);
-    expect(screen.getByLabelText('All changes saved')).toBeInTheDocument();
+    expect(screen.queryByLabelText('All changes saved')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Unsaved changes')).not.toBeInTheDocument();
+    expect(document.querySelector('[data-save-state]')).toBeNull();
+    expect(document.querySelector('.bg-green-500')).toBeNull();
   });
 
   it('shows a red dot on the logo when there are unsaved changes', () => {

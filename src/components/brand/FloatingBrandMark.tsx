@@ -12,7 +12,7 @@ type Props = {
  * the welcome screen has no menu yet, so it shows the same badge without a click target.
  */
 const FloatingBrandMark: React.FC<Props> = ({ label = 'Flare Studio' }) => (
-  <div className="pointer-events-none absolute left-2 top-2 z-10">
+  <div className="floats-below-window-bar pointer-events-none absolute left-2 top-2 z-10">
     <Tooltip content={label} side="bottom">
       <div
         aria-hidden="true"

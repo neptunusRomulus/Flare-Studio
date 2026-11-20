@@ -111,7 +111,7 @@ export const HELP_TOPICS: HelpTopic[] = [
   {
     id: 'export',
     title: 'Export & Play in Flare',
-    text: 'Play in the title bar saves and opens your game in Flare. Export Project is in the app menu behind the Flare Studio mark.',
+    text: 'Play, next to the zoom controls, saves and opens your game in Flare. Export Project is in the app menu behind the Flare Studio mark.',
     keywords: 'export play run launch test flare engine mod package build new game icon logo brand mark menu',
   },
 ];

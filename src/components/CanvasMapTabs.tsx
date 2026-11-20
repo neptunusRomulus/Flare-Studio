@@ -35,7 +35,7 @@ export default function CanvasMapTabs({
   if (tabs.length === 0) return null;
 
   return (
-    <div className="pointer-events-none absolute top-px left-1/2 z-20 flex -translate-x-1/2 justify-center">
+    <div className="floats-below-window-bar pointer-events-none absolute top-px left-1/2 z-20 flex -translate-x-1/2 justify-center">
       <div className="pointer-events-auto relative flex h-8 max-w-[min(100%,42rem)] items-center gap-0.5 rounded-none rounded-b-lg bg-orange-600 px-1.5 pb-0.5 shadow-sm">
         {appMenu ? (
           <div className="absolute right-full top-1/2 mr-2 mt-px -translate-y-1/2">

@@ -40,7 +40,7 @@ const EditorArea: React.FC<Props> = ({ topBarProps, canvasCtx, bottomToolbarProp
   return (
     <section className="flex-1 min-w-0 flex flex-col relative">
       {appMenu && !logoInTabStrip ? (
-        <div className="absolute top-2 left-2 z-10">
+        <div className="floats-below-window-bar absolute top-2 left-2 z-10">
           {appMenu}
         </div>
       ) : null}

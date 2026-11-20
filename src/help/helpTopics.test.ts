@@ -22,6 +22,12 @@ describe('help topics', () => {
     expect(filterHelpTopics('zzzz')).toEqual([]);
   });
 
+  it('describes Play next to the zoom controls, not in a title bar', () => {
+    const exportTopic = HELP_TOPICS.find((t) => t.id === 'export');
+    expect(exportTopic?.text).toContain('zoom controls');
+    expect(exportTopic?.text).not.toMatch(/title bar/i);
+  });
+
   it('search filters shortcuts by key or action', () => {
     expect(filterHelpShortcuts('undo').map((s) => s.label)).toEqual(['Undo']);
     expect(filterHelpShortcuts('tab').length).toBe(2);

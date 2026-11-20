@@ -30,4 +30,8 @@ describe('canvas map tabs', () => {
     const html = render();
     expect(html).not.toContain('right-full');
   });
+
+  it('yields to the window-control reveal bar so the strip is not covered', () => {
+    expect(render()).toContain('floats-below-window-bar');
+  });
 });

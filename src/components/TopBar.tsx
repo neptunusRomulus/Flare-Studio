@@ -44,7 +44,7 @@ const TopBar: React.FC<Props> = ({
 }) => (
   <div
     ref={containerRef}
-    className="absolute top-2 right-2 z-10 flex items-center gap-2"
+    className="floats-below-window-bar absolute top-2 right-2 z-10 flex items-center gap-2"
     onMouseEnter={onMouseEnter}
     onMouseLeave={onMouseLeave}
     onFocus={onFocus}

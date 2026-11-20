@@ -7,7 +7,9 @@ export const PALETTE_PANEL_KEY = 'flare.paletteDockWidth';
 export const SIDEBAR_RAIL_WIDTH = 44;
 /**
  * Floating card top inset: Play + zoom sit at top-2 (~8px) with ~40px controls.
- * The card starts below that group; the help panel may overlap the card and stays above it (z-index).
+ * The card starts below that group and also adds `--window-controls-offset` when the
+ * window-control reveal bar is open (those controls shift down by the same amount).
+ * The help panel may overlap the card and stays above it (z-index).
  */
 export const PALETTE_CARD_TOP = 56;
 /**

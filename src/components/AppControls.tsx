@@ -75,14 +75,7 @@ const AppControls: React.FC<Props> = ({
               aria-label="Unsaved changes"
               data-save-state="unsaved"
             />
-          ) : (
-            <span
-              className="absolute -right-0.5 -top-0.5 w-2 h-2 bg-green-500 rounded-full border border-background pointer-events-none"
-              role="img"
-              aria-label="All changes saved"
-              data-save-state="saved"
-            />
-          )}
+          ) : null}
         </Button>
       </Tooltip>
 

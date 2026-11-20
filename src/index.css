@@ -332,6 +332,19 @@
     -webkit-app-region: no-drag;
 }
 
+/* Floating chrome yields to the hover-reveal window-control strip.
+   Uses the independent `translate` property so it does not clash with Tailwind
+   `transform` utilities (e.g. -translate-x-1/2 on the map-tab strip). */
+.floats-below-window-bar {
+    translate: 0 var(--window-controls-offset, 0px);
+    transition: translate 200ms ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+    .floats-below-window-bar {
+        transition: none;
+    }
+}
+
 /* Custom tooltip styles */
 .custom-tooltip {
     position: absolute;

@@ -1,6 +1,6 @@
 /**
- * "Start with template": NPC looks and enemy definitions shipped in the
- * installed Flare's fantasycore mod. Read-only; free of Electron for tests.
+ * "Start with template": NPC and enemy looks shipped in the installed Flare's
+ * fantasycore mod, for the appearance pickers. Read-only; free of Electron for tests.
  */
 const fs = require("fs");
 const path = require("path");

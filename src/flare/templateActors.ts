@@ -1,11 +1,9 @@
 /**
- * "Start with template": bring fantasycore enemy definitions into the new project as
- * (unplaced) Entities, next to the tileset import.
+ * "Start with template": NPC and enemy looks from fantasycore are listed for the
+ * Edit NPC / Edit Enemy appearance pickers only. They are not turned into project
+ * entities or copied as enemies/*.txt — the enemy list of a new project starts empty.
  *
- * NPC looks (animations/npcs/*.txt) are listed for the Edit NPC appearance picker only;
- * they are not turned into project NPC entities.
- *
- * Paths stay mod-relative ("animations/npcs/knight.txt", "enemies/base/goblin.txt"):
+ * Paths stay mod-relative ("animations/npcs/knight.txt", "animations/enemies/goblin.txt"):
  * projects require fantasycore, so Flare resolves them at Play/export without copies.
  */
 import type { MapObject } from '@/types';
@@ -47,14 +45,6 @@ export function titleFromKey(key: string): string {
   return key.replace(/[_-]+/g, ' ').replace(/\d+$/, (d) => ` ${d}`).replace(/\s+/g, ' ').trim().replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function firstValue(text: string, key: string): string | null {
-  for (const raw of text.split(/\r?\n/)) {
-    const line = raw.trim();
-    if (line.startsWith(`${key}=`)) return line.slice(key.length + 1).trim();
-  }
-  return null;
-}
-
 /** Minimal enemy definition on top of a fantasycore base (looks + sounds come from the INCLUDE). */
 export function enemyFileFromBase(baseRel: string, key: string): string {
   return [
@@ -67,44 +57,9 @@ export function enemyFileFromBase(baseRel: string, key: string): string {
   ].join('\n');
 }
 
-/** Entities to create for a template listing (pure). NPC looks are picker assets only. */
-export function planTemplateActors(listing: TemplateActorListing): PlannedActor[] {
-  const mod = listing.mod || 'fantasycore';
-  const out: PlannedActor[] = [];
-  for (const e of listing.enemies) {
-    // Bases without their own look (e.g. beacon.txt, a shared behaviour block) are not enemies.
-    if (e.isBase && !firstValue(e.raw, 'animations')) continue;
-    if (e.isBase) {
-      const rel = `enemies/${e.key}.txt`;
-      const animationsValue = firstValue(e.raw, 'animations');
-      out.push({
-        type: 'enemy',
-        importKey: `${mod}:enemy:${e.key}`,
-        name: titleFromKey(e.key),
-        category: e.key,
-        properties: {
-          include: e.file,
-          categories: e.key,
-          // `animations` is the Flare key; `tilesetPath` is Studio's look thumbnail source.
-          ...(animationsValue ? { animations: animationsValue, tilesetPath: animationsValue } : {}),
-          enemyFilename: rel,
-        },
-        file: { rel, content: enemyFileFromBase(e.file, e.key) },
-      });
-    } else {
-      // Full definition from a mod: keep the raw file as is (no re-serialisation).
-      const cats = (firstValue(e.raw, 'categories') || e.key).split(',').map(s => s.trim()).filter(Boolean);
-      out.push({
-        type: 'enemy',
-        importKey: `${mod}:enemy:${e.key}`,
-        name: firstValue(e.raw, 'name') || titleFromKey(e.key),
-        category: cats[0],
-        properties: { categories: cats.join(','), enemyFilename: e.file },
-        file: { rel: e.file, content: e.raw },
-      });
-    }
-  }
-  return out;
+/** Template listings no longer pre-create enemy entities; looks stay in the appearance picker. */
+export function planTemplateActors(_listing: TemplateActorListing): PlannedActor[] {
+  return [];
 }
 
 /** Drop planned entities already in the project (same import key or enemy file). */
@@ -130,7 +85,7 @@ type ActorEditor = {
   updateMapObject: (id: number, updates: Partial<MapObject>) => boolean;
 };
 
-/** Read the template listing, write missing project files, add unplaced Entities. */
+/** Kept for compatibility: listings are used by the appearance pickers; this no longer adds entities. */
 export async function importTemplateActors(
   editor: ActorEditor,
   flarePath: string,

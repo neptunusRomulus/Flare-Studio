@@ -68,21 +68,20 @@ describe('template actor references', () => {
 });
 
 describe('template actor plan', () => {
-  it('maps enemy bases to unplaced Entities and leaves NPC looks for the picker', () => {
-    const plan = planTemplateActors(listing);
-    expect(plan.map(p => [p.type, p.name, p.category])).toEqual([
-      ['enemy', 'Goblin Elite', 'goblin_elite'],
-      ['enemy', 'Goblin', 'goblin'],
-      ['enemy', 'Labyrinth Antlion', 'il_antlion'],
-    ]);
-    expect(plan.every((p) => p.type === 'enemy')).toBe(true);
-    expect(plan[1].file).toEqual({ rel: 'enemies/goblin.txt', content: enemyFileFromBase('enemies/base/goblin.txt', 'goblin') });
-    expect(plan[1].file?.content).toContain('INCLUDE enemies/base/goblin.txt\nname=Goblin\ncategories=goblin');
-    // full definitions are kept raw (repeated stat= lines survive)
-    expect(plan[2].file?.content).toBe(listing.enemies[3].raw);
+  it('does not pre-create enemy entities from the template; looks stay in the picker', () => {
+    expect(planTemplateActors(listing)).toEqual([]);
+    expect(listing.enemyLooks || listing.enemies.length).toBeTruthy();
+  });
+  it('still writes a minimal enemy file from a fantasycore base when one is created later', () => {
+    const content = enemyFileFromBase('enemies/base/goblin.txt', 'goblin');
+    expect(content).toContain('INCLUDE enemies/base/goblin.txt\nname=Goblin\ncategories=goblin');
   });
   it('dedupes by import key and keeps existing files', () => {
-    const plan = planTemplateActors(listing);
+    const plan = [
+      { type: 'enemy' as const, importKey: 'fantasycore:enemy:goblin_elite', name: 'Goblin Elite', properties: {}, file: { rel: 'enemies/goblin_elite.txt', content: 'x' } },
+      { type: 'enemy' as const, importKey: 'fantasycore:enemy:goblin', name: 'Goblin', properties: {}, file: { rel: 'enemies/goblin.txt', content: 'y' } },
+      { type: 'enemy' as const, importKey: 'fantasycore:enemy:il_antlion', name: 'Labyrinth Antlion', properties: {}, file: { rel: 'enemies/il_antlion.txt', content: 'z' } },
+    ];
     const existing: Parameters<typeof dedupeActors>[1] = [
       { type: 'enemy' as const, name: 'y', properties: { importKey: 'fantasycore:enemy:il_antlion' } },
     ];

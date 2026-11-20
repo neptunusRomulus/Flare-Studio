@@ -34,7 +34,6 @@ import useManualSaveSetup from '@/hooks/useManualSaveSetup';
 import useFlareEngine from '@/hooks/useFlareEngine';
 import { takeTemplateImport, markPreMapSlots } from '@/flare/projectTemplate';
 import { importTemplateTilesets, type TilesetImportEditor } from '@/editor/importTileset';
-import { importTemplateActors, type ActorImportResult } from '@/flare/templateActors';
 import { toast } from '@/hooks/use-toast';
 import type { HelpTarget } from '@/help/helpTopics';
 
@@ -241,18 +240,7 @@ export default function AppMain() {
         console.warn('[Template] import failed', err);
         result = { imported: [], skipped: [], failed: [], misfit: [] };
       }
-      let actors: ActorImportResult | null = null;
-      try {
-        loadingOverlay.progress('template', 0, 0, 'Loading enemies…');
-        actors = await importTemplateActors(editor, flarePath, templateProjectPath,
-          (done, total) => loadingOverlay.progress('template', done, total, 'Loading enemies…'));
-        if (actors.missing.length) console.warn('[Template] Missing referenced files:', actors.missing);
-        if (actors.rawOnly.length) console.warn('[Template] fantasycore NPC defs stay in the mod (picker uses looks):', actors.rawOnly);
-      } catch (err) {
-        console.warn('[Template] enemy import failed', err);
-      } finally {
-        loadingOverlay.end('template');
-      }
+      loadingOverlay.end('template');
       try { await layersObj?.handleSetActiveLayer?.(background.id); } catch { /* ignore */ }
       try { tileset?.setTabTick?.((t: number) => (t || 0) + 1); } catch { /* ignore */ }
       if (result.imported.length > 0) {
@@ -260,7 +248,6 @@ export default function AppMain() {
           result.skipped.length > 0 ? `${result.skipped.length} skipped (slot limit)` : '',
           result.failed.length > 0 ? `${result.failed.length} failed` : '',
           result.misfit.length > 0 ? `${result.misfit.length} don't fit the tile size` : '',
-          actors && actors.enemies ? `${actors.enemies} enemies added` : '',
         ].filter(Boolean).join(', ');
         toast({ title: 'Template tilesets imported', description: notes || undefined });
       } else {

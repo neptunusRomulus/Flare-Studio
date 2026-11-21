@@ -24,6 +24,7 @@ export default function SidebarGameSettingsArea() {
                 <Button type="button" variant="outline" className="h-7 px-2 justify-start text-xs" onClick={() => openEngineStudio('tree')}>Power tree</Button>
                 <Button type="button" variant="outline" className="h-7 px-2 justify-start text-xs" onClick={() => openEngineStudio('items')}>Types, qualities, sets</Button>
                 <Button type="button" variant="outline" className="h-7 px-2 justify-start text-xs" onClick={() => openEngineStudio('animations')}>Animations</Button>
+                <Button type="button" variant="outline" className="h-7 px-2 justify-start text-xs" onClick={() => openEngineStudio('statuses')}>Status tracking</Button>
                 <Button type="button" variant="outline" className="h-7 px-2 justify-start text-xs" onClick={() => openEngineStudio('problems')}>Problems</Button>
               </div>
             </div>

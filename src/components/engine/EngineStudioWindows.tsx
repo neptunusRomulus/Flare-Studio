@@ -4,6 +4,7 @@ import { EngineConfigEditor } from '@/components/EngineConfigEditor';
 import PowerTreeEditor from '@/components/engine/PowerTreeEditor';
 import ItemMetaEditor from '@/components/engine/ItemMetaEditor';
 import AnimationEditor from '@/components/engine/AnimationEditor';
+import StatusTrackingView from '@/components/engine/StatusTrackingView';
 import { useAppContext } from '@/context/AppContext';
 import ProblemsPanel from '@/components/engine/ProblemsPanel';
 import { closeEngineStudio, subscribeEngineStudio, type EngineStudioRequest } from '@/components/studio/engineStudio';
@@ -14,6 +15,7 @@ const TITLES: Record<NonNullable<EngineStudioRequest>['view'], string> = {
   items: 'Item types, qualities and sets',
   problems: 'Problems',
   animations: 'Animations',
+  statuses: 'Status tracking',
 };
 
 /** Host for engine-file, power-tree, item-meta and Problems windows. Mount once in AppMain. */
@@ -30,6 +32,7 @@ export default function EngineStudioWindows() {
       {req.view === 'items' && <ItemMetaEditor initialFile={req.file} />}
       {req.view === 'problems' && <ProblemsPanel />}
       {req.view === 'animations' && <AnimationEditor projectPath={projectPath} initialFile={req.file} />}
+      {req.view === 'statuses' && <StatusTrackingView projectPath={projectPath} />}
     </StudioWindow>
   );
 }

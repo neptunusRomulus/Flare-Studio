@@ -217,9 +217,8 @@ ipcMain.handle("prepare-flare-quick-launch", async (_event, { flarePath, project
     const engineInfo = ensureProjectEngineFiles(projectPath);
     miscPath = engineInfo.miscPath;
     // A crashed launch can leave the temporary playtest prefix in misc.txt.
-    let stablePrefix = engineInfo.savePrefix;
-    if (stablePrefix.endsWith("_playtest")) {
-      stablePrefix = stablePrefix.slice(0, -"_playtest".length) || stablePrefix;
+    let stablePrefix = flareLaunch.stableSavePrefix(engineInfo.savePrefix);
+    if (stablePrefix !== engineInfo.savePrefix) {
       const healed = flareLaunch.upsertKey(fs.readFileSync(miscPath, "utf8"), "save_prefix", stablePrefix);
       fs.writeFileSync(miscPath, healed, "utf8");
     }
@@ -253,22 +252,36 @@ ipcMain.handle("prepare-flare-quick-launch", async (_event, { flarePath, project
     }
 
     const className = flareLaunch.firstHeroClassName(readOptionalText(path.join(projectPath, "engine", "classes.txt")));
-    const testPrefix = flareLaunch.playtestPrefix(stablePrefix);
+    const useStudioTest = mode !== "new-game";
+    const testPrefix = useStudioTest
+      ? flareLaunch.studioTestPrefix(stablePrefix)
+      : flareLaunch.playtestPrefix(stablePrefix);
     previousMisc = fs.readFileSync(miscPath, "utf8");
     const playMisc = flareLaunch.upsertKey(previousMisc, "save_prefix", testPrefix, { appendIfEmpty: true });
     fs.writeFileSync(miscPath, playMisc, "utf8");
 
     const pathUser = currentPathUser();
     testSaveDir = path.join(pathUser, "saves", testPrefix);
-    fs.rmSync(testSaveDir, { recursive: true, force: true });
+    if (!useStudioTest) {
+      fs.rmSync(testSaveDir, { recursive: true, force: true });
+    }
     const slotDir = path.join(testSaveDir, "1");
     fs.mkdirSync(slotDir, { recursive: true });
+    const existingAvatar = useStudioTest ? readOptionalText(path.join(slotDir, "avatar.txt")) : "";
+    const previousAvatar = flareLaunch.parseAvatarText(existingAvatar);
     const avatar = flareLaunch.buildAvatarText({
-      name: "StudioTest",
-      className,
+      name: previousAvatar.name || "StudioTest",
+      className: className || previousAvatar.class,
       mapPath: target.relativePath.replace(/\\/g, "/"),
       x,
       y,
+      xp: previousAvatar.xp,
+      campaign: previousAvatar.campaign,
+      carried: previousAvatar.carried,
+      equipped: previousAvatar.equipped,
+      equippedQuantity: previousAvatar.equipped_quantity,
+      carriedQuantity: previousAvatar.carried_quantity,
+      currency: previousAvatar.currency,
     });
     fs.writeFileSync(path.join(slotDir, "avatar.txt"), avatar, "utf8");
 
@@ -284,7 +297,7 @@ ipcMain.handle("prepare-flare-quick-launch", async (_event, { flarePath, project
     fs.mkdirSync(sessionDir, { recursive: true });
     fs.writeFileSync(
       playSessionPath(projectPath),
-      JSON.stringify({ previousMisc, testSaveDir, testPrefix, loadSlot }, null, 2),
+      JSON.stringify({ previousMisc, testSaveDir, testPrefix, loadSlot, keepSave: useStudioTest }, null, 2),
       "utf8"
     );
 
@@ -340,7 +353,7 @@ ipcMain.handle("write-flare-test-save", async (_event, options = {}) => {
     const misc = fs.existsSync(miscPath) ? fs.readFileSync(miscPath, "utf8") : "";
     const listed = flareLaunch.readKey(misc, "save_prefix");
     const stablePrefix = listed || flareLaunch.slugSavePrefix(path.basename(String(projectPath).replace(/[\\/]+$/, "")));
-    const testPrefix = `${stablePrefix}_studio_test`;
+    const testPrefix = flareLaunch.studioTestPrefix(stablePrefix);
     const pathUser = currentPathUser();
     const testSaveDir = path.join(pathUser, "saves", testPrefix);
     const slotDir = path.join(testSaveDir, "1");

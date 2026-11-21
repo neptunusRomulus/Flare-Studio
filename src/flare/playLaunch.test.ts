@@ -246,6 +246,20 @@ describe('engine gameplay.txt and misc.txt', () => {
     expect(flare.playtestPrefix('studio_my_village')).toBe('studio_my_village_playtest');
     expect(flare.playtestPrefix('studio_my_village')).not.toBe('studio_my_village');
   });
+
+  it('uses <prefix>_studio_test for Play and the test-save form', () => {
+    expect(flare.studioTestPrefix('studio_my_village')).toBe('studio_my_village_studio_test');
+    expect(flare.studioTestPrefix('studio_my_village_studio_test')).toBe('studio_my_village_studio_test');
+    expect(flare.studioTestPrefix('studio_my_village_playtest')).toBe('studio_my_village_studio_test');
+    expect(flare.stableSavePrefix('studio_my_village_studio_test')).toBe('studio_my_village');
+    expect(flare.stableSavePrefix('studio_my_village_playtest')).toBe('studio_my_village');
+    expect(flare.isStudioTestPrefix('studio_my_village_studio_test')).toBe(true);
+  });
+
+  it('reads existing avatar fields so Play can keep XP and items', () => {
+    const parsed = flare.parseAvatarText('name=Hero\nxp=1500\ncarried=12,13\nspawn=maps/old.txt,1,2\n');
+    expect(parsed).toMatchObject({ name: 'Hero', xp: '1500', carried: '12,13', spawn: 'maps/old.txt,1,2' });
+  });
 });
 
 describe('--load-slot index', () => {

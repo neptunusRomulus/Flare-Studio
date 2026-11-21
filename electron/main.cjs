@@ -247,7 +247,7 @@ function cleanupPlaySession(projectPath) {
     }
   }
 
-  if (session && session.testSaveDir) {
+  if (session && session.testSaveDir && !session.keepSave) {
     try {
       const savesRoot = path.join(currentPathUser(), "saves");
       const relative = path.relative(path.resolve(savesRoot), path.resolve(session.testSaveDir));

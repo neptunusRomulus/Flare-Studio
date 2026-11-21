@@ -86,7 +86,7 @@ export default function TestLaunchForm({ projectPath }: { projectPath: string | 
 
   return (
     <div className="space-y-3 p-3">
-      <FieldHint hint="Writes a temporary Flare save under path_user/saves/<prefix>_studio_test/1/avatar.txt with the chosen map, XP, items and campaign statuses. This does not launch Flare. The Play button still writes its own short-lived playtest save when you run the game.">
+      <FieldHint hint="Writes a Flare save under path_user/saves/<prefix>_studio_test/1/avatar.txt with the chosen map, XP, items and campaign statuses. Play Current Map launches that save (updating the spawn to the current map and position, and keeping any XP, items and statuses already in the file). This button only writes the file.">
         <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Test save</div>
       </FieldHint>
       <div className="flex flex-wrap items-center gap-1">

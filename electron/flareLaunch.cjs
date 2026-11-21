@@ -208,6 +208,40 @@ function playtestPrefix(stablePrefix) {
   return `${base}_playtest`;
 }
 
+const STUDIO_TEST_SUFFIX = "_studio_test";
+
+/** Save prefix used by Play and the Test save form: path_user/saves/<prefix>_studio_test. */
+function studioTestPrefix(stablePrefix) {
+  let base = stablePrefix || "studio_project";
+  if (base.endsWith("_playtest")) base = base.slice(0, -"_playtest".length) || base;
+  if (base.endsWith(STUDIO_TEST_SUFFIX)) return base;
+  return `${base}${STUDIO_TEST_SUFFIX}`;
+}
+
+function isStudioTestPrefix(prefix) {
+  return String(prefix || "").endsWith(STUDIO_TEST_SUFFIX);
+}
+
+/** If a crashed Play left a temporary prefix in misc.txt, strip it back to the project prefix. */
+function stableSavePrefix(prefix) {
+  let base = String(prefix || "");
+  if (base.endsWith("_playtest")) base = base.slice(0, -"_playtest".length) || base;
+  if (base.endsWith(STUDIO_TEST_SUFFIX)) base = base.slice(0, -STUDIO_TEST_SUFFIX.length) || base;
+  return base || prefix;
+}
+
+function parseAvatarText(text) {
+  const out = {};
+  for (const line of String(text || "").split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const eq = trimmed.indexOf("=");
+    if (eq <= 0) continue;
+    out[trimmed.slice(0, eq).trim()] = trimmed.slice(eq + 1);
+  }
+  return out;
+}
+
 /** Keep an existing save_prefix. Only fill it in when the key is missing. */
 function ensureSavePrefix(content, prefix) {
   const current = readKey(content, "save_prefix");
@@ -546,6 +580,10 @@ module.exports = {
   upsertKey,
   slugSavePrefix,
   playtestPrefix,
+  studioTestPrefix,
+  isStudioTestPrefix,
+  stableSavePrefix,
+  parseAvatarText,
   ensureSavePrefix,
   dataPathFromFlareSelection,
   resolvePathUser,

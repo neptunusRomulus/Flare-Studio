@@ -5,7 +5,7 @@ import { PowerEditorBody } from './PowerEditorWindow';
 import type { PowerProjectFiles } from './usePowerProjectFiles';
 
 const files: ProjectFile[] = [
-  { path: 'powers/powers.txt', text: '[power]\nid=10\nname=Frost Bolt\ntype=missile\nspeed=16\nrequires_mp=5\nmodifier_damage=multiply,130,0\npost_effect=slow,50,5s\nwall_reflect=true\n' },
+  { path: 'powers/powers.txt', text: '[power]\nid=10\nname=Frost Bolt\ntype=missile\nspeed=16\nrequires_mp=5\nmodifier_damage=multiply,130,0\npost_effect=slow,50,5s\nwall_reflect=true\nscript=on_hit,scripts/powers/dev_tome.txt\n' },
   { path: 'powers/effects.txt', text: '[effect]\nid=slow\nname=Slow\ntype=speed\n\n[effect]\nid=lonely\nname=Lonely\ntype=stun\n' },
   { path: 'npcs/guard.txt', text: 'name=Guard\n[dialog]\nrequires_status=met_guard\n' },
 ];
@@ -26,6 +26,8 @@ describe('power editor', () => {
     expect(html).toContain('Has a mana cost but no player can use it');
     expect(html).toContain('Wall reflect');
     expect(html).toContain('>Slow<');
+    expect(html).toContain('list="event-script-suggestions"');
+    expect(html).toContain('data-power-script="on_hit,scripts/powers/dev_tome.txt"');
   });
 
   it('shows effects as Buff/Debuff with an unused warning', () => {

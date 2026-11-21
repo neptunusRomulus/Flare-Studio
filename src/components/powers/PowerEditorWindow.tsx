@@ -27,8 +27,20 @@ import type { PowerProjectFiles } from './usePowerProjectFiles';
 import { renameIfNameChanged } from '@/editor/identityFromName';
 import { displayIdentity } from '@/editor/identityRename';
 import { HintLabel } from '@/components/ui/field-hint';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { EVENT_SCRIPT_LIST_ID } from '@/hooks/useEventScripts';
 
 export type PowerTarget = { type: 'power' | 'effect' | 'flag' | 'new'; id: string };
+
+
+const POWER_SCRIPT_TRIGGERS = ['on_cast', 'on_hit', 'on_wall'] as const;
+const parsePowerScript = (raw: string) => {
+  const parts = String(raw || '').split(',').map((part) => part.trim()).filter((part, i, all) => !(part === '' && i === all.length - 1));
+  if (parts.length && (POWER_SCRIPT_TRIGGERS as readonly string[]).includes(parts[0])) {
+    return { trigger: parts[0], path: parts.slice(1).join(',') };
+  }
+  return { trigger: 'on_cast', path: String(raw || '').trim() };
+};
 
 const POWER_TYPES: Array<{ id: string; label: string; tooltip: string }> = [
   { id: 'fixed', label: 'Hits a spot', tooltip: 'type=fixed: appears at the caster or target' },
@@ -42,7 +54,7 @@ const EFFECT_TYPES = ['speed', 'attack_speed', 'damage', 'damage_percent', 'heal
 
 /** Keys the question sections already show; everything else goes through Properties. */
 const POWER_SECTION_KEYS = new Set(['id', 'name', 'description', 'type', 'modifier_damage', 'radius', 'target_range', 'speed', 'count', 'lifespan', 'base_damage',
-  'trait_elemental', 'spawn_type', 'buff', 'post_effect', 'post_effect_src', 'requires_mp', 'cooldown', 'icon', 'animation', 'soundfx', 'new_state']);
+  'trait_elemental', 'spawn_type', 'buff', 'post_effect', 'post_effect_src', 'requires_mp', 'cooldown', 'icon', 'animation', 'soundfx', 'new_state', 'script']);
 const EFFECT_SECTION_KEYS = new Set(['id', 'name', 'type', 'icon', 'animation', 'can_stack', 'max_stacks']);
 const TOGGLE_KEYS = /^(use_hazard|buff|buff_teleport|buff_party|directional|face|aim_assist|multitarget|floor|complete_animation|requires_los|requires_corpse|remove_corpse|no_attack|passive|meta_power|sacrifice|can_stack|render_above|ignore_resist|wall_reflect|target_party|beacon|on_floor|ignore_zero_damage|lock_target_to_direction|missile_anim|trigger_all|manual_untransform|keep_equipment|untransform_on_hit|can_trigger_passives|script_trigger)$/;
 
@@ -234,6 +246,35 @@ const PowerEditor = ({ target, data, onClose, onOpen }: Props) => {
         <PowerSlider label="Cooldown" flareKey="cooldown" raw={v('cooldown')} unit="s" onChange={(r) => set('cooldown', r)} />
         <Field label="Description" flareKey="description">
           <DraftInput className="h-7 text-xs" value={v('description')} onChange={(e) => set('description', e.target.value || null)} />
+        </Field>
+        <Field label="Event" flareKey="script">
+          {(() => {
+            const parsed = parsePowerScript(v('script'));
+            const write = (trigger: string, path: string) => set('script', path.trim() ? `${trigger},${path.trim()}` : null);
+            return (
+              <div className="flex flex-wrap items-center gap-1" data-power-script={`${parsed.trigger},${parsed.path}`}>
+                <Select value={parsed.trigger} onValueChange={(trigger) => write(trigger, parsed.path)}>
+                  <SelectTrigger className="h-7 w-auto text-xs" aria-label="Script trigger">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {POWER_SCRIPT_TRIGGERS.map((trigger) => (
+                      <SelectItem key={trigger} value={trigger}>{trigger}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  width="path"
+                  className="h-7 text-xs"
+                  list={EVENT_SCRIPT_LIST_ID}
+                  value={parsed.path}
+                  placeholder="scripts/…"
+                  aria-label="Script file"
+                  onChange={(e) => write(parsed.trigger, e.target.value)}
+                />
+              </div>
+            );
+          })()}
         </Field>
         <Field label="Used by" flareKey="enemy power= · item power= · event power= · skill tree · class">
           <UsedByList items={usedBy} />

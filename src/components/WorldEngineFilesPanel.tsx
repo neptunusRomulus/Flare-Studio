@@ -22,6 +22,7 @@ import {
   parseKeyedValues,
   upsertKeyedValues,
 } from '@/editor/worldEngine';
+import { useRegisterDirty } from '@/context/SaveHealthContext';
 
 type WorldPane = 'world' | 'gameplay' | 'misc' | 'death' | 'music' | 'loot';
 
@@ -179,6 +180,8 @@ export default function WorldEngineFilesPanel({ worldEditors }: { worldEditors: 
       setBusy(false);
     }
   };
+
+  useRegisterDirty('world-engine-files', dirty, save);
 
   return (
     <div className="space-y-3">

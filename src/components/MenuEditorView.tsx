@@ -17,6 +17,7 @@ import {
   type MenuPanel,
   type Resolutions,
 } from '@/editor/menuLayout';
+import { useRegisterDirty } from '@/context/SaveHealthContext';
 
 export const OPEN_MENUS_EVENT = 'flare-studio:open-menus';
 
@@ -124,6 +125,8 @@ const MenuEditorView = ({ projectPath }: Props) => {
     }
     await load();
   };
+
+  useRegisterDirty('menus', Object.keys(dirty).length > 0, save);
 
   if (!root) {
     return <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">Open a project to edit menus.</div>;

@@ -52,6 +52,7 @@ import {
   type KeybindRow,
   type WidgetSectionId,
 } from '@/editor/uiEngine';
+import { useRegisterDirty } from '@/context/SaveHealthContext';
 
 type UiPane = 'general' | 'fonts' | 'colors' | 'tooltips' | 'resolutions' | 'combat' | 'icons' | 'backgrounds' | 'cursor' | 'widgets' | 'defaults' | 'subtitles';
 
@@ -393,6 +394,8 @@ export default function UIEngineFilesPanel({ general }: { general: ReactNode }) 
       setBusy(false);
     }
   };
+
+  useRegisterDirty('ui-engine-files', dirty, save);
 
   const fonts = parseFontSettings(fontsText);
   const icons = parseIconsFile(iconsText);

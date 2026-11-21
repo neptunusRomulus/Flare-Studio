@@ -46,8 +46,8 @@ declare global {
       close: () => void;
       /** false/'close' = nothing unsaved; 'save' | 'discard' | 'cancel' = the user's answer. */
       confirmClose: (decision: boolean | 'close' | 'save' | 'discard' | 'cancel') => Promise<boolean>;
-      onBeforeClose: (callback: () => void) => void;
-      onSaveAndClose: (callback: () => void) => void;
+      onBeforeClose: (callback: (() => void) | null) => void;
+      onSaveAndClose: (callback: (() => void) | null) => void;
       closeAfterSave: () => void;
       selectDirectory: () => Promise<string | null>;
       selectTilesetFile: () => Promise<string | null>;
@@ -120,7 +120,7 @@ declare global {
       onMenuUndo: (callback: () => void) => void;
       onMenuRedo: (callback: () => void) => void;
       // Graceful shutdown handlers
-      onAppBeforeQuit: (callback: () => void) => void;
+      onAppBeforeQuit: (callback: (() => void) | null) => void;
       appShutdownComplete: () => void;
       // Flare engine launcher
       selectFlareExe: () => Promise<string | null>;

@@ -38,8 +38,11 @@ import ItemRandomizerDatalist from '@/components/engine/ItemRandomizerDatalist';
 import ProcgenRulesDatalist from '@/components/engine/ProcgenRulesDatalist';
 import StoryFlagDatalist from '@/components/powers/StoryFlagDatalist';
 import SessionRecoveryDialog from '@/components/SessionRecoveryDialog';
-import useCrashRecovery from '@/hooks/useCrashRecovery';
+import useCrashRecovery, { waitUntil } from '@/hooks/useCrashRecovery';
+import useCloseGuard from '@/hooks/useCloseGuard';
 import useManualSaveSetup from '@/hooks/useManualSaveSetup';
+import { useSaveHealth } from '@/context/SaveHealthContext';
+import { anythingDirty, backupMapName, isMapDirty } from '@/editor/saveHealth';
 import useFlareEngine from '@/hooks/useFlareEngine';
 import { takeTemplateImport, markPreMapSlots } from '@/flare/projectTemplate';
 import { importTemplateTilesets, type TilesetImportEditor } from '@/editor/importTileset';
@@ -54,6 +57,7 @@ export default function AppMain() {
     showWelcome,
     handleCreateNewMap,
     handleOpenMap,
+    openMapForRecovery,
     isDarkMode,
     titleBarProps,
     actors,
@@ -111,9 +115,15 @@ export default function AppMain() {
 
   // Crash recovery state
   const [showRecoveryDialog, setShowRecoveryDialog] = useState(false);
+  const { editorDirty, saveDirtySources } = useSaveHealth();
+  const editorRef = useRef(editor);
+  editorRef.current = editor;
+  const openMapForRecoveryRef = useRef(openMapForRecovery);
+  openMapForRecoveryRef.current = openMapForRecovery;
+  const projectPathRef = useRef<string | null>(controls?.currentProjectPath ?? null);
+  projectPathRef.current = controls?.currentProjectPath ?? null;
   const {
     hasCrashBackup,
-    backupTimestamp,
     mapName: crashedMapName,
     isRecovering,
     recoveryError,
@@ -126,47 +136,41 @@ export default function AppMain() {
     onRecoveryFound: () => setShowRecoveryDialog(true),
     onRecoveryDismissed: () => setShowRecoveryDialog(false),
     onRecoverBackup: async (backup: unknown) => {
-      if (!editor || typeof editor.loadFromBackupData !== 'function') {
-        return false;
+      const targetName = backupMapName(backup);
+      if (targetName && typeof openMapForRecoveryRef.current === 'function') {
+        await openMapForRecoveryRef.current(targetName);
       }
+      const ready = await waitUntil(() => {
+        const current = editorRef.current;
+        if (!current || typeof current.loadFromBackupData !== 'function') return null;
+        if (targetName && typeof current.getMapName === 'function') {
+          const loadedName = String(current.getMapName() || '');
+          if (loadedName && loadedName.toLowerCase() !== targetName.toLowerCase()) return null;
+        }
+        return current;
+      });
+      if (!ready) return false;
 
-      const loaded = editor.loadFromBackupData(backup);
-      if (!loaded) {
-        return false;
-      }
+      const loaded = ready.loadFromBackupData(backup);
+      if (!loaded) return false;
 
-      const restored = backup as {
-        mapName?: unknown;
-        mapWidth?: unknown;
-        mapHeight?: unknown;
-      };
-
-      if (typeof restored.mapName === 'string') {
-        setMapName(restored.mapName);
-      }
-      if (typeof restored.mapWidth === 'number') {
-        setMapWidth(restored.mapWidth);
-      }
-      if (typeof restored.mapHeight === 'number') {
-        setMapHeight(restored.mapHeight);
-      }
-
-      try {
-        editor.redraw?.();
-      } catch (err) {
-        void err;
-      }
-
+      const restored = backup as { mapName?: unknown; mapWidth?: unknown; mapHeight?: unknown };
+      if (typeof restored.mapName === 'string') setMapName(restored.mapName);
+      if (typeof restored.mapWidth === 'number') setMapWidth(restored.mapWidth);
+      if (typeof restored.mapHeight === 'number') setMapHeight(restored.mapHeight);
+      try { ready.redraw?.(); } catch (err) { void err; }
       return true;
     }
   });
 
+  useEffect(() => {
+    editor?.setCrashBackupPaused?.(hasCrashBackup);
+    return () => { editor?.setCrashBackupPaused?.(false); };
+  }, [editor, hasCrashBackup]);
+
   const handleRecover = async () => {
     const success = await recoverSession();
-    if (success) {
-      // Close dialog and allow editor to use recovered state
-      setShowRecoveryDialog(false);
-    }
+    if (success) setShowRecoveryDialog(false);
   };
 
   const handleDismiss = () => {
@@ -182,12 +186,32 @@ export default function AppMain() {
   }, [isStartingMap, updateStartingMap]);
   const { handleManualSave, isManuallySaving } = useManualSaveSetup(editor, controls?.currentProjectPath, undefined, onAfterSave);
 
+  const mapStatus = titleBarProps?.saveStatus ?? 'saved';
+  const dirty = anythingDirty(mapStatus, editorDirty ? { editors: true } : {});
+  const saveAll = useCallback(async () => {
+    if (isMapDirty(mapStatus)) await handleManualSave();
+    await saveDirtySources();
+  }, [mapStatus, handleManualSave, saveDirtySources]);
+
+  useCloseGuard({
+    isDirty: () => anythingDirty(titleBarProps?.saveStatus ?? 'saved', editorDirty ? { editors: true } : {}),
+    saveAll,
+    onDiscard: () => { dismissRecovery(); },
+  });
+
   const enhancedControls = useMemo(() => ({
     ...(controls ?? {}),
-    handleManualSave,
+    handleManualSave: saveAll,
     isManuallySaving,
-    hasUnsavedChanges: Boolean(controls?.hasUnsavedChanges)
-  }), [controls, handleManualSave, isManuallySaving]);
+    hasUnsavedChanges: dirty,
+    onSaveAndQuit: async () => {
+      await saveAll();
+      if (typeof controls?.onSaveAndQuit === 'function') {
+        // onSaveAndQuit also saves the map and shows welcome; map already saved above.
+        await controls.onQuit?.();
+      }
+    },
+  }), [controls, saveAll, isManuallySaving, dirty]);
 
   const hasMap = canvasCtx.mapInitialized;
 
@@ -213,7 +237,7 @@ export default function AppMain() {
   } : undefined, [layersObj]);
 
   // Flare engine launcher
-  const flareEngineSave = useCallback(async () => { await handleManualSave(); }, [handleManualSave]);
+  const flareEngineSave = useCallback(async () => { await saveAll(); }, [saveAll]);
   const flareEngine = useFlareEngine({
     currentProjectPath: controls?.currentProjectPath ?? null,
     mapName: mapName ?? null,
@@ -308,9 +332,16 @@ export default function AppMain() {
   // The old title bar is gone: the logo menu floats next to the map-tab strip (top-left when there is none).
   const appMenu = useMemo(
     () => showPanels && controls
-      ? <AppControls {...enhancedControls} saveStatus={titleBarProps?.saveStatus} />
+      ? <AppControls
+          {...enhancedControls}
+          saveStatus={titleBarProps?.saveStatus}
+          editorDirty={editorDirty}
+          hasRecovery={hasCrashBackup}
+          backedUpAt={titleBarProps?.backedUpAt ?? null}
+          onRecoveryClick={() => setShowRecoveryDialog(true)}
+        />
       : undefined,
-    [showPanels, controls, enhancedControls, titleBarProps],
+    [showPanels, controls, enhancedControls, titleBarProps, editorDirty, hasCrashBackup],
   );
 
   const enhancedTopBarProps = useMemo(() => ({

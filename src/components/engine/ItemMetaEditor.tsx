@@ -8,6 +8,7 @@ import { loadConfigDocument, saveConfigDocument } from '@/editor/projectFiles';
 import { useAppContext } from '@/context/AppContext';
 import { FieldHint } from '@/components/ui/field-hint';
 import ItemRandomizerForm from '@/components/engine/ItemRandomizerForm';
+import { useRegisterDirty } from '@/context/SaveHealthContext';
 
 const FILES = [
   { path: 'items/types.txt', label: 'Types', section: 'type' },
@@ -64,6 +65,18 @@ export default function ItemMetaEditor({ initialFile }: { initialFile?: string }
       toast({ title: 'Save failed', description: active, variant: 'destructive' });
     }
   };
+
+  const itemMetaDirty = Object.values(dirty).some(Boolean);
+  const saveAllItemMeta = async () => {
+    if (!projectPath) return;
+    for (const [path, isDirty] of Object.entries(dirty)) {
+      if (!isDirty) continue;
+      const text = engineTextFromSections(docs[path] || []);
+      const saved = await saveConfigDocument(projectPath, path, text);
+      if (saved) setDirty((prev) => ({ ...prev, [path]: false }));
+    }
+  };
+  useRegisterDirty('item-meta', itemMetaDirty, saveAllItemMeta);
 
   const updateField = (si: number, fi: number, key: 'key' | 'value', value: string) => {
     const next = sections.map((sec, i) => i !== si ? sec : { ...sec, fields: sec.fields.map((f, j) => (j === fi ? { ...f, [key]: value } : f)) });

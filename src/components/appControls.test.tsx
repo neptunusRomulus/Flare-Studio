@@ -44,3 +44,28 @@ describe('floating logo menu button', () => {
     expect(menuTooltip(false, 'saved')).toBe('Menu — all changes saved');
   });
 });
+
+describe('logo save marks', () => {
+  it('shows an amber dot when the map is only crash-backed-up', () => {
+    const html = renderToStaticMarkup(<AppControls {...props} hasUnsavedChanges saveStatus="backed-up" />);
+    expect(html).toContain('data-save-state="backed-up"');
+    expect(html).toContain('bg-amber-400');
+    expect(html).toContain('Backed up, not written to project files');
+    expect(html).not.toContain('data-save-state="unsaved"');
+  });
+
+  it('shows a recover mark that is distinct from the status dot', () => {
+    const html = renderToStaticMarkup(<AppControls {...props} hasUnsavedChanges={false} saveStatus="saved" hasRecovery />);
+    expect(html).toContain('data-save-state="recovery"');
+    expect(html).toContain('Recovery backup waiting');
+    expect(html).not.toContain('data-save-state="unsaved"');
+    expect(html).not.toContain('data-save-state="backed-up"');
+  });
+
+  it('shows a red error mark when a save failed', () => {
+    const html = renderToStaticMarkup(<AppControls {...props} hasUnsavedChanges saveStatus="error" />);
+    expect(html).toContain('data-save-state="error"');
+    expect(html).toContain('bg-red-500');
+    expect(menuTooltip(true, 'error')).toBe('Save failed — open the menu to try again');
+  });
+});

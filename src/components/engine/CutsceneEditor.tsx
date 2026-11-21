@@ -17,6 +17,7 @@ import {
   type CutsceneFile,
   type CutscenePart,
 } from '@/editor/cutsceneFile';
+import { useRegisterDirty } from '@/context/SaveHealthContext';
 
 const projectFile = (root: string, rel: string) =>
   `${root.replace(/\\/g, '/')}/${rel.replace(/\\/g, '/').replace(/^\//, '')}`;
@@ -127,6 +128,8 @@ export default function CutsceneEditor() {
       setBusy(false);
     }
   };
+
+  useRegisterDirty('cutscenes', dirty, save);
 
   const setPart = (index: number, next: CutscenePart) => write({ ...file, parts: file.parts.map((part, partIndex) => partIndex === index ? next : part) });
   const setComponent = (partIndex: number, compIndex: number, patch: Partial<CutsceneComponent>) => {

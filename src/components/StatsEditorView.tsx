@@ -45,6 +45,7 @@ import { AVATAR_SFX_DIR, STEP_SOUND_LIST_ID, STEP_SOUNDS_PATH } from '@/editor/a
 import { listTxtUnder } from '@/hooks/useEventScripts';
 import { XP_SCALING_DIR } from '@/editor/xpScaling';
 import { CombatSettingsForm, DamageTypesForm } from '@/components/engine/CombatAndDamageForms';
+import { useRegisterDirty } from '@/context/SaveHealthContext';
 
 type Props = { projectPath?: string | null };
 
@@ -345,6 +346,8 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
       setBusy(false);
     }
   };
+
+  useRegisterDirty('stats', dirty, save);
 
   return (
     <div className="flex flex-col flex-1 min-h-0 gap-3">

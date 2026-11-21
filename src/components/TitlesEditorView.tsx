@@ -16,6 +16,7 @@ import {
   PRIMARY_STATS_PATH,
   DEFAULT_PRIMARY_STATS,
 } from '@/editor/statsTitles';
+import { useRegisterDirty } from '@/context/SaveHealthContext';
 
 type Props = { projectPath?: string | null };
 
@@ -87,6 +88,8 @@ const TitlesEditorView: React.FC<Props> = ({ projectPath }) => {
       setBusy(false);
     }
   };
+
+  useRegisterDirty('titles', dirty, save);
 
   return (
     <div className="flex flex-col flex-1 min-h-0 gap-3">

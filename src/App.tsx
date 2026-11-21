@@ -2,6 +2,7 @@ import React from 'react';
 import { ToolbarProvider } from './context/ToolbarContext';
 import { SidebarProvider } from './context/SidebarContext';
 import { SaveQueueProvider } from './context/SaveQueueContext';
+import { SaveHealthProvider } from './context/SaveHealthContext';
 import { RetryStrategyProvider } from './context/RetryStrategyContext';
 import { SaveTransactionProvider } from './context/SaveTransactionContext';
 import { ConflictResolutionProvider } from './context/ConflictResolutionContext';
@@ -52,12 +53,14 @@ export default function App() {
       <RetryStrategyProvider initialConfig={{ maxRetries: 3, initialDelayMs: 500 }}>
         <SaveTransactionProvider>
           <SaveQueueProvider>
+            <SaveHealthProvider>
             <ConflictResolutionProvider>
               <ToolbarProvider value={toolbarValue}>
                 <AppMainWrapper sidebarDeps={sidebarDeps} buildAppMainCtxFromSidebar={buildAppMainCtxFromSidebar} />
                 <InlineConfirmHost />
               </ToolbarProvider>
             </ConflictResolutionProvider>
+            </SaveHealthProvider>
           </SaveQueueProvider>
         </SaveTransactionProvider>
       </RetryStrategyProvider>

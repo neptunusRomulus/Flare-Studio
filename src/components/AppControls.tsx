@@ -1,8 +1,10 @@
 import React, { useState, useRef } from 'react';
+import { History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Tooltip from '@/components/ui/tooltip';
 import MainMenuDialog from '@/components/MainMenuDialog';
 import BrandMark, { BRAND_MARK_RADIUS_CLASS, BRAND_MARK_SIZE_CLASS } from '@/components/brand/BrandMark';
+import { deriveLogoState, logoTooltip, type LogoSaveMark, type MapSaveStatus } from '@/editor/saveHealth';
 
 type Props = {
   currentProjectPath: string | null;
@@ -20,32 +22,63 @@ type Props = {
   isPreparingNewMap: boolean;
   hasUnsavedChanges: boolean;
   setShowSettings: (v: boolean) => void;
-  /** Save state from the editor; only used for the button tooltip (was the title-bar Saving… text). */
-  saveStatus?: 'saving' | 'saved' | 'unsaved' | 'error';
+  saveStatus?: MapSaveStatus;
+  editorDirty?: boolean;
+  hasRecovery?: boolean;
+  backedUpAt?: number | null;
+  saveError?: string | null;
+  onRecoveryClick?: () => void;
   /** @deprecated The menu button always shows the Flare Studio mark; kept for callers. */
   iconUrl?: string | null;
 };
 
-/** Tooltip text for the logo button; the old title-bar "Saving… / Save Error" text moved here. */
-export function menuTooltip(hasUnsavedChanges: boolean, saveStatus?: 'saving' | 'saved' | 'unsaved' | 'error'): string {
+/** Tooltip text for the logo button. */
+export function menuTooltip(
+  hasUnsavedChanges: boolean,
+  saveStatus?: MapSaveStatus,
+  extras?: { editorDirty?: boolean; hasRecovery?: boolean; backedUpAt?: number | null; saveError?: string | null },
+): string {
   if (saveStatus === 'saving') return 'Saving…';
-  if (saveStatus === 'error') return 'Save failed — open the menu to try again';
-  if (hasUnsavedChanges) return 'Unsaved changes — open the menu to save (Ctrl+S)';
-  return 'Menu — all changes saved';
+  const state = deriveLogoState({
+    mapStatus: saveStatus ?? (hasUnsavedChanges ? 'unsaved' : 'saved'),
+    editorDirty: extras?.editorDirty ?? false,
+    hasRecovery: extras?.hasRecovery ?? false,
+  });
+  return logoTooltip(state, extras?.backedUpAt, extras?.saveError);
+}
+
+export function logoMarkClass(mark: LogoSaveMark): string {
+  if (mark === 'backed-up') return 'bg-amber-400';
+  return 'bg-red-500';
+}
+
+export function logoMarkLabel(mark: LogoSaveMark): string {
+  if (mark === 'error') return 'Save failed';
+  if (mark === 'backed-up') return 'Backed up, not written to project files';
+  return 'Unsaved changes';
 }
 
 /** Floating rounded-square Flare Studio mark: the mark itself is the menu button (Save, Engine Settings, help…). */
 const AppControls: React.FC<Props> = ({
   currentProjectPath, onSaveAndQuit, onQuit, onShowProjectFolder, onShowHelp, onSaveAsCopy, onRestart, onExport, onCheckUpdates,
   handleManualSave, isManuallySaving, isPreparingNewMap, hasUnsavedChanges, setShowSettings, saveStatus,
+  editorDirty = false, hasRecovery = false, backedUpAt = null, saveError = null, onRecoveryClick,
 }) => {
   const btnRef = useRef<HTMLButtonElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPos, setMenuPos] = useState<{ left: number; top: number } | null>(null);
+  const mapStatus = saveStatus ?? (hasUnsavedChanges ? 'unsaved' : 'saved');
+  const logo = deriveLogoState({
+    mapStatus,
+    editorDirty,
+    hasRecovery,
+  });
+  const tooltip = mapStatus === 'saving' ? 'Saving…' : logoTooltip(logo, backedUpAt, saveError);
 
   return (
     <div className="no-drag">
-      <Tooltip content={menuTooltip(hasUnsavedChanges, saveStatus)} side="bottom">
+      <div className="relative inline-flex">
+      <Tooltip content={tooltip} side="bottom">
         <Button
           ref={btnRef}
           type="button"
@@ -68,16 +101,32 @@ const AppControls: React.FC<Props> = ({
             className={`${BRAND_MARK_SIZE_CLASS} shrink-0 ${BRAND_MARK_RADIUS_CLASS} transition-transform duration-150 ease-out group-active:scale-90 motion-reduce:transition-none motion-reduce:transform-none`}
             flameClassName="transition-transform duration-150 ease-out group-hover:scale-110 group-hover:-skew-x-3 group-aria-expanded:scale-110 motion-reduce:transition-none motion-reduce:transform-none"
           />
-          {hasUnsavedChanges ? (
+          {logo.mark !== 'none' ? (
             <span
-              className="absolute -right-0.5 -top-0.5 w-2 h-2 bg-red-500 rounded-full border border-background pointer-events-none"
+              className={`absolute -right-0.5 -top-0.5 w-2 h-2 ${logoMarkClass(logo.mark)} rounded-full border border-background pointer-events-none`}
               role="img"
-              aria-label="Unsaved changes"
-              data-save-state="unsaved"
+              aria-label={logoMarkLabel(logo.mark)}
+              data-save-state={logo.mark}
             />
           ) : null}
         </Button>
       </Tooltip>
+          {logo.showRecovery ? (
+            <button
+              type="button"
+              aria-label="Recovery backup waiting"
+              data-save-state="recovery"
+              className="absolute -left-0.5 -bottom-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-orange-500 text-white border border-background"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onRecoveryClick?.();
+              }}
+            >
+              <History className="h-2.5 w-2.5" aria-hidden="true" />
+            </button>
+          ) : null}
+      </div>
 
       <MainMenuDialog
         open={menuOpen}

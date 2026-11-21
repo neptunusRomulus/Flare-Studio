@@ -20,6 +20,7 @@ import {
   type ProcgenKey,
   type ProcgenPart,
 } from '@/editor/procgenRules';
+import { useRegisterDirty } from '@/context/SaveHealthContext';
 
 const projectFile = (rootPath: string, rel: string) =>
   `${rootPath.replace(/\\/g, '/')}/${rel.replace(/\\/g, '/').replace(/^\//, '')}`;
@@ -124,6 +125,8 @@ export default function ProcgenRulesForm() {
       setBusy(false);
     }
   };
+
+  useRegisterDirty('procgen', dirty, save);
 
   const setPart = (index: number, next: ProcgenPart) => write({ ...file, parts: file.parts.map((part, partIndex) => partIndex === index ? next : part) });
   const setKeys = (index: number, keys: ProcgenKey[]) => {

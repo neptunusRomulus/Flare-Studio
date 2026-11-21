@@ -4,9 +4,17 @@ const { contextBridge, ipcRenderer, webUtils } = require("electron");
 // handled=false (no screen listening, e.g. welcome) lets main close directly.
 // Only the latest handler runs, so a double-registered listener can't open two prompts.
 let beforeCloseHandler = null;
+let saveAndCloseHandler = null;
+let beforeQuitHandler = null;
 ipcRenderer.on("before-close", () => {
   ipcRenderer.send("before-close-ack", !!beforeCloseHandler);
   if (beforeCloseHandler) beforeCloseHandler();
+});
+ipcRenderer.on("save-and-close", () => {
+  if (saveAndCloseHandler) saveAndCloseHandler();
+});
+ipcRenderer.on("app-before-quit", () => {
+  if (beforeQuitHandler) beforeQuitHandler();
 });
 
 // Expose protected methods that allow the renderer process to use
@@ -29,8 +37,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
   onBeforeClose: (callback) => {
     beforeCloseHandler = typeof callback === "function" ? callback : null;
   },
-  onSaveAndClose: (callback) =>
-    ipcRenderer.on("save-and-close", () => callback && callback()),
+  onSaveAndClose: (callback) => {
+    saveAndCloseHandler = typeof callback === "function" ? callback : null;
+  },
   closeAfterSave: () => ipcRenderer.send("close-after-save"),
   selectDirectory: () => ipcRenderer.invoke("select-directory"),
   selectTilesetFile: () => ipcRenderer.invoke("select-tileset-file"),
@@ -133,8 +142,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
   copyProject: (sourcePath, destPath) =>
     ipcRenderer.invoke("copy-project", sourcePath, destPath),
   // Graceful shutdown handlers
-  onAppBeforeQuit: (callback) =>
-    ipcRenderer.on("app-before-quit", () => callback && callback()),
+  onAppBeforeQuit: (callback) => {
+    beforeQuitHandler = typeof callback === "function" ? callback : null;
+  },
   appShutdownComplete: () =>
     ipcRenderer.send("app-shutdown-complete"),
   // Flare engine launcher

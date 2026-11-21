@@ -136,20 +136,29 @@ export default function useAppMainBuilder() {
 
   const activeTabForSaveRef = useRef<{ name: string } | null>(null);
 
-  const [saveStatus, setSaveStatusState] = useState<'saving' | 'saved' | 'unsaved' | 'error'>('saved');
+  const [saveStatus, setSaveStatusState] = useState<'saving' | 'saved' | 'unsaved' | 'backed-up' | 'error'>('saved');
   const [lastSaveTime, setLastSaveTime] = useState(0);
+  const [backedUpAt, setBackedUpAt] = useState<number | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const applySaveStatus = useCallback((status: 'saving' | 'saved' | 'unsaved' | 'error') => {
+  const applySaveStatus = useCallback((status: 'saving' | 'saved' | 'unsaved' | 'backed-up' | 'error') => {
     setSaveStatusState(status);
-    setHasUnsavedChanges(status === 'unsaved' || status === 'error');
-    if (status === 'saved') setLastSaveTime(Date.now());
+    setHasUnsavedChanges(status === 'unsaved' || status === 'error' || status === 'backed-up' || status === 'saving');
+    if (status === 'saved') {
+      setLastSaveTime(Date.now());
+      setBackedUpAt(null);
+    }
+    if (status === 'backed-up') setBackedUpAt(Date.now());
   }, []);
-  const handleSaveStatus = useCallback((status: React.SetStateAction<'saving' | 'saved' | 'unsaved' | 'error'>) => {
+  const handleSaveStatus = useCallback((status: React.SetStateAction<'saving' | 'saved' | 'unsaved' | 'backed-up' | 'error'>) => {
     if (typeof status === 'function') {
       setSaveStatusState((prev) => {
         const next = status(prev);
-        setHasUnsavedChanges(next === 'unsaved' || next === 'error');
-        if (next === 'saved') setLastSaveTime(Date.now());
+        setHasUnsavedChanges(next === 'unsaved' || next === 'error' || next === 'backed-up' || next === 'saving');
+        if (next === 'saved') {
+          setLastSaveTime(Date.now());
+          setBackedUpAt(null);
+        }
+        if (next === 'backed-up') setBackedUpAt(Date.now());
         return next;
       });
       return;
@@ -968,10 +977,30 @@ export default function useAppMainBuilder() {
       showWelcome: appState.showWelcome,
       handleCreateNewMap: handleCreateNewMap,
       handleOpenMap: (projectPath?: string) => { try { const manager = projectManager as ProjectManagerType; if (manager && typeof manager.handleOpenMap === 'function' && typeof projectPath === 'string') void manager.handleOpenMap(projectPath); } catch (e) { console.warn(e); } },
+      openMapForRecovery: async (name: string) => {
+        const mapName = String(name || '').trim();
+        if (!currentProjectPath || !mapName) return false;
+        try {
+          const match = (tabs as { id: string; name: string }[]).find((tab) => tab.name.toLowerCase() === mapName.toLowerCase());
+          if (match) {
+            if (match.id !== activeTabId) await switchToTab(match.id);
+            return true;
+          }
+          const manager = projectManager as ProjectManagerType;
+          if (manager && typeof manager.handleOpenMap === 'function') {
+            await manager.handleOpenMap(currentProjectPath, true, mapName);
+            return true;
+          }
+        } catch (err) {
+          console.warn('openMapForRecovery failed', err);
+        }
+        return false;
+      },
       isDarkMode,
       titleBarProps: {
         saveStatus,
         lastSaveTime,
+        backedUpAt,
         onMinimize: () => {
           try { window?.electronAPI?.minimize?.(); } catch (e) { console.warn('Minimize failed', e); }
         },

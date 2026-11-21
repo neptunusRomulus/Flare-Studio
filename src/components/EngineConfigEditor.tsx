@@ -15,6 +15,7 @@ import { collectSectionIds } from '@/editor/engineForms';
 import { ClassHeroForm, EquipFlagsForm, HeroLayersForm, HeroOptionsForm, LootSettingsForm, XpTableForm } from '@/components/engine/EngineSpecialForms';
 import { registerProblemOpener } from '@/editor/projectProblems';
 import { FieldHint } from '@/components/ui/field-hint';
+import { useRegisterDirty } from '@/context/SaveHealthContext';
 
 export interface ParsedSection {
   type: string;
@@ -168,6 +169,14 @@ export function EngineConfigEditor({ initialFile }: { initialFile?: string } = {
       toast({ title: 'Error', description: `Failed to save ${fileName}`, variant: 'destructive' });
     }
   };
+
+  const engineDirty = Object.values(hasUnsavedChanges).some(Boolean);
+  const saveAllEngine = async () => {
+    for (const fileName of Object.keys(hasUnsavedChanges)) {
+      if (hasUnsavedChanges[fileName]) await saveConfig(fileName);
+    }
+  };
+  useRegisterDirty('engine-config', engineDirty, saveAllEngine);
 
   const handleFieldChange = (fileName: string, sectionIndex: number, fieldIndex: number, key: string, value: string) => {
     setParsedData(prev => {

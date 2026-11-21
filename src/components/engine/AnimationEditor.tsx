@@ -20,6 +20,7 @@ import {
   type AnimationSection,
   type PackedFrame,
 } from '@/editor/animationFile';
+import { useRegisterDirty } from '@/context/SaveHealthContext';
 
 const projectFile = (root: string, rel: string) =>
   `${root.replace(/\\/g, '/')}/${rel.replace(/\\/g, '/').replace(/^\//, '')}`;
@@ -237,6 +238,8 @@ export default function AnimationEditor({ projectPath, initialFile }: { projectP
       setBusy(false);
     }
   };
+
+  useRegisterDirty('animations', dirty, save);
 
   const setHeader = (patch: Partial<AnimationFile['headerKeys']>) => write({ ...file, headerKeys: { ...file.headerKeys, ...patch } });
   const setSection = (patch: Partial<AnimationSection>) => {

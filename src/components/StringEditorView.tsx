@@ -29,6 +29,7 @@ import {
   type PoFile,
 } from '@/editor/poFile';
 import { scanProjectStrings } from '@/editor/stringScan';
+import { useRegisterDirty } from '@/context/SaveHealthContext';
 
 type Props = {
   projectPath?: string | null;
@@ -236,6 +237,8 @@ const StringEditorView: React.FC<Props> = ({ projectPath, onBack }) => {
       setBusy(false);
     }
   };
+
+  useRegisterDirty('strings', dirty, save);
 
   const selectedName = languages.find((language) => language.code === selected)?.name || selected;
   const canRemove = Boolean(selected && selected !== SOURCE_LANGUAGE);

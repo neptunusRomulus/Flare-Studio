@@ -18,6 +18,7 @@ import {
   type RandomizerBonus,
   type RandomizerOption,
 } from '@/editor/itemRandomizer';
+import { useRegisterDirty } from '@/context/SaveHealthContext';
 
 const projectFile = (root: string, rel: string) =>
   `${root.replace(/\\/g, '/')}/${rel.replace(/\\/g, '/').replace(/^\//, '')}`;
@@ -117,6 +118,8 @@ export default function ItemRandomizerForm({ projectPath }: { projectPath: strin
       setBusy(false);
     }
   };
+
+  useRegisterDirty('item-randomizer', dirty, save);
 
   const setOption = (index: number, patch: Partial<RandomizerOption>) => {
     write({ ...table, options: table.options.map((row, rowIndex) => rowIndex === index ? { ...row, ...patch } : row) });

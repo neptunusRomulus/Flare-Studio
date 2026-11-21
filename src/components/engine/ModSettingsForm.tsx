@@ -16,6 +16,7 @@ import {
   type ModRequire,
   type ModSettingsFile,
 } from '@/editor/modSettings';
+import { useRegisterDirty } from '@/context/SaveHealthContext';
 
 export default function ModSettingsForm({ projectPath }: { projectPath: string | null }) {
   const root = (projectPath || '').replace(/\\/g, '/');
@@ -85,6 +86,8 @@ export default function ModSettingsForm({ projectPath }: { projectPath: string |
       setBusy(false);
     }
   };
+
+  useRegisterDirty('mod-settings', dirty, save);
 
   const order = loadOrder(file, projectName);
 

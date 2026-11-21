@@ -25,6 +25,7 @@ import {
   type BookPresent,
   type BookTextBlock,
 } from '@/editor/bookFile';
+import { useRegisterDirty } from '@/context/SaveHealthContext';
 
 export const OPEN_BOOK_EVENT = 'flare-studio:open-book';
 
@@ -207,6 +208,8 @@ const BookEditorView = ({ projectPath }: Props) => {
     setText(next);
     setDirty(false);
   };
+
+  useRegisterDirty('books', dirty, save);
 
   const addText = () => {
     const block: BookTextBlock = {

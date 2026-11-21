@@ -58,6 +58,7 @@ import {
   DEFAULT_POWERS_TAB_AREA,
   type PowersMenuLayout,
 } from '@/editor/menuLayout';
+import { useRegisterDirty } from '@/context/SaveHealthContext';
 
 
 export default function PowerTreeEditor() {
@@ -167,6 +168,8 @@ export default function PowerTreeEditor() {
       setBusy(false);
     }
   };
+
+  useRegisterDirty('power-tree', dirty, save);
 
   const switchPath = (nextPath: string) => {
     if (!nextPath || nextPath === path) return;

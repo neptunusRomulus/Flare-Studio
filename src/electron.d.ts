@@ -51,6 +51,7 @@ declare global {
       closeAfterSave: () => void;
       selectDirectory: () => Promise<string | null>;
       selectTilesetFile: () => Promise<string | null>;
+      importIntoProject: (options: { projectPath: string; destDir: string; title?: string; filters?: Array<{ name: string; extensions: string[] }> }) => Promise<{ success: boolean; rel?: string; name?: string; error?: string; cancelled?: boolean }>;
       selectProjectFile: (options?: { projectPath?: string | null; title?: string; filters?: Array<{ name: string; extensions: string[] }> }) => Promise<string | null>;
       getDisplaySettings: () => Promise<{ interfaceScale: number; textScale: number }>;
       setDisplaySettings: (settings: { interfaceScale: number; textScale: number }) => Promise<{ interfaceScale: number; textScale: number }>;

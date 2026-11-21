@@ -3,6 +3,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { FieldHint, HintLabel } from '@/components/ui/field-hint';
+import FontLibrary, { FONT_FILE_LIST_ID } from '@/components/engine/FontLibrary';
 import { FlareColorField } from '@/components/ui/flare-color-field';
 import { toast } from '@/hooks/use-toast';
 import { useAppContext } from '@/context/AppContext';
@@ -434,7 +435,8 @@ export default function UIEngineFilesPanel({ general }: { general: ReactNode }) 
 
       {pane === 'general' ? general
         : pane === 'fonts' ? (
-          <div className="space-y-2">
+          <div className="space-y-4">
+            <FontLibrary projectPath={projectPath} />
             <FieldHint hint="engine/font_settings.txt. Each font has an id and one or more style lines: language, file, point size, blend, and optional bold, italic, underline, shadow_x, shadow_y. Language is default or a region code. Only .ttf files, usually under /fonts, are supported. font_fallback has been removed from Flare and is not written.">
               <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Fonts</div>
             </FieldHint>
@@ -456,7 +458,7 @@ export default function UIEngineFilesPanel({ general }: { general: ReactNode }) 
                       const next = fonts.fonts.map((item, index) => index === fontIndex ? { ...item, styles: item.styles.map((row, rowIndex) => rowIndex === styleIndex ? { ...row, language: event.target.value } : row) } : item);
                       setFonts(next);
                     }} />
-                    <Input aria-label={`Font ${font.id || fontIndex + 1} style ${styleIndex + 1} file`} width="path" className="h-7 text-xs" placeholder="file.ttf" value={style.file} onChange={(event) => {
+                    <Input aria-label={`Font ${font.id || fontIndex + 1} style ${styleIndex + 1} file`} width="path" className="h-7 text-xs" placeholder="file.ttf" list={FONT_FILE_LIST_ID} value={style.file} onChange={(event) => {
                       const next = fonts.fonts.map((item, index) => index === fontIndex ? { ...item, styles: item.styles.map((row, rowIndex) => rowIndex === styleIndex ? { ...row, file: event.target.value } : row) } : item);
                       setFonts(next);
                     }} />

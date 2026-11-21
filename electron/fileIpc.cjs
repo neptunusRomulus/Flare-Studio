@@ -50,6 +50,35 @@ ipcMain.handle("select-project-file", async (_event, options = {}) => {
   return abs.replace(/\\/g, "/");
 });
 
+ipcMain.handle("import-into-project", async (_event, options = {}) => {
+  try {
+    const projectPath = options.projectPath;
+    const destDir = String(options.destDir || "").replace(/\\/g, "/").replace(/^[\/]+/, "").replace(/\/+$/, "");
+    if (!projectPath || !destDir) return { success: false, error: "Missing project or destination" };
+    const destRoot = path.join(projectPath, destDir);
+    if (!isAllowedProjectPath(destRoot)) return { success: false, error: "Path not allowed" };
+    const result = await dialog.showOpenDialog(getMainWindow(), {
+      title: options.title || "Select a file",
+      properties: ["openFile"],
+      filters: options.filters || [{ name: "All files", extensions: ["*"] }],
+    });
+    if (result.canceled || !result.filePaths.length) return { success: false, cancelled: true };
+    const source = result.filePaths[0];
+    const name = path.basename(source);
+    if (!name || name === "." || name === "..") return { success: false, error: "Invalid filename" };
+    fs.mkdirSync(destRoot, { recursive: true });
+    const dest = path.join(destRoot, name);
+    if (!isAllowedProjectPath(dest)) return { success: false, error: "Path not allowed" };
+    if (fs.existsSync(dest)) return { success: false, error: "A file with that name already exists" };
+    fs.copyFileSync(source, dest);
+    const rel = `${destDir}/${name}`.replace(/\\/g, "/");
+    return { success: true, rel, name };
+  } catch (error) {
+    console.error("import-into-project failed:", error);
+    return { success: false, error: error.message };
+  }
+});
+
 ipcMain.handle("select-tileset-file", async () => {
   const result = await dialog.showOpenDialog(getMainWindow(), {
     properties: ["openFile"],
@@ -71,10 +100,19 @@ ipcMain.handle("read-file-dataurl", async (_event, filePath) => {
   try {
     if (!filePath || !fs.existsSync(filePath)) return null;
     const ext = (filePath.split(".").pop() || "png").toLowerCase();
-    const normalizedExt = ext === "jpg" ? "jpeg" : ext;
+    const mime = {
+      png: "image/png",
+      jpg: "image/jpeg",
+      jpeg: "image/jpeg",
+      gif: "image/gif",
+      webp: "image/webp",
+      ttf: "font/ttf",
+      otf: "font/otf",
+      woff: "font/woff",
+    }[ext] || `application/octet-stream`;
     const buf = fs.readFileSync(filePath);
     const b64 = buf.toString("base64");
-    return `data:image/${normalizedExt};base64,${b64}`;
+    return `data:${mime};base64,${b64}`;
   } catch (e) {
     console.warn("read-file-dataurl failed for", filePath, e);
     return null;

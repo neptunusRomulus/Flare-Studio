@@ -46,9 +46,19 @@ function AppMainWrapper({
   );
 }
 
+function AppTree() {
+  const { toolbarValue, sidebarDeps, buildAppMainCtxFromSidebar } = useAppController();
+
+  return (
+    <ToolbarProvider value={toolbarValue}>
+      <AppMainWrapper sidebarDeps={sidebarDeps} buildAppMainCtxFromSidebar={buildAppMainCtxFromSidebar} />
+      <InlineConfirmHost />
+    </ToolbarProvider>
+  );
+}
+
 export default function App() {
   useInterfaceScale();
-  const { toolbarValue, sidebarDeps, buildAppMainCtxFromSidebar } = useAppController();
 
   return (
     <StudioHintsProvider>
@@ -58,10 +68,7 @@ export default function App() {
           <SaveQueueProvider>
             <SaveHealthProvider>
             <ConflictResolutionProvider>
-              <ToolbarProvider value={toolbarValue}>
-                <AppMainWrapper sidebarDeps={sidebarDeps} buildAppMainCtxFromSidebar={buildAppMainCtxFromSidebar} />
-                <InlineConfirmHost />
-              </ToolbarProvider>
+              <AppTree />
             </ConflictResolutionProvider>
             </SaveHealthProvider>
           </SaveQueueProvider>

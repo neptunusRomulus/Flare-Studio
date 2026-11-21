@@ -77,4 +77,31 @@ describe('SaveHealthContext', () => {
     expect(writeProjectFiles).toHaveBeenCalledWith('/proj', [{ path: 'books/lore.txt', content: 'hello' }]);
     await waitFor(() => expect(api?.editorDirty).toBe(false));
   });
+
+  it('does not drop an unmounted draft when the editor remounts from disk as clean', async () => {
+    let api: ReturnType<typeof useSaveHealth> | null = null;
+    const { rerender } = render(
+      <SaveHealthProvider>
+        <Probe onReady={(value) => { api = value; }} />
+        <Editor id="books" dirty files={[{ path: 'books/lore.txt', content: 'hello' }]} />
+      </SaveHealthProvider>,
+    );
+    await waitFor(() => expect(api?.editorDirty).toBe(true));
+
+    rerender(
+      <SaveHealthProvider>
+        <Probe onReady={(value) => { api = value; }} />
+      </SaveHealthProvider>,
+    );
+    await waitFor(() => expect(api?.editorDirty).toBe(true));
+
+    rerender(
+      <SaveHealthProvider>
+        <Probe onReady={(value) => { api = value; }} />
+        <Editor id="books" dirty={false} />
+      </SaveHealthProvider>,
+    );
+    await waitFor(() => expect(api?.collectEditorDrafts()).toEqual({ books: [{ path: 'books/lore.txt', content: 'hello' }] }));
+    expect(api!.editorDirty).toBe(true);
+  });
 });

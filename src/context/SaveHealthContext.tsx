@@ -41,15 +41,19 @@ export function SaveHealthProvider({ children }: { children: React.ReactNode }) 
 
   const setSource = useCallback((id: string, dirty: boolean, save?: DirtySaveFn, files?: EditorFileDraft[], mounted = true) => {
     const prev = entriesRef.current[id];
+    // A remounted editor often starts clean (it reloads from disk). Do not throw away a
+    // surviving unmounted draft until the editor itself reports dirty or a save clears it.
+    if (!dirty && mounted && prev?.dirty && prev.files?.length && !files) {
+      entriesRef.current[id] = { ...prev, save: save ?? prev.save, mounted: true };
+      setSources((current) => (current[id] === true ? current : { ...current, [id]: true }));
+      return;
+    }
     entriesRef.current[id] = {
       dirty,
       save: save ?? prev?.save,
-      files: files ?? prev?.files,
+      files: dirty ? (files ?? prev?.files) : undefined,
       mounted,
     };
-    if (!dirty) {
-      delete entriesRef.current[id].files;
-    }
     setSources((current) => (current[id] === dirty ? current : { ...current, [id]: dirty }));
   }, []);
 

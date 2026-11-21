@@ -13,7 +13,9 @@ import {
   emptyAnimationFile,
   emptyAnimationSection,
   parseAnimationFile,
+  parseColorMod,
   parseDurationMs,
+  previewLayout,
   previewRect,
   serializeAnimationFile,
   type AnimationFile,
@@ -85,15 +87,19 @@ function AnimationFramePreview({
   }, [playing, duration, frameCount, section.type]);
 
   const rect = previewRect(file, section, frame, direction);
+  const blendMode = (file.headerKeys.blend_mode || 'normal').trim().toLowerCase();
+  const colorMod = parseColorMod(file.headerKeys.color_mod);
+  const alphaMod = parseInt(file.headerKeys.alpha_mod || '255', 10);
   useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
     if (!canvas || !ctx) return;
-    const w = rect?.w || 64;
-    const h = rect?.h || 64;
-    const scale = Math.min(160 / w, 160 / h, 4);
-    canvas.width = Math.max(1, Math.round(w * scale));
-    canvas.height = Math.max(1, Math.round(h * scale));
+    const layout = rect
+      ? previewLayout(rect)
+      : { canvasW: 64, canvasH: 64, originX: 0, originY: 0, destX: 0, destY: 0 };
+    const scale = Math.min(160 / layout.canvasW, 160 / layout.canvasH, 4);
+    canvas.width = Math.max(1, Math.round(layout.canvasW * scale));
+    canvas.height = Math.max(1, Math.round(layout.canvasH * scale));
     ctx.imageSmoothingEnabled = false;
     ctx.fillStyle = '#1a1a2e';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -104,8 +110,61 @@ function AnimationFramePreview({
       }
     }
     const img = imgRef.current;
-    if (img && rect) ctx.drawImage(img, rect.x, rect.y, rect.w, rect.h, 0, 0, canvas.width, canvas.height);
-  }, [rect, src, frame, ready]);
+    if (img && rect) {
+      const destW = Math.max(1, Math.round(rect.w * scale));
+      const destH = Math.max(1, Math.round(rect.h * scale));
+      const destX = Math.round(layout.destX * scale);
+      const destY = Math.round(layout.destY * scale);
+      const needsTint = colorMod.r !== 255 || colorMod.g !== 255 || colorMod.b !== 255;
+      let source: CanvasImageSource = img;
+      let sx = rect.x;
+      let sy = rect.y;
+      let sw = rect.w;
+      let sh = rect.h;
+      if (needsTint) {
+        const tint = document.createElement('canvas');
+        tint.width = rect.w;
+        tint.height = rect.h;
+        const tctx = tint.getContext('2d');
+        if (tctx) {
+          tctx.drawImage(img, rect.x, rect.y, rect.w, rect.h, 0, 0, rect.w, rect.h);
+          const imageData = tctx.getImageData(0, 0, rect.w, rect.h);
+          const d = imageData.data;
+          const r = colorMod.r / 255;
+          const g = colorMod.g / 255;
+          const b = colorMod.b / 255;
+          for (let i = 0; i < d.length; i += 4) {
+            d[i] = Math.round(d[i] * r);
+            d[i + 1] = Math.round(d[i + 1] * g);
+            d[i + 2] = Math.round(d[i + 2] * b);
+          }
+          tctx.putImageData(imageData, 0, 0);
+          source = tint;
+          sx = 0;
+          sy = 0;
+        }
+      }
+      ctx.save();
+      const alpha = Number.isFinite(alphaMod) ? Math.max(0, Math.min(255, alphaMod)) / 255 : 1;
+      ctx.globalAlpha = alpha;
+      if (blendMode === 'add') ctx.globalCompositeOperation = 'lighter';
+      ctx.drawImage(source, sx, sy, sw, sh, destX, destY, destW, destH);
+      ctx.restore();
+    }
+    // Crosshair at the render origin (feet / hotspot), matching Flare's dest = position - offset.
+    const originX = Math.round((rect ? layout.originX : 0) * scale) + 0.5;
+    const originY = Math.round((rect ? layout.originY : 0) * scale) + 0.5;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255, 160, 40, 0.9)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(originX - 4, originY);
+    ctx.lineTo(originX + 4, originY);
+    ctx.moveTo(originX, originY - 4);
+    ctx.lineTo(originX, originY + 4);
+    ctx.stroke();
+    ctx.restore();
+  }, [rect, src, frame, ready, blendMode, colorMod.r, colorMod.g, colorMod.b, alphaMod]);
 
   return (
     <div className="flex flex-wrap items-end gap-2">

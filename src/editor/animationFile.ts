@@ -213,9 +213,41 @@ export function parseDurationMs(raw: string): number {
   return ticks > 0 ? ticks * (1000 / 60) : 1000;
 }
 
-export type PreviewRect = { x: number; y: number; w: number; h: number; image: string };
+export type PreviewRect = { x: number; y: number; w: number; h: number; image: string; ox: number; oy: number };
 
-/** Sprite rectangle for one frame of a section, unpacked grid or packed frame= row. */
+export function parseColorMod(value: string): { r: number; g: number; b: number } {
+  const parts = String(value || '').split(',').map((part) => parseInt(part.trim(), 10));
+  return {
+    r: Number.isFinite(parts[0]) ? parts[0] : 255,
+    g: Number.isFinite(parts[1]) ? parts[1] : 255,
+    b: Number.isFinite(parts[2]) ? parts[2] : 255,
+  };
+}
+
+export function parseOffsetPair(value: string): { x: number; y: number } {
+  const [x, y] = String(value || '').split(',').map((part) => parseInt(part.trim(), 10) || 0);
+  return { x, y };
+}
+
+/** Canvas placement for a frame: dest = origin - offset, as Flare draws at position - render_offset. */
+export function previewLayout(rect: Pick<PreviewRect, 'w' | 'h' | 'ox' | 'oy'>): {
+  canvasW: number; canvasH: number; originX: number; originY: number; destX: number; destY: number;
+} {
+  const originX = Math.max(rect.ox, 0);
+  const originY = Math.max(rect.oy, 0);
+  const destX = originX - rect.ox;
+  const destY = originY - rect.oy;
+  return {
+    canvasW: Math.max(destX + rect.w, originX + 1),
+    canvasH: Math.max(destY + rect.h, originY + 1),
+    originX,
+    originY,
+    destX,
+    destY,
+  };
+}
+
+/** Sprite rectangle and render offset for one frame of a section, unpacked grid or packed frame= row. */
 export function previewRect(file: AnimationFile, section: AnimationSection, frameIndex: number, direction: number): PreviewRect | null {
   const packed = section.packed.find((frame) => parseInt(frame.index, 10) === frameIndex && parseInt(frame.direction, 10) === direction);
   if (packed) {
@@ -226,7 +258,15 @@ export function previewRect(file: AnimationFile, section: AnimationSection, fram
     const w = parseInt(packed.w, 10) || 0;
     const h = parseInt(packed.h, 10) || 0;
     if (!w || !h || !image) return null;
-    return { x: parseInt(packed.x, 10) || 0, y: parseInt(packed.y, 10) || 0, w, h, image };
+    return {
+      x: parseInt(packed.x, 10) || 0,
+      y: parseInt(packed.y, 10) || 0,
+      w,
+      h,
+      image,
+      ox: parseInt(packed.ox, 10) || 0,
+      oy: parseInt(packed.oy, 10) || 0,
+    };
   }
   const size = parseSize(file.headerKeys.render_size);
   if (!size.w || !size.h) return null;
@@ -236,12 +276,15 @@ export function previewRect(file: AnimationFile, section: AnimationSection, fram
     || file.headerKeys.images[0]?.file
     || '';
   if (!image) return null;
+  const offset = parseOffsetPair(file.headerKeys.render_offset);
   return {
     x: size.w * (position + frameIndex),
     y: size.h * direction,
     w: size.w,
     h: size.h,
     image,
+    ox: offset.x,
+    oy: offset.y,
   };
 }
 

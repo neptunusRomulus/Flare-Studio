@@ -212,6 +212,20 @@ ipcMain.handle("write-file", async (_event, filePath, content) => {
   }
 });
 
+ipcMain.handle("delete-project-file", async (_event, filePath) => {
+  try {
+    if (!isAllowedProjectPath(filePath)) return { success: false, error: "Path not allowed" };
+    if (!fs.existsSync(filePath)) return { success: false, error: "File not found", missing: true };
+    const stat = fs.statSync(filePath);
+    if (!stat.isFile()) return { success: false, error: "Not a file" };
+    fs.unlinkSync(filePath);
+    return { success: true };
+  } catch (error) {
+    console.error("Error deleting file:", filePath, error);
+    return { success: false, error: error.message };
+  }
+});
+
 ipcMain.handle("rename-project-file", async (_event, fromPath, toPath) => {
   try {
     if (!isAllowedProjectPath(fromPath) || !isAllowedProjectPath(toPath)) {

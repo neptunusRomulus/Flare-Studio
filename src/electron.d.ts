@@ -25,6 +25,8 @@ interface MapConfig {
   isStartingMap?: boolean;
   /** Saved Flare path; picks the starting tile size (Classic 1.14 = 64x32). */
   flarePath?: string;
+  /** How the project was created; stored on project.json as meta.studioStart. */
+  projectStart?: 'scratch' | 'template';
 }
 
 interface ProjectMapData extends EditorProjectData {
@@ -52,6 +54,7 @@ declare global {
       selectDirectory: () => Promise<string | null>;
       selectTilesetFile: () => Promise<string | null>;
       importIntoProject: (options: { projectPath: string; destDir: string; title?: string; filters?: Array<{ name: string; extensions: string[] }> }) => Promise<{ success: boolean; rel?: string; name?: string; error?: string; cancelled?: boolean }>;
+      importIconFiles: (options: { projectPath: string; destDir?: string; title?: string; filters?: Array<{ name: string; extensions: string[] }> }) => Promise<{ success: boolean; files?: Array<{ rel: string; name: string }>; error?: string; cancelled?: boolean }>;
       selectProjectFile: (options?: { projectPath?: string | null; title?: string; filters?: Array<{ name: string; extensions: string[] }> }) => Promise<string | null>;
       getDisplaySettings: () => Promise<{ interfaceScale: number; textScale: number }>;
       setDisplaySettings: (settings: { interfaceScale: number; textScale: number }) => Promise<{ interfaceScale: number; textScale: number }>;
@@ -109,6 +112,7 @@ declare global {
       createFolderIfNotExists: (folderPath: string) => Promise<boolean>;
       readFile: (filePath: string) => Promise<string | null>;
       writeFile: (filePath: string, content: string) => Promise<boolean>;
+      writeFileFromDataURL: (filePath: string, dataUrl: string) => Promise<boolean>;
       deleteProjectFile: (filePath: string) => Promise<{ success: boolean; error?: string; missing?: boolean }>;
       renameProjectFile: (fromPath: string, toPath: string) => Promise<{ success: boolean; error?: string; missing?: boolean }>;
       readDir: (dirPath: string) => Promise<Array<{ name: string; isDirectory: boolean }>>;

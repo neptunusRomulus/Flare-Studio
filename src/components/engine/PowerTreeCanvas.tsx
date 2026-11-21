@@ -42,6 +42,7 @@ export default function PowerTreeCanvas({
   selectedIndex,
   onSelect,
   onMove,
+  iconSrcs,
 }: {
   tree: PowerTreeFile;
   tabIndex: number;
@@ -52,6 +53,7 @@ export default function PowerTreeCanvas({
   selectedIndex: number | null;
   onSelect: (index: number | null) => void;
   onMove: (index: number, position: string) => void;
+  iconSrcs?: Record<string, string>;
 }) {
   const frameRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<TreeView>({ zoom: 1, panX: 0, panY: 0 });
@@ -325,7 +327,14 @@ export default function PowerTreeCanvas({
                 onPointerUp={endDrag}
                 onPointerCancel={endDrag}
               >
-                <span className="pointer-events-none truncate px-0.5">{names?.[power.id] || power.id || '?'}</span>
+                {iconSrcs?.[power.id] ? (
+                  <span
+                    className="pointer-events-none absolute inset-0 bg-center bg-no-repeat"
+                    style={{ backgroundImage: `url("${iconSrcs[power.id]}")`, backgroundSize: '100% 100%' }}
+                  />
+                ) : (
+                  <span className="pointer-events-none truncate px-0.5">{names?.[power.id] || power.id || '?'}</span>
+                )}
                 <span className="pointer-events-none absolute left-1/2 top-full z-10 mt-0.5 max-w-[7rem] -translate-x-1/2 truncate rounded bg-background/90 px-0.5 text-[9px] leading-tight text-foreground">
                   {formatPowerLabel({ id: power.id, name: names?.[power.id] || '' })}
                 </span>

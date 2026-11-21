@@ -45,6 +45,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   selectTilesetFile: () => ipcRenderer.invoke("select-tileset-file"),
   selectProjectFile: (options) => ipcRenderer.invoke("select-project-file", options),
   importIntoProject: (options) => ipcRenderer.invoke("import-into-project", options),
+  importIconFiles: (options) => ipcRenderer.invoke("import-icon-files", options),
   createMapProject: (config) =>
     ipcRenderer.invoke("create-map-project", config),
   openMapProject: (projectPath, mapName) =>
@@ -116,6 +117,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("create-folder-if-not-exists", folderPath),
   writeFile: (filePath, content) =>
     ipcRenderer.invoke("write-file", filePath, content),
+  writeFileFromDataURL: (filePath, dataUrl) =>
+    ipcRenderer.invoke("write-file-dataurl", filePath, dataUrl),
   deleteProjectFile: (filePath) =>
     ipcRenderer.invoke("delete-project-file", filePath),
   renameProjectFile: (fromPath, toPath) =>

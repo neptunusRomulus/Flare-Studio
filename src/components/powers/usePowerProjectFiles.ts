@@ -12,6 +12,13 @@ type Api = {
 
 const api = (): Api => ((typeof window !== 'undefined' ? (window as unknown as { electronAPI?: Api }).electronAPI : undefined) || {});
 
+const powerFilePatchListeners = new Set<(files: Record<string, string>) => void>();
+
+/** Apply in-memory text patches after another saver (e.g. the icon atlas) writes icon=. */
+export function notifyPowerFilePatches(files: Record<string, string>) {
+  for (const listener of powerFilePatchListeners) listener(files);
+}
+
 /** Project files for the power editor, with debounced write-back per file. */
 export function usePowerProjectFiles(projectPath: string | null | undefined) {
   const [files, setFiles] = useState<ProjectFile[]>([]);
@@ -38,6 +45,26 @@ export function usePowerProjectFiles(projectPath: string | null | undefined) {
   }, [projectPath]);
 
   useEffect(() => { void reload(); }, [reload]);
+
+  useEffect(() => {
+    const listener = (incoming: Record<string, string>) => {
+      setFiles((prev) => {
+        let changed = false;
+        const next = prev.map((file) => {
+          if (incoming[file.path] == null || incoming[file.path] === file.text) return file;
+          changed = true;
+          return { ...file, text: incoming[file.path] };
+        });
+        const extras = Object.entries(incoming)
+          .filter(([path]) => !prev.some((file) => file.path === path))
+          .map(([path, content]) => ({ path, text: content }));
+        if (!changed && extras.length === 0) return prev;
+        return [...next, ...extras];
+      });
+    };
+    powerFilePatchListeners.add(listener);
+    return () => { powerFilePatchListeners.delete(listener); };
+  }, []);
 
   const flush = useCallback(async (rel: string) => {
     const text = pending.current.get(rel);

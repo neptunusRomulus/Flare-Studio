@@ -5,6 +5,42 @@ import { loadingOverlay } from '@/components/loadingOverlayStore';
  */
 export type ProjectStart = 'scratch' | 'template';
 
+const PROJECT_START_KEY = 'flare-studio.project-start';
+
+/** Remember how a project was created so project-specific tools can respect its starting point. */
+export function rememberProjectStart(projectPath: string, start: ProjectStart): void {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    const saved = JSON.parse(localStorage.getItem(PROJECT_START_KEY) || '{}') as Record<string, ProjectStart>;
+    localStorage.setItem(PROJECT_START_KEY, JSON.stringify({ ...saved, [projectPath]: start }));
+  } catch { /* ignore unavailable or malformed local storage */ }
+}
+
+/** Remembered start mode, or null when this machine has no record. */
+export function projectStartFor(projectPath: string | null | undefined): ProjectStart | null {
+  if (!projectPath || typeof localStorage === 'undefined') return null;
+  try {
+    const saved = JSON.parse(localStorage.getItem(PROJECT_START_KEY) || '{}') as Record<string, ProjectStart>;
+    const value = saved[projectPath];
+    return value === 'template' || value === 'scratch' ? value : null;
+  } catch { return null; }
+}
+
+/** Persist the start mode in project.json so it travels with the project, and keep a local fallback. */
+export async function persistProjectStart(projectPath: string, start: ProjectStart): Promise<void> {
+  rememberProjectStart(projectPath, start);
+  const api = typeof window !== 'undefined' ? window.electronAPI : undefined;
+  if (!api?.readFile || !api.writeFile) return;
+  const file = `${projectPath.replace(/\\/g, '/')}/project.json`;
+  try {
+    const text = await api.readFile(file);
+    if (text == null) return;
+    const json = JSON.parse(text) as { meta?: Record<string, unknown> };
+    json.meta = { ...(json.meta || {}), studioStart: start };
+    await api.writeFile(file, `${JSON.stringify(json, null, 2)}\n`);
+  } catch { /* leave the localStorage fallback if the project file cannot be updated */ }
+}
+
 let pending: { projectPath: string; flarePath: string } | null = null;
 
 export function queueTemplateImport(projectPath: string, flarePath: string): void {

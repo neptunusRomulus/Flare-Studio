@@ -79,6 +79,48 @@ ipcMain.handle("import-into-project", async (_event, options = {}) => {
   }
 });
 
+ipcMain.handle("import-icon-files", async (_event, options = {}) => {
+  try {
+    const projectPath = options.projectPath;
+    const destDir = String(options.destDir || "images/icons/studio").replace(/\\/g, "/").replace(/^[\/]+/, "").replace(/\/+$/, "");
+    if (!projectPath || !destDir) return { success: false, error: "Missing project or destination" };
+    const destRoot = path.join(projectPath, destDir);
+    if (!isAllowedProjectPath(destRoot)) return { success: false, error: "Path not allowed" };
+    const result = await dialog.showOpenDialog(getMainWindow(), {
+      title: options.title || "Import power icons",
+      properties: ["openFile", "multiSelections"],
+      filters: options.filters || [{ name: "PNG images", extensions: ["png"] }],
+    });
+    if (result.canceled || !result.filePaths.length) return { success: false, cancelled: true };
+    fs.mkdirSync(destRoot, { recursive: true });
+    const files = [];
+    const used = new Set(fs.existsSync(destRoot) ? fs.readdirSync(destRoot).map((name) => name.toLowerCase()) : []);
+    for (const source of result.filePaths) {
+      const base = path.basename(source);
+      if (!base || base === "." || base === "..") continue;
+      const stemRaw = base.toLowerCase().endsWith(".png") ? base.slice(0, -4) : base;
+      const stem = stemRaw.replace(/[^A-Za-z0-9._-]+/g, "_").replace(/^_+|_+$/g, "") || "icon";
+      let name = `${stem}.png`;
+      let index = 2;
+      while (used.has(name.toLowerCase())) {
+        name = `${stem}_${index}.png`;
+        index += 1;
+      }
+      const dest = path.join(destRoot, name);
+      if (!isAllowedProjectPath(dest)) return { success: false, error: "Path not allowed" };
+      fs.copyFileSync(source, dest);
+      used.add(name.toLowerCase());
+      files.push({ rel: `${destDir}/${name}`.replace(/\\/g, "/"), name });
+    }
+    if (!files.length) return { success: false, error: "No icons were imported" };
+    return { success: true, files };
+  } catch (error) {
+    console.error("import-icon-files failed:", error);
+    return { success: false, error: error.message };
+  }
+});
+
+
 ipcMain.handle("select-tileset-file", async () => {
   const result = await dialog.showOpenDialog(getMainWindow(), {
     properties: ["openFile"],
@@ -249,6 +291,26 @@ ipcMain.handle("write-file", async (_event, filePath, content) => {
     return false;
   }
 });
+
+ipcMain.handle("write-file-dataurl", async (_event, filePath, dataUrl) => {
+  try {
+    if (!isAllowedProjectPath(filePath)) return false;
+    const raw = String(dataUrl || "");
+    const match = raw.match(/^data:([^;,]+)?(;base64)?,(.*)$/s);
+    if (!match) return false;
+    const buffer = match[2] ? Buffer.from(match[3], "base64") : Buffer.from(decodeURIComponent(match[3]));
+    const directory = path.dirname(filePath);
+    if (!fs.existsSync(directory)) {
+      fs.mkdirSync(directory, { recursive: true });
+    }
+    fs.writeFileSync(filePath, buffer);
+    return true;
+  } catch (error) {
+    console.error("Error writing data URL file:", filePath, error);
+    return false;
+  }
+});
+
 
 ipcMain.handle("delete-project-file", async (_event, filePath) => {
   try {

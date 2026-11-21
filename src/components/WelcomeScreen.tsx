@@ -10,7 +10,7 @@ import FloatingBrandMark from '@/components/brand/FloatingBrandMark';
 import WindowControlBar from '@/components/WindowControlBar';
 import { getStoredFlarePath, FLARE_PATH_EVENT } from '@/flare/flarePathStore';
 import ProjectStartToggle from '@/components/ProjectStartToggle';
-import { isTemplateAvailable, queueTemplateImport, type ProjectStart } from '@/flare/projectTemplate';
+import { isTemplateAvailable, queueTemplateImport, persistProjectStart, type ProjectStart } from '@/flare/projectTemplate';
 import { FieldHint } from '@/components/ui/field-hint';
 
 interface WelcomeScreenProps {
@@ -235,9 +235,11 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ onCreateNewMap, onOpenMap
     try {
       if (window.electronAPI?.createMapProject) {
         const flarePath = getStoredFlarePath();
-        const result = await window.electronAPI.createMapProject({ ...mapConfig, flarePath: flarePath || undefined });
+        const start = projectStart === 'template' && templateAvailable ? 'template' : 'scratch';
+        const result = await window.electronAPI.createMapProject({ ...mapConfig, flarePath: flarePath || undefined, projectStart: start });
         if (result?.success && result.projectPath) {
           const projectPath = result.projectPath;
+          await persistProjectStart(projectPath, start);
           if (projectStart === 'template' && templateAvailable && flarePath) {
             queueTemplateImport(projectPath, flarePath);
           }

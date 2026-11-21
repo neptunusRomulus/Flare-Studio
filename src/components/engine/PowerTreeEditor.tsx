@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { ImagePlus, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -60,6 +60,7 @@ import {
   type PowersMenuLayout,
 } from '@/editor/menuLayout';
 import { useRegisterDirty } from '@/context/SaveHealthContext';
+import { usePowerIconAtlas } from '@/context/PowerIconAtlasContext';
 
 
 export default function PowerTreeEditor() {
@@ -81,6 +82,7 @@ export default function PowerTreeEditor() {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [powerTarget, setPowerTarget] = useState<PowerTarget | null>(null);
   const powerFiles = usePowerProjectFiles(projectPath);
+  const { previewFor, importFor, warning: iconWarning, canImport } = usePowerIconAtlas();
 
 
   const load = useCallback(async (preferredPath?: string) => {
@@ -190,6 +192,17 @@ export default function PowerTreeEditor() {
   const selected = selectedIndex != null && tree.items[selectedIndex]?.kind === 'power'
     ? tree.items[selectedIndex] as PowerTreeNode
     : null;
+
+  const iconSrcs = useMemo(() => {
+    const out: Record<string, string> = {};
+    for (const item of tree.items) {
+      if (item.kind !== 'power') continue;
+      const power = powerFiles.project.powers.find((entry) => entry.id === item.id);
+      const url = previewFor('power', item.id, power?.keys.icon?.[0] ?? '');
+      if (url) out[item.id] = url;
+    }
+    return out;
+  }, [tree.items, powerFiles.project.powers, previewFor]);
 
   useEffect(() => {
     const rel = (active?.background || tree.background || '').trim();
@@ -383,6 +396,7 @@ export default function PowerTreeEditor() {
               names={Object.fromEntries(powerOptions.map((item) => [item.id, item.name]))}
               selectedIndex={selectedIndex}
               onSelect={setSelectedIndex}
+              iconSrcs={iconSrcs}
               onMove={(index, position) => {
                 const item = tree.items[index];
                 if (item?.kind !== 'power') return;
@@ -425,6 +439,27 @@ export default function PowerTreeEditor() {
               <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" onClick={() => addPower()}>
                 <Plus className="w-3 h-3 mr-1" />Power
               </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className={`h-7 text-xs ${canImport ? '' : 'opacity-50'}`}
+                aria-disabled={canImport ? undefined : true}
+                onClick={() => {
+                  if (!canImport) {
+                    void importFor('power', selected?.id || '', '');
+                    return;
+                  }
+                  if (!selected) {
+                    toast({ title: 'Select a power', description: 'Select a power on the tree before importing an icon.' });
+                    return;
+                  }
+                  const power = powerFiles.project.powers.find((entry) => entry.id === selected.id);
+                  void importFor('power', selected.id, power?.keys.icon?.[0] ?? '');
+                }}
+              >
+                <ImagePlus className="w-3 h-3 mr-1" />Import icon
+              </Button>
               <SearchablePalette
                 buttonLabel="Add from list"
                 placeholder="Search powers…"
@@ -436,6 +471,9 @@ export default function PowerTreeEditor() {
                 onSelect={(id) => addPower(id)}
               />
             </div>
+          ) : null}
+          {iconWarning ? (
+            <div className="text-[11px] leading-snug text-amber-500 max-w-3xl">{iconWarning}</div>
           ) : null}
 
           {tabPowers.length > 0 ? (

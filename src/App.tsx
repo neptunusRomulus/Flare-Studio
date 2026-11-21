@@ -10,6 +10,7 @@ import { SaveErrorProvider } from './context/SaveErrorContext';
 import { StudioHintsProvider } from './context/StudioHintsContext';
 import useSidebarDeps from './hooks/useSidebarDeps';
 import { AppProvider } from './context/AppContext';
+import { PowerIconAtlasProvider } from './context/PowerIconAtlasContext';
 import AppMain from './components/AppMain';
 import { InlineConfirmHost } from './components/ui/inline-confirm';
 import useAppController from './hooks/useAppController';
@@ -35,7 +36,9 @@ function AppMainWrapper({
         const appCtx = buildAppMainCtxFromSidebar(assembledSidebar);
         return (
           <AppProvider value={appCtx}>
-            <AppMain />
+            <PowerIconAtlasProvider>
+              <AppMain />
+            </PowerIconAtlasProvider>
           </AppProvider>
         );
       }}

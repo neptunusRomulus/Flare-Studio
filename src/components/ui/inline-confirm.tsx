@@ -155,7 +155,7 @@ export function InlineChoice({ anchor, side = 'auto', title, detail, options, on
     >
       <div className="mr-1 min-w-0">
         <div className="whitespace-nowrap text-xs">{title}</div>
-        {detail && <div className="truncate text-[10px] text-muted-foreground">{detail}</div>}
+        {detail && <div className="whitespace-normal text-[10px] leading-snug text-muted-foreground">{detail}</div>}
       </div>
       {options.map((o, i) => (
         <Button

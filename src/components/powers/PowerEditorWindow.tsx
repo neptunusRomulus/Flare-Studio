@@ -4,6 +4,7 @@ import { AlertTriangle, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import DraftInput from './DraftInput';
+import PowerIconField from './PowerIconField';
 import { Switch } from '@/components/ui/switch';
 import Tooltip from '@/components/ui/tooltip';
 import { InlineConfirm } from '@/components/ui/inline-confirm';
@@ -294,7 +295,7 @@ const PowerEditor = ({ target, data, onClose, onOpen }: Props) => {
       </Section>
 
       <Section title="How does it look and sound?">
-        <Field label="Icon" flareKey="icon"><DraftInput className="h-7 text-xs" value={v('icon')} onChange={(e) => set('icon', e.target.value || null)} /></Field>
+        <Field label="Icon" flareKey="icon"><PowerIconField kind="power" id={power.id} value={v('icon')} onChange={(next) => set('icon', next)} /></Field>
         <Field label="Animation" flareKey="animation"><DraftInput className="h-7 text-xs" value={v('animation')} placeholder="animations/powers/…" onChange={(e) => set('animation', e.target.value || null)} /></Field>
         <Field label="Sound" flareKey="soundfx"><DraftInput className="h-7 text-xs" value={v('soundfx')} placeholder="soundfx/powers/…" onChange={(e) => set('soundfx', e.target.value || null)} /></Field>
         <Field label="Caster animation" flareKey="new_state"><DraftInput className="h-7 text-xs" value={v('new_state')} placeholder="cast, swing, shoot, instant" onChange={(e) => set('new_state', e.target.value || null)} /></Field>
@@ -369,7 +370,7 @@ const EffectEditor = ({ target, data, onClose, onOpen }: Props) => {
         </Field>
       </Section>
       <Section title="How does it look?">
-        <Field label="Icon" flareKey="icon"><DraftInput className="h-7 text-xs" value={v('icon')} onChange={(e) => set('icon', e.target.value || null)} /></Field>
+        <Field label="Icon" flareKey="icon"><PowerIconField kind="effect" id={effect.id} value={v('icon')} onChange={(next) => set('icon', next)} /></Field>
         <Field label="Animation" flareKey="animation"><DraftInput className="h-7 text-xs" value={v('animation')} onChange={(e) => set('animation', e.target.value || null)} /></Field>
       </Section>
       <EditorPropertyList properties={properties} catalog={catalog}

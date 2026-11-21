@@ -380,6 +380,10 @@ ipcMain.handle("create-map-project", async (event, config) => {
     fs.writeFileSync(mapConfigPath, JSON.stringify(mapData, null, 2));
     const project = flareAdapter.emptyProject(config.name);
     project.tile = tile;
+    if (config.projectStart === "template" || config.projectStart === "scratch") {
+      project.meta = project.meta || {};
+      project.meta.studioStart = config.projectStart;
+    }
     const tilesetText = flareAdapter.exportTilesetConfig(tile);
     writeAdapterFile(
       projectPath,

@@ -91,7 +91,7 @@ export type EventData = {
   };
 };
 
-export type EventSectionKey = 'eventInfo' | 'positioning' | 'requirements' | 'rewards' | 'advancedEffects' | 'engine';
+export type EventSectionKey = 'eventInfo' | 'positioning' | 'requirements';
 
 /** Props every collapsible section of the event dialog shares. */
 export type EventSectionProps = {

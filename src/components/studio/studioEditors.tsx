@@ -14,14 +14,11 @@ import { toast } from '@/hooks/use-toast';
 import { loadConfigDocument, projectRoot, writeProjectFiles } from '@/editor/projectFiles';
 import { useRegisterDirty } from '@/context/SaveHealthContext';
 import {
-  collectTranslatableStrings,
   fogFiles,
   linesOf,
-  msgidsFromPot,
   normalizeTileDraft,
   parallaxFiles,
   parallaxRelativePath,
-  potFiles,
   readCanonical,
   tileFiles,
   type FogDraft,
@@ -152,101 +149,6 @@ export function TileSizeForm({ editor, onSaved }: { editor?: StudioEditor | null
 }
 
 export { CutsceneEditor };
-
-export function LanguagePotEditor() {
-  const projectPath = useProjectPath();
-  const [text, setText] = useState('');
-  const [savedText, setSavedText] = useState('');
-  const skipDiskLoadRef = useRef(false);
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || !projectPath) return;
-    let cancelled = false;
-    void loadConfigDocument(projectPath, 'content/languages/catalog.json').then((raw) => {
-      if (cancelled || skipDiskLoadRef.current) return;
-      const parsed = readCanonical(raw);
-      const stored = parsed?.strings;
-      if (Array.isArray(stored)) {
-        const next = stored.filter((entry) => typeof entry === 'string').join('\n');
-        setText(next);
-        setSavedText(next);
-        return;
-      }
-      return loadConfigDocument(projectPath, 'languages/data.pot').then((pot) => {
-        if (cancelled || skipDiskLoadRef.current || !pot) return;
-        const next = msgidsFromPot(pot).join('\n');
-        setText(next);
-        setSavedText(next);
-      });
-    }).catch(() => undefined);
-    return () => { cancelled = true; };
-  }, [projectPath]);
-
-  const scan = async () => {
-    if (!projectPath || typeof window === 'undefined' || !window.electronAPI?.readDir || !window.electronAPI.readFile) {
-      toast({ title: 'No project', description: 'Open a project before scanning strings.', variant: 'destructive' });
-      return;
-    }
-    const root = projectRoot(projectPath);
-    const files: string[] = [];
-    const walk = async (rel: string, depth: number) => {
-      if (depth > 5 || files.length > 200) return;
-      const entries = await window.electronAPI.readDir(`${root}/${rel}`);
-      for (const entry of entries || []) {
-        const child = `${rel}/${entry.name}`;
-        if (entry.isDirectory) await walk(child, depth + 1);
-        else if (entry.name.endsWith('.json')) files.push(child);
-      }
-    };
-    await walk('content', 0);
-    const strings = linesOf(text);
-    for (const file of files) {
-      const raw = await window.electronAPI.readFile(`${root}/${file}`);
-      const parsed = readCanonical(raw);
-      if (parsed) strings.push(...collectTranslatableStrings(parsed));
-    }
-    setText(Array.from(new Set(strings)).join('\n'));
-  };
-
-  const save = async () => {
-    const saved = await persist(projectPath, potFiles(linesOf(text)), 'languages/data.pot', 'Could not write languages/data.pot.');
-    if (saved) setSavedText(text);
-  };
-
-  const potDirty = text !== savedText;
-  const potDrafts = useMemo(() => (potDirty ? potFiles(linesOf(text)) : []), [potDirty, text]);
-  useRegisterDirty('language-pot', potDirty, save, potDrafts, (incoming) => {
-    skipDiskLoadRef.current = true;
-    const catalog = incoming.find((file) => file.path.replace(/\\/g, '/') === 'content/languages/catalog.json');
-    const pot = incoming.find((file) => file.path.replace(/\\/g, '/') === 'languages/data.pot');
-    if (catalog) {
-      const parsed = readCanonical(catalog.content);
-      const stored = parsed?.strings;
-      if (Array.isArray(stored)) {
-        setText(stored.filter((entry) => typeof entry === 'string').join('\n'));
-        return;
-      }
-    }
-    if (pot) setText(msgidsFromPot(pot.content).join('\n'));
-  });
-
-  return (
-    <div className="space-y-2 rounded-lg border border-border p-3">
-      <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Language catalog</div>
-      <Textarea
-        aria-label="Translatable strings"
-        value={text}
-        onChange={(event) => setText(event.target.value)}
-        placeholder={'One string per line'}
-        className="h-24 w-full rounded-md border border-input bg-background px-2 py-1 text-sm"
-      />
-      <div className="flex gap-2">
-        <Button type="button" size="sm" variant="outline" onClick={() => { void scan(); }}>Scan project</Button>
-        <Button type="button" size="sm" onClick={() => { void save(); }}>Write catalog</Button>
-      </div>
-    </div>
-  );
-}
 
 export function ParallaxEditor({ editor }: { editor?: StudioEditor | null }) {
   const projectPath = useProjectPath();

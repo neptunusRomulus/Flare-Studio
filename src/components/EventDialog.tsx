@@ -661,9 +661,6 @@ const EventDialog: React.FC<EventDialogProps> = ({
     eventInfo: true,
     positioning: true,
     requirements: true,
-    rewards: true,
-    advancedEffects: false,
-    engine: true,
   });
 
   const toggleSection = (section: keyof typeof expandedSections) => {

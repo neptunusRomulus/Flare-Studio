@@ -34,6 +34,7 @@ import StatusEditDialog from '@/components/StatusEditDialog';
 import EventScriptDatalist from '@/components/events/EventScriptDatalist';
 import XpScalingDatalist from '@/components/engine/XpScalingDatalist';
 import StepSoundDatalist from '@/components/engine/StepSoundDatalist';
+import ItemRandomizerDatalist from '@/components/engine/ItemRandomizerDatalist';
 import StoryFlagDatalist from '@/components/powers/StoryFlagDatalist';
 import SessionRecoveryDialog from '@/components/SessionRecoveryDialog';
 import useCrashRecovery from '@/hooks/useCrashRecovery';
@@ -456,6 +457,7 @@ export default function AppMain() {
       <EventScriptDatalist projectPath={controls?.currentProjectPath ?? null} />
       <XpScalingDatalist projectPath={controls?.currentProjectPath ?? null} />
       <StepSoundDatalist projectPath={controls?.currentProjectPath ?? null} />
+      <ItemRandomizerDatalist projectPath={controls?.currentProjectPath ?? null} />
 
       <SessionRecoveryDialog
         isOpen={showRecoveryDialog && hasCrashBackup}

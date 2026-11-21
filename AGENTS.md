@@ -66,3 +66,5 @@
 - Name and appearance (fantasycore picker, default sprite) are on the first screen. Roles use on/off switches; a reserved gear opens the Role center (Dialogue / Shop / Quest).
 - Properties list shows only what is set; new keys go through the searchable Add property palette (synonym search). Raw Flare keys belong in Tooltips only.
 - No engine feature may be removed, only relocated.
+
+- `items/random/*.txt` randomizer definitions are edited on the Items Random tab; `randomizer_def` on an item points at one of those files.

@@ -7,12 +7,15 @@ import { engineTextFromSections, sectionsFromEngineText } from '@/adapters/flare
 import { loadConfigDocument, saveConfigDocument } from '@/editor/projectFiles';
 import { useAppContext } from '@/context/AppContext';
 import { FieldHint } from '@/components/ui/field-hint';
+import ItemRandomizerForm from '@/components/engine/ItemRandomizerForm';
 
 const FILES = [
   { path: 'items/types.txt', label: 'Types', section: 'type' },
   { path: 'items/qualities.txt', label: 'Qualities', section: 'quality' },
   { path: 'items/sets.txt', label: 'Sets', section: 'set' },
 ] as const;
+
+const RANDOM_TAB = 'items/random';
 
 type Section = { type: string; fields: Array<{ key: string; value: string; comment?: string }> };
 
@@ -41,6 +44,7 @@ export default function ItemMetaEditor({ initialFile }: { initialFile?: string }
     return () => { cancelled = true; };
   }, [projectPath]);
 
+  const isRandom = active === RANDOM_TAB || active.replace(/\\/g, '/').startsWith('items/random/');
   const sections = docs[active] || [];
   const meta = FILES.find((f) => f.path === active) || FILES[0];
 
@@ -75,10 +79,18 @@ export default function ItemMetaEditor({ initialFile }: { initialFile?: string }
             {file.label}{dirty[file.path] ? ' ●' : ''}
           </Button>
         ))}
+        <Button type="button" variant="outline" size="sm" aria-pressed={isRandom} onClick={() => setActive(RANDOM_TAB)}
+          className={`h-7 px-2 rounded border text-xs ${isRandom ? 'bg-orange-600 text-white border-orange-600' : 'border-border text-muted-foreground'}`}>
+          Random
+        </Button>
         <div className="flex-1" />
-        <Button size="sm" className="h-7 text-xs" onClick={() => void save()} disabled={!dirty[active]}>Save</Button>
+        {isRandom ? null : <Button size="sm" className="h-7 text-xs" onClick={() => void save()} disabled={!dirty[active]}>Save</Button>}
       </div>
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
+        {isRandom ? (
+          <ItemRandomizerForm projectPath={projectPath} />
+        ) : (
+        <>
         <FieldHint hint={`${meta.path} — short id/name forms. Extra keys stay editable.`}>
           <div className="text-xs font-mono text-muted-foreground">{meta.path}</div>
         </FieldHint>
@@ -104,6 +116,8 @@ export default function ItemMetaEditor({ initialFile }: { initialFile?: string }
         <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" onClick={() => remember(active, [...sections, { type: meta.section, fields: [{ key: 'id', value: '' }, { key: 'name', value: '' }] }])}>
           <Plus className="w-3 h-3 mr-1" />{meta.label.slice(0, -1)}
         </Button>
+        </>
+        )}
       </div>
     </div>
   );

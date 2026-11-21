@@ -1,3 +1,4 @@
+import { RANDOMIZER_DEF_LIST_ID } from '@/editor/itemRandomizer';
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
@@ -977,7 +978,8 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
                 <Input
                   value={editingItem.randomizer_def}
                   onChange={(e) => updateEditingItemField('randomizer_def', e.target.value)}
-                  placeholder="randomizer/def.txt"
+                  placeholder="items/random/table.txt"
+                  list={RANDOMIZER_DEF_LIST_ID}
                   className="h-8"
                 />
               </div>

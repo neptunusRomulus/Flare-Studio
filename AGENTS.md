@@ -71,3 +71,4 @@
 - Animation definitions in `animations/*.txt` are edited from Engine data → Animations. Unpacked sections use `render_size` and `position` on an 8-direction sheet; packed sections list `frame=` rows. The editor previews the selected section and direction from the project image.
 - Cutscenes in `cutscenes/*.txt` are edited on the World Settings card. The editor lists those files, keeps component order and INCLUDE lines, and writes the engine file (not a JSON sidecar).
 - Status tracking (Engine data → Status tracking) is a read-only index of campaign statuses found in project `.txt` files: where each status is set, unset, required or mentioned.
+- Mod settings (Engine data → Mod settings) edits the project `settings.txt` manifest: description, version, `requires` (dependency load order), game and engine version bounds. Play uses that requires list plus this folder name as `--mods`. The player's global `mods.txt` is not edited.

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Book, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { FieldHint } from '@/components/ui/field-hint';
 import { bookRelPath, DEFAULT_BOOK_TEMPLATE } from '@/editor/bookFile';
 import { OPEN_BOOK_EVENT } from '@/components/BookEditorView';
 
@@ -49,14 +50,14 @@ const SidebarBooksArea = ({ projectPath }: Props) => {
   return (
     <div className="flex flex-col gap-2 p-2">
       <div className="flex items-center justify-between">
-        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Books</div>
+        <FieldHint hint="Books are books/*.txt files. Open one to edit every MenuBook key on the page: text, images, buttons, and open/close events."><div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Books</div></FieldHint>
         <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={() => setCreating(true)}>
           <Plus className="w-3 h-3 mr-1" /> Book
         </Button>
       </div>
       {creating && (
         <div className="flex gap-1">
-          <Input className="h-7 text-xs" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" autoFocus />
+          <Input width="name" className="h-7 text-xs" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" autoFocus />
           <Button type="button" size="sm" className="h-7 text-xs" onClick={() => void create()}>Create</Button>
         </div>
       )}
@@ -73,9 +74,6 @@ const SidebarBooksArea = ({ projectPath }: Props) => {
             <span className="truncate">{path.replace(/^books\//, '').replace(/\.txt$/, '')}</span>
           </Button>
         ))}
-        {books.length === 0 && (
-          <p className="text-[11px] text-muted-foreground px-1">No books/*.txt files yet.</p>
-        )}
       </div>
     </div>
   );

@@ -32,10 +32,8 @@ describe('studio editor screens', () => {
 
   it('renders the cutscene editor', () => {
     const html = render(<CutsceneEditor />);
-    expect(html).toContain('Cutscene');
-    expect(html).toContain('Write cutscene');
-    expect(html).toContain('Add scene');
-    expect(html).toContain('Add vscroll');
+    expect(html).toContain('Cutscenes');
+    expect(html).toContain('No cutscene files in cutscenes/ yet.');
   });
 
   it('renders the parallax editor', () => {

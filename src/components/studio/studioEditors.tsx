@@ -8,11 +8,11 @@ import { FieldHint } from '@/components/ui/field-hint';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { useAppContext } from '@/context/AppContext';
+import CutsceneEditor from '@/components/engine/CutsceneEditor';
 import { toast } from '@/hooks/use-toast';
 import { loadConfigDocument, projectRoot, writeProjectFiles } from '@/editor/projectFiles';
 import {
   collectTranslatableStrings,
-  cutsceneFiles,
   fogFiles,
   linesOf,
   msgidsFromPot,
@@ -24,9 +24,6 @@ import {
   procgenRelativePath,
   readCanonical,
   tileFiles,
-  type CutsceneDraft,
-  type CutsceneScene,
-  type CutsceneScroll,
   type FogDraft,
   type MapPresentation,
   type ParallaxLayerDraft,
@@ -155,94 +152,7 @@ export function TileSizeForm({ editor, onSaved }: { editor?: StudioEditor | null
   );
 }
 
-export function CutsceneEditor() {
-  const projectPath = useProjectPath();
-  const [slug, setSlug] = useState('intro');
-  const [draft, setDraft] = useState<CutsceneDraft>({
-    caption_margins: '',
-    caption_background: '',
-    vscroll_speed: '',
-    menu_backgrounds: '',
-    music: '',
-    scenes: [{ caption: '', image: '', pause: '', soundfx: '' }],
-    vscroll: [],
-  });
-
-  const load = async (id = slug, isCurrent: () => boolean = () => true) => {
-    if (!projectPath || typeof window === 'undefined') return;
-    const text = await loadConfigDocument(projectPath, `content/cutscenes/${id}.json`);
-    if (!isCurrent()) return;
-    const parsed = readCanonical(text);
-    if (!parsed) return;
-    const scenes = Array.isArray(parsed.scenes) ? parsed.scenes as CutsceneScene[] : [];
-    const vscroll = Array.isArray(parsed.vscroll) ? parsed.vscroll as CutsceneScroll[] : [];
-    if (!isCurrent()) return;
-    setDraft({
-      caption_margins: stringField(parsed, 'caption_margins'),
-      caption_background: stringField(parsed, 'caption_background'),
-      vscroll_speed: stringField(parsed, 'vscroll_speed'),
-      menu_backgrounds: stringField(parsed, 'menu_backgrounds'),
-      music: stringField(parsed, 'music'),
-      scenes: scenes.length ? scenes : [{ caption: '', image: '', pause: '', soundfx: '' }],
-      vscroll,
-    });
-  };
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    let cancelled = false;
-    void load('intro', () => !cancelled);
-    return () => { cancelled = true; };
-    // Load the default cutscene when the project changes. Slug edits stay local until Load.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectPath]);
-
-  const setScene = (index: number, patch: Partial<CutsceneScene>) => {
-    setDraft((current) => ({
-      ...current,
-      scenes: current.scenes.map((scene, sceneIndex) => sceneIndex === index ? { ...scene, ...patch } : scene),
-    }));
-  };
-
-  const save = async () => {
-    await persist(projectPath, cutsceneFiles(slug, draft), `cutscenes/${slug}.txt`, 'Could not write the cutscene.');
-  };
-
-  return (
-    <div className="space-y-2 rounded-lg border border-border p-3">
-      <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Cutscene</div>
-      <Input value={slug} onChange={(event) => setSlug(event.target.value)} placeholder="id" width="id" className="h-8" aria-label="Cutscene id" />
-      <Input value={draft.music || ''} onChange={(event) => setDraft({ ...draft, music: event.target.value })} placeholder="music" width="path" className="h-8" aria-label="Cutscene music" />
-      <Input value={draft.caption_margins || ''} onChange={(event) => setDraft({ ...draft, caption_margins: event.target.value })} placeholder="caption_margins" width="short" className="h-8" aria-label="Caption margins" />
-      <Input value={draft.caption_background || ''} onChange={(event) => setDraft({ ...draft, caption_background: event.target.value })} placeholder="caption_background" width="path" className="h-8" aria-label="Caption background" />
-      <Input value={draft.vscroll_speed || ''} onChange={(event) => setDraft({ ...draft, vscroll_speed: event.target.value })} placeholder="vscroll_speed" width="short" className="h-8" aria-label="Vscroll speed" />
-      <Input value={draft.menu_backgrounds || ''} onChange={(event) => setDraft({ ...draft, menu_backgrounds: event.target.value })} placeholder="menu_backgrounds" width="path" className="h-8" aria-label="Menu backgrounds" />
-      {draft.scenes.map((scene, index) => (
-        <div key={`scene-${index}`} className="space-y-1 rounded-md border border-border p-2">
-          <div className="text-xs text-muted-foreground">Scene</div>
-          <Input value={scene.caption || ''} onChange={(event) => setScene(index, { caption: event.target.value })} placeholder="caption" width="name" className="h-8" aria-label={`Scene ${index + 1} caption`} />
-          <Input value={scene.image || ''} onChange={(event) => setScene(index, { image: event.target.value })} placeholder="image" width="path" className="h-8" aria-label={`Scene ${index + 1} image`} />
-          <Input value={scene.pause || ''} onChange={(event) => setScene(index, { pause: event.target.value })} placeholder="pause" width="short" className="h-8" aria-label={`Scene ${index + 1} pause`} />
-          <Input value={scene.soundfx || ''} onChange={(event) => setScene(index, { soundfx: event.target.value })} placeholder="soundfx" width="path" className="h-8" aria-label={`Scene ${index + 1} soundfx`} />
-        </div>
-      ))}
-      <Button type="button" size="sm" variant="outline" onClick={() => setDraft({ ...draft, scenes: [...draft.scenes, { caption: '', image: '', pause: '', soundfx: '' }] })}>Add scene</Button>
-      {draft.vscroll.map((scroll, index) => (
-        <div key={`scroll-${index}`} className="space-y-1 rounded-md border border-border p-2">
-          <div className="text-xs text-muted-foreground">Vscroll</div>
-          <Input value={scroll.text || ''} onChange={(event) => setDraft({ ...draft, vscroll: draft.vscroll.map((entry, entryIndex) => entryIndex === index ? { ...entry, text: event.target.value } : entry) })} placeholder="text" width="name" className="h-8" aria-label={`Vscroll ${index + 1} text`} />
-          <Input value={scroll.image || ''} onChange={(event) => setDraft({ ...draft, vscroll: draft.vscroll.map((entry, entryIndex) => entryIndex === index ? { ...entry, image: event.target.value } : entry) })} placeholder="image" width="path" className="h-8" aria-label={`Vscroll ${index + 1} image`} />
-          <Input value={scroll.separator || ''} onChange={(event) => setDraft({ ...draft, vscroll: draft.vscroll.map((entry, entryIndex) => entryIndex === index ? { ...entry, separator: event.target.value } : entry) })} placeholder="separator" width="short" className="h-8" aria-label={`Vscroll ${index + 1} separator`} />
-        </div>
-      ))}
-      <Button type="button" size="sm" variant="outline" onClick={() => setDraft({ ...draft, vscroll: [...draft.vscroll, { text: '', image: '', separator: '' }] })}>Add vscroll</Button>
-      <div className="flex gap-2">
-        <Button type="button" size="sm" variant="outline" onClick={() => { void load(); }}>Load cutscene</Button>
-        <Button type="button" size="sm" onClick={() => { void save(); }}>Write cutscene</Button>
-      </div>
-    </div>
-  );
-}
+export { CutsceneEditor };
 
 export function LanguagePotEditor() {
   const projectPath = useProjectPath();

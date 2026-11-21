@@ -12,7 +12,7 @@ describe('World Settings dock panel', () => {
     expect(html).toContain('Parallax');
     expect(html).toContain('Fog of war');
     expect(html).toContain('Procedural rules');
-    expect(html).toContain('Write cutscene');
+    expect(html).toContain('No cutscene files in cutscenes/ yet.');
     expect(html).toContain('Write parallax');
     expect(html).toContain('Write fog mask');
     expect(html).toContain('Write rules');

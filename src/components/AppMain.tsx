@@ -41,6 +41,7 @@ import SessionRecoveryDialog from '@/components/SessionRecoveryDialog';
 import useCrashRecovery from '@/hooks/useCrashRecovery';
 import useCloseGuard from '@/hooks/useCloseGuard';
 import { useProjectBackup } from '@/hooks/useProjectBackup';
+import { npcObjectsFromSession, writeNpcDefinitionsForObjects } from '@/flare/manualSaveExport';
 import useManualSaveSetup from '@/hooks/useManualSaveSetup';
 import { useSaveHealth } from '@/context/SaveHealthContext';
 import { anythingDirty, isMapDirty } from '@/editor/saveHealth';
@@ -200,12 +201,15 @@ export default function AppMain() {
   const dirty = anythingDirty(mapStatus, sessionDirty ? { session: true } : {});
   const saveAll = useCallback(async () => {
     rememberCurrentMap();
+    const projectPath = controls?.currentProjectPath;
+    const npcObjects = npcObjectsFromSession(editor, mapDrafts);
     await saveInactiveMapDrafts();
     if (isMapDirty(mapStatus)) await handleManualSave();
-    await saveDirtySources(controls?.currentProjectPath);
+    if (projectPath) await writeNpcDefinitionsForObjects(npcObjects, projectPath);
+    await saveDirtySources(projectPath);
     const currentName = typeof editor?.getMapName === 'function' ? editor.getMapName() : '';
     if (currentName) clearMapDraft(currentName);
-  }, [mapStatus, handleManualSave, saveDirtySources, saveInactiveMapDrafts, rememberCurrentMap, controls?.currentProjectPath, editor, clearMapDraft]);
+  }, [mapStatus, handleManualSave, saveDirtySources, saveInactiveMapDrafts, rememberCurrentMap, controls?.currentProjectPath, editor, mapDrafts, clearMapDraft]);
 
   useCloseGuard({
     isDirty: () => anythingDirty(titleBarProps?.saveStatus ?? 'saved', (editorDirty || mapDrafts.length > 0) ? { session: true } : {}),

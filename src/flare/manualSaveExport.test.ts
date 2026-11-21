@@ -4,8 +4,12 @@ import type { MapObject } from '@/types';
 import {
   buildAnimationFileContent,
   collectNpcExportFiles,
+  collectNpcExportFilesFromObjects,
   exportFlareTextFiles,
+  exportMapSnapshotToProject,
+  npcObjectsFromSession,
   sanitizeNpcFileName,
+  writeInactiveMapDrafts,
   type ManualSaveFileApi,
 } from './manualSaveExport';
 
@@ -173,5 +177,117 @@ describe('exportFlareTextFiles', () => {
     const saveExportFiles = vi.fn(async () => ({ success: true }));
     await exportFlareTextFiles(textEditor(), null, { saveExportFiles });
     expect(saveExportFiles).not.toHaveBeenCalled();
+  });
+});
+
+describe('npcObjectsFromSession', () => {
+  it('unions NPCs from the open map, drafts and an extra form object', () => {
+    const editor = fakeEditor([
+      npc({ id: 1, name: 'Alice', properties: { talker: 'true' } }),
+      { id: 2, type: 'enemy', name: 'Rat', x: 0, y: 0 } as MapObject,
+    ]);
+    const drafts = [
+      { snapshot: { objects: [npc({ id: 3, name: 'Bob', properties: { vendor: 'true' } })] } },
+      { snapshot: { objects: [npc({ id: 1, name: 'Alice', properties: { talker: 'true', direction: '2' } })] } },
+    ];
+    const extra = npc({ id: 4, name: 'Cara', properties: { questGiver: 'true' } });
+    const names = npcObjectsFromSession(editor, drafts, extra).map((obj) => obj.name).sort();
+    expect(names).toEqual(['Alice', 'Bob', 'Cara']);
+    const alice = npcObjectsFromSession(editor, drafts, extra).find((obj) => obj.name === 'Alice');
+    expect(alice?.properties?.direction).toBe('2');
+  });
+});
+
+describe('collectNpcExportFilesFromObjects', () => {
+  it('collects from a raw object list without an editor', async () => {
+    const files = await collectNpcExportFilesFromObjects([
+      npc({ properties: { npcFilename: 'npcs/Alice.txt', talker: 'true' } }),
+    ], '/proj', { readFile: async () => null });
+    expect(files.npcFiles).toHaveLength(1);
+    expect(files.npcFiles[0].filename).toBe('Alice.txt');
+  });
+});
+
+describe('exportMapSnapshotToProject', () => {
+  it('exports through a detached editor and always disposes it', async () => {
+    const liveLoad = vi.fn();
+    const dispose = vi.fn();
+    const saveProjectData = vi.fn(async () => true);
+    const saveExportFiles = vi.fn(async () => ({ success: true }));
+    const created: string[] = [];
+    const result = await exportMapSnapshotToProject(
+      { mapName: 'cellar', objects: [] },
+      '/proj',
+      'cellar',
+      { saveExportFiles },
+      () => {
+        created.push('editor');
+        return {
+          loadFromBackupData: (data: unknown) => {
+            created.push(`load:${(data as { mapName?: string }).mapName}`);
+            return true;
+          },
+          generateFlareMapTxt: () => 'MAP',
+          generateFlareTilesetDef: () => 'TILESET',
+          getMapName: () => 'cellar',
+          getMapObjects: () => [],
+          getTilesetExportInfo: () => [],
+          saveProjectData,
+          dispose,
+        };
+      },
+    );
+    expect(result).toBe(true);
+    expect(created).toEqual(['editor', 'load:cellar']);
+    expect(saveExportFiles).toHaveBeenCalledTimes(1);
+    expect(saveProjectData).toHaveBeenCalledWith('/proj', { mapName: 'cellar' });
+    expect(dispose).toHaveBeenCalledTimes(1);
+    expect(liveLoad).not.toHaveBeenCalled();
+  });
+
+  it('disposes the detached editor when the snapshot cannot be loaded', async () => {
+    const dispose = vi.fn();
+    const saveExportFiles = vi.fn(async () => ({ success: true }));
+    const result = await exportMapSnapshotToProject(
+      { mapName: 'cellar' },
+      '/proj',
+      'cellar',
+      { saveExportFiles },
+      () => ({
+        loadFromBackupData: () => false,
+        generateFlareMapTxt: () => '',
+        generateFlareTilesetDef: () => '',
+        getMapName: () => 'cellar',
+        getMapObjects: () => [],
+        dispose,
+      }),
+    );
+    expect(result).toBe(false);
+    expect(saveExportFiles).not.toHaveBeenCalled();
+    expect(dispose).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('writeInactiveMapDrafts', () => {
+  it('skips the current map and only clears drafts that exported', async () => {
+    const cleared: string[] = [];
+    const exported: string[] = [];
+    const written = await writeInactiveMapDrafts({
+      currentMapName: 'Hall',
+      projectPath: '/p',
+      drafts: [
+        { mapName: 'hall', snapshot: { mapName: 'hall' } },
+        { mapName: 'cellar', snapshot: { mapName: 'cellar' } },
+        { mapName: 'attic', snapshot: { mapName: 'attic' } },
+      ],
+      clearMapDraft: (name) => cleared.push(name),
+      exportSnapshot: async (_snapshot, _path, mapName) => {
+        exported.push(mapName);
+        return mapName !== 'attic';
+      },
+    });
+    expect(exported).toEqual(['cellar', 'attic']);
+    expect(written).toEqual(['cellar']);
+    expect(cleared).toEqual(['cellar']);
   });
 });

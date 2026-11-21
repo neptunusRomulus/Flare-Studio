@@ -17,51 +17,37 @@ describe('multi-map backup restore contract', () => {
 });
 
 describe('saveAll inactive map drafts', () => {
-  it('exports every non-current map draft, then reloads the current snapshot', async () => {
+  it('exports every non-current map draft without loading them into the live editor', async () => {
+    const { writeInactiveMapDrafts } = await import('@/flare/manualSaveExport');
     const exported: string[] = [];
-    const editor = {
+    const liveEditor = {
       getMapName: () => 'hall',
-      buildCrashBackupSnapshot: () => ({ mapName: 'hall', heroX: 3 }),
-      setTabSwitching: vi.fn(),
-      loadFromBackupData: vi.fn((data: { mapName?: string; timestamp?: number }) => {
-        exported.push(`load:${data.mapName}`);
-        return true;
-      }),
-      saveProjectData: vi.fn(async (_path: string, opts?: { mapName?: string }) => {
-        exported.push(`json:${opts?.mapName}`);
-        return true;
-      }),
+      loadFromBackupData: vi.fn(),
+      saveProjectData: vi.fn(),
       markAsFullySaved: vi.fn(),
-      redraw: vi.fn(),
+      setTabSwitching: vi.fn(),
     };
-
-    // Exercise the same sequence useProjectBackup.saveInactiveMapDrafts uses.
     const drafts = [
       { mapName: 'hall', snapshot: { mapName: 'hall' } },
-      { mapName: 'cellar', snapshot: { mapName: 'cellar' } },
+      { mapName: 'cellar', snapshot: { mapName: 'cellar', objects: [{ type: 'npc', name: 'Mira' }] } },
     ];
-    const currentName = editor.getMapName();
-    const others = drafts.filter((d) => d.mapName !== currentName);
-    const currentSnapshot = editor.buildCrashBackupSnapshot();
-    editor.setTabSwitching(true);
     const cleared: string[] = [];
-    try {
-      for (const draft of others) {
-        const loaded = editor.loadFromBackupData({ ...draft.snapshot, timestamp: Date.now() });
-        expect(loaded).toBe(true);
-        editor.setTabSwitching(false);
-        exported.push(`txt:${draft.mapName}`);
-        await editor.saveProjectData('/p', { mapName: draft.mapName });
-        editor.setTabSwitching(true);
-        editor.markAsFullySaved();
-        cleared.push(draft.mapName);
-      }
-    } finally {
-      editor.loadFromBackupData({ ...currentSnapshot, timestamp: Date.now() });
-      editor.setTabSwitching(false);
-    }
+    const written = await writeInactiveMapDrafts({
+      currentMapName: liveEditor.getMapName(),
+      projectPath: '/p',
+      drafts,
+      clearMapDraft: (name) => cleared.push(name),
+      exportSnapshot: async (snapshot, projectPath, mapName) => {
+        exported.push(`${projectPath}:${mapName}:${(snapshot as { mapName?: string }).mapName}`);
+        return true;
+      },
+    });
+    expect(written).toEqual(['cellar']);
     expect(cleared).toEqual(['cellar']);
-    expect(exported).toEqual(['load:cellar', 'txt:cellar', 'json:cellar', 'load:hall']);
-    expect(editor.markAsFullySaved).toHaveBeenCalledTimes(1);
+    expect(exported).toEqual(['/p:cellar:cellar']);
+    expect(liveEditor.loadFromBackupData).not.toHaveBeenCalled();
+    expect(liveEditor.saveProjectData).not.toHaveBeenCalled();
+    expect(liveEditor.markAsFullySaved).not.toHaveBeenCalled();
+    expect(liveEditor.setTabSwitching).not.toHaveBeenCalled();
   });
 });

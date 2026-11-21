@@ -7,11 +7,12 @@
  * (`useManualSave`) keeps sequencing, conflict handling and UI progress; this
  * module only produces content and calls the filesystem bridge it is given.
  */
-import type { TileMapEditor } from '@/editor/TileMapEditor';
+import { TileMapEditor } from '@/editor/TileMapEditor';
 import type { FlareNPC, MapObject } from '@/types';
 import { npcFileUpdate, npcFileContent, npcFileBase, isStudioNpcAnimation } from '@/utils/npcFileUpdate';
 import { propertyRecord, propertyText } from '@/editor/propertyText';
 import { writeEnemyDefinition } from '@/utils/enemyFileWrite';
+import { projectRoot, writeProjectFiles } from '@/editor/projectFiles';
 import { debugLog } from '@/lib/debugLog';
 
 /** The filesystem bridge the export needs (subset of `window.electronAPI`). */
@@ -241,8 +242,8 @@ export function buildFlareNpc(npc: MapObject, gfxRelative?: string, portraitRela
  * Collect every NPC file the export writes: the merged `.txt` definitions plus
  * the portrait, tileset image and animation files they reference.
  */
-export async function collectNpcExportFiles(
-  editor: TileMapEditor,
+export async function collectNpcExportFilesFromObjects(
+  objects: MapObject[],
   currentProjectPath: string | null | undefined,
   api: ManualSaveFileApi | undefined = manualSaveFileApi()
 ): Promise<NpcExportFiles> {
@@ -251,8 +252,7 @@ export async function collectNpcExportFiles(
   const npcTilesetImages: Array<{ sourcePath: string; destFilename: string }> = [];
   const npcAnimationFiles: Array<{ filename: string; content: string }> = [];
   try {
-    const allObjects = editor.getMapObjects();
-    const npcObjects = allObjects.filter(obj => obj.type === 'npc');
+    const npcObjects = objects.filter(obj => obj.type === 'npc');
     for (const npc of npcObjects) {
       const npcName = npc.name || `npc_${npc.id}`;
       const sanitizedName = sanitizeNpcFileName(npcName);
@@ -403,12 +403,100 @@ export async function collectNpcExportFiles(
   return { npcFiles, portraitFiles, npcTilesetImages, npcAnimationFiles };
 }
 
-/** Write one `npcs/…` definition file per enemy on the map. Returns the count. */
-export async function writeEnemyDefinitions(editor: TileMapEditor, projectPath: string | null | undefined): Promise<number> {
+/** Collect NPC files from a map editor. */
+export async function collectNpcExportFiles(
+  editor: Pick<TileMapEditor, 'getMapObjects'>,
+  currentProjectPath: string | null | undefined,
+  api: ManualSaveFileApi | undefined = manualSaveFileApi()
+): Promise<NpcExportFiles> {
+  const objects = typeof editor.getMapObjects === 'function' ? editor.getMapObjects() : [];
+  return collectNpcExportFilesFromObjects(objects, currentProjectPath, api);
+}
+
+/** NPC map objects from the open map, every map draft, and an optional open editor form. */
+export function npcObjectsFromSession(
+  editor: Pick<TileMapEditor, 'getMapObjects'> | null | undefined,
+  drafts: Array<{ snapshot: Record<string, unknown> }>,
+  extra?: MapObject | null,
+): MapObject[] {
+  const byKey = new Map<string, MapObject>();
+  const add = (obj: MapObject | null | undefined) => {
+    if (!obj || obj.type !== 'npc') return;
+    const key = String(obj.name || obj.id || '').trim().toLowerCase() || `id:${obj.id}`;
+    byKey.set(key, obj);
+  };
+  if (editor && typeof editor.getMapObjects === 'function') {
+    for (const obj of editor.getMapObjects()) add(obj);
+  }
+  for (const draft of drafts) {
+    const objects = Array.isArray(draft.snapshot?.objects) ? draft.snapshot.objects : [];
+    for (const obj of objects) add(obj as MapObject);
+  }
+  add(extra ?? null);
+  return [...byKey.values()];
+}
+
+async function copyAssetIntoProject(projectPath: string, sourcePath: string, destRel: string): Promise<boolean> {
+  const api = typeof window !== 'undefined' ? window.electronAPI : undefined;
+  if (!api?.readFileAsDataURL || !api.writeFileFromDataURL || !sourcePath) return false;
+  try {
+    const dataUrl = await api.readFileAsDataURL(sourcePath);
+    if (!dataUrl) return false;
+    const full = `${projectRoot(projectPath)}/${destRel.replace(/^\/+/, '')}`;
+    const folder = full.slice(0, full.lastIndexOf('/'));
+    if (api.createFolderIfNotExists) {
+      const created = await api.createFolderIfNotExists(folder);
+      if (!created) return false;
+    }
+    return !!(await api.writeFileFromDataURL(full, dataUrl));
+  } catch (err) {
+    console.warn('[ManualSave][TXT] Failed to copy', sourcePath, 'to', destRel, err);
+    return false;
+  }
+}
+
+/** Write collected NPC definition, animation, portrait and sprite files without exporting a map. */
+export async function writeNpcExportFiles(
+  projectPath: string,
+  files: NpcExportFiles,
+): Promise<boolean> {
+  if (!projectPath) return false;
+  const textFiles = [
+    ...files.npcFiles.map((file) => ({ path: `npcs/${file.filename}`, content: file.content })),
+    ...files.npcAnimationFiles.map((file) => ({ path: `animations/npcs/${file.filename}`, content: file.content })),
+  ];
+  if (textFiles.length && !(await writeProjectFiles(projectPath, textFiles))) return false;
+  for (const portrait of files.portraitFiles) {
+    await copyAssetIntoProject(projectPath, portrait.sourcePath, `images/portraits/${portrait.destFilename}`);
+  }
+  for (const image of files.npcTilesetImages) {
+    await copyAssetIntoProject(projectPath, image.sourcePath, `images/npcs/${image.destFilename}`);
+  }
+  return true;
+}
+
+/** Write `npcs/*.txt` (and related sidecars) for the given objects during a project save. */
+export async function writeNpcDefinitionsForObjects(
+  objects: MapObject[],
+  projectPath: string | null | undefined,
+  api: ManualSaveFileApi | undefined = manualSaveFileApi(),
+): Promise<boolean> {
+  if (!projectPath) return false;
+  const npcs = objects.filter((obj) => obj.type === 'npc');
+  if (!npcs.length) return true;
+  const files = await collectNpcExportFilesFromObjects(npcs, projectPath, api);
+  return writeNpcExportFiles(projectPath, files);
+}
+
+/** Write one `enemies/…` definition file per enemy object. Returns the count. */
+export async function writeEnemyDefinitionsFromObjects(
+  objects: MapObject[],
+  projectPath: string | null | undefined,
+): Promise<number> {
   let written = 0;
   try {
     if (projectPath) {
-      const enemyObjects = editor.getMapObjects().filter((obj) => obj.type === 'enemy');
+      const enemyObjects = objects.filter((obj) => obj.type === 'enemy');
       for (const enemy of enemyObjects) {
         const wrote = await writeEnemyDefinition(projectPath, enemy);
         if (!wrote) console.warn('[ManualSave][TXT] Failed to write enemy file for', enemy.name || enemy.id);
@@ -422,6 +510,87 @@ export async function writeEnemyDefinitions(editor: TileMapEditor, projectPath: 
     console.warn('[ManualSave][TXT] Failed to write enemy files:', enemyErr);
   }
   return written;
+}
+
+/** Write one `enemies/…` definition file per enemy on the map. Returns the count. */
+export async function writeEnemyDefinitions(editor: Pick<TileMapEditor, 'getMapObjects'>, projectPath: string | null | undefined): Promise<number> {
+  const objects = typeof editor.getMapObjects === 'function' ? editor.getMapObjects() : [];
+  return writeEnemyDefinitionsFromObjects(objects, projectPath);
+}
+
+/** A throwaway editor used to export a map snapshot without touching the live one. */
+export type DetachedMapExportEditor = {
+  loadFromBackupData: (data: unknown) => boolean;
+  generateFlareMapTxt: (options?: { mapName?: string }) => string;
+  generateFlareTilesetDef: (options?: { mapName?: string }) => string;
+  getMapName: () => string;
+  getMapObjects: () => MapObject[];
+  saveProjectData?: (projectPath: string, options?: { mapName?: string }) => Promise<boolean>;
+  setCurrentProjectPath?: (path: string | null) => void;
+  dispose?: () => void;
+};
+
+export function createDetachedMapEditor(): DetachedMapExportEditor {
+  const canvas = document.createElement('canvas');
+  canvas.width = 8;
+  canvas.height = 8;
+  return new TileMapEditor(canvas) as unknown as DetachedMapExportEditor;
+}
+
+/**
+ * Export one map from a crash/session snapshot without loading it into the live editor.
+ * The live tab and editor stay as they are.
+ */
+export async function exportMapSnapshotToProject(
+  snapshot: Record<string, unknown>,
+  projectPath: string,
+  mapName: string,
+  api: ManualSaveFileApi | undefined = manualSaveFileApi(),
+  createEditor: () => DetachedMapExportEditor = createDetachedMapEditor,
+): Promise<boolean> {
+  const editor = createEditor();
+  try {
+    editor.setCurrentProjectPath?.(projectPath);
+    const loaded = editor.loadFromBackupData({
+      ...snapshot,
+      mapName: (typeof snapshot.mapName === 'string' && snapshot.mapName.trim()) || mapName,
+      timestamp: Date.now(),
+    });
+    if (!loaded) return false;
+    const exported = await exportFlareTextFiles(editor as unknown as TileMapEditor, projectPath, api);
+    if (exported && typeof editor.saveProjectData === 'function') {
+      await editor.saveProjectData(projectPath, { mapName });
+    }
+    return !!exported;
+  } finally {
+    editor.dispose?.();
+  }
+}
+
+/** Write every dirty map draft except the currently open map, without swapping the live editor. */
+export async function writeInactiveMapDrafts(args: {
+  currentMapName: string;
+  projectPath: string;
+  drafts: Array<{ mapName: string; snapshot: Record<string, unknown> }>;
+  clearMapDraft: (mapName: string) => void;
+  exportSnapshot?: (
+    snapshot: Record<string, unknown>,
+    projectPath: string,
+    mapName: string,
+  ) => Promise<boolean>;
+}): Promise<string[]> {
+  const exportSnapshot = args.exportSnapshot ?? exportMapSnapshotToProject;
+  const current = String(args.currentMapName || '').toLowerCase();
+  const others = args.drafts.filter((draft) => draft.mapName.toLowerCase() !== current);
+  const cleared: string[] = [];
+  for (const draft of others) {
+    const exported = await exportSnapshot(draft.snapshot, args.projectPath, draft.mapName);
+    if (exported) {
+      args.clearMapDraft(draft.mapName);
+      cleared.push(draft.mapName);
+    }
+  }
+  return cleared;
 }
 
 /**

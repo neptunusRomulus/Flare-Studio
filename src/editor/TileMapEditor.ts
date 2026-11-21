@@ -7310,4 +7310,10 @@ export class TileMapEditor {
     // Redraw to restore the content
     this.draw();
   }
+
+  /** Drop canvas listeners. Used when a project save exports a map from a snapshot in a detached editor. */
+  public dispose(): void {
+    this.cleanupCanvasObservers();
+    this.cleanupCanvasEvents();
+  }
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { exportFlareTextFiles } from '@/flare/manualSaveExport';
+import { writeInactiveMapDrafts } from '@/flare/manualSaveExport';
 import { backupMapName } from '@/editor/saveHealth';
 import { buildProjectBackup, normalizeProjectBackup, type MapSessionDraft } from '@/editor/projectSession';
 import type { TileMapEditor } from '@/editor/TileMapEditor';
@@ -94,33 +94,15 @@ export function useProjectBackup(args: Args): {
 
   const saveInactiveMapDrafts = useCallback(async () => {
     const { editor, projectPath, mapDrafts, clearMapDraft } = argsRef.current;
-    if (!editor || !projectPath || typeof editor.loadFromBackupData !== 'function') return;
+    if (!editor || !projectPath) return;
     const currentName = typeof editor.getMapName === 'function' ? String(editor.getMapName() || '') : '';
-    const others = mapDrafts.filter((draft) => draft.mapName.toLowerCase() !== currentName.toLowerCase());
-    if (!others.length) return;
-
-    const currentSnapshot = typeof editor.buildCrashBackupSnapshot === 'function' ? editor.buildCrashBackupSnapshot() : null;
-    editor.setTabSwitching?.(true);
-    try {
-      for (const draft of others) {
-        const loaded = editor.loadFromBackupData({ ...draft.snapshot, timestamp: Date.now() });
-        if (!loaded) continue;
-        editor.setTabSwitching?.(false);
-        const exported = await exportFlareTextFiles(editor, projectPath);
-        if (typeof editor.saveProjectData === 'function') {
-          await editor.saveProjectData(projectPath, { mapName: draft.mapName });
-        }
-        editor.setTabSwitching?.(true);
-        if (exported) {
-          editor.markAsFullySaved?.();
-          clearMapDraft(draft.mapName);
-        }
-      }
-    } finally {
-      if (currentSnapshot) editor.loadFromBackupData({ ...currentSnapshot, timestamp: Date.now() });
-      editor.setTabSwitching?.(false);
-      try { editor.redraw?.(); } catch { /* ignore */ }
-    }
+    // Export each other map from its snapshot. The live editor and active tab stay put.
+    await writeInactiveMapDrafts({
+      currentMapName: currentName,
+      projectPath,
+      drafts: mapDrafts,
+      clearMapDraft,
+    });
   }, []);
 
   const restoreProjectBackup = useCallback(async (backup: unknown): Promise<boolean> => {

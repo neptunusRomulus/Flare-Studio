@@ -514,11 +514,8 @@ const [name, setName] = useState(() => enemy?.name || '');
 
   const handleClose = () => onOpenChange ? onOpenChange(false) : undefined;
 
-  const handleSave = async () => {
-    if (!enemy) {
-      handleClose();
-      return;
-    }
+  const buildUpdatedEnemy = (): MapObject | null => {
+    if (!enemy) return null;
 
     const newProps: Record<string, string> = propertyRecord(enemy.properties);
     const knownKeys = ENEMY_FORM_KEYS;
@@ -644,6 +641,29 @@ const [name, setName] = useState(() => enemy?.name || '');
       }
     }
 
+    return {
+      ...enemy,
+      name,
+      level: Number.isFinite(Number(level)) ? Number(level) : enemy.level,
+      number: Number.isFinite(Number(count)) ? Number(count) : enemy.number,
+      category: category,
+      properties: newProps,
+    };
+  };
+
+  const handleSave = async () => {
+    if (!enemy) {
+      handleClose();
+      return;
+    }
+
+    const updatedBase = buildUpdatedEnemy();
+    if (!updatedBase) {
+      handleClose();
+      return;
+    }
+    const newProps: Record<string, string> = { ...propertyRecord(updatedBase.properties) };
+
     const previousPath = propertyText(enemy.properties?.enemyFilename) || propertyText(enemy.properties?.sourcePath);
     if (projectPath && name.trim()) {
       try {
@@ -666,11 +686,7 @@ const [name, setName] = useState(() => enemy?.name || '');
     }
 
     const updated: MapObject = {
-      ...enemy,
-      name,
-      level: Number.isFinite(Number(level)) ? Number(level) : enemy.level,
-      number: Number.isFinite(Number(count)) ? Number(count) : enemy.number,
-      category: category,
+      ...updatedBase,
       properties: newProps,
     };
 
@@ -720,14 +736,10 @@ const [name, setName] = useState(() => enemy?.name || '');
   const enemyRel = enemy ? enemySourceRel(enemy) : '';
   const enemyDrafts = useMemo(() => {
     if (!enemyDirty || !enemy) return [];
-    const { text } = enemyFileTextFromObject({
-      ...enemy,
-      name,
-      level: Number.isFinite(Number(level)) ? Number(level) : enemy.level,
-      category,
-    });
+    const updated = buildUpdatedEnemy();
+    const { text } = enemyFileTextFromObject(updated ?? enemy);
     return enemyRel ? [{ path: enemyRel, content: text }] : [{ path: 'content/documents/studio-enemy-edit.json', content: enemyFormSnapshot }];
-  }, [enemyDirty, enemy, enemyRel, name, level, category, enemyFormSnapshot]);
+  }, [enemyDirty, enemy, enemyRel, enemyFormSnapshot]);
   useRegisterDirty('enemy-template', enemyDirty, handleSave, enemyDrafts);
 
   const handleCloseDecision = (decision: 'save' | 'discard' | 'cancel') => {

@@ -8,6 +8,7 @@ import { askConfirm } from '@/components/ui/inline-confirm';
 import { resolveDefaultNpcAppearance } from '@/flare/npcAppearance';
 import { hydrateEnemyObject, enemyFilePath } from '@/utils/enemyFileHydrate';
 import { hydrateNpcObject, npcFilePath } from '@/utils/npcFileHydrate';
+import { writeNpcDefinitionsForObjects } from '@/flare/manualSaveExport';
 
 /**
  * Load an image from an absolute file path via Electron and return its pixel dimensions.
@@ -483,10 +484,16 @@ const useObjectEditing = (opts?: UseObjectEditingOptions) => {
     }
     setObjectValidationErrors([]);
 
-    // If NPC and a write API is available we could persist NPC file here
-    // For now, just update the editor/local state
-    handleUpdateObject({ ...editingObject, properties: sanitized }, opts);
-  }, [editingObject, handleUpdateObject]);
+    const updated = { ...editingObject, properties: sanitized };
+    handleUpdateObject(updated, opts);
+    if (updated.type === 'npc' && currentProjectPath) {
+      try {
+        await writeNpcDefinitionsForObjects([updated], currentProjectPath);
+      } catch (err) {
+        console.warn('Failed to write NPC file on template save', err);
+      }
+    }
+  }, [editingObject, handleUpdateObject, currentProjectPath]);
 
   const updateEditingObjectProperty = useCallback((key: string, value: string | null) => {
     setEditingObject((prev) => {

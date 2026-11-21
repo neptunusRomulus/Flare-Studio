@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button';
 import { FieldHint } from '@/components/ui/field-hint';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { InlineConfirm } from '@/components/ui/inline-confirm';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -321,7 +322,11 @@ const StringEditorView: React.FC<Props> = ({ projectPath, onBack }) => {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button type="button" size="sm" variant="outline" onClick={() => setAddOpen(true)} disabled={!projectPath}>Add language</Button>
-          <Button type="button" size="sm" variant="outline" onClick={() => setRemoveOpen(true)} disabled={!projectPath || !canRemove}>Remove</Button>
+          <FieldHint hint={`This removes ${selected} from engine/languages.txt. The languages/data.${selected}.po file stays on disk and will be reused if you add the language again. English cannot be removed.`}>
+            <InlineConfirm open={removeOpen} onCancel={() => setRemoveOpen(false)} onConfirm={removeLanguage}>
+              <Button type="button" size="sm" variant="outline" onClick={() => canRemove && setRemoveOpen(true)} disabled={!projectPath || !canRemove}>Remove</Button>
+            </InlineConfirm>
+          </FieldHint>
         </div>
       </div>
 
@@ -446,22 +451,6 @@ const StringEditorView: React.FC<Props> = ({ projectPath, onBack }) => {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={removeOpen} onOpenChange={setRemoveOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <FieldHint hint={`This removes ${selected} from engine/languages.txt. The languages/data.${selected}.po file stays on disk and will be reused if you add the language again. English cannot be removed.`}>
-              <DialogTitle>Remove {selectedName}?</DialogTitle>
-            </FieldHint>
-            <DialogDescription className="sr-only">
-              This removes {selected} from engine/languages.txt. The languages/data.{selected}.po file stays on disk and will be reused if you add the language again. English cannot be removed.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => setRemoveOpen(false)}>Cancel</Button>
-            <Button type="button" variant="destructive" onClick={removeLanguage}>Remove</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

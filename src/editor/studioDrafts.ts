@@ -183,13 +183,12 @@ export function fogFiles(mask: FogDraft): ProjectFile[] {
 export function procgenFiles(slugInput: string, rules: ProcgenDraft): ProjectFile[] {
   const slug = contentSlug(slugInput, 'rules');
   return [
-    { path: `maps/procgen/${slug}.txt`, content: exportProcgenRules(rules) },
-    { path: `content/procgen/${slug}.json`, content: canonicalJson('procgen', { id: slug, ...rules }) },
+    { path: `maps/procgen_rules/${slug}.txt`, content: exportProcgenRules(rules) },
   ];
 }
 
 export function procgenRelativePath(slugInput: string): string {
-  return `maps/procgen/${contentSlug(slugInput, 'rules')}.txt`;
+  return `maps/procgen_rules/${contentSlug(slugInput, 'rules')}.txt`;
 }
 
 /** Header keys `exportMapText` already understands. `procgen_chunks` is not a known key. */

@@ -32,6 +32,7 @@ import EventScriptForm from '@/components/events/EventScriptForm';
 import { HintLabel } from '@/components/ui/field-hint';
 import { Input } from '@/components/ui/input';
 import { EVENT_SCRIPT_LIST_ID } from '@/hooks/useEventScripts';
+import { PROCGEN_RULES_LIST_ID } from '@/editor/procgenRules';
 import {
   actionPropertiesFrom,
   emptyEventScript,
@@ -751,6 +752,45 @@ const EventDialog: React.FC<EventDialogProps> = ({
             </div>
           </div>
 
+          <div className="space-y-2 px-1">
+            <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Procgen</div>
+            <div className="flex flex-wrap items-center gap-2">
+              <HintLabel className="text-xs font-normal w-28 shrink-0" hint="Rules file under maps/procgen_rules. The engine fills this event's location rectangle when the map loads. Only the first event with procgen_filename on the map is used, and it must be on the map event itself, not in a script file. intermap_random is a different feature: a random teleport map list, not a procgen rules file.">procgen_filename</HintLabel>
+              <Input
+                width="path"
+                className="h-7 text-xs"
+                list={PROCGEN_RULES_LIST_ID}
+                value={eventData.rewards.procgenFilename}
+                onChange={(e) => setEventData((prev) => ({ ...prev, rewards: { ...prev.rewards, procgenFilename: e.target.value } }))}
+              />
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <HintLabel className="text-xs font-normal w-28 shrink-0" hint="Only used on chunk maps with procgen_type=links. north, south, west, or east.">procgen_link</HintLabel>
+              <Input
+                width="id"
+                className="h-7 text-xs"
+                list="procgen-link-dirs"
+                value={eventData.rewards.procgenLink}
+                onChange={(e) => setEventData((prev) => ({ ...prev, rewards: { ...prev.rewards, procgenLink: e.target.value } }))}
+              />
+              <datalist id="procgen-link-dirs">
+                <option value="north" />
+                <option value="south" />
+                <option value="west" />
+                <option value="east" />
+              </datalist>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <HintLabel className="text-xs font-normal w-28 shrink-0" hint="For procedural generation chunks only. The event is active on these door levels (comma-separated integers).">procgen_door_level</HintLabel>
+              <Input
+                width="id"
+                className="h-7 text-xs"
+                value={eventData.rewards.procgenDoorLevel}
+                onChange={(e) => setEventData((prev) => ({ ...prev, rewards: { ...prev.rewards, procgenDoorLevel: e.target.value } }))}
+              />
+            </div>
+          </div>
+
           <div className="px-1">
             <EditorPropertyList
               title="More"
@@ -762,7 +802,7 @@ const EventDialog: React.FC<EventDialogProps> = ({
                   value: row.value,
                   tooltip: entry?.tooltip || row.key,
                   kind: entry?.kind,
-                  list: isStoryFlagType(row.key) ? STORY_FLAG_LIST_ID : undefined,
+                  list: isStoryFlagType(row.key) ? STORY_FLAG_LIST_ID : row.key === 'procgen_filename' ? PROCGEN_RULES_LIST_ID : undefined,
                 };
               })}
               catalog={eventExtraPaletteKeys(extraRows).map((entry) => ({

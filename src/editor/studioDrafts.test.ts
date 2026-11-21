@@ -106,6 +106,8 @@ describe('studio draft writers', () => {
       main_path_length_max: '8',
       chunks: ['maps/chunks/start.txt', 'maps/chunks/hall.txt'],
     });
+    expect(files).toHaveLength(1);
+    expect(files[0].path).toBe('maps/procgen_rules/dungeon.txt');
     expect(files[0].content).toBe(fixture('dungeon.procgen.txt'));
     expect(validateText('procgen', files[0].content)).toEqual([]);
     expect(files[0].content).not.toContain('procgen_chunks');

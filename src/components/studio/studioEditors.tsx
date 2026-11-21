@@ -4,11 +4,12 @@ import Tooltip from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { FieldHint } from '@/components/ui/field-hint';
+import { FieldHint, HintLabel } from '@/components/ui/field-hint';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { useAppContext } from '@/context/AppContext';
 import CutsceneEditor from '@/components/engine/CutsceneEditor';
+import ProcgenRulesForm from '@/components/engine/ProcgenRulesForm';
 import { toast } from '@/hooks/use-toast';
 import { loadConfigDocument, projectRoot, writeProjectFiles } from '@/editor/projectFiles';
 import {
@@ -20,14 +21,11 @@ import {
   parallaxFiles,
   parallaxRelativePath,
   potFiles,
-  procgenFiles,
-  procgenRelativePath,
   readCanonical,
   tileFiles,
   type FogDraft,
   type MapPresentation,
   type ParallaxLayerDraft,
-  type ProcgenDraft,
   type TileDraft,
 } from '@/editor/studioDrafts';
 
@@ -364,64 +362,7 @@ export function FogEditor({ editor }: { editor?: StudioEditor | null }) {
   );
 }
 
-const PROCGEN_FIELDS: Array<[keyof Omit<ProcgenDraft, 'chunks'>, string]> = [
-  ['doors_max', 'doors_max'],
-  ['main_path_length_min', 'main_path_length_min'],
-  ['main_path_length_max', 'main_path_length_max'],
-  ['main_path_attempts_max', 'main_path_attempts_max'],
-  ['branch_length_min', 'branch_length_min'],
-  ['branch_length_max', 'branch_length_max'],
-  ['branches_per_door_level_max', 'branches_per_door_level_max'],
-  ['door_spacing_min', 'door_spacing_min'],
-];
-
-export function ProcgenEditor() {
-  const projectPath = useProjectPath();
-  const [slug, setSlug] = useState('rules');
-  const [rules, setRules] = useState<ProcgenDraft>({ chunks: [] });
-  const [chunksText, setChunksText] = useState('');
-
-  const load = async () => {
-    if (!projectPath) return;
-    const parsed = readCanonical(await loadConfigDocument(projectPath, `content/procgen/${slug}.json`));
-    if (!parsed) return;
-    const next: ProcgenDraft = { chunks: [] };
-    for (const [key] of PROCGEN_FIELDS) next[key] = stringField(parsed, key);
-    const chunks = Array.isArray(parsed.chunks) ? parsed.chunks.map(String) : [];
-    next.chunks = chunks;
-    setRules(next);
-    setChunksText(chunks.join('\n'));
-  };
-
-  const save = async () => {
-    const next = { ...rules, chunks: linesOf(chunksText) };
-    await persist(projectPath, procgenFiles(slug, next), procgenRelativePath(slug), 'Could not write the procgen rules.');
-  };
-
-  return (
-    <div className="space-y-2 rounded-lg border border-border p-3">
-      <FieldHint hint={`Event procgen_filename points at ${procgenRelativePath(slug)}. Chunk type stays on the map header.`}>
-        <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Procedural rules</div>
-      </FieldHint>
-      <Input width="id" value={slug} onChange={(event) => setSlug(event.target.value)} placeholder="id" className="h-8" aria-label="Procgen id" />
-      {PROCGEN_FIELDS.map(([key, label]) => (
-        <Input
-          key={key}
-          value={rules[key] || ''}
-          onChange={(event) => setRules({ ...rules, [key]: event.target.value })}
-          placeholder={label}
-          className="h-8"
-          aria-label={label}
-        />
-      ))}
-      <Textarea aria-label="Procgen chunks" value={chunksText} onChange={(event) => setChunksText(event.target.value)} placeholder="chunk filenames" className="h-16 w-full rounded-md border border-input bg-background px-2 py-1 text-sm" />
-      <div className="flex gap-2">
-        <Button type="button" size="sm" variant="outline" onClick={() => { void load(); }}>Load rules</Button>
-        <Button type="button" size="sm" onClick={() => { void save(); }}>Write rules</Button>
-      </div>
-    </div>
-  );
-}
+export { default as ProcgenEditor } from '@/components/engine/ProcgenRulesForm';
 
 export const PROCGEN_TYPES = ['', 'links', 'normal', 'start', 'end', 'key', 'door_north_south', 'door_west_east'];
 
@@ -462,7 +403,7 @@ export function MapPresentationFields({
           <SelectItem value="false">false</SelectItem>
         </SelectContent>
       </Select>
-      <Label className="block text-xs text-muted-foreground font-normal" htmlFor="header-procgen-type">Procgen type</Label>
+      <HintLabel className="block text-xs text-muted-foreground font-normal" htmlFor="header-procgen-type" hint="Set on chunk maps, not on the rules file. links, normal, start, end, key, door_north_south, or door_west_east tell the generator how to use this chunk.">Procgen type</HintLabel>
       <Select value={value.procgen_type || '__empty__'} onValueChange={(next) => set({ procgen_type: next === '__empty__' ? '' : next })}>
         <SelectTrigger id="header-procgen-type" className={selectClass}>
           <SelectValue placeholder="none" />
@@ -471,8 +412,10 @@ export function MapPresentationFields({
           {PROCGEN_TYPES.map((type) => <SelectItem key={type || 'none'} value={type || '__empty__'}>{type || 'none'}</SelectItem>)}
         </SelectContent>
       </Select>
-      <Input value={value.procgen_unique_status} onChange={(event) => set({ procgen_unique_status: event.target.value })} placeholder="procgen_unique_status" width="id" className="h-8" aria-label="Procgen unique status" />
-      <Input value={value.procgen_reset_status} onChange={(event) => set({ procgen_reset_status: event.target.value })} placeholder="procgen_reset_status" width="id" className="h-8" aria-label="Procgen reset status" />
+      <HintLabel className="block text-xs text-muted-foreground font-normal" htmlFor="header-procgen-unique" hint="On a chunk map: once this status is set, the chunk is no longer eligible for placement.">Procgen unique status</HintLabel>
+      <Input id="header-procgen-unique" value={value.procgen_unique_status} onChange={(event) => set({ procgen_unique_status: event.target.value })} placeholder="procgen_unique_status" width="id" className="h-8" aria-label="Procgen unique status" />
+      <HintLabel className="block text-xs text-muted-foreground font-normal" htmlFor="header-procgen-reset" hint="If this status is set, the engine regenerates the region instead of loading the saved procgen cache.">Procgen reset status</HintLabel>
+      <Input id="header-procgen-reset" value={value.procgen_reset_status} onChange={(event) => set({ procgen_reset_status: event.target.value })} placeholder="procgen_reset_status" width="id" className="h-8" aria-label="Procgen reset status" />
     </div>
   );
 }
@@ -483,7 +426,7 @@ export function StudioWorldPanel() {
       <CutsceneEditor />
       <ParallaxEditor />
       <FogEditor />
-      <ProcgenEditor />
+      <ProcgenRulesForm />
     </div>
   );
 }

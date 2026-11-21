@@ -15,6 +15,7 @@ describe('World Settings dock panel', () => {
     expect(html).toContain('No cutscene files in cutscenes/ yet.');
     expect(html).toContain('Write parallax');
     expect(html).toContain('Write fog mask');
-    expect(html).toContain('Write rules');
+    expect(html).toContain('No procgen rule files in maps/procgen_rules/ yet.');
+    expect(html).not.toContain('Write rules');
   });
 });

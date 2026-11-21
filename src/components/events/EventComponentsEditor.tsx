@@ -2,6 +2,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { EVENT_COMPONENT_KEYS, type EventScriptComponent } from '@/editor/eventScripts';
+import { PROCGEN_RULES_LIST_ID } from '@/editor/procgenRules';
 
 /** Repeatable EventManager component rows (script, book, cutscene, set_status, …). */
 export default function EventComponentsEditor({
@@ -26,8 +27,9 @@ export default function EventComponentsEditor({
   return (
     <div className="space-y-2">
       {components.map((row, index) => {
-        const listId = `event-comp-${index}-${row.key}`;
+        const localListId = `event-comp-${index}-${row.key}`;
         const suggestions = suggestionsFor(row.key);
+        const listId = row.key === 'procgen_filename' ? PROCGEN_RULES_LIST_ID : suggestions.length ? localListId : undefined;
         return (
           <div key={index} className="flex flex-wrap items-center gap-1">
             <Input
@@ -42,12 +44,12 @@ export default function EventComponentsEditor({
               aria-label={`Event value ${index + 1}`}
               width="path"
               className="h-7 text-xs"
-              list={suggestions.length ? listId : undefined}
+              list={listId}
               value={row.value}
               onChange={(event) => onChange(components.map((item, i) => (i === index ? { ...item, value: event.target.value } : item)))}
             />
-            {suggestions.length ? (
-              <datalist id={listId}>
+            {suggestions.length && row.key !== 'procgen_filename' ? (
+              <datalist id={localListId}>
                 {suggestions.map((path) => <option key={path} value={path} />)}
               </datalist>
             ) : null}

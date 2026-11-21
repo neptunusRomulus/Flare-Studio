@@ -3,6 +3,8 @@ import { Zap } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { HintLabel } from '@/components/ui/field-hint';
+import { PROCGEN_RULES_LIST_ID } from '@/editor/procgenRules';
 import EventSectionShell from './EventSectionShell';
 import type { EventSectionProps } from './eventDialogModel';
 
@@ -117,16 +119,16 @@ export default function EventAdvancedSection({ eventData, setEventData, expanded
                 <Input value={eventData.rewards.intermapId} onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, intermapId: e.target.value } }))} className="h-7 text-xs" />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs font-medium text-foreground/80">Procgen File</Label>
-                <Input value={eventData.rewards.procgenFilename} onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, procgenFilename: e.target.value } }))} className="h-7 text-xs" />
+                <HintLabel className="text-xs font-medium text-foreground/80" hint="Rules file under maps/procgen_rules. The engine fills this event's location rectangle when the map loads. Only the first such event on the map is used. intermap_random is a different feature (a random teleport map list).">Procgen File</HintLabel>
+                <Input width="path" list={PROCGEN_RULES_LIST_ID} value={eventData.rewards.procgenFilename} onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, procgenFilename: e.target.value } }))} className="h-7 text-xs" />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs font-medium text-foreground/80">Procgen Link</Label>
-                <Input value={eventData.rewards.procgenLink} onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, procgenLink: e.target.value } }))} className="h-7 text-xs" />
+                <HintLabel className="text-xs font-medium text-foreground/80" hint="Only used on chunk maps with procgen_type=links. north, south, west, or east.">Procgen Link</HintLabel>
+                <Input width="id" value={eventData.rewards.procgenLink} onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, procgenLink: e.target.value } }))} className="h-7 text-xs" />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs font-medium text-foreground/80">Procgen Door Level</Label>
-                <Input value={eventData.rewards.procgenDoorLevel} onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, procgenDoorLevel: e.target.value } }))} className="h-7 text-xs" />
+                <HintLabel className="text-xs font-medium text-foreground/80" hint="For procedural generation chunks only. The event is active on these door levels.">Procgen Door Level</HintLabel>
+                <Input width="id" value={eventData.rewards.procgenDoorLevel} onChange={e => setEventData(prev => ({ ...prev, rewards: { ...prev.rewards, procgenDoorLevel: e.target.value } }))} className="h-7 text-xs" />
               </div>
             </div>
           </div>

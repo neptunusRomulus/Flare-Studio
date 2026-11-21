@@ -54,9 +54,9 @@ describe('studio editor screens', () => {
   it('renders the procgen rules editor', () => {
     const html = render(<ProcgenEditor />);
     expect(html).toContain('Procedural rules');
-    expect(html).toContain('Write rules');
-    expect(html).toContain('doors_max');
+    expect(html).toContain('No procgen rule files in maps/procgen_rules/ yet.');
     expect(html).toContain('data-studio-hint');
+    expect(html).not.toContain('Write rules');
     expect(html).not.toContain('procgen_chunks');
   });
 

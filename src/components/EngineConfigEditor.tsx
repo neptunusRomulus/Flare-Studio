@@ -16,6 +16,8 @@ import { ClassHeroForm, EquipFlagsForm, HeroLayersForm, HeroOptionsForm, LootSet
 import { registerProblemOpener } from '@/editor/projectProblems';
 import { FieldHint } from '@/components/ui/field-hint';
 import { useRegisterDirty } from '@/context/SaveHealthContext';
+import { getStoredFlarePath } from '@/flare/flarePathStore';
+import { loadAvatarSfxFiles } from '@/editor/avatarSounds';
 
 export interface ParsedSection {
   type: string;
@@ -65,6 +67,7 @@ export function EngineConfigEditor({ initialFile }: { initialFile?: string } = {
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<Record<string, boolean>>({});
+  const [extraConfigFiles, setExtraConfigFiles] = useState<Array<{ name: string; displayName: string; description: string }>>([]);
 
   const [itemIds, setItemIds] = useState<Set<string>>(new Set());
   const [powerIds, setPowerIds] = useState<Set<string>>(new Set());
@@ -99,7 +102,7 @@ export function EngineConfigEditor({ initialFile }: { initialFile?: string } = {
       const rel = file.path.replace(/\\/g, '/');
       if (!rel.startsWith('engine/') || rel.endsWith('.json')) continue;
       const fileName = rel.slice('engine/'.length);
-      if (!fileName || fileName.includes('/')) continue;
+      if (!fileName || (fileName.includes('/') && !fileName.startsWith('avatar/'))) continue;
       contents[fileName] = file.content;
       parsed[fileName] = sectionsFromEngineText(file.content);
       unsaved[fileName] = true;
@@ -152,10 +155,34 @@ export function EngineConfigEditor({ initialFile }: { initialFile?: string } = {
         }
       }
       
+      const flarePath = getStoredFlarePath();
+      const avatarFiles = currentProjectPath
+        ? await loadAvatarSfxFiles({
+            projectPath: currentProjectPath,
+            flarePath,
+            fs: {
+              readFile: window.electronAPI?.readFile ?? (async () => ''),
+              readDir: window.electronAPI?.readDir,
+            },
+          }).catch(() => ({} as Record<string, string>))
+        : {};
+      const extras: Array<{ name: string; displayName: string; description: string }> = [];
+      for (const [rel, text] of Object.entries(avatarFiles)) {
+        const fileName = rel.replace(/^engine\//, '');
+        contents[fileName] = text;
+        parsed[fileName] = sectionsFromEngineText(text);
+        extras.push({
+          name: fileName,
+          displayName: `Avatar ${fileName.replace(/^avatar\//, '').replace(/\.txt$/i, '')}`,
+          description: 'Body-type hero sound effects',
+        });
+      }
+
       if (skipDiskLoadRef.current) return;
       setFileContents(contents);
       setParsedData(parsed);
       setHasUnsavedChanges({});
+      setExtraConfigFiles(extras);
       const projectFiles = await loadProjectTextMap(currentProjectPath);
       setItemIds(collectSectionIds(projectFiles, ['item']));
       setPowerIds(collectSectionIds(projectFiles, ['power', 'upgrade']));
@@ -270,7 +297,8 @@ export function EngineConfigEditor({ initialFile }: { initialFile?: string } = {
     });
   };
 
-  const filteredFiles = ENGINE_CONFIG_FILES.filter(f => 
+  const configFiles = [...ENGINE_CONFIG_FILES, ...extraConfigFiles];
+  const filteredFiles = configFiles.filter(f => 
     f.displayName.toLowerCase().includes(searchQuery.toLowerCase()) ||
     f.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -292,7 +320,7 @@ export function EngineConfigEditor({ initialFile }: { initialFile?: string } = {
         <div className="flex items-center gap-3">
           <FileText className="w-5 h-5 text-accent" />
           <div>
-            <FieldHint hint={`Edit ${ENGINE_CONFIG_FILES.length} engine config files`}>
+            <FieldHint hint={`Edit ${configFiles.length} engine config files`}>
               <h2 className="text-sm font-semibold text-foreground">Engine Configuration Editor</h2>
             </FieldHint>
           </div>

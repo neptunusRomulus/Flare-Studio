@@ -110,7 +110,7 @@ export function AvatarSfxTablesForm({ files, onChange }: { files: Record<string,
       </div>
       {creating && (
         <div className="flex flex-wrap items-center gap-1">
-          <HintLabel className="text-xs font-normal w-16 shrink-0" hint="Filename stem under engine/avatar/, matching a hero option base.">base</HintLabel>
+          <HintLabel className="text-xs font-normal w-16 shrink-0" hint="base. Filename stem under engine/avatar/, matching a hero option base (gfx_base).">Body</HintLabel>
           <Input width="name" className="h-7 text-xs" value={title} onChange={(e) => setTitle(e.target.value)} autoFocus onKeyDown={(e) => { if (e.key === 'Enter') create(); }} />
           <Button type="button" size="sm" className="h-7 text-xs" onClick={create}>Create</Button>
         </div>
@@ -124,7 +124,7 @@ export function AvatarSfxTablesForm({ files, onChange }: { files: Record<string,
             </Button>
           </div>
           <div className="space-y-1">
-            <HintLabel className="text-xs font-normal" hint="sfx_attack=animation,filename. Repeat for several files of the same animation; the engine picks one.">sfx_attack</HintLabel>
+            <HintLabel className="text-xs font-normal" hint="sfx_attack=animation,filename. Repeat for several files of the same animation; the engine picks one.">Attack</HintLabel>
             {file.attacks.map((row, index) => (
               <div key={index} className="flex flex-wrap items-center gap-1">
                 <Input width="id" className="h-6 text-xs" aria-label={`Attack animation ${index + 1}`} value={row.animation} onChange={(e) => write({ ...file, attacks: file.attacks.map((item, i) => (i === index ? { ...item, animation: e.target.value } : item)) })} />
@@ -134,16 +134,16 @@ export function AvatarSfxTablesForm({ files, onChange }: { files: Record<string,
             ))}
             <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" onClick={() => write({ ...file, attacks: [...file.attacks, { animation: 'swing', file: '' }] })}><Plus className="w-3 h-3 mr-1" />Attack</Button>
           </div>
-          <PathList label="sfx_hit" hint="Sound when the hero is hit." values={file.hit} onChange={(hit) => write({ ...file, hit })} />
-          <PathList label="sfx_die" hint="Sound when the hero dies." values={file.die} onChange={(die) => write({ ...file, die })} />
-          <PathList label="sfx_critdie" hint="Sound when the hero dies to a critical hit." values={file.critdie} onChange={(critdie) => write({ ...file, critdie })} />
-          <PathList label="sfx_block" hint="Sound when the hero blocks a hit." values={file.block} onChange={(block) => write({ ...file, block })} />
+          <PathList label="Hit" hint="sfx_hit. Sound when the hero is hit." values={file.hit} onChange={(hit) => write({ ...file, hit })} />
+          <PathList label="Death" hint="sfx_die. Sound when the hero dies." values={file.die} onChange={(die) => write({ ...file, die })} />
+          <PathList label="Critical death" hint="sfx_critdie. Sound when the hero dies to a critical hit." values={file.critdie} onChange={(critdie) => write({ ...file, critdie })} />
+          <PathList label="Block" hint="sfx_block. Sound when the hero blocks a hit." values={file.block} onChange={(block) => write({ ...file, block })} />
           <div className="flex flex-wrap items-center gap-2">
-            <HintLabel className="text-xs font-normal w-24 shrink-0" hint="Sound played on level up.">sfx_levelup</HintLabel>
+            <HintLabel className="text-xs font-normal w-24 shrink-0" hint="sfx_levelup. Sound played on level up.">Level up</HintLabel>
             <Input width="path" className="h-7 text-xs" value={file.levelup} onChange={(e) => write({ ...file, levelup: e.target.value })} />
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <HintLabel className="text-xs font-normal w-24 shrink-0" hint="Low-health warning. Use filename,true to loop it.">sfx_lowhp</HintLabel>
+            <HintLabel className="text-xs font-normal w-24 shrink-0" hint="sfx_lowhp. Low-health warning. Use filename,true to loop it.">Low health</HintLabel>
             <Input width="path" className="h-7 text-xs" value={file.lowhp} onChange={(e) => write({ ...file, lowhp: e.target.value })} />
           </div>
         </div>

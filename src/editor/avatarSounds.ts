@@ -3,6 +3,9 @@
  * Step sets: items/step_sounds.txt (Avatar step definitions). engine/stats.txt sfx_step is an id in that file.
  */
 
+import { candidateEnginePaths, loadEngineFileWithFallback, parseProjectRequires } from '@/editor/engineFileFallback';
+import { projectRoot } from '@/editor/projectFiles';
+
 export const AVATAR_SFX_DIR = 'engine/avatar';
 export const STEP_SOUNDS_PATH = 'items/step_sounds.txt';
 export const STEP_SOUND_LIST_ID = 'step-sound-suggestions';
@@ -123,3 +126,52 @@ export function serializeStepSounds(sets: StepSoundSet[], previous = ''): string
 export const DEFAULT_STEP_SOUNDS = `id=cloth
 step=soundfx/steps/step_cloth1.ogg
 `;
+
+type AvatarFs = {
+  readFile: (absPath: string) => Promise<string | null | undefined>;
+  readDir?: (absPath: string) => Promise<Array<{ name: string; isDirectory?: boolean }> | null | undefined>;
+};
+
+async function listTxtNames(absDir: string, readDir: AvatarFs['readDir']): Promise<string[]> {
+  if (!readDir) return [];
+  try {
+    const entries = (await readDir(absDir)) || [];
+    return entries
+      .filter((entry) => !entry.isDirectory && String(entry.name || '').toLowerCase().endsWith('.txt'))
+      .map((entry) => entry.name);
+  } catch {
+    return [];
+  }
+}
+
+/** Project engine/avatar files, plus required-mod / default copies when the project has none of that name. */
+export async function loadAvatarSfxFiles(opts: {
+  projectPath: string;
+  flarePath: string | null;
+  fs: AvatarFs;
+}): Promise<Record<string, string>> {
+  const root = projectRoot(opts.projectPath);
+  const requires = parseProjectRequires((await opts.fs.readFile(`${root}/project.json`).catch(() => '')) || '');
+  const names = new Set<string>();
+  const dirs = candidateEnginePaths({
+    projectRoot: root,
+    flarePath: opts.flarePath,
+    requires,
+    relative: AVATAR_SFX_DIR,
+  });
+  for (const dir of dirs) {
+    for (const name of await listTxtNames(dir, opts.fs.readDir)) names.add(name);
+  }
+  const files: Record<string, string> = {};
+  for (const name of [...names].sort()) {
+    const loaded = await loadEngineFileWithFallback({
+      projectPath: opts.projectPath,
+      relative: `${AVATAR_SFX_DIR}/${name}`,
+      flarePath: opts.flarePath,
+      fs: opts.fs,
+      requires,
+    });
+    if (loaded.text.trim()) files[`${AVATAR_SFX_DIR}/${name}`] = loaded.text;
+  }
+  return files;
+}

@@ -41,7 +41,7 @@ import { EQUIP_FLAGS_PATH } from '@/editor/equipFlags';
 import { ClassHeroForm, EquipFlagsForm, HeroLayersForm, HeroOptionsForm, XpTableForm } from '@/components/engine/EngineSpecialForms';
 import XpScalingTablesForm from '@/components/engine/XpScalingTablesForm';
 import { AvatarSfxTablesForm, StepSoundsForm } from '@/components/engine/AvatarSoundsForms';
-import { AVATAR_SFX_DIR, STEP_SOUND_LIST_ID, STEP_SOUNDS_PATH } from '@/editor/avatarSounds';
+import { AVATAR_SFX_DIR, STEP_SOUND_LIST_ID, STEP_SOUNDS_PATH, loadAvatarSfxFiles } from '@/editor/avatarSounds';
 import { listTxtUnder } from '@/hooks/useEventScripts';
 import { XP_SCALING_DIR } from '@/editor/xpScaling';
 import { CombatSettingsForm, DamageTypesForm } from '@/components/engine/CombatAndDamageForms';
@@ -150,16 +150,14 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
     setEquipFlagsText(equipFlagsFile.text);
     const stepFile = await loadEngineFileWithFallback({ projectPath, relative: STEP_SOUNDS_PATH, flarePath, fs });
     setStepSoundsText(stepFile.text);
-    const avatar: Record<string, string> = {};
-    try {
-      const root = projectPath.replace(/\\/g, '/');
-      for (const rel of await listTxtUnder(root, AVATAR_SFX_DIR)) {
-        const text = await window.electronAPI.readFile(`${root}/${rel}`);
-        if (text != null) avatar[rel] = text;
-      }
-    } catch {
-      /* no engine/avatar folder yet */
-    }
+    const avatar = await loadAvatarSfxFiles({
+      projectPath,
+      flarePath,
+      fs: {
+        readFile: window.electronAPI?.readFile ?? (async () => ''),
+        readDir: window.electronAPI?.readDir,
+      },
+    }).catch(() => ({} as Record<string, string>));
     setAvatarSfxFiles(avatar);
     setAvatarSfxOriginal(Object.keys(avatar));
     try {

@@ -5,6 +5,7 @@ import {
   serializeAvatarSfx,
   serializeStepSounds,
   avatarSfxRelPath,
+  loadAvatarSfxFiles,
 } from './avatarSounds';
 
 const MALE = `# male body
@@ -44,5 +45,29 @@ describe('avatarSounds', () => {
     expect(next).toContain('id=cloth');
     expect(next).toContain('id=metal');
     expect(parseStepSounds(next)).toEqual(parseStepSounds(text));
+  });
+
+  it('loads body files from a required mod and prefers a project override', async () => {
+    const files: Record<string, string> = {
+      '/proj/project.json': JSON.stringify({ requires: ['fantasycore'] }),
+      '/proj/engine/avatar/female.txt': 'sfx_hit=soundfx/custom_female_hit.ogg\n',
+      '/opt/flare-game/mods/fantasycore/engine/avatar/male.txt': 'sfx_hit=soundfx/male_hit.ogg\n',
+      '/opt/flare-game/mods/fantasycore/engine/avatar/female.txt': 'sfx_hit=soundfx/female_hit.ogg\n',
+    };
+    const dirs: Record<string, Array<{ name: string; isDirectory?: boolean }>> = {
+      '/proj/engine/avatar': [{ name: 'female.txt' }],
+      '/opt/flare-game/mods/fantasycore/engine/avatar': [{ name: 'male.txt' }, { name: 'female.txt' }],
+    };
+    const loaded = await loadAvatarSfxFiles({
+      projectPath: '/proj',
+      flarePath: '/opt/flare-engine',
+      fs: {
+        readFile: async (abs) => files[abs] || '',
+        readDir: async (abs) => dirs[abs] || [],
+      },
+    });
+    expect(loaded['engine/avatar/male.txt']).toContain('male_hit');
+    expect(loaded['engine/avatar/female.txt']).toContain('custom_female_hit');
+    expect(loaded['engine/avatar/female.txt']).not.toContain('soundfx/female_hit.ogg');
   });
 });

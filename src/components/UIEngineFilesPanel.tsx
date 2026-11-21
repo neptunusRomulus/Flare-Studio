@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { FieldHint, HintLabel } from '@/components/ui/field-hint';
 import FontLibrary, { FONT_FILE_LIST_ID } from '@/components/engine/FontLibrary';
+import SubtitlesForm from '@/components/engine/SubtitlesForm';
 import { FlareColorField } from '@/components/ui/flare-color-field';
 import { toast } from '@/hooks/use-toast';
 import { useAppContext } from '@/context/AppContext';
@@ -11,6 +12,7 @@ import { getStoredFlarePath } from '@/flare/flarePathStore';
 import { writeProjectFiles } from '@/editor/projectFiles';
 import { loadEngineFileWithFallback } from '@/editor/engineFileFallback';
 import type { FieldWidth } from '@/components/ui/fieldWidth';
+import { SUBTITLES_PATH } from '@/editor/subtitlesFile';
 import {
   COMBAT_TEXT_KEYS,
   COMBAT_TEXT_PATH,
@@ -51,7 +53,7 @@ import {
   type WidgetSectionId,
 } from '@/editor/uiEngine';
 
-type UiPane = 'general' | 'fonts' | 'colors' | 'tooltips' | 'resolutions' | 'combat' | 'icons' | 'backgrounds' | 'cursor' | 'widgets' | 'defaults';
+type UiPane = 'general' | 'fonts' | 'colors' | 'tooltips' | 'resolutions' | 'combat' | 'icons' | 'backgrounds' | 'cursor' | 'widgets' | 'defaults' | 'subtitles';
 
 type FieldMeta = { key: string; tip: string; width: FieldWidth; color?: boolean };
 
@@ -245,6 +247,7 @@ const PANES: Array<{ id: UiPane; label: string }> = [
   { id: 'cursor', label: 'Cursor' },
   { id: 'widgets', label: 'Widgets' },
   { id: 'defaults', label: 'Defaults' },
+  { id: 'subtitles', label: 'Subtitles' },
 ];
 
 function withNewline(text: string): string {
@@ -302,6 +305,7 @@ export default function UIEngineFilesPanel({ general }: { general: ReactNode }) 
   const [widgetsText, setWidgetsText] = useState('');
   const [defaultsText, setDefaultsText] = useState('');
   const [keybindsText, setKeybindsText] = useState('');
+  const [subtitlesText, setSubtitlesText] = useState('');
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -311,7 +315,7 @@ export default function UIEngineFilesPanel({ general }: { general: ReactNode }) 
     const clear = () => {
       setFontsText(''); setColorsText(''); setTooltipsText(''); setResolutionsText('');
       setCombatText(''); setIconsText(''); setBackgroundsText(''); setCursorText('');
-      setWidgetsText(''); setDefaultsText(''); setKeybindsText(''); setDirty(false);
+      setWidgetsText(''); setDefaultsText(''); setKeybindsText(''); setSubtitlesText(''); setDirty(false);
     };
     if (!projectPath || !window.electronAPI?.readFile) {
       clear();
@@ -321,7 +325,7 @@ export default function UIEngineFilesPanel({ general }: { general: ReactNode }) 
     const flarePath = getStoredFlarePath();
     const load = (relative: string) => loadEngineFileWithFallback({ projectPath, relative, flarePath, fs });
     const [
-      fonts, colors, tooltips, resolutions, combat, icons, backgrounds, cursor, widgets, defaults, keybinds,
+      fonts, colors, tooltips, resolutions, combat, icons, backgrounds, cursor, widgets, defaults, keybinds, subtitles,
     ] = await Promise.all([
       load(FONT_SETTINGS_PATH),
       load(FONT_COLORS_PATH),
@@ -334,6 +338,7 @@ export default function UIEngineFilesPanel({ general }: { general: ReactNode }) 
       load(WIDGET_SETTINGS_PATH),
       load(DEFAULT_SETTINGS_PATH),
       load(DEFAULT_KEYBINDINGS_PATH),
+      load(SUBTITLES_PATH),
     ]);
     setFontsText(fonts.text);
     setColorsText(colors.text);
@@ -346,6 +351,7 @@ export default function UIEngineFilesPanel({ general }: { general: ReactNode }) 
     setWidgetsText(widgets.text);
     setDefaultsText(defaults.text);
     setKeybindsText(keybinds.text);
+    setSubtitlesText(subtitles.text);
     setDirty(false);
   }, [projectPath]);
 
@@ -368,6 +374,7 @@ export default function UIEngineFilesPanel({ general }: { general: ReactNode }) 
       widgetsText.trim() ? { path: WIDGET_SETTINGS_PATH, content: withNewline(widgetsText) } : null,
       defaultsText.trim() ? { path: DEFAULT_SETTINGS_PATH, content: withNewline(defaultsText) } : null,
       keybindsText.trim() ? { path: DEFAULT_KEYBINDINGS_PATH, content: withNewline(keybindsText) } : null,
+      subtitlesText.trim() ? { path: SUBTITLES_PATH, content: withNewline(subtitlesText) } : null,
     ].filter(Boolean) as Array<{ path: string; content: string }>;
     if (!files.length) {
       toast({ title: 'Nothing to write', description: 'No UI engine files were loaded.' });
@@ -597,7 +604,7 @@ export default function UIEngineFilesPanel({ general }: { general: ReactNode }) 
               </div>
             ))}
           </div>
-        ) : (
+        ) : pane === 'defaults' ? (
           <div className="space-y-3">
             <FieldHint hint="engine/default_settings.txt. These are the values Flare uses when the player has no settings.txt yet. Many mods do not ship this file; it is common in platform packs such as gcw0_defaults. Empty keys are not written; unknown keys such as older show_target are kept.">
               <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Default settings</div>
@@ -632,6 +639,8 @@ export default function UIEngineFilesPanel({ general }: { general: ReactNode }) 
               <Plus className="w-3 h-3 mr-1" />Bind
             </Button>
           </div>
+        ) : (
+          <SubtitlesForm text={subtitlesText} projectPath={projectPath} onChange={mark(setSubtitlesText)} />
         )}
     </div>
   );

@@ -8,10 +8,16 @@ import { listTxtUnder } from '@/hooks/useEventScripts';
 import { loadConfigDocument, writeProjectFiles } from '@/editor/projectFiles';
 import { useAppContext } from '@/context/AppContext';
 import {
+  MAP_CHUNK_LIST_ID,
   PROCGEN_RULES_DIR,
+  PROCGEN_RULES_LIST_ID,
   PROCGEN_SETTING_HINTS,
   PROCGEN_SETTING_KEYS,
+  PROCGEN_SETTING_LABELS,
+  collectChunkFilenames,
   emptyProcgenFile,
+  isChunkMapPath,
+  parseMapProcgenType,
   parseProcgenFile,
   procgenRulesRelPath,
   serializeProcgenFile,
@@ -20,6 +26,7 @@ import {
   type ProcgenKey,
   type ProcgenPart,
 } from '@/editor/procgenRules';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useRegisterDirty } from '@/context/SaveHealthContext';
 
 const projectFile = (rootPath: string, rel: string) =>
@@ -37,6 +44,8 @@ export default function ProcgenRulesForm() {
   const [title, setTitle] = useState('');
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [chunkMaps, setChunkMaps] = useState<string[]>([]);
+  const [chunkTypes, setChunkTypes] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!root) { setPaths([]); setFiles({}); setOriginal([]); setSelected(''); setRemoved([]); setDirty(false); return; }
@@ -49,6 +58,16 @@ export default function ProcgenRulesForm() {
       setRemoved([]);
       setSelected(list[0] || '');
       setDirty(false);
+    })();
+    return () => { cancelled = true; };
+  }, [root]);
+
+  useEffect(() => {
+    if (!root) { setChunkMaps([]); return; }
+    let cancelled = false;
+    void (async () => {
+      const list = (await listTxtUnder(root, 'maps')).filter(isChunkMapPath);
+      if (!cancelled) setChunkMaps(list);
     })();
     return () => { cancelled = true; };
   }, [root]);
@@ -70,6 +89,38 @@ export default function ProcgenRulesForm() {
     setFiles((current) => ({ ...current, [selected]: serializeProcgenFile(next) }));
     setDirty(true);
   };
+
+  const listedChunks = useMemo(
+    () => selected ? collectChunkFilenames(parseProcgenFile(text), (rel) => files[rel] ?? null) : [],
+    [selected, text, files],
+  );
+  const typeCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const rel of listedChunks) {
+      const type = chunkTypes[rel] || 'unknown';
+      counts[type] = (counts[type] || 0) + 1;
+    }
+    return counts;
+  }, [listedChunks, chunkTypes]);
+  const missingStart = listedChunks.length > 0 && !listedChunks.some((rel) => chunkTypes[rel] === 'start');
+  const missingEnd = listedChunks.length > 0 && !listedChunks.some((rel) => chunkTypes[rel] === 'end');
+
+  useEffect(() => {
+    if (!root || !listedChunks.length) return;
+    const pending = listedChunks.filter((rel) => !(rel in chunkTypes));
+    if (!pending.length) return;
+    let cancelled = false;
+    void (async () => {
+      const next: Record<string, string> = {};
+      for (const rel of pending) {
+        const mapText = await loadConfigDocument(root, rel);
+        if (cancelled) return;
+        next[rel] = parseMapProcgenType(mapText);
+      }
+      if (!cancelled) setChunkTypes((current) => ({ ...current, ...next }));
+    })();
+    return () => { cancelled = true; };
+  }, [root, listedChunks, chunkTypes]);
 
   const create = () => {
     const path = procgenRulesRelPath(title || 'rules');
@@ -185,13 +236,13 @@ export default function ProcgenRulesForm() {
               {part.kind === 'include' || part.kind === 'append' ? (
                 <div className="flex flex-wrap items-center gap-1">
                   <HintLabel className="text-xs font-normal w-16 shrink-0" hint="Path of another maps/procgen_rules file to insert at this point.">{part.kind.toUpperCase()}</HintLabel>
-                  <Input width="path" className="h-7 text-xs" value={part.path} onChange={(event) => setPart(index, { ...part, path: event.target.value })} />
+                  <Input width="path" className="h-7 text-xs" list={PROCGEN_RULES_LIST_ID} value={part.path} onChange={(event) => setPart(index, { ...part, path: event.target.value })} aria-label={`${part.kind} path`} />
                 </div>
               ) : part.kind === 'settings' ? (
                 visibleSettingKeys(part).map((row, keyIndex, rows) => (
                   <div key={`${row.key}-${keyIndex}`} className="flex flex-wrap items-center gap-1">
                     {PROCGEN_SETTING_KEYS.includes(row.key as typeof PROCGEN_SETTING_KEYS[number]) ? (
-                      <HintLabel className="text-xs font-normal w-48 shrink-0" hint={PROCGEN_SETTING_HINTS[row.key as typeof PROCGEN_SETTING_KEYS[number]]}>{row.key}</HintLabel>
+                      <HintLabel className="text-xs font-normal w-48 shrink-0" hint={PROCGEN_SETTING_HINTS[row.key as typeof PROCGEN_SETTING_KEYS[number]]}>{PROCGEN_SETTING_LABELS[row.key as typeof PROCGEN_SETTING_KEYS[number]]}</HintLabel>
                     ) : (
                       <Input width="id" className="h-7 text-xs" aria-label={`Settings key ${keyIndex + 1}`} value={row.key} onChange={(event) => setKeys(index, rows.map((item, i) => i === keyIndex ? { ...item, key: event.target.value } : item))} />
                     )}
@@ -212,25 +263,64 @@ export default function ProcgenRulesForm() {
                       ) : (
                         <Input width="id" className="h-7 text-xs" aria-label={`Key ${keyIndex + 1}`} value={row.key} onChange={(event) => setKeys(index, rows.map((item, i) => i === keyIndex ? { ...item, key: event.target.value } : item))} />
                       )}
-                      <Input width="path" className="h-7 text-xs" aria-label={part.kind === 'chunks' ? `Chunk file ${keyIndex + 1}` : `Value ${keyIndex + 1}`} value={row.value} onChange={(event) => setKeys(index, rows.map((item, i) => i === keyIndex ? { ...item, value: event.target.value } : item))} />
+                      <Input width="path" className="h-7 text-xs" list={part.kind === 'chunks' ? MAP_CHUNK_LIST_ID : undefined} aria-label={part.kind === 'chunks' ? `Chunk file ${keyIndex + 1}` : `Value ${keyIndex + 1}`} value={row.value} onChange={(event) => setKeys(index, rows.map((item, i) => i === keyIndex ? { ...item, value: event.target.value } : item))} />
+                      {part.kind === 'chunks' && row.value.trim() && chunkTypes[row.value.trim()] ? (
+                        <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{chunkTypes[row.value.trim()]}</span>
+                      ) : null}
                       <Button type="button" variant="ghost" size="sm" className="h-7 px-2" aria-label={`Remove row ${keyIndex + 1}`} onClick={() => setKeys(index, rows.filter((_, i) => i !== keyIndex))}>
                         <Trash2 className="w-3 h-3" />
                       </Button>
                     </div>
                   ))}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-7 text-xs"
-                    onClick={() => setKeys(index, [...(part.keys.length ? part.keys : []), { key: part.kind === 'chunks' ? 'filename' : '', value: '', comment: '' }])}
-                  >
-                    <Plus className="w-3 h-3 mr-1" />{part.kind === 'chunks' ? 'Chunk' : 'Key'}
-                  </Button>
+                  <div className="flex flex-wrap items-center gap-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs"
+                      onClick={() => setKeys(index, [...(part.keys.length ? part.keys : []), { key: part.kind === 'chunks' ? 'filename' : '', value: '', comment: '' }])}
+                    >
+                      <Plus className="w-3 h-3 mr-1" />{part.kind === 'chunks' ? 'Chunk' : 'Key'}
+                    </Button>
+                    {part.kind === 'chunks' && chunkMaps.length ? (
+                      <Select
+                        value="__pick__"
+                        onValueChange={(path) => {
+                          if (!path || path === '__pick__') return;
+                          setKeys(index, [...(part.keys.length ? part.keys : []), { key: 'filename', value: path, comment: '' }]);
+                        }}
+                      >
+                        <SelectTrigger className="h-7 w-[180px] text-xs" aria-label="Add a map as a chunk">
+                          <SelectValue placeholder="Add a map…" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__pick__">Add a map…</SelectItem>
+                          {chunkMaps.map((path) => (
+                            <SelectItem key={path} value={path}>{path.replace(/^maps\//, '')}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : null}
+                  </div>
                 </>
               )}
             </div>
           ))}
+          {listedChunks.length ? (
+            <div className="space-y-1">
+              <p className="text-[11px] text-muted-foreground">
+                {Object.entries(typeCounts).map(([type, count]) => `${count} ${type}`).join(', ')}
+              </p>
+              {missingStart || missingEnd ? (
+                <p className="text-[11px] leading-snug text-amber-500">
+                  This set is missing {[missingStart ? 'a start chunk' : null, missingEnd ? 'an end chunk' : null].filter(Boolean).join(' and ')}. The generator uses those to build the main path.
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+          <datalist id={MAP_CHUNK_LIST_ID}>
+            {chunkMaps.map((path) => <option key={path} value={path} />)}
+          </datalist>
           <div className="flex flex-wrap gap-1">
             <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={() => write({ ...file, parts: [...file.parts, { kind: 'include', path: '', comment: '' }] })}>
               <Plus className="w-3 h-3 mr-1" />INCLUDE

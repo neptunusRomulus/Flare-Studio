@@ -33,7 +33,7 @@ import { HintLabel } from '@/components/ui/field-hint';
 import { useRegisterDirty } from '@/context/SaveHealthContext';
 import { Input } from '@/components/ui/input';
 import { EVENT_SCRIPT_LIST_ID } from '@/hooks/useEventScripts';
-import { PROCGEN_RULES_LIST_ID } from '@/editor/procgenRules';
+import { PROCGEN_RULES_LIST_ID, extraProcgenEvents } from '@/editor/procgenRules';
 import {
   actionPropertiesFrom,
   emptyEventScript,
@@ -767,8 +767,13 @@ const EventDialog: React.FC<EventDialogProps> = ({
 
           <div className="space-y-2 px-1">
             <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Procgen</div>
+            {extraProcgenEvents((typeof editor?.getMapObjects === 'function' ? editor.getMapObjects() : []).filter((obj: { type?: string }) => obj.type === 'event'), editingEventId).length ? (
+              <p className="text-[11px] leading-snug text-amber-500">
+                The engine only uses the first rules file on this map. Another event already has one.
+              </p>
+            ) : null}
             <div className="flex flex-wrap items-center gap-2">
-              <HintLabel className="text-xs font-normal w-28 shrink-0" hint="Rules file under maps/procgen_rules. The engine fills this event's location rectangle when the map loads. Only the first event with procgen_filename on the map is used, and it must be on the map event itself, not in a script file. intermap_random is a different feature: a random teleport map list, not a procgen rules file.">procgen_filename</HintLabel>
+              <HintLabel className="text-xs font-normal w-28 shrink-0" hint="procgen_filename. Rules file under maps/procgen_rules. The engine fills this event's location rectangle when the map loads. Only the first event with procgen_filename on this map is used, and it must be on the map event itself, not in a script file. intermap_random is a different feature: a random teleport map list, not a procgen rules file.">Rules file</HintLabel>
               <Input
                 width="path"
                 className="h-7 text-xs"
@@ -778,7 +783,7 @@ const EventDialog: React.FC<EventDialogProps> = ({
               />
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <HintLabel className="text-xs font-normal w-28 shrink-0" hint="Only used on chunk maps with procgen_type=links. north, south, west, or east.">procgen_link</HintLabel>
+              <HintLabel className="text-xs font-normal w-28 shrink-0" hint="procgen_link. Only used on chunk maps with procgen_type=links. north, south, west, or east.">Link side</HintLabel>
               <Input
                 width="id"
                 className="h-7 text-xs"
@@ -794,7 +799,7 @@ const EventDialog: React.FC<EventDialogProps> = ({
               </datalist>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <HintLabel className="text-xs font-normal w-28 shrink-0" hint="For procedural generation chunks only. The event is active on these door levels (comma-separated integers).">procgen_door_level</HintLabel>
+              <HintLabel className="text-xs font-normal w-28 shrink-0" hint="procgen_door_level. For procedural generation chunks only. The event is active on these door levels (comma-separated integers).">Door level</HintLabel>
               <Input
                 width="id"
                 className="h-7 text-xs"

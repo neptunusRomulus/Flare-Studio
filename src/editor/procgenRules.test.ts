@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  collectChunkFilenames,
+  extraProcgenEvents,
+  isChunkMapPath,
+  parseMapProcgenType,
   parseProcgenFile,
   procgenRulesRelPath,
   serializeProcgenFile,
@@ -88,5 +92,38 @@ note=keep-me
     expect(keys).toContain('branch_length_max');
     expect(visibleSettingKeys(settings).find((row) => row.key === 'doors_max')?.value).toBe('1');
     expect(visibleSettingKeys(settings).find((row) => row.key === 'branch_length_max')?.value).toBe('');
+  });
+
+  it('reads procgen_type from a map header and ignores later sections', () => {
+    expect(parseMapProcgenType('title=Start\nprocgen_type=start\n\n[layer]\nprocgen_type=normal\n')).toBe('start');
+    expect(parseMapProcgenType('[header]\nprocgen_type=end\n')).toBe('');
+    expect(parseMapProcgenType('')).toBe('');
+  });
+
+  it('collects chunk filenames and follows INCLUDE', () => {
+    const included = parseProcgenFile(BASE);
+    const floor = parseProcgenFile(FLOOR);
+    expect(collectChunkFilenames(floor)).toEqual([
+      'maps/iron_labyrinth/f1/start.txt',
+      'maps/iron_labyrinth/f1/end.txt',
+    ]);
+    expect(collectChunkFilenames(floor, (rel) => rel === 'maps/procgen_rules/iron_labyrinth.txt' ? included : null)).toEqual([
+      'maps/iron_labyrinth/links1.txt',
+      'maps/iron_labyrinth/room1.txt',
+      'maps/iron_labyrinth/f1/start.txt',
+      'maps/iron_labyrinth/f1/end.txt',
+    ]);
+    expect(isChunkMapPath('maps/iron_labyrinth/f1/start.txt')).toBe(true);
+    expect(isChunkMapPath('maps/procgen_rules/iron_labyrinth.txt')).toBe(false);
+  });
+
+  it('finds other events that already have a rules file', () => {
+    const events = [
+      { id: 1, properties: { procgen_filename: 'maps/procgen_rules/a.txt' } },
+      { id: 2, properties: { name: 'plain' } },
+      { id: 3, properties: { procgen_filename: 'maps/procgen_rules/b.txt' } },
+    ];
+    expect(extraProcgenEvents(events, 1).map((event) => event.id)).toEqual([3]);
+    expect(extraProcgenEvents(events).map((event) => event.id)).toEqual([1, 3]);
   });
 });

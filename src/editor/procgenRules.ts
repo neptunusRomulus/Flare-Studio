@@ -14,16 +14,29 @@ export const PROCGEN_SETTING_KEYS = [
   'door_spacing_min',
 ] as const;
 
-export const PROCGEN_SETTING_HINTS: Record<(typeof PROCGEN_SETTING_KEYS)[number], string> = {
-  doors_max: 'Maximum number of door chunks that can be placed in this region.',
-  main_path_length_min: "Minimum length of the 'main' path (start chunk to end chunk).",
-  main_path_length_max: "Maximum length of the 'main' path (start chunk to end chunk).",
-  main_path_attempts_max: 'Maximum number of attempts to generate the main path to match the min/max constraints.',
-  branch_length_min: 'Minimum number of steps taken when creating a branch off the main path.',
-  branch_length_max: 'Maximum number of steps taken when creating a branch off the main path.',
-  branches_per_door_level_max: "Maximum number of branches between each door level. A door level is the set of chunks between two door chunks (start and end count as doors).",
-  door_spacing_min: 'The minimum chunk length of each door level.',
+export const PROCGEN_SETTING_LABELS: Record<(typeof PROCGEN_SETTING_KEYS)[number], string> = {
+  doors_max: 'Max doors',
+  main_path_length_min: 'Shortest main path',
+  main_path_length_max: 'Longest main path',
+  main_path_attempts_max: 'Path attempts',
+  branch_length_min: 'Shortest branch',
+  branch_length_max: 'Longest branch',
+  branches_per_door_level_max: 'Max branches per door level',
+  door_spacing_min: 'Min door spacing',
 };
+
+export const PROCGEN_SETTING_HINTS: Record<(typeof PROCGEN_SETTING_KEYS)[number], string> = {
+  doors_max: 'doors_max. Maximum number of door chunks that can be placed in this region.',
+  main_path_length_min: "main_path_length_min. Minimum length of the main path (start chunk to end chunk).",
+  main_path_length_max: "main_path_length_max. Maximum length of the main path (start chunk to end chunk).",
+  main_path_attempts_max: 'main_path_attempts_max. Maximum number of attempts to generate the main path to match the min/max constraints.',
+  branch_length_min: 'branch_length_min. Minimum number of steps taken when creating a branch off the main path.',
+  branch_length_max: 'branch_length_max. Maximum number of steps taken when creating a branch off the main path.',
+  branches_per_door_level_max: "branches_per_door_level_max. Maximum number of branches between each door level. A door level is the set of chunks between two door chunks (start and end count as doors).",
+  door_spacing_min: 'door_spacing_min. The minimum chunk length of each door level.',
+};
+
+export const MAP_CHUNK_LIST_ID = 'procgen-chunk-maps';
 
 const SETTING_KEY_SET = new Set<string>(PROCGEN_SETTING_KEYS);
 
@@ -166,4 +179,59 @@ export function visibleSettingKeys(part: Extract<ProcgenPart, { kind: 'settings'
   const known = PROCGEN_SETTING_KEYS.map((key) => found.get(key) || { key, value: '', comment: '' });
   const extra = part.keys.filter((row) => !SETTING_KEY_SET.has(row.key));
   return [...known, ...extra];
+}
+
+/** Header procgen_type on a chunk map, if the file declares one. */
+export function parseMapProcgenType(text: string): string {
+  for (const raw of String(text || '').replace(/\r/g, '').split('\n')) {
+    const line = raw.trim();
+    if (!line || line.startsWith('#')) continue;
+    if (line.startsWith('[')) break;
+    const eq = line.indexOf('=');
+    if (eq < 0) continue;
+    if (line.slice(0, eq).trim() === 'procgen_type') return line.slice(eq + 1).trim();
+  }
+  return '';
+}
+
+/** Chunk map paths listed in this rules file, following INCLUDE/APPEND when a resolver is given. */
+export function collectChunkFilenames(
+  file: ProcgenFile,
+  resolve?: (rel: string) => ProcgenFile | string | null | undefined,
+  seen: Set<string> = new Set(),
+): string[] {
+  const out: string[] = [];
+  for (const part of file.parts) {
+    if (part.kind === 'include' || part.kind === 'append') {
+      const rel = part.path.trim();
+      if (!rel || seen.has(rel) || !resolve) continue;
+      seen.add(rel);
+      const next = resolve(rel);
+      if (!next) continue;
+      out.push(...collectChunkFilenames(typeof next === 'string' ? parseProcgenFile(next) : next, resolve, seen));
+    } else if (part.kind === 'chunks') {
+      for (const row of part.keys) {
+        if (row.key === 'filename' && row.value.trim()) out.push(row.value.trim());
+      }
+    }
+  }
+  return out;
+}
+
+export function isChunkMapPath(rel: string): boolean {
+  const path = String(rel || '').replace(/\\/g, '/');
+  return path.startsWith('maps/') && path.toLowerCase().endsWith('.txt') && !path.startsWith(`${PROCGEN_RULES_DIR}/`);
+}
+
+/** Other map events that already have procgen_filename. The engine only uses the first one. */
+export function extraProcgenEvents<T extends { id?: number; properties?: Record<string, unknown> }>(
+  events: T[],
+  currentId?: number | null,
+): T[] {
+  return events.filter((event) => {
+    if (currentId != null && event.id === currentId) return false;
+    const value = event.properties?.procgen_filename;
+    const text = Array.isArray(value) ? String(value[0] ?? '') : String(value ?? '');
+    return text.trim().length > 0;
+  });
 }

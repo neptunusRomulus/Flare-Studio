@@ -32,6 +32,7 @@ import { Toaster } from '@/components/ui/toaster';
 import DialogsContainer from '@/components/DialogsContainer';
 import StatusEditDialog from '@/components/StatusEditDialog';
 import EventScriptDatalist from '@/components/events/EventScriptDatalist';
+import XpScalingDatalist from '@/components/engine/XpScalingDatalist';
 import StoryFlagDatalist from '@/components/powers/StoryFlagDatalist';
 import SessionRecoveryDialog from '@/components/SessionRecoveryDialog';
 import useCrashRecovery from '@/hooks/useCrashRecovery';
@@ -452,6 +453,7 @@ export default function AppMain() {
       <StatusEditDialog open={showStatusDialog} onClose={handleCloseStatusDialog} />
       <StoryFlagDatalist projectPath={controls?.currentProjectPath ?? null} />
       <EventScriptDatalist projectPath={controls?.currentProjectPath ?? null} />
+      <XpScalingDatalist projectPath={controls?.currentProjectPath ?? null} />
 
       <SessionRecoveryDialog
         isOpen={showRecoveryDialog && hasCrashBackup}

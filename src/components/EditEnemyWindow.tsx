@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import Tooltip from '@/components/ui/tooltip';
+import { XP_SCALING_LIST_ID } from '@/editor/xpScaling';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -1112,7 +1113,7 @@ const [name, setName] = useState(() => enemy?.name || '');
               <div className="space-y-1"><LabelWithTooltip field="vulnerable">Vulnerable</LabelWithTooltip><Input value={vulnerable} onChange={(e) => setVulnerable(e.target.value)} className={inputCls} /></div>
               <div className="space-y-1"><LabelWithTooltip field="statPerLevel">Stat per level</LabelWithTooltip><Input value={statPerLevel} onChange={(e) => setStatPerLevel(e.target.value)} className={inputCls} /></div>
               <div className="space-y-1"><LabelWithTooltip field="statPerPrimary">Stat per primary</LabelWithTooltip><Input value={statPerPrimary} onChange={(e) => setStatPerPrimary(e.target.value)} className={inputCls} /></div>
-              <div className="space-y-1"><LabelWithTooltip field="xpScaling">XP scaling</LabelWithTooltip><Input value={xpScaling} onChange={(e) => setXpScaling(e.target.value)} className={inputCls} /></div>
+              <div className="space-y-1"><LabelWithTooltip field="xpScaling">XP scaling</LabelWithTooltip><Input value={xpScaling} onChange={(e) => setXpScaling(e.target.value)} className={inputCls} list={XP_SCALING_LIST_ID} /></div>
             </div>
             <div className="space-y-1">
               <LabelWithTooltip field="passivePowers">Passive powers</LabelWithTooltip>

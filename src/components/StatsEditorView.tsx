@@ -39,6 +39,9 @@ import { COMBAT_PATH, HERO_LAYERS_PATH, HERO_OPTIONS_PATH, XP_TABLE_PATH, collec
 import { CLASSES_PATH } from '@/editor/heroClasses';
 import { EQUIP_FLAGS_PATH } from '@/editor/equipFlags';
 import { ClassHeroForm, EquipFlagsForm, HeroLayersForm, HeroOptionsForm, XpTableForm } from '@/components/engine/EngineSpecialForms';
+import XpScalingTablesForm from '@/components/engine/XpScalingTablesForm';
+import { listTxtUnder } from '@/hooks/useEventScripts';
+import { XP_SCALING_DIR } from '@/editor/xpScaling';
 import { CombatSettingsForm, DamageTypesForm } from '@/components/engine/CombatAndDamageForms';
 
 type Props = { projectPath?: string | null };
@@ -57,6 +60,8 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
   const [showResist, setShowResist] = useState(false);
   const [combatText, setCombatText] = useState('');
   const [xpText, setXpText] = useState('');
+  const [scalingFiles, setScalingFiles] = useState<Record<string, string>>({});
+  const [scalingOriginal, setScalingOriginal] = useState<string[]>([]);
   const [damageSourceText, setDamageSourceText] = useState('');
   const [pane, setPane] = useState<'stats' | 'combat' | 'damage' | 'xp' | 'classes' | 'appearance' | 'equip'>('stats');
   const [classesText, setClassesText] = useState('');
@@ -81,6 +86,8 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
       setDamageTypes([]);
       setCombatText('');
       setXpText('');
+      setScalingFiles({});
+      setScalingOriginal([]);
       setDamageSourceText('');
       setClassesText('');
       setHeroOptionsText('');
@@ -114,6 +121,18 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
     setDamageSourceText(damageFile.text);
     setCombatText(combatFile.text);
     setXpText(xpFile.text);
+    const scaling: Record<string, string> = {};
+    try {
+      const root = projectPath.replace(/\\/g, '/');
+      for (const rel of await listTxtUnder(root, XP_SCALING_DIR)) {
+        const text = await window.electronAPI.readFile(`${root}/${rel}`);
+        if (text != null) scaling[rel] = text;
+      }
+    } catch {
+      /* no enemies/xp_scaling folder yet */
+    }
+    setScalingFiles(scaling);
+    setScalingOriginal(Object.keys(scaling));
     setClassesText(classesFile.text);
     setHeroOptionsText(heroOptionsFile.text);
     setHeroLayersText(heroLayersFile.text);
@@ -264,6 +283,9 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
       ];
       if (combatText.trim()) files.push({ path: COMBAT_PATH, content: combatText.endsWith('\n') ? combatText : `${combatText}\n` });
       if (xpText.trim()) files.push({ path: XP_TABLE_PATH, content: xpText.endsWith('\n') ? xpText : `${xpText}\n` });
+      for (const [path, content] of Object.entries(scalingFiles)) {
+        files.push({ path, content: content.endsWith('\n') ? content : `${content}\n` });
+      }
       if (classesText.trim()) files.push({ path: CLASSES_PATH, content: classesText.endsWith('\n') ? classesText : `${classesText}\n` });
       if (heroOptionsText.trim()) files.push({ path: HERO_OPTIONS_PATH, content: heroOptionsText.endsWith('\n') ? heroOptionsText : `${heroOptionsText}\n` });
       if (heroLayersText.trim()) files.push({ path: HERO_LAYERS_PATH, content: heroLayersText.endsWith('\n') ? heroLayersText : `${heroLayersText}\n` });
@@ -276,6 +298,13 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
         toast({ title: 'Save failed', description: 'Could not write the engine stat files.', variant: 'destructive' });
         return;
       }
+      const kept = new Set(Object.keys(scalingFiles));
+      const root = projectPath.replace(/\\/g, '/');
+      for (const path of scalingOriginal) {
+        if (kept.has(path) || !window.electronAPI?.deleteProjectFile) continue;
+        await window.electronAPI.deleteProjectFile(`${root}/${path}`);
+      }
+      setScalingOriginal(Object.keys(scalingFiles));
       setPrimaries(cleaned);
       setDirty(false);
       setSourceKind('project');
@@ -290,9 +319,9 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <FieldHint hint={
-            sourceKind === 'project' ? 'Editing project overrides. Primary stats can be added; core derived keys (hp, mp, accuracy, and the rest of Stats.cpp) are fixed — you can set their values, not invent new core keys. Extra MP-like pools go under Resource stats. Combat, damage types, the XP table, classes, hero appearance and equipment flags are edited in this card.'
+            sourceKind === 'project' ? 'Editing project overrides. Primary stats can be added; core derived keys (hp, mp, accuracy, and the rest of Stats.cpp) are fixed — you can set their values, not invent new core keys. Extra MP-like pools go under Resource stats. Combat, damage types, the XP table, XP scaling, classes, hero appearance and equipment flags are edited in this card.'
             : sourceKind === 'mod' ? `Loaded from a required mod or default (${sourceLabel}). Save writes project overrides. Primary stats can be added; core derived keys are fixed. Extra MP-like pools go under Resource stats.`
-            : 'Primary stats can be added; they are not hardcoded. Core derived keys (hp, mp, accuracy, and the rest of Stats.cpp) are fixed — you can set their values, not invent new core keys. Extra MP-like pools go under Resource stats. Combat, damage types, the XP table, classes, hero appearance and equipment flags are edited in this card. No project stat files yet: empty fields use Flare engine defaults until you save.'
+            : 'Primary stats can be added; they are not hardcoded. Core derived keys (hp, mp, accuracy, and the rest of Stats.cpp) are fixed — you can set their values, not invent new core keys. Extra MP-like pools go under Resource stats. Combat, damage types, the XP table, XP scaling, classes, hero appearance and equipment flags are edited in this card. No project stat files yet: empty fields use Flare engine defaults until you save.'
           }>
             <div className="text-sm font-semibold">Stats</div>
           </FieldHint>
@@ -305,7 +334,7 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
             { id: 'stats', label: 'Stats' },
             { id: 'combat', label: 'Combat' },
             { id: 'damage', label: 'Damage types' },
-            { id: 'xp', label: 'XP table' },
+            { id: 'xp', label: 'XP' },
             { id: 'classes', label: 'Classes' },
             { id: 'appearance', label: 'Appearance' },
             { id: 'equip', label: 'Equip flags' },
@@ -334,7 +363,10 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
           ) : pane === 'damage' ? (
             <DamageTypesForm types={damageTypes} onChange={(next) => { setDamageTypes(next); mark(); }} />
           ) : pane === 'xp' ? (
-            <XpTableForm text={xpText} onChange={(next) => { setXpText(next); mark(); }} />
+            <div className="space-y-6">
+              <XpTableForm text={xpText} onChange={(next) => { setXpText(next); mark(); }} />
+              <XpScalingTablesForm files={scalingFiles} onChange={(next) => { setScalingFiles(next); mark(); }} />
+            </div>
           ) : pane === 'classes' ? (
             <ClassHeroForm text={classesText} onChange={(next) => { setClassesText(next); mark(); }} itemIds={itemIds} powerIds={powerIds} />
           ) : pane === 'appearance' ? (

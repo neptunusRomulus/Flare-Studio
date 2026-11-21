@@ -7,6 +7,7 @@
  */
 
 import { BOOK_EVENT_KEYS } from '@/editor/bookFile';
+import { slugFileName } from '@/adapters/flare/flareAdapter.cjs';
 
 export const EVENT_COMPONENT_KEYS = [...BOOK_EVENT_KEYS] as const;
 export const EVENT_COMPONENT_KEY_SET = new Set<string>(EVENT_COMPONENT_KEYS);
@@ -251,9 +252,51 @@ export function actionPropertiesFrom(
   return components;
 }
 
+export type ScriptUsageObject = {
+  id?: number;
+  type?: string;
+  properties?: Record<string, string | string[] | undefined>;
+};
+
+export type ScriptUsageLiveMap = {
+  name: string;
+  objects: ScriptUsageObject[];
+};
+
+/** Stable map key used to match a live/draft map to its saved maps/*.txt or root .json. */
+export function scriptUsageMapKey(name: string): string {
+  const stem = String(name || '').replace(/\\/g, '/').replace(/^.*\//, '').replace(/\.(txt|json)$/i, '');
+  return slugFileName(stem) || stem.trim().toLowerCase();
+}
+
+/** Map key for a project file, or null when the file is not a map. */
+export function fileScriptUsageMapKey(file: string): string | null {
+  const path = file.replace(/\\/g, '/');
+  const lower = path.toLowerCase();
+  if (lower.startsWith('maps/procgen_rules/')) return null;
+  if (lower.endsWith('/spawn.txt') || lower === 'maps/spawn.txt') return null;
+  if (lower.startsWith('maps/') && lower.endsWith('.txt')) {
+    return scriptUsageMapKey(path.slice('maps/'.length));
+  }
+  if (lower.endsWith('.json') && !path.includes('/')) {
+    return scriptUsageMapKey(path);
+  }
+  return null;
+}
+
+function scriptValues(properties: ScriptUsageObject['properties']): string[] {
+  const script = properties?.script;
+  const values = script == null ? [] : Array.isArray(script) ? script : [script];
+  return values.map((value) => String(value)).filter((value) => value.trim());
+}
+
+/**
+ * Count every script= placement. Live/draft maps replace the saved file for that map
+ * so unsaved place/delete/undo is reflected immediately and not double-counted.
+ */
 export function collectScriptUsages(
   files: Record<string, string>,
-  liveObjects?: Array<{ type?: string; properties?: Record<string, string | string[] | undefined> }>,
+  liveMaps: ScriptUsageLiveMap[] = [],
 ): Map<string, string[]> {
   const uses = new Map<string, string[]>();
   const add = (script: string, where: string) => {
@@ -263,26 +306,30 @@ export function collectScriptUsages(
     list.push(where);
     uses.set(path, list);
   };
+  const liveKeys = new Set(
+    liveMaps.map((map) => scriptUsageMapKey(map.name)).filter(Boolean),
+  );
+
   for (const [file, content] of Object.entries(files || {})) {
-    const lower = file.replace(/\\/g, '/').toLowerCase();
-    for (const match of String(content || '').matchAll(/^\s*script\s*=\s*(.+)$/gim)) {
-      add(match[1], file);
-    }
-    if (lower.startsWith('scripts/') && lower.endsWith('.txt')) {
-      const parsed = parseEventScript(content);
-      for (const step of parsed.steps) {
-        for (const component of step.components) {
-          if (component.key === 'script') add(component.value, file);
-        }
-      }
-    }
+    const mapKey = fileScriptUsageMapKey(file);
+    if (mapKey && liveKeys.has(mapKey)) continue;
+    const lines = String(content || '').replace(/\r/g, '').split('\n');
+    lines.forEach((line, index) => {
+      const match = line.match(/^\s*script\s*=\s*(.+)$/i);
+      if (match) add(match[1], `${file}:${index + 1}`);
+    });
   }
-  for (const object of liveObjects || []) {
-    if (object.type !== 'event') continue;
-    const script = object.properties?.script;
-    const values = script == null ? [] : Array.isArray(script) ? script : [script];
-    for (const value of values) add(value, '__current_map__');
-  }
+
+  liveMaps.forEach((map, mapIndex) => {
+    const mapKey = scriptUsageMapKey(map.name) || `map-${mapIndex}`;
+    (map.objects || []).forEach((object, objectIndex) => {
+      if (object.type !== 'event') return;
+      const id = object.id ?? objectIndex;
+      scriptValues(object.properties).forEach((value, valueIndex) => {
+        add(value, `map:${mapKey}:event:${id}:${valueIndex}`);
+      });
+    });
+  });
   return uses;
 }
 

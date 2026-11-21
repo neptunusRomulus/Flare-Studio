@@ -79,6 +79,46 @@ describe('eventScripts', () => {
       'scripts/open_gate.txt': '[event]\nset_status=ok\n',
       'scripts/chain.txt': '[event]\nscript=scripts/open_gate.txt\n',
     });
-    expect(uses.get('scripts/open_gate.txt')?.length).toBeGreaterThanOrEqual(3);
+    expect(uses.get('scripts/open_gate.txt')?.length).toBe(3);
+  });
+
+  it('counts two unsaved placements on the open map and ignores that map\'s saved file', () => {
+    const uses = collectScriptUsages(
+      {
+        'maps/town.txt': '[event]\nscript=scripts/open_gate.txt\n[event]\nscript=scripts/open_gate.txt\n',
+        'maps/cellar.txt': '[event]\nscript=scripts/open_gate.txt\n',
+        'books/note.txt': 'script=scripts/open_gate.txt\n',
+      },
+      [
+        {
+          name: 'Town',
+          objects: [
+            { id: 1, type: 'event', properties: { script: 'scripts/open_gate.txt' } },
+            { id: 2, type: 'event', properties: { script: 'scripts/open_gate.txt' } },
+            { id: 3, type: 'npc', properties: { script: 'scripts/open_gate.txt' } },
+          ],
+        },
+        {
+          name: 'cellar',
+          objects: [
+            { id: 8, type: 'event', properties: { script: 'scripts/open_gate.txt' } },
+          ],
+        },
+      ],
+    );
+    // 2 live town + 1 live cellar + 1 book. Saved town/cellar files are skipped.
+    expect(uses.get('scripts/open_gate.txt')?.length).toBe(4);
+  });
+
+  it('drops a placement immediately when it is no longer in the live map', () => {
+    const files = { 'maps/town.txt': '[event]\nscript=scripts/open_gate.txt\n' };
+    const afterPlace = collectScriptUsages(files, [
+      { name: 'town', objects: [{ id: 1, type: 'event', properties: { script: 'scripts/open_gate.txt' } }] },
+    ]);
+    const afterDelete = collectScriptUsages(files, [
+      { name: 'town', objects: [] },
+    ]);
+    expect(afterPlace.get('scripts/open_gate.txt')?.length).toBe(1);
+    expect(afterDelete.get('scripts/open_gate.txt') ?? []).toEqual([]);
   });
 });

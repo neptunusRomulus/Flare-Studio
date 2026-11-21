@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   collectScriptUsages,
   DEFAULT_EVENT_SCRIPT,
@@ -6,6 +6,7 @@ import {
   eventScriptRelPath,
   normalizeEventScriptPath,
   type EventScriptEntry,
+  type ScriptUsageLiveMap,
 } from '@/editor/eventScripts';
 
 export const EVENT_SCRIPT_LIST_ID = 'event-script-suggestions';
@@ -46,31 +47,39 @@ async function loadTexts(root: string, dirs: string[]): Promise<Record<string, s
   return files;
 }
 
-/** List scripts/*.txt, with how many places each is referenced. */
+const NO_LIVE_MAPS: ScriptUsageLiveMap[] = [];
+
+/** List scripts/*.txt, with how many places each is referenced (disk + live/draft maps). */
 export default function useEventScripts(
   projectPath: string | null | undefined,
-  liveObjects?: Array<{ type?: string; properties?: Record<string, string | string[] | undefined> }>,
+  liveMaps: ScriptUsageLiveMap[] = NO_LIVE_MAPS,
 ) {
   const root = (projectPath || '').replace(/\\/g, '/');
-  const [entries, setEntries] = useState<EventScriptEntry[]>([]);
-  const scripts = entries.map((entry) => entry.path);
+  const [paths, setPaths] = useState<string[]>([]);
+  const [files, setFiles] = useState<Record<string, string>>({});
 
   const refresh = useCallback(async () => {
     if (!root) {
-      setEntries([]);
+      setPaths([]);
+      setFiles({});
       return [];
     }
-    const paths = await listTxtUnder(root, 'scripts');
-    const files = await loadTexts(root, USAGE_DIRS);
-    const uses = collectScriptUsages(files, liveObjects);
-    const next = paths.map((path) => ({
+    const nextPaths = await listTxtUnder(root, 'scripts');
+    const nextFiles = await loadTexts(root, USAGE_DIRS);
+    setPaths(nextPaths);
+    setFiles(nextFiles);
+    return nextPaths;
+  }, [root]);
+
+  const entries = useMemo<EventScriptEntry[]>(() => {
+    const uses = collectScriptUsages(files, liveMaps);
+    return paths.map((path) => ({
       path,
       name: eventScriptDisplayName(path),
       usage: [...new Set(uses.get(path) || uses.get(normalizeEventScriptPath(path)) || [])].length,
     }));
-    setEntries(next);
-    return next;
-  }, [root]);
+  }, [files, paths, liveMaps]);
+  const scripts = entries.map((entry) => entry.path);
 
   useEffect(() => { void refresh(); }, [refresh]);
   useEffect(() => {

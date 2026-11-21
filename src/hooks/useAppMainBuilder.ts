@@ -19,6 +19,8 @@ import useAppEffects from './useAppEffects';
 import useNpcDrag from './useNpcDrag';
 import useEventDrag from './useEventDrag';
 import useEventScripts from './useEventScripts';
+import { useSaveHealth } from '@/context/SaveHealthContext';
+import type { ScriptUsageLiveMap } from '@/editor/eventScripts';
 import useObjectEditing from './useObjectEditing';
 import useAppMainObjectCommands from './useAppMainObjectCommands';
 import useAppMainSidebarDeps, { type ProjectManagerView } from './useAppMainSidebarDeps';
@@ -508,7 +510,22 @@ export default function useAppMainBuilder() {
 
   const { handleEventDragStart, handleEventDragEnd } = useEventDrag({ editor, setDraggingEventId: appState.setDraggingEventId });
 
-  const eventScripts = useEventScripts(currentProjectPath);
+  const { mapDrafts } = useSaveHealth();
+  const eventLiveMaps = useMemo<ScriptUsageLiveMap[]>(() => {
+    const current = String(mapConfig.mapName || '').trim();
+    const maps: ScriptUsageLiveMap[] = [
+      { name: current || 'current', objects: appState.mapObjects || [] },
+    ];
+    const currentKey = current.toLowerCase();
+    for (const draft of mapDrafts) {
+      if (draft.mapName.trim().toLowerCase() === currentKey) continue;
+      const objects = Array.isArray(draft.snapshot?.objects) ? draft.snapshot.objects : [];
+      maps.push({ name: draft.mapName, objects: objects as ScriptUsageLiveMap['objects'] });
+    }
+    return maps;
+  }, [mapConfig.mapName, appState.mapObjects, mapDrafts]);
+  const eventScripts = useEventScripts(currentProjectPath, eventLiveMaps);
+
 
   const handleEditEventScript = useCallback((scriptPath: string) => {
     appState.setEditingScriptPath(scriptPath);

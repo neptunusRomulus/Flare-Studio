@@ -347,7 +347,36 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
     }
   };
 
-  useRegisterDirty('stats', dirty, save);
+  const draftFiles = useMemo(() => {
+    if (!dirty) return [];
+    const cleaned = primaries
+      .map((stat) => ({ id: normalizeStatId(stat.id) || '', name: stat.name.trim() || stat.id }))
+      .filter((stat) => stat.id);
+    if (!cleaned.length) return [];
+    const files = [
+      { path: PRIMARY_STATS_PATH, content: serializePrimaryStats(cleaned) },
+      { path: HERO_STATS_PATH, content: serializeHeroStats(hero) },
+      { path: RESOURCE_STATS_PATH, content: serializeResourceStats(resources) },
+    ];
+    if (combatText.trim()) files.push({ path: COMBAT_PATH, content: combatText.endsWith('\n') ? combatText : `${combatText}\n` });
+    if (xpText.trim()) files.push({ path: XP_TABLE_PATH, content: xpText.endsWith('\n') ? xpText : `${xpText}\n` });
+    for (const [path, content] of Object.entries(scalingFiles)) {
+      files.push({ path, content: content.endsWith('\n') ? content : `${content}\n` });
+    }
+    if (classesText.trim()) files.push({ path: CLASSES_PATH, content: classesText.endsWith('\n') ? classesText : `${classesText}\n` });
+    if (heroOptionsText.trim()) files.push({ path: HERO_OPTIONS_PATH, content: heroOptionsText.endsWith('\n') ? heroOptionsText : `${heroOptionsText}\n` });
+    if (heroLayersText.trim()) files.push({ path: HERO_LAYERS_PATH, content: heroLayersText.endsWith('\n') ? heroLayersText : `${heroLayersText}\n` });
+    if (equipFlagsText.trim()) files.push({ path: EQUIP_FLAGS_PATH, content: equipFlagsText.endsWith('\n') ? equipFlagsText : `${equipFlagsText}\n` });
+    if (stepSoundsText.trim()) files.push({ path: STEP_SOUNDS_PATH, content: stepSoundsText.endsWith('\n') ? stepSoundsText : `${stepSoundsText}\n` });
+    for (const [path, content] of Object.entries(avatarSfxFiles)) {
+      files.push({ path, content: content.endsWith('\n') ? content : `${content}\n` });
+    }
+    if (damageTypes.length || damageSourceText.trim()) {
+      files.push({ path: DAMAGE_TYPES_PATH, content: serializeDamageTypes(damageTypes, damageSourceText) });
+    }
+    return files;
+  }, [dirty, primaries, hero, resources, combatText, xpText, scalingFiles, classesText, heroOptionsText, heroLayersText, equipFlagsText, stepSoundsText, avatarSfxFiles, damageTypes, damageSourceText]);
+  useRegisterDirty('stats', dirty, save, draftFiles);
 
   return (
     <div className="flex flex-col flex-1 min-h-0 gap-3">

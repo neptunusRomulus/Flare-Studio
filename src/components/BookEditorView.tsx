@@ -209,7 +209,28 @@ const BookEditorView = ({ projectPath }: Props) => {
     setDirty(false);
   };
 
-  useRegisterDirty('books', dirty, save);
+  const draftFiles = useMemo(() => {
+    if (!dirty || !rel) return [];
+    return [{
+      path: rel,
+      content: mergeBookText(text, {
+        pos: book.pos,
+        align: book.align,
+        close: book.close ?? null,
+        background: book.background,
+        soundfxOpen: book.soundfxOpen ?? null,
+        soundfxClose: book.soundfxClose ?? null,
+        present: book.present,
+        blocks: book.blocks,
+      }),
+    }];
+  }, [dirty, rel, text, book]);
+  useRegisterDirty('books', dirty, save, draftFiles, (incoming) => {
+    const file = incoming.find((entry) => entry.path === rel) ?? incoming[0];
+    if (!file) return;
+    setText(file.content);
+    setDirty(true);
+  });
 
   const addText = () => {
     const block: BookTextBlock = {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -119,7 +119,15 @@ export default function ItemRandomizerForm({ projectPath }: { projectPath: strin
     }
   };
 
-  useRegisterDirty('item-randomizer', dirty, save);
+    const draftFiles = useMemo(() => Object.entries(files).map(([path, content]) => ({
+    path,
+    content: content.endsWith('\n') ? content : `${content}\n`,
+  })), [files]);
+  useRegisterDirty('item-randomizer', dirty, save, draftFiles, (incoming) => {
+    setFiles(Object.fromEntries(incoming.map((entry) => [entry.path, entry.content])));
+    setDirty(true);
+  });
+
 
   const setOption = (index: number, patch: Partial<RandomizerOption>) => {
     write({ ...table, options: table.options.map((row, rowIndex) => rowIndex === index ? { ...row, ...patch } : row) });

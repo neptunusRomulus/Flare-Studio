@@ -38,11 +38,13 @@ import ItemRandomizerDatalist from '@/components/engine/ItemRandomizerDatalist';
 import ProcgenRulesDatalist from '@/components/engine/ProcgenRulesDatalist';
 import StoryFlagDatalist from '@/components/powers/StoryFlagDatalist';
 import SessionRecoveryDialog from '@/components/SessionRecoveryDialog';
-import useCrashRecovery, { waitUntil } from '@/hooks/useCrashRecovery';
+import useCrashRecovery from '@/hooks/useCrashRecovery';
 import useCloseGuard from '@/hooks/useCloseGuard';
+import { useProjectBackup } from '@/hooks/useProjectBackup';
 import useManualSaveSetup from '@/hooks/useManualSaveSetup';
 import { useSaveHealth } from '@/context/SaveHealthContext';
-import { anythingDirty, backupMapName, isMapDirty } from '@/editor/saveHealth';
+import { anythingDirty, isMapDirty } from '@/editor/saveHealth';
+import { normalizeProjectBackup } from '@/editor/projectSession';
 import useFlareEngine from '@/hooks/useFlareEngine';
 import { takeTemplateImport, markPreMapSlots } from '@/flare/projectTemplate';
 import { importTemplateTilesets, type TilesetImportEditor } from '@/editor/importTileset';
@@ -115,11 +117,12 @@ export default function AppMain() {
 
   // Crash recovery state
   const [showRecoveryDialog, setShowRecoveryDialog] = useState(false);
-  const { editorDirty, saveDirtySources } = useSaveHealth();
+  const { editorDirty, saveDirtySources, collectEditorDrafts, hydrateEditorDrafts, mapDrafts, setMapDraft, clearMapDraft } = useSaveHealth();
   const editorRef = useRef(editor);
   editorRef.current = editor;
   const openMapForRecoveryRef = useRef(openMapForRecovery);
   openMapForRecoveryRef.current = openMapForRecovery;
+  const restoreProjectBackupRef = useRef<(backup: unknown) => Promise<boolean>>(async () => false);
   const projectPathRef = useRef<string | null>(controls?.currentProjectPath ?? null);
   projectPathRef.current = controls?.currentProjectPath ?? null;
   const {
@@ -136,32 +139,38 @@ export default function AppMain() {
     onRecoveryFound: () => setShowRecoveryDialog(true),
     onRecoveryDismissed: () => setShowRecoveryDialog(false),
     onRecoverBackup: async (backup: unknown) => {
-      const targetName = backupMapName(backup);
-      if (targetName && typeof openMapForRecoveryRef.current === 'function') {
-        await openMapForRecoveryRef.current(targetName);
-      }
-      const ready = await waitUntil(() => {
-        const current = editorRef.current;
-        if (!current || typeof current.loadFromBackupData !== 'function') return null;
-        if (targetName && typeof current.getMapName === 'function') {
-          const loadedName = String(current.getMapName() || '');
-          if (loadedName && loadedName.toLowerCase() !== targetName.toLowerCase()) return null;
-        }
-        return current;
-      });
-      if (!ready) return false;
-
-      const loaded = ready.loadFromBackupData(backup);
-      if (!loaded) return false;
-
-      const restored = backup as { mapName?: unknown; mapWidth?: unknown; mapHeight?: unknown };
-      if (typeof restored.mapName === 'string') setMapName(restored.mapName);
-      if (typeof restored.mapWidth === 'number') setMapWidth(restored.mapWidth);
-      if (typeof restored.mapHeight === 'number') setMapHeight(restored.mapHeight);
-      try { ready.redraw?.(); } catch (err) { void err; }
-      return true;
+      return restoreProjectBackupRef.current(backup);
     }
   });
+
+  const { saveInactiveMapDrafts, restoreProjectBackup, rememberCurrentMap } = useProjectBackup({
+    editor,
+    projectPath: controls?.currentProjectPath ?? null,
+    paused: hasCrashBackup,
+    editorDirty,
+    mapDrafts,
+    collectEditorDrafts,
+    setMapDraft,
+    clearMapDraft,
+    openMapForRecovery: async (name: string) => {
+      if (typeof openMapForRecoveryRef.current === 'function') await openMapForRecoveryRef.current(name);
+    },
+  });
+  restoreProjectBackupRef.current = async (backup: unknown) => {
+    const parsed = normalizeProjectBackup(backup);
+    if (parsed?.editors) hydrateEditorDrafts(parsed.editors);
+    const ok = await restoreProjectBackup(backup);
+    const current = editorRef.current;
+    if (current) {
+      const restoredName = typeof current.getMapName === 'function' ? current.getMapName() : '';
+      if (restoredName) setMapName(restoredName);
+      const snap = parsed?.maps.find((entry) => entry.mapName.toLowerCase() === String(restoredName || parsed.mapName || '').toLowerCase())?.snapshot
+        || parsed?.maps[0]?.snapshot;
+      if (typeof snap?.mapWidth === 'number') setMapWidth(snap.mapWidth);
+      if (typeof snap?.mapHeight === 'number') setMapHeight(snap.mapHeight);
+    }
+    return ok;
+  };
 
   useEffect(() => {
     editor?.setCrashBackupPaused?.(hasCrashBackup);
@@ -187,14 +196,19 @@ export default function AppMain() {
   const { handleManualSave, isManuallySaving } = useManualSaveSetup(editor, controls?.currentProjectPath, undefined, onAfterSave);
 
   const mapStatus = titleBarProps?.saveStatus ?? 'saved';
-  const dirty = anythingDirty(mapStatus, editorDirty ? { editors: true } : {});
+  const sessionDirty = editorDirty || mapDrafts.length > 0;
+  const dirty = anythingDirty(mapStatus, sessionDirty ? { session: true } : {});
   const saveAll = useCallback(async () => {
+    rememberCurrentMap();
+    await saveInactiveMapDrafts();
     if (isMapDirty(mapStatus)) await handleManualSave();
-    await saveDirtySources();
-  }, [mapStatus, handleManualSave, saveDirtySources]);
+    await saveDirtySources(controls?.currentProjectPath);
+    const currentName = typeof editor?.getMapName === 'function' ? editor.getMapName() : '';
+    if (currentName) clearMapDraft(currentName);
+  }, [mapStatus, handleManualSave, saveDirtySources, saveInactiveMapDrafts, rememberCurrentMap, controls?.currentProjectPath, editor, clearMapDraft]);
 
   useCloseGuard({
-    isDirty: () => anythingDirty(titleBarProps?.saveStatus ?? 'saved', editorDirty ? { editors: true } : {}),
+    isDirty: () => anythingDirty(titleBarProps?.saveStatus ?? 'saved', (editorDirty || mapDrafts.length > 0) ? { session: true } : {}),
     saveAll,
     onDiscard: () => { dismissRecovery(); },
   });
@@ -335,13 +349,10 @@ export default function AppMain() {
       ? <AppControls
           {...enhancedControls}
           saveStatus={titleBarProps?.saveStatus}
-          editorDirty={editorDirty}
-          hasRecovery={hasCrashBackup}
-          backedUpAt={titleBarProps?.backedUpAt ?? null}
-          onRecoveryClick={() => setShowRecoveryDialog(true)}
+          editorDirty={sessionDirty}
         />
       : undefined,
-    [showPanels, controls, enhancedControls, titleBarProps, editorDirty, hasCrashBackup],
+    [showPanels, controls, enhancedControls, titleBarProps, sessionDirty],
   );
 
   const enhancedTopBarProps = useMemo(() => ({

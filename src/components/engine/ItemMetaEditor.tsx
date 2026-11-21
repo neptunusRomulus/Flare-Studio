@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -76,7 +76,10 @@ export default function ItemMetaEditor({ initialFile }: { initialFile?: string }
       if (saved) setDirty((prev) => ({ ...prev, [path]: false }));
     }
   };
-  useRegisterDirty('item-meta', itemMetaDirty, saveAllItemMeta);
+  const draftFiles = useMemo(() => Object.entries(dirty)
+    .filter(([, isDirty]) => isDirty)
+    .map(([path]) => ({ path, content: engineTextFromSections(docs[path] || []) })), [dirty, docs]);
+  useRegisterDirty('item-meta', itemMetaDirty, saveAllItemMeta, draftFiles);
 
   const updateField = (si: number, fi: number, key: 'key' | 'value', value: string) => {
     const next = sections.map((sec, i) => i !== si ? sec : { ...sec, fields: sec.fields.map((f, j) => (j === fi ? { ...f, [key]: value } : f)) });

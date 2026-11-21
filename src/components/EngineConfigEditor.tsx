@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Save, RefreshCw, FileText, Plus, Trash2, ChevronDown, ChevronUp, Search } from 'lucide-react';
@@ -176,7 +176,14 @@ export function EngineConfigEditor({ initialFile }: { initialFile?: string } = {
       if (hasUnsavedChanges[fileName]) await saveConfig(fileName);
     }
   };
-  useRegisterDirty('engine-config', engineDirty, saveAllEngine);
+  const draftFiles = useMemo(() => Object.entries(hasUnsavedChanges)
+    .filter(([, unsaved]) => unsaved)
+    .map(([fileName]) => ({
+      path: `engine/${fileName}`,
+      content: engineTextFromSections(parsedData[fileName] || []) || fileContents[fileName] || '',
+    }))
+    .filter((file) => file.content), [hasUnsavedChanges, parsedData, fileContents]);
+  useRegisterDirty('engine-config', engineDirty, saveAllEngine, draftFiles);
 
   const handleFieldChange = (fileName: string, sectionIndex: number, fieldIndex: number, key: string, value: string) => {
     setParsedData(prev => {

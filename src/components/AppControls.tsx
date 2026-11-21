@@ -1,5 +1,4 @@
 import React, { useState, useRef } from 'react';
-import { History } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Tooltip from '@/components/ui/tooltip';
 import MainMenuDialog from '@/components/MainMenuDialog';
@@ -24,10 +23,7 @@ type Props = {
   setShowSettings: (v: boolean) => void;
   saveStatus?: MapSaveStatus;
   editorDirty?: boolean;
-  hasRecovery?: boolean;
-  backedUpAt?: number | null;
   saveError?: string | null;
-  onRecoveryClick?: () => void;
   /** @deprecated The menu button always shows the Flare Studio mark; kept for callers. */
   iconUrl?: string | null;
 };
@@ -36,25 +32,22 @@ type Props = {
 export function menuTooltip(
   hasUnsavedChanges: boolean,
   saveStatus?: MapSaveStatus,
-  extras?: { editorDirty?: boolean; hasRecovery?: boolean; backedUpAt?: number | null; saveError?: string | null },
+  extras?: { editorDirty?: boolean; saveError?: string | null },
 ): string {
   if (saveStatus === 'saving') return 'Saving…';
   const state = deriveLogoState({
     mapStatus: saveStatus ?? (hasUnsavedChanges ? 'unsaved' : 'saved'),
     editorDirty: extras?.editorDirty ?? false,
-    hasRecovery: extras?.hasRecovery ?? false,
   });
-  return logoTooltip(state, extras?.backedUpAt, extras?.saveError);
+  return logoTooltip(state, extras?.saveError);
 }
 
-export function logoMarkClass(mark: LogoSaveMark): string {
-  if (mark === 'backed-up') return 'bg-amber-400';
+export function logoMarkClass(_mark: LogoSaveMark): string {
   return 'bg-red-500';
 }
 
 export function logoMarkLabel(mark: LogoSaveMark): string {
   if (mark === 'error') return 'Save failed';
-  if (mark === 'backed-up') return 'Backed up, not written to project files';
   return 'Unsaved changes';
 }
 
@@ -62,7 +55,7 @@ export function logoMarkLabel(mark: LogoSaveMark): string {
 const AppControls: React.FC<Props> = ({
   currentProjectPath, onSaveAndQuit, onQuit, onShowProjectFolder, onShowHelp, onSaveAsCopy, onRestart, onExport, onCheckUpdates,
   handleManualSave, isManuallySaving, isPreparingNewMap, hasUnsavedChanges, setShowSettings, saveStatus,
-  editorDirty = false, hasRecovery = false, backedUpAt = null, saveError = null, onRecoveryClick,
+  editorDirty = false, saveError = null,
 }) => {
   const btnRef = useRef<HTMLButtonElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -71,9 +64,8 @@ const AppControls: React.FC<Props> = ({
   const logo = deriveLogoState({
     mapStatus,
     editorDirty,
-    hasRecovery,
   });
-  const tooltip = mapStatus === 'saving' ? 'Saving…' : logoTooltip(logo, backedUpAt, saveError);
+  const tooltip = mapStatus === 'saving' ? 'Saving…' : logoTooltip(logo, saveError);
 
   return (
     <div className="no-drag">
@@ -111,21 +103,6 @@ const AppControls: React.FC<Props> = ({
           ) : null}
         </Button>
       </Tooltip>
-          {logo.showRecovery ? (
-            <button
-              type="button"
-              aria-label="Recovery backup waiting"
-              data-save-state="recovery"
-              className="absolute -left-0.5 -bottom-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-orange-500 text-white border border-background"
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                onRecoveryClick?.();
-              }}
-            >
-              <History className="h-2.5 w-2.5" aria-hidden="true" />
-            </button>
-          ) : null}
       </div>
 
       <MainMenuDialog

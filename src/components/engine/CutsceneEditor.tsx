@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -129,7 +129,15 @@ export default function CutsceneEditor() {
     }
   };
 
-  useRegisterDirty('cutscenes', dirty, save);
+    const draftFiles = useMemo(() => Object.entries(files).map(([path, content]) => ({
+    path,
+    content: content.endsWith('\n') ? content : `${content}\n`,
+  })), [files]);
+  useRegisterDirty('cutscenes', dirty, save, draftFiles, (incoming) => {
+    setFiles(Object.fromEntries(incoming.map((entry) => [entry.path, entry.content])));
+    setDirty(true);
+  });
+
 
   const setPart = (index: number, next: CutscenePart) => write({ ...file, parts: file.parts.map((part, partIndex) => partIndex === index ? next : part) });
   const setComponent = (partIndex: number, compIndex: number, patch: Partial<CutsceneComponent>) => {

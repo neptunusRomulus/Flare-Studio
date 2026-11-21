@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -87,7 +87,12 @@ export default function ModSettingsForm({ projectPath }: { projectPath: string |
     }
   };
 
-  useRegisterDirty('mod-settings', dirty, save);
+  const draftFiles = useMemo(() => (dirty ? [{ path: MOD_SETTINGS_PATH, content: text.endsWith('\n') ? text : `${text}\n` }] : []), [dirty, text]);
+  useRegisterDirty('mod-settings', dirty, save, draftFiles, (incoming) => {
+    if (!incoming[0]) return;
+    setText(incoming[0].content);
+    setDirty(true);
+  });
 
   const order = loadOrder(file, projectName);
 

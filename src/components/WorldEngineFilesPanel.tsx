@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { FieldHint, HintLabel } from '@/components/ui/field-hint';
@@ -181,7 +181,14 @@ export default function WorldEngineFilesPanel({ worldEditors }: { worldEditors: 
     }
   };
 
-  useRegisterDirty('world-engine-files', dirty, save);
+  const draftFiles = useMemo(() => ([
+    gameplayText.trim() ? { path: GAMEPLAY_PATH, content: gameplayText.endsWith('\n') ? gameplayText : `${gameplayText}\n` } : null,
+    miscText.trim() ? { path: MISC_PATH, content: miscText.endsWith('\n') ? miscText : `${miscText}\n` } : null,
+    deathText.trim() ? { path: DEATH_PENALTY_PATH, content: deathText.endsWith('\n') ? deathText : `${deathText}\n` } : null,
+    musicText.trim() ? { path: DEFAULT_MUSIC_PATH, content: musicText.endsWith('\n') ? musicText : `${musicText}\n` } : null,
+    lootText.trim() ? { path: LOOT_PATH, content: lootText.endsWith('\n') ? lootText : `${lootText}\n` } : null,
+  ].filter(Boolean) as Array<{ path: string; content: string }>), [gameplayText, miscText, deathText, musicText, lootText]);
+  useRegisterDirty('world-engine-files', dirty, save, dirty ? draftFiles : []);
 
   return (
     <div className="space-y-3">

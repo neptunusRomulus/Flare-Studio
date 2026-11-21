@@ -239,7 +239,15 @@ export default function AnimationEditor({ projectPath, initialFile }: { projectP
     }
   };
 
-  useRegisterDirty('animations', dirty, save);
+    const draftFiles = useMemo(() => Object.entries(files).map(([path, content]) => ({
+    path,
+    content: content.endsWith('\n') ? content : `${content}\n`,
+  })), [files]);
+  useRegisterDirty('animations', dirty, save, draftFiles, (incoming) => {
+    setFiles(Object.fromEntries(incoming.map((entry) => [entry.path, entry.content])));
+    setDirty(true);
+  });
+
 
   const setHeader = (patch: Partial<AnimationFile['headerKeys']>) => write({ ...file, headerKeys: { ...file.headerKeys, ...patch } });
   const setSection = (patch: Partial<AnimationSection>) => {

@@ -238,7 +238,37 @@ const StringEditorView: React.FC<Props> = ({ projectPath, onBack }) => {
     }
   };
 
-  useRegisterDirty('strings', dirty, save);
+  const draftFiles = useMemo(() => {
+    if (!dirty) return [];
+    let catalogEntries = catalog;
+    if (!catalogEntries.length) {
+      const seen = new Set<string>();
+      catalogEntries = [];
+      for (const file of Object.values(pos)) {
+        for (const entry of file.entries) {
+          if (entry.obsolete || !entry.msgid) continue;
+          const key = `${entry.msgctxt ?? ''}\0${entry.msgid}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          catalogEntries.push({ msgid: entry.msgid, msgctxt: entry.msgctxt, comments: entry.comments });
+        }
+      }
+    }
+    const pot = mergeCatalogIntoPo(emptyPo(), catalogEntries);
+    const files = [
+      { path: LANGUAGES_TXT_PATH, content: serializeLanguagesTxt(languages) },
+      { path: DATA_POT_PATH, content: serializePo(pot) },
+    ];
+    for (const language of languages) {
+      if (language.code === SOURCE_LANGUAGE) continue;
+      files.push({
+        path: dataPoPath(language.code),
+        content: serializePo(pos[language.code] ?? emptyPo(language.code)),
+      });
+    }
+    return files;
+  }, [dirty, catalog, pos, languages]);
+  useRegisterDirty('strings', dirty, save, draftFiles);
 
   const selectedName = languages.find((language) => language.code === selected)?.name || selected;
   const canRemove = Boolean(selected && selected !== SOURCE_LANGUAGE);

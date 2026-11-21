@@ -18,22 +18,19 @@ describe('saveHealth', () => {
     expect(anythingDirty('saved', { books: true })).toBe(true);
   });
 
-  it('derives logo marks: red unsaved, amber backed-up, none saved, error wins, recovery is separate', () => {
-    expect(deriveLogoState({ mapStatus: 'saved', editorDirty: false, hasRecovery: false })).toEqual({ mark: 'none', showRecovery: false });
-    expect(deriveLogoState({ mapStatus: 'unsaved', editorDirty: false, hasRecovery: false })).toEqual({ mark: 'unsaved', showRecovery: false });
-    expect(deriveLogoState({ mapStatus: 'backed-up', editorDirty: false, hasRecovery: false })).toEqual({ mark: 'backed-up', showRecovery: false });
-    expect(deriveLogoState({ mapStatus: 'backed-up', editorDirty: true, hasRecovery: false })).toEqual({ mark: 'unsaved', showRecovery: false });
-    expect(deriveLogoState({ mapStatus: 'error', editorDirty: false, hasRecovery: true })).toEqual({ mark: 'error', showRecovery: true });
-    expect(deriveLogoState({ mapStatus: 'saved', editorDirty: false, hasRecovery: true })).toEqual({ mark: 'none', showRecovery: true });
+  it('derives logo marks: red for unsaved or backed-up, none when saved, error wins; no recovery mark', () => {
+    expect(deriveLogoState({ mapStatus: 'saved', editorDirty: false })).toEqual({ mark: 'none' });
+    expect(deriveLogoState({ mapStatus: 'unsaved', editorDirty: false })).toEqual({ mark: 'unsaved' });
+    expect(deriveLogoState({ mapStatus: 'backed-up', editorDirty: false })).toEqual({ mark: 'unsaved' });
+    expect(deriveLogoState({ mapStatus: 'backed-up', editorDirty: true })).toEqual({ mark: 'unsaved' });
+    expect(deriveLogoState({ mapStatus: 'error', editorDirty: false })).toEqual({ mark: 'error' });
+    expect(deriveLogoState({ mapStatus: 'saved', editorDirty: true })).toEqual({ mark: 'unsaved' });
   });
 
-  it('builds tooltips with the backup time and a recovery hint', () => {
-    const at = Date.UTC(2026, 10, 21, 3, 0, 0);
-    expect(logoTooltip({ mark: 'backed-up', showRecovery: false }, at)).toMatch(/Backed up at /);
-    expect(logoTooltip({ mark: 'backed-up', showRecovery: false }, at)).toContain('Ctrl+S to write project files');
-    expect(logoTooltip({ mark: 'error', showRecovery: false }, null, 'disk full')).toBe('disk full');
-    expect(logoTooltip({ mark: 'none', showRecovery: true })).toMatch(/recovery backup/i);
-    expect(logoTooltip({ mark: 'unsaved', showRecovery: false })).toMatch(/Unsaved changes/);
+  it('builds tooltips without backup-time or recovery hints', () => {
+    expect(logoTooltip({ mark: 'error' }, 'disk full')).toBe('disk full');
+    expect(logoTooltip({ mark: 'none' })).toBe('Menu — all changes saved');
+    expect(logoTooltip({ mark: 'unsaved' })).toMatch(/Unsaved changes/);
   });
 
   it('rejects stale or invalid crash backups after 24 hours', () => {

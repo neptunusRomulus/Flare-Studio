@@ -169,7 +169,14 @@ export default function PowerTreeEditor() {
     }
   };
 
-  useRegisterDirty('power-tree', dirty, save);
+  const draftFiles = useMemo(() => (dirty ? [{ path, content: serializePowerTree(tree) }] : []), [dirty, path, tree]);
+  useRegisterDirty('power-tree', dirty, save, draftFiles, (incoming) => {
+    const file = incoming[0];
+    if (!file) return;
+    setTree(parsePowerTree(file.content));
+    if (file.path) setPath(file.path);
+    setDirty(true);
+  });
 
   const switchPath = (nextPath: string) => {
     if (!nextPath || nextPath === path) return;

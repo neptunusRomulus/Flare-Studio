@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { FieldHint } from '@/components/ui/field-hint';
 import { Input } from '@/components/ui/input';
@@ -89,7 +89,13 @@ const TitlesEditorView: React.FC<Props> = ({ projectPath }) => {
     }
   };
 
-  useRegisterDirty('titles', dirty, save);
+  const draftFiles = useMemo(() => (dirty ? [{ path: TITLES_PATH, content: serializeTitles(titles) }] : []), [dirty, titles]);
+  useRegisterDirty('titles', dirty, save, draftFiles, (incoming) => {
+    const file = incoming[0];
+    if (!file) return;
+    setTitles(parseTitles(file.content));
+    setDirty(true);
+  });
 
   return (
     <div className="flex flex-col flex-1 min-h-0 gap-3">

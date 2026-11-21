@@ -614,6 +614,9 @@ export class TileMapEditor {
   private saveStatusCallback: ((status: 'saving' | 'saved' | 'error' | 'unsaved' | 'backed-up') => void) | null = null;
   private backedUpAt: number | null = null;
   private crashBackupPaused = false;
+  private crashBackupEnricher: ((snapshot: Record<string, unknown>) => Record<string, unknown> | Promise<Record<string, unknown>>) | null = null;
+  private shouldClearCrashBackup: (() => boolean) | null = null;
+  private onMapFullySaved: ((mapName: string) => void) | null = null;
   // Callback to notify React app about active GID changes
   private activeGidCallback: ((gid: number) => void) | null = null;
   // Callback to notify about undo stack changes (for persistence)
@@ -4679,7 +4682,10 @@ export class TileMapEditor {
   /** Real project files were written (Ctrl+S or a full tab-switch save). Also deletes the crash backup. */
   public markAsFullySaved(): void {
     this.markAsSaved();
-    this.clearCrashBackup();
+    if (this.shouldClearCrashBackup ? this.shouldClearCrashBackup() : true) {
+      this.clearCrashBackup();
+    }
+    if (this.mapName) this.onMapFullySaved?.(this.mapName);
   }
 
   public getBackedUpAt(): number | null {
@@ -4688,6 +4694,58 @@ export class TileMapEditor {
 
   public setCrashBackupPaused(paused: boolean): void {
     this.crashBackupPaused = paused;
+  }
+
+  public setCrashBackupEnricher(enricher: ((snapshot: Record<string, unknown>) => Record<string, unknown> | Promise<Record<string, unknown>>) | null): void {
+    this.crashBackupEnricher = enricher;
+  }
+
+  public setCrashBackupClearPolicy(shouldClear: (() => boolean) | null, onMapFullySaved?: ((mapName: string) => void) | null): void {
+    this.shouldClearCrashBackup = shouldClear;
+    this.onMapFullySaved = onMapFullySaved ?? this.onMapFullySaved;
+  }
+
+  /** Snapshot of the current map for a crash backup. Allowed without a tileset or painted tiles. */
+  public buildCrashBackupSnapshot(): Record<string, unknown> {
+    const layerTabsObj: Record<string, Array<{ id: number; name?: string }>> = {};
+    for (const [key, value] of this.layerTabs.entries()) {
+      layerTabsObj[key] = value.map(tab => ({
+        id: tab.id,
+        name: tab.name
+      }));
+    }
+
+    const layerActiveTabIdObj: Record<string, number> = {};
+    for (const [key, value] of this.layerActiveTabId.entries()) {
+      layerActiveTabIdObj[key] = value;
+    }
+
+    return {
+      timestamp: Date.now(),
+      mapWidth: this.mapWidth,
+      mapHeight: this.mapHeight,
+      layers: this.tileLayers,
+      objects: this.objects,
+      heroX: this.heroX,
+      heroY: this.heroY,
+      tilesetFileName: this.tilesetFileName,
+      tilesetImage: this.tilesetImage ? this.canvasToDataURL(this.tilesetImage) : null,
+      tileSizeX: this.tileSizeX,
+      tileSizeY: this.tileSizeY,
+      orientation: this.orientation,
+      parallax: this.mapParallax,
+      fogofwar: this.mapFog,
+      save_fogofwar: this.mapSaveFog,
+      procgen_type: this.mapProcgenType,
+      procgen_unique_status: this.mapProcgenUnique,
+      procgen_reset_status: this.mapProcgenReset,
+      mapName: this.mapName,
+      detectedTileData: Array.from(this.detectedTileData.entries()),
+      tileContentThreshold: this.tileContentThreshold,
+      objectSeparationSensitivity: this.objectSeparationSensitivity,
+      layerTabs: layerTabsObj,
+      layerActiveTabId: layerActiveTabIdObj
+    };
   }
 
   private async performAutoSave(): Promise<void> {
@@ -4727,56 +4785,19 @@ export class TileMapEditor {
 
   private saveToLocalStorage(): void {
     try {
-      // Convert layerTabs and layerActiveTabId Maps to serializable objects
-      // Note: We store minimal tab info (id and name) since the full tileset/brush data
-      // is reconstructed from the tileset when loaded
-      const layerTabsObj: Record<string, Array<{ id: number; name?: string }>> = {};
-      for (const [key, value] of this.layerTabs.entries()) {
-        layerTabsObj[key] = value.map(tab => ({
-          id: tab.id,
-          name: tab.name
-        }));
-      }
-      
-      const layerActiveTabIdObj: Record<string, number> = {};
-      for (const [key, value] of this.layerActiveTabId.entries()) {
-        layerActiveTabIdObj[key] = value;
-      }
-      
-      const backupData = {
-        timestamp: Date.now(),
-        mapWidth: this.mapWidth,
-        mapHeight: this.mapHeight,
-        layers: this.tileLayers,
-        objects: this.objects,
-        heroX: this.heroX,
-        heroY: this.heroY,
-        tilesetFileName: this.tilesetFileName,
-        tilesetImage: this.tilesetImage ? this.canvasToDataURL(this.tilesetImage) : null,
-        tileSizeX: this.tileSizeX,
-        tileSizeY: this.tileSizeY,
-        orientation: this.orientation,
-        parallax: this.mapParallax,
-        fogofwar: this.mapFog,
-        save_fogofwar: this.mapSaveFog,
-        procgen_type: this.mapProcgenType,
-        procgen_unique_status: this.mapProcgenUnique,
-        procgen_reset_status: this.mapProcgenReset,
-        mapName: this.mapName,
-        // Save brush data for proper restoration
-        detectedTileData: Array.from(this.detectedTileData.entries()),
-        tileContentThreshold: this.tileContentThreshold,
-        objectSeparationSensitivity: this.objectSeparationSensitivity,
-        // Save tab state for proper restoration
-        layerTabs: layerTabsObj,
-        layerActiveTabId: layerActiveTabIdObj
-      };
-
-      // Crash backup is project-scoped and stored on disk: {projectPath}/backup/crash-backup.json
       const projectPath = this.currentProjectPath;
-      if (projectPath && window.electronAPI?.saveCrashBackup) {
-        void window.electronAPI.saveCrashBackup(projectPath, backupData);
+      if (!projectPath || !window.electronAPI?.saveCrashBackup) return;
+      const backupData = this.buildCrashBackupSnapshot();
+      const enricher = this.crashBackupEnricher;
+      if (enricher) {
+        void Promise.resolve(enricher(backupData)).then((full) => {
+          void window.electronAPI?.saveCrashBackup?.(projectPath, full);
+        }).catch(() => {
+          void window.electronAPI?.saveCrashBackup?.(projectPath, backupData);
+        });
+        return;
       }
+      void window.electronAPI.saveCrashBackup(projectPath, backupData);
     } catch (_error) { void _error; }
   }
   

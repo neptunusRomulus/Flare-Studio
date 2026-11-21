@@ -126,7 +126,11 @@ const MenuEditorView = ({ projectPath }: Props) => {
     await load();
   };
 
-  useRegisterDirty('menus', Object.keys(dirty).length > 0, save);
+  const draftFiles = useMemo(() => Object.values(dirty).map((panel) => ({
+    path: panel.file,
+    content: mergeMenuPos(panel.text, panel.pos),
+  })), [dirty]);
+  useRegisterDirty('menus', Object.keys(dirty).length > 0, save, draftFiles);
 
   if (!root) {
     return <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">Open a project to edit menus.</div>;

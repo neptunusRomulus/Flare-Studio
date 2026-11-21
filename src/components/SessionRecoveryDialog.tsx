@@ -1,60 +1,54 @@
-import React, { useMemo } from 'react';
-import { InlineChoice, topCenterAnchor } from '@/components/ui/inline-confirm';
+import React from 'react';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 interface SessionRecoveryDialogProps {
   isOpen: boolean;
-  mapName: string | null;
-  crashTime: string | null;
-  timeSinceCrash: string | null;
-  isRecovering: boolean;
-  error: string | null;
-  onRecover: () => Promise<void>;
+  isRecovering?: boolean;
+  error?: string | null;
+  onRecover: () => Promise<void> | void;
   onDismiss: () => void;
+  /** @deprecated Kept so existing callers can pass map/time; the dialog text is fixed. */
+  mapName?: string | null;
+  crashTime?: string | null;
+  timeSinceCrash?: string | null;
 }
 
 /**
- * Startup crash recovery as a small choice card at the top of the window.
- * Doesn't block the rest of the UI and isn't dismissed by outside clicks or Escape.
+ * Modal shown when a project opens with a leftover crash backup.
+ * The user must choose Restore or Discard; outside clicks and Escape do not dismiss it.
  */
 const SessionRecoveryDialog: React.FC<SessionRecoveryDialogProps> = ({
-  isOpen, mapName, timeSinceCrash, isRecovering, error, onRecover, onDismiss,
+  isOpen, isRecovering, error, onRecover, onDismiss,
 }) => {
-  const anchor = useMemo(() => topCenterAnchor(), [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
-  if (!isOpen) return null;
-
-  if (error) {
-    return (
-      <InlineChoice
-        anchor={anchor}
-        side="bottom"
-        title="Recovery failed"
-        detail={error}
-        options={[{ id: 'close', label: 'Close', primary: true }]}
-        onChoose={onDismiss}
-      />
-    );
-  }
-
-  const detail = [mapName, timeSinceCrash].filter(Boolean).join(' · ') || undefined;
   return (
-    <InlineChoice
-      anchor={anchor}
-      side="bottom"
-      title={isRecovering ? 'Recovering…' : 'Recover last session?'}
-      detail={detail}
-      busy={isRecovering}
-      options={[
-        { id: 'recover', label: 'Recover', primary: true },
-        { id: 'fresh', label: 'Start fresh' },
-      ]}
-      onChoose={(id) => {
-        if (id === 'recover') {
-          onRecover().catch((err) => console.error('Recovery failed:', err));
-        } else {
-          onDismiss();
-        }
-      }}
-    />
+    <Dialog open={isOpen} onOpenChange={() => { /* require an explicit button */ }}>
+      <DialogContent
+        className="max-w-md"
+        onPointerDownOutside={(event) => event.preventDefault()}
+        onEscapeKeyDown={(event) => event.preventDefault()}
+        onInteractOutside={(event) => event.preventDefault()}
+      >
+        <DialogHeader>
+          <DialogTitle>Unsaved changes found from your last session. Restore them?</DialogTitle>
+          {error ? <DialogDescription>{error}</DialogDescription> : (
+            <DialogDescription className="sr-only">Choose Restore to bring the backup back, or Discard to delete it.</DialogDescription>
+          )}
+        </DialogHeader>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={onDismiss} disabled={!!isRecovering}>
+            Discard
+          </Button>
+          <Button
+            type="button"
+            onClick={() => { void Promise.resolve(onRecover()).catch((err) => console.error('Recovery failed:', err)); }}
+            disabled={!!isRecovering}
+          >
+            {isRecovering ? 'Restoring…' : 'Restore'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
 

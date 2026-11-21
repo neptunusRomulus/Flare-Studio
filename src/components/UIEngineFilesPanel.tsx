@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -395,7 +395,21 @@ export default function UIEngineFilesPanel({ general }: { general: ReactNode }) 
     }
   };
 
-  useRegisterDirty('ui-engine-files', dirty, save);
+  const draftFiles = useMemo(() => ([
+    fontsText.trim() ? { path: FONT_SETTINGS_PATH, content: withNewline(fontsText) } : null,
+    colorsText.trim() ? { path: FONT_COLORS_PATH, content: withNewline(colorsText) } : null,
+    tooltipsText.trim() ? { path: TOOLTIPS_PATH, content: withNewline(tooltipsText) } : null,
+    resolutionsText.trim() ? { path: RESOLUTIONS_PATH, content: withNewline(resolutionsText) } : null,
+    combatText.trim() ? { path: COMBAT_TEXT_PATH, content: withNewline(combatText) } : null,
+    iconsText.trim() ? { path: ICONS_PATH, content: withNewline(iconsText) } : null,
+    backgroundsText.trim() ? { path: MENU_BACKGROUNDS_PATH, content: withNewline(backgroundsText) } : null,
+    cursorText.trim() ? { path: MOUSE_CURSOR_PATH, content: withNewline(cursorText) } : null,
+    widgetsText.trim() ? { path: WIDGET_SETTINGS_PATH, content: withNewline(widgetsText) } : null,
+    defaultsText.trim() ? { path: DEFAULT_SETTINGS_PATH, content: withNewline(defaultsText) } : null,
+    keybindsText.trim() ? { path: DEFAULT_KEYBINDINGS_PATH, content: withNewline(keybindsText) } : null,
+    subtitlesText.trim() ? { path: SUBTITLES_PATH, content: withNewline(subtitlesText) } : null,
+  ].filter(Boolean) as Array<{ path: string; content: string }>), [fontsText, colorsText, tooltipsText, resolutionsText, combatText, iconsText, backgroundsText, cursorText, widgetsText, defaultsText, keybindsText, subtitlesText]);
+  useRegisterDirty('ui-engine-files', dirty, save, dirty ? draftFiles : []);
 
   const fonts = parseFontSettings(fontsText);
   const icons = parseIconsFile(iconsText);

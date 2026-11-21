@@ -9,6 +9,8 @@ import {
   listTreePaths,
   powersOnTab,
   parsePosition,
+  nextPowerPosition,
+  POWER_TREE_NODE_SIZE,
 } from './powerTree';
 
 const sample = `# tab 0
@@ -187,3 +189,17 @@ function replaceAndUpdate(
     }),
   };
 }
+
+describe('nextPowerPosition', () => {
+  it('falls back when the tab is empty', () => {
+    expect(nextPowerPosition([], '40,80')).toBe('40,80');
+  });
+
+  it('places a new power to the right of the rightmost one on the same row', () => {
+    expect(nextPowerPosition([
+      { position: '40,80' },
+      { position: '120,80' },
+      { position: '80,200' },
+    ])).toBe(`${120 + POWER_TREE_NODE_SIZE},80`);
+  });
+});

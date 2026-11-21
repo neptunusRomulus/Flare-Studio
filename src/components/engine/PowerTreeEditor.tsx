@@ -23,6 +23,7 @@ import {
   listTreePaths,
   ownedUpgradeIndexes,
   parsePowerTree,
+  nextPowerPosition,
   powersOnTab,
   replaceItem,
   serializePowerTree,
@@ -237,7 +238,7 @@ export default function PowerTreeEditor() {
   };
 
   const addPower = async (id = '') => {
-    const position = `${layout.tabArea.x},${layout.tabArea.y}`;
+    const position = nextPowerPosition(tabPowers, `${layout.tabArea.x},${layout.tabArea.y}`);
     let nextId = id.trim();
     if (!nextId) {
       if (!projectPath) {

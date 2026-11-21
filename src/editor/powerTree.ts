@@ -410,6 +410,22 @@ export function formatPosition(x: number, y: number): string {
   return `${Math.round(x)},${Math.round(y)}`;
 }
 
+/** Pixel size of a power-tree icon square in the editor. */
+export const POWER_TREE_NODE_SIZE = 32;
+
+/** Place a new power to the right of the rightmost node, same row, by one icon width. */
+export function nextPowerPosition(
+  nodes: Array<{ position?: string }>,
+  fallback = '0,0',
+  size = POWER_TREE_NODE_SIZE,
+): string {
+  if (!nodes.length) return fallback;
+  const rightmost = nodes
+    .map((node) => parsePosition(node.position || ''))
+    .reduce((best, point) => (point.x > best.x ? point : best));
+  return formatPosition(rightmost.x + size, rightmost.y);
+}
+
 /** Consecutive [upgrade] blocks after a power whose ids are in that power's upgrades= list. */
 export function ownedUpgradeIndexes(tree: PowerTreeFile, powerIndex: number): number[] {
   const power = tree.items[powerIndex];

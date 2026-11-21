@@ -5912,7 +5912,8 @@ export class TileMapEditor {
       object.wander_radius = 0;
     }
 
-    this.objects.push(object);
+    if (type === 'npc' || type === 'enemy') this.objects.unshift(object);
+    else this.objects.push(object);
     this.saveState();
     this.notifyObjectsChanged();
     return object;

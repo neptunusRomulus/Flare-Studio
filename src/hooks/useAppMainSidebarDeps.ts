@@ -39,13 +39,14 @@ export type AppMainSidebarDepsInput = {
   handleNpcDragStart: NpcDrag['handleNpcDragStart'];
   handleNpcDragEnd: NpcDrag['handleNpcDragEnd'];
   activeLayer: { type?: string } | null;
-  handleEditEvent: (eventId: number) => void;
-  handleDuplicateEvent: (eventId: number) => void;
-  handleDeleteEvent: (eventId: number) => void;
+  handleEditEvent: (scriptPath: string) => void;
+  handleDuplicateEvent: (scriptPath: string) => void;
+  handleDeleteEvent: (scriptPath: string) => void;
+  eventScriptEntries?: import('@/editor/eventScripts').EventScriptEntry[];
   handleReorderEvents: (fromIndex: number, toIndex: number) => void;
   handleEventDragStart: EventDrag['handleEventDragStart'];
   handleEventDragEnd: EventDrag['handleEventDragEnd'];
-  handleOpenEventDialog: (location?: { x: number; y: number } | null) => void;
+  handleOpenEventDialog: (name?: string) => void;
   isRulesLayer: boolean;
   rulesList: AppMainState['rulesList'];
   handleOpenQuestDialog: AppMainState['handleOpenQuestDialog'];
@@ -103,6 +104,7 @@ export default function useAppMainSidebarDeps(args: AppMainSidebarDepsInput) {
     handleEventDragStart,
     handleEventDragEnd,
     handleOpenEventDialog,
+    eventScriptEntries = [],
     isRulesLayer,
     rulesList,
     handleOpenQuestDialog,
@@ -200,7 +202,7 @@ export default function useAppMainSidebarDeps(args: AppMainSidebarDepsInput) {
       },
       events: {
         isEventLayer: activeLayer?.type === 'event',
-        eventEntries: activeLayer?.type === 'event' ? appState.mapObjects.filter((obj) => obj.type === 'event') : [],
+        eventEntries: activeLayer?.type === 'event' ? eventScriptEntries : [],
         draggingEventId: appState.draggingEventId,
         handleEditEvent,
         handleDuplicateEvent,
@@ -341,6 +343,11 @@ export default function useAppMainSidebarDeps(args: AppMainSidebarDepsInput) {
     appState.mapObjects,
     appState.draggingNpcId,
     appState.draggingEventId,
+    eventScriptEntries,
+    handleEditEvent,
+    handleDuplicateEvent,
+    handleDeleteEvent,
+    handleOpenEventDialog,
     appState.setNpcHoverTooltip,
     handleNpcDragStart,
     handleNpcDragEnd,

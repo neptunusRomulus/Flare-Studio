@@ -16,6 +16,7 @@ import { applyMomentToTopic, type RoleMoment } from '@/editor/roleMoments';
 import type { DialogueLine, DialogueRequirement, DialogueReward, DialogueTree, DialogueWorldEffect } from '@/types';
 import { resolveNpcPreviewPaths } from '@/flare/npcPreviewPaths';
 import { isStoryFlagType, STORY_FLAG_LIST_ID } from '@/editor/powers/storyFlags';
+import { EVENT_SCRIPT_LIST_ID } from '@/hooks/useEventScripts';
 import {
   actionChipLabel,
   actionChipTooltip,
@@ -354,7 +355,7 @@ const TopicMeta = ({ tree, onPatch }: { tree: DialogueTree; onPatch: (next: Dial
               tooltip={actionChipTooltip(chip)}
               value={chip.value}
               needsValue={!['stash', 'save_game', 'respec'].includes(chip.type)}
-              list={isStoryFlagType(chip.type) ? STORY_FLAG_LIST_ID : undefined}
+              list={isStoryFlagType(chip.type) ? STORY_FLAG_LIST_ID : chip.type === 'script' ? EVENT_SCRIPT_LIST_ID : undefined}
               onChange={(value) => onPatch(writeEffect(tree, chip, value))}
               onRemove={() => onPatch(removeAction(tree, chip.group, chip.index))}
             />

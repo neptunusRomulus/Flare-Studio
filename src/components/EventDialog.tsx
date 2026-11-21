@@ -28,19 +28,47 @@ import {
 import EventInformationSection from '@/components/events/EventInformationSection';
 import EventPositioningSection from '@/components/events/EventPositioningSection';
 import EventRequirementsSection from '@/components/events/EventRequirementsSection';
-import EventActionsSection from '@/components/events/EventActionsSection';
-import EventAdvancedSection from '@/components/events/EventAdvancedSection';
-import EventEngineSection from '@/components/events/EventEngineSection';
+import EventScriptForm from '@/components/events/EventScriptForm';
+import { HintLabel } from '@/components/ui/field-hint';
+import { Input } from '@/components/ui/input';
+import { EVENT_SCRIPT_LIST_ID } from '@/hooks/useEventScripts';
+import {
+  actionPropertiesFrom,
+  emptyEventScript,
+  eventScriptRelPath,
+  mergeEventScript,
+  normalizeEventScriptPath,
+  parseEventScript,
+  instancePropertiesFrom,
+  type EventScriptFile,
+} from '@/editor/eventScripts';
 
 type EventDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   eventLocation: { x: number; y: number } | null;
   editingEventId?: number | null;
+  scriptPath?: string | null;
+  scripts?: string[];
+  books?: string[];
+  cutscenes?: string[];
+  onScriptSaved?: () => void;
+  onEditScript?: (path: string) => void;
 };
 
 
-const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLocation: _eventLocation, editingEventId }) => {
+const EventDialog: React.FC<EventDialogProps> = ({
+  open,
+  onOpenChange,
+  eventLocation: _eventLocation,
+  editingEventId,
+  scriptPath = null,
+  scripts = [],
+  books = [],
+  cutscenes = [],
+  onScriptSaved,
+  onEditScript,
+}) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { mapName: currentMapName, mapWidth, mapHeight, editor, syncMapObjectsWrapper, controls, itemsList = [] } = useAppContext() as any;
   const itemGroups = useMemo(() => (itemsList as any[]).filter((item) => item.role === 'loot_groups'), [itemsList]);
@@ -51,6 +79,9 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
   const [extraRows, setExtraRows] = useState<EventExtraRow[]>([]);
 
   const isEditing = editingEventId != null;
+  const isScript = Boolean(scriptPath);
+  const [scriptFile, setScriptFile] = useState<EventScriptFile>(emptyEventScript);
+  const [scriptError, setScriptError] = useState('');
 
   const parseItemValue = (value: string) => {
     const [id, quantity] = value.split(/[: ,]/).map((part) => part.trim());
@@ -165,19 +196,46 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
     return props;
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (isScript && scriptPath) {
+      if (!currentProjectPath || !window.electronAPI?.writeFile) {
+        setScriptError('No project is open.');
+        return;
+      }
+      const abs = `${currentProjectPath.replace(/\\/g, '/')}/${normalizeEventScriptPath(scriptPath)}`;
+      const previous = (window.electronAPI.readFile ? await window.electronAPI.readFile(abs) : '') || '';
+      const ok = await window.electronAPI.writeFile(abs, mergeEventScript(previous, scriptFile));
+      if (!ok) {
+        setScriptError('Could not write the script file.');
+        return;
+      }
+      setScriptError('');
+      onScriptSaved?.();
+      onOpenChange(false);
+      return;
+    }
     if (!editor) return;
     const { coordinates, size } = eventData.positioning;
     const flareActivate = ACTIVATION_TO_FLARE[eventData.timing.activeActivation || ''] || 'on_trigger';
-    const props = buildProps();
+    const props = instancePropertiesFrom(buildProps());
     const existing = isEditing && typeof editor.getMapObjects === 'function'
       ? (editor.getMapObjects() as Array<{ id: number; properties?: Record<string, string | string[]> }>)
         .find((object) => object.id === editingEventId)
       : undefined;
-    const properties = mergeEventFormProperties(existing?.properties, props);
+    let script = normalizeEventScriptPath(eventData.engine.script || props.script);
+    const leftover = actionPropertiesFrom(existing?.properties);
+    if (!script && leftover.length && currentProjectPath && window.electronAPI?.writeFile) {
+      const stamp = `${(currentMapName || 'map').replace(/[^A-Za-z0-9]+/g, '_')}_${coordinates.x}_${coordinates.y}`;
+      script = eventScriptRelPath(stamp);
+      const abs = `${currentProjectPath.replace(/\\/g, '/')}/${script}`;
+      await window.electronAPI.writeFile(abs, mergeEventScript('', { header: '', steps: [{ components: leftover }] }));
+      onScriptSaved?.();
+    }
+    if (script) props.script = script;
+    const properties = instancePropertiesFrom(mergeEventFormProperties(existing?.properties, props));
+    if (script) properties.script = script;
 
-    if (isEditing && typeof editor.updateMapObject === 'function') {
-      // Update existing event
+    if (isEditing && typeof editor.updateMapObject === 'function' && editingEventId != null) {
       editor.updateMapObject(editingEventId, {
         name: eventData.name || 'Event',
         description: eventData.description || '',
@@ -189,26 +247,8 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
         height: size.height,
         properties
       });
-    } else if (typeof editor.addMapObject === 'function') {
-      // Create new event
-      // New events start unplaced; dragging an area on the map sets location/hotspot
-      const newObject = editor.addMapObject('event', -1, -1, 1, 1);
-      if (newObject && typeof editor.updateMapObject === 'function') {
-        editor.updateMapObject(newObject.id, {
-          name: eventData.name || 'Event',
-          description: eventData.description || '',
-          type: 'event',
-          activate: flareActivate,
-          x: -1,
-          y: -1,
-          width: 1,
-          height: 1,
-          properties
-        });
-      }
     }
 
-    // reset selection / close
     if (typeof syncMapObjectsWrapper === 'function') syncMapObjectsWrapper();
     onOpenChange(false);
   };
@@ -432,7 +472,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
     }
 
     // Reset to defaults for new event
-    if (!isEditing) {
+    if (!isEditing && !isScript) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setExtraRows([]);
       setEventData({
@@ -459,7 +499,21 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
     
     document.addEventListener('keydown', handleEsc);
     return () => document.removeEventListener('keydown', handleEsc);
-  }, [open, onOpenChange, currentMapName, isEditing, editingEventId, editor, syncMapObjectsWrapper]);
+  }, [open, onOpenChange, currentMapName, isEditing, isScript, editingEventId, editor, syncMapObjectsWrapper]);
+
+  useEffect(() => {
+    if (!open || !isScript || !scriptPath || !currentProjectPath) return;
+    let cancelled = false;
+    const abs = `${currentProjectPath.replace(/\\/g, '/')}/${normalizeEventScriptPath(scriptPath)}`;
+    void (async () => {
+      const text = window.electronAPI?.readFile ? await window.electronAPI.readFile(abs) : '';
+      if (cancelled) return;
+      setScriptFile(parseEventScript(text || ''));
+      setScriptError('');
+    })();
+    return () => { cancelled = true; };
+  }, [open, isScript, scriptPath, currentProjectPath]);
+
 
   // Fetch project maps when dialog opens
   useEffect(() => {
@@ -624,7 +678,7 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
           className="sticky top-0 z-10 border-b border-border/50 bg-background px-6 py-3 flex items-center justify-between cursor-move select-none"
           onMouseDown={handleHeaderMouseDown}
         >
-          <h3 className="text-lg font-semibold flex-1">{isEditing ? 'Edit Event' : 'Add Event'}</h3>
+          <h3 className="text-lg font-semibold flex-1">{isScript ? (scriptPath || 'Event') : isEditing ? 'Event instance' : 'Event'}</h3>
           <Button
             size="icon"
             variant="ghost"
@@ -636,6 +690,13 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
         </div>
 
         <div className="flex-1 overflow-y-auto space-y-6 px-6 py-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/15 [&::-webkit-scrollbar-thumb]:rounded-full">
+          {isScript ? (
+            <div className="space-y-3">
+              {scriptError ? <div className="text-xs text-destructive">{scriptError}</div> : null}
+              <EventScriptForm file={scriptFile} onChange={setScriptFile} scripts={scripts} books={books} cutscenes={cutscenes} />
+            </div>
+          ) : (
+          <>
           <EventInformationSection
             eventData={eventData}
             setEventData={setEventData}
@@ -671,30 +732,24 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
             removeItemRequirement={removeItemRequirement}
           />
 
-          <EventActionsSection
-            eventData={eventData}
-            setEventData={setEventData}
-            expandedSections={expandedSections}
-            toggleSection={toggleSection}
-            inventoryItems={inventoryItems}
-            itemGroups={itemGroups}
-            projectMaps={projectMaps}
-            currentMapName={currentMapName}
-          />
-
-          <EventAdvancedSection
-            eventData={eventData}
-            setEventData={setEventData}
-            expandedSections={expandedSections}
-            toggleSection={toggleSection}
-          />
-
-          <EventEngineSection
-            eventData={eventData}
-            setEventData={setEventData}
-            expandedSections={expandedSections}
-            toggleSection={toggleSection}
-          />
+          <div className="space-y-2 px-1">
+            <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Event</div>
+            <div className="flex flex-wrap items-center gap-2">
+              <HintLabel className="text-xs font-normal w-16 shrink-0" hint="This instance runs the event script. Changing the script changes every place that uses it.">script</HintLabel>
+              <Input
+                width="path"
+                className="h-7 text-xs"
+                list={EVENT_SCRIPT_LIST_ID}
+                value={eventData.engine.script}
+                onChange={(e) => setEventData((prev) => ({ ...prev, engine: { ...prev.engine, script: e.target.value } }))}
+              />
+              {normalizeEventScriptPath(eventData.engine.script) ? (
+                <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={() => onEditScript?.(normalizeEventScriptPath(eventData.engine.script))}>
+                  Edit event
+                </Button>
+              ) : null}
+            </div>
+          </div>
 
           <div className="px-1">
             <EditorPropertyList
@@ -724,6 +779,8 @@ const EventDialog: React.FC<EventDialogProps> = ({ open, onOpenChange, eventLoca
               onRemove={(id) => setExtraRows((rows) => rows.filter((row) => row.id !== id))}
             />
           </div>
+          </>
+          )}
         </div>
 
         <div className="sticky bottom-0 border-t border-border/50 bg-background px-6 py-3 flex justify-end">

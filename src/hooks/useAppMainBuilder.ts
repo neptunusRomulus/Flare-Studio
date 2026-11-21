@@ -18,6 +18,7 @@ import useMapHandlers from './useMapHandlers';
 import useAppEffects from './useAppEffects';
 import useNpcDrag from './useNpcDrag';
 import useEventDrag from './useEventDrag';
+import useEventScripts from './useEventScripts';
 import useObjectEditing from './useObjectEditing';
 import useAppMainObjectCommands from './useAppMainObjectCommands';
 import useAppMainSidebarDeps, { type ProjectManagerView } from './useAppMainSidebarDeps';
@@ -158,6 +159,7 @@ export default function useAppMainBuilder() {
 
   useEffect(() => {
     const prev = editorRefs.editorOptsRef.current ?? {};
+    // eslint-disable-next-line react-hooks/immutability -- existing opts ref write
     editorRefs.editorOptsRef.current = {
       ...prev,
       setSaveStatus: handleSaveStatus,
@@ -241,6 +243,7 @@ export default function useAppMainBuilder() {
   });
   useEffect(() => {
     if (appState.beforeCreateMapRef) {
+      // eslint-disable-next-line react-hooks/immutability -- existing before-create ref write
       appState.beforeCreateMapRef.current = beforeCreateMapFn;
     }
   }, [appState.beforeCreateMapRef, beforeCreateMapFn]);
@@ -496,17 +499,38 @@ export default function useAppMainBuilder() {
 
   const { handleEventDragStart, handleEventDragEnd } = useEventDrag({ editor, setDraggingEventId: appState.setDraggingEventId });
 
-  const handleOpenEventDialog = useCallback((location?: { x: number; y: number } | null) => {
-    appState.setEditingEventId(null);
-    appState.setEventDialogLocation(location ?? null);
-    appState.setEventDialogOpen(true);
-  }, [appState]);
+  const eventScripts = useEventScripts(currentProjectPath);
 
-  const handleEditEvent = useCallback((eventId: number) => {
-    appState.setEditingEventId(eventId);
+  const handleEditEventScript = useCallback((scriptPath: string) => {
+    appState.setEditingScriptPath(scriptPath);
+    appState.setEditingEventId(null);
     appState.setEventDialogLocation(null);
     appState.setEventDialogOpen(true);
   }, [appState]);
+
+  const handleOpenEventDialog = useCallback(async (name?: string) => {
+    const path = await eventScripts.create(name || 'event');
+    if (path) handleEditEventScript(path);
+  }, [eventScripts, handleEditEventScript]);
+
+  const handleEditEvent = useCallback((eventId: number) => {
+    appState.setEditingEventId(eventId);
+    appState.setEditingScriptPath(null);
+    appState.setEventDialogLocation(null);
+    appState.setEventDialogOpen(true);
+  }, [appState]);
+
+  const handleDuplicateEventScript = useCallback(async (scriptPath: string) => {
+    const path = await eventScripts.duplicate(scriptPath);
+    if (path) toast({ title: 'Event duplicated', description: path });
+    else toast({ title: 'Error', description: 'Failed to duplicate the event.', variant: 'destructive' });
+  }, [eventScripts]);
+
+  const handleDeleteEventScript = useCallback(async (scriptPath: string) => {
+    const ok = await eventScripts.remove(scriptPath);
+    if (ok) toast({ title: 'Event deleted' });
+    else toast({ title: 'Error', description: 'Failed to delete the event.', variant: 'destructive' });
+  }, [eventScripts]);
 
   // Wire canvas double-click on events to open the edit dialog
   useEffect(() => {
@@ -700,8 +724,6 @@ export default function useAppMainBuilder() {
   const {
     handleDuplicateObject,
     handleDeleteObject,
-    handleDuplicateEvent,
-    handleDeleteEvent,
     handleReorderActors,
     handleReorderEvents,
     handleDuplicateItem,
@@ -727,13 +749,14 @@ export default function useAppMainBuilder() {
     handleNpcDragStart,
     handleNpcDragEnd,
     activeLayer,
-    handleEditEvent,
-    handleDuplicateEvent,
-    handleDeleteEvent,
+    handleEditEvent: handleEditEventScript,
+    handleDuplicateEvent: handleDuplicateEventScript,
+    handleDeleteEvent: handleDeleteEventScript,
     handleReorderEvents,
     handleEventDragStart,
     handleEventDragEnd,
     handleOpenEventDialog,
+    eventScriptEntries: eventScripts.entries,
     isRulesLayer,
     rulesList,
     handleOpenQuestDialog,
@@ -1048,6 +1071,11 @@ export default function useAppMainBuilder() {
       setEventDialogLocation: appState.setEventDialogLocation,
       editingEventId: appState.editingEventId,
       setEditingEventId: appState.setEditingEventId,
+      editingScriptPath: appState.editingScriptPath,
+      setEditingScriptPath: appState.setEditingScriptPath,
+      eventScriptPaths: eventScripts.scripts,
+      onEventScriptSaved: eventScripts.refresh,
+      onEditEventScript: handleEditEventScript,
       confirmDialogProps: buildConfirmDialogProps({ confirmAction, setConfirmAction, onCancel, onConfirm }),
       showHelp: helpState.showHelp,
       handleHelpClose: () => { if (typeof helpState.setShowHelp === 'function') helpState.setShowHelp(false); },

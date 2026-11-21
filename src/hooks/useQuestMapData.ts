@@ -6,6 +6,7 @@ import { normalizeNpcFile, npcFileForActor } from '@/editor/npcInstances';
 import { propertyRecord, propertyText } from '@/editor/propertyText';
 import useNpcInstances from '@/hooks/useNpcInstances';
 import { questMapEventsFromMapProject, questMapEventsFromMapText, questMapEventsFromObjects } from '@/editor/questMapEvents';
+import { listTxtUnder } from '@/hooks/useEventScripts';
 import { slugFileName } from '@/adapters/flare/flareAdapter.cjs';
 import {
   QUEST_MAP_SIDECAR,
@@ -42,6 +43,7 @@ type Params = {
 export default function useQuestMapData({ open, projectPath, mapName = '', mapObjects }: Params) {
   const [fileNpcs, setFileNpcs] = useState<FileNpc[]>([]);
   const [mapEvents, setMapEvents] = useState<QuestMapEventInput[]>([]);
+  const [scriptFiles, setScriptFiles] = useState<Record<string, string>>({});
   const [positions, setPositions] = useState<QuestMapPositions>({});
   const [loading, setLoading] = useState(false);
   const npcObjects = useMemo(() => mapObjects.filter((o) => o.type === 'npc'), [mapObjects]);
@@ -76,6 +78,15 @@ export default function useQuestMapData({ open, projectPath, mapName = '', mapOb
       } catch {
         /* no npcs folder yet */
       }
+      const scripts: Record<string, string> = {};
+      try {
+        for (const rel of await listTxtUnder(root, 'scripts')) {
+          const text = await api.readFile(`${root}/${rel}`);
+          if (text) scripts[rel] = text;
+        }
+      } catch {
+        /* no scripts folder yet */
+      }
       const events: QuestMapEventInput[] = [];
       try {
         const maps = api.listMaps ? await api.listMaps(projectPath) : [];
@@ -84,10 +95,10 @@ export default function useQuestMapData({ open, projectPath, mapName = '', mapOb
           try {
             if (/\.json$/i.test(file)) {
               const text = await api.readFile(`${root}/${file}`);
-              if (text) events.push(...questMapEventsFromMapProject(text, file));
+              if (text) events.push(...questMapEventsFromMapProject(text, file, scripts));
             } else if (/\.txt$/i.test(file) && api.readMapFile) {
               const text = await api.readMapFile(projectPath, file);
-              if (text) events.push(...questMapEventsFromMapText(text, file));
+              if (text) events.push(...questMapEventsFromMapText(text, file, scripts));
             }
           } catch {
             /* a map Studio cannot read adds no events */
@@ -105,6 +116,7 @@ export default function useQuestMapData({ open, projectPath, mapName = '', mapOb
       if (cancelled) return;
       setFileNpcs(found);
       setMapEvents(events);
+      setScriptFiles(scripts);
       setPositions(saved);
       setLoading(false);
     })();
@@ -143,9 +155,9 @@ export default function useQuestMapData({ open, projectPath, mapName = '', mapOb
     const others = currentKey
       ? mapEvents.filter((e) => slugFileName(e.mapTitle) !== currentKey && slugFileName(e.id.split('#')[0].replace(/\.(json|txt)$/i, '').replace(/^.*\//, '')) !== currentKey)
       : mapEvents;
-    const live = questMapEventsFromObjects(mapObjects as unknown as Array<Record<string, unknown>>, '__current_map__', mapName.trim() || 'Current map');
+    const live = questMapEventsFromObjects(mapObjects as unknown as Array<Record<string, unknown>>, '__current_map__', mapName.trim() || 'Current map', scriptFiles);
     return [...others, ...live];
-  }, [mapEvents, mapObjects, mapName]);
+  }, [mapEvents, mapObjects, mapName, scriptFiles]);
 
   const saveTimer = useRef<number | null>(null);
   const savePositions = useCallback((next: QuestMapPositions) => {

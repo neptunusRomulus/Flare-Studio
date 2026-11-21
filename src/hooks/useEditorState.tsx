@@ -93,6 +93,7 @@ export function useEditorState(optsRef: React.RefObject<Partial<UseEditorStateOp
   syncMapObjectsWrapperRef.current = syncMapObjectsWrapper;
 
   // Editor command helpers — keep lifecycle and commands inside the hook
+  // eslint-disable-next-line react-hooks/immutability -- safeReadRefCurrent uses a render-local seen set
   const handlePlaceActorOnMap = useCallback((objectId: number, x?: number, y?: number) => {
     if (!editor) return;
     // safe read of optsRef.current to avoid recursive ref structures
@@ -180,21 +181,29 @@ export function useEditorState(optsRef: React.RefObject<Partial<UseEditorStateOp
     syncMapObjectsWrapper();
   }, [editor, syncMapObjectsWrapper]);
 
-  const handlePlaceEventOnMap = useCallback((eventId: string, x: number, y: number) => {
+  const handlePlaceEventOnMap = useCallback((scriptPath: string, x: number, y: number, width = 1, height = 1) => {
     if (!editor) return;
-    const numId = parseInt(eventId, 10);
-    if (isNaN(numId)) return;
-    const ev = editor.getMapObjects().find((obj: { id: number }) => obj.id === numId);
-    if (!ev) return;
-    // Update position and recalculate location/hotspot in properties
-    const props = { ...(ev.properties || {}) };
-    if (props.location) {
-      props.location = `${x},${y},${ev.width},${ev.height}`;
-    }
-    if (props.hotspot) {
-      props.hotspot = `${x},${y},${ev.width},${ev.height}`;
-    }
-    editor.updateMapObject(numId, { x, y, properties: props });
+    const rel = String(scriptPath || '').replace(/\\/g, '/').replace(/^\//, '');
+    if (!rel) return;
+    const name = rel.replace(/^scripts\//, '').replace(/\.txt$/i, '') || 'Event';
+    const object = editor.addMapObject('event', x, y, width, height);
+    if (!object || typeof editor.updateMapObject !== 'function') return;
+    editor.updateMapObject(object.id, {
+      name,
+      type: 'event',
+      activate: 'on_trigger',
+      hotspot: 'location',
+      x,
+      y,
+      width,
+      height,
+      properties: {
+        activate: 'on_trigger',
+        location: `${x},${y},${width},${height}`,
+        hotspot: 'location',
+        script: rel.startsWith('scripts/') ? rel : `scripts/${rel}`,
+      },
+    });
     syncMapObjectsWrapper();
   }, [editor, syncMapObjectsWrapper]);
 
@@ -261,6 +270,7 @@ export function useEditorState(optsRef: React.RefObject<Partial<UseEditorStateOp
   }, [setupAutoSave]);
 
   // Editor instantiation effect reads options from optsRef
+  // eslint-disable-next-line react-hooks/immutability -- safeReadRefCurrent uses a render-local seen set
   useEffect(() => {
     // guard against malformed refs that recursively reference themselves
     let opts: Partial<UseEditorStateOptions> = {};

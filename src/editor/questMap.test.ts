@@ -209,6 +209,17 @@ describe('map events', () => {
     expect(g2.events.map((e) => e.location)).toEqual(['Town 2,5', 'Town · Not placed']);
     expect(layoutQuestGraph(g2).map((b) => b.nodeId)).toContain('event:__current_map__#4');
   });
+
+  it('follows script= set_status when a scripts map is provided', async () => {
+    const { questMapEventsFromObjects } = await import('@/editor/questMapEvents');
+    const scripts = { 'scripts/open_gate.txt': '[event]\nset_status=gate_open\n' };
+    const live = questMapEventsFromObjects([
+      { id: 7, type: 'event', name: 'Gate', x: 3, y: 4, properties: { script: 'scripts/open_gate.txt' } },
+    ], '__current_map__', 'Town', scripts);
+    expect(live.map((e) => [e.id, e.name, e.x, e.sets.join(',')])).toEqual([
+      ['__current_map__#7', 'Gate', 3, 'gate_open'],
+    ]);
+  });
 });
 
 describe('crowded quests', () => {

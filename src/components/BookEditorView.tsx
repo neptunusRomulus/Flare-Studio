@@ -7,9 +7,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { FieldHint, HintLabel } from '@/components/ui/field-hint';
 import { FlareColorField } from '@/components/ui/flare-color-field';
 import Tooltip from '@/components/ui/tooltip';
+import EventComponentsEditor from '@/components/events/EventComponentsEditor';
 import {
   BOOK_ALIGNMENTS,
-  BOOK_EVENT_KEYS,
   DEFAULT_BOOK_SIZE,
   DEFAULT_BOOK_TEMPLATE,
   mergeBookText,
@@ -64,69 +64,6 @@ function Field({ label, hint, children }: { label: string; hint: string; childre
     <div className="flex flex-wrap items-center gap-2">
       <HintLabel className="text-xs font-normal w-28 shrink-0" hint={hint}>{label}</HintLabel>
       {children}
-    </div>
-  );
-}
-
-function BookEventComponentsEditor({
-  components,
-  onChange,
-  scripts,
-  books,
-  cutscenes,
-}: {
-  components: BookEventComponent[];
-  onChange: (next: BookEventComponent[]) => void;
-  scripts: string[];
-  books: string[];
-  cutscenes: string[];
-}) {
-  const suggestionsFor = (key: string) => {
-    if (key === 'script') return scripts;
-    if (key === 'book') return books;
-    if (key === 'cutscene') return cutscenes;
-    return [];
-  };
-  return (
-    <div className="space-y-2">
-      {components.map((row, index) => {
-        const listId = `book-event-${index}-${row.key}`;
-        const suggestions = suggestionsFor(row.key);
-        return (
-          <div key={index} className="flex flex-wrap items-center gap-1">
-            <Input
-              aria-label={`Event key ${index + 1}`}
-              width="id"
-              className="h-7 text-xs"
-              list="book-event-keys"
-              value={row.key}
-              onChange={(event) => onChange(components.map((item, i) => (i === index ? { ...item, key: event.target.value } : item)))}
-            />
-            <Input
-              aria-label={`Event value ${index + 1}`}
-              width="path"
-              className="h-7 text-xs"
-              list={suggestions.length ? listId : undefined}
-              value={row.value}
-              onChange={(event) => onChange(components.map((item, i) => (i === index ? { ...item, value: event.target.value } : item)))}
-            />
-            {suggestions.length ? (
-              <datalist id={listId}>
-                {suggestions.map((path) => <option key={path} value={path} />)}
-              </datalist>
-            ) : null}
-            <Button type="button" variant="ghost" size="sm" className="h-7 px-2" aria-label={`Remove event key ${index + 1}`} onClick={() => onChange(components.filter((_, i) => i !== index))}>
-              <Trash2 className="w-3 h-3" />
-            </Button>
-          </div>
-        );
-      })}
-      <datalist id="book-event-keys">
-        {BOOK_EVENT_KEYS.map((key) => <option key={key} value={key} />)}
-      </datalist>
-      <Button type="button" variant="outline" size="sm" className="h-7" onClick={() => onChange([...components, { key: 'script', value: '' }])}>
-        <Plus className="w-3 h-3 mr-1" />Component
-      </Button>
     </div>
   );
 }
@@ -572,7 +509,7 @@ const BookEditorView = ({ projectPath }: Props) => {
                 <Input aria-label="button text" width="name" className="h-7 text-xs" value={selectedBlock.text ?? ''} onChange={(event) => updateBlock(selected!, { ...selectedBlock, text: event.target.value || undefined })} />
               </Field>
               <div className="text-xs font-medium">Event components</div>
-              <BookEventComponentsEditor
+              <EventComponentsEditor
                 components={selectedBlock.components}
                 onChange={(components) => updateBlock(selected!, { ...selectedBlock, components })}
                 scripts={scripts}
@@ -587,7 +524,7 @@ const BookEditorView = ({ projectPath }: Props) => {
               <FieldHint hint={`${selectedBlock.section} runs EventManager components when the book is ${selectedBlock.section === 'event_open' ? 'opened' : 'closed'}. Typical use is script=. Empty values are not written. Flare only uses the first ${selectedBlock.section} section.`}>
                 <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{selectedBlock.section}</div>
               </FieldHint>
-              <BookEventComponentsEditor
+              <EventComponentsEditor
                 components={selectedBlock.components}
                 onChange={(components) => updateBlock(selected!, { ...selectedBlock, components })}
                 scripts={scripts}

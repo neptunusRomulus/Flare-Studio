@@ -34,6 +34,7 @@ const SelectionInfo: React.FC<Props> = ({
   const popoverRef = React.useRef<HTMLDivElement | null>(null);
   const [position, setPosition] = React.useState<OverlayPosition>({ left: 16, top: 16 });
   const [eventDialogOpen, setEventDialogOpen] = React.useState(false);
+  const [editingEventId, setEditingEventId] = React.useState<number | null>(null);
   const [eventLocation, setEventLocation] = React.useState<{ x: number; y: number } | null>(null);
 
   React.useEffect(() => {
@@ -87,11 +88,20 @@ const SelectionInfo: React.FC<Props> = ({
   const handleOpenEventDialog = () => {
     if (!editor) return;
     const selection = editor.getSelection();
-    if (selection.length > 0) {
-      const firstCell = selection[0];
-      setEventLocation({ x: firstCell.x, y: firstCell.y });
-      setEventDialogOpen(true);
-    }
+    if (!selection.length) return;
+    const objects = typeof editor.getMapObjects === 'function' ? editor.getMapObjects() : [];
+    const hit = objects.find((object) => {
+      if (object.type !== 'event') return false;
+      const x = object.x ?? 0;
+      const y = object.y ?? 0;
+      const width = object.width ?? 1;
+      const height = object.height ?? 1;
+      return selection.some((cell) => cell.x >= x && cell.x < x + width && cell.y >= y && cell.y < y + height);
+    });
+    if (!hit) return;
+    setEditingEventId(hit.id);
+    setEventLocation({ x: hit.x, y: hit.y });
+    setEventDialogOpen(true);
   };
 
   return (
@@ -172,7 +182,7 @@ const SelectionInfo: React.FC<Props> = ({
         </Tooltip>
       </div>
 
-      <EventDialog open={eventDialogOpen} onOpenChange={setEventDialogOpen} eventLocation={eventLocation} />
+      <EventDialog open={eventDialogOpen} onOpenChange={(open) => { setEventDialogOpen(open); if (!open) setEditingEventId(null); }} eventLocation={eventLocation} editingEventId={editingEventId} />
     </div>
   );
 };

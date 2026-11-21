@@ -31,6 +31,7 @@ import MenuEditorView from '@/components/MenuEditorView';
 import { Toaster } from '@/components/ui/toaster';
 import DialogsContainer from '@/components/DialogsContainer';
 import StatusEditDialog from '@/components/StatusEditDialog';
+import EventScriptDatalist from '@/components/events/EventScriptDatalist';
 import StoryFlagDatalist from '@/components/powers/StoryFlagDatalist';
 import SessionRecoveryDialog from '@/components/SessionRecoveryDialog';
 import useCrashRecovery from '@/hooks/useCrashRecovery';
@@ -88,6 +89,10 @@ export default function AppMain() {
     setEventDialogOpen,
     eventDialogLocation,
     editingEventId,
+    editingScriptPath,
+    eventScriptPaths,
+    onEventScriptSaved,
+    onEditEventScript,
     confirmDialogProps,
     showHelp,
     handleHelpClose,
@@ -428,7 +433,7 @@ export default function AppMain() {
           currentMapFileId={(canvasCtx?.mapTabs?.tabs ?? []).find((t: { id?: string }) => t.id === canvasCtx?.mapTabs?.activeTabId)?.name || mapName}
         />
 
-        <EventDialog open={eventDialogOpen} onOpenChange={setEventDialogOpen} eventLocation={eventDialogLocation} editingEventId={editingEventId} />
+        <EventDialog open={eventDialogOpen} onOpenChange={setEventDialogOpen} eventLocation={eventDialogLocation} editingEventId={editingEventId} scriptPath={editingScriptPath} scripts={eventScriptPaths} onScriptSaved={() => { void onEventScriptSaved(); }} onEditScript={onEditEventScript} />
 
         <AnchoredConfirm open={!!showClearLayerDialog} onCancel={handleClearLayerClose} onConfirm={handleClearLayerConfirm} />
 
@@ -446,6 +451,7 @@ export default function AppMain() {
 
       <StatusEditDialog open={showStatusDialog} onClose={handleCloseStatusDialog} />
       <StoryFlagDatalist projectPath={controls?.currentProjectPath ?? null} />
+      <EventScriptDatalist projectPath={controls?.currentProjectPath ?? null} />
 
       <SessionRecoveryDialog
         isOpen={showRecoveryDialog && hasCrashBackup}

@@ -425,9 +425,9 @@ const SidebarActorEntries = ({
                             }
                             onDragEnd();
                           }}
-                          className={`w-8 h-8 flex items-center justify-center cursor-grab active:cursor-grabbing transition-colors flex-shrink-0 rounded ${armed?.id === actor.id ? 'text-primary ring-1 ring-primary' : 'text-muted-foreground hover:text-foreground'}`}
+                          className={`w-8 h-8 flex items-center justify-center cursor-grab active:cursor-grabbing transition-colors flex-shrink-0 rounded ${armed != null && armed.type !== 'event' && armed.id === actor.id ? 'text-primary ring-1 ring-primary' : 'text-muted-foreground hover:text-foreground'}`}
                           onClick={(event) => { event.stopPropagation(); entityPlacement.toggle({ id: actor.id, type: (isNpcLayer ? 'npc' : 'enemy') }); }}
-                          data-armed={armed?.id === actor.id ? 'true' : undefined}
+                          data-armed={armed != null && armed.type !== 'event' && armed.id === actor.id ? 'true' : undefined}
                         >
                           <GripVertical className="w-5 h-5" />
                         </div>

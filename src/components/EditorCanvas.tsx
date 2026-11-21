@@ -24,13 +24,13 @@ type EditorContext = {
   canvasRef: React.RefObject<HTMLCanvasElement>;
   draggingNpcId: number | null;
   setDraggingNpcId: (id: number | null) => void;
-  draggingEventId: number | null;
-  setDraggingEventId: (id: number | null) => void;
+  draggingEventId: string | null;
+  setDraggingEventId: (id: string | null) => void;
   isEnemyTabActive: boolean;
   mapWidth: number;
   mapHeight: number;
   handlePlaceActorOnMap: (objectId: number, x?: number, y?: number) => void;
-  handlePlaceEventOnMap: (eventId: string, x: number, y: number) => void;
+  handlePlaceEventOnMap: (scriptPath: string, x: number, y: number, width?: number, height?: number) => void;
   mapInitialized: boolean;
   handleOpenCreateMapDialog: () => void;
   isPreparingNewMap: boolean;
@@ -295,8 +295,8 @@ export default function EditorCanvas(props: Props) {
         e.stopPropagation();
         const end = tileAtClient(e.clientX, e.clientY) ?? start;
         const rect = normalizeTileRect(start, end, mapWidth, mapHeight);
-        editorRef.current.updateMapObject(armed.id, { width: rect.width, height: rect.height });
-        handlePlaceEventOnMap(String(armed.id), rect.x, rect.y);
+        if (armed.type !== 'event') return;
+        handlePlaceEventOnMap(armed.script, rect.x, rect.y, rect.width, rect.height);
         entityPlacement.clear();
       }}
       onMouseMove={(e) => {
@@ -521,13 +521,13 @@ export default function EditorCanvas(props: Props) {
           return;
         }
 
-        // Handle Event drop
-        const eventIdStr = e.dataTransfer.getData('event-id');
-        if (eventIdStr) {
+        // Handle Event drop: catalog script path becomes a new map instance
+        const eventScript = e.dataTransfer.getData('event-script') || e.dataTransfer.getData('event-id');
+        if (eventScript && eventScript.includes('/')) {
           const { x: canvasX, y: canvasY } = clientToCanvas(e.clientX, e.clientY, canvas);
           const mapCoords = editorRef.current.screenToTile(canvasX, canvasY);
           if (mapCoords && mapCoords.x >= 0 && mapCoords.x < mapWidth && mapCoords.y >= 0 && mapCoords.y < mapHeight) {
-            handlePlaceEventOnMap(eventIdStr, mapCoords.x, mapCoords.y);
+            handlePlaceEventOnMap(eventScript, mapCoords.x, mapCoords.y);
           }
           editorRef.current.clearEventDragHover();
           setDraggingEventId(null);

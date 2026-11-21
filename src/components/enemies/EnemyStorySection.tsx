@@ -4,6 +4,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import LootRowsEditor from '@/components/LootRowsEditor';
 import { LabelWithTooltip, MoreToggle, EditorSection, enemyInputCls } from './enemyFormPrimitives';
+import { EVENT_SCRIPT_LIST_ID } from '@/hooks/useEventScripts';
 
 export type EnemyStorySectionProps = {
   defeatStatus: string; setDefeatStatus: (v: string) => void;
@@ -67,7 +68,7 @@ const EnemyStorySection = ({
           </div>
           <div className="space-y-1">
             <LabelWithTooltip field="script">Script</LabelWithTooltip>
-            <Input value={script} onChange={(e) => setScript(e.target.value)} className={`${enemyInputCls} font-mono`} />
+            <Input value={script} onChange={(e) => setScript(e.target.value)} className={`${enemyInputCls} font-mono`} list={EVENT_SCRIPT_LIST_ID} />
           </div>
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground font-normal">Raw properties</Label>

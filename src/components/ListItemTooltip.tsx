@@ -2,7 +2,7 @@ import React from 'react';
 import Tooltip from '@/components/ui/tooltip';
 import { Mouse, MouseRight } from 'lucide-react';
 
-const ListItemTooltip: React.FC<{ children: React.ReactNode; item: { id: number; name: string; description?: string }; showActions?: boolean }> = ({ children, item, showActions = true }) => {
+const ListItemTooltip: React.FC<{ children: React.ReactNode; item: { id: number | string; name: string; description?: string }; showActions?: boolean }> = ({ children, item, showActions = true }) => {
   const content = (
     <div className="flex flex-col gap-1">
       <div className="text-xs font-medium">{item.name}</div>

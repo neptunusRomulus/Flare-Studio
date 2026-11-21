@@ -20,7 +20,7 @@ import type { DragEvent } from 'react';
  */
 function isPlacementDrag(dataTransfer: DataTransfer): boolean {
   const types = Array.from(dataTransfer.types);
-  return types.includes('npc-id') || types.includes('event-id');
+  return types.includes('npc-id') || types.includes('event-id') || types.includes('event-script');
 }
 
 /** Reorder drags carry their source index in text/plain; other drags (map placement) leave it empty. */

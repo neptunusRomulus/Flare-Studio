@@ -1,19 +1,18 @@
 import React from 'react';
 import SidebarEventEntries from '@/components/SidebarEventEntries';
-import type { MapObject } from '@/types';
+import type { EventScriptEntry } from '@/editor/eventScripts';
 
 type Props = {
   isEventLayer: boolean;
-  eventEntries: MapObject[];
-  draggingEventId: number | null;
-  handleEditEvent: (id: number) => void;
-  handleDuplicateEvent: (id: number) => void;
-  handleDeleteEvent: (id: number) => void;
+  eventEntries: EventScriptEntry[];
+  draggingEventId: string | null;
+  handleEditEvent: (scriptPath: string) => void;
+  handleDuplicateEvent: (scriptPath: string) => void;
+  handleDeleteEvent: (scriptPath: string) => void;
   setEventHoverTooltip: (p: { x: number; y: number } | null) => void;
-  handleEventDragStart: (e: React.DragEvent, eventId: number) => void;
+  handleEventDragStart: (e: React.DragEvent, scriptPath: string) => void;
   handleEventDragEnd: () => void;
-  handleReorderEvents: (fromIndex: number, toIndex: number) => void;
-  handleOpenEventDialog: () => void;
+  handleOpenEventDialog: (name?: string) => void;
 };
 
 const SidebarEventArea: React.FC<Props> = ({
@@ -26,7 +25,6 @@ const SidebarEventArea: React.FC<Props> = ({
   setEventHoverTooltip,
   handleEventDragStart,
   handleEventDragEnd,
-  handleReorderEvents,
   handleOpenEventDialog
 }) => {
   return (
@@ -38,15 +36,12 @@ const SidebarEventArea: React.FC<Props> = ({
       onDuplicateEvent={handleDuplicateEvent}
       onDeleteEvent={handleDeleteEvent}
       onHover={() => {}}
-      onHoverEnd={() => {}}
+      onHoverEnd={() => setEventHoverTooltip(null)}
       onDragStart={handleEventDragStart}
       onDragEnd={handleEventDragEnd}
-      onReorderEvents={handleReorderEvents}
       onAddEvent={handleOpenEventDialog}
     />
   );
 };
 
 export default SidebarEventArea;
-
-

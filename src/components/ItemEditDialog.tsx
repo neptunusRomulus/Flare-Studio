@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
+import { EVENT_SCRIPT_LIST_ID } from '@/hooks/useEventScripts';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -727,6 +728,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
                 value={editingItem.script}
                 onChange={(e) => updateEditingItemField('script', e.target.value)}
                 placeholder="scripts/item_script.txt"
+                list={EVENT_SCRIPT_LIST_ID}
                 className="h-8"
               />
             </div>

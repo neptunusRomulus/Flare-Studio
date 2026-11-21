@@ -9,6 +9,7 @@
   ObjectInstance,
   PaintMode
 } from '../types';
+import { EVENT_INSTANCE_KEY_SET, normalizeEventScriptPath } from '@/editor/eventScripts';
 import { placedOfType } from './entityPlacementRules';
 import { applyExportLocation, updatesWithSyncedLocation } from './actorLocation';
 import { MAP_TARGET_CURSOR } from '@/components/mapTargets';
@@ -3997,6 +3998,15 @@ export class TileMapEditor {
     if (!record.loot && event.loot) record.loot = event.loot;
     delete record._description;
     delete record.type;
+    const script = normalizeEventScriptPath(record.script);
+    if (script) {
+      record.script = script;
+      const keep: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(record)) {
+        if (EVENT_INSTANCE_KEY_SET.has(key) && value != null && value !== '') keep[key] = value;
+      }
+      return keep;
+    }
     return record;
   }
 

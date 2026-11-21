@@ -33,6 +33,7 @@ import DialogsContainer from '@/components/DialogsContainer';
 import StatusEditDialog from '@/components/StatusEditDialog';
 import EventScriptDatalist from '@/components/events/EventScriptDatalist';
 import XpScalingDatalist from '@/components/engine/XpScalingDatalist';
+import StepSoundDatalist from '@/components/engine/StepSoundDatalist';
 import StoryFlagDatalist from '@/components/powers/StoryFlagDatalist';
 import SessionRecoveryDialog from '@/components/SessionRecoveryDialog';
 import useCrashRecovery from '@/hooks/useCrashRecovery';
@@ -454,6 +455,7 @@ export default function AppMain() {
       <StoryFlagDatalist projectPath={controls?.currentProjectPath ?? null} />
       <EventScriptDatalist projectPath={controls?.currentProjectPath ?? null} />
       <XpScalingDatalist projectPath={controls?.currentProjectPath ?? null} />
+      <StepSoundDatalist projectPath={controls?.currentProjectPath ?? null} />
 
       <SessionRecoveryDialog
         isOpen={showRecoveryDialog && hasCrashBackup}

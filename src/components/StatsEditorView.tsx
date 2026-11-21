@@ -40,6 +40,8 @@ import { CLASSES_PATH } from '@/editor/heroClasses';
 import { EQUIP_FLAGS_PATH } from '@/editor/equipFlags';
 import { ClassHeroForm, EquipFlagsForm, HeroLayersForm, HeroOptionsForm, XpTableForm } from '@/components/engine/EngineSpecialForms';
 import XpScalingTablesForm from '@/components/engine/XpScalingTablesForm';
+import { AvatarSfxTablesForm, StepSoundsForm } from '@/components/engine/AvatarSoundsForms';
+import { AVATAR_SFX_DIR, STEP_SOUND_LIST_ID, STEP_SOUNDS_PATH } from '@/editor/avatarSounds';
 import { listTxtUnder } from '@/hooks/useEventScripts';
 import { XP_SCALING_DIR } from '@/editor/xpScaling';
 import { CombatSettingsForm, DamageTypesForm } from '@/components/engine/CombatAndDamageForms';
@@ -68,6 +70,9 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
   const [heroOptionsText, setHeroOptionsText] = useState('');
   const [heroLayersText, setHeroLayersText] = useState('');
   const [equipFlagsText, setEquipFlagsText] = useState('');
+  const [stepSoundsText, setStepSoundsText] = useState('');
+  const [avatarSfxFiles, setAvatarSfxFiles] = useState<Record<string, string>>({});
+  const [avatarSfxOriginal, setAvatarSfxOriginal] = useState<string[]>([]);
   const [itemIds, setItemIds] = useState<Set<string>>(new Set());
   const [powerIds, setPowerIds] = useState<Set<string>>(new Set());
   const [addOpen, setAddOpen] = useState(false);
@@ -93,6 +98,9 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
       setHeroOptionsText('');
       setHeroLayersText('');
       setEquipFlagsText('');
+      setStepSoundsText('');
+      setAvatarSfxFiles({});
+      setAvatarSfxOriginal([]);
       setItemIds(new Set());
       setPowerIds(new Set());
       setSourceKind('empty');
@@ -137,6 +145,20 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
     setHeroOptionsText(heroOptionsFile.text);
     setHeroLayersText(heroLayersFile.text);
     setEquipFlagsText(equipFlagsFile.text);
+    const stepFile = await loadEngineFileWithFallback({ projectPath, relative: STEP_SOUNDS_PATH, flarePath, fs });
+    setStepSoundsText(stepFile.text);
+    const avatar: Record<string, string> = {};
+    try {
+      const root = projectPath.replace(/\\/g, '/');
+      for (const rel of await listTxtUnder(root, AVATAR_SFX_DIR)) {
+        const text = await window.electronAPI.readFile(`${root}/${rel}`);
+        if (text != null) avatar[rel] = text;
+      }
+    } catch {
+      /* no engine/avatar folder yet */
+    }
+    setAvatarSfxFiles(avatar);
+    setAvatarSfxOriginal(Object.keys(avatar));
     try {
       const projectFiles = await loadProjectTextMap(projectPath);
       setItemIds(collectSectionIds(projectFiles, ['item']));
@@ -290,6 +312,10 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
       if (heroOptionsText.trim()) files.push({ path: HERO_OPTIONS_PATH, content: heroOptionsText.endsWith('\n') ? heroOptionsText : `${heroOptionsText}\n` });
       if (heroLayersText.trim()) files.push({ path: HERO_LAYERS_PATH, content: heroLayersText.endsWith('\n') ? heroLayersText : `${heroLayersText}\n` });
       if (equipFlagsText.trim()) files.push({ path: EQUIP_FLAGS_PATH, content: equipFlagsText.endsWith('\n') ? equipFlagsText : `${equipFlagsText}\n` });
+      if (stepSoundsText.trim()) files.push({ path: STEP_SOUNDS_PATH, content: stepSoundsText.endsWith('\n') ? stepSoundsText : `${stepSoundsText}\n` });
+      for (const [path, content] of Object.entries(avatarSfxFiles)) {
+        files.push({ path, content: content.endsWith('\n') ? content : `${content}\n` });
+      }
       if (damageTypes.length || damageSourceText.trim()) {
         files.push({ path: DAMAGE_TYPES_PATH, content: serializeDamageTypes(damageTypes, damageSourceText) });
       }
@@ -305,6 +331,12 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
         await window.electronAPI.deleteProjectFile(`${root}/${path}`);
       }
       setScalingOriginal(Object.keys(scalingFiles));
+      const keptAvatar = new Set(Object.keys(avatarSfxFiles));
+      for (const path of avatarSfxOriginal) {
+        if (keptAvatar.has(path) || !window.electronAPI?.deleteProjectFile) continue;
+        await window.electronAPI.deleteProjectFile(`${projectPath.replace(/\\/g, '/')}/${path}`);
+      }
+      setAvatarSfxOriginal(Object.keys(avatarSfxFiles));
       setPrimaries(cleaned);
       setDirty(false);
       setSourceKind('project');
@@ -373,6 +405,8 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
             <div className="space-y-6">
               <HeroOptionsForm text={heroOptionsText} onChange={(next) => { setHeroOptionsText(next); mark(); }} />
               <HeroLayersForm text={heroLayersText} onChange={(next) => { setHeroLayersText(next); mark(); }} />
+              <StepSoundsForm text={stepSoundsText} onChange={(next) => { setStepSoundsText(next); mark(); }} />
+              <AvatarSfxTablesForm files={avatarSfxFiles} onChange={(next) => { setAvatarSfxFiles(next); mark(); }} />
             </div>
           ) : pane === 'equip' ? (
             <EquipFlagsForm text={equipFlagsText} onChange={(next) => { setEquipFlagsText(next); mark(); }} />
@@ -495,7 +529,7 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
               </div>
               <div className="space-y-1">
                 <Label className="text-[11px] font-normal text-muted-foreground" htmlFor="hero-step">sfx_step</Label>
-                <Input id="hero-step" width="id" value={hero.scalars.sfx_step} onChange={(event) => setScalar('sfx_step', event.target.value)} className="h-8" />
+                <Input id="hero-step" width="id" value={hero.scalars.sfx_step} onChange={(event) => setScalar('sfx_step', event.target.value)} className="h-8" list={STEP_SOUND_LIST_ID} />
               </div>
               <div className="space-y-1">
                 <HintLabel className="text-[11px] font-normal text-muted-foreground" htmlFor="hero-cooldown" hint="Global attack cooldown. Defaults to 66ms if empty.">cooldown</HintLabel>

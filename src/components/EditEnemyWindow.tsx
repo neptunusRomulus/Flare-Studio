@@ -20,7 +20,7 @@ import type { MapObject } from '@/types';
 import { includesFromEnemyText } from '@/adapters/flare/flareAdapter.cjs';
 import { propertyRecord, propertyText } from '@/editor/propertyText';
 import { ENEMY_STAT_IDS, enemyFilePath, formatStatProperty, statsFromProperties } from '@/utils/enemyFileHydrate';
-import { writeEnemyDefinition } from '@/utils/enemyFileWrite';
+import { enemyFileTextFromObject, writeEnemyDefinition } from '@/utils/enemyFileWrite';
 import { canonicalIdentity } from '@/editor/identityRename';
 import { renameIfNameChanged, uniqueSlugFromName } from '@/editor/identityFromName';
 import { loadProjectTextMap } from '@/editor/projectFiles';
@@ -37,6 +37,7 @@ import EnemyStorySection from '@/components/enemies/EnemyStorySection';
 import { BEHAVIOR_ICONS, enemyPropertyTooltips } from '@/components/enemies/enemyModel';
 import { EditorSection, Flag, LabelWithTooltip, MoreToggle, enemyInputCls } from '@/components/enemies/enemyFormPrimitives';
 import { HintIcon } from '@/components/ui/field-hint';
+import { useRegisterDirty } from '@/context/SaveHealthContext';
 import {
   formatLootProperty,
   formatLootRow,
@@ -685,6 +686,49 @@ const [name, setName] = useState(() => enemy?.name || '');
     onSave?.(updated);
     handleClose();
   };
+
+  const enemyFormSnapshot = JSON.stringify({
+    name, level, rarity, count, category, includes, isHumanoid, isLifeform,
+    tilesetPath, portraitPath, gfx, renderLayers, animationSlots, suppressHp,
+    sfxAttack, sfxHit, sfxDie, sfxCritDie, hp, mp, attack, defense, speed, xp, gold,
+    meleeRange, statPerLevel, xpScaling, vulnerable, resistDamageOverTime, resistSlow,
+    resistStun, resistKnockback, resistStatDebuff, resistDamageReflect, xpGain, hpRegen,
+    mpRegen, hpSteal, mpSteal, accuracy, avoidance, crit, absorbMin, absorbMax, poise,
+    reflectChance, returnDamage, currencyFind, itemFind, stealth, dmgMeleeMin, dmgMeleeMax,
+    dmgRangedMin, dmgRangedMax, animations, powers, script, isMelee, isRanged, isCaster,
+    isSummoner, isBoss, isPassive, isStationary, combatStyle, threatRange, fleeRange,
+    fleeDuration, fleeCooldown, chancePursue, chanceFlee, turnDelay, wanderRadius,
+    waypoints, waypointPause, isFacing, isFlying, isIntangible, powersList, passivePowers,
+    cooldown, cooldownHit, powerFilter, abilitiesList, lootRows, lootCountMin, lootCountMax,
+    firstDefeatLoot, tableRows, questLoot, defeatStatus, convertStatus, cooldownLos,
+    corpseHasCollision, corpseHasTimeout, corpseRenderBelow, restingHpRegenTime, sfxBlock,
+    sfxLevelup, sfxLowhp, statPerPrimary, resistHpSteal, resistMpSteal, dmgMentMin, dmgMentMax,
+    customPropsRaw,
+  });
+  const [enemyBaseline, setEnemyBaseline] = useState('');
+  useEffect(() => {
+    if (!open || !enemy) {
+      setEnemyBaseline('');
+      return;
+    }
+  }, [open, enemy?.id]);
+  useEffect(() => {
+    if (!open || !enemy || enemyBaseline) return;
+    setEnemyBaseline(enemyFormSnapshot);
+  }, [open, enemy, enemyBaseline, enemyFormSnapshot]);
+  const enemyDirty = Boolean(open && enemy && enemyBaseline && enemyFormSnapshot !== enemyBaseline);
+  const enemyRel = enemy ? enemySourceRel(enemy) : '';
+  const enemyDrafts = useMemo(() => {
+    if (!enemyDirty || !enemy) return [];
+    const { text } = enemyFileTextFromObject({
+      ...enemy,
+      name,
+      level: Number.isFinite(Number(level)) ? Number(level) : enemy.level,
+      category,
+    });
+    return enemyRel ? [{ path: enemyRel, content: text }] : [{ path: 'content/documents/studio-enemy-edit.json', content: enemyFormSnapshot }];
+  }, [enemyDirty, enemy, enemyRel, name, level, category, enemyFormSnapshot]);
+  useRegisterDirty('enemy-template', enemyDirty, handleSave, enemyDrafts);
 
   const handleCloseDecision = (decision: 'save' | 'discard' | 'cancel') => {
     if (decision === 'save') {

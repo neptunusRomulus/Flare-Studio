@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { InlineConfirm } from '@/components/ui/inline-confirm';
 import Tooltip from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,7 @@ import CutsceneEditor from '@/components/engine/CutsceneEditor';
 import ProcgenRulesForm from '@/components/engine/ProcgenRulesForm';
 import { toast } from '@/hooks/use-toast';
 import { loadConfigDocument, projectRoot, writeProjectFiles } from '@/editor/projectFiles';
+import { useRegisterDirty } from '@/context/SaveHealthContext';
 import {
   collectTranslatableStrings,
   fogFiles,
@@ -155,20 +156,27 @@ export { CutsceneEditor };
 export function LanguagePotEditor() {
   const projectPath = useProjectPath();
   const [text, setText] = useState('');
+  const [savedText, setSavedText] = useState('');
+  const skipDiskLoadRef = useRef(false);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !projectPath) return;
     let cancelled = false;
     void loadConfigDocument(projectPath, 'content/languages/catalog.json').then((raw) => {
-      if (cancelled) return;
+      if (cancelled || skipDiskLoadRef.current) return;
       const parsed = readCanonical(raw);
       const stored = parsed?.strings;
       if (Array.isArray(stored)) {
-        setText(stored.filter((entry) => typeof entry === 'string').join('\n'));
+        const next = stored.filter((entry) => typeof entry === 'string').join('\n');
+        setText(next);
+        setSavedText(next);
         return;
       }
       return loadConfigDocument(projectPath, 'languages/data.pot').then((pot) => {
-        if (!cancelled && pot) setText(msgidsFromPot(pot).join('\n'));
+        if (cancelled || skipDiskLoadRef.current || !pot) return;
+        const next = msgidsFromPot(pot).join('\n');
+        setText(next);
+        setSavedText(next);
       });
     }).catch(() => undefined);
     return () => { cancelled = true; };
@@ -201,8 +209,26 @@ export function LanguagePotEditor() {
   };
 
   const save = async () => {
-    await persist(projectPath, potFiles(linesOf(text)), 'languages/data.pot', 'Could not write languages/data.pot.');
+    const saved = await persist(projectPath, potFiles(linesOf(text)), 'languages/data.pot', 'Could not write languages/data.pot.');
+    if (saved) setSavedText(text);
   };
+
+  const potDirty = text !== savedText;
+  const potDrafts = useMemo(() => (potDirty ? potFiles(linesOf(text)) : []), [potDirty, text]);
+  useRegisterDirty('language-pot', potDirty, save, potDrafts, (incoming) => {
+    skipDiskLoadRef.current = true;
+    const catalog = incoming.find((file) => file.path.replace(/\\/g, '/') === 'content/languages/catalog.json');
+    const pot = incoming.find((file) => file.path.replace(/\\/g, '/') === 'languages/data.pot');
+    if (catalog) {
+      const parsed = readCanonical(catalog.content);
+      const stored = parsed?.strings;
+      if (Array.isArray(stored)) {
+        setText(stored.filter((entry) => typeof entry === 'string').join('\n'));
+        return;
+      }
+    }
+    if (pot) setText(msgidsFromPot(pot.content).join('\n'));
+  });
 
   return (
     <div className="space-y-2 rounded-lg border border-border p-3">
@@ -227,27 +253,44 @@ export function ParallaxEditor({ editor }: { editor?: StudioEditor | null }) {
   const studioEditor = useStudioEditor(editor);
   const [slug, setSlug] = useState('sky');
   const [layers, setLayers] = useState<ParallaxLayerDraft[]>([{ image: '', speed: '', fixed_speed: '', map_layer: '' }]);
+  const [parallaxDirty, setParallaxDirty] = useState(false);
+  const skipParallaxLoadRef = useRef(false);
 
   const updateLayer = (index: number, patch: Partial<ParallaxLayerDraft>) => {
     setLayers((current) => current.map((layer, layerIndex) => layerIndex === index ? { ...layer, ...patch } : layer));
+    setParallaxDirty(true);
   };
 
   const load = async () => {
-    if (!projectPath) return;
+    if (!projectPath || skipParallaxLoadRef.current) return;
     const parsed = readCanonical(await loadConfigDocument(projectPath, `content/parallax/${slug}.json`));
     if (!parsed || !Array.isArray(parsed.layers)) return;
     setLayers(parsed.layers as ParallaxLayerDraft[]);
+    setParallaxDirty(false);
   };
 
   const save = async () => {
     const saved = await persist(projectPath, parallaxFiles(slug, layers), parallaxRelativePath(slug), 'Could not write the parallax file.');
-    if (saved) studioEditor?.setMapPresentation?.({ parallax: parallaxRelativePath(slug) });
+    if (saved) {
+      setParallaxDirty(false);
+      studioEditor?.setMapPresentation?.({ parallax: parallaxRelativePath(slug) });
+    }
   };
+
+  const parallaxDrafts = useMemo(() => (parallaxDirty ? parallaxFiles(slug, layers) : []), [parallaxDirty, slug, layers]);
+  useRegisterDirty('parallax', parallaxDirty, save, parallaxDrafts, (incoming) => {
+    skipParallaxLoadRef.current = true;
+    const json = incoming.find((file) => file.path.replace(/\\/g, '/').startsWith('content/parallax/') && file.path.endsWith('.json'));
+    const parsed = json ? readCanonical(json.content) : null;
+    if (parsed?.id) setSlug(String(parsed.id));
+    if (Array.isArray(parsed?.layers)) setLayers(parsed.layers as ParallaxLayerDraft[]);
+    setParallaxDirty(true);
+  });
 
   return (
     <div className="space-y-2 rounded-lg border border-border p-3">
       <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Parallax</div>
-      <Input value={slug} onChange={(event) => setSlug(event.target.value)} placeholder="id" width="id" className="h-8" aria-label="Parallax id" />
+      <Input value={slug} onChange={(event) => { setSlug(event.target.value); setParallaxDirty(true); }} placeholder="id" width="id" className="h-8" aria-label="Parallax id" />
       {layers.map((layer, index) => (
         <div key={`layer-${index}`} className="space-y-1 rounded-md border border-border p-2">
           <div className="text-xs text-muted-foreground">Layer</div>
@@ -257,7 +300,7 @@ export function ParallaxEditor({ editor }: { editor?: StudioEditor | null }) {
           <Input value={layer.map_layer || ''} onChange={(event) => updateLayer(index, { map_layer: event.target.value })} placeholder="map_layer" width="id" className="h-8" aria-label={`Parallax ${index + 1} map layer`} />
         </div>
       ))}
-      <Button type="button" size="sm" variant="outline" onClick={() => setLayers([...layers, { image: '', speed: '', fixed_speed: '', map_layer: '' }])}>Add layer</Button>
+      <Button type="button" size="sm" variant="outline" onClick={() => { setLayers([...layers, { image: '', speed: '', fixed_speed: '', map_layer: '' }]); setParallaxDirty(true); }}>Add layer</Button>
       <div className="flex gap-2">
         <Button type="button" size="sm" variant="outline" onClick={() => { void load(); }}>Load parallax</Button>
         <Button type="button" size="sm" onClick={() => { void save(); }}>Write parallax</Button>
@@ -284,12 +327,14 @@ export function FogEditor({ editor }: { editor?: StudioEditor | null }) {
   const [tilesText, setTilesText] = useState('');
   const [fogofwar, setFogofwar] = useState('');
   const [saveFog, setSaveFog] = useState('');
+  const [fogDirty, setFogDirty] = useState(false);
+  const skipFogLoadRef = useRef(false);
 
   useEffect(() => {
     if (typeof window === 'undefined' || !projectPath) return;
     let cancelled = false;
     void loadConfigDocument(projectPath, 'content/fog/mask.json').then((raw) => {
-      if (cancelled) return;
+      if (cancelled || skipFogLoadRef.current) return;
       const parsed = readCanonical(raw);
       if (!parsed) return;
       const bits = Array.isArray(parsed.bits) ? parsed.bits.map(String) : [];
@@ -307,6 +352,7 @@ export function FogEditor({ editor }: { editor?: StudioEditor | null }) {
       });
       setBitsText(bits.join('\n'));
       setTilesText(tiles.join('\n'));
+      setFogDirty(false);
     }).catch(() => undefined);
     return () => { cancelled = true; };
   }, [projectPath]);
@@ -315,24 +361,52 @@ export function FogEditor({ editor }: { editor?: StudioEditor | null }) {
     const next: FogDraft = { ...mask, bits: linesOf(bitsText), tiles: linesOf(tilesText) };
     const saved = await persist(projectPath, fogFiles(next), 'engine/fow_mask.txt', 'Could not write engine/fow_mask.txt.');
     if (!saved) return;
+    setFogDirty(false);
     const patch: Partial<MapPresentation> = {};
     if (fogofwar) patch.fogofwar = fogofwar;
     if (saveFog) patch.save_fogofwar = saveFog;
     if (Object.keys(patch).length) studioEditor?.setMapPresentation?.(patch);
   };
 
+  const fogDraft = useMemo(() => {
+    const next: FogDraft = { ...mask, bits: linesOf(bitsText), tiles: linesOf(tilesText) };
+    return fogDirty ? fogFiles(next) : [];
+  }, [fogDirty, mask, bitsText, tilesText]);
+  useRegisterDirty('fog', fogDirty, save, fogDraft, (incoming) => {
+    skipFogLoadRef.current = true;
+    const json = incoming.find((file) => file.path.replace(/\\/g, '/') === 'content/fog/mask.json');
+    const parsed = json ? readCanonical(json.content) : null;
+    if (!parsed) return;
+    const bits = Array.isArray(parsed.bits) ? parsed.bits.map(String) : [];
+    const tiles = Array.isArray(parsed.tiles) ? parsed.tiles.map(String) : [];
+    setMask({
+      radius: stringField(parsed, 'radius'),
+      bits_per_tile: stringField(parsed, 'bits_per_tile'),
+      color_dark: stringField(parsed, 'color_dark'),
+      color_fog: stringField(parsed, 'color_fog'),
+      tileset_dark: stringField(parsed, 'tileset_dark'),
+      tileset_fog: stringField(parsed, 'tileset_fog'),
+      bits,
+      tiles,
+      data: stringField(parsed, 'data'),
+    });
+    setBitsText(bits.join('\n'));
+    setTilesText(tiles.join('\n'));
+    setFogDirty(true);
+  });
+
   return (
     <div className="space-y-2 rounded-lg border border-border p-3">
       <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Fog of war</div>
-      <Input value={mask.radius || ''} onChange={(event) => setMask({ ...mask, radius: event.target.value })} placeholder="radius" width="num" className="h-8" aria-label="Fog radius" />
-      <Input value={mask.bits_per_tile || ''} onChange={(event) => setMask({ ...mask, bits_per_tile: event.target.value })} placeholder="bits_per_tile" width="num" className="h-8" aria-label="Bits per tile" />
-      <Input value={mask.color_dark || ''} onChange={(event) => setMask({ ...mask, color_dark: event.target.value })} placeholder="color_dark" width="short" className="h-8" aria-label="Color dark" />
-      <Input value={mask.color_fog || ''} onChange={(event) => setMask({ ...mask, color_fog: event.target.value })} placeholder="color_fog" width="short" className="h-8" aria-label="Color fog" />
-      <Input value={mask.tileset_dark || ''} onChange={(event) => setMask({ ...mask, tileset_dark: event.target.value })} placeholder="tileset_dark" width="path" className="h-8" aria-label="Tileset dark" />
-      <Input value={mask.tileset_fog || ''} onChange={(event) => setMask({ ...mask, tileset_fog: event.target.value })} placeholder="tileset_fog" width="path" className="h-8" aria-label="Tileset fog" />
-      <Textarea aria-label="Fog bits" value={bitsText} onChange={(event) => setBitsText(event.target.value)} placeholder="bit lines" className="h-16 w-full rounded-md border border-input bg-background px-2 py-1 text-sm" />
-      <Textarea aria-label="Fog tiles" value={tilesText} onChange={(event) => setTilesText(event.target.value)} placeholder="tile lines" className="h-16 w-full rounded-md border border-input bg-background px-2 py-1 text-sm" />
-      <Textarea aria-label="Fog mask data" value={mask.data || ''} onChange={(event) => setMask({ ...mask, data: event.target.value })} placeholder="mask data" className="h-16 w-full rounded-md border border-input bg-background px-2 py-1 text-sm" />
+      <Input value={mask.radius || ''} onChange={(event) => { setMask({ ...mask, radius: event.target.value }); setFogDirty(true); }} placeholder="radius" width="num" className="h-8" aria-label="Fog radius" />
+      <Input value={mask.bits_per_tile || ''} onChange={(event) => { setMask({ ...mask, bits_per_tile: event.target.value }); setFogDirty(true); }} placeholder="bits_per_tile" width="num" className="h-8" aria-label="Bits per tile" />
+      <Input value={mask.color_dark || ''} onChange={(event) => { setMask({ ...mask, color_dark: event.target.value }); setFogDirty(true); }} placeholder="color_dark" width="short" className="h-8" aria-label="Color dark" />
+      <Input value={mask.color_fog || ''} onChange={(event) => { setMask({ ...mask, color_fog: event.target.value }); setFogDirty(true); }} placeholder="color_fog" width="short" className="h-8" aria-label="Color fog" />
+      <Input value={mask.tileset_dark || ''} onChange={(event) => { setMask({ ...mask, tileset_dark: event.target.value }); setFogDirty(true); }} placeholder="tileset_dark" width="path" className="h-8" aria-label="Tileset dark" />
+      <Input value={mask.tileset_fog || ''} onChange={(event) => { setMask({ ...mask, tileset_fog: event.target.value }); setFogDirty(true); }} placeholder="tileset_fog" width="path" className="h-8" aria-label="Tileset fog" />
+      <Textarea aria-label="Fog bits" value={bitsText} onChange={(event) => { setBitsText(event.target.value); setFogDirty(true); }} placeholder="bit lines" className="h-16 w-full rounded-md border border-input bg-background px-2 py-1 text-sm" />
+      <Textarea aria-label="Fog tiles" value={tilesText} onChange={(event) => { setTilesText(event.target.value); setFogDirty(true); }} placeholder="tile lines" className="h-16 w-full rounded-md border border-input bg-background px-2 py-1 text-sm" />
+      <Textarea aria-label="Fog mask data" value={mask.data || ''} onChange={(event) => { setMask({ ...mask, data: event.target.value }); setFogDirty(true); }} placeholder="mask data" className="h-16 w-full rounded-md border border-input bg-background px-2 py-1 text-sm" />
       <Label className="block text-xs text-muted-foreground font-normal" htmlFor="map-fogofwar">Map fogofwar</Label>
       <Select value={fogofwar || '__empty__'} onValueChange={(value) => setFogofwar(value === '__empty__' ? '' : value)}>
         <SelectTrigger id="map-fogofwar" className={selectClass}>

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -83,6 +83,7 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
   const [draftResource, setDraftResource] = useState<ResourceStat>(emptyResourceStat());
 
   const mark = () => setDirty(true);
+  const skipDiskLoadRef = useRef(false);
 
   const loadAll = useCallback(async () => {
     if (!projectPath || !window.electronAPI?.readFile) {
@@ -122,6 +123,7 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
       loadEngineFileWithFallback({ projectPath, relative: HERO_LAYERS_PATH, flarePath, fs }),
       loadEngineFileWithFallback({ projectPath, relative: EQUIP_FLAGS_PATH, flarePath, fs }),
     ]);
+    if (skipDiskLoadRef.current) return;
     const parsedPrimaries = parsePrimaryStats(primaryFile.text);
     setPrimaries(parsedPrimaries.length ? parsedPrimaries : DEFAULT_PRIMARY_STATS);
     setHero(statsFile.text.trim() ? parseHeroStats(statsFile.text) : emptyHeroStats());
@@ -376,7 +378,36 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
     }
     return files;
   }, [dirty, primaries, hero, resources, combatText, xpText, scalingFiles, classesText, heroOptionsText, heroLayersText, equipFlagsText, stepSoundsText, avatarSfxFiles, damageTypes, damageSourceText]);
-  useRegisterDirty('stats', dirty, save, draftFiles);
+  const applyStatsDrafts = (incoming: Array<{ path: string; content: string }>) => {
+    skipDiskLoadRef.current = true;
+    const scaling: Record<string, string> = {};
+    const avatar: Record<string, string> = {};
+    for (const file of incoming) {
+      const path = file.path.replace(/\\/g, '/');
+      const content = file.content;
+      if (path === PRIMARY_STATS_PATH) {
+        const parsed = parsePrimaryStats(content);
+        setPrimaries(parsed.length ? parsed : DEFAULT_PRIMARY_STATS);
+      } else if (path === HERO_STATS_PATH) setHero(content.trim() ? parseHeroStats(content) : emptyHeroStats());
+      else if (path === RESOURCE_STATS_PATH) setResources(parseResourceStats(content));
+      else if (path === DAMAGE_TYPES_PATH) {
+        setDamageTypes(parseDamageTypes(content));
+        setDamageSourceText(content);
+      } else if (path === COMBAT_PATH) setCombatText(content);
+      else if (path === XP_TABLE_PATH) setXpText(content);
+      else if (path === CLASSES_PATH) setClassesText(content);
+      else if (path === HERO_OPTIONS_PATH) setHeroOptionsText(content);
+      else if (path === HERO_LAYERS_PATH) setHeroLayersText(content);
+      else if (path === EQUIP_FLAGS_PATH) setEquipFlagsText(content);
+      else if (path === STEP_SOUNDS_PATH) setStepSoundsText(content);
+      else if (path.startsWith(`${XP_SCALING_DIR}/`)) scaling[path] = content;
+      else if (path.startsWith(`${AVATAR_SFX_DIR}/`)) avatar[path] = content;
+    }
+    if (Object.keys(scaling).length) setScalingFiles((current) => ({ ...current, ...scaling }));
+    if (Object.keys(avatar).length) setAvatarSfxFiles((current) => ({ ...current, ...avatar }));
+    setDirty(true);
+  };
+  useRegisterDirty('stats', dirty, save, draftFiles, applyStatsDrafts);
 
   return (
     <div className="flex flex-col flex-1 min-h-0 gap-3">

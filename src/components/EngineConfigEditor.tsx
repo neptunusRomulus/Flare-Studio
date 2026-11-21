@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Save, RefreshCw, FileText, Plus, Trash2, ChevronDown, ChevronUp, Search } from 'lucide-react';
@@ -10,7 +10,7 @@ import {
   exportTilesetConfig,
   sectionsFromEngineText,
 } from '@/adapters/flare/flareAdapter.cjs';
-import { loadProjectTextMap, projectRoot, saveConfigDocument } from '@/editor/projectFiles';
+import { configDocumentFiles, loadProjectTextMap, projectRoot, saveConfigDocument } from '@/editor/projectFiles';
 import { collectSectionIds } from '@/editor/engineForms';
 import { ClassHeroForm, EquipFlagsForm, HeroLayersForm, HeroOptionsForm, LootSettingsForm, XpTableForm } from '@/components/engine/EngineSpecialForms';
 import { registerProblemOpener } from '@/editor/projectProblems';
@@ -88,6 +88,28 @@ export function EngineConfigEditor({ initialFile }: { initialFile?: string } = {
   };
 
   // Load all engine config files
+  const skipDiskLoadRef = useRef(false);
+
+  const applyEngineDrafts = (incoming: Array<{ path: string; content: string }>) => {
+    skipDiskLoadRef.current = true;
+    const contents: Record<string, string> = {};
+    const parsed: Record<string, ParsedSection[]> = {};
+    const unsaved: Record<string, boolean> = {};
+    for (const file of incoming) {
+      const rel = file.path.replace(/\\/g, '/');
+      if (!rel.startsWith('engine/') || rel.endsWith('.json')) continue;
+      const fileName = rel.slice('engine/'.length);
+      if (!fileName || fileName.includes('/')) continue;
+      contents[fileName] = file.content;
+      parsed[fileName] = sectionsFromEngineText(file.content);
+      unsaved[fileName] = true;
+    }
+    if (!Object.keys(contents).length) return;
+    setFileContents((prev) => ({ ...prev, ...contents }));
+    setParsedData((prev) => ({ ...prev, ...parsed }));
+    setHasUnsavedChanges((prev) => ({ ...prev, ...unsaved }));
+  };
+
   const loadAllConfigs = async () => {
     if (!currentProjectPath) return;
     
@@ -130,6 +152,7 @@ export function EngineConfigEditor({ initialFile }: { initialFile?: string } = {
         }
       }
       
+      if (skipDiskLoadRef.current) return;
       setFileContents(contents);
       setParsedData(parsed);
       setHasUnsavedChanges({});
@@ -178,12 +201,11 @@ export function EngineConfigEditor({ initialFile }: { initialFile?: string } = {
   };
   const draftFiles = useMemo(() => Object.entries(hasUnsavedChanges)
     .filter(([, unsaved]) => unsaved)
-    .map(([fileName]) => ({
-      path: `engine/${fileName}`,
-      content: engineTextFromSections(parsedData[fileName] || []) || fileContents[fileName] || '',
-    }))
-    .filter((file) => file.content), [hasUnsavedChanges, parsedData, fileContents]);
-  useRegisterDirty('engine-config', engineDirty, saveAllEngine, draftFiles);
+    .flatMap(([fileName]) => {
+      const content = engineTextFromSections(parsedData[fileName] || []) || fileContents[fileName] || '';
+      return content ? configDocumentFiles(`engine/${fileName}`, content) : [];
+    }), [hasUnsavedChanges, parsedData, fileContents]);
+  useRegisterDirty('engine-config', engineDirty, saveAllEngine, draftFiles, applyEngineDrafts);
 
   const handleFieldChange = (fileName: string, sectionIndex: number, fieldIndex: number, key: string, value: string) => {
     setParsedData(prev => {

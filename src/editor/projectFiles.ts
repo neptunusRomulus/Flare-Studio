@@ -44,6 +44,15 @@ export async function loadConfigDocument(projectPath: string | null, relativePat
   return text || '';
 }
 
+/** txt + content/documents sidecar, matching a mounted saveConfigDocument write. */
+export function configDocumentFiles(relativePath: string, content: string): Array<{ path: string; content: string }> {
+  const text = authoredConfigText(relativePath, content);
+  return [
+    { path: relativePath, content: text },
+    { path: `content/documents/${relativePath}.json`, content: canonicalJson('document', { path: relativePath, text }) },
+  ];
+}
+
 export async function saveConfigDocument(
   projectPath: string | null,
   relativePath: string,
@@ -51,10 +60,7 @@ export async function saveConfigDocument(
 ): Promise<boolean> {
   if (!projectPath) return false;
   const text = authoredConfigText(relativePath, content);
-  const saved = await writeProjectFiles(projectPath, [
-    { path: relativePath, content: text },
-    { path: `content/documents/${relativePath}.json`, content: canonicalJson('document', { path: relativePath, text }) },
-  ]);
+  const saved = await writeProjectFiles(projectPath, configDocumentFiles(relativePath, content));
   if (!saved || relativePath !== 'engine/tileset_config.txt' || !window.electronAPI?.readFile) return saved;
   const indexPath = `${projectRoot(projectPath)}/project.json`;
   const indexText = await window.electronAPI.readFile(indexPath);

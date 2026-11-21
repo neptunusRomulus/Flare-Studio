@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { FieldHint, HintLabel } from '@/components/ui/field-hint';
@@ -119,6 +119,7 @@ export default function WorldEngineFilesPanel({ worldEditors }: { worldEditors: 
   const [lootText, setLootText] = useState('');
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
+  const skipDiskLoadRef = useRef(false);
 
   const mark = (write: (value: string) => void) => (next: string) => { write(next); setDirty(true); };
 
@@ -141,6 +142,7 @@ export default function WorldEngineFilesPanel({ worldEditors }: { worldEditors: 
       loadEngineFileWithFallback({ projectPath, relative: DEFAULT_MUSIC_PATH, flarePath, fs }),
       loadEngineFileWithFallback({ projectPath, relative: LOOT_PATH, flarePath, fs }),
     ]);
+    if (skipDiskLoadRef.current) return;
     setGameplayText(gameplay.text);
     setMiscText(misc.text);
     setDeathText(death.text);
@@ -188,7 +190,25 @@ export default function WorldEngineFilesPanel({ worldEditors }: { worldEditors: 
     musicText.trim() ? { path: DEFAULT_MUSIC_PATH, content: musicText.endsWith('\n') ? musicText : `${musicText}\n` } : null,
     lootText.trim() ? { path: LOOT_PATH, content: lootText.endsWith('\n') ? lootText : `${lootText}\n` } : null,
   ].filter(Boolean) as Array<{ path: string; content: string }>), [gameplayText, miscText, deathText, musicText, lootText]);
-  useRegisterDirty('world-engine-files', dirty, save, dirty ? draftFiles : []);
+  const applyWorldDrafts = (incoming: Array<{ path: string; content: string }>) => {
+    skipDiskLoadRef.current = true;
+    const setters: Record<string, (value: string) => void> = {
+      [GAMEPLAY_PATH]: setGameplayText,
+      [MISC_PATH]: setMiscText,
+      [DEATH_PENALTY_PATH]: setDeathText,
+      [DEFAULT_MUSIC_PATH]: setMusicText,
+      [LOOT_PATH]: setLootText,
+    };
+    let any = false;
+    for (const file of incoming) {
+      const set = setters[file.path.replace(/\\/g, '/')];
+      if (!set) continue;
+      set(file.content);
+      any = true;
+    }
+    if (any) setDirty(true);
+  };
+  useRegisterDirty('world-engine-files', dirty, save, dirty ? draftFiles : [], applyWorldDrafts);
 
   return (
     <div className="space-y-3">

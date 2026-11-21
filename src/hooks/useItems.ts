@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ItemRole, ItemResourceSubtype } from '../editor/itemRoles';
 import type { RawItem, ItemSummary } from '@/utils/items';
 import { canonicalJson, exportLootFile, importLootText, mergeLootText, slugFileName } from '../adapters/flare/flareAdapter.cjs';
 import { loadConfigDocument, writeProjectFiles } from '../editor/projectFiles';
 import { hydrateItemDraft } from '@/editor/itemFileHydrate';
+import { useRegisterDirty } from '@/context/SaveHealthContext';
 
 const safeString = (value: unknown) => {
   if (typeof value === 'string') return value;
@@ -516,6 +517,55 @@ export default function useItems({ currentProjectPath, toast, normalizeItemsForS
   const updateEditingItemField = useCallback((key: string, value: unknown) => {
     setEditingItem((prev: ItemEdit) => (prev ? { ...prev, [key]: value } as ItemEdit : null));
   }, []);
+
+  const [itemBaseline, setItemBaseline] = useState('');
+  const [lootBaseline, setLootBaseline] = useState('');
+  useEffect(() => {
+    if (!showItemEditDialog || !editingItem) {
+      setItemBaseline('');
+      return;
+    }
+    setItemBaseline((current) => current || JSON.stringify(editingItem));
+  }, [showItemEditDialog, editingItem]);
+  useEffect(() => {
+    if (!showLootGroupEditDialog || !lootGroupEditingData) {
+      setLootBaseline('');
+      return;
+    }
+    setLootBaseline((current) => current || JSON.stringify(lootGroupEditingData));
+  }, [showLootGroupEditDialog, lootGroupEditingData]);
+
+  const itemDirty = Boolean(showItemEditDialog && editingItem && itemBaseline && JSON.stringify(editingItem) !== itemBaseline);
+  const lootDirty = Boolean(showLootGroupEditDialog && lootGroupEditingData && lootBaseline && JSON.stringify(lootGroupEditingData) !== lootBaseline);
+  const itemDrafts = useMemo(
+    () => (itemDirty && editingItem ? [{ path: 'content/documents/studio-item-edit.json', content: JSON.stringify(editingItem) }] : []),
+    [itemDirty, editingItem],
+  );
+  const lootDrafts = useMemo(
+    () => (lootDirty && lootGroupEditingData ? [{ path: 'content/documents/studio-loot-edit.json', content: JSON.stringify(lootGroupEditingData) }] : []),
+    [lootDirty, lootGroupEditingData],
+  );
+  useRegisterDirty('item-template', itemDirty, handleSaveItemEdit, itemDrafts, (incoming) => {
+    const file = incoming[0];
+    if (!file) return;
+    try {
+      const parsed = JSON.parse(file.content) as ItemEdit;
+      if (!parsed) return;
+      setEditingItem(parsed);
+      setShowItemEditDialog(true);
+      setItemBaseline('{}');
+    } catch { /* ignore unreadable draft */ }
+  });
+  useRegisterDirty('loot-template', lootDirty, handleSaveLootGroupEdit, lootDrafts, (incoming) => {
+    const file = incoming[0];
+    if (!file) return;
+    try {
+      const parsed = JSON.parse(file.content) as Record<string, unknown>;
+      setLootGroupEditingData(parsed);
+      setShowLootGroupEditDialog(true);
+      setLootBaseline('{}');
+    } catch { /* ignore unreadable draft */ }
+  });
 
   return {
     itemsList,

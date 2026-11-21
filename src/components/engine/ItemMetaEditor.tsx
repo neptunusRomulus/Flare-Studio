@@ -1,10 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
 import { engineTextFromSections, sectionsFromEngineText } from '@/adapters/flare/flareAdapter.cjs';
-import { loadConfigDocument, saveConfigDocument } from '@/editor/projectFiles';
+import { configDocumentFiles, loadConfigDocument, saveConfigDocument } from '@/editor/projectFiles';
 import { useAppContext } from '@/context/AppContext';
 import { FieldHint } from '@/components/ui/field-hint';
 import ItemRandomizerForm from '@/components/engine/ItemRandomizerForm';
@@ -26,6 +26,22 @@ export default function ItemMetaEditor({ initialFile }: { initialFile?: string }
   const [active, setActive] = useState(initialFile || FILES[0].path);
   const [docs, setDocs] = useState<Record<string, Section[]>>({});
   const [dirty, setDirty] = useState<Record<string, boolean>>({});
+  const skipDiskLoadRef = useRef(false);
+
+  const applyItemMetaDrafts = (incoming: Array<{ path: string; content: string }>) => {
+    skipDiskLoadRef.current = true;
+    const nextDocs: Record<string, Section[]> = {};
+    const nextDirty: Record<string, boolean> = {};
+    for (const file of incoming) {
+      const rel = file.path.replace(/\\/g, '/');
+      if (!FILES.some((entry) => entry.path === rel)) continue;
+      nextDocs[rel] = (sectionsFromEngineText(file.content || '') || []) as Section[];
+      nextDirty[rel] = true;
+    }
+    if (!Object.keys(nextDocs).length) return;
+    setDocs((prev) => ({ ...prev, ...nextDocs }));
+    setDirty((prev) => ({ ...prev, ...nextDirty }));
+  };
 
   useEffect(() => {
     if (initialFile) setActive(initialFile);
@@ -40,7 +56,7 @@ export default function ItemMetaEditor({ initialFile }: { initialFile?: string }
         const text = await loadConfigDocument(projectPath, file.path);
         next[file.path] = (sectionsFromEngineText(text || '') || []) as Section[];
       }
-      if (!cancelled) { setDocs(next); setDirty({}); }
+      if (!cancelled && !skipDiskLoadRef.current) { setDocs(next); setDirty({}); }
     })();
     return () => { cancelled = true; };
   }, [projectPath]);
@@ -78,8 +94,8 @@ export default function ItemMetaEditor({ initialFile }: { initialFile?: string }
   };
   const draftFiles = useMemo(() => Object.entries(dirty)
     .filter(([, isDirty]) => isDirty)
-    .map(([path]) => ({ path, content: engineTextFromSections(docs[path] || []) })), [dirty, docs]);
-  useRegisterDirty('item-meta', itemMetaDirty, saveAllItemMeta, draftFiles);
+    .flatMap(([path]) => configDocumentFiles(path, engineTextFromSections(docs[path] || []))), [dirty, docs]);
+  useRegisterDirty('item-meta', itemMetaDirty, saveAllItemMeta, draftFiles, applyItemMetaDrafts);
 
   const updateField = (si: number, fi: number, key: 'key' | 'value', value: string) => {
     const next = sections.map((sec, i) => i !== si ? sec : { ...sec, fields: sec.fields.map((f, j) => (j === fi ? { ...f, [key]: value } : f)) });

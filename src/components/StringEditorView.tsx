@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { FieldHint } from '@/components/ui/field-hint';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -58,6 +58,7 @@ const StringEditorView: React.FC<Props> = ({ projectPath, onBack }) => {
   const [addName, setAddName] = useState('');
   const [removeOpen, setRemoveOpen] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const skipDiskLoadRef = useRef(false);
 
   const selectedPo = selected === SOURCE_LANGUAGE ? null : pos[selected] ?? emptyPo(selected);
   const progress = selectedPo ? translationProgress(selectedPo) : { total: 0, done: 0 };
@@ -88,6 +89,7 @@ const StringEditorView: React.FC<Props> = ({ projectPath, onBack }) => {
       const raw = await loadConfigDocument(projectPath, dataPoPath(language.code));
       nextPos[language.code] = raw ? parsePo(raw) : (loadedCatalog.length ? mergeCatalogIntoPo(emptyPo(language.code), loadedCatalog) : emptyPo(language.code));
     }
+    if (skipDiskLoadRef.current) return;
     setLanguages(list);
     setPos(nextPos);
     setCatalog(loadedCatalog);
@@ -268,7 +270,40 @@ const StringEditorView: React.FC<Props> = ({ projectPath, onBack }) => {
     }
     return files;
   }, [dirty, catalog, pos, languages]);
-  useRegisterDirty('strings', dirty, save, draftFiles);
+  const applyStringDrafts = (incoming: Array<{ path: string; content: string }>) => {
+    skipDiskLoadRef.current = true;
+    const byPath = Object.fromEntries(incoming.map((file) => [file.path.replace(/\\/g, '/'), file.content]));
+    const languagesText = byPath[LANGUAGES_TXT_PATH];
+    const list = languagesText ? parseLanguagesTxt(languagesText) : undefined;
+    const potRaw = byPath[DATA_POT_PATH];
+    const loadedCatalog: CatalogString[] | undefined = potRaw
+      ? parsePo(potRaw).entries.filter((entry) => !entry.obsolete && entry.msgid).map((entry) => ({
+        msgid: entry.msgid,
+        msgctxt: entry.msgctxt,
+        comments: entry.comments,
+      }))
+      : undefined;
+    if (list) setLanguages(list);
+    if (loadedCatalog) setCatalog(loadedCatalog);
+    const langs = list ?? [];
+    const nextPos: Record<string, PoFile> = {};
+    for (const language of langs.length ? langs : Object.keys(byPath).map((path) => ({ code: path }))) {
+      const code = language.code;
+      if (!code || code === SOURCE_LANGUAGE) continue;
+      const raw = byPath[dataPoPath(code)];
+      if (raw) nextPos[code] = parsePo(raw);
+    }
+    // Also apply any po files not already covered.
+    for (const [path, content] of Object.entries(byPath)) {
+      if (!path.endsWith('.po')) continue;
+      const code = path.replace(/^languages\//, '').replace(/\.po$/, '');
+      if (code && !nextPos[code]) nextPos[code] = parsePo(content);
+    }
+    if (Object.keys(nextPos).length) setPos((current) => ({ ...current, ...nextPos }));
+    setDirty(true);
+    setLoaded(true);
+  };
+  useRegisterDirty('strings', dirty, save, draftFiles, applyStringDrafts);
 
   const selectedName = languages.find((language) => language.code === selected)?.name || selected;
   const canRemove = Boolean(selected && selected !== SOURCE_LANGUAGE);

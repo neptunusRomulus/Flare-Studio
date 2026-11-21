@@ -42,6 +42,7 @@ const MenuEditorView = ({ projectPath }: Props) => {
   const [scale, setScale] = useState(1);
   const [showAll, setShowAll] = useState(false);
   const frameRef = useRef<HTMLDivElement>(null);
+  const skipDiskLoadRef = useRef(false);
   const view = useMemo(() => viewSize(screen.w, screen.h, resolutions), [screen, resolutions]);
 
   const load = useCallback(async () => {
@@ -65,6 +66,7 @@ const MenuEditorView = ({ projectPath }: Props) => {
         if (text) loaded.push(parseMenuText(text, `menus/${name}`));
       } catch { /* missing in this mod */ }
     }
+    if (skipDiskLoadRef.current) return;
     setPanels(loaded);
     setDirty({});
   }, [root]);
@@ -130,7 +132,25 @@ const MenuEditorView = ({ projectPath }: Props) => {
     path: panel.file,
     content: mergeMenuPos(panel.text, panel.pos),
   })), [dirty]);
-  useRegisterDirty('menus', Object.keys(dirty).length > 0, save, draftFiles);
+  const applyMenuDrafts = (incoming: Array<{ path: string; content: string }>) => {
+    skipDiskLoadRef.current = true;
+    const nextDirty: Record<string, MenuPanel> = {};
+    const nextPanels: MenuPanel[] = [];
+    for (const file of incoming) {
+      const path = file.path.replace(/\\/g, '/');
+      if (!path.startsWith('menus/')) continue;
+      const panel = parseMenuText(file.content, path);
+      nextDirty[path] = panel;
+      nextPanels.push(panel);
+    }
+    if (!nextPanels.length) return;
+    setDirty((current) => ({ ...current, ...nextDirty }));
+    setPanels((current) => {
+      const seen = new Set(nextPanels.map((panel) => panel.file));
+      return [...nextPanels, ...current.filter((panel) => !seen.has(panel.file))];
+    });
+  };
+  useRegisterDirty('menus', Object.keys(dirty).length > 0, save, draftFiles, applyMenuDrafts);
 
   if (!root) {
     return <div className="flex-1 flex items-center justify-center text-sm text-muted-foreground">Open a project to edit menus.</div>;

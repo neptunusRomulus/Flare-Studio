@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { X, Save } from 'lucide-react';
@@ -30,6 +30,7 @@ import EventPositioningSection from '@/components/events/EventPositioningSection
 import EventRequirementsSection from '@/components/events/EventRequirementsSection';
 import EventScriptForm from '@/components/events/EventScriptForm';
 import { HintLabel } from '@/components/ui/field-hint';
+import { useRegisterDirty } from '@/context/SaveHealthContext';
 import { Input } from '@/components/ui/input';
 import { EVENT_SCRIPT_LIST_ID } from '@/hooks/useEventScripts';
 import { PROCGEN_RULES_LIST_ID } from '@/editor/procgenRules';
@@ -82,6 +83,8 @@ const EventDialog: React.FC<EventDialogProps> = ({
   const isEditing = editingEventId != null;
   const isScript = Boolean(scriptPath);
   const [scriptFile, setScriptFile] = useState<EventScriptFile>(emptyEventScript);
+  const [scriptBaseline, setScriptBaseline] = useState('');
+  const skipScriptLoadRef = useRef(false);
   const [scriptError, setScriptError] = useState('');
 
   const parseItemValue = (value: string) => {
@@ -205,11 +208,13 @@ const EventDialog: React.FC<EventDialogProps> = ({
       }
       const abs = `${currentProjectPath.replace(/\\/g, '/')}/${normalizeEventScriptPath(scriptPath)}`;
       const previous = (window.electronAPI.readFile ? await window.electronAPI.readFile(abs) : '') || '';
-      const ok = await window.electronAPI.writeFile(abs, mergeEventScript(previous, scriptFile));
+      const next = mergeEventScript(previous, scriptFile);
+      const ok = await window.electronAPI.writeFile(abs, next);
       if (!ok) {
         setScriptError('Could not write the script file.');
         return;
       }
+      setScriptBaseline(next);
       setScriptError('');
       onScriptSaved?.();
       onOpenChange(false);
@@ -509,12 +514,23 @@ const EventDialog: React.FC<EventDialogProps> = ({
     void (async () => {
       const text = window.electronAPI?.readFile ? await window.electronAPI.readFile(abs) : '';
       if (cancelled) return;
+      if (skipScriptLoadRef.current) return;
       setScriptFile(parseEventScript(text || ''));
+      setScriptBaseline(text || '');
       setScriptError('');
     })();
     return () => { cancelled = true; };
   }, [open, isScript, scriptPath, currentProjectPath]);
 
+  const scriptRel = isScript && scriptPath ? normalizeEventScriptPath(scriptPath) : '';
+  const scriptDraftText = scriptRel ? mergeEventScript(scriptBaseline, scriptFile) : '';
+  const scriptDirty = Boolean(isScript && open && scriptRel && scriptDraftText !== scriptBaseline);
+  useRegisterDirty(scriptRel ? `event-script:${scriptRel}` : 'event-script', scriptDirty, handleSave, scriptDirty ? [{ path: scriptRel, content: scriptDraftText }] : [], (incoming) => {
+    const file = incoming.find((entry) => entry.path.replace(/\\/g, '/') === scriptRel) ?? incoming[0];
+    if (!file) return;
+    skipScriptLoadRef.current = true;
+    setScriptFile(parseEventScript(file.content));
+  });
 
   // Fetch project maps when dialog opens
   useEffect(() => {

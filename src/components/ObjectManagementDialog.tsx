@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,6 +16,7 @@ import type { TileMapEditor } from '@/editor/TileMapEditor';
 import { InlineConfirm } from '@/components/ui/inline-confirm';
 import ResizeHandle from '@/components/ResizeHandle';
 import { FieldHint, HintLabel } from '@/components/ui/field-hint';
+import { useRegisterDirty } from '@/context/SaveHealthContext';
 
 type ObjectManagementDialogProps = {
   showObjectDialog: boolean;
@@ -135,6 +136,20 @@ const ObjectManagementDialog = ({
   const objectDialogDirty = Boolean(
     isOpen && objectBaseline && editingObject && JSON.stringify(editingObject) !== objectBaseline,
   );
+  const objectDrafts = useMemo(
+    () => (objectDialogDirty && editingObject
+      ? [{ path: 'content/documents/studio-object-edit.json', content: JSON.stringify(editingObject) }]
+      : []),
+    [objectDialogDirty, editingObject],
+  );
+  useRegisterDirty('npc-template', objectDialogDirty, () => handleObjectDialogSave({ keepOpen: true }), objectDrafts, (incoming) => {
+    const file = incoming[0];
+    if (!file) return;
+    try {
+      const parsed = JSON.parse(file.content) as MapObject;
+      if (parsed && typeof parsed === 'object') setEditingObject(parsed);
+    } catch { /* ignore unreadable draft */ }
+  });
 
   const {
     position,

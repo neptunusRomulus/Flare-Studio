@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -309,6 +309,7 @@ export default function UIEngineFilesPanel({ general }: { general: ReactNode }) 
   const [subtitlesText, setSubtitlesText] = useState('');
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
+  const skipDiskLoadRef = useRef(false);
 
   const mark = (write: (value: string) => void) => (next: string) => { write(next); setDirty(true); };
 
@@ -341,6 +342,7 @@ export default function UIEngineFilesPanel({ general }: { general: ReactNode }) 
       load(DEFAULT_KEYBINDINGS_PATH),
       load(SUBTITLES_PATH),
     ]);
+    if (skipDiskLoadRef.current) return;
     setFontsText(fonts.text);
     setColorsText(colors.text);
     setTooltipsText(tooltips.text);
@@ -409,7 +411,32 @@ export default function UIEngineFilesPanel({ general }: { general: ReactNode }) 
     keybindsText.trim() ? { path: DEFAULT_KEYBINDINGS_PATH, content: withNewline(keybindsText) } : null,
     subtitlesText.trim() ? { path: SUBTITLES_PATH, content: withNewline(subtitlesText) } : null,
   ].filter(Boolean) as Array<{ path: string; content: string }>), [fontsText, colorsText, tooltipsText, resolutionsText, combatText, iconsText, backgroundsText, cursorText, widgetsText, defaultsText, keybindsText, subtitlesText]);
-  useRegisterDirty('ui-engine-files', dirty, save, dirty ? draftFiles : []);
+  const applyUiDrafts = (incoming: Array<{ path: string; content: string }>) => {
+    skipDiskLoadRef.current = true;
+    const setters: Record<string, (value: string) => void> = {
+      [FONT_SETTINGS_PATH]: setFontsText,
+      [FONT_COLORS_PATH]: setColorsText,
+      [TOOLTIPS_PATH]: setTooltipsText,
+      [RESOLUTIONS_PATH]: setResolutionsText,
+      [COMBAT_TEXT_PATH]: setCombatText,
+      [ICONS_PATH]: setIconsText,
+      [MENU_BACKGROUNDS_PATH]: setBackgroundsText,
+      [MOUSE_CURSOR_PATH]: setCursorText,
+      [WIDGET_SETTINGS_PATH]: setWidgetsText,
+      [DEFAULT_SETTINGS_PATH]: setDefaultsText,
+      [DEFAULT_KEYBINDINGS_PATH]: setKeybindsText,
+      [SUBTITLES_PATH]: setSubtitlesText,
+    };
+    let any = false;
+    for (const file of incoming) {
+      const set = setters[file.path.replace(/\\/g, '/')];
+      if (!set) continue;
+      set(file.content);
+      any = true;
+    }
+    if (any) setDirty(true);
+  };
+  useRegisterDirty('ui-engine-files', dirty, save, dirty ? draftFiles : [], applyUiDrafts);
 
   const fonts = parseFontSettings(fontsText);
   const icons = parseIconsFile(iconsText);

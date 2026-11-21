@@ -6,6 +6,7 @@ import ItemMetaEditor from '@/components/engine/ItemMetaEditor';
 import AnimationEditor from '@/components/engine/AnimationEditor';
 import StatusTrackingView from '@/components/engine/StatusTrackingView';
 import ModSettingsForm from '@/components/engine/ModSettingsForm';
+import TestLaunchForm from '@/components/engine/TestLaunchForm';
 import { useAppContext } from '@/context/AppContext';
 import ProblemsPanel from '@/components/engine/ProblemsPanel';
 import { closeEngineStudio, subscribeEngineStudio, type EngineStudioRequest } from '@/components/studio/engineStudio';
@@ -18,6 +19,7 @@ const TITLES: Record<NonNullable<EngineStudioRequest>['view'], string> = {
   animations: 'Animations',
   statuses: 'Status tracking',
   mod: 'Mod settings',
+  'test-save': 'Test save',
 };
 
 /** Host for engine-file, power-tree, item-meta and Problems windows. Mount once in AppMain. */
@@ -36,6 +38,7 @@ export default function EngineStudioWindows() {
       {req.view === 'animations' && <AnimationEditor projectPath={projectPath} initialFile={req.file} />}
       {req.view === 'statuses' && <StatusTrackingView projectPath={projectPath} />}
       {req.view === 'mod' && <ModSettingsForm projectPath={projectPath} />}
+      {req.view === 'test-save' && <TestLaunchForm projectPath={projectPath} />}
     </StudioWindow>
   );
 }

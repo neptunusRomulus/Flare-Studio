@@ -332,6 +332,41 @@ ipcMain.handle("restore-spawn-backup", async (_event, { projectPath } = {}) => {
   }
 });
 
+ipcMain.handle("write-flare-test-save", async (_event, options = {}) => {
+  try {
+    const projectPath = options.projectPath;
+    if (!projectPath) return { success: false, error: "Project path is required." };
+    const miscPath = path.join(projectPath, "engine", "misc.txt");
+    const misc = fs.existsSync(miscPath) ? fs.readFileSync(miscPath, "utf8") : "";
+    const listed = flareLaunch.readKey(misc, "save_prefix");
+    const stablePrefix = listed || flareLaunch.slugSavePrefix(path.basename(String(projectPath).replace(/[\\/]+$/, "")));
+    const testPrefix = `${stablePrefix}_studio_test`;
+    const pathUser = currentPathUser();
+    const testSaveDir = path.join(pathUser, "saves", testPrefix);
+    const slotDir = path.join(testSaveDir, "1");
+    fs.mkdirSync(slotDir, { recursive: true });
+    const className = options.className || flareLaunch.firstHeroClassName(readOptionalText(path.join(projectPath, "engine", "classes.txt")));
+    const avatar = flareLaunch.buildAvatarText({
+      name: options.name || "StudioTest",
+      className,
+      mapPath: options.mapPath,
+      x: options.x,
+      y: options.y,
+      xp: options.xp,
+      campaign: options.campaign,
+      carried: options.carried,
+      equipped: options.equipped,
+      currency: options.currency,
+    });
+    const avatarPath = path.join(slotDir, "avatar.txt");
+    fs.writeFileSync(avatarPath, avatar, "utf8");
+    return { success: true, avatarPath, testSaveDir, testPrefix, loadSlot: "1" };
+  } catch (err) {
+    console.error("[FlareEngine] write-flare-test-save error:", err);
+    return { success: false, error: err.message };
+  }
+});
+
 ipcMain.handle("launch-flare-engine", async (_event, options = {}) => {
   const flarePath = options.flarePath;
   const target = flareLaunch.resolveFlareLaunchTarget(flarePath, flarePathProbe());

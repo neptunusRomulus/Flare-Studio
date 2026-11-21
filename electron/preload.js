@@ -144,6 +144,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("ensure-flare-mod-link", options),
   prepareFlareQuickLaunch: (options) =>
     ipcRenderer.invoke("prepare-flare-quick-launch", options),
+  writeFlareTestSave: (options) =>
+    ipcRenderer.invoke("write-flare-test-save", options),
   restoreSpawnBackup: (options) =>
     ipcRenderer.invoke("restore-spawn-backup", options),
   launchFlareEngine: (options) =>

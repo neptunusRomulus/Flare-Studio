@@ -134,6 +134,19 @@ declare global {
         mapName: string;
         mode: 'current-map' | 'new-game';
       }) => Promise<{ success: boolean; slotNum?: number; loadSlot?: number; mods?: string[]; error?: string }>;
+      writeFlareTestSave: (options: {
+        projectPath: string;
+        mapPath?: string;
+        x?: number | string;
+        y?: number | string;
+        xp?: number | string;
+        campaign?: string | string[];
+        carried?: string | string[];
+        equipped?: string | string[];
+        currency?: number | string;
+        className?: string;
+        name?: string;
+      }) => Promise<{ success: boolean; avatarPath?: string; testSaveDir?: string; testPrefix?: string; loadSlot?: string; error?: string }>;
       restoreSpawnBackup: (options: {
         projectPath: string;
       }) => Promise<boolean>;

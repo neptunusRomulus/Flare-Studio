@@ -302,6 +302,20 @@ describe('quick-launch avatar and map paths', () => {
     expect(text.startsWith('## flare-engine save file ##')).toBe(true);
   });
 
+  it('writes xp, carried items and campaign statuses into the test save', () => {
+    const text = flare.buildAvatarText({
+      mapPath: 'maps/town.txt',
+      x: 1,
+      y: 2,
+      xp: 1500,
+      carried: '12,13',
+      campaign: ['quest_started', 'has_key'],
+    });
+    expect(text).toContain('xp=1500');
+    expect(text).toContain('carried=12,13');
+    expect(text).toContain('campaign=quest_started,has_key');
+  });
+
   it('reads the first [class] name', () => {
     const text = '# comment\n[class]\nname=Wanderer\ndescription=x\n';
     expect(flare.firstHeroClassName(text)).toBe('Wanderer');

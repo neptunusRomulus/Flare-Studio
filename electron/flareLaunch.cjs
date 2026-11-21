@@ -421,15 +421,46 @@ function firstHeroClassName(classesText) {
   return "";
 }
 
-function buildAvatarText({ name = "StudioTest", className, mapPath, x, y }) {
+function listCsv(value) {
+  if (Array.isArray(value)) return value.map((entry) => String(entry).trim()).filter(Boolean);
+  return String(value || "").split(/[,;]/).map((entry) => entry.trim()).filter(Boolean);
+}
+
+function buildAvatarText({
+  name = "StudioTest",
+  className,
+  mapPath,
+  x,
+  y,
+  xp,
+  campaign,
+  carried,
+  equipped,
+  equippedQuantity,
+  carriedQuantity,
+  currency,
+} = {}) {
   const lines = [
     "## flare-engine save file ##",
     "# flare-studio-quick-launch",
     `name=${name}`,
     "permadeath=0",
-    "xp=0",
+    `xp=${xp == null || xp === "" ? 0 : xp}`,
   ];
   if (className) lines.push(`class=${className}`);
+  if (currency != null && currency !== "") lines.push(`currency=${currency}`);
+  const equippedItems = listCsv(equipped);
+  if (equippedItems.length) {
+    lines.push(`equipped=${equippedItems.join(",")}`);
+    if (equippedQuantity) lines.push(`equipped_quantity=${equippedQuantity}`);
+  }
+  const carriedItems = listCsv(carried);
+  if (carriedItems.length) {
+    lines.push(`carried=${carriedItems.join(",")}`);
+    if (carriedQuantity) lines.push(`carried_quantity=${carriedQuantity}`);
+  }
+  const statuses = listCsv(campaign);
+  if (statuses.length) lines.push(`campaign=${statuses.join(",")}`);
   const map = String(mapPath || "").replace(/\\/g, "/");
   lines.push(`spawn=${map},${Number(x) || 0},${Number(y) || 0}`);
   lines.push("");

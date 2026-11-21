@@ -215,8 +215,23 @@ const useEditorTabs = ({
               // previously-loaded map's file. Without this fix the editor keeps the old
               // mapName (e.g. "Map 1") and SAVE-SYNC writes the current layer data into
               // the wrong JSON, causing painting from one map to bleed into another.
-              console.warn(`[TAB SWITCH] Map file not found for tab "${nextTab.name}" — updating mapName to prevent cross-map save contamination`);
-              if (typeof editor.setMapName === 'function') {
+              console.warn(`[TAB SWITCH] Map file not found for tab "${nextTab.name}" — trying maps/*.txt`);
+              const filename = nextTab.name.toLowerCase().endsWith('.txt') ? nextTab.name : `${nextTab.name}.txt`;
+              const text = await window.electronAPI?.readMapFile?.(nextTab.projectPath, filename);
+              if (text && typeof (editor as { loadFlareMapTxt?: (s: string) => void }).loadFlareMapTxt === 'function') {
+                (editor as { loadFlareMapTxt: (s: string) => void }).loadFlareMapTxt(text);
+                if (typeof editor.setMapName === 'function') editor.setMapName(nextTab.name);
+                const width = typeof (editor as { getMapWidth?: () => number }).getMapWidth === 'function'
+                  ? (editor as { getMapWidth: () => number }).getMapWidth()
+                  : 20;
+                const height = typeof (editor as { getMapHeight?: () => number }).getMapHeight === 'function'
+                  ? (editor as { getMapHeight: () => number }).getMapHeight()
+                  : 15;
+                syncMapConfigForTab?.(nextTab.name, width, height);
+                switchToTabHelpersRef.current.setupAutoSave(editor);
+                switchToTabHelpersRef.current.updateLayersList();
+                switchToTabHelpersRef.current.syncMapObjects();
+              } else if (typeof editor.setMapName === 'function') {
                 editor.setMapName(nextTab.name);
               }
             }
@@ -245,6 +260,24 @@ const useEditorTabs = ({
     switchToTabHelpersRef
   ]);
 
+
+  const openOrCreateMapTab = useCallback(async (name: string, projectPath: string) => {
+    const safe = String(name || '').replace(/\.txt$/i, '').trim();
+    if (!safe || !projectPath) return false;
+    const norm = (value: string) => value.replace(/\\/g, '/').toLowerCase();
+    const existing = tabsRef.current.find((tab) => tab.name.toLowerCase() === safe.toLowerCase() && norm(tab.projectPath || '') === norm(projectPath));
+    if (existing) {
+      if (existing.id !== activeTabIdRef.current) await switchToTab(existing.id);
+      return true;
+    }
+    const id = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    const tab: EditorTab = { id, name: safe, projectPath, config: null };
+    tabsRef.current = [...tabsRef.current, tab];
+    setTabs(tabsRef.current);
+    await switchToTab(id);
+    return true;
+  }, [switchToTab, setTabs]);
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const direction = matchEditorTabCycleShortcut(event);
@@ -272,7 +305,8 @@ const useEditorTabs = ({
     isEnemyTabActive,
     createTabFor,
     closeEditorTab,
-    switchToTab
+    switchToTab,
+    openOrCreateMapTab,
   };
 };
 export default useEditorTabs;

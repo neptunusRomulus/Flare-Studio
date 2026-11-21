@@ -70,7 +70,7 @@ export default function useFlareEngine({ currentProjectPath, mapName, onBeforeLa
     return selected;
   }, [promptSelectFlareExe]);
 
-  const launch = useCallback(async (mode: FlareLaunchMode) => {
+  const launch = useCallback(async (mode: FlareLaunchMode, launchOpts?: { mapName?: string }) => {
     const api = (window as unknown as { electronAPI?: typeof window.electronAPI }).electronAPI;
     if (!api?.launchFlareEngine) {
       setLastError('Flare engine launcher not available (not running in Electron)');
@@ -141,7 +141,7 @@ export default function useFlareEngine({ currentProjectPath, mapName, onBeforeLa
         const prepResult = await api.prepareFlareQuickLaunch({
           flarePath: activeFlarePath,
           projectPath: currentProjectPath,
-          mapName: mapName || '',
+          mapName: launchOpts?.mapName || mapName || '',
           mode,
         });
         if (!prepResult.success) {

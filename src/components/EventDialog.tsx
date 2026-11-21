@@ -29,11 +29,17 @@ import EventInformationSection from '@/components/events/EventInformationSection
 import EventPositioningSection from '@/components/events/EventPositioningSection';
 import EventRequirementsSection from '@/components/events/EventRequirementsSection';
 import EventScriptForm from '@/components/events/EventScriptForm';
-import { HintLabel } from '@/components/ui/field-hint';
+import { FieldHint, HintLabel } from '@/components/ui/field-hint';
+import { askConfirm } from '@/components/ui/inlineConfirmCore';
 import { useRegisterDirty } from '@/context/SaveHealthContext';
 import { Input } from '@/components/ui/input';
 import { EVENT_SCRIPT_LIST_ID } from '@/hooks/useEventScripts';
 import { PROCGEN_RULES_LIST_ID, extraProcgenEvents } from '@/editor/procgenRules';
+import RandomDungeonDialog from '@/components/engine/RandomDungeonDialog';
+import { dungeonSlugFromIntermap, intermapForHost, parseMapHeader, type MapStyle } from '@/editor/randomDungeon';
+import { projectRoot } from '@/editor/projectFiles';
+import { getStoredFlarePath } from '@/flare/flarePathStore';
+import useFlareEngine from '@/hooks/useFlareEngine';
 import {
   actionPropertiesFrom,
   emptyEventScript,
@@ -72,11 +78,21 @@ const EventDialog: React.FC<EventDialogProps> = ({
   onEditScript,
 }) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { mapName: currentMapName, mapWidth, mapHeight, editor, syncMapObjectsWrapper, controls, itemsList = [] } = useAppContext() as any;
+  const { mapName: currentMapName, mapWidth, mapHeight, editor, syncMapObjectsWrapper, controls, itemsList = [], openOrCreateMapTab, openMapForRecovery } = useAppContext() as any;
   const itemGroups = useMemo(() => (itemsList as any[]).filter((item) => item.role === 'loot_groups'), [itemsList]);
   const inventoryItems = useMemo(() => (itemsList as any[]).filter((item) => item.role !== 'loot_groups'), [itemsList]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const currentProjectPath: string | null = (controls as any)?.currentProjectPath ?? null;
+  const flareEngine = useFlareEngine({
+    currentProjectPath,
+    mapName: currentMapName,
+    onBeforeLaunch: async () => {
+      if (typeof (controls as any)?.handleManualSave === 'function') await (controls as any).handleManualSave();
+    },
+  });
+  const [dungeonOpen, setDungeonOpen] = useState(false);
+  const [dungeonSlug, setDungeonSlug] = useState<string | null>(null);
+  const [mapStyle, setMapStyle] = useState<MapStyle>({});
   const [projectMaps, setProjectMaps] = useState<string[]>([]);
   const [extraRows, setExtraRows] = useState<EventExtraRow[]>([]);
 
@@ -667,6 +683,64 @@ const EventDialog: React.FC<EventDialogProps> = ({
     setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
   };
 
+
+  const openRandomDungeon = async () => {
+    const root = currentProjectPath ? projectRoot(currentProjectPath) : '';
+    const style: MapStyle = {};
+    const ground = typeof editor?.getGroundTileSize === 'function' ? editor.getGroundTileSize() : null;
+    if (ground) {
+      style.tilewidth = ground.width;
+      style.tileheight = ground.height;
+      style.orientation = ground.orientation;
+    }
+    if (root && currentMapName) {
+      const leaf = String(currentMapName).replace(/\\/g, '/').split('/').pop() || currentMapName;
+      const file = leaf.toLowerCase().endsWith('.txt') ? leaf : `${leaf}.txt`;
+      const text = (await window.electronAPI?.readMapFile?.(root, file).catch(() => '')) || '';
+      const header = parseMapHeader(text);
+      if (header.tileset) style.tileset = header.tileset;
+      if (header.tilewidth) style.tilewidth = header.tilewidth;
+      if (header.tileheight) style.tileheight = header.tileheight;
+      if (header.orientation) style.orientation = header.orientation;
+    }
+    setMapStyle(style);
+
+    const raw = eventData.rewards.teleportMap.trim();
+    const candidate = dungeonSlugFromIntermap(raw ? intermapForHost(raw) : '');
+    if (candidate && root) {
+      const rules = await window.electronAPI?.readFile?.(`${root}/maps/procgen_rules/${candidate}.txt`).catch(() => '');
+      if (rules) {
+        setDungeonSlug(candidate);
+        setDungeonOpen(true);
+        return;
+      }
+      if (raw && !(await askConfirm('Replace this map link with a new random dungeon?'))) {
+        return;
+      }
+    }
+    setDungeonSlug(null);
+    setDungeonOpen(true);
+  };
+
+  const wireDungeon = (info: { slug: string; host: string; intermap: string; title: string }) => {
+    setDungeonSlug(info.slug);
+    setEventData((prev) => ({
+      ...prev,
+      name: prev.name.trim() && prev.name.trim().toLowerCase() !== 'event' ? prev.name : info.title,
+      rewards: { ...prev.rewards, teleportMap: info.host, teleportX: 0, teleportY: 0 },
+      timing: { ...prev.timing, activeActivation: prev.timing.activeActivation || 'Trigger' },
+    }));
+  };
+
+  const openDungeonRoom = async (relPath: string) => {
+    const name = relPath.replace(/\\/g, '/').replace(/^maps\//, '').replace(/\.txt$/i, '');
+    if (typeof openOrCreateMapTab === 'function' && currentProjectPath) {
+      await openOrCreateMapTab(name, currentProjectPath);
+      return;
+    }
+    if (typeof openMapForRecovery === 'function') await openMapForRecovery(name);
+  };
+
   const isLocEnabled = ['Trigger', 'Leave'].includes(eventData.timing.activeActivation || '');
   const isHotspotEnabled = ['Interact', 'Trigger'].includes(eventData.timing.activeActivation || '');
 
@@ -765,6 +839,14 @@ const EventDialog: React.FC<EventDialogProps> = ({
             </div>
           </div>
 
+          <div className="px-1">
+            <FieldHint hint="Creates a dungeon map, links this door to it, and lets you draw entrance, normal and exit rooms. The rules file is written for you.">
+              <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={() => { void openRandomDungeon(); }}>
+                Random dungeon
+              </Button>
+            </FieldHint>
+          </div>
+
           <div className="space-y-2 px-1">
             <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Procgen</div>
             {extraProcgenEvents((typeof editor?.getMapObjects === 'function' ? editor.getMapObjects() : []).filter((obj: { type?: string }) => obj.type === 'event'), editingEventId).length ? (
@@ -856,6 +938,21 @@ const EventDialog: React.FC<EventDialogProps> = ({
         {/* Resize handle */}
         <ResizeHandle onMouseDown={handleResizeMouseDown} />
       </div>
+
+      <RandomDungeonDialog
+        open={dungeonOpen}
+        onOpenChange={setDungeonOpen}
+        projectPath={currentProjectPath}
+        flarePath={getStoredFlarePath()}
+        slug={dungeonSlug}
+        defaultName={eventData.name?.trim() && eventData.name.trim().toLowerCase() !== 'event' ? eventData.name.trim() : 'Dungeon'}
+        style={mapStyle}
+        onWired={wireDungeon}
+        onOpenRoom={openDungeonRoom}
+        onTryInGame={async (hostRel) => {
+          await flareEngine.launch('current-map', { mapName: hostRel });
+        }}
+      />
     </>
   );
 

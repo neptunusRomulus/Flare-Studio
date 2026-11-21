@@ -221,7 +221,7 @@ export default function useAppMainBuilder() {
     syncMapConfigForTab: mapConfig.syncMapConfigForTab,
     switchToTabHelpersRef: editorRefs.switchToTabHelpersRef
   }) as EditorTabsType;
-  const { tabs, activeTabId, setTabs, setActiveTabId, switchToTab, createTabFor, closeEditorTab } = editorTabs as unknown as EditorTabsType;
+  const { tabs, activeTabId, setTabs, setActiveTabId, switchToTab, createTabFor, closeEditorTab, openOrCreateMapTab } = editorTabs as unknown as EditorTabsType;
   activeTabForSaveRef.current = (tabs.find((t: { id: string; name: string }) => t.id === activeTabId) as { name: string } | undefined) ?? null;
 
   const handleCloseEditorTab = useCallback(async (tabId: string) => {
@@ -1012,6 +1012,12 @@ export default function useAppMainBuilder() {
           console.warn('openMapForRecovery failed', err);
         }
         return false;
+      },
+      openOrCreateMapTab: async (name: string, projectPath?: string) => {
+        const fn = (editorTabs as unknown as { openOrCreateMapTab?: (n: string, p: string) => Promise<boolean> }).openOrCreateMapTab;
+        const root = projectPath || currentProjectPath;
+        if (!fn || !root) return false;
+        return fn(name, root);
       },
       isDarkMode,
       titleBarProps: {

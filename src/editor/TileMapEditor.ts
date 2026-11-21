@@ -611,7 +611,9 @@ export class TileMapEditor {
   private autoSaveTimeout: number | null = null;
   private lastSaveTimestamp: number = 0;
   private autoSaveCallback: (() => void) | null = null;
-  private saveStatusCallback: ((status: 'saving' | 'saved' | 'error' | 'unsaved') => void) | null = null;
+  private saveStatusCallback: ((status: 'saving' | 'saved' | 'error' | 'unsaved' | 'backed-up') => void) | null = null;
+  private backedUpAt: number | null = null;
+  private crashBackupPaused = false;
   // Callback to notify React app about active GID changes
   private activeGidCallback: ((gid: number) => void) | null = null;
   // Callback to notify about undo stack changes (for persistence)
@@ -3546,22 +3548,10 @@ export class TileMapEditor {
 
   // Silent auto-save export (no alerts, no downloads)
   public autoSaveExport(): boolean {
-    // Don't auto-save if there's no tileset or no meaningful data
-    if (!this.tilesetImage || !this.tilesetFileName) {
-      return false; // Nothing to save yet
-    }
-
-    // Check if there's any actual tile data to save
-    const hasData = this.tileLayers.some(layer => 
-      layer.data.some(tile => tile !== 0)
-    );
-
-    if (!hasData) {
-      return false; // No meaningful data to save
-    }
-
+    // Crash backup is allowed without a tileset or painted tiles (objects, NPC, events, hero).
+    if (this.crashBackupPaused) return false;
+    if (!this.currentProjectPath) return false;
     try {
-      // Save to localStorage only for auto-save
       this.saveToLocalStorage();
       return true;
     } catch (_error) {
@@ -4626,7 +4616,7 @@ export class TileMapEditor {
     this.autoSaveCallback = callback;
   }
 
-  public setSaveStatusCallback(callback: ((status: 'saving' | 'saved' | 'error' | 'unsaved') => void) | null): void {
+  public setSaveStatusCallback(callback: ((status: 'saving' | 'saved' | 'error' | 'unsaved' | 'backed-up') => void) | null): void {
     this.saveStatusCallback = callback;
   }
 
@@ -4681,8 +4671,23 @@ export class TileMapEditor {
 
   public markAsSaved(): void {
     this.hasUnsavedChanges = false;
+    this.backedUpAt = null;
     this.lastSaveTimestamp = Date.now();
     this.updateSaveStatus('saved');
+  }
+
+  /** Real project files were written (Ctrl+S or a full tab-switch save). Also deletes the crash backup. */
+  public markAsFullySaved(): void {
+    this.markAsSaved();
+    this.clearCrashBackup();
+  }
+
+  public getBackedUpAt(): number | null {
+    return this.backedUpAt;
+  }
+
+  public setCrashBackupPaused(paused: boolean): void {
+    this.crashBackupPaused = paused;
   }
 
   private async performAutoSave(): Promise<void> {
@@ -4700,13 +4705,10 @@ export class TileMapEditor {
         if (this.autoSaveCallback) {
           await this.autoSaveCallback();
         }
-        
-        this.hasUnsavedChanges = false;
-        this.lastSaveTimestamp = Date.now();
-        this.updateSaveStatus('saved');
+        // A crash backup is not a real project save — stay dirty and show "backed-up".
+        this.backedUpAt = Date.now();
+        this.updateSaveStatus('backed-up');
       } else {
-        // No tile data to auto-save (for example a new map that only has
-        // unplaced NPCs). Do not pretend the project was persisted.
         this.updateSaveStatus(this.hasUnsavedChanges ? 'unsaved' : 'saved');
       }
       
@@ -5799,7 +5801,7 @@ export class TileMapEditor {
     }
   }
 
-  private updateSaveStatus(status: 'saving' | 'saved' | 'error' | 'unsaved'): void {
+  private updateSaveStatus(status: 'saving' | 'saved' | 'error' | 'unsaved' | 'backed-up'): void {
     if (this.saveStatusCallback) {
       this.saveStatusCallback(status);
     }

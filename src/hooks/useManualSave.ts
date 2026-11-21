@@ -154,7 +154,7 @@ export default function useManualSave(args: {
           setLastErrorMessage('');
           setPartialFailureWarning('');
           resolveError(lastErrorId);
-          editor.markAsSaved?.();
+          editor.markAsFullySaved?.();
           // Refresh spawn.txt with the current hero position after every successful save
           // so moving the hero and saving (Ctrl+S) updates the intermap= line.
           try { await args.onAfterSave?.(); } catch (_e) { void _e; }
@@ -222,13 +222,14 @@ export default function useManualSave(args: {
   }, [editor, currentProjectPath, setIsManuallySaving, setLastSaveTime, registerSave, executeAtomicSave, getErrorSummary, hasPartialFailure, showConflictPrompt, checkFileConflict, registerFileConflictSave, saveSequencing]);
 
   // Optionally populate a stable ref so callers (IPC) can call the latest implementation
+  const manualSaveRef = args.manualSaveRef;
   useEffect(() => {
-    if (args.manualSaveRef) {
-      args.manualSaveRef.current = handleManualSave;
-      return () => { if (args.manualSaveRef) args.manualSaveRef.current = undefined; };
+    if (manualSaveRef) {
+      manualSaveRef.current = handleManualSave;
+      return () => { manualSaveRef.current = undefined; };
     }
     return undefined;
-  }, [handleManualSave, args.manualSaveRef, notifyManualSaveError, resolveError]);
+  }, [handleManualSave, manualSaveRef, notifyManualSaveError, resolveError]);
 
   return { handleManualSave, lastErrorMessage, partialFailureWarning };
 }

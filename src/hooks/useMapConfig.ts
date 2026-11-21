@@ -30,7 +30,7 @@ type MapConfigOptions = {
   setBrushTool: React.Dispatch<React.SetStateAction<'none' | 'move' | 'merge' | 'separate' | 'remove'>>;
   setShowSeparateDialog: React.Dispatch<React.SetStateAction<boolean>>;
   setBrushToSeparate: React.Dispatch<React.SetStateAction<number | null>>;
-  setSaveStatus: React.Dispatch<React.SetStateAction<'saving' | 'saved' | 'error' | 'unsaved'>>;
+  setSaveStatus: React.Dispatch<React.SetStateAction<'saving' | 'saved' | 'error' | 'unsaved' | 'backed-up'>>;
   setHasUnsavedChanges: React.Dispatch<React.SetStateAction<boolean>>;
   setHasSelection: React.Dispatch<React.SetStateAction<boolean>>;
   setSelectionCount: React.Dispatch<React.SetStateAction<number>>;

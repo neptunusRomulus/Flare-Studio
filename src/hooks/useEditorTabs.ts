@@ -5,6 +5,7 @@ import type { EditorProjectData, TileMapEditor } from '@/editor/TileMapEditor';
 import type { MapConfig } from '@/editor/mapConfig';
 import { resolveSaveMapName } from '@/editor/mapSaveName';
 import { isTypingOrDialogTarget, matchEditorTabCycleShortcut, nextEditorTabId } from '@/editor/tabCycle';
+import { exportFlareTextFiles } from '@/flare/manualSaveExport';
 
 export type EditorTab = {
   id: string;
@@ -101,7 +102,16 @@ const useEditorTabs = ({
         const persistName = resolveSaveMapName(editorName, prevTab.name);
         if (prevTab.projectPath) {
           const saved = await editor.saveProjectData(prevTab.projectPath, persistName ? { mapName: persistName } : undefined);
-          persistOk = saved !== false;
+          if (saved !== false) {
+            const exported = await exportFlareTextFiles(editor, prevTab.projectPath);
+            if (exported) {
+              editor.markAsFullySaved?.();
+              persistOk = true;
+            } else {
+              // JSON was written but the Flare map text was not — keep the crash backup.
+              persistOk = true;
+            }
+          }
         } else if (typeof editor.getProjectData === 'function') {
           const snapshot = await editor.getProjectData();
           const safeSnapshot = JSON.parse(JSON.stringify(snapshot));

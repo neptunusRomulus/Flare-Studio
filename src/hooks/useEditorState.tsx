@@ -32,7 +32,7 @@ type UseEditorStateOptions = {
   setNpcDeletePopup: (p: NpcDeletePopup) => void;
   setHeroEditData: (d: HeroEditData | null) => void;
   setShowHeroEditDialog: (v: boolean) => void;
-  setSaveStatus: (s: 'saving' | 'saved' | 'error' | 'unsaved') => void;
+  setSaveStatus: (s: 'saving' | 'saved' | 'error' | 'unsaved' | 'backed-up') => void;
   setHasUnsavedChanges: (b: boolean) => void;
   setLastSaveTime: (t: number) => void;
 };
@@ -237,8 +237,8 @@ export function useEditorState(optsRef: React.RefObject<Partial<UseEditorStateOp
       opts = {};
     }
     editorInstance.setSaveStatusCallback((status) => {
-      opts.setSaveStatus?.(status as 'saving' | 'saved' | 'error' | 'unsaved');
-      opts.setHasUnsavedChanges?.(status === 'unsaved' || status === 'error');
+      opts.setSaveStatus?.(status as 'saving' | 'saved' | 'error' | 'unsaved' | 'backed-up');
+      opts.setHasUnsavedChanges?.(status === 'unsaved' || status === 'error' || status === 'backed-up' || status === 'saving');
     });
 
     editorInstance.setEyedropperCallback(() => {

@@ -433,18 +433,18 @@ export async function exportFlareTextFiles(
   editor: TileMapEditor | null | undefined,
   projectPath: string | null | undefined,
   api: ManualSaveFileApi | undefined = manualSaveFileApi()
-): Promise<void> {
+): Promise<boolean> {
   if (!editor) {
     console.warn('[ManualSave][TXT] Skipping — editor is null');
-    return;
+    return false;
   }
   if (!projectPath) {
     console.warn('[ManualSave][TXT] Skipping — no project path');
-    return;
+    return false;
   }
   if (!api?.saveExportFiles) {
     console.warn('[ManualSave][TXT] Skipping — electronAPI.saveExportFiles not available');
-    return;
+    return false;
   }
   const mapName = typeof editor.getMapName === 'function' ? editor.getMapName() : 'Map';
   debugLog('[ManualSave][TXT] Map name:', mapName, '| Generating Flare map text...');
@@ -459,7 +459,7 @@ export async function exportFlareTextFiles(
   const saveResult = await api.saveExportFiles(projectPath, mapName, mapTxt, tilesetDef, { tilesetImages, npcFiles, portraitFiles, npcTilesetImages, npcAnimationFiles });
   if (saveResult?.success) {
     debugLog('[ManualSave][TXT] ✓ Flare .txt saved to', projectPath + '/maps/' + mapName + '.txt');
-    return;
+    return true;
   }
   const validationDetails = saveResult?.validation?.fileResults
     ?.map((r) => `${r.filePath}: ${[...r.errors, ...r.warnings].join('; ')}`)

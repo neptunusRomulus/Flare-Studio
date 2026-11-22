@@ -1,7 +1,6 @@
 import { ACTIVATION_TO_FLARE, type EventData } from '@/components/events/eventDialogModel';
 import { buildEventInstanceProps } from '@/components/events/eventInstanceProps';
 import { instancePropertiesFrom } from '@/editor/eventScripts';
-import { mergeEventFormProperties, type EventPropertyValue } from '@/editor/eventFormProperties';
 import type { EventExtraRow } from '@/editor/eventExtraProperties';
 
 export type EventInstanceUpdate = {
@@ -17,19 +16,17 @@ export type EventInstanceUpdate = {
 };
 
 /**
- * The map object an event save writes: form values win, keys the form does not model survive, and a
- * resolved script path overrides whatever the form held.
+ * The map object an event save writes: the form plus the extra rows decide the keys, and a resolved
+ * script path overrides whatever the form held. Nothing is carried over from the previous object —
+ * its leftover action keys are moved into a script before this runs (see `actionPropertiesFrom`).
  */
 export function buildEventInstanceUpdate(args: {
   eventData: EventData;
   extraRows: EventExtraRow[];
-  existingProperties?: Record<string, EventPropertyValue | undefined> | null;
   script?: string;
 }): EventInstanceUpdate {
   const { coordinates, size } = args.eventData.positioning;
-  const props = instancePropertiesFrom(buildEventInstanceProps(args.eventData, args.extraRows));
-  if (args.script) props.script = args.script;
-  const properties = instancePropertiesFrom(mergeEventFormProperties(args.existingProperties, props));
+  const properties = instancePropertiesFrom(buildEventInstanceProps(args.eventData, args.extraRows));
   if (args.script) properties.script = args.script;
   return {
     name: args.eventData.name || 'Event',

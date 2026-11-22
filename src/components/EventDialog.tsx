@@ -147,12 +147,7 @@ const EventDialog: React.FC<EventDialogProps> = ({
     }
 
     if (isEditing && typeof editor.updateMapObject === 'function' && editingEventId != null) {
-      editor.updateMapObject(editingEventId, buildEventInstanceUpdate({
-        eventData,
-        extraRows,
-        existingProperties: existing?.properties,
-        script,
-      }));
+      editor.updateMapObject(editingEventId, buildEventInstanceUpdate({ eventData, extraRows, script }));
     }
 
     if (typeof syncMapObjectsWrapper === 'function') syncMapObjectsWrapper();

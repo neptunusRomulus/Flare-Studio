@@ -48,12 +48,8 @@ describe('buildEventInstanceUpdate', () => {
     expect(update.properties.requires_status).toBe('quest_1');
   });
 
-  it('drops values the form no longer emits, and keys that are not engine keys', () => {
-    const update = buildEventInstanceUpdate({
-      eventData: eventData(),
-      extraRows: [],
-      existingProperties: { cooldown: '3000', not_an_engine_key: 'x' },
-    });
+  it('writes nothing the form and the rows do not produce', () => {
+    const update = buildEventInstanceUpdate({ eventData: eventData(), extraRows: [] });
     expect(update.properties.cooldown).toBeUndefined();
     expect(update.properties.not_an_engine_key).toBeUndefined();
   });

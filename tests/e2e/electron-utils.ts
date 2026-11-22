@@ -61,9 +61,19 @@ export async function stopViteServer(viteProcess: ChildProcess | null): Promise<
 
 export async function launchElectronApp(): Promise<{ app: ElectronApplication; window: Page; viteProcess: ChildProcess | null }> {
   const viteProcess = await startViteServer();
-  const app = await electron.launch({ args: ['.'] });
+  const app = await electron.launch({ args: ['.'], env: testEnv() });
   const window = await getAppWindow(app);
   return { app, window, viteProcess };
+}
+
+// Inherited env plus FLARE_NO_DEVTOOLS=1: tests must not spawn a DevTools window.
+function testEnv(): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const [key, value] of Object.entries(process.env)) {
+    if (value !== undefined) env[key] = value;
+  }
+  env.FLARE_NO_DEVTOOLS = '1';
+  return env;
 }
 
 export async function getAppWindow(electronApp: ElectronApplication): Promise<Page> {

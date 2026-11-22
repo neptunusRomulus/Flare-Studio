@@ -77,6 +77,11 @@ function isAllowedProjectPath(targetPath) {
   return false;
 }
 const isDev = !app.isPackaged;
+// Automated tests must not open DevTools: the extra devtools:// window steals
+// focus and breaks window/focus/screenshot assertions. The e2e launcher
+// (tests/e2e/electron-utils.ts) sets FLARE_NO_DEVTOOLS=1; CI forces it off too.
+const showDevToolsOnStart =
+  isDev && process.env.FLARE_NO_DEVTOOLS !== "1" && process.env.CI !== "true";
 const validationRoot = path.join(__dirname, "..");
 const PLAY_SESSION_DIR = ".flare-studio";
 const PLAY_SESSION_FILE = "play-session.json";
@@ -315,7 +320,7 @@ function createWindow() {
   if (isDev) {
     // Vite dev server runs on 5173
     mainWindow.loadURL("http://localhost:5173");
-    mainWindow.webContents.openDevTools();
+    if (showDevToolsOnStart) mainWindow.webContents.openDevTools();
   } else {
     mainWindow.loadFile(path.join(__dirname, "../dist/index.html"));
   }

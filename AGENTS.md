@@ -19,6 +19,7 @@ demand (see the map at the bottom). Do not paste implementation detail back into
 - Never stage/commit the owner's uncommitted `package.json` change or untracked `IDEA.md`. Always `git add <explicit paths>`, never `git add -A` / `.`.
 - Commit author is configured repo-locally; don't change git config.
 - Before committing run: `npx tsc --noEmit`, `npm test` (= `vitest run`), `npm run build` (= `vite build`). The pre-commit hook (`.husky/pre-commit`) also runs lint-staged, tsc and vitest; it must pass (never `--no-verify`).
+- DevTools stay closed in tests: the e2e launcher passes `FLARE_NO_DEVTOOLS=1` and `electron/main.cjs` skips `openDevTools()` when it is set or when `CI` is set. Keep that guard — a DevTools window steals focus and breaks window/focus/screenshot assertions.
 - Small, focused commits. The owner is near usage limits: prefer cheap, targeted changes; ask before large rewrites.
 
 ## Restart notes (state this in every report, plus what was NOT verified in the running app)

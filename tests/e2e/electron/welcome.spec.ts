@@ -20,6 +20,8 @@ test('electron welcome screen shows the primary actions', async () => {
       await new Promise((resolve) => setTimeout(resolve, 250));
     }
     expect(found, `welcome text missing. urls=${launched.app.windows().map((window) => window.url()).join(' | ')}`).toBe(true);
+    const devtools = launched.app.windows().filter((window) => window.url().startsWith('devtools://'));
+    expect(devtools, 'tests must not open DevTools (FLARE_NO_DEVTOOLS=1)').toHaveLength(0);
     await expect(welcome.getByText('Create New Project')).toBeVisible();
     await expect(welcome.getByText('Open Existing Project')).toBeVisible();
   } finally {

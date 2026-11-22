@@ -206,6 +206,11 @@ export type MenuPanel = {
   pos: Rect;
   align: MenuAlign;
   background?: string;
+  soundfxOpen?: string;
+  soundfxClose?: string;
+  enabled?: string;
+  /** All other menu keys, in file order. Repeated keys (slot) keep every value. */
+  values: Record<string, string[]>;
   tabArea?: Rect;
   /** Original file text, for merge. */
   text: string;
@@ -221,6 +226,10 @@ export function parseMenuText(content: string, file = ''): MenuPanel {
   let pos = { x: 0, y: 0, w: 0, h: 0 };
   let align: MenuAlign = 'topleft';
   let background: string | undefined;
+  let soundfxOpen: string | undefined;
+  let soundfxClose: string | undefined;
+  let enabled: string | undefined;
+  const values: Record<string, string[]> = {};
   let tabArea: Rect | undefined;
   for (const raw of String(content || '').replace(/\r/g, '').split('\n')) {
     const line = raw.trim();
@@ -232,11 +241,15 @@ export function parseMenuText(content: string, file = ''): MenuPanel {
     if (key === 'pos') pos = parsePos(value);
     else if (key === 'align') align = parseAlignment(value);
     else if (key === 'background') background = value;
+    else if (key === 'soundfx_open') soundfxOpen = value;
+    else if (key === 'soundfx_close') soundfxClose = value;
+    else if (key === 'enabled') enabled = value;
     else if (key === 'tab_area') tabArea = parsePos(value);
+    else (values[key] ??= []).push(value);
   }
   const base = file.replace(/^.*\//, '').replace(/\.txt$/, '');
   const name = base.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) || 'Menu';
-  return { file, name, pos, align, background, tabArea, text: String(content || '') };
+  return { file, name, pos, align, background, soundfxOpen, soundfxClose, enabled, values, tabArea, text: String(content || '') };
 }
 
 export type PowersMenuLayout = { pos: Rect; tabArea: Rect; background?: string };
@@ -278,6 +291,58 @@ export function mergeMenuPos(existingText: string, pos: Rect): string {
     return `${indent}pos=${value}`;
   });
   if (!replaced) out.unshift(`pos=${value}`);
+  return `${out.join('\n')}\n`;
+}
+
+/** Rewrite common menu keys while keeping comments, unknown keys and line order. */
+export function mergeMenuSettings(existingText: string, panel: Pick<MenuPanel, 'pos' | 'align' | 'background' | 'soundfxOpen' | 'soundfxClose' | 'enabled'> & { values?: Record<string, string[]> }): string {
+  const lines = String(existingText || '').replace(/\r/g, '').split('\n');
+  const trailing = lines.length && lines[lines.length - 1] === '';
+  if (trailing) lines.pop();
+  const values: Record<string, string> = {
+    pos: formatPos(panel.pos),
+    align: panel.align,
+    background: panel.background?.trim() || '',
+    soundfx_open: panel.soundfxOpen?.trim() || '',
+    soundfx_close: panel.soundfxClose?.trim() || '',
+    enabled: panel.enabled?.trim() || '',
+  };
+  const seen = new Set<string>();
+  const extraSeen: Record<string, number> = {};
+  const extras = panel.values || {};
+  const out: string[] = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith('[')) { out.push(line); continue; }
+    const eq = trimmed.indexOf('=');
+    if (eq <= 0) { out.push(line); continue; }
+    const key = trimmed.slice(0, eq).trim();
+    if (!(key in values)) {
+      if (!(key in extras)) { out.push(line); continue; }
+      const index = extraSeen[key] || 0;
+      extraSeen[key] = index + 1;
+      const extra = extras[key][index];
+      if (extra && extra.trim()) {
+        const indent = line.match(/^\s*/)?.[0] || '';
+        out.push(`${indent}${key}=${extra.trim()}`);
+      }
+      continue;
+    }
+    seen.add(key);
+    const value = values[key];
+    if (!value) continue;
+    const indent = line.match(/^\s*/)?.[0] || '';
+    out.push(`${indent}${key}=${value}`);
+  }
+  const missing = Object.entries(values).filter(([key, value]) => value && !seen.has(key));
+  if (missing.length) out.unshift(...missing.map(([key, value]) => `${key}=${value}`));
+  for (const [key, list] of Object.entries(extras)) {
+    if (key in values) continue;
+    const start = extraSeen[key] || 0;
+    for (const value of list.slice(start)) {
+      if (value && value.trim()) out.push(`${key}=${value.trim()}`);
+    }
+  }
   return `${out.join('\n')}\n`;
 }
 

@@ -8,7 +8,7 @@ import DirectionField from '@/components/DirectionField';
 import { FolderOpen, X } from 'lucide-react';
 import SearchablePalette from '@/components/ui/searchable-palette';
 import type { MapObject } from '@/types';
-import { sectionsFromNpcText, type KeyValue } from '@/utils/npcFileUpdate';
+import { parseSectionProperty, sectionsFromNpcText, type KeyValue } from '@/utils/npcFileUpdate';
 import { FieldHint } from '@/components/ui/field-hint';
 import {
   filterPropertyCatalog,
@@ -81,6 +81,90 @@ const PolaritySelect = ({
   </Select>
 );
 
+
+type SectionRowsProps = {
+  title: string;
+  property: string;
+  defaultKey: string;
+  fileSections: KeyValue[][] | undefined;
+  properties: Record<string, string | string[] | undefined>;
+  setProp: (key: string, value: string | null) => void;
+};
+
+const DIRECTIONS = [
+  { value: '0', label: 'South West' },
+  { value: '1', label: 'West' },
+  { value: '2', label: 'North West' },
+  { value: '3', label: 'North' },
+  { value: '4', label: 'North East' },
+  { value: '5', label: 'East' },
+  { value: '6', label: 'South East' },
+  { value: '7', label: 'South' },
+];
+
+function SectionRows({ title, property, defaultKey, fileSections, properties, setProp }: SectionRowsProps) {
+  const stored = properties[property];
+  const sections = typeof stored === 'string'
+    ? parseSectionProperty(stored)
+    : (Array.isArray(stored) ? stored as unknown as KeyValue[][] : (fileSections || []));
+  const write = (next: KeyValue[][]) => setProp(property, JSON.stringify(next));
+  const update = (sectionIndex: number, rowIndex: number, patch: Partial<KeyValue>) => write(
+    sections.map((section, index) => index === sectionIndex
+      ? section.map((entry, entryIndex) => entryIndex === rowIndex ? { ...entry, ...patch } : entry)
+      : section),
+  );
+  const add = () => {
+    const row = { key: defaultKey, value: '' };
+    write(sections.length > 0
+      ? sections.map((section, index) => index === 0 ? [...section, row] : section)
+      : [[row]]);
+  };
+  const isLayers = property === 'npc_render_layers';
+  return (
+    <div className="rounded-md border border-border bg-muted/10 p-2 space-y-2" aria-label={title}>
+      <div className="flex items-center justify-between gap-2">
+        <FieldHint hint={isLayers ? 'The order layers are drawn in for each direction.' : 'Which animation plays on each layer.'}>
+          <div className="text-xs font-semibold">{title}</div>
+        </FieldHint>
+        <Button type="button" size="sm" variant="outline" className="h-6 text-[11px]" onClick={add}>{isLayers ? 'Add direction' : 'Add slot'}</Button>
+      </div>
+      {sections.length === 0 ? <p className="text-[11px] text-muted-foreground">{isLayers ? 'No layers yet. Add a direction to start.' : 'No slots yet. Add one to assign an animation.'}</p> : null}
+      {sections.map((section, sectionIndex) => (
+        <div key={sectionIndex} className="space-y-1">
+          {section.map((row, rowIndex) => {
+            if (isLayers) {
+              const [rawDirection = '0', ...rest] = row.value.split(',').map((part) => part.trim());
+              const direction = DIRECTIONS.some((item) => item.value === rawDirection) ? rawDirection : '0';
+              return (
+                <div key={rowIndex} className="flex items-center gap-1">
+                  <Select value={direction} onValueChange={(next) => update(sectionIndex, rowIndex, { key: row.key || defaultKey, value: [next, ...rest].join(',') })}>
+                    <SelectTrigger aria-label={`${title} row ${rowIndex + 1} direction`} className="h-6 w-28 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DIRECTIONS.map((item) => <SelectItem key={item.value} value={item.value}>{item.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Input aria-label={`${title} row ${rowIndex + 1} layers`} width="full" className="h-6 text-xs" value={rest.join(', ')} onChange={(event) => update(sectionIndex, rowIndex, { key: row.key || defaultKey, value: [direction, event.target.value].join(',') })} placeholder="body, head" />
+                  <Button type="button" variant="ghost" size="icon" className="h-6 w-6" aria-label={`Remove ${title} row ${rowIndex + 1}`} onClick={() => write(sections.map((part, index) => index === sectionIndex ? part.filter((_, i) => i !== rowIndex) : part).filter((part) => part.length > 0))}><X className="w-3 h-3" /></Button>
+                </div>
+              );
+            }
+            const [slot = '', ...rest] = row.value.split(',').map((part) => part.trim());
+            return (
+              <div key={rowIndex} className="flex items-center gap-1">
+                <Input aria-label={`${title} row ${rowIndex + 1} slot`} width="id" className="h-6 w-24 text-xs" value={slot} onChange={(event) => update(sectionIndex, rowIndex, { key: row.key || defaultKey, value: [event.target.value, ...rest].join(',') })} placeholder="body" />
+                <Input aria-label={`${title} row ${rowIndex + 1} animation`} width="full" className="h-6 text-xs" value={rest.join(',')} onChange={(event) => update(sectionIndex, rowIndex, { key: row.key || defaultKey, value: [slot, event.target.value].join(',') })} placeholder="Choose an animation" />
+                <Button type="button" variant="ghost" size="icon" className="h-6 w-6" aria-label={`Remove ${title} row ${rowIndex + 1}`} onClick={() => write(sections.map((part, index) => index === sectionIndex ? part.filter((_, i) => i !== rowIndex) : part).filter((part) => part.length > 0))}><X className="w-3 h-3" /></Button>
+              </div>
+            );
+          })}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 const NpcPropertyList = ({ editingObject, get, setProp, applyPatch, projectPath }: Props) => {
   const browseInclude = async (index: number) => {
     const api = window.electronAPI as typeof window.electronAPI & {
@@ -100,6 +184,8 @@ const NpcPropertyList = ({ editingObject, get, setProp, applyPatch, projectPath 
   const [animMore, setAnimMore] = useState(false);
   const [fileStats, setFileStats] = useState<KeyValue[] | undefined>();
   const [fileEffects, setFileEffects] = useState<KeyValue[][] | undefined>();
+  const [fileRenderLayers, setFileRenderLayers] = useState<KeyValue[][] | undefined>();
+  const [fileAnimationSlots, setFileAnimationSlots] = useState<KeyValue[][] | undefined>();
 
   const tilesetPath = get('tilesetPath', '');
   const tilesetSourcePath = get('tilesetSourcePath', '');
@@ -111,6 +197,8 @@ const NpcPropertyList = ({ editingObject, get, setProp, applyPatch, projectPath 
     if (!npcFilename || !projectPath) {
       setFileStats(undefined);
       setFileEffects(undefined);
+      setFileRenderLayers(undefined);
+      setFileAnimationSlots(undefined);
       return;
     }
     const api = window.electronAPI as unknown as { readFile?: (p: string) => Promise<string | null> };
@@ -120,10 +208,14 @@ const NpcPropertyList = ({ editingObject, get, setProp, applyPatch, projectPath 
       if (cancelled) return;
       setFileStats(sectionsFromNpcText(txt || '', 'stats').flat());
       setFileEffects(sectionsFromNpcText(txt || '', 'visual_effect'));
+      setFileRenderLayers(sectionsFromNpcText(txt || '', 'render_layers'));
+      setFileAnimationSlots(sectionsFromNpcText(txt || '', 'animation_slots'));
     }).catch(() => {
       if (!cancelled) {
         setFileStats([]);
         setFileEffects([]);
+        setFileRenderLayers([]);
+        setFileAnimationSlots([]);
       }
     });
     return () => { cancelled = true; };
@@ -171,7 +263,7 @@ const NpcPropertyList = ({ editingObject, get, setProp, applyPatch, projectPath 
 
   const renderCard = (card: NpcPropertyCard) => {
     const tip = filterPropertyCatalog('', [], { customTileset: true }).find((e) => e.kind === card.kind);
-    const tipText = tip ? `${tip.flareKey} — ${tip.description}` : card.kind;
+    const tipText = tip ? tip.description : card.kind;
 
     switch (card.kind) {
       case 'level':
@@ -553,7 +645,7 @@ const NpcPropertyList = ({ editingObject, get, setProp, applyPatch, projectPath 
         entries={catalog.map((entry) => ({
           id: entry.kind,
           label: entry.label,
-          tooltip: `${entry.flareKey} — ${entry.description}`,
+          tooltip: entry.description,
           searchText: [entry.label, entry.flareKey, entry.description, ...(entry.synonyms || [])].join(' '),
         }))}
         onSelect={(id) => {
@@ -561,6 +653,12 @@ const NpcPropertyList = ({ editingObject, get, setProp, applyPatch, projectPath 
           if (entry) add(entry);
         }}
       />
+      {npcFilename ? (
+        <div className="space-y-2 pt-1">
+          <SectionRows title="Render layers" property="npc_render_layers" defaultKey="layer" fileSections={fileRenderLayers} properties={editingObject.properties || {}} setProp={setProp} />
+          <SectionRows title="Animation slots" property="npc_animation_slots" defaultKey="slot" fileSections={fileAnimationSlots} properties={editingObject.properties || {}} setProp={setProp} />
+        </div>
+      ) : null}
     </section>
   );
 };

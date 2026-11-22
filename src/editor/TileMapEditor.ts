@@ -214,6 +214,7 @@ export interface EditorProjectData {
   tileSize?: number;
   tileHeight?: number;
   orientation?: 'isometric' | 'orthogonal';
+  backgroundColor?: string;
   parallax?: string;
   fogofwar?: string;
   save_fogofwar?: string;
@@ -397,6 +398,7 @@ export class TileMapEditor {
   private mapHeaderTileHeight: number | string | undefined;
   private mapHeaderOrientation: string | undefined;
   private mapParallax = '';
+  private mapBackgroundColor = '';
   private mapFog = '';
   private mapSaveFog = '';
   private mapProcgenType = '';
@@ -2185,6 +2187,7 @@ export class TileMapEditor {
 
   public getMapPresentation(): MapPresentation {
     return {
+      backgroundColor: this.mapBackgroundColor,
       parallax: this.mapParallax,
       fogofwar: this.mapFog,
       save_fogofwar: this.mapSaveFog,
@@ -2195,6 +2198,7 @@ export class TileMapEditor {
   }
 
   public setMapPresentation(next: Partial<MapPresentation>): void {
+    if (typeof next.backgroundColor === 'string') this.mapBackgroundColor = next.backgroundColor;
     if (typeof next.parallax === 'string') this.mapParallax = next.parallax;
     if (typeof next.fogofwar === 'string') this.mapFog = next.fogofwar;
     if (typeof next.save_fogofwar === 'string') this.mapSaveFog = next.save_fogofwar;
@@ -4048,6 +4052,7 @@ export class TileMapEditor {
       music?: string;
       heroX?: number;
       heroY?: number;
+      backgroundColor?: string;
       parallax?: string;
       fogofwar?: string;
       save_fogofwar?: string;
@@ -4069,6 +4074,7 @@ export class TileMapEditor {
     this.mapMusic = typeof map.music === 'string' ? map.music : '';
     this.setHeroPosition(Number(map.heroX) || 0, Number(map.heroY) || 0);
     this.setMapPresentation({
+      backgroundColor: typeof map.backgroundColor === 'string' ? map.backgroundColor : '',
       parallax: typeof map.parallax === 'string' ? map.parallax : '',
       fogofwar: map.fogofwar != null ? String(map.fogofwar) : '',
       save_fogofwar: map.save_fogofwar != null ? String(map.save_fogofwar) : '',
@@ -4733,6 +4739,7 @@ export class TileMapEditor {
       tileSizeX: this.tileSizeX,
       tileSizeY: this.tileSizeY,
       orientation: this.orientation,
+      backgroundColor: this.mapBackgroundColor,
       parallax: this.mapParallax,
       fogofwar: this.mapFog,
       save_fogofwar: this.mapSaveFog,
@@ -4882,6 +4889,7 @@ export class TileMapEditor {
         }, false);
       }
       this.setMapPresentation({
+        backgroundColor: typeof data.backgroundColor === 'string' ? data.backgroundColor : '',
         parallax: typeof data.parallax === 'string' ? data.parallax : '',
         fogofwar: typeof data.fogofwar === 'string' ? data.fogofwar : '',
         save_fogofwar: typeof data.save_fogofwar === 'string' ? data.save_fogofwar : '',
@@ -5254,6 +5262,7 @@ export class TileMapEditor {
       tileSize: this.tileSizeX,
       tileHeight: this.tileSizeY,
       orientation: this.orientation,
+      backgroundColor: this.mapBackgroundColor,
       parallax: this.mapParallax,
       fogofwar: this.mapFog,
       save_fogofwar: this.mapSaveFog,
@@ -6385,6 +6394,7 @@ export class TileMapEditor {
     this.heroY = 0;
     this.isDraggingHero = false;
     this.setMapPresentation({
+      backgroundColor: '',
       parallax: '',
       fogofwar: '',
       save_fogofwar: '',
@@ -7056,6 +7066,7 @@ export class TileMapEditor {
         }, false);
       }
       this.setMapPresentation({
+        backgroundColor: typeof projectData.backgroundColor === 'string' ? projectData.backgroundColor : '',
         parallax: typeof projectData.parallax === 'string' ? projectData.parallax : '',
         fogofwar: typeof projectData.fogofwar === 'string' ? projectData.fogofwar : '',
         save_fogofwar: typeof projectData.save_fogofwar === 'string' ? projectData.save_fogofwar : '',

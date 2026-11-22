@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { FieldHint, HintLabel } from '@/components/ui/field-hint';
 import { Switch } from '@/components/ui/switch';
 import { toast } from '@/hooks/use-toast';
@@ -503,7 +504,7 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
 
           <section className="rounded-lg border border-border p-3 space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <FieldHint hint="Renaming an id only updates bonuses in stats.txt here. Classes, items, powers and titles that use the old id must be edited separately.">
+              <FieldHint hint="Renaming an id only updates the bonuses here. Other content that uses the old id must be updated separately.">
                 <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Primary stats</div>
               </FieldHint>
               <Button type="button" size="sm" variant="outline" onClick={() => setAddOpen(true)}>Add primary</Button>
@@ -580,7 +581,7 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
           </section>
 
           <section className="rounded-lg border border-border p-3 space-y-2">
-            <FieldHint hint={hero.trailing ? 'The existing [render_layers] (or other) section is kept as-is when you save.' : 'Movement, sounds and other hero stats from engine/stats.txt.'}>
+            <FieldHint hint={hero.trailing ? 'Your existing extra sections are kept when you save.' : 'How the hero moves and sounds.'}>
               <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Other stats</div>
             </FieldHint>
             <div className="flex flex-wrap items-end gap-3">
@@ -605,6 +606,20 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
                 <Input id="hero-categories" width="name" value={hero.scalars.categories} onChange={(event) => setScalar('categories', event.target.value)} className="h-8" />
               </div>
             </div>
+            <details open={hero.trailing ? true : undefined} className="w-full rounded-md border border-border/70 bg-muted/20 px-2 py-1.5">
+              <summary className="cursor-pointer text-[11px] text-muted-foreground">Advanced sprite sections</summary>
+              <div className="space-y-1 pt-1.5">
+                <p className="text-[10px] text-muted-foreground">Extra sprite layers and animations. Most heroes do not need this.</p>
+                <Textarea
+                  id="hero-advanced-sections"
+                  aria-label="Advanced sprite sections"
+                  className="min-h-[7rem] font-mono text-xs"
+                  value={hero.trailing}
+                  onChange={(event) => { setHero((current) => ({ ...current, trailing: event.target.value })); mark(); }}
+                />
+                <p className="text-[10px] text-muted-foreground">Existing extra sections are kept as written.</p>
+              </div>
+            </details>
           </section>
           </>
           )}
@@ -614,10 +629,10 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
       <Dialog open={addOpen} onOpenChange={setAddOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <FieldHint hint="Writes a new [stat] block in engine/primary_stats.txt. The id is what other files (classes, items, titles) will use.">
+            <FieldHint hint="Adds a new primary stat. Other content can use its id.">
               <DialogTitle>Add primary stat</DialogTitle>
             </FieldHint>
-            <DialogDescription className="sr-only">Writes a new [stat] block in engine/primary_stats.txt. The id is what other files (classes, items, titles) will use.</DialogDescription>
+            <DialogDescription className="sr-only">Adds a new primary stat. Other content can use its id.</DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
             <Label htmlFor="add-primary-id">Id</Label>
@@ -635,10 +650,10 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
       <Dialog open={resourceOpen} onOpenChange={setResourceOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <FieldHint hint="Creates an extra MP-like pool in engine/resource_stats.txt. Empty related keys are filled with standard suffixes.">
+            <FieldHint hint="Adds another resource pool, like stamina.">
               <DialogTitle>Add resource stat</DialogTitle>
             </FieldHint>
-            <DialogDescription className="sr-only">Creates an extra MP-like pool in engine/resource_stats.txt. Empty related keys are filled with standard suffixes.</DialogDescription>
+            <DialogDescription className="sr-only">Adds another resource pool, like stamina.</DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
             <Label htmlFor="resource-base">stat_base</Label>
@@ -646,7 +661,7 @@ const StatsEditorView: React.FC<Props> = ({ projectPath }) => {
             <Label htmlFor="resource-text">text_base (display name)</Label>
             <Input id="resource-text" width="name" value={draftResource.text_base} onChange={(event) => setDraftResource((current) => ({ ...current, text_base: event.target.value }))} placeholder="Max Stamina" className="h-8" />
             <Label htmlFor="resource-menu">menu_filename (optional)</Label>
-            <Input id="resource-menu" width="path" value={draftResource.menu_filename} onChange={(event) => setDraftResource((current) => ({ ...current, menu_filename: event.target.value }))} placeholder="menus/resource_stamina.txt" className="h-8" />
+            <Input id="resource-menu" width="path" value={draftResource.menu_filename} onChange={(event) => setDraftResource((current) => ({ ...current, menu_filename: event.target.value }))} placeholder="Resource menu" className="h-8" />
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setResourceOpen(false)}>Cancel</Button>

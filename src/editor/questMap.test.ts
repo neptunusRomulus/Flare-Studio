@@ -202,7 +202,7 @@ describe('map events', () => {
       { id: 6, type: 'event', properties: {} },
     ], '__current_map__', 'Town');
     expect(live.map((e) => [e.id, e.name, e.x, e.sets.join(',')])).toEqual([
-      ['__current_map__#3', 'Map event', 2, 'a_started,b'],
+      ['__current_map__#3', 'Event', 2, 'a_started,b'],
       ['__current_map__#4', 'Gate', -1, 'a_done'],
     ]);
     const g2 = deriveQuestGraph([{ id: 'a', name: 'A', complete_status: 'a_done', steps: [{ requires_status: 'a_started' }] }], [], live);

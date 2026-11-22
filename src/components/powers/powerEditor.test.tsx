@@ -34,6 +34,7 @@ describe('power editor', () => {
     const html = render('effect', 'lonely');
     expect(html).toContain('Debuff');
     expect(html).toContain('This Debuff is never used');
+    expect(html).toContain('aria-label="Custom effect type"');
   });
 
   it('shows story flags and template cards', () => {

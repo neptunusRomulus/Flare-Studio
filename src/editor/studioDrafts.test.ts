@@ -83,6 +83,7 @@ describe('studio draft writers', () => {
       heroY: 0,
       layers: [],
       ...mapHeaderForExport({
+        backgroundColor: '10,20,30,255',
         parallax: 'maps/parallax/sky.txt',
         fogofwar: '1',
         save_fogofwar: 'true',
@@ -91,6 +92,7 @@ describe('studio draft writers', () => {
         procgen_reset_status: 'reset',
       }),
     });
+    expect(exported.text).toContain('background_color=10,20,30,255');
     expect(exported.text).toContain('parallax_layers=maps/parallax/sky.txt');
     expect(exported.text).toContain('fogofwar=1');
     expect(exported.text).toContain('save_fogofwar=true');

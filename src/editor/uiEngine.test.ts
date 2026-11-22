@@ -2,6 +2,7 @@ import { readFileSync } from 'fs';
 import { describe, expect, it } from 'vitest';
 import {
   FONT_COLOR_KEYS,
+  NUMBER_FORMAT_KEYS,
   RESOLUTION_KEYS,
   TOOLTIP_KEYS,
   applyHexToFlareColor,
@@ -66,6 +67,17 @@ describe('font settings', () => {
 });
 
 describe('flat UI engine files', () => {
+  it('parses number_format decimals and keeps comments when upserting', () => {
+    const text = '# decimal places\nplayer_statbar=0\nenemy_statbar=0\ncombat_text=0\ncharacter_menu=2\nitem_tooltips=2\npower_tooltips=2\ndurations=1\ndeath_penalty=2\n';
+    expect(parseKeyedValues(text, NUMBER_FORMAT_KEYS)).toMatchObject({
+      player_statbar: '0', combat_text: '0', character_menu: '2', durations: '1', death_penalty: '2',
+    });
+    const next = upsertKeyedValues(text, NUMBER_FORMAT_KEYS, { combat_text: '1', durations: '' });
+    expect(next).toContain('# decimal places');
+    expect(next).toContain('combat_text=1');
+    expect(next).not.toContain('durations=');
+  });
+
   it('parses font colors and keeps comments when upserting', () => {
     const text = readFileSync(`${DEFAULT}/font_colors.txt`, 'utf8');
     const parsed = parseKeyedValues(text, FONT_COLOR_KEYS);

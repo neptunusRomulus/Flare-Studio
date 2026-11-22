@@ -11,7 +11,7 @@ import Tooltip from '@/components/ui/tooltip';
 import EditorPropertyList from '@/components/EditorPropertyList';
 import { extraItemPropertyKeys, ITEM_EXTRA_CATALOG } from '@/editor/itemFileHydrate';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
-import { Apple, Book, Box, Check, ChevronDown, ChevronRight, Coins, Folder, Gift, Key, Layers, Save, Shield, Sparkles, Sword, Tag, Trash2, Volume2, X, Zap } from 'lucide-react';
+import { Apple, Book, Box, Check, ChevronDown, ChevronRight, Coins, Folder, Gift, Hammer, Key, Layers, Save, Shield, Sparkles, Sword, Tag, Trash2, Volume2, X, Zap } from 'lucide-react';
 import { ITEM_ROLE_META, ITEM_ROLE_SELECTIONS, RESOURCE_SUBTYPE_META } from '@/editor/itemRoles'
 import { bookRelPath, DEFAULT_BOOK_TEMPLATE } from '@/editor/bookFile'
 import { OPEN_BOOK_EVENT } from '@/components/BookEditorView';
@@ -66,6 +66,13 @@ type EditingItem = {
   bonus_power_level?: string;
   dmg?: string;
   abs?: string;
+  dmg_min?: string;
+  dmg_max?: string;
+  abs_min?: string;
+  abs_max?: string;
+  crafting_items?: string;
+  soundfx_craft?: string;
+  soundfx_craft_override?: boolean | string;
   trait_elemental?: string;
   power?: string;
   power_desc?: string;
@@ -338,6 +345,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
                     { value: 'currency', label: 'Currency', swatch: 'rgb(255,232,156)' }
                   ];
                   const currentValue = editingItem.quality || '';
+                  const customValue = qualityOptions.some((opt) => opt.value === currentValue) ? '' : currentValue;
                   return (
                     <div className="space-y-2">
                       <div className="flex flex-wrap gap-1.5">
@@ -362,6 +370,20 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
                           );
                         })}
                       </div>
+                      <details open={customValue ? true : undefined} className="rounded-md border border-border/70 bg-muted/20 px-2 py-1.5">
+                        <summary className="cursor-pointer text-[11px] text-muted-foreground">Use a custom quality</summary>
+                        <div className="pt-1.5">
+                          <Label className="text-xs font-normal">Custom quality</Label>
+                          <Input
+                            aria-label="Custom quality"
+                            width="id"
+                            className="h-8"
+                            value={customValue}
+                            placeholder="e.g. legendary"
+                            onChange={(event) => updateEditingItemField('quality', event.target.value)}
+                          />
+                        </div>
+                      </details>
                     </div>
                   );
                 })()}
@@ -556,7 +578,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
                 <Input
                   value={editingItem.item_type}
                   onChange={(e) => updateEditingItemField('item_type', e.target.value)}
-                  placeholder="items/types.txt ID"
+                  placeholder="Choose a type"
                   className="h-8"
                 />
               </div>
@@ -615,7 +637,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
                 <Input
                   value={editingItem.gfx}
                   onChange={(e) => updateEditingItemField('gfx', e.target.value)}
-                  placeholder="animations/item.txt"
+                  placeholder="Choose an animation"
                   className="h-8"
                 />
               </div>
@@ -647,13 +669,32 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
           </CollapsibleSection>
         )}
 
+        {isEquipment && (
+          <CollapsibleSection title="Crafting" icon={Hammer}>
+            <div>
+              <Label className="text-xs text-muted-foreground font-normal">Required items</Label>
+              <Input aria-label="Required items" value={editingItem.crafting_items || ''} onChange={(e) => updateEditingItemField('crafting_items', e.target.value)} placeholder="Item IDs, separated by commas" className="h-8" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs text-muted-foreground font-normal">Crafting sound</Label>
+                <Input aria-label="Crafting sound" value={editingItem.soundfx_craft || ''} onChange={(e) => updateEditingItemField('soundfx_craft', e.target.value)} placeholder="Default" className="h-8" />
+              </div>
+              <Label className="flex items-center gap-2 text-xs font-normal text-foreground mt-6">
+                <Checkbox aria-label="Override crafting sound" className="h-4 w-4" checked={editingItem.soundfx_craft_override === true || editingItem.soundfx_craft_override === 'true'} onCheckedChange={(checked) => updateEditingItemField('soundfx_craft_override', checked === true)} />
+                Override crafting sound
+              </Label>
+            </div>
+          </CollapsibleSection>
+        )}
+
         {/* Usage and Power */}
         {(isEquipment || isConsumable) && (
           <CollapsibleSection title="Usage and Power" icon={Zap}>
             {isEquipment && (
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label className="text-xs text-muted-foreground font-normal">Damage (dmg)</Label>
+                  <Label className="text-xs text-muted-foreground font-normal">Damage</Label>
                   <Input
                     value={editingItem.dmg}
                     onChange={(e) => updateEditingItemField('dmg', e.target.value)}
@@ -662,7 +703,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
                   />
                 </div>
                 <div>
-                  <Label className="text-xs text-muted-foreground font-normal">Absorb (abs)</Label>
+                  <Label className="text-xs text-muted-foreground font-normal">Absorb</Label>
                   <Input
                     value={editingItem.abs}
                     onChange={(e) => updateEditingItemField('abs', e.target.value)}
@@ -672,9 +713,35 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
                 </div>
               </div>
             )}
+            {isEquipment && (
+              <details className="rounded-md border border-border/70 bg-muted/20 px-2 py-1.5">
+                <summary className="cursor-pointer text-[11px] text-muted-foreground">Advanced damage scaling</summary>
+                <div className="space-y-2 pt-1.5">
+                  <p className="text-[11px] text-muted-foreground">Optional. Use this when damage should grow with level or stats.</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs text-muted-foreground font-normal">Minimum damage</Label>
+                      <Input aria-label="Minimum damage" value={editingItem.dmg_min || ''} onChange={(e) => updateEditingItemField('dmg_min', e.target.value)} placeholder="melee,base:10" className="h-8" />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground font-normal">Maximum damage</Label>
+                      <Input aria-label="Maximum damage" value={editingItem.dmg_max || ''} onChange={(e) => updateEditingItemField('dmg_max', e.target.value)} placeholder="melee,item_level:1" className="h-8" />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground font-normal">Minimum absorb</Label>
+                      <Input aria-label="Minimum absorb" value={editingItem.abs_min || ''} onChange={(e) => updateEditingItemField('abs_min', e.target.value)} placeholder="base:5" className="h-8" />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground font-normal">Maximum absorb</Label>
+                      <Input aria-label="Maximum absorb" value={editingItem.abs_max || ''} onChange={(e) => updateEditingItemField('abs_max', e.target.value)} placeholder="item_level:1" className="h-8" />
+                    </div>
+                  </div>
+                </div>
+              </details>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <Tooltip content="power= — the Flare [power] id this item casts when used">
+                <Tooltip content="The power this item casts when used.">
                   <Label className="text-xs text-muted-foreground font-normal">Item Use</Label>
                 </Tooltip>
                 {powerIds.length > 0 ? (
@@ -728,7 +795,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
               <Input
                 value={editingItem.script}
                 onChange={(e) => updateEditingItemField('script', e.target.value)}
-                placeholder="scripts/item_script.txt"
+                placeholder="Choose a script"
                 list={EVENT_SCRIPT_LIST_ID}
                 className="h-8"
               />
@@ -921,7 +988,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
                 <Input
                   value={editingItem.book || ''}
                   onChange={(e) => updateEditingItemField('book', e.target.value)}
-                  placeholder="books/lore.txt"
+                  placeholder="Choose a book"
                   className="h-8"
                 />
               </div>
@@ -963,7 +1030,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
             <Input
               value={editingItem.loot_animation}
               onChange={(e) => updateEditingItemField('loot_animation', e.target.value)}
-              placeholder="loot/animation.txt,min,max"
+              placeholder="Loot table, min, max"
               className="h-8"
             />
           </div>
@@ -978,7 +1045,7 @@ const ItemEditDialog = (props: ItemEditDialogProps) => {
                 <Input
                   value={editingItem.randomizer_def}
                   onChange={(e) => updateEditingItemField('randomizer_def', e.target.value)}
-                  placeholder="items/random/table.txt"
+                  placeholder="Choose a table"
                   list={RANDOMIZER_DEF_LIST_ID}
                   className="h-8"
                 />

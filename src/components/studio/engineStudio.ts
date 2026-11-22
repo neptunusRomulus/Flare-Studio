@@ -1,4 +1,4 @@
-export type EngineStudioView = 'files' | 'tree' | 'items' | 'problems' | 'animations' | 'statuses' | 'mod' | 'test-save';
+export type EngineStudioView = 'files' | 'tree' | 'items' | 'problems' | 'animations' | 'tileset-animations' | 'statuses' | 'mod' | 'test-save';
 export type EngineStudioRequest = { view: EngineStudioView; file?: string };
 
 type Listener = (req: EngineStudioRequest | null) => void;

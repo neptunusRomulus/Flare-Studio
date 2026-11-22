@@ -229,6 +229,20 @@ export function parseOffsetPair(value: string): { x: number; y: number } {
   return { x, y };
 }
 
+
+/** Frame indexes marked active_frame: "all" or a comma list. Out-of-range values are ignored. */
+export function activeFrameIndexes(value: string, frameCount: number): Set<number> {
+  const count = Math.max(1, Math.floor(frameCount) || 1);
+  const text = String(value || '').trim().toLowerCase();
+  if (text === 'all') return new Set(Array.from({ length: count }, (_, index) => index));
+  const frames = new Set<number>();
+  for (const part of text.split(',')) {
+    const frame = Number.parseInt(part.trim(), 10);
+    if (Number.isFinite(frame) && frame >= 0 && frame < count) frames.add(frame);
+  }
+  return frames;
+}
+
 /** Canvas placement for a frame: dest = origin - offset, as Flare draws at position - render_offset. */
 export function previewLayout(rect: Pick<PreviewRect, 'w' | 'h' | 'ox' | 'oy'>): {
   canvasW: number; canvasH: number; originX: number; originY: number; destX: number; destY: number;

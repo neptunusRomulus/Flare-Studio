@@ -79,7 +79,7 @@ const WhenDoneRow = ({ completeStatus, onCompleteStatusChange, rewards = {}, onR
         </FieldHint>
       ) : (
         <div className="space-y-1">
-          <p className="text-[11px] text-muted-foreground">No turn-in NPC dialog found. Pick a map event to write reward_xp, reward_item, and set_status.</p>
+          <p className="text-[11px] text-muted-foreground">No turn-in NPC dialog found. Pick an event to write reward_xp, reward_item, and set_status.</p>
           <Select
             value={rewards.event_path && rewards.event_key ? `${rewards.event_path}::${rewards.event_key}` : '__empty__'}
             onValueChange={(value) => {
@@ -94,10 +94,10 @@ const WhenDoneRow = ({ completeStatus, onCompleteStatusChange, rewards = {}, onR
             }}
           >
             <SelectTrigger className="h-6 text-[11px]">
-              <SelectValue placeholder="Map event" />
+              <SelectValue placeholder="Event" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="__empty__">Map event</SelectItem>
+              <SelectItem value="__empty__">Event</SelectItem>
               {events.map((event) => (
                 <SelectItem key={`${event.path}::${event.eventKey}`} value={`${event.path}::${event.eventKey}`}>{event.label}</SelectItem>
               ))}

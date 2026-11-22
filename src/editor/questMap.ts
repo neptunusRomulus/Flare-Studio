@@ -344,7 +344,7 @@ export function deriveQuestGraph(questsIn: QuestMapQuestInput[], npcsIn: QuestMa
     .map((event) => ({
       nodeId: eventNodeId(event.id),
       eventId: event.id,
-      name: clean(event.name) || 'Map event',
+      name: clean(event.name) || 'Event',
       location: event.x >= 0 && event.y >= 0 ? `${event.mapTitle} ${event.x},${event.y}` : `${event.mapTitle} · Not placed`,
     }));
 

@@ -13,6 +13,7 @@ export const MOUSE_CURSOR_PATH = 'engine/mouse_cursor.txt';
 export const WIDGET_SETTINGS_PATH = 'engine/widget_settings.txt';
 export const DEFAULT_SETTINGS_PATH = 'engine/default_settings.txt';
 export const DEFAULT_KEYBINDINGS_PATH = 'engine/default_keybindings.txt';
+export const NUMBER_FORMAT_PATH = 'engine/number_format.txt';
 
 export const FONT_COLOR_KEYS = [
   'menu_normal', 'menu_bonus', 'menu_penalty',
@@ -34,6 +35,11 @@ export const RESOLUTION_KEYS = [
 ] as const;
 
 export const COMBAT_TEXT_KEYS = ['duration', 'speed', 'offset', 'fade_duration', 'font'] as const;
+
+export const NUMBER_FORMAT_KEYS = [
+  'player_statbar', 'enemy_statbar', 'combat_text', 'character_menu',
+  'item_tooltips', 'power_tooltips', 'durations', 'death_penalty',
+] as const;
 
 export const MOUSE_CURSOR_KEYS = [
   'normal', 'interact', 'talk', 'attack',

@@ -61,6 +61,8 @@ export type NpcFileUpdate = { fields: Record<string, string | boolean>; dialogue
 export const NPC_SECTION_FIELDS: Record<string, string> = {
   npc_stats: 'stats',
   npc_visual_effects: 'visual_effect',
+  npc_render_layers: 'render_layers',
+  npc_animation_slots: 'animation_slots',
 };
 
 /** Parse a section property: JSON list of sections, each a list of {key, value}. */

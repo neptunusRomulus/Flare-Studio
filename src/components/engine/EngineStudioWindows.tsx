@@ -4,6 +4,7 @@ import { EngineConfigEditor } from '@/components/EngineConfigEditor';
 import PowerTreeEditor from '@/components/engine/PowerTreeEditor';
 import ItemMetaEditor from '@/components/engine/ItemMetaEditor';
 import AnimationEditor from '@/components/engine/AnimationEditor';
+import TilesetAnimationsForm from '@/components/engine/TilesetAnimationsForm';
 import StatusTrackingView from '@/components/engine/StatusTrackingView';
 import ModSettingsForm from '@/components/engine/ModSettingsForm';
 import TestLaunchForm from '@/components/engine/TestLaunchForm';
@@ -12,11 +13,12 @@ import ProblemsPanel from '@/components/engine/ProblemsPanel';
 import { closeEngineStudio, subscribeEngineStudio, type EngineStudioRequest } from '@/components/studio/engineStudio';
 
 const TITLES: Record<NonNullable<EngineStudioRequest>['view'], string> = {
-  files: 'Engine files',
+  files: 'Game files',
   tree: 'Power tree',
   items: 'Item types, qualities and sets',
   problems: 'Problems',
   animations: 'Animations',
+  'tileset-animations': 'Tileset animations',
   statuses: 'Status tracking',
   mod: 'Mod settings',
   'test-save': 'Test save',
@@ -36,6 +38,7 @@ export default function EngineStudioWindows() {
       {req.view === 'items' && <ItemMetaEditor initialFile={req.file} />}
       {req.view === 'problems' && <ProblemsPanel />}
       {req.view === 'animations' && <AnimationEditor projectPath={projectPath} initialFile={req.file} />}
+      {req.view === 'tileset-animations' && <TilesetAnimationsForm />}
       {req.view === 'statuses' && <StatusTrackingView projectPath={projectPath} />}
       {req.view === 'mod' && <ModSettingsForm projectPath={projectPath} />}
       {req.view === 'test-save' && <TestLaunchForm projectPath={projectPath} />}

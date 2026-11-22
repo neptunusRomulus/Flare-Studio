@@ -65,6 +65,15 @@ describe('NPC sections', () => {
     expect(sectionsFromNpcText(file, 'visual_effect').map(s => s[0].value)).toEqual(['glow', 'old']);
     expect(sectionsFromNpcText(file, 'stats')).toEqual([[{ key: 'speed', value: '2' }, { key: 'stat', value: 'hp,10' }]]);
   });
+  it('writes render_layers and animation_slots from section properties', () => {
+    const out = npcFileContent(file, npcFileUpdate('A', {
+      npc_render_layers: JSON.stringify([[{ key: 'layer', value: '0,body,head' }]]),
+      npc_animation_slots: JSON.stringify([[{ key: 'slot', value: 'body,animations/npcs/body.txt' }]]),
+    }, {}));
+    expect(out).toContain('[render_layers]\nlayer=0,body,head');
+    expect(out).toContain('[animation_slots]\nslot=body,animations/npcs/body.txt');
+  });
+
   it('a present property replaces the sections in place; comments stay; absent keeps the file', () => {
     const out = npcFileContent(file, npcFileUpdate('A', {
       npc_stats: JSON.stringify([[{ key: 'speed', value: '3' }, { key: 'stat', value: 'hp,10' }, { key: 'stat', value: 'mp,5' }]]),

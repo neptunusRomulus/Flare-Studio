@@ -58,7 +58,7 @@ const PaletteCard: React.FC<Props> = ({ open, width, onWidthChange, children, fo
       ref={cardRef}
       aria-label={wide ? "Sidebar panel" : "Sidebar list"}
       aria-hidden={!open}
-      className="absolute z-[5] flex flex-col min-h-0 overflow-hidden rounded-xl bg-white/90 dark:bg-neutral-900/90 backdrop-blur-sm border border-border shadow-lg"
+      className="absolute z-30 flex flex-col min-h-0 overflow-hidden rounded-xl bg-white/90 dark:bg-neutral-900/90 backdrop-blur-sm border border-border shadow-lg"
       style={{
         top: `calc(${PALETTE_CARD_TOP}px + var(--window-controls-offset, 0px))`,
         bottom: PALETTE_CARD_BOTTOM,

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { AlertTriangle, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import DraftInput from './DraftInput';
 import PowerIconField from './PowerIconField';
 import { Switch } from '@/components/ui/switch';
@@ -44,12 +45,12 @@ const parsePowerScript = (raw: string) => {
 };
 
 const POWER_TYPES: Array<{ id: string; label: string; tooltip: string }> = [
-  { id: 'fixed', label: 'Hits a spot', tooltip: 'type=fixed: appears at the caster or target' },
-  { id: 'missile', label: 'Projectile', tooltip: 'type=missile: flies until it hits' },
-  { id: 'repeater', label: 'Chain of hits', tooltip: 'type=repeater: a line of hits, one after another' },
-  { id: 'spawn', label: 'Summon', tooltip: 'type=spawn: creates a creature' },
-  { id: 'transform', label: 'Transform', tooltip: 'type=transform: turns the caster into a creature' },
-  { id: 'block', label: 'Block', tooltip: 'type=block: raises a shield while held' },
+  { id: 'fixed', label: 'Hits a spot', tooltip: 'Appears right at the caster or target.' },
+  { id: 'missile', label: 'Projectile', tooltip: 'Flies until it hits something.' },
+  { id: 'repeater', label: 'Chain of hits', tooltip: 'A line of hits, one after another.' },
+  { id: 'spawn', label: 'Summon', tooltip: 'Creates a creature.' },
+  { id: 'transform', label: 'Transform', tooltip: 'Turns the caster into a creature.' },
+  { id: 'block', label: 'Block', tooltip: 'Raises a shield while held.' },
 ];
 const EFFECT_TYPES = ['speed', 'attack_speed', 'damage', 'damage_percent', 'heal', 'hpot', 'hpot_percent', 'mpot', 'mpot_percent', 'shield', 'stun', 'fear', 'knockback', 'immunity', 'revive', 'convert', 'death_sentence'];
 
@@ -59,7 +60,7 @@ const POWER_SECTION_KEYS = new Set(['id', 'name', 'description', 'type', 'modifi
 const EFFECT_SECTION_KEYS = new Set(['id', 'name', 'type', 'icon', 'animation', 'can_stack', 'max_stacks']);
 const TOGGLE_KEYS = /^(use_hazard|buff|buff_teleport|buff_party|directional|face|aim_assist|multitarget|floor|complete_animation|requires_los|requires_corpse|remove_corpse|no_attack|passive|meta_power|sacrifice|can_stack|render_above|ignore_resist|wall_reflect|target_party|beacon|on_floor|ignore_zero_damage|lock_target_to_direction|missile_anim|trigger_all|manual_untransform|keep_equipment|untransform_on_hit|can_trigger_passives|script_trigger)$/;
 
-const USED_BY_LABEL: Record<UsedBy['kind'], string> = { enemy: 'Enemy', item: 'Item', event: 'Map event', npc: 'NPC', power: 'Power', skill_tree: 'Skill tree', class: 'Class' };
+const USED_BY_LABEL: Record<UsedBy['kind'], string> = { enemy: 'Enemy', item: 'Item', event: 'Event', npc: 'NPC', power: 'Power', skill_tree: 'Skill tree', class: 'Class' };
 
 const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
   <section className="space-y-2">
@@ -68,9 +69,9 @@ const Section = ({ title, children }: { title: string; children: React.ReactNode
   </section>
 );
 
-const Field = ({ label, flareKey, children }: { label: string; flareKey: string; children: React.ReactNode }) => (
+const Field = ({ label, hint, children }: { label: string; flareKey?: string; hint?: string; children: React.ReactNode }) => (
   <div className="grid grid-cols-[7rem_1fr] items-center gap-2">
-    <HintLabel className="text-xs truncate font-normal" hint={flareKey} side="left">{label}</HintLabel>
+    <HintLabel className="text-xs truncate font-normal" hint={hint} side="left">{label}</HintLabel>
     <div className="min-w-0">{children}</div>
   </div>
 );
@@ -89,7 +90,7 @@ const UsedByList = ({ items, extra }: { items: Array<UsedBy & { detail?: string 
   items.length === 0 ? <div className="text-xs text-muted-foreground">Nothing yet.</div> : (
     <div className="flex flex-wrap gap-1">
       {items.filter((u, i) => items.findIndex((x) => x.kind === u.kind && x.name === u.name && x.path === u.path) === i).map((u, i) => (
-        <Tooltip key={`${u.path}-${u.key}-${i}`} content={`${u.path} · ${u.key}=`} side="top">
+        <Tooltip key={`${u.path}-${u.key}-${i}`} content={`Used by ${USED_BY_LABEL[u.kind].toLowerCase()} ${u.name}.`} side="top">
           <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px]">
             <span className="text-muted-foreground">{USED_BY_LABEL[u.kind]}</span>{u.name}{u.detail ? <span className="text-muted-foreground">{u.detail}</span> : null}{extra?.(u)}
           </span>
@@ -340,12 +341,23 @@ const EffectEditor = ({ target, data, onClose, onOpen }: Props) => {
         <Warnings items={effectWarnings(effect, kind, uses)} />
       </div>
       <Section title="What does it do?">
-        <Field label="Changes" flareKey="type">
+        <Field label="Changes" flareKey="type" hint="What this effect changes.">
           <div className="flex flex-wrap gap-1">
             {EFFECT_TYPES.map((t) => (
               <Button key={t} type="button" variant="ghost" aria-pressed={v('type') === t} onClick={() => set('type', t)}
                 className={`h-6 px-2 rounded-full text-[11px] ${v('type') === t ? 'bg-foreground text-background hover:bg-foreground hover:text-background' : 'bg-muted hover:bg-muted/70'}`}>{keyLabel(t)}</Button>
             ))}
+          </div>
+          <div className="mt-1 space-y-0.5">
+            <Label className="text-[10px] text-muted-foreground">Other change</Label>
+            <DraftInput
+              className="h-7 text-xs"
+              aria-label="Custom effect type"
+              placeholder="Another stat or resistance"
+              value={v('type')}
+              onChange={(e) => set('type', e.target.value || null)}
+            />
+            <p className="text-[10px] text-muted-foreground">Pick a common change above, or name another one here.</p>
           </div>
         </Field>
         <Field label="Stacks" flareKey="can_stack"><Switch checked={v('can_stack') !== 'false'} onCheckedChange={(c) => set('can_stack', c ? 'true' : 'false')} aria-label="Stacks" /></Field>

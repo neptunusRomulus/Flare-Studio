@@ -34,6 +34,8 @@ import EnemyLookSection from '@/components/enemies/EnemyLookSection';
 import EnemyBehaviorSection from '@/components/enemies/EnemyBehaviorSection';
 import EnemyLootSection from '@/components/enemies/EnemyLootSection';
 import EnemyStorySection from '@/components/enemies/EnemyStorySection';
+import EnemySpawnConditionsSection from '@/components/enemies/EnemySpawnConditionsSection';
+import { SPAWN_CONDITION_KEYS } from '@/editor/enemySpawnConditions';
 import { BEHAVIOR_ICONS, enemyPropertyTooltips } from '@/components/enemies/enemyModel';
 import { EditorSection, Flag, LabelWithTooltip, MoreToggle, enemyInputCls } from '@/components/enemies/enemyFormPrimitives';
 import { HintIcon } from '@/components/ui/field-hint';
@@ -65,6 +67,7 @@ const ENEMY_FORM_KEYS: string[] = [
   'powers', 'passive_powers', 'cooldown', 'cooldown_hit', 'cooldown_los', 'power_filter', 'script',
   'loot', 'loot_count', 'first_defeat_loot', 'quest_loot', 'defeat_status', 'convert_status',
   'categories', 'rarity', 'include',
+  ...SPAWN_CONDITION_KEYS,
   'sfx_attack', 'sfx_hit', 'sfx_die', 'sfx_critdie', 'sfx_block', 'sfx_levelup', 'sfx_lowhp',
   'melee_range', 'combat_style', 'threat_range', 'flee_range', 'flee_duration', 'flee_cooldown',
   'chance_pursue', 'chance_flee', 'turn_delay', 'wander_radius', 'waypoints', 'waypoint_pause',
@@ -229,6 +232,7 @@ const [name, setName] = useState(() => enemy?.name || '');
     }
   });
   const [script, setScript] = useState<string>(() => propertyText(enemy?.properties?.script));
+  const [spawnConditions, setSpawnConditions] = useState<Record<string, string>>(() => Object.fromEntries(SPAWN_CONDITION_KEYS.map((key) => [key, propertyText(enemy?.properties?.[key])])));
 
   // Loot
 
@@ -497,6 +501,7 @@ const [name, setName] = useState(() => enemy?.name || '');
       setBehaviorMore(filled(propertyText(props.flee_duration), propertyText(props.flee_cooldown), propertyText(props.turn_delay), propertyText(props.waypoints), propertyText(props.waypoint_pause), props.facing === 'true', props.flying === 'true', props.intangible === 'true'));
       setLootMore(filled(propertyText(props.loot_count), propertyText(props.gold), stats.item_find, stats.currency_find));
       setStoryMore(filled(propertyText(props.first_defeat_loot), propertyText(props.convert_status), propertyText(props.script)));
+      setSpawnConditions(Object.fromEntries(SPAWN_CONDITION_KEYS.map((key) => [key, propertyText(props[key])])));
 
       setCustomPropsRaw(() => {
         if (!enemy?.properties) return '';
@@ -626,6 +631,10 @@ const [name, setName] = useState(() => enemy?.name || '');
     if (sfxLowhp) newProps.sfx_lowhp = sfxLowhp; else delete newProps.sfx_lowhp;
     if (statPerPrimary) newProps.stat_per_primary = statPerPrimary; else delete newProps.stat_per_primary;
     if (script) newProps.script = script; else delete newProps.script;
+    for (const key of SPAWN_CONDITION_KEYS) {
+      const value = String(spawnConditions[key] || '').trim();
+      if (value) newProps[key] = value; else delete newProps[key];
+    }
     if (abilitiesList.length > 0) newProps.abilities = JSON.stringify(abilitiesList); else delete newProps.abilities;
 
     const customLines = (customPropsRaw || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean);
@@ -1244,6 +1253,11 @@ const [name, setName] = useState(() => enemy?.name || '');
     setGold={setGold}
     lootMore={lootMore}
     setLootMore={setLootMore}
+        />
+
+        <EnemySpawnConditionsSection
+          values={spawnConditions}
+          onChange={(key, value) => setSpawnConditions((current) => ({ ...current, [key]: value }))}
         />
 
         <EnemyStorySection

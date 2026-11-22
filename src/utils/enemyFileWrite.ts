@@ -6,6 +6,7 @@
 import type { MapObject } from '@/types';
 import { applyEnemyFileUpdates } from '@/adapters/flare/flareAdapter.cjs';
 import { writeProjectFiles, projectRoot } from '@/editor/projectFiles';
+import { SPAWN_CONDITION_KEYS } from '@/editor/enemySpawnConditions';
 import { propertyRecord, propertyText } from '@/editor/propertyText';
 import { enemyFilePath } from '@/utils/enemyFileHydrate';
 
@@ -17,6 +18,7 @@ const STUDIO_ONLY_KEYS = new Set([
 ]);
 
 const LIST_KEYS = new Set(['loot', 'stat', 'stat_per_level', 'stat_per_primary']);
+const MAP_ONLY_KEYS = new Set<string>(SPAWN_CONDITION_KEYS);
 
 /** Project-relative enemies/...txt path, same rule as the editor save. */
 export function enemyRelPath(object: Pick<MapObject, 'name' | 'properties'>): string {
@@ -40,7 +42,7 @@ export function enemyFileTextFromObject(object: Pick<MapObject, 'name' | 'level'
   }
 
   for (const [key, value] of Object.entries(props)) {
-    if (!value || STUDIO_ONLY_KEYS.has(key) || LIST_KEYS.has(key) || key === 'categories' || key === 'category' || key === 'name' || key === 'level') continue;
+    if (!value || STUDIO_ONLY_KEYS.has(key) || LIST_KEYS.has(key) || MAP_ONLY_KEYS.has(key) || key === 'categories' || key === 'category' || key === 'name' || key === 'level') continue;
     if (key === 'powers') {
       // Studio sometimes stores a JSON array; Flare wants power=state,id,chance lines.
       const trimmed = value.trim();

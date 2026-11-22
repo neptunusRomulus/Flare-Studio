@@ -15,6 +15,6 @@ describe('item file hydrate', () => {
   });
 
   it('lists extra keys for the Properties list', () => {
-    expect(extraItemPropertyKeys({ id: 1, name: 'X', crafting_items: '1', dmg_min: 'ment,1', role: 'equipment' })).toEqual(['crafting_items', 'dmg_min']);
+    expect(extraItemPropertyKeys({ id: 1, name: 'X', crafting_items: '1', dmg_min: 'ment,1', role: 'equipment', custom_key: 'x' })).toEqual(['custom_key']);
   });
 });

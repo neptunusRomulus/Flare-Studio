@@ -6,6 +6,7 @@ import {
   DEFAULT_RESOLUTIONS,
   formatPos,
   mergeMenuPos,
+  mergeMenuSettings,
   parseMenuText,
   parsePowersMenuLayout,
   menuToTabPoint,
@@ -86,6 +87,57 @@ describe.skipIf(!hasMenus)('mergeMenuPos', () => {
     expect(next.slice(next.indexOf('\n') + 1)).toBe(inventory!.slice(inventory!.indexOf('\n') + 1));
     expect(mergeMenuPos(actionbar!, parseMenuText(actionbar!).pos)).toBe(actionbar!.endsWith('\n') ? actionbar! : `${actionbar!}\n`);
     expect(parseMenuText(minimap!).align).toBe('topright');
+  });
+});
+
+describe('mergeMenuSettings', () => {
+  it('updates common menu keys and keeps comments/unknown keys', () => {
+    const text = 'pos=1,2,300,400\nalign=right\n# keep\nbackground=old.png\nenabled=false\nunknown=yes\n';
+    const next = mergeMenuSettings(text, {
+      pos: { x: 10, y: 20, w: 300, h: 400 },
+      align: 'center',
+      background: 'new.png',
+      soundfxOpen: 'soundfx/open.ogg',
+      soundfxClose: '',
+      enabled: 'true',
+    });
+    expect(next).toContain('pos=10,20,300,400');
+    expect(next).toContain('align=center');
+    expect(next).toContain('background=new.png');
+    expect(next).toContain('soundfx_open=soundfx/open.ogg');
+    expect(next).toContain('enabled=true');
+    expect(next).toContain('# keep');
+    expect(next).toContain('unknown=yes');
+    expect(next).not.toContain('soundfx_close=');
+  });
+});
+
+describe('menu extra settings', () => {
+  it('keeps repeated action bar keys and rewrites them in place', () => {
+    const text = 'pos=0,0,1280,70\nslot=1,64,6\nslot=2,128,6\nunknown=yes\n';
+    const parsed = parseMenuText(text, 'menus/actionbar.txt');
+    expect(parsed.values.slot).toEqual(['1,64,6', '2,128,6']);
+    expect(parsed.values.unknown).toEqual(['yes']);
+    const next = mergeMenuSettings(text, {
+      ...parsed,
+      values: { ...parsed.values, slot: ['1,80,10,true', '2,128,6'] },
+    });
+    expect(next).toContain('slot=1,80,10,true');
+    expect(next).toContain('slot=2,128,6');
+    expect(next).toContain('unknown=yes');
+  });
+
+  it('adds stat bar keys without touching unknown lines', () => {
+    const text = 'pos=4,4,512,32\nbar_pos=0,0,512,32\n# keep\n';
+    const parsed = parseMenuText(text, 'menus/hp.txt');
+    const next = mergeMenuSettings(text, {
+      ...parsed,
+      values: { ...parsed.values, bar_gfx: ['images/menus/hp.png'], hide_timeout: ['10s'] },
+    });
+    expect(next).toContain('bar_gfx=images/menus/hp.png');
+    expect(next).toContain('hide_timeout=10s');
+    expect(next).toContain('bar_pos=0,0,512,32');
+    expect(next).toContain('# keep');
   });
 });
 

@@ -26,6 +26,8 @@ import {
   MENU_BACKGROUNDS_PATH,
   MOUSE_CURSOR_KEYS,
   MOUSE_CURSOR_PATH,
+  NUMBER_FORMAT_KEYS,
+  NUMBER_FORMAT_PATH,
   RESOLUTIONS_PATH,
   RESOLUTION_KEYS,
   TOOLTIPS_PATH,
@@ -54,9 +56,9 @@ import {
 } from '@/editor/uiEngine';
 import { useRegisterDirty } from '@/context/SaveHealthContext';
 
-type UiPane = 'general' | 'fonts' | 'colors' | 'tooltips' | 'resolutions' | 'combat' | 'icons' | 'backgrounds' | 'cursor' | 'widgets' | 'defaults' | 'subtitles';
+type UiPane = 'general' | 'fonts' | 'colors' | 'tooltips' | 'resolutions' | 'combat' | 'numbers' | 'icons' | 'backgrounds' | 'cursor' | 'widgets' | 'defaults' | 'subtitles';
 
-type FieldMeta = { key: string; tip: string; width: FieldWidth; color?: boolean };
+type FieldMeta = { key: string; label?: string; tip: string; width: FieldWidth; color?: boolean };
 
 const COLOR_FIELDS: FieldMeta[] = [
   { key: 'menu_normal', tip: 'Basic menu text color. Recommended: white.', width: 'name', color: true },
@@ -102,6 +104,17 @@ const COMBAT_TEXT_FIELDS: FieldMeta[] = [
   { key: 'offset', tip: 'Vertical offset where the floating text starts.', width: 'num' },
   { key: 'fade_duration', tip: 'Fade-out duration, as milliseconds or a duration such as 400ms.', width: 'short' },
   { key: 'font', tip: 'Font id from font_settings.txt used for combat text.', width: 'id' },
+];
+
+const NUMBER_FORMAT_FIELDS: FieldMeta[] = [
+  { key: 'player_statbar', label: 'Player health and mana', tip: 'How many decimals to show.', width: 'num' },
+  { key: 'enemy_statbar', label: 'Enemy health', tip: 'How many decimals to show.', width: 'num' },
+  { key: 'combat_text', label: 'Combat numbers', tip: 'How many decimals to show.', width: 'num' },
+  { key: 'character_menu', label: 'Character menu', tip: 'How many decimals to show.', width: 'num' },
+  { key: 'item_tooltips', label: 'Item tooltips', tip: 'How many decimals to show.', width: 'num' },
+  { key: 'power_tooltips', label: 'Power tooltips', tip: 'How many decimals to show.', width: 'num' },
+  { key: 'durations', label: 'Durations', tip: 'How many decimals to show.', width: 'num' },
+  { key: 'death_penalty', label: 'Death penalty', tip: 'How many decimals to show.', width: 'num' },
 ];
 
 const CURSOR_FIELDS: FieldMeta[] = [
@@ -243,6 +256,7 @@ const PANES: Array<{ id: UiPane; label: string }> = [
   { id: 'tooltips', label: 'Tooltips' },
   { id: 'resolutions', label: 'Resolutions' },
   { id: 'combat', label: 'Combat text' },
+  { id: 'numbers', label: 'Number format' },
   { id: 'icons', label: 'Icons' },
   { id: 'backgrounds', label: 'Backgrounds' },
   { id: 'cursor', label: 'Cursor' },
@@ -268,16 +282,16 @@ function KeyedFields({
     <div className="space-y-2">
       {fields.map((field) => (
         <div key={field.key} className="flex flex-wrap items-center gap-2">
-          <HintLabel className="text-xs font-normal w-52 shrink-0" hint={field.tip}>{field.key}</HintLabel>
+          <HintLabel className="text-xs font-normal w-52 shrink-0" hint={field.tip}>{field.label ?? field.key}</HintLabel>
           {field.color ? (
             <FlareColorField
-              aria-label={field.key}
+              aria-label={field.label ?? field.key}
               value={values[field.key] ?? ''}
               onChange={(next) => onChange(upsertKeyedValues(text, keys, { [field.key]: next }))}
             />
           ) : (
             <Input
-              aria-label={field.key}
+              aria-label={field.label ?? field.key}
               width={field.width}
               className="h-7 text-xs"
               value={values[field.key] ?? ''}
@@ -300,6 +314,7 @@ export default function UIEngineFilesPanel({ general }: { general: ReactNode }) 
   const [tooltipsText, setTooltipsText] = useState('');
   const [resolutionsText, setResolutionsText] = useState('');
   const [combatText, setCombatText] = useState('');
+  const [numberFormatText, setNumberFormatText] = useState('');
   const [iconsText, setIconsText] = useState('');
   const [backgroundsText, setBackgroundsText] = useState('');
   const [cursorText, setCursorText] = useState('');
@@ -316,7 +331,7 @@ export default function UIEngineFilesPanel({ general }: { general: ReactNode }) 
   const loadAll = useCallback(async () => {
     const clear = () => {
       setFontsText(''); setColorsText(''); setTooltipsText(''); setResolutionsText('');
-      setCombatText(''); setIconsText(''); setBackgroundsText(''); setCursorText('');
+      setCombatText(''); setNumberFormatText(''); setIconsText(''); setBackgroundsText(''); setCursorText('');
       setWidgetsText(''); setDefaultsText(''); setKeybindsText(''); setSubtitlesText(''); setDirty(false);
     };
     if (!projectPath || !window.electronAPI?.readFile) {
@@ -327,13 +342,14 @@ export default function UIEngineFilesPanel({ general }: { general: ReactNode }) 
     const flarePath = getStoredFlarePath();
     const load = (relative: string) => loadEngineFileWithFallback({ projectPath, relative, flarePath, fs });
     const [
-      fonts, colors, tooltips, resolutions, combat, icons, backgrounds, cursor, widgets, defaults, keybinds, subtitles,
+      fonts, colors, tooltips, resolutions, combat, numbers, icons, backgrounds, cursor, widgets, defaults, keybinds, subtitles,
     ] = await Promise.all([
       load(FONT_SETTINGS_PATH),
       load(FONT_COLORS_PATH),
       load(TOOLTIPS_PATH),
       load(RESOLUTIONS_PATH),
       load(COMBAT_TEXT_PATH),
+      load(NUMBER_FORMAT_PATH),
       load(ICONS_PATH),
       load(MENU_BACKGROUNDS_PATH),
       load(MOUSE_CURSOR_PATH),
@@ -348,6 +364,7 @@ export default function UIEngineFilesPanel({ general }: { general: ReactNode }) 
     setTooltipsText(tooltips.text);
     setResolutionsText(resolutions.text);
     setCombatText(combat.text);
+    setNumberFormatText(numbers.text);
     setIconsText(icons.text);
     setBackgroundsText(backgrounds.text);
     setCursorText(cursor.text);
@@ -371,6 +388,7 @@ export default function UIEngineFilesPanel({ general }: { general: ReactNode }) 
       tooltipsText.trim() ? { path: TOOLTIPS_PATH, content: withNewline(tooltipsText) } : null,
       resolutionsText.trim() ? { path: RESOLUTIONS_PATH, content: withNewline(resolutionsText) } : null,
       combatText.trim() ? { path: COMBAT_TEXT_PATH, content: withNewline(combatText) } : null,
+      numberFormatText.trim() ? { path: NUMBER_FORMAT_PATH, content: withNewline(numberFormatText) } : null,
       iconsText.trim() ? { path: ICONS_PATH, content: withNewline(iconsText) } : null,
       backgroundsText.trim() ? { path: MENU_BACKGROUNDS_PATH, content: withNewline(backgroundsText) } : null,
       cursorText.trim() ? { path: MOUSE_CURSOR_PATH, content: withNewline(cursorText) } : null,
@@ -403,6 +421,7 @@ export default function UIEngineFilesPanel({ general }: { general: ReactNode }) 
     tooltipsText.trim() ? { path: TOOLTIPS_PATH, content: withNewline(tooltipsText) } : null,
     resolutionsText.trim() ? { path: RESOLUTIONS_PATH, content: withNewline(resolutionsText) } : null,
     combatText.trim() ? { path: COMBAT_TEXT_PATH, content: withNewline(combatText) } : null,
+    numberFormatText.trim() ? { path: NUMBER_FORMAT_PATH, content: withNewline(numberFormatText) } : null,
     iconsText.trim() ? { path: ICONS_PATH, content: withNewline(iconsText) } : null,
     backgroundsText.trim() ? { path: MENU_BACKGROUNDS_PATH, content: withNewline(backgroundsText) } : null,
     cursorText.trim() ? { path: MOUSE_CURSOR_PATH, content: withNewline(cursorText) } : null,
@@ -410,7 +429,7 @@ export default function UIEngineFilesPanel({ general }: { general: ReactNode }) 
     defaultsText.trim() ? { path: DEFAULT_SETTINGS_PATH, content: withNewline(defaultsText) } : null,
     keybindsText.trim() ? { path: DEFAULT_KEYBINDINGS_PATH, content: withNewline(keybindsText) } : null,
     subtitlesText.trim() ? { path: SUBTITLES_PATH, content: withNewline(subtitlesText) } : null,
-  ].filter(Boolean) as Array<{ path: string; content: string }>), [fontsText, colorsText, tooltipsText, resolutionsText, combatText, iconsText, backgroundsText, cursorText, widgetsText, defaultsText, keybindsText, subtitlesText]);
+  ].filter(Boolean) as Array<{ path: string; content: string }>), [fontsText, colorsText, tooltipsText, resolutionsText, combatText, numberFormatText, iconsText, backgroundsText, cursorText, widgetsText, defaultsText, keybindsText, subtitlesText]);
   const applyUiDrafts = (incoming: Array<{ path: string; content: string }>) => {
     skipDiskLoadRef.current = true;
     const setters: Record<string, (value: string) => void> = {
@@ -419,6 +438,7 @@ export default function UIEngineFilesPanel({ general }: { general: ReactNode }) 
       [TOOLTIPS_PATH]: setTooltipsText,
       [RESOLUTIONS_PATH]: setResolutionsText,
       [COMBAT_TEXT_PATH]: setCombatText,
+      [NUMBER_FORMAT_PATH]: setNumberFormatText,
       [ICONS_PATH]: setIconsText,
       [MENU_BACKGROUNDS_PATH]: setBackgroundsText,
       [MOUSE_CURSOR_PATH]: setCursorText,
@@ -570,6 +590,14 @@ export default function UIEngineFilesPanel({ general }: { general: ReactNode }) 
               <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Combat text</div>
             </FieldHint>
             <KeyedFields text={combatText} keys={COMBAT_TEXT_KEYS} fields={COMBAT_TEXT_FIELDS} onChange={mark(setCombatText)} />
+          </div>
+        ) : pane === 'numbers' ? (
+          <div className="space-y-2">
+            <div>
+              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Number format</div>
+              <p className="text-[11px] text-muted-foreground">Choose how many decimal places each number shows.</p>
+            </div>
+            <KeyedFields text={numberFormatText} keys={NUMBER_FORMAT_KEYS} fields={NUMBER_FORMAT_FIELDS} onChange={mark(setNumberFormatText)} />
           </div>
         ) : pane === 'icons' ? (
           <div className="space-y-2">

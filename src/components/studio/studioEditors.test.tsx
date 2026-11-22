@@ -19,14 +19,15 @@ function render(node: React.ReactNode) {
 }
 
 describe('studio editor screens', () => {
-  it('renders a project-wide tile size with Low Res and High Res', () => {
+  it('renders a project-wide tile size with presets and custom orientation/size', () => {
     const html = render(<TileSizeForm />);
     expect(html).toContain('Tile Size');
     expect(html).toContain('Low Res');
     expect(html).toContain('High Res');
-    expect(html).not.toContain('128');
-    expect(html).not.toContain('type="number"');
-    expect(html).not.toContain('Apply');
+    expect(html).toContain('Tile orientation');
+    expect(html).toContain('Tile width');
+    expect(html).toContain('Apply custom size');
+    expect(html).toContain('type="number"');
     expect(html).not.toContain('Are you sure?');
   });
 

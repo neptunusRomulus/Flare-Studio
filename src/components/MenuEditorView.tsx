@@ -4,22 +4,36 @@ import { Button } from '@/components/ui/button';
 import Tooltip from '@/components/ui/tooltip';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
+  ALIGNMENTS,
   alignToScreenEdge,
   DEFAULT_RESOLUTIONS,
   MAIN_MENU_FILES,
-  mergeMenuPos,
+  mergeMenuSettings,
   parseMenuText,
   parseResolutionsText,
   posFromScreen,
   viewSize,
   visibleMenuFiles,
+  type MenuAlign,
   type MenuPanel,
   type Resolutions,
 } from '@/editor/menuLayout';
+import MenuExtraSettings from '@/components/menus/MenuExtraSettings';
 import { useRegisterDirty } from '@/context/SaveHealthContext';
 
 export const OPEN_MENUS_EVENT = 'flare-studio:open-menus';
+
+const ALIGN_LABELS: Record<string, string> = {
+  topleft: 'Top left', top: 'Top', topright: 'Top right',
+  left: 'Left', center: 'Center', right: 'Right',
+  bottomleft: 'Bottom left', bottom: 'Bottom', bottomright: 'Bottom right',
+  frame_topleft: 'Frame top left', frame_top: 'Frame top', frame_topright: 'Frame top right',
+  frame_left: 'Frame left', frame_center: 'Frame center', frame_right: 'Frame right',
+  frame_bottomleft: 'Frame bottom left', frame_bottom: 'Frame bottom', frame_bottomright: 'Frame bottom right',
+};
 
 const RESOLUTIONS = [
   { label: '640×480', w: 640, h: 480 },
@@ -93,6 +107,19 @@ const MenuEditorView = ({ projectPath }: Props) => {
   }, [view.viewW, view.viewH]);
 
   const current = (file: string) => dirty[file] || panels.find((panel) => panel.file === file);
+  const selectedPanel = selected ? current(selected) : undefined;
+  const updateSelected = (patch: Partial<MenuPanel>) => {
+    if (!selected) return;
+    const base = current(selected);
+    if (!base) return;
+    setDirty((prev) => ({ ...prev, [selected]: { ...base, ...patch } }));
+  };
+  const updateValue = (key: string, values: string[]) => {
+    if (!selected) return;
+    const base = current(selected);
+    if (!base) return;
+    setDirty((prev) => ({ ...prev, [selected]: { ...base, values: { ...base.values, [key]: values } } }));
+  };
   const shown = useMemo(
     () => visibleMenuFiles(panels.map((panel) => panel.file), selected, showAll),
     [panels, selected, showAll],
@@ -122,7 +149,7 @@ const MenuEditorView = ({ projectPath }: Props) => {
   const save = async () => {
     if (!root || !window.electronAPI?.writeFile) return;
     for (const panel of Object.values(dirty)) {
-      const next = mergeMenuPos(panel.text, panel.pos);
+      const next = mergeMenuSettings(panel.text, panel);
       await window.electronAPI.writeFile(projectFile(root, panel.file), next);
     }
     await load();
@@ -130,7 +157,7 @@ const MenuEditorView = ({ projectPath }: Props) => {
 
   const draftFiles = useMemo(() => Object.values(dirty).map((panel) => ({
     path: panel.file,
-    content: mergeMenuPos(panel.text, panel.pos),
+    content: mergeMenuSettings(panel.text, panel),
   })), [dirty]);
   const applyMenuDrafts = (incoming: Array<{ path: string; content: string }>) => {
     skipDiskLoadRef.current = true;
@@ -175,7 +202,7 @@ const MenuEditorView = ({ projectPath }: Props) => {
           ))}
         </div>
         <div className="text-[11px] text-muted-foreground ml-2">
-          view {view.viewW}×{view.viewH}
+          Preview {view.viewW}×{view.viewH}
         </div>
         <div className="flex items-center gap-2 ml-3">
           <Switch
@@ -188,12 +215,41 @@ const MenuEditorView = ({ projectPath }: Props) => {
             <Label htmlFor="menu-show-all" className="text-[11px] font-normal text-muted-foreground">Show all panels</Label>
           </Tooltip>
         </div>
-        <Tooltip content="Write pos= for moved panels. Other keys stay as they are.">
+        <Tooltip content="Save the position and settings you changed.">
           <Button type="button" size="sm" className="h-7 ml-auto" disabled={!Object.keys(dirty).length} onClick={() => void save()}>
             <Save className="w-3.5 h-3.5" />
           </Button>
         </Tooltip>
       </div>
+      {selectedPanel ? (
+        <div className="flex flex-wrap items-end gap-2 border-b border-border bg-muted/20 px-3 py-2">
+          <div className="text-[11px] font-medium w-28 truncate" title={selectedPanel.file}>{selectedPanel.name}</div>
+          <div className="space-y-1">
+            <Label className="text-[10px] text-muted-foreground font-normal" htmlFor="menu-align">Align</Label>
+            <Select value={selectedPanel.align} onValueChange={(value) => updateSelected({ align: value as MenuAlign })}>
+              <SelectTrigger id="menu-align" aria-label="Menu alignment" className="h-7 w-32 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>{ALIGNMENTS.map((align) => <SelectItem key={align} value={align}>{ALIGN_LABELS[align] || align}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-[10px] text-muted-foreground font-normal" htmlFor="menu-background">Background</Label>
+            <Input id="menu-background" aria-label="Menu background" className="h-7 text-xs" width="path" value={selectedPanel.background || ''} onChange={(event) => updateSelected({ background: event.target.value })} placeholder="Background image" />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-[10px] text-muted-foreground font-normal" htmlFor="menu-open-sfx">Open sound</Label>
+            <Input id="menu-open-sfx" aria-label="Menu open sound" className="h-7 text-xs" width="path" value={selectedPanel.soundfxOpen || ''} onChange={(event) => updateSelected({ soundfxOpen: event.target.value })} placeholder="Open sound" />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-[10px] text-muted-foreground font-normal" htmlFor="menu-close-sfx">Close sound</Label>
+            <Input id="menu-close-sfx" aria-label="Menu close sound" className="h-7 text-xs" width="path" value={selectedPanel.soundfxClose || ''} onChange={(event) => updateSelected({ soundfxClose: event.target.value })} placeholder="Close sound" />
+          </div>
+          <div className="flex items-center gap-2 pb-1">
+            <Switch id="menu-enabled" aria-label="Menu enabled" checked={selectedPanel.enabled !== 'false'} onCheckedChange={(checked) => updateSelected({ enabled: checked ? '' : 'false' })} />
+            <Label htmlFor="menu-enabled" className="text-[11px] font-normal text-muted-foreground">Enabled</Label>
+          </div>
+        </div>
+      ) : null}
+      {selectedPanel ? <MenuExtraSettings panel={selectedPanel} onChange={updateValue} /> : null}
       <div className="flex flex-1 min-h-0">
         <div className="w-44 overflow-y-auto border-r border-border p-2 space-y-0.5">
           {panels.map((panel) => (
@@ -208,7 +264,7 @@ const MenuEditorView = ({ projectPath }: Props) => {
               {dirty[panel.file] ? ' •' : ''}
             </Button>
           ))}
-          {panels.length === 0 && <p className="text-[11px] text-muted-foreground">No menus/*.txt in this project.</p>}
+          {panels.length === 0 && <p className="text-[11px] text-muted-foreground">No menus found in this project.</p>}
         </div>
         <div ref={frameRef} className="flex-1 overflow-auto p-4 bg-zinc-900">
           <div style={{ width: view.viewW * scale, height: view.viewH * scale, margin: '0 auto' }}>
@@ -227,7 +283,7 @@ const MenuEditorView = ({ projectPath }: Props) => {
                     onClick={() => setSelected(panel.file)}
                     className={`absolute border text-[10px] leading-tight px-1 py-0.5 overflow-hidden cursor-move ${selected === panel.file ? 'border-amber-400 bg-amber-400/20 text-amber-50' : 'border-white/40 bg-black/40 text-white/90'}`}
                     style={{ left: rect.x, top: rect.y, width: Math.max(rect.w, 8), height: Math.max(rect.h, 8), zIndex: selected === panel.file ? 2 : 1 }}
-                    title={`${panel.file}  pos=${panel.pos.x},${panel.pos.y}  align=${panel.align}`}
+                    title={`${panel.name}. Drag to move.`}
                   >
                     {panel.name}
                   </div>

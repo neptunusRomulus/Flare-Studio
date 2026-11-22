@@ -20,7 +20,7 @@ export const KIND_META: Record<ContentKind, KindMeta> = {
   skill: { label: 'Skill', plural: 'Skills', icon: 'Wand2', color: 'text-blue-500', tooltip: 'Flare [power] the player can use (powers menu, hotbar, class)' },
   monster: { label: 'Monster Attack', plural: 'Monster Attacks', icon: 'Skull', color: 'text-red-500', tooltip: 'Flare [power] used by an enemy (power=, passive_powers=)' },
   item: { label: 'Item Use', plural: 'Item Uses', icon: 'FlaskConical', color: 'text-green-500', tooltip: 'Flare [power] an item casts (item power=)' },
-  trap: { label: 'Trap / Map Spell', plural: 'Traps / Map Spells', icon: 'Flame', color: 'text-orange-500', tooltip: 'Flare [power] cast by a map event or NPC (event power=)' },
+  trap: { label: 'Trap / Map Spell', plural: 'Traps / Map Spells', icon: 'Flame', color: 'text-orange-500', tooltip: 'A power cast by an event or NPC.' },
   buff: { label: 'Buff', plural: 'Buffs', icon: 'ArrowUpCircle', color: 'text-emerald-500', tooltip: 'Flare [effect] that helps its target' },
   debuff: { label: 'Debuff', plural: 'Debuffs', icon: 'ArrowDownCircle', color: 'text-purple-500', tooltip: 'Flare [effect] that hurts its target' },
   flag: { label: 'Story Flag', plural: 'Story Flags', icon: 'Flag', color: 'text-amber-500', tooltip: 'Flare campaign status (set_status / requires_status)' },

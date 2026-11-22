@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseAnimationFile, parseColorMod, previewLayout, previewRect, serializeAnimationFile } from './animationFile';
+import { activeFrameIndexes, parseAnimationFile, parseColorMod, previewLayout, previewRect, serializeAnimationFile } from './animationFile';
 
 const UNPACKED = `# demo
 
@@ -49,6 +49,16 @@ describe('animationFile', () => {
     const out = serializeAnimationFile(parseAnimationFile(UNPACKED));
     expect(out).toContain('# demo');
     expect(serializeAnimationFile(parseAnimationFile(out)).trim()).toBe(out.trim());
+  });
+
+  it('resolves active frames and packed frames that switch image mid-section', () => {
+    expect([...activeFrameIndexes('all', 3)]).toEqual([0, 1, 2]);
+    expect([...activeFrameIndexes('0, 2, 9', 3)]).toEqual([0, 2]);
+    expect([...activeFrameIndexes('', 2)]).toEqual([]);
+
+    const twoImages = parseAnimationFile(`image=images/a.png,first\nimage=images/b.png,second\n\n[stance]\nframes=2\nduration=200ms\ntype=looped\nframe=0,0,0,0,10,10,0,0,first\nframe=1,0,0,0,10,10,0,0,second\n`);
+    expect(previewRect(twoImages, twoImages.sections[0], 0, 0)?.image).toBe('images/a.png');
+    expect(previewRect(twoImages, twoImages.sections[0], 1, 0)?.image).toBe('images/b.png');
   });
 
   it('parses color_mod and places a frame at origin minus offset', () => {

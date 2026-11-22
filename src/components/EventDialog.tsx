@@ -821,19 +821,21 @@ const EventDialog: React.FC<EventDialogProps> = ({
           />
 
           <div className="space-y-2 px-1">
-            <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Event</div>
+            <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Actions</div>
             <div className="flex flex-wrap items-center gap-2">
-              <HintLabel className="text-xs font-normal w-16 shrink-0" hint="This instance runs the event script. Changing the script changes every place that uses it.">script</HintLabel>
+              <HintLabel className="text-xs font-normal w-16 shrink-0" hint="What this event does when it runs.">Actions</HintLabel>
               <Input
                 width="path"
                 className="h-7 text-xs"
+                aria-label="Event actions"
                 list={EVENT_SCRIPT_LIST_ID}
+                placeholder="Choose event actions"
                 value={eventData.engine.script}
                 onChange={(e) => setEventData((prev) => ({ ...prev, engine: { ...prev.engine, script: e.target.value } }))}
               />
               {normalizeEventScriptPath(eventData.engine.script) ? (
                 <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={() => onEditScript?.(normalizeEventScriptPath(eventData.engine.script))}>
-                  Edit event
+                  Edit actions
                 </Button>
               ) : null}
             </div>
@@ -848,14 +850,14 @@ const EventDialog: React.FC<EventDialogProps> = ({
           </div>
 
           <div className="space-y-2 px-1">
-            <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Procgen</div>
+            <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Generated maps</div>
             {extraProcgenEvents((typeof editor?.getMapObjects === 'function' ? editor.getMapObjects() : []).filter((obj: { type?: string }) => obj.type === 'event'), editingEventId).length ? (
               <p className="text-[11px] leading-snug text-amber-500">
-                The engine only uses the first rules file on this map. Another event already has one.
+                Only one layout file is used per map. Another event already has one.
               </p>
             ) : null}
             <div className="flex flex-wrap items-center gap-2">
-              <HintLabel className="text-xs font-normal w-28 shrink-0" hint="procgen_filename. Rules file under maps/procgen_rules. The engine fills this event's location rectangle when the map loads. Only the first event with procgen_filename on this map is used, and it must be on the map event itself, not in a script file. intermap_random is a different feature: a random teleport map list, not a procgen rules file.">Rules file</HintLabel>
+              <HintLabel className="text-xs font-normal w-28 shrink-0" hint="A layout that fills this event's area when the map loads. Only one is used per map.">Layout file</HintLabel>
               <Input
                 width="path"
                 className="h-7 text-xs"
@@ -865,7 +867,7 @@ const EventDialog: React.FC<EventDialogProps> = ({
               />
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <HintLabel className="text-xs font-normal w-28 shrink-0" hint="procgen_link. Only used on chunk maps with procgen_type=links. north, south, west, or east.">Link side</HintLabel>
+              <HintLabel className="text-xs font-normal w-28 shrink-0" hint="Which side of a generated map this door connects to.">Connects to</HintLabel>
               <Input
                 width="id"
                 className="h-7 text-xs"
@@ -881,7 +883,7 @@ const EventDialog: React.FC<EventDialogProps> = ({
               </datalist>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <HintLabel className="text-xs font-normal w-28 shrink-0" hint="procgen_door_level. For procedural generation chunks only. The event is active on these door levels (comma-separated integers).">Door level</HintLabel>
+              <HintLabel className="text-xs font-normal w-28 shrink-0" hint="The door levels where this event is active.">Door level</HintLabel>
               <Input
                 width="id"
                 className="h-7 text-xs"

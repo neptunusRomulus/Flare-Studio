@@ -17,6 +17,7 @@ export type TileDraft = {
 };
 
 export type MapPresentation = {
+  backgroundColor: string;
   parallax: string;
   fogofwar: string;
   save_fogofwar: string;
@@ -74,6 +75,7 @@ export const TEXT_KEYS = new Set(['name', 'title', 'description', 'quest_text', 
 
 export function emptyMapPresentation(): MapPresentation {
   return {
+    backgroundColor: '',
     parallax: '',
     fogofwar: '',
     save_fogofwar: '',
@@ -193,6 +195,7 @@ export function procgenRelativePath(slugInput: string): string {
 
 /** Header keys `exportMapText` already understands. `procgen_chunks` is not a known key. */
 export function mapHeaderForExport(presentation: MapPresentation): {
+  backgroundColor?: string;
   parallax?: string;
   fogofwar?: string;
   save_fogofwar?: string;
@@ -201,6 +204,7 @@ export function mapHeaderForExport(presentation: MapPresentation): {
   procgen_reset_status?: string;
 } {
   const header: {
+    backgroundColor?: string;
     parallax?: string;
     fogofwar?: string;
     save_fogofwar?: string;
@@ -208,6 +212,7 @@ export function mapHeaderForExport(presentation: MapPresentation): {
     procgen_unique_status?: string;
     procgen_reset_status?: string;
   } = {};
+  if (presentation.backgroundColor) header.backgroundColor = presentation.backgroundColor;
   if (presentation.parallax) header.parallax = presentation.parallax;
   if (presentation.fogofwar) header.fogofwar = presentation.fogofwar;
   if (presentation.save_fogofwar) header.save_fogofwar = presentation.save_fogofwar;

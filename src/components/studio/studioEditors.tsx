@@ -10,6 +10,8 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { useAppContext } from '@/context/AppContext';
 import CutsceneEditor from '@/components/engine/CutsceneEditor';
 import ProcgenRulesForm from '@/components/engine/ProcgenRulesForm';
+import RandomMapListsForm from '@/components/engine/RandomMapListsForm';
+import { FlareColorField } from '@/components/ui/flare-color-field';
 import { toast } from '@/hooks/use-toast';
 import { loadConfigDocument, projectRoot, writeProjectFiles } from '@/editor/projectFiles';
 import { useRegisterDirty } from '@/context/SaveHealthContext';
@@ -68,6 +70,7 @@ export function TileSizeForm({ editor, onSaved }: { editor?: StudioEditor | null
   const projectPath = useProjectPath();
   const studioEditor = useStudioEditor(editor);
   const [tile, setTile] = useState<TileDraft>({ width: 192, height: 96, orientation: 'isometric' });
+  const [draft, setDraft] = useState<TileDraft>({ width: 192, height: 96, orientation: 'isometric' });
 
   useEffect(() => {
     if (typeof window === 'undefined' || !projectPath || !window.electronAPI?.readFile) return;
@@ -78,7 +81,9 @@ export function TileSizeForm({ editor, onSaved }: { editor?: StudioEditor | null
       const parsed = readCanonical(text);
       const stored = parsed?.tile;
       if (stored && typeof stored === 'object') {
-        setTile(normalizeTileDraft(stored as TileDraft));
+        const normalized = normalizeTileDraft(stored as TileDraft);
+        setTile(normalized);
+        setDraft(normalized);
       }
     }).catch(() => undefined);
     return () => { cancelled = true; };
@@ -88,54 +93,58 @@ export function TileSizeForm({ editor, onSaved }: { editor?: StudioEditor | null
     {
       width: 64,
       label: 'Low Res',
-      description: 'Whole game uses 64×32 tiles, for low-resolution art. fantasycore (192×96) does not fit this size, so you need 64×32 art.',
+      description: 'Smaller tiles for pixel art.',
     },
     {
       width: 192,
       label: 'High Res',
-      description: 'Whole game uses 192×96 tiles. Matches fantasycore, the default base mod, so its menus, hero and animations work as they are.',
+      description: 'Detailed tiles that match the default art.',
     },
   ];
-  // Preset waiting for the inline "Are you sure?" answer.
-  const [pending, setPending] = useState<number | null>(null);
+  // Preset/custom value waiting for the inline "Are you sure?" answer.
+  const [pending, setPending] = useState<number | 'custom' | null>(null);
 
-  const save = async (width: number) => {
+  const save = async (next: TileDraft) => {
     setPending(null);
-    const draft: TileDraft = { width, height: width / 2, orientation: 'isometric' };
+    if (!(next.width > 0) || !(next.height > 0)) return;
     const indexText = projectPath && window.electronAPI?.readFile
       ? await window.electronAPI.readFile(`${projectRoot(projectPath)}/project.json`)
       : null;
     const saved = await persist(
       projectPath,
-      tileFiles(indexText, draft),
-      'engine/tileset_config.txt',
-      'Could not write engine/tileset_config.txt.'
+      tileFiles(indexText, next),
+      'Tile size saved. Your maps and art will use this grid.',
+      'Could not save the tile size.'
     );
     if (saved) {
-      setTile(draft);
-      studioEditor?.setGroundTileSize?.(draft);
+      setTile(next);
+      setDraft(next);
+      studioEditor?.setGroundTileSize?.(next);
       onSaved?.();
     }
   };
 
   return (
     <div className="space-y-3 rounded-lg border border-border p-3">
-      <div className="text-base font-semibold">Tile Size</div>
+      <div>
+        <div className="text-base font-semibold">Tile Size</div>
+        <p className="text-[11px] text-muted-foreground">Choose the art style for your game. This affects every map.</p>
+      </div>
       <div className="flex gap-2">
         {presets.map((preset) => (
           <div key={preset.width} className="flex-1">
             <InlineConfirm
               open={pending === preset.width}
               onCancel={() => setPending(null)}
-              onConfirm={() => { void save(preset.width); }}
+              onConfirm={() => { void save({ width: preset.width, height: preset.width / 2, orientation: 'isometric' }); }}
             >
               <Tooltip content={preset.description} side="bottom">
                 <Button
                   type="button"
                   size="sm"
                   className="w-full"
-                  variant={tile.width === preset.width ? 'default' : 'outline'}
-                  onClick={() => setPending(tile.width === preset.width ? null : preset.width)}
+                  variant={tile.width === preset.width && tile.orientation === 'isometric' ? 'default' : 'outline'}
+                  onClick={() => setPending(tile.width === preset.width && tile.orientation === 'isometric' ? null : preset.width)}
                 >
                   {preset.label}
                 </Button>
@@ -144,6 +153,49 @@ export function TileSizeForm({ editor, onSaved }: { editor?: StudioEditor | null
           </div>
         ))}
       </div>
+      <p className="text-[11px] text-muted-foreground">
+        Most games can stay on one of these. Pick the one closest to your art.
+      </p>
+
+      <details className="rounded-md border border-border/70 bg-muted/20 px-2.5 py-2">
+        <summary className="cursor-pointer text-[11px] font-medium text-muted-foreground">Advanced tile settings</summary>
+        <div className="space-y-2 pt-2">
+          <p className="text-[11px] text-muted-foreground">Only change this if your art uses a different tile shape.</p>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <Label className="text-[11px] text-muted-foreground font-normal" htmlFor="tile-orientation">Tile orientation</Label>
+              <Select value={draft.orientation} onValueChange={(value) => setDraft((current) => ({ ...current, orientation: value === 'orthogonal' ? 'orthogonal' : 'isometric' }))}>
+                <SelectTrigger id="tile-orientation" aria-label="Tile orientation" className="h-8">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="isometric">Isometric</SelectItem>
+                  <SelectItem value="orthogonal">Orthogonal</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-1">
+              <div className="space-y-1">
+                <Label className="text-[11px] text-muted-foreground font-normal" htmlFor="tile-width">Tile width</Label>
+                <Input id="tile-width" aria-label="Tile width" type="number" min={1} className="h-8" value={draft.width} onChange={(event) => setDraft((current) => ({ ...current, width: Number(event.target.value) || 0 }))} />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[11px] text-muted-foreground font-normal" htmlFor="tile-height">Tile height</Label>
+                <Input id="tile-height" aria-label="Tile height" type="number" min={1} className="h-8" value={draft.height} onChange={(event) => setDraft((current) => ({ ...current, height: Number(event.target.value) || 0 }))} />
+              </div>
+            </div>
+          </div>
+          <InlineConfirm
+            open={pending === 'custom'}
+            onCancel={() => setPending(null)}
+            onConfirm={() => { void save(draft); }}
+          >
+            <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={() => setPending('custom')} disabled={!(draft.width > 0) || !(draft.height > 0)}>
+              Apply custom size
+            </Button>
+          </InlineConfirm>
+        </div>
+      </details>
     </div>
   );
 }
@@ -353,6 +405,8 @@ export function MapPresentationFields({
   return (
     <div className="space-y-2 rounded-lg border border-border p-3">
       <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Map header</div>
+      <Label className="block text-xs text-muted-foreground font-normal" htmlFor="map-background-color">Background color</Label>
+      <FlareColorField aria-label="Background color" value={value.backgroundColor} onChange={(next) => set({ backgroundColor: next })} />
       <Label className="block text-xs text-muted-foreground font-normal" htmlFor="map-parallax">Parallax layers</Label>
       <Input id="map-parallax" width="path" value={value.parallax} onChange={(event) => set({ parallax: event.target.value })} placeholder="maps/parallax/sky.txt" className="h-8" />
       <Label className="block text-xs text-muted-foreground font-normal" htmlFor="header-fogofwar">Fog of war</Label>
@@ -403,6 +457,7 @@ export function StudioWorldPanel() {
       <ParallaxEditor />
       <FogEditor />
       <ProcgenRulesForm />
+      <RandomMapListsForm />
     </div>
   );
 }

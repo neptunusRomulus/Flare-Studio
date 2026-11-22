@@ -14,6 +14,7 @@ import {
   emptyAnimationSection,
   parseAnimationFile,
   parseColorMod,
+  activeFrameIndexes,
   parseDurationMs,
   previewLayout,
   previewRect,
@@ -45,7 +46,8 @@ function AnimationFramePreview({
     ? 1 + Math.max(0, ...section.packed.map((row) => parseInt(row.index, 10) || 0))
     : parseInt(section.frames, 10) || 1);
   const duration = parseDurationMs(section.duration);
-  const imagePath = previewRect(file, section, 0, direction)?.image || file.headerKeys.images[0]?.file || '';
+  const rect = previewRect(file, section, frame, direction);
+  const imagePath = rect?.image || file.headerKeys.images[0]?.file || '';
 
   useEffect(() => {
     let cancelled = false;
@@ -67,7 +69,7 @@ function AnimationFramePreview({
     return () => { imgRef.current = null; };
   }, [src]);
 
-  useEffect(() => { setFrame(0); }, [section.name, direction, imagePath]);
+  useEffect(() => { setFrame(0); }, [section.name, direction]);
 
   useEffect(() => {
     if (!playing) return;
@@ -86,7 +88,6 @@ function AnimationFramePreview({
     return () => window.clearInterval(id);
   }, [playing, duration, frameCount, section.type]);
 
-  const rect = previewRect(file, section, frame, direction);
   const blendMode = (file.headerKeys.blend_mode || 'normal').trim().toLowerCase();
   const colorMod = parseColorMod(file.headerKeys.color_mod);
   const alphaMod = parseInt(file.headerKeys.alpha_mod || '255', 10);
@@ -174,6 +175,9 @@ function AnimationFramePreview({
           {playing ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
         </Button>
         <HintLabel className="text-xs font-normal" hint="Current frame in the selected section and direction.">frame {frame + 1}/{frameCount}</HintLabel>
+        {activeFrameIndexes(section.active_frame, frameCount).has(frame) ? (
+          <span className="rounded-full bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400" aria-label="Active frame">active</span>
+        ) : null}
       </div>
       {!src ? <div className="text-xs text-muted-foreground">No image in the project for this animation, so the preview is empty.</div> : null}
     </div>

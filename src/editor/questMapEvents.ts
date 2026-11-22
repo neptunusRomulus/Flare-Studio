@@ -53,10 +53,10 @@ export function questMapEventFromRecord(
   }
   const placed = Number.isFinite(x) && Number.isFinite(y) && x >= 0 && y >= 0;
   const tooltip = text(pick('tooltip')).trim();
-  const name = (tooltip && tooltip.toLowerCase() !== 'event' ? tooltip : '') || text(record.name).trim() || 'Map event';
+  const name = (tooltip && tooltip.toLowerCase() !== 'event' ? tooltip : '') || text(record.name).trim() || 'Event';
   return {
     id: `${mapFile}#${index}`,
-    name: name.toLowerCase() === 'event' ? 'Map event' : name,
+    name: name.toLowerCase() === 'event' ? 'Event' : name,
     mapTitle: mapTitle || mapFile,
     x: placed ? Math.trunc(x) : -1,
     y: placed ? Math.trunc(y) : -1,

@@ -121,7 +121,7 @@ export default function QuestMapView({ graph: fullGraph, positions, onPositionsC
   const npcByNode = useMemo(() => new Map(graph.npcs.map((n) => [n.nodeId, n])), [graph.npcs]);
   const questByNode = useMemo(() => new Map(graph.quests.map((q) => [q.nodeId, q])), [graph.quests]);
   const npcName = useCallback((id: string) => graph.npcs.find((n) => n.npcId === id)?.name || id, [graph.npcs]);
-  const eventName = useCallback((id: string) => graph.events.find((e) => e.eventId === id)?.name || 'Map event', [graph.events]);
+  const eventName = useCallback((id: string) => graph.events.find((e) => e.eventId === id)?.name || 'Event', [graph.events]);
 
   const fit = useCallback(() => {
     const el = containerRef.current;
@@ -273,7 +273,7 @@ export default function QuestMapView({ graph: fullGraph, positions, onPositionsC
                   <Tooltip
                     content={event.details
                       ? <span className="whitespace-pre text-[11px]">{event.details.join('\n')}</span>
-                      : 'Map event. Open its map to edit it'}
+                      : 'Event. Open its map to edit it'}
                     className="w-full h-full"
                   >
                     <div className="flex items-center gap-2 px-2 w-full h-full">

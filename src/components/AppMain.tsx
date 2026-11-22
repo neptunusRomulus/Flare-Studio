@@ -47,6 +47,7 @@ import { anythingDirty, isMapDirty } from '@/editor/saveHealth';
 import { normalizeProjectBackup } from '@/editor/projectSession';
 import useFlareEngine from '@/hooks/useFlareEngine';
 import usePreMapSetup from '@/hooks/usePreMapSetup';
+import useHelpNavigation from '@/hooks/useHelpNavigation';
 import { toast } from '@/hooks/use-toast';
 import type { HelpTarget } from '@/help/helpTopics';
 
@@ -267,32 +268,17 @@ export default function AppMain() {
   usePreMapSetup({ editor, hasMap, projectPath: templateProjectPath, layersObj, tileset });
 
   // Help "Go there": switch to a layer tab, or open Engine Settings on a tab.
-  const [settingsTab, setSettingsTab] = useState<'general' | 'save' | 'display' | undefined>(undefined);
-  const closeSettings = useCallback(() => { setSettingsTab(undefined); handleCloseSettings?.(); }, [handleCloseSettings]);
-  const canGoHelp = useCallback((target: HelpTarget) => {
-    if (target === 'display') return typeof controls?.setShowSettings === 'function';
-    if (target === 'quest-map') {
-      return !!layersObj?.layers?.some((l: { type: string }) => l.type === 'rules') && !!controls?.currentProjectPath;
-    }
-    return !!layersObj?.layers?.some((l: { type: string }) => l.type === target);
-  }, [controls, layersObj]);
-  const goHelp = useCallback((target: HelpTarget) => {
-    handleHelpClose?.();
-    if (target === 'display') {
-      setSettingsTab('display');
-      controls?.setShowSettings?.(true);
-      return;
-    }
-    if (target === 'quest-map') {
-      const layer = layersObj?.layers?.find((l: { type: string }) => l.type === 'rules');
-      if (layer) { try { void layersObj?.handleSetActiveLayer?.(layer.id); } catch { /* ignore */ } }
-      setQuestMapOpen(true);
-      try { localStorage.setItem('flare-studio.questMapOpen', 'true'); } catch { /* ignore */ }
-      return;
-    }
-    const layer = layersObj?.layers?.find((l: { type: string }) => l.type === target);
-    if (layer) { try { void layersObj?.handleSetActiveLayer?.(layer.id); } catch { /* ignore */ } }
-  }, [controls, layersObj, handleHelpClose]);
+  const { settingsTab, closeSettings, canGoHelp, goHelp } = useHelpNavigation({
+    controls,
+    layersObj,
+    hasSettings: typeof controls?.setShowSettings === 'function',
+    onHelpClose: handleHelpClose,
+    onCloseSettings: handleCloseSettings,
+    setQuestMapOpen,
+    persistQuestMapOpen: useCallback((open: boolean) => {
+      try { localStorage.setItem('flare-studio.questMapOpen', String(open)); } catch { /* ignore */ }
+    }, []),
+  });
 
   const playProps = useMemo(() => ({
     isRunning: flareEngine.isRunning,

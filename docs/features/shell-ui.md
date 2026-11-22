@@ -50,4 +50,5 @@ implementation detail. Verify against `src/` before trusting a line here — the
 |---|---|
 | Shell layout, dialog wiring, help targets | `src/components/AppMain.tsx` (being split, one seam per commit) |
 | Background selection and template tileset import before the first map | `src/hooks/usePreMapSetup.ts` |
+| Help "Go there": which target can open, which layer it switches to | `src/hooks/useHelpNavigation.ts`, `src/help/helpNavigation.ts` |
 | Rail, palette card | `src/components/PaletteDock.tsx`, `src/components/palette/` |

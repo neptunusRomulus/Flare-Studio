@@ -27,6 +27,7 @@ import {
 } from '@/components/events/eventDialogModel';
 import { buildEventInstanceProps } from '@/components/events/eventInstanceProps';
 import { buildEventInstanceUpdate } from '@/components/events/eventInstanceUpdate';
+import { writeEventScript } from '@/components/events/eventScriptSave';
 import EventInformationSection from '@/components/events/EventInformationSection';
 import EventPositioningSection from '@/components/events/EventPositioningSection';
 import EventRequirementsSection from '@/components/events/EventRequirementsSection';
@@ -112,19 +113,17 @@ const EventDialog: React.FC<EventDialogProps> = ({
 
   const handleSave = async () => {
     if (isScript && scriptPath) {
-      if (!currentProjectPath || !window.electronAPI?.writeFile) {
-        setScriptError('No project is open.');
+      const result = await writeEventScript({
+        projectPath: currentProjectPath,
+        scriptPath,
+        file: scriptFile,
+        io: window.electronAPI,
+      });
+      if (!result.ok) {
+        setScriptError(result.error);
         return;
       }
-      const abs = `${currentProjectPath.replace(/\\/g, '/')}/${normalizeEventScriptPath(scriptPath)}`;
-      const previous = (window.electronAPI.readFile ? await window.electronAPI.readFile(abs) : '') || '';
-      const next = mergeEventScript(previous, scriptFile);
-      const ok = await window.electronAPI.writeFile(abs, next);
-      if (!ok) {
-        setScriptError('Could not write the script file.');
-        return;
-      }
-      setScriptBaseline(next);
+      setScriptBaseline(result.content);
       setScriptError('');
       onScriptSaved?.();
       onOpenChange(false);

@@ -19,6 +19,14 @@ import { buildEventInstanceUpdate } from '@/components/events/eventInstanceUpdat
 import { writeEventScript } from '@/components/events/eventScriptSave';
 import { eventDataFromObject } from '@/components/events/eventDataFromObject';
 import EventActionsSection from '@/components/events/EventActionsSection';
+import {
+  withItemRequirementAdded,
+  withItemRequirementRemoved,
+  withItemRequirementUpdated,
+  withStatusAdded,
+  withStatusRemoved,
+  withStatusUpdated,
+} from '@/components/events/eventRequirementsEdit';
 import EventDialogFrame from '@/components/events/EventDialogFrame';
 import EventExtraPropertiesSection from '@/components/events/EventExtraPropertiesSection';
 import EventGeneratedMapsSection from '@/components/events/EventGeneratedMapsSection';
@@ -366,75 +374,17 @@ const EventDialog: React.FC<EventDialogProps> = ({
     }));
   };
 
-  const addStatusRequirement = () => {
-    setEventData(prev => ({
-      ...prev,
-      requirements: {
-        ...prev.requirements,
-        status: [...prev.requirements.status, ''],
-      },
-    }));
-  };
+  const editRequirements = (fn: (reqs: EventData['requirements']) => EventData['requirements']) =>
+    setEventData((prev) => ({ ...prev, requirements: fn(prev.requirements) }));
 
-  const updateStatusRequirement = (index: number, value: string) => {
-    setEventData(prev => ({
-      ...prev,
-      requirements: {
-        ...prev.requirements,
-        status: prev.requirements.status.map((s, i) => (i === index ? value : s)),
-      },
-    }));
-  };
-
-  const removeStatusRequirement = (index: number) => {
-    setEventData(prev => ({
-      ...prev,
-      requirements: {
-        ...prev.requirements,
-        status: prev.requirements.status.filter((_, i) => i !== index),
-      },
-    }));
-  };
-
-  const addItemRequirement = () => {
-    setEventData(prev => ({
-      ...prev,
-      requirements: {
-        ...prev.requirements,
-        itemRequirements: [
-          ...prev.requirements.itemRequirements,
-          {
-            id: `item-req-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-            type: 'requires_item',
-            itemId: '',
-            itemQuantity: 1,
-          },
-        ],
-      },
-    }));
-  };
-
-  const updateItemRequirement = (id: string, updates: Partial<Omit<EventItemRequirement, 'id'>>) => {
-    setEventData(prev => ({
-      ...prev,
-      requirements: {
-        ...prev.requirements,
-        itemRequirements: prev.requirements.itemRequirements.map((req) =>
-          req.id === id ? { ...req, ...updates } : req
-        ),
-      },
-    }));
-  };
-
-  const removeItemRequirement = (id: string) => {
-    setEventData(prev => ({
-      ...prev,
-      requirements: {
-        ...prev.requirements,
-        itemRequirements: prev.requirements.itemRequirements.filter((req) => req.id !== id),
-      },
-    }));
-  };
+  const addStatusRequirement = () => editRequirements(withStatusAdded);
+  const updateStatusRequirement = (index: number, value: string) => editRequirements((reqs) => withStatusUpdated(reqs, index, value));
+  const removeStatusRequirement = (index: number) => editRequirements((reqs) => withStatusRemoved(reqs, index));
+  const addItemRequirement = () =>
+    editRequirements((reqs) => withItemRequirementAdded(reqs, `item-req-${Date.now()}-${Math.random().toString(36).slice(2)}`));
+  const updateItemRequirement = (id: string, updates: Partial<Omit<EventItemRequirement, 'id'>>) =>
+    editRequirements((reqs) => withItemRequirementUpdated(reqs, id, updates));
+  const removeItemRequirement = (id: string) => editRequirements((reqs) => withItemRequirementRemoved(reqs, id));
 
   const [expandedSections, setExpandedSections] = useState({
     eventInfo: true,

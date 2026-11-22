@@ -3,14 +3,8 @@ import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { useAppContext } from '@/context/AppContext';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
-import EditorPropertyList from '@/components/EditorPropertyList';
-import { isStoryFlagType, STORY_FLAG_LIST_ID } from '@/editor/powers/storyFlags';
 import {
-  EVENT_EXTRA_CATALOG,
-  eventExtraPaletteKeys,
-  eventExtraPropsFrom,
   eventExtraRowsFrom,
-  newEventExtraRowId,
   type EventExtraRow,
 } from '@/editor/eventExtraProperties';
 
@@ -25,6 +19,7 @@ import { buildEventInstanceUpdate } from '@/components/events/eventInstanceUpdat
 import { writeEventScript } from '@/components/events/eventScriptSave';
 import { eventDataFromObject } from '@/components/events/eventDataFromObject';
 import EventDialogFrame from '@/components/events/EventDialogFrame';
+import EventExtraPropertiesSection from '@/components/events/EventExtraPropertiesSection';
 import EventGeneratedMapsSection from '@/components/events/EventGeneratedMapsSection';
 import EventInformationSection from '@/components/events/EventInformationSection';
 import EventPositioningSection from '@/components/events/EventPositioningSection';
@@ -35,7 +30,7 @@ import { askConfirm } from '@/components/ui/inlineConfirmCore';
 import { useRegisterDirty } from '@/context/SaveHealthContext';
 import { Input } from '@/components/ui/input';
 import { EVENT_SCRIPT_LIST_ID } from '@/hooks/useEventScripts';
-import { PROCGEN_RULES_LIST_ID, extraProcgenEvents } from '@/editor/procgenRules';
+import { extraProcgenEvents } from '@/editor/procgenRules';
 import RandomDungeonDialog from '@/components/engine/RandomDungeonDialog';
 import { parseMapHeader, type MapStyle } from '@/editor/randomDungeon';
 import { currentMapFile, dungeonRoomMapName, dungeonSlugForLink, mapStyleFrom } from '@/components/events/dungeonLink';
@@ -595,34 +590,7 @@ const EventDialog: React.FC<EventDialogProps> = ({
             onChange={(patch) => setEventData((prev) => ({ ...prev, rewards: { ...prev.rewards, ...patch } }))}
           />
 
-          <div className="px-1">
-            <EditorPropertyList
-              title="More"
-              properties={extraRows.map((row) => {
-                const entry = EVENT_EXTRA_CATALOG.find((item) => item.key === row.key);
-                return {
-                  key: row.id,
-                  label: entry?.label || row.key,
-                  value: row.value,
-                  tooltip: entry?.tooltip || row.key,
-                  kind: entry?.kind,
-                  list: isStoryFlagType(row.key) ? STORY_FLAG_LIST_ID : row.key === 'procgen_filename' ? PROCGEN_RULES_LIST_ID : undefined,
-                };
-              })}
-              catalog={eventExtraPaletteKeys(extraRows).map((entry) => ({
-                id: entry.key,
-                label: entry.label,
-                tooltip: entry.tooltip,
-                searchText: `${entry.key} ${entry.synonyms || ''}`,
-              }))}
-              onChange={(id, value) => setExtraRows((rows) => rows.map((row) => (row.id === id ? { ...row, value } : row)))}
-              onAdd={(key) => {
-                const entry = EVENT_EXTRA_CATALOG.find((item) => item.key === key);
-                setExtraRows((rows) => [...rows, { id: newEventExtraRowId(), key, value: entry?.kind === 'toggle' ? 'true' : '' }]);
-              }}
-              onRemove={(id) => setExtraRows((rows) => rows.filter((row) => row.id !== id))}
-            />
-          </div>
+          <EventExtraPropertiesSection rows={extraRows} onRowsChange={setExtraRows} />
           </>
           )}
       </EventDialogFrame>

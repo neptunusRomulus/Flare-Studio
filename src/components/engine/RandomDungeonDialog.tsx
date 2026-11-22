@@ -33,7 +33,6 @@ import {
   roomSizeFromRooms,
   serializeDungeonRules,
   uniqueDungeonSlug,
-  withRulesRooms,
   type DungeonCardType,
   type DungeonRoom,
   type DungeonStatus,
@@ -56,9 +55,9 @@ export type RandomDungeonDialogProps = {
 };
 
 const CARD_META: Record<DungeonCardType, { title: string; hint: string }> = {
-  start: { title: 'Entrance room', hint: 'procgen_type=start. The hero appears here when the dungeon is generated.' },
-  normal: { title: 'Normal rooms', hint: 'procgen_type=normal. These rooms fill the path between the entrance and the exit.' },
-  end: { title: 'Exit room', hint: 'procgen_type=end. The last room on the main path.' },
+  start: { title: 'Entrance room', hint: 'Where the hero starts.' },
+  normal: { title: 'Normal rooms', hint: 'Rooms that fill the path between the entrance and the exit.' },
+  end: { title: 'Exit room', hint: 'The last room on the path.' },
 };
 
 type Fs = {
@@ -350,7 +349,7 @@ export default function RandomDungeonDialog({
         </DialogHeader>
         <div className="space-y-3">
           <div className="flex flex-wrap items-center gap-2">
-            <HintLabel className="text-xs font-normal w-12 shrink-0" hint="Shown as the host map title. The door on the current map leads here.">Name</HintLabel>
+            <HintLabel className="text-xs font-normal w-12 shrink-0" hint="The name of this dungeon.">Name</HintLabel>
             <Input
               width="path"
               className="h-7 text-xs"
@@ -391,7 +390,7 @@ export default function RandomDungeonDialog({
                         </Button>
                       </div>
                     ))}
-                    <Button type="button" variant="outline" size="sm" className="h-7 w-full text-xs" disabled={busy} onClick={() => { void addRoom(type, '', 'draw'); }}>
+                    <Button type="button" variant="outline" size="sm" className="h-7 w-full text-xs" disabled={busy} aria-label={`Draw ${type === 'start' ? 'entrance' : type === 'end' ? 'exit' : 'normal'} room`} onClick={() => { void addRoom(type, '', 'draw'); }}>
                       <Plus className="w-3 h-3 mr-1" />Draw room
                     </Button>
                     {suggestions.length ? (
@@ -436,11 +435,11 @@ export default function RandomDungeonDialog({
             <CollapsibleTrigger asChild>
               <Button type="button" variant="ghost" size="sm" className="h-7 text-xs px-1">
                 <ChevronDown className={`w-3 h-3 mr-1 transition-transform ${settingsOpen ? 'rotate-180' : ''}`} />
-                Settings
+                Advanced settings
               </Button>
             </CollapsibleTrigger>
             <CollapsibleContent className="space-y-2 pt-1">
-              {PROCGEN_SETTING_KEYS.map((key) => (
+              {PROCGEN_SETTING_KEYS.filter((key) => key !== 'doors_max').map((key) => (
                 <div key={key} className="flex flex-wrap items-center gap-1">
                   <HintLabel className="text-xs font-normal w-44 shrink-0" hint={PROCGEN_SETTING_HINTS[key]}>{PROCGEN_SETTING_LABELS[key]}</HintLabel>
                   <Input

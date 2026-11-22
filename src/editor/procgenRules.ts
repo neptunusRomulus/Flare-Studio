@@ -26,14 +26,14 @@ export const PROCGEN_SETTING_LABELS: Record<(typeof PROCGEN_SETTING_KEYS)[number
 };
 
 export const PROCGEN_SETTING_HINTS: Record<(typeof PROCGEN_SETTING_KEYS)[number], string> = {
-  doors_max: 'doors_max. Maximum number of door chunks that can be placed in this region.',
-  main_path_length_min: "main_path_length_min. Minimum length of the main path (start chunk to end chunk).",
-  main_path_length_max: "main_path_length_max. Maximum length of the main path (start chunk to end chunk).",
-  main_path_attempts_max: 'main_path_attempts_max. Maximum number of attempts to generate the main path to match the min/max constraints.',
-  branch_length_min: 'branch_length_min. Minimum number of steps taken when creating a branch off the main path.',
-  branch_length_max: 'branch_length_max. Maximum number of steps taken when creating a branch off the main path.',
-  branches_per_door_level_max: "branches_per_door_level_max. Maximum number of branches between each door level. A door level is the set of chunks between two door chunks (start and end count as doors).",
-  door_spacing_min: 'door_spacing_min. The minimum chunk length of each door level.',
+  doors_max: 'How many locked doors may appear. The beginner flow keeps this at zero.',
+  main_path_length_min: 'The fewest rooms on the way from the entrance to the exit.',
+  main_path_length_max: 'The most rooms on the way from the entrance to the exit.',
+  main_path_attempts_max: 'How many layouts the game may try before it gives up.',
+  branch_length_min: 'The fewest rooms in a side branch.',
+  branch_length_max: 'The most rooms in a side branch.',
+  branches_per_door_level_max: 'How many side branches may split off between doors.',
+  door_spacing_min: 'How many rooms must come before another door.',
 };
 
 export const MAP_CHUNK_LIST_ID = 'procgen-chunk-maps';

@@ -11,6 +11,8 @@ Opened by double-clicking a placed event on the map (`src/components/EventDialog
   reward_*, loot, spawn, msg, cutscene, book, script, …).
 - Add engine keys the form has no field for, through the searchable extra-property palette.
 - Pick a `script=` target from the same suggestion list books and NPC dialogue use.
+- Create a beginner **Random dungeon** from an event: Studio writes the host map, its hidden openings map and
+  the rules file, links the event to the host, and lets the user draw entrance, normal and exit rooms.
 
 ## Acceptance criteria
 
@@ -28,6 +30,15 @@ Written before the split below, one line per provable outcome; each is true toda
   every engine key" and "covers every event key … the form has no field for").
 - [x] The usage count in the Events rail counts live placements on the open map, including unsaved ones, and
   ignores that map's saved copy. Enforced by `src/editor/eventScripts.test.ts`.
+- [x] Random dungeon writes a host map, a hidden openings map and a rules file, and points the event at the
+  host. Enforced by `src/editor/randomDungeon.test.ts` and `src/components/engine/RandomDungeonDialog.test.tsx`.
+- [x] Beginner rules keep door chunks closed (`doors_max=0`), reuse the first room's size for later rooms and
+  report a missing entrance, missing exit, missing openings or mismatched room sizes before launch. Enforced by
+  the same tests.
+- [x] Drawing a room creates a sealed, blank map; Studio never paints walls for the user. Enforced by
+  `src/editor/randomDungeon.test.ts` ("builds a sealed blank room …").
+- [x] The Random dungeon UI shows plain labels; `doors_max` is fixed at zero in this flow and stays editable in
+  the advanced procgen editor. Enforced by `RandomDungeonDialog.test.tsx`.
 - [ ] `script=` suggestions come from one shared list (`EVENT_SCRIPT_LIST_ID`), so a script created for a book
   or NPC dialogue shows up in the event inspector — no second Events tab. Manual check.
 - [ ] Deleting a script file asks first and goes through the `delete-project-file` IPC, never a direct unlink
@@ -49,6 +60,8 @@ Written before the split below, one line per provable outcome; each is true toda
 | Sections: information, positioning, requirements, script form | `src/components/events/` |
 | Activation ↔ Flare mapping, instance model | `src/components/events/eventDialogModel.ts` |
 | Usage counts | `src/hooks/useEventScripts.ts` |
+| Random dungeon host, openings and rooms | `src/editor/randomDungeon.ts` |
+| Random dungeon beginner dialog | `src/components/engine/RandomDungeonDialog.tsx` |
 
 ## Known traps
 
@@ -60,3 +73,6 @@ Written before the split below, one line per provable outcome; each is true toda
   not be coerced to the default.
 - Map export writes the instance keys only. Editing a script from here changes every placement that points at
   it — say so before saving, the same way `delete-project-file` does.
+- The random-dungeon host uses `hero_pos=0,0` like the official Empyrean hosts; `Try in game` quick-launches
+  that host, so the first view is the empty host before the procgen event fills it. Do not move the hero into
+  the event rectangle just to make the launch look busier.

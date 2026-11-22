@@ -64,3 +64,4 @@ These files are hints, not contracts: verify against `src/` before trusting a li
 - Anything derivable from `src/`, `../flare-engine/` or `scripts/` is looked up, not copied: engine keys, attribute lists, gap lists, file inventories.
 - One-off history goes to `../flare-studio-notes/` (dated notes, Grok archive); read it when the owner asks about the past, not on every task.
 - Stale guidance is worse than no guidance: if a line here is no longer true and not worth keeping, delete it in the same commit that made it false.
+- The Obsidian attribute reference (`../flare-studio-notes/Agent/Referans/Attribute Referansı/`) is generated, not written: `node tools/extract-engine-schema.cjs` then `node tools/generate-attribute-notes.cjs`. Never hand-edit its tables; a note that must survive regeneration goes in a `> [!warning]` callout.

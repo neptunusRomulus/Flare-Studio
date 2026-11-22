@@ -25,6 +25,7 @@ import { buildEventInstanceUpdate } from '@/components/events/eventInstanceUpdat
 import { writeEventScript } from '@/components/events/eventScriptSave';
 import { eventDataFromObject } from '@/components/events/eventDataFromObject';
 import EventDialogFrame from '@/components/events/EventDialogFrame';
+import EventGeneratedMapsSection from '@/components/events/EventGeneratedMapsSection';
 import EventInformationSection from '@/components/events/EventInformationSection';
 import EventPositioningSection from '@/components/events/EventPositioningSection';
 import EventRequirementsSection from '@/components/events/EventRequirementsSection';
@@ -584,49 +585,15 @@ const EventDialog: React.FC<EventDialogProps> = ({
             </FieldHint>
           </div>
 
-          <div className="space-y-2 px-1">
-            <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Generated maps</div>
-            {extraProcgenEvents((typeof editor?.getMapObjects === 'function' ? editor.getMapObjects() : []).filter((obj: { type?: string }) => obj.type === 'event'), editingEventId).length ? (
-              <p className="text-[11px] leading-snug text-amber-500">
-                Only one layout file is used per map. Another event already has one.
-              </p>
-            ) : null}
-            <div className="flex flex-wrap items-center gap-2">
-              <HintLabel className="text-xs font-normal w-28 shrink-0" hint="A layout that fills this event's area when the map loads. Only one is used per map.">Layout file</HintLabel>
-              <Input
-                width="path"
-                className="h-7 text-xs"
-                list={PROCGEN_RULES_LIST_ID}
-                value={eventData.rewards.procgenFilename}
-                onChange={(e) => setEventData((prev) => ({ ...prev, rewards: { ...prev.rewards, procgenFilename: e.target.value } }))}
-              />
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <HintLabel className="text-xs font-normal w-28 shrink-0" hint="Which side of a generated map this door connects to.">Connects to</HintLabel>
-              <Input
-                width="id"
-                className="h-7 text-xs"
-                list="procgen-link-dirs"
-                value={eventData.rewards.procgenLink}
-                onChange={(e) => setEventData((prev) => ({ ...prev, rewards: { ...prev.rewards, procgenLink: e.target.value } }))}
-              />
-              <datalist id="procgen-link-dirs">
-                <option value="north" />
-                <option value="south" />
-                <option value="west" />
-                <option value="east" />
-              </datalist>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <HintLabel className="text-xs font-normal w-28 shrink-0" hint="The door levels where this event is active.">Door level</HintLabel>
-              <Input
-                width="id"
-                className="h-7 text-xs"
-                value={eventData.rewards.procgenDoorLevel}
-                onChange={(e) => setEventData((prev) => ({ ...prev, rewards: { ...prev.rewards, procgenDoorLevel: e.target.value } }))}
-              />
-            </div>
-          </div>
+          <EventGeneratedMapsSection
+            values={{
+              filename: eventData.rewards.procgenFilename,
+              link: eventData.rewards.procgenLink,
+              doorLevel: eventData.rewards.procgenDoorLevel,
+            }}
+            conflicting={extraProcgenEvents((typeof editor?.getMapObjects === 'function' ? editor.getMapObjects() : []).filter((obj: { type?: string }) => obj.type === 'event'), editingEventId).length > 0}
+            onChange={(patch) => setEventData((prev) => ({ ...prev, rewards: { ...prev.rewards, ...patch } }))}
+          />
 
           <div className="px-1">
             <EditorPropertyList

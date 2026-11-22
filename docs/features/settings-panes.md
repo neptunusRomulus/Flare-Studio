@@ -29,6 +29,14 @@ Feature detail split out of `AGENTS.md` (2026-11-22). Rules and invariants live 
   id/text rows tied to a sound file). Keybindings are saved in the current format (`file_version` and a
   `[default]` section of `action=bind,type`).
 
+## Menus
+
+- UI Settings → Menus edits the project's own `menus/*.txt` files. The left list comes from that folder;
+  selecting a panel shows shared keys plus the panel's own settings. Unknown keys, comments and repeated keys
+  are kept when the panel is saved.
+- New projects start with the default menu set from `electron/templates/menus`. A project whose `menus/` folder
+  is empty shows **Create default menus**; this copies only missing files, so existing edits are never replaced.
+
 ## World Settings card
 
 - Edits `engine/gameplay.txt`, `engine/misc.txt`, `engine/death_penalty.txt`, `engine/default_music.txt` and

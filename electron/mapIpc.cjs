@@ -29,6 +29,7 @@ module.exports = function registerMapIpc({
   rememberCanonicalMap,
   writeProjectSettings,
   ensureProjectEngineFiles,
+  ensureDefaultMenus,
   writeAdapterFile,
   collectProjectText,
   migrateProjectIfNeeded,
@@ -424,6 +425,13 @@ ipcMain.handle("create-map-project", async (event, config) => {
       );
     }
 
+    // Start the Menu editor with a usable set instead of an empty list.
+    try {
+      ensureDefaultMenus(projectPath);
+    } catch (menusErr) {
+      console.warn("Failed to create default menus:", menusErr);
+    }
+
     // Do not create spawn.txt yet. It will be generated when a starting map is selected.
 
     return { success: true, projectPath };
@@ -433,6 +441,19 @@ ipcMain.handle("create-map-project", async (event, config) => {
       success: false,
       error: error instanceof Error ? error.message : String(error),
     };
+  }
+});
+
+ipcMain.handle("create-default-menus", async (_event, projectPath) => {
+  if (!isAllowedProjectPath(projectPath)) {
+    return { success: false, error: "Open the project before adding menus." };
+  }
+  try {
+    const result = ensureDefaultMenus(projectPath);
+    return { success: true, ...result };
+  } catch (error) {
+    console.error("create-default-menus failed:", error);
+    return { success: false, error: error instanceof Error ? error.message : String(error) };
   }
 });
 

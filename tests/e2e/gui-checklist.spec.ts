@@ -443,3 +443,20 @@ test('Başlık ekranı logosu ve düğme konumu kaydedilir', async () => {
     timeout: 15_000,
   }).toContain('play_pos=10,-84,bottom');
 });
+
+test('Boş projede varsayılan menüler oluşturulur', async () => {
+  const { window } = session;
+
+  fs.rmSync(path.join(project.projectPath, 'menus'), { recursive: true, force: true });
+
+  await openRailTarget(window, 'Settings', 'UI Settings');
+  await window.keyboard.press('Escape');
+
+  await expect(window.getByText('No menus yet.', { exact: true })).toBeVisible();
+  await window.getByRole('button', { name: 'Create default menus', exact: true }).click();
+
+  await expect(window.getByRole('button', { name: 'Inventory', exact: true })).toBeVisible({ timeout: 15_000 });
+  await expect.poll(() => fs.existsSync(path.join(project.projectPath, 'menus/inventory.txt')), {
+    timeout: 15_000,
+  }).toBe(true);
+});

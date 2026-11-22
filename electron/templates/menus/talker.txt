@@ -1,0 +1,15 @@
+pos=0,-102,960,384
+align=bottom
+close=891,5
+advance=891,5
+dialogbox=0,0,960,384
+dialogtext=343,51,570,280
+portrait_he=13,51,320,320
+portrait_you=13,51,320,320
+text_offset=8,8
+font_who=font_bold
+font_dialog=font_regular
+topic_color_normal=128,171,255
+trade_color_normal=128,171,255
+topic_color_hover=255,244,128
+trade_color_hover=255,244,128

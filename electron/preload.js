@@ -48,6 +48,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   importIconFiles: (options) => ipcRenderer.invoke("import-icon-files", options),
   createMapProject: (config) =>
     ipcRenderer.invoke("create-map-project", config),
+  createDefaultMenus: (projectPath) =>
+    ipcRenderer.invoke("create-default-menus", projectPath),
   openMapProject: (projectPath, mapName) =>
     ipcRenderer.invoke("open-map-project", projectPath, mapName),
   saveMapProject: (projectPath, mapData) =>

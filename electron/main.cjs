@@ -35,6 +35,7 @@ const registerItemIpc = require("./itemIpc.cjs");
 const registerFileIpc = require("./fileIpc.cjs");
 const registerPlayIpc = require("./playIpc.cjs");
 const registerMapIpc = require("./mapIpc.cjs");
+const { ensureDefaultMenus } = require("./defaultMenus.cjs");
 const flareAdapter = require("../src/adapters/flare/flareAdapter.cjs");
 /** Map file base name; same slug Play and the adapter use. */
 const sanitizeMapNameForFilename = (name) => flareAdapter.slugFileName(name);
@@ -789,6 +790,7 @@ registerMapIpc({
   rememberCanonicalMap,
   writeProjectSettings,
   ensureProjectEngineFiles,
+  ensureDefaultMenus,
   writeAdapterFile,
   collectProjectText,
   migrateProjectIfNeeded,

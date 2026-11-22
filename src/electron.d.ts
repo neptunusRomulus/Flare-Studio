@@ -61,6 +61,7 @@ declare global {
       setZoomFactor: (factor: number) => Promise<boolean>;
       onInterfaceScaleMenu: (callback: (kind: 'in' | 'out' | 'reset') => void) => () => void;
       createMapProject: (config: MapConfig) => Promise<{ success: boolean; projectPath?: string; error?: string }>;
+      createDefaultMenus: (projectPath: string) => Promise<{ success: boolean; written?: string[]; skipped?: string[]; error?: string }>;
       openMapProject: (projectPath: string, mapName?: string) => Promise<EditorProjectData | null>;
       saveMapProject: (projectPath: string, mapData: ProjectMapData) => Promise<boolean>;
       // Phase 2: Tileset profile persistence

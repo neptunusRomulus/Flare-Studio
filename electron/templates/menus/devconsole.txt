@@ -1,0 +1,13 @@
+# pos=0,0,640,176
+# align=top
+#
+# close=613,3
+# label_title=hidden
+# confirm=463,3
+# input=7,7
+# history=8,32,613,140
+
+font=font_console_regular
+font_bold=font_console_bold
+color_background=0,0,0,200
+color_resize_handle=255,255,255,63

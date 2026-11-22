@@ -1,0 +1,11 @@
+pos=4,40,512,32
+bar_pos=0,0,512,32
+bar_fill_size=478,26
+align=topleft
+bar_fill_offset=17,3
+orientation=0
+
+bar_gfx=images/menus/bar_mp.png
+bar_gfx_background=images/menus/bar_mp_background.png
+
+

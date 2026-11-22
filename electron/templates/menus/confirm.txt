@@ -1,0 +1,7 @@
+pos=0,0,768,300
+align=center
+background=images/menus/modal_window.png
+label_title=384,23,center,center
+close=700,4
+action_list=136,150
+

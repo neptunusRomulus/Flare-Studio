@@ -1,0 +1,26 @@
+# Settings for actionbar menu
+# pos is x,y,width,height
+
+pos=0,0,1280,70
+align=bottom
+
+slot=1,64,6
+slot=2,128,6
+slot=3,192,6
+slot=4,256,6
+slot=5,320,6
+slot=6,384,6
+slot=7,448,6
+slot=8,512,6
+slot=9,576,6
+slot=10,640,6
+
+slot_M1=768,6
+slot_M2=832,6
+
+char_menu=960,6
+inv_menu=1024,6
+powers_menu=1088,6
+log_menu=1152,6
+
+tooltip_length=long_all

@@ -1,0 +1,6 @@
+logo=images/menus/logo.png,-320,-128,bottom
+
+play_pos=256,-272,bottom
+config_pos=256,-224,bottom
+credits_pos=256,-176,bottom
+exit_pos=256,-128,bottom

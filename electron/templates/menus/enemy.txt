@@ -1,0 +1,11 @@
+pos=0,0,256,64
+bar_pos=0,0,256,64
+bar_fill_size=196,27
+align=top
+bar_fill_offset=30,34
+text_pos=128,32,center,bottom
+
+bar_gfx=images/menus/bar_enemy_hp.png
+background=images/menus/bar_enemy_hp_background.png
+
+

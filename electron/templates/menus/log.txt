@@ -1,0 +1,8 @@
+pos=0,-35,640,832
+align=left
+soundfx_open=soundfx/inventory/inventory_page.ogg
+soundfx_close=soundfx/inventory/inventory_book.ogg
+
+label_title=320,24,center,center
+close=571,5
+tab_area=64,60,482,672

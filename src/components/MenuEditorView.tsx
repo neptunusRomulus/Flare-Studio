@@ -56,6 +56,8 @@ const MenuEditorView = ({ projectPath }: Props) => {
   const [dirty, setDirty] = useState<Record<string, MenuPanel>>({});
   const [scale, setScale] = useState(1);
   const [showAll, setShowAll] = useState(false);
+  const [seedingMenus, setSeedingMenus] = useState(false);
+  const [menuError, setMenuError] = useState('');
   const frameRef = useRef<HTMLDivElement>(null);
   const skipDiskLoadRef = useRef(false);
   const view = useMemo(() => viewSize(screen.w, screen.h, resolutions), [screen, resolutions]);
@@ -87,6 +89,25 @@ const MenuEditorView = ({ projectPath }: Props) => {
   }, [root]);
 
   useEffect(() => { void load(); }, [load]);
+
+  const addDefaultMenus = async () => {
+    if (!root || seedingMenus || !window.electronAPI) return;
+    setSeedingMenus(true);
+    setMenuError('');
+    try {
+      const result = await window.electronAPI.createDefaultMenus(root);
+      if (result?.success) {
+        await load();
+        setSelected('menus/inventory.txt');
+      } else {
+        setMenuError(result?.error || 'Could not add the default menus.');
+      }
+    } catch {
+      setMenuError('Could not add the default menus.');
+    } finally {
+      setSeedingMenus(false);
+    }
+  };
   useEffect(() => {
     const onOpen = () => { void load(); };
     window.addEventListener(OPEN_MENUS_EVENT, onOpen);
@@ -266,7 +287,23 @@ const MenuEditorView = ({ projectPath }: Props) => {
               {dirty[panel.file] ? ' •' : ''}
             </Button>
           ))}
-          {panels.length === 0 && <p className="text-[11px] text-muted-foreground">No menus found in this project.</p>}
+          {panels.length === 0 && (
+            <div className="space-y-2 px-1 py-2">
+              <p className="text-[11px] text-muted-foreground">No menus yet.</p>
+              {menuError ? <p className="text-[11px] text-destructive">{menuError}</p> : null}
+              {window.electronAPI ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  className="h-7 text-[11px]"
+                  disabled={seedingMenus}
+                  onClick={() => void addDefaultMenus()}
+                >
+                  {seedingMenus ? 'Adding menus...' : 'Create default menus'}
+                </Button>
+              ) : null}
+            </div>
+          )}
         </div>
         <div ref={frameRef} className="flex-1 overflow-auto p-4 bg-zinc-900">
           <div style={{ width: view.viewW * scale, height: view.viewH * scale, margin: '0 auto' }}>

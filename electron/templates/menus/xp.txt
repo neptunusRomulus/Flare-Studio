@@ -1,0 +1,12 @@
+pos=448,-70,256,16
+bar_pos=0,0,256,16
+bar_fill_size=246,6
+align=bottom
+bar_fill_offset=5,5
+orientation=0
+text_pos=128,-32,center,top
+
+bar_gfx=images/menus/bar_xp.png
+bar_gfx_background=images/menus/bar_xp_background.png
+
+

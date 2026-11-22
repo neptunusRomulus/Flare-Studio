@@ -36,7 +36,8 @@ import { Input } from '@/components/ui/input';
 import { EVENT_SCRIPT_LIST_ID } from '@/hooks/useEventScripts';
 import { PROCGEN_RULES_LIST_ID, extraProcgenEvents } from '@/editor/procgenRules';
 import RandomDungeonDialog from '@/components/engine/RandomDungeonDialog';
-import { dungeonSlugFromIntermap, intermapForHost, parseMapHeader, type MapStyle } from '@/editor/randomDungeon';
+import { parseMapHeader, type MapStyle } from '@/editor/randomDungeon';
+import { currentMapFile, dungeonRoomMapName, dungeonSlugForLink, mapStyleFrom } from '@/components/events/dungeonLink';
 import { projectRoot } from '@/editor/projectFiles';
 import { getStoredFlarePath } from '@/flare/flarePathStore';
 import useFlareEngine from '@/hooks/useFlareEngine';
@@ -451,27 +452,16 @@ const EventDialog: React.FC<EventDialogProps> = ({
 
   const openRandomDungeon = async () => {
     const root = currentProjectPath ? projectRoot(currentProjectPath) : '';
-    const style: MapStyle = {};
     const ground = typeof editor?.getGroundTileSize === 'function' ? editor.getGroundTileSize() : null;
-    if (ground) {
-      style.tilewidth = ground.width;
-      style.tileheight = ground.height;
-      style.orientation = ground.orientation;
-    }
+    let header = null;
     if (root && currentMapName) {
-      const leaf = String(currentMapName).replace(/\\/g, '/').split('/').pop() || currentMapName;
-      const file = leaf.toLowerCase().endsWith('.txt') ? leaf : `${leaf}.txt`;
-      const text = (await window.electronAPI?.readMapFile?.(root, file).catch(() => '')) || '';
-      const header = parseMapHeader(text);
-      if (header.tileset) style.tileset = header.tileset;
-      if (header.tilewidth) style.tilewidth = header.tilewidth;
-      if (header.tileheight) style.tileheight = header.tileheight;
-      if (header.orientation) style.orientation = header.orientation;
+      const text = (await window.electronAPI?.readMapFile?.(root, currentMapFile(currentMapName)).catch(() => '')) || '';
+      header = parseMapHeader(text);
     }
-    setMapStyle(style);
+    setMapStyle(mapStyleFrom({ ground, header }));
 
     const raw = eventData.rewards.teleportMap.trim();
-    const candidate = dungeonSlugFromIntermap(raw ? intermapForHost(raw) : '');
+    const candidate = dungeonSlugForLink(raw);
     if (candidate && root) {
       const rules = await window.electronAPI?.readFile?.(`${root}/maps/procgen_rules/${candidate}.txt`).catch(() => '');
       if (rules) {
@@ -498,7 +488,7 @@ const EventDialog: React.FC<EventDialogProps> = ({
   };
 
   const openDungeonRoom = async (relPath: string) => {
-    const name = relPath.replace(/\\/g, '/').replace(/^maps\//, '').replace(/\.txt$/i, '');
+    const name = dungeonRoomMapName(relPath);
     if (typeof openOrCreateMapTab === 'function' && currentProjectPath) {
       await openOrCreateMapTab(name, currentProjectPath);
       return;

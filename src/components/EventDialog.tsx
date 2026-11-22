@@ -18,6 +18,7 @@ import { buildEventInstanceProps } from '@/components/events/eventInstanceProps'
 import { buildEventInstanceUpdate } from '@/components/events/eventInstanceUpdate';
 import { writeEventScript } from '@/components/events/eventScriptSave';
 import { eventDataFromObject } from '@/components/events/eventDataFromObject';
+import EventActionsSection from '@/components/events/EventActionsSection';
 import EventDialogFrame from '@/components/events/EventDialogFrame';
 import EventExtraPropertiesSection from '@/components/events/EventExtraPropertiesSection';
 import EventGeneratedMapsSection from '@/components/events/EventGeneratedMapsSection';
@@ -551,26 +552,11 @@ const EventDialog: React.FC<EventDialogProps> = ({
             removeItemRequirement={removeItemRequirement}
           />
 
-          <div className="space-y-2 px-1">
-            <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Actions</div>
-            <div className="flex flex-wrap items-center gap-2">
-              <HintLabel className="text-xs font-normal w-16 shrink-0" hint="What this event does when it runs.">Actions</HintLabel>
-              <Input
-                width="path"
-                className="h-7 text-xs"
-                aria-label="Event actions"
-                list={EVENT_SCRIPT_LIST_ID}
-                placeholder="Choose event actions"
-                value={eventData.engine.script}
-                onChange={(e) => setEventData((prev) => ({ ...prev, engine: { ...prev.engine, script: e.target.value } }))}
-              />
-              {normalizeEventScriptPath(eventData.engine.script) ? (
-                <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={() => onEditScript?.(normalizeEventScriptPath(eventData.engine.script))}>
-                  Edit actions
-                </Button>
-              ) : null}
-            </div>
-          </div>
+          <EventActionsSection
+            script={eventData.engine.script}
+            onScriptChange={(script) => setEventData((prev) => ({ ...prev, engine: { ...prev.engine, script } }))}
+            onEditScript={onEditScript}
+          />
 
           <div className="px-1">
             <FieldHint hint="Creates a dungeon, links this event to it, and lets you draw the rooms.">

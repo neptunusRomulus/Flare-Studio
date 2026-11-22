@@ -43,6 +43,7 @@ import { useProjectBackup } from '@/hooks/useProjectBackup';
 import { npcObjectsFromSession, writeNpcDefinitionsForObjects } from '@/flare/manualSaveExport';
 import useManualSaveSetup from '@/hooks/useManualSaveSetup';
 import { useSaveHealth } from '@/context/SaveHealthContext';
+import { useProjectRecovery } from '@/hooks/useProjectRecovery';
 import { anythingDirty, isMapDirty } from '@/editor/saveHealth';
 import { normalizeProjectBackup } from '@/editor/projectSession';
 import useFlareEngine from '@/hooks/useFlareEngine';
@@ -116,76 +117,31 @@ export default function AppMain() {
   } = c;
 
   // Crash recovery state
-  const [showRecoveryDialog, setShowRecoveryDialog] = useState(false);
-  const { editorDirty, saveDirtySources, collectEditorDrafts, hydrateEditorDrafts, mapDrafts, setMapDraft, clearMapDraft } = useSaveHealth();
-  const editorRef = useRef(editor);
-  editorRef.current = editor;
-  const openMapForRecoveryRef = useRef(openMapForRecovery);
-  openMapForRecoveryRef.current = openMapForRecovery;
-  const restoreProjectBackupRef = useRef<(backup: unknown) => Promise<boolean>>(async () => false);
-  const projectPathRef = useRef<string | null>(controls?.currentProjectPath ?? null);
-  projectPathRef.current = controls?.currentProjectPath ?? null;
+  const saveHealth = useSaveHealth();
+  const { editorDirty, saveDirtySources, mapDrafts, clearMapDraft } = saveHealth;
   const {
+    showRecoveryDialog,
     hasCrashBackup,
-    mapName: crashedMapName,
+    crashedMapName,
     isRecovering,
     recoveryError,
-    recoverSession,
-    dismissRecovery,
     getCrashTimeFormatted,
-    getTimeSinceCrash
-  } = useCrashRecovery({
-    projectPath: controls?.currentProjectPath ?? null,
-    onRecoveryFound: () => setShowRecoveryDialog(true),
-    onRecoveryDismissed: () => setShowRecoveryDialog(false),
-    onRecoverBackup: async (backup: unknown) => {
-      return restoreProjectBackupRef.current(backup);
-    }
-  });
-
-  const { saveInactiveMapDrafts, restoreProjectBackup, rememberCurrentMap } = useProjectBackup({
+    getTimeSinceCrash,
+    handleRecover,
+    handleDismiss,
+    saveInactiveMapDrafts,
+    rememberCurrentMap,
+  } = useProjectRecovery({
     editor,
     projectPath: controls?.currentProjectPath ?? null,
-    paused: hasCrashBackup,
-    editorDirty,
-    mapDrafts,
-    collectEditorDrafts,
-    setMapDraft,
-    clearMapDraft,
-    openMapForRecovery: async (name: string) => {
-      if (typeof openMapForRecoveryRef.current === 'function') await openMapForRecoveryRef.current(name);
+    openMapForRecovery,
+    saveHealth,
+    onMapRestored: ({ name, width, height }) => {
+      if (name) setMapName(name);
+      if (typeof width === 'number') setMapWidth(width);
+      if (typeof height === 'number') setMapHeight(height);
     },
   });
-  restoreProjectBackupRef.current = async (backup: unknown) => {
-    const parsed = normalizeProjectBackup(backup);
-    if (parsed?.editors) hydrateEditorDrafts(parsed.editors);
-    const ok = await restoreProjectBackup(backup);
-    const current = editorRef.current;
-    if (current) {
-      const restoredName = typeof current.getMapName === 'function' ? current.getMapName() : '';
-      if (restoredName) setMapName(restoredName);
-      const snap = parsed?.maps.find((entry) => entry.mapName.toLowerCase() === String(restoredName || parsed.mapName || '').toLowerCase())?.snapshot
-        || parsed?.maps[0]?.snapshot;
-      if (typeof snap?.mapWidth === 'number') setMapWidth(snap.mapWidth);
-      if (typeof snap?.mapHeight === 'number') setMapHeight(snap.mapHeight);
-    }
-    return ok;
-  };
-
-  useEffect(() => {
-    editor?.setCrashBackupPaused?.(hasCrashBackup);
-    return () => { editor?.setCrashBackupPaused?.(false); };
-  }, [editor, hasCrashBackup]);
-
-  const handleRecover = async () => {
-    const success = await recoverSession();
-    if (success) setShowRecoveryDialog(false);
-  };
-
-  const handleDismiss = () => {
-    dismissRecovery();
-    setShowRecoveryDialog(false);
-  };
 
   // Set up manual save (Ctrl+S) support - must be called within SaveQueueProvider
   // After every successful save, refresh spawn.txt if this map is the starting map
@@ -213,7 +169,7 @@ export default function AppMain() {
   useCloseGuard({
     isDirty: () => anythingDirty(titleBarProps?.saveStatus ?? 'saved', (editorDirty || mapDrafts.length > 0) ? { session: true } : {}),
     saveAll,
-    onDiscard: () => { dismissRecovery(); },
+    onDiscard: () => { handleDismiss(); },
   });
 
   const enhancedControls = useMemo(() => ({

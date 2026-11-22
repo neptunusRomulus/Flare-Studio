@@ -26,6 +26,7 @@ import {
   type EventItemRequirement,
 } from '@/components/events/eventDialogModel';
 import { buildEventInstanceProps } from '@/components/events/eventInstanceProps';
+import { buildEventInstanceUpdate } from '@/components/events/eventInstanceUpdate';
 import EventInformationSection from '@/components/events/EventInformationSection';
 import EventPositioningSection from '@/components/events/EventPositioningSection';
 import EventRequirementsSection from '@/components/events/EventRequirementsSection';
@@ -130,14 +131,12 @@ const EventDialog: React.FC<EventDialogProps> = ({
       return;
     }
     if (!editor) return;
-    const { coordinates, size } = eventData.positioning;
-    const flareActivate = ACTIVATION_TO_FLARE[eventData.timing.activeActivation || ''] || 'on_trigger';
-    const props = instancePropertiesFrom(buildEventInstanceProps(eventData, extraRows));
+    const { coordinates } = eventData.positioning;
     const existing = isEditing && typeof editor.getMapObjects === 'function'
       ? (editor.getMapObjects() as Array<{ id: number; properties?: Record<string, string | string[]> }>)
         .find((object) => object.id === editingEventId)
       : undefined;
-    let script = normalizeEventScriptPath(eventData.engine.script || props.script);
+    let script = normalizeEventScriptPath(eventData.engine.script || buildEventInstanceProps(eventData, extraRows).script);
     const leftover = actionPropertiesFrom(existing?.properties);
     if (!script && leftover.length && currentProjectPath && window.electronAPI?.writeFile) {
       const stamp = `${(currentMapName || 'map').replace(/[^A-Za-z0-9]+/g, '_')}_${coordinates.x}_${coordinates.y}`;
@@ -146,22 +145,14 @@ const EventDialog: React.FC<EventDialogProps> = ({
       await window.electronAPI.writeFile(abs, mergeEventScript('', { header: '', steps: [{ components: leftover }] }));
       onScriptSaved?.();
     }
-    if (script) props.script = script;
-    const properties = instancePropertiesFrom(mergeEventFormProperties(existing?.properties, props));
-    if (script) properties.script = script;
 
     if (isEditing && typeof editor.updateMapObject === 'function' && editingEventId != null) {
-      editor.updateMapObject(editingEventId, {
-        name: eventData.name || 'Event',
-        description: eventData.description || '',
-        type: 'event',
-        activate: flareActivate,
-        x: coordinates.x,
-        y: coordinates.y,
-        width: size.width,
-        height: size.height,
-        properties
-      });
+      editor.updateMapObject(editingEventId, buildEventInstanceUpdate({
+        eventData,
+        extraRows,
+        existingProperties: existing?.properties,
+        script,
+      }));
     }
 
     if (typeof syncMapObjectsWrapper === 'function') syncMapObjectsWrapper();

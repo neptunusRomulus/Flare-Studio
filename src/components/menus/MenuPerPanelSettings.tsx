@@ -101,10 +101,34 @@ const ColorField = ({ field, raw, onChange }: { field: MenuField; raw: string; o
 
 const Field = ({ field, raw, onChange }: { field: MenuField; raw: string; onChange: SetValue }) => {
   if (field.kind === 'switch') {
+    const checked = raw === '' ? Boolean(field.defaultValue) : raw !== 'false' && raw !== '0';
     return (
       <div className="flex items-center gap-2">
-        <Switch aria-label={field.label} checked={raw !== 'false' && raw !== '0'} onCheckedChange={(checked) => onChange(checked ? 'true' : 'false')} />
+        <Switch aria-label={field.label} checked={checked} onCheckedChange={(next) => onChange(next ? 'true' : 'false')} />
         <span className="text-[11px] text-muted-foreground">{field.label}</span>
+      </div>
+    );
+  }
+  if (field.kind === 'duration') {
+    const isSeconds = /^\d+(?:\.\d+)?s$/.test(raw.trim());
+    const shown = isSeconds ? raw.trim().slice(0, -1) : raw;
+    return (
+      <div className="space-y-1">
+        <FieldLabel field={field} />
+        <div className="flex items-center gap-1">
+          <Input
+            aria-label={field.label}
+            className="h-7 w-24 text-xs"
+            inputMode="decimal"
+            placeholder="10s"
+            value={shown}
+            onChange={(event) => {
+              const next = event.target.value.trim();
+              onChange(next === '' ? '' : /^\d+(?:\.\d+)?$/.test(next) ? `${next}s` : next);
+            }}
+          />
+          <span className="text-[10px] text-muted-foreground">{isSeconds || raw === '' ? 'sec' : ''}</span>
+        </div>
       </div>
     );
   }

@@ -21,6 +21,8 @@ afterEach(() => {
 describe('default project menus', () => {
   it('ships the core editable menus', () => {
     const names = menus.defaultMenuNames();
+    expect(names).toHaveLength(25);
+    expect(names).not.toContain('npc.txt');
     expect(names).toEqual(expect.arrayContaining([
       'actionbar.txt',
       'character.txt',

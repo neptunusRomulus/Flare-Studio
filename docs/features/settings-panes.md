@@ -34,8 +34,17 @@ Feature detail split out of `AGENTS.md` (2026-11-22). Rules and invariants live 
 - UI Settings → Menus edits the project's own `menus/*.txt` files. The left list comes from that folder;
   selecting a panel shows shared keys plus the panel's own settings. Unknown keys, comments and repeated keys
   are kept when the panel is saved.
-- New projects start with the default menu set from `electron/templates/menus`. A project whose `menus/` folder
-  is empty shows **Create default menus**; this copies only missing files, so existing edits are never replaced.
+- New projects start with the default menu set from `electron/templates/menus` (the 25 files the engine loads).
+  A project whose `menus/` folder is empty shows **Create default menus**; this copies only missing files, so
+  existing edits are never replaced.
+- Simple panel keys are described in `src/editor/menuFields.ts`; Action bar and Health/Mana/Experience bars have
+  their own section in `src/components/menus/MenuExtraSettings.tsx`. Missing booleans use the engine default
+  (`defaultValue`), not `false`. Durations are written with `s`/`ms` as the engine expects.
+- Labels, colour-alpha fields, repeated/nested keys (`slot`, `equipment_slot`, `tab.*`) and the remaining
+  Character/Inventory/Stash fields are preserved but not editable yet; they are listed in
+  `src/editor/menuCoverage.test.ts`. That test compares `src/schema/attribute-reference.json` with the editors,
+  so a new engine key fails until it is exposed or explicitly added to the unsupported list. The schema's
+  `keybinds_bg_color` is the parser's `scrollpane_bg_color`.
 
 ## World Settings card
 

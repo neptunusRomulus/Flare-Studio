@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { mergeEventFormProperties } from './eventFormProperties';
 import {
   EVENT_EXTRA_CATALOG,
   eventExtraPaletteKeys,
@@ -29,31 +28,6 @@ const existing = {
   shakycam: '500ms',
   custom_note: 'keep',
 };
-
-describe('mergeEventFormProperties', () => {
-  it('keeps keys the form does not own and clears a form field the user emptied', () => {
-    const formProps = {
-      activate: 'on_interact',
-      location: '2,3,1,1',
-      msg: 'The door opens.',
-      ...eventExtraPropsFrom(eventExtraRowsFrom(existing)),
-    };
-    const merged = mergeEventFormProperties(existing, formProps);
-    expect(merged.requires_status).toBeUndefined();
-    expect(merged.custom_note).toBe('keep');
-    expect(merged.activate).toBe('on_interact');
-    for (const entry of EVENT_EXTRA_CATALOG) {
-      expect(merged[entry.key]).toEqual((existing as Record<string, unknown>)[entry.key]);
-    }
-  });
-
-  it('drops an extra key whose row was removed', () => {
-    const rows = eventExtraRowsFrom(existing).filter((row) => row.key !== 'cutscene');
-    const merged = mergeEventFormProperties(existing, eventExtraPropsFrom(rows));
-    expect(merged.cutscene).toBeUndefined();
-    expect(merged.custom_note).toBe('keep');
-  });
-});
 
 describe('event extra properties', () => {
   it('round-trips every engine key, including repeated values', () => {

@@ -40,6 +40,7 @@ Written before the split below, one line per provable outcome; each is true toda
 | Dialog shell, dirty tracking, layout | `src/components/EventDialog.tsx` |
 | Instance vs action split, parse/serialize/merge | `src/editor/eventScripts.ts` |
 | Instance keys for the map file (pure, tested) | `src/components/events/eventInstanceProps.ts` |
+| A map object read back into the form (pure, tested) | `src/components/events/eventDataFromObject.ts` |
 | The map object an event save writes (pure, tested) | `src/components/events/eventInstanceUpdate.ts` |
 | Writing one `scripts/*.txt` with a merge base | `src/components/events/eventScriptSave.ts` |
 | Keys the form does not model | `src/editor/eventExtraProperties.ts` |

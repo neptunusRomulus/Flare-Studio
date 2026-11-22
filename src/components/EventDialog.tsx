@@ -6,7 +6,6 @@ import Tooltip from '@/components/ui/tooltip';
 import { useAppContext } from '@/context/AppContext';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
 import ResizeHandle from '@/components/ResizeHandle';
-import { mergeEventFormProperties } from '@/editor/eventFormProperties';
 import EditorPropertyList from '@/components/EditorPropertyList';
 import { isStoryFlagType, STORY_FLAG_LIST_ID } from '@/editor/powers/storyFlags';
 import {
@@ -20,7 +19,6 @@ import {
 
 import {
   ACTIVATION_TO_FLARE,
-  FLARE_TO_ACTIVATION,
   type EventActivation,
   type EventData,
   type EventItemRequirement,
@@ -28,6 +26,7 @@ import {
 import { buildEventInstanceProps } from '@/components/events/eventInstanceProps';
 import { buildEventInstanceUpdate } from '@/components/events/eventInstanceUpdate';
 import { writeEventScript } from '@/components/events/eventScriptSave';
+import { eventDataFromObject } from '@/components/events/eventDataFromObject';
 import EventInformationSection from '@/components/events/EventInformationSection';
 import EventPositioningSection from '@/components/events/EventPositioningSection';
 import EventRequirementsSection from '@/components/events/EventRequirementsSection';
@@ -50,7 +49,6 @@ import {
   mergeEventScript,
   normalizeEventScriptPath,
   parseEventScript,
-  instancePropertiesFrom,
   type EventScriptFile,
 } from '@/editor/eventScripts';
 
@@ -105,11 +103,6 @@ const EventDialog: React.FC<EventDialogProps> = ({
   const [scriptBaseline, setScriptBaseline] = useState('');
   const skipScriptLoadRef = useRef(false);
   const [scriptError, setScriptError] = useState('');
-
-  const parseItemValue = (value: string) => {
-    const [id, quantity] = value.split(/[: ,]/).map((part) => part.trim());
-    return { id: id || '', quantity: parseInt(quantity || '1', 10) || 1 };
-  };
 
   const handleSave = async () => {
     if (isScript && scriptPath) {
@@ -252,121 +245,17 @@ const EventDialog: React.FC<EventDialogProps> = ({
       if (obj) {
         const p = obj.properties || {};
         setExtraRows(eventExtraRowsFrom(p));
-        // Parse hotspot "x,y,w,h"
-        const hotParts = (p.hotspot || '').split(',').map(Number);
-        const hotspot = hotParts.length === 4 && hotParts.every((n: number) => !isNaN(n))
-          ? { x: hotParts[0], y: hotParts[1], width: hotParts[2], height: hotParts[3] }
-          : { x: 0, y: 0, width: 1, height: 1 };
-        const itemRequirements: EventItemRequirement[] = [];
-        const requiresItemValues = Array.isArray(p.requires_item)
-          ? p.requires_item
-          : p.requires_item ? [p.requires_item] : [];
-        const requiresNotItemValues = Array.isArray(p.requires_not_item)
-          ? p.requires_not_item
-          : p.requires_not_item ? [p.requires_not_item] : [];
-
-        itemRequirements.push(
-          ...requiresItemValues.map((item: string) => {
-            const parsed = parseItemValue(item);
-            return {
-              id: `item-req-${Math.random().toString(36).slice(2)}`,
-              type: 'requires_item' as const,
-              itemId: parsed.id,
-              itemQuantity: parsed.quantity,
-            };
-          })
-        );
-        itemRequirements.push(
-          ...requiresNotItemValues.map((item: string) => {
-            const parsed = parseItemValue(item);
-            return {
-              id: `item-req-${Math.random().toString(36).slice(2)}`,
-              type: 'requires_not_item' as const,
-              itemId: parsed.id,
-              itemQuantity: parsed.quantity,
-            };
-          })
-        );
-        const rewardItemParts = parseItemValue(p.reward_item || '');
-        const removeItemParts = parseItemValue(p.remove_item || '');
-        const rewardLootCountParts = (p.reward_loot_count || '').split(',').map((part: string) => parseInt(part.trim(), 10) || 0);
-        // Parse intermap "map,x,y"
-        const intermapParts = (p.intermap || '').split(',');
-        // Parse cooldown/delay (remove "ms" suffix)
-        const parseCooldown = (v: string) => parseInt((v || '0').replace('ms', '')) || 0;
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setEventData({
-          name: obj.name || '',
-          description: obj.description || p._description || '',
-          positioning: {
-            mapName: currentMapName || '',
-            coordinates: { x: obj.x ?? 0, y: obj.y ?? 0 },
-            size: { width: obj.width ?? 1, height: obj.height ?? 1 },
-            hotspot,
-          },
-          timing: {
-            activeActivation: FLARE_TO_ACTIVATION[p.activate || obj.activate || ''] || null,
-            cooldown: parseCooldown(p.cooldown),
-            delay: parseCooldown(p.delay),
-          },
-          requirements: {
-            status: Array.isArray(p.requires_status)
-              ? p.requires_status.map(String).filter(Boolean)
-              : p.requires_status
-                ? [String(p.requires_status).trim()]
-                : [],
-            minLevel: parseInt(p.requires_level || '0') || 0,
-            itemRequirements,
-            currency: parseInt(p.requires_currency || '0') || 0,
-          },
-          rewards: {
-            message: p.msg || '',
-            expReward: parseInt(p.reward_xp || '0') || 0,
-            rewardCurrency: parseInt(p.reward_currency || '0') || 0,
-            removeCurrency: parseInt(p.remove_currency || '0') || 0,
-            rewardItemId: rewardItemParts.id,
-            rewardItemQuantity: rewardItemParts.quantity,
-            removeItemId: removeItemParts.id,
-            removeItemQuantity: removeItemParts.quantity,
-            lootGroup: p.loot || '',
-            rewardLootGroup: p.reward_loot || '',
-            rewardLootCountMin: rewardLootCountParts[0] || 1,
-            rewardLootCountMax: rewardLootCountParts[1] || (rewardLootCountParts[0] || 1),
-            enemySpawn: p.spawn || '',
-            teleportMap: intermapParts.length >= 3 ? intermapParts[0].replace(/^\/?(maps\/)/i, '').replace(/\.txt$/i, '') : (p.intermap || '').replace(/^\/?(maps\/)/i, '').replace(/\.txt$/i, ''),
-            teleportX: intermapParts.length >= 3 ? parseInt(intermapParts[1]) || 0 : 0,
-            teleportY: intermapParts.length >= 3 ? parseInt(intermapParts[2]) || 0 : 0,
-            sound: p.soundfx || '',
-            // NEW
-            power: p.power || '',
-            powerPath: p.power_path || '',
-            powerDamage: parseInt(p.power_damage || '0') || 0,
-            powerStats: p.power_stats || '',
-            powerLevel: p.power_level || '',
-            mapmod: p.mapmod || '',
-            mapmodToggle: p.mapmod_toggle && p.mapmod_toggle !== 'true' ? p.mapmod_toggle : '',
-            requiresTile: p.requires_tile || '',
-            requiresNotTile: p.requires_not_tile || '',
-            spawnLevel: p.spawn_level || '',
-            intermapId: p.intermap_id || '',
-            procgenFilename: p.procgen_filename || '',
-            procgenLink: p.procgen_link || '',
-            procgenDoorLevel: p.procgen_door_level || '',
-            restore: p.restore || '',
-            npc: p.npc || '',
-            music: p.music || '',
-            book: p.book || '',
-            respec: p.respec === 'true',
-            showOnMinimap: p.show_on_minimap === 'true',
-            parallaxLayers: p.parallax_layers || '',
-            randomStatus: p.random_status || '',
-          },
-          engine: {
-            chance: parseInt(p.chance_exec || '100') || 100,
-            autoSave: p.save_game === 'true',
-            script: p.script || '',
-          },
-        });
+        setEventData(eventDataFromObject({
+          properties: p,
+          name: obj.name,
+          description: obj.description,
+          x: obj.x,
+          y: obj.y,
+          width: obj.width,
+          height: obj.height,
+          activate: obj.activate,
+          mapName: currentMapName,
+        }));
         return; // Skip default reset when editing
       }
     }
@@ -720,7 +609,7 @@ const EventDialog: React.FC<EventDialogProps> = ({
           </div>
 
           <div className="px-1">
-            <FieldHint hint="Creates a dungeon map, links this door to it, and lets you draw entrance, normal and exit rooms. The rules file is written for you.">
+            <FieldHint hint="Creates a dungeon, links this event to it, and lets you draw the rooms.">
               <Button type="button" variant="outline" size="sm" className="h-7 text-xs" onClick={() => { void openRandomDungeon(); }}>
                 Random dungeon
               </Button>

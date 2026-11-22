@@ -27,9 +27,9 @@ Overhead is roughly ten minutes on top of the change itself.
 5. **Risk areas get a second pair of eyes.** `electron/**`, `src/adapters/flare/*.cjs`, `src/editor/pathGuard.cjs`,
    serializers and anything writing user files: run `review-security` on the diff. These are the paths where a
    mistake costs the owner data, not a rebuild.
-6. **Commit small, push by owner.** Commits are cheap and local; `git push` is the owner's call. The agent asks;
-   the owner decides. Nothing irreversible (push, tag, release, delete, bulk rewrite) happens on the agent's
-   own initiative.
+6. **Commit small, push when green.** A verified commit goes out without asking (`git push` on `main-dev2`);
+   the owner asked for this on 2026-11-22. Irreversible steps (force-push, tag, release, delete, bulk rewrite)
+   still need the owner's yes.
 7. **Docs follow the code.** The feature commit updates its `docs/features/<area>.md` — never `AGENTS.md`.
 
 ## One-time repo setup (already in place — do not rebuild it)
@@ -77,7 +77,7 @@ npm run shots                                                    # look at the t
 **1. Friction is the judgment.** Research on AI-assisted development is consistent: speed without review
 converts into debt at net speed. Friction is not the enemy — the parts of the pipeline that force you to look
 are the parts that keep the project healthy. So the flow above adds friction *only* where a machine cannot
-judge: reading a diff, accepting a criterion, deciding to push. Everything a machine can check is automated,
+judge: reading a diff, accepting a criterion, saying yes to a release. Everything a machine can check is automated,
 because a human doing it by hand burns the same attention the judgment needs. Removing all friction does not
 produce a faster project; it produces a project nobody understands.
 

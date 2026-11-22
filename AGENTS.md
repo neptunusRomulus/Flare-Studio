@@ -16,13 +16,15 @@ demand (see the map at the bottom). Do not paste implementation detail back into
 
 ## Workflow
 - Work on branch `main-dev2`. No PRs or extra branches unless asked; a risky change may go in a worktree, but only when the owner asks for one.
-- Commit locally; **the owner pushes**. Ask before `git push`; never tag or release on your own.
+- Commit and push small, verified changes without asking (the owner asked for this on 2026-11-22). Still ask before the
+  irreversible ones: `--force`, tag, release, `git reset --hard`, deleting files or branches.
 - Never stage/commit the owner's uncommitted `package.json` change or untracked `IDEA.md`. Always `git add <explicit paths>`, never `git add -A` / `.`.
 - Commit author is configured repo-locally; don't change git config.
 - Before committing run: `npx tsc --noEmit`, `npm test` (= `vitest run`), `npm run build` (= `vite build`). The pre-commit hook (`.husky/pre-commit`) also runs lint-staged, tsc and vitest; it must pass (never `--no-verify`).
 - Test first: a behavioural change starts with the failing test; a bug fix ships with the test that reproduces it.
 - Read `git diff --staged` before every commit — every line explainable in one sentence, otherwise split the commit.
-- Deletions, pushes, releases and bulk rewrites are irreversible: confirm with the owner first.
+- Deletions, force-pushes, tags, releases and bulk rewrites are irreversible: confirm with the owner first. A normal
+  `git push` of a verified commit is not.
 - Run `review-security` on the diff of the data-safety paths below (`electron/**`, `src/adapters/flare/*.cjs`, `src/editor/pathGuard.cjs`, serializers, anything writing user files).
 - DevTools stay closed in tests: the e2e launcher passes `FLARE_NO_DEVTOOLS=1` and `electron/main.cjs` skips `openDevTools()` when it is set or when `CI` is set. Keep that guard — a DevTools window steals focus and breaks window/focus/screenshot assertions.
 - Small, focused commits. The owner is near usage limits: prefer cheap, targeted changes; ask before large rewrites.

@@ -41,7 +41,11 @@ const useProjectIO = ({
   const [exportProgress, setExportProgress] = useState(0);
   const [showExportSuccess, setShowExportSuccess] = useState(false);
   const [showOverwriteDialog, setShowOverwriteDialog] = useState(false);
-  const [pendingExport, setPendingExport] = useState<null | (() => Promise<boolean>)>(null);
+  const [pendingExport, setPendingExport] = useState<null | (() => void)>(null);
+  // The overwrite retry runs performExport again from inside performExport. Go through a ref: a
+  // self-reference in the callback body makes React Compiler think the variable is used before its
+  // declaration (react-hooks/immutability). The ref is filled in an effect right after it is created.
+  const performExportRef = useRef<null | ((_options: { silent?: boolean; forceOverwrite?: boolean }) => Promise<boolean>)>(null);
 
   const checkExportFilesExist = useCallback(async (targetMapName: string) => {
     if (!window.electronAPI?.resolvePathRelative || !currentProjectPath) return false;
@@ -156,7 +160,9 @@ const useProjectIO = ({
       if (!forceOverwrite && !silent) {
         const exists = await checkExportFilesExist(mapName);
         if (exists) {
-          setPendingExport(() => () => performExport({ silent, forceOverwrite: true }));
+          setPendingExport(() => () => {
+            void performExportRef.current?.({ silent, forceOverwrite: true });
+          });
           setShowOverwriteDialog(true);
           return false;
         }
@@ -336,6 +342,10 @@ const useProjectIO = ({
       }
     }
   }, [editor, currentProjectPath, mapName, startingMapIntermap, toast, checkExportFilesExist, buildConstantStockString, mapObjects]);
+
+  useEffect(() => {
+    performExportRef.current = performExport;
+  }, [performExport]);
 
   const handleExportMap = useCallback(async () => {
     await performExport();

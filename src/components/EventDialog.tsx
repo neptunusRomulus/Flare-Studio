@@ -1,11 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
-import { X, Save } from 'lucide-react';
-import Tooltip from '@/components/ui/tooltip';
 import { useAppContext } from '@/context/AppContext';
 import { useDraggableResizable } from '@/hooks/useDraggableResizable';
-import ResizeHandle from '@/components/ResizeHandle';
 import EditorPropertyList from '@/components/EditorPropertyList';
 import { isStoryFlagType, STORY_FLAG_LIST_ID } from '@/editor/powers/storyFlags';
 import {
@@ -27,6 +24,7 @@ import { buildEventInstanceProps } from '@/components/events/eventInstanceProps'
 import { buildEventInstanceUpdate } from '@/components/events/eventInstanceUpdate';
 import { writeEventScript } from '@/components/events/eventScriptSave';
 import { eventDataFromObject } from '@/components/events/eventDataFromObject';
+import EventDialogFrame from '@/components/events/EventDialogFrame';
 import EventInformationSection from '@/components/events/EventInformationSection';
 import EventPositioningSection from '@/components/events/EventPositioningSection';
 import EventRequirementsSection from '@/components/events/EventRequirementsSection';
@@ -515,36 +513,16 @@ const EventDialog: React.FC<EventDialogProps> = ({
 
   const dialogContent = (
     <>
-      <div 
-        ref={dialogRef}
-        className="bg-background border border-border/70 rounded-lg flex flex-col shadow-xl"
-        style={{
-          position: 'fixed',
-          left: `${position.x}px`,
-          top: `${position.y}px`,
-          width: `${size.width}px`,
-          height: `${size.height}px`,
-          zIndex: 50,
-          pointerEvents: 'auto',
-        }}
-        onClick={(e) => e.stopPropagation()}
+      <EventDialogFrame
+        title={isScript ? (scriptPath || 'Event') : isEditing ? 'Event instance' : 'Event'}
+        position={position}
+        size={size}
+        dialogRef={dialogRef}
+        onHeaderMouseDown={handleHeaderMouseDown}
+        onResizeMouseDown={handleResizeMouseDown}
+        onClose={() => onOpenChange(false)}
+        onSave={handleSave}
       >
-        <div 
-          className="sticky top-0 z-10 border-b border-border/50 bg-background px-6 py-3 flex items-center justify-between cursor-move select-none"
-          onMouseDown={handleHeaderMouseDown}
-        >
-          <h3 className="text-lg font-semibold flex-1">{isScript ? (scriptPath || 'Event') : isEditing ? 'Event instance' : 'Event'}</h3>
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={() => onOpenChange(false)}
-            className="h-6 w-6 text-foreground/60 hover:text-foreground"
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto space-y-6 px-6 py-4 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/15 [&::-webkit-scrollbar-thumb]:rounded-full">
           {isScript ? (
             <div className="space-y-3">
               {scriptError ? <div className="text-xs text-destructive">{scriptError}</div> : null}
@@ -690,23 +668,7 @@ const EventDialog: React.FC<EventDialogProps> = ({
           </div>
           </>
           )}
-        </div>
-
-        <div className="sticky bottom-0 border-t border-border/50 bg-background px-6 py-3 flex justify-end">
-          <Tooltip content="Save event">
-            <Button
-              size="icon"
-              onClick={handleSave}
-              className="h-7 w-7 text-foreground/80 hover:text-foreground hover:bg-muted"
-            >
-              <Save className="h-4 w-4" />
-            </Button>
-          </Tooltip>
-        </div>
-
-        {/* Resize handle */}
-        <ResizeHandle onMouseDown={handleResizeMouseDown} />
-      </div>
+      </EventDialogFrame>
 
       <RandomDungeonDialog
         open={dungeonOpen}

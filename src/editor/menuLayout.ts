@@ -222,6 +222,28 @@ export const DEFAULT_POWERS_TAB_AREA: Rect = { x: 64, y: 60, w: 512, h: 672 };
 
 const HEADER_KEYS = new Set(['pos', 'align', 'background', 'soundfx_open', 'soundfx_close', 'enabled']);
 
+const MENU_NAMES: Record<string, string> = {
+  inventory: 'Inventory',
+  character: 'Character',
+  powers: 'Powers',
+  log: 'Combat log',
+  actionbar: 'Action bar',
+  hp: 'Health bar',
+  mp: 'Mana bar',
+  xp: 'Experience bar',
+  minimap: 'Mini map',
+  hudlog: 'Message log',
+  activeeffects: 'Active effects',
+  vendor: 'Vendor',
+  stash: 'Stash',
+  enemy: 'Enemy',
+  talker: 'Dialog',
+  config: 'Settings',
+  gametitle: 'Title screen',
+  gameload: 'Load game',
+  gamenew: 'New game',
+};
+
 export function parseMenuText(content: string, file = ''): MenuPanel {
   let pos = { x: 0, y: 0, w: 0, h: 0 };
   let align: MenuAlign = 'topleft';
@@ -248,7 +270,7 @@ export function parseMenuText(content: string, file = ''): MenuPanel {
     else (values[key] ??= []).push(value);
   }
   const base = file.replace(/^.*\//, '').replace(/\.txt$/, '');
-  const name = base.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) || 'Menu';
+  const name = MENU_NAMES[base] || base.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()) || 'Menu';
   return { file, name, pos, align, background, soundfxOpen, soundfxClose, enabled, values, tabArea, text: String(content || '') };
 }
 

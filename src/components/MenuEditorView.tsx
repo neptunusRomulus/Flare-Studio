@@ -22,6 +22,7 @@ import {
   type Resolutions,
 } from '@/editor/menuLayout';
 import MenuExtraSettings from '@/components/menus/MenuExtraSettings';
+import MenuPerPanelSettings from '@/components/menus/MenuPerPanelSettings';
 import { useRegisterDirty } from '@/context/SaveHealthContext';
 
 export const OPEN_MENUS_EVENT = 'flare-studio:open-menus';
@@ -250,6 +251,7 @@ const MenuEditorView = ({ projectPath }: Props) => {
         </div>
       ) : null}
       {selectedPanel ? <MenuExtraSettings panel={selectedPanel} onChange={updateValue} /> : null}
+      {selectedPanel ? <MenuPerPanelSettings panel={selectedPanel} onChange={updateValue} /> : null}
       <div className="flex flex-1 min-h-0">
         <div className="w-44 overflow-y-auto border-r border-border p-2 space-y-0.5">
           {panels.map((panel) => (

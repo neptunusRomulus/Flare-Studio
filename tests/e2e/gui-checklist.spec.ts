@@ -336,7 +336,7 @@ test('Menü ortak anahtarları (align, background, ses, enabled) kaydedilir', as
 
   await openRailTarget(window, 'Settings', 'UI Settings');
   await window.keyboard.press('Escape');
-  await window.getByRole('button', { name: 'Hp', exact: true }).click();
+  await window.getByRole('button', { name: 'Health bar', exact: true }).click();
 
   await window.getByLabel('Menu alignment').click();
   await window.getByRole('option', { name: 'Center', exact: true }).click();
@@ -380,7 +380,7 @@ test('Action bar slotu ve tooltip ayarı kaydedilir', async () => {
 
   await openRailTarget(window, 'Settings', 'UI Settings');
   await window.keyboard.press('Escape');
-  await window.getByRole('button', { name: 'Actionbar', exact: true }).click();
+  await window.getByRole('button', { name: 'Action bar', exact: true }).click();
 
   await window.getByLabel('Slot 1 X').fill('80');
   await window.getByLabel('Power tooltip length').click();
@@ -394,4 +394,52 @@ test('Action bar slotu ve tooltip ayarı kaydedilir', async () => {
   await expect.poll(() => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : ''), {
     timeout: 15_000,
   }).toContain('tooltip_length=short');
+});
+
+test('Envanter panel ayarları kaydedilir', async () => {
+  const { window } = session;
+
+  await openRailTarget(window, 'Settings', 'UI Settings');
+  await window.keyboard.press('Escape');
+  await window.getByRole('button', { name: 'Inventory', exact: true }).click();
+
+  await window.getByLabel('Item columns').fill('7');
+  await window.getByLabel('Show sort button').click();
+  await window.getByLabel('Sort button X').fill('42');
+  await window.getByLabel('Help area width').fill('300');
+  await window.locator('button:has(svg.lucide-save)').last().click();
+
+  const file = path.join(project.projectPath, 'menus/inventory.txt');
+  await expect.poll(() => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : ''), {
+    timeout: 15_000,
+  }).toContain('carried_cols=7');
+  await expect.poll(() => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : ''), {
+    timeout: 15_000,
+  }).toContain('sort_enabled=true');
+  await expect.poll(() => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : ''), {
+    timeout: 15_000,
+  }).toContain('sort_pos=42,0');
+  await expect.poll(() => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : ''), {
+    timeout: 15_000,
+  }).toContain('help=0,0,300,80');
+});
+
+test('Başlık ekranı logosu ve düğme konumu kaydedilir', async () => {
+  const { window } = session;
+
+  await openRailTarget(window, 'Settings', 'UI Settings');
+  await window.keyboard.press('Escape');
+  await window.getByRole('button', { name: 'Title screen', exact: true }).click();
+
+  await window.getByLabel('Logo image').fill('images/menus/title.png');
+  await window.getByLabel('Play button X').fill('10');
+  await window.locator('button:has(svg.lucide-save)').last().click();
+
+  const file = path.join(project.projectPath, 'menus/gametitle.txt');
+  await expect.poll(() => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : ''), {
+    timeout: 15_000,
+  }).toContain('logo=images/menus/title.png,0,0,center');
+  await expect.poll(() => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : ''), {
+    timeout: 15_000,
+  }).toContain('play_pos=10,-84,bottom');
 });

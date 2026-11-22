@@ -73,6 +73,8 @@ export function createGuiProject(label: string, files: Record<string, string> = 
   const defaultFiles: Record<string, string> = {
     'menus/hp.txt': 'pos=0,0,320,48\nalign=bottomleft\nbar_pos=0,0,320,48\norientation=0\n',
     'menus/actionbar.txt': 'pos=0,0,1280,70\nalign=bottom\nslot=1,64,6\nslot=2,128,6\nslot_M1=768,6\nslot_M2=832,6\nchar_menu=960,6\ninv_menu=1024,6\npowers_menu=1088,6\nlog_menu=1152,6\ntooltip_length=long_all\n',
+    'menus/inventory.txt': 'pos=0,0,640,480\ncarried_area=32,64\ncarried_cols=5\ncarried_rows=4\npreview_enabled=false\nsort_enabled=false\nhelp=0,0,640,80\n',
+    'menus/gametitle.txt': 'logo=images/menus/logo.png,0,0,center\nplay_pos=0,-84,bottom\nconfig_pos=0,-56,bottom\ncredits_pos=0,-28,bottom\nexit_pos=0,0,bottom\n',
   };
   for (const [relative, content] of Object.entries({ ...defaultFiles, ...files })) {
     const target = path.join(projectPath, relative);

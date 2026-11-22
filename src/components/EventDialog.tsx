@@ -19,6 +19,7 @@ import { buildEventInstanceUpdate } from '@/components/events/eventInstanceUpdat
 import { writeEventScript } from '@/components/events/eventScriptSave';
 import { eventDataFromObject } from '@/components/events/eventDataFromObject';
 import EventActionsSection from '@/components/events/EventActionsSection';
+import { planScriptRescue } from '@/components/events/eventScriptRescue';
 import {
   withItemRequirementAdded,
   withItemRequirementRemoved,
@@ -34,11 +35,9 @@ import EventInformationSection from '@/components/events/EventInformationSection
 import EventPositioningSection from '@/components/events/EventPositioningSection';
 import EventRequirementsSection from '@/components/events/EventRequirementsSection';
 import EventScriptForm from '@/components/events/EventScriptForm';
-import { FieldHint, HintLabel } from '@/components/ui/field-hint';
+import { FieldHint } from '@/components/ui/field-hint';
 import { askConfirm } from '@/components/ui/inlineConfirmCore';
 import { useRegisterDirty } from '@/context/SaveHealthContext';
-import { Input } from '@/components/ui/input';
-import { EVENT_SCRIPT_LIST_ID } from '@/hooks/useEventScripts';
 import { extraProcgenEvents } from '@/editor/procgenRules';
 import RandomDungeonDialog from '@/components/engine/RandomDungeonDialog';
 import { parseMapHeader, type MapStyle } from '@/editor/randomDungeon';
@@ -49,7 +48,6 @@ import useFlareEngine from '@/hooks/useFlareEngine';
 import {
   actionPropertiesFrom,
   emptyEventScript,
-  eventScriptRelPath,
   mergeEventScript,
   normalizeEventScriptPath,
   parseEventScript,
@@ -133,12 +131,16 @@ const EventDialog: React.FC<EventDialogProps> = ({
         .find((object) => object.id === editingEventId)
       : undefined;
     let script = normalizeEventScriptPath(eventData.engine.script || buildEventInstanceProps(eventData, extraRows).script);
-    const leftover = actionPropertiesFrom(existing?.properties);
-    if (!script && leftover.length && currentProjectPath && window.electronAPI?.writeFile) {
-      const stamp = `${(currentMapName || 'map').replace(/[^A-Za-z0-9]+/g, '_')}_${coordinates.x}_${coordinates.y}`;
-      script = eventScriptRelPath(stamp);
-      const abs = `${currentProjectPath.replace(/\\/g, '/')}/${script}`;
-      await window.electronAPI.writeFile(abs, mergeEventScript('', { header: '', steps: [{ components: leftover }] }));
+    const rescue = planScriptRescue({
+      script,
+      leftover: actionPropertiesFrom(existing?.properties),
+      projectPath: currentProjectPath,
+      mapName: currentMapName,
+      coordinates,
+    });
+    if (rescue && window.electronAPI?.writeFile) {
+      await window.electronAPI.writeFile(rescue.absPath, rescue.content);
+      script = rescue.script;
       onScriptSaved?.();
     }
 
@@ -374,7 +376,7 @@ const EventDialog: React.FC<EventDialogProps> = ({
     }));
   };
 
-  const editRequirements = (fn: (reqs: EventData['requirements']) => EventData['requirements']) =>
+  const editRequirements = (fn: (_requirements: EventData['requirements']) => EventData['requirements']) =>
     setEventData((prev) => ({ ...prev, requirements: fn(prev.requirements) }));
 
   const addStatusRequirement = () => editRequirements(withStatusAdded);

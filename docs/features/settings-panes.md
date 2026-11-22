@@ -3,6 +3,15 @@
 Feature detail split out of `AGENTS.md` (2026-11-22). Rules and invariants live in `AGENTS.md`; verify against
 `src/` before trusting a line here — the code wins.
 
+## Acceptance criteria
+
+- [ ] Every settings save goes through the merge serializer: keys the pane does not own, comments and section
+  order survive untouched.
+- [ ] A new project gets the full default menu set from `electron/templates/menus`, and edits land in the
+  project's own `menus/*.txt` — never in the template folder.
+- [ ] Repeated and nested keys (`slot`, `equipment_slot`, `tab.*`) are edited as rows, not as raw text.
+- [ ] Read-only panes (Status tracking) stay read-only and say where the data comes from.
+
 ## Stats card
 
 - The Stats card XP pane also edits `enemies/xp_scaling/*.txt` tables (`[absolute]` / `[relative]`

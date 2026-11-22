@@ -3,6 +3,14 @@
 Feature detail split out of `AGENTS.md` (2026-11-22). Rules and invariants live in `AGENTS.md`; verify against
 `src/` before trusting a line here — the code wins.
 
+## Acceptance criteria
+
+- [ ] An entity that was never placed stays at -1,-1, reads as "Not placed" and is never written to the map
+  file.
+- [ ] Placing an event writes instance keys only (location, hotspot, activate, requires_*, cooldown/delay,
+  tooltip) plus `script=scripts/<id>.txt` — never the action components.
+- [ ] The Events rail usage count reflects live placements, including unsaved ones on the open map.
+
 ## Entities
 
 - "+" in the list header. Add dialogs have no coordinates: position is instance data set by placing on the map.

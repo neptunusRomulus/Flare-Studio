@@ -3,6 +3,13 @@
 Feature detail split out of `AGENTS.md` (2026-11-22). Rules and invariants live in `AGENTS.md`; this file is
 implementation detail. Verify against `src/` before trusting a line here — the code wins.
 
+## Acceptance criteria
+
+- [ ] Every rail group is reachable by mouse and by Tab / Shift+Tab, and a group hidden with Ctrl+Click opens
+  again after unhiding.
+- [ ] Clicking a rail target, a palette row or a pane never moves or resizes the palette card.
+- [ ] Zen mode starts the canvas at y=0 with no title bar, and the Flare mark stays out of the canvas.
+
 ## Right rail and palette card
 
 - No left sidebar. Right edge: a thin always-visible icon rail (`src/components/PaletteRail.tsx`,

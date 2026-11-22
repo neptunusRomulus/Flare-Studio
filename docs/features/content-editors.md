@@ -3,6 +3,14 @@
 Feature detail split out of `AGENTS.md` (2026-11-22). Rules and invariants live in `AGENTS.md`; verify against
 `src/` before trusting a line here — the code wins.
 
+## Acceptance criteria
+
+- [ ] A hand-made `animations/*.txt` is never overwritten: Studio writes `<name>_studio.txt` beside it.
+- [ ] Book, status/power and quest saves keep unknown keys, repeated keys and section order (`content.cjs`
+  merge helpers, fixtures in `tests/fixtures/`).
+- [ ] A power `script=` is written as `trigger,filename` and resolves against an existing `scripts/*.txt`.
+- [ ] Editing a randomizer definition does not detach the items that reference it by `randomizer_def`.
+
 ## Books
 
 - The Books rail layer edits `books/*.txt` as MenuBook files: header `pos`, `align`, `background`, `close`,

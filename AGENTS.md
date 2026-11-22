@@ -63,7 +63,7 @@ demand (see the map at the bottom). Do not paste implementation detail back into
 | Touching | Read |
 |---|---|
 | Rail, palette card, zen mode, app menu, window controls, brand, GID/minimap | `docs/features/shell-ui.md` |
-| Map tabs, entity placement, events/`scripts/*.txt`, quest map | `docs/features/map-entities.md` |
+| Map tabs, entity placement, events/`scripts/*.txt`, quest map | `docs/features/map-entities.md`, `docs/features/event-editor.md` |
 | NPC editor, Role center, properties palette, dialogue chat | `docs/features/npc-editor.md` |
 | Books, Statuses/powers, items randomizer, animations, cutscenes, quest journals | `docs/features/content-editors.md` |
 | Stats / UI Settings / World Settings cards, Engine data panes | `docs/features/settings-panes.md` |

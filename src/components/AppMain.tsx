@@ -3,7 +3,6 @@ import EntityDock from '@/components/EntityDock';
 import { groupOfType, ENTITY_GROUP, CONTENT_GROUP } from '@/components/targetGroups';
 import ContentDock from '@/components/ContentDock';
 import LoadingOverlay from '@/components/LoadingOverlay';
-import { loadingOverlay } from '@/components/loadingOverlayStore';
 import { useAppContext } from '../context/AppContext';
 import WelcomeScreen from '../components/WelcomeScreen';
 import WindowControlBar from '@/components/WindowControlBar';
@@ -47,8 +46,7 @@ import { useSaveHealth } from '@/context/SaveHealthContext';
 import { anythingDirty, isMapDirty } from '@/editor/saveHealth';
 import { normalizeProjectBackup } from '@/editor/projectSession';
 import useFlareEngine from '@/hooks/useFlareEngine';
-import { takeTemplateImport, markPreMapSlots } from '@/flare/projectTemplate';
-import { importTemplateTilesets, type TilesetImportEditor } from '@/editor/importTileset';
+import usePreMapSetup from '@/hooks/usePreMapSetup';
 import { toast } from '@/hooks/use-toast';
 import type { HelpTarget } from '@/help/helpTopics';
 
@@ -266,50 +264,7 @@ export default function AppMain() {
   const templateProjectPath: string | null = controls?.currentProjectPath ?? null;
   const showPanels = shouldShowPanels({ hasMap, hasEditor: !!editor, projectPath: templateProjectPath });
 
-  // Before the first map: select Background so the palette dock shows (scratch and template alike).
-  const preMapInitEditorRef = useRef<unknown>(null);
-  useEffect(() => {
-    if (!editor || hasMap || !templateProjectPath || preMapInitEditorRef.current === editor) return;
-    preMapInitEditorRef.current = editor;
-    const layers = typeof editor.getLayers === 'function' ? editor.getLayers() : [];
-    const background = layers.find((l: { type: string }) => l.type === 'background');
-    if (background) { try { void layersObj?.handleSetActiveLayer?.(background.id); } catch { /* ignore */ } }
-  }, [editor, hasMap, templateProjectPath, layersObj]);
-
-  // "Start with template": import fantasycore tilesets as soon as the new project's editor is ready (no map needed).
-  useEffect(() => {
-    if (!editor || !templateProjectPath) return;
-    const layers = typeof editor.getLayers === 'function' ? editor.getLayers() : [];
-    const background = layers.find((l: { type: string }) => l.type === 'background');
-    if (!background) return;
-    const flarePath = takeTemplateImport(templateProjectPath);
-    if (!flarePath) return;
-    if (!hasMap) markPreMapSlots(editor);
-    void (async () => {
-      let result: Awaited<ReturnType<typeof importTemplateTilesets>>;
-      try {
-        loadingOverlay.begin('template');
-        result = await importTemplateTilesets(editor as TilesetImportEditor, flarePath, templateProjectPath, 'background',
-          (done, total) => loadingOverlay.progress('template', done, total, 'Loading tilesets…'));
-      } catch (err) {
-        console.warn('[Template] import failed', err);
-        result = { imported: [], skipped: [], failed: [], misfit: [] };
-      }
-      loadingOverlay.end('template');
-      try { await layersObj?.handleSetActiveLayer?.(background.id); } catch { /* ignore */ }
-      try { tileset?.setTabTick?.((t: number) => (t || 0) + 1); } catch { /* ignore */ }
-      if (result.imported.length > 0) {
-        const notes = [
-          result.skipped.length > 0 ? `${result.skipped.length} skipped (slot limit)` : '',
-          result.failed.length > 0 ? `${result.failed.length} failed` : '',
-          result.misfit.length > 0 ? `${result.misfit.length} don't fit the tile size` : '',
-        ].filter(Boolean).join(', ');
-        toast({ title: 'Template tilesets imported', description: notes || undefined });
-      } else {
-        toast({ title: 'Template import failed', variant: 'destructive' });
-      }
-    })();
-  }, [editor, hasMap, templateProjectPath, layersObj, tileset]);
+  usePreMapSetup({ editor, hasMap, projectPath: templateProjectPath, layersObj, tileset });
 
   // Help "Go there": switch to a layer tab, or open Engine Settings on a tab.
   const [settingsTab, setSettingsTab] = useState<'general' | 'save' | 'display' | undefined>(undefined);

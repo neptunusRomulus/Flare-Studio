@@ -61,9 +61,19 @@ function invoke<T = unknown>(channel: string, ...args: unknown[]): Promise<T> {
   return Promise.resolve(fn({}, ...args) as T);
 }
 
+/**
+ * A real project root always carries project.json; main.cjs only remembers a
+ * directory as a trusted root when it looks like one (isPlausibleProjectRoot).
+ */
 function makeProject(prefix: string): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix));
+  fs.writeFileSync(path.join(dir, "project.json"), JSON.stringify({ name: "test" }), "utf8");
   return dir;
+}
+
+/** Opening a project remembers its root; these tests open it the same way. */
+function trustProject(dir: string): Promise<unknown> {
+  return invoke("list-maps", dir);
 }
 
 const PNG_1X1 =
@@ -186,6 +196,7 @@ describe("main-process save handlers write into a temp project", () => {
 
   it("save-export-files writes map, tileset, npc, spawn, and engine files", async () => {
     const project = makeProject("fs-save-export-");
+    await trustProject(project);
     try {
       const mapTxt = fs.readFileSync(path.join(fixtures, "village.map.txt"), "utf8");
       const tilesetDef = fs.readFileSync(path.join(fixtures, "tileset.txt"), "utf8");
@@ -218,6 +229,7 @@ describe("main-process save handlers write into a temp project", () => {
 
   it("refuses to export a map the adapter rejects as invalid", async () => {
     const project = makeProject("fs-save-bad-");
+    await trustProject(project);
     try {
       // validateText only errors on bad layer geometry or unknown keys —
       // a bare string is accepted, so use a layer whose rows != header height.
@@ -250,6 +262,7 @@ describe("main-process save handlers write into a temp project", () => {
 
   it("create-npc-file only returns a path; write-item-file merges into the category file", async () => {
     const project = makeProject("fs-save-item-");
+    await trustProject(project);
     try {
       const created = (await invoke("create-npc-file", project, { name: "Old Guard" })) as {
         success: boolean;
@@ -286,6 +299,7 @@ describe("main-process save handlers write into a temp project", () => {
 
   it("delete-map removes the map json and maps txt without throwing", async () => {
     const project = makeProject("fs-delete-map-");
+    await trustProject(project);
     const outsider = makeProject("fs-delete-out-");
     try {
       expect(await invoke<boolean>("save-map-project", project, { name: "Harbor Town", width: 2, height: 2 })).toBe(

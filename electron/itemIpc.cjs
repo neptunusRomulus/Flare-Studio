@@ -663,7 +663,10 @@ ipcMain.handle("read-item-file", async (event, filePath) => {
   try {
     const hashIdx = filePath.indexOf("#");
     const realPath = hashIdx > 0 ? filePath.substring(0, hashIdx) : filePath;
-    if (!realPath || !fs.existsSync(realPath)) {
+    if (!realPath || !isAllowedProjectPath(realPath)) {
+      return { success: false, error: "Path not allowed" };
+    }
+    if (!fs.existsSync(realPath)) {
       return { success: false, error: "Item file not found" };
     }
 
@@ -706,6 +709,9 @@ ipcMain.handle("write-item-file", async (event, filePath, itemData) => {
     // Strip the #item_<id> fragment to get the real file path
     const hashIdx = filePath.indexOf("#");
     const categoryFilePath = hashIdx > 0 ? filePath.substring(0, hashIdx) : filePath;
+    if (!isAllowedProjectPath(categoryFilePath)) {
+      return { success: false, error: "Path not allowed" };
+    }
     if (!fs.existsSync(categoryFilePath)) {
       return { success: false, error: `Category file not found: ${categoryFilePath}` };
     }
@@ -738,6 +744,9 @@ ipcMain.handle("delete-item-file", async (event, filePath) => {
     const hashIdx = filePath.indexOf("#");
     const categoryFilePath = hashIdx > 0 ? filePath.substring(0, hashIdx) : filePath;
 
+    if (!isAllowedProjectPath(categoryFilePath)) {
+      return { success: false, error: "Path not allowed" };
+    }
     if (!fs.existsSync(categoryFilePath)) {
       return { success: false, error: "File does not exist" };
     }

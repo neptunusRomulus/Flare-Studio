@@ -382,6 +382,12 @@ ipcMain.handle("write-flare-test-save", async (_event, options = {}) => {
 
 ipcMain.handle("launch-flare-engine", async (_event, options = {}) => {
   const flarePath = options.flarePath;
+  if (!flareLaunch.looksLikeFlareExecutable(flarePath)) {
+    // The renderer names this path, and launchFlareEngine spawns it, so a path
+    // that is not a Flare binary would be arbitrary code execution.
+    if (options.projectPath) cleanupPlaySession(options.projectPath);
+    return { success: false, error: "That path is not a Flare executable." };
+  }
   const target = flareLaunch.resolveFlareLaunchTarget(flarePath, flarePathProbe());
   if (target.error) {
     if (options.projectPath) cleanupPlaySession(options.projectPath);

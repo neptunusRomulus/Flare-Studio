@@ -563,6 +563,7 @@ function linkProjectMod(projectPath, pathUser) {
 }
 
 module.exports = {
+  looksLikeFlareExecutable,
   DEFAULT_GAME,
   DEFAULT_MOD_VERSION,
   DEFAULT_ENGINE_MIN,
@@ -598,3 +599,18 @@ module.exports = {
   isPathInside,
   linkProjectMod,
 };
+
+/**
+ * The renderer picks the launch target, so only an obviously-Flare binary may
+ * be spawned: the file has to exist and its name has to start with "flare".
+ */
+function looksLikeFlareExecutable(flarePath) {
+  if (typeof flarePath !== "string" || !flarePath.trim()) return false;
+  const name = path.basename(flarePath).toLowerCase().replace(/\.(exe|app|bin|sh)$/, "");
+  if (!name.startsWith("flare")) return false;
+  try {
+    return fs.statSync(flarePath).isFile();
+  } catch {
+    return false;
+  }
+}

@@ -36,6 +36,13 @@ module.exports = function registerMapIpc({
   getMainWindow,
 }) {
 
+/** File names arriving over IPC must stay inside the folder they are joined to. */
+function safeFileName(name, fallback) {
+  const base = path.basename(String(name || ""));
+  if (!base || base === "." || base === ".." || base !== String(name || "")) return fallback;
+  return base;
+}
+
 ipcMain.handle("read-session", async (event, projectPath) => {
   try {
     if (!projectPath) return null;
@@ -261,6 +268,11 @@ ipcMain.handle("list-maps", async (event, projectPath) => {
 ipcMain.handle("read-map-file", async (event, projectPath, filename) => {
   try {
     if (!projectPath || !filename) return null;
+    if (filename !== path.basename(filename)) {
+      console.warn("read-map-file: rejecting a path, expected a file name:", filename);
+      return null;
+    }
+    if (!isAllowedProjectPath(projectPath)) return null;
     const mapsDir = path.join(projectPath, "maps");
     const full = path.join(mapsDir, filename);
     if (!fs.existsSync(full)) return null;
@@ -350,8 +362,6 @@ ipcMain.handle("set-zoom-factor", async (_event, factor) => {
 ipcMain.handle("create-map-project", async (event, config) => {
   try {
     const projectPath = path.join(config.location, config.name);
-    rememberProjectRoot(config.location);
-    rememberProjectRoot(projectPath);
 
     // Create project directory
     if (!fs.existsSync(projectPath)) {
@@ -391,6 +401,8 @@ ipcMain.handle("create-map-project", async (event, config) => {
       "project.json",
       `${JSON.stringify(project, null, 2)}\n`
     );
+    // Only now does it look like a project, so only now may it widen the allowlist.
+    rememberProjectRoot(projectPath);
     writeAdapterFile(
       projectPath,
       "content/documents/engine/tileset_config.txt.json",
@@ -793,7 +805,7 @@ ipcMain.handle("save-map-project", async (event, projectPath, mapData) => {
             /^data:image\/[a-z]+;base64,/,
             ""
           );
-          const imagePath = path.join(tilesetsPath, filename);
+          const imagePath = path.join(tilesetsPath, safeFileName(filename, ""));
           // Only write if file doesn't exist or content has changed (avoid unnecessary writes)
           let needsWrite = true;
           try {
@@ -861,6 +873,9 @@ ipcMain.handle("delete-map", async (_event, projectPath, mapName) => {
     if (!projectPath || !mapName) {
       return { success: false, message: "Project path and map name are required" };
     }
+    if (!isAllowedProjectPath(projectPath)) {
+      return { success: false, message: "Path not allowed" };
+    }
     const sanitizedName = sanitizeMapNameForFilename(mapName);
     deleteMatchingFile(projectPath, `${sanitizedName}.json`);
     const mapsDir = path.join(projectPath, "maps");
@@ -885,6 +900,9 @@ ipcMain.handle(
       }
       if (!fs.existsSync(projectPath)) {
         throw new Error("Project path does not exist");
+      }
+      if (!isAllowedProjectPath(projectPath)) {
+        throw new Error("Path not allowed");
       }
 
       const mapsDir = path.join(projectPath, "maps");
@@ -927,7 +945,7 @@ ipcMain.handle(
       );
 
       if (options.spawn && options.spawn.enabled && typeof options.spawn.content === 'string') {
-        const spawnFile = path.join("maps", options.spawn.filename || "spawn.txt").split(path.sep).join("/");
+        const spawnFile = path.join("maps", safeFileName(options.spawn.filename, "spawn.txt") || "spawn.txt").split(path.sep).join("/");
         validationResults.push(
           validateSerializedFlareData(projectPath, spawnFile, options.spawn.content, validationSchema)
         );
@@ -936,7 +954,7 @@ ipcMain.handle(
       if (Array.isArray(options.npcFiles)) {
         for (const npcFile of options.npcFiles) {
           if (npcFile && npcFile.filename && typeof npcFile.content === 'string') {
-            const npcTarget = path.join("npcs", npcFile.filename).split(path.sep).join("/");
+            const npcTarget = path.join("npcs", safeFileName(npcFile.filename, "")).split(path.sep).join("/");
             validationResults.push(
               validateSerializedFlareData(projectPath, npcTarget, npcFile.content, validationSchema)
             );
@@ -983,7 +1001,7 @@ ipcMain.handle(
       }
 
       if (options.spawn && options.spawn.enabled && options.spawn.content) {
-        const spawnFilename = options.spawn.filename || "spawn.txt";
+        const spawnFilename = safeFileName(options.spawn.filename, "spawn.txt") || "spawn.txt";
         const spawnPath = path.join(mapsDir, spawnFilename);
         fs.writeFileSync(spawnPath, options.spawn.content, "utf8");
         debugLog("Spawn file saved:", spawnPath);
@@ -1016,7 +1034,7 @@ ipcMain.handle(
                 /^data:image\/[a-z]+;base64,/,
                 ""
               );
-              const imagePath = path.join(tilesetsPath, filename);
+              const imagePath = path.join(tilesetsPath, safeFileName(filename, ""));
               fs.writeFileSync(imagePath, base64Data, "base64");
               debugLog("Export: saved tileset image to", imagePath);
             }
@@ -1041,7 +1059,7 @@ ipcMain.handle(
 
           for (const npcFile of options.npcFiles) {
             if (npcFile && npcFile.filename && npcFile.content) {
-              const npcFilePath = path.join(npcsDir, npcFile.filename);
+              const npcFilePath = path.join(npcsDir, safeFileName(npcFile.filename, ""));
               fs.writeFileSync(npcFilePath, npcFile.content, "utf8");
               debugLog("Export: saved NPC file to", npcFilePath);
             }
@@ -1071,7 +1089,7 @@ ipcMain.handle(
 
           for (const portrait of options.portraitFiles) {
             if (portrait && portrait.sourcePath && portrait.destFilename) {
-              const destPath = path.join(portraitsDir, portrait.destFilename);
+              const destPath = path.join(portraitsDir, safeFileName(portrait.destFilename, ""));
               if (fs.existsSync(portrait.sourcePath)) {
                 fs.copyFileSync(portrait.sourcePath, destPath);
                 debugLog("Export: copied portrait", portrait.sourcePath, "->", destPath);
@@ -1105,7 +1123,7 @@ ipcMain.handle(
 
           for (const img of options.npcTilesetImages) {
             if (img && img.sourcePath && img.destFilename) {
-              const destPath = path.join(npcsImgDir, img.destFilename);
+              const destPath = path.join(npcsImgDir, safeFileName(img.destFilename, ""));
               if (fs.existsSync(img.sourcePath)) {
                 fs.copyFileSync(img.sourcePath, destPath);
                 debugLog("Export: copied NPC tileset image", img.sourcePath, "->", destPath);
@@ -1139,7 +1157,7 @@ ipcMain.handle(
 
           for (const animFile of options.npcAnimationFiles) {
             if (animFile && animFile.filename && animFile.content) {
-              const animFilePath = path.join(npcsAnimDir, animFile.filename);
+              const animFilePath = path.join(npcsAnimDir, safeFileName(animFile.filename, ""));
               fs.writeFileSync(animFilePath, animFile.content, "utf8");
               debugLog("Export: saved NPC animation file to", animFilePath);
             }

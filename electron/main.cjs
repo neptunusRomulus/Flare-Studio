@@ -62,10 +62,18 @@ const deleteMatchingFile = (dir, filename) => {
   return false;
 };
 const { isInsideRootReal } = require("../src/editor/pathGuard.cjs");
+const { isPlausibleProjectRoot } = require("../src/editor/projectRoot.cjs");
 const allowedProjectRoots = new Set();
 
 function rememberProjectRoot(projectPath) {
   if (typeof projectPath !== "string" || !projectPath) return;
+  // The renderer asks for this, so it is untrusted: only a directory that looks
+  // like a project may widen the allowlist. Without the check one call with "/"
+  // or "$HOME" made every guarded handler accept any path on disk.
+  if (!isPlausibleProjectRoot(projectPath)) {
+    console.warn("rememberProjectRoot: not a project root, ignored:", projectPath);
+    return;
+  }
   allowedProjectRoots.add(path.resolve(projectPath));
 }
 

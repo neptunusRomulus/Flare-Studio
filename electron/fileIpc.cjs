@@ -196,6 +196,9 @@ ipcMain.handle("check-project-exists", async (event, projectPath) => {
 ipcMain.handle("show-item-in-folder", async (_event, folderPath) => {
   try {
     if (!folderPath) return false;
+    // Opening an arbitrary path launches whatever it points at (an .exe on
+    // Windows), and the renderer is the one naming it.
+    if (!isAllowedProjectPath(folderPath)) return false;
     if (!fs.existsSync(folderPath)) return false;
     shell.openPath(folderPath);
     return true;
@@ -209,6 +212,7 @@ ipcMain.handle("show-item-in-folder", async (_event, folderPath) => {
 ipcMain.handle("copy-project", async (_event, sourcePath, destPath) => {
   try {
     if (!sourcePath || !destPath) return { success: false, error: "Invalid paths" };
+    if (!isAllowedProjectPath(sourcePath)) return { success: false, error: "Path not allowed" };
     if (!fs.existsSync(sourcePath)) return { success: false, error: "Source project not found" };
 
     const copyDirRecursive = (src, dest) => {

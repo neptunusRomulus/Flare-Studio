@@ -1,3 +1,4 @@
+const fs = require('fs');
 const path = require('path');
 
 /**
@@ -18,4 +19,34 @@ function isInsideRoot(root, target) {
   return targetCmp === rootCmp || targetCmp.startsWith(rootPrefix);
 }
 
-module.exports = { isInsideRoot };
+/**
+ * Resolve symlinks for the deepest part of target that exists, then re-attach
+ * the segments that do not exist yet (a file about to be written).
+ */
+function realPathOfNearest(target) {
+  let current = path.resolve(target);
+  const rest = [];
+  for (;;) {
+    try {
+      return path.join(fs.realpathSync.native ? fs.realpathSync.native(current) : fs.realpathSync(current), ...rest);
+    } catch {
+      const parent = path.dirname(current);
+      if (parent === current) return path.resolve(target);
+      rest.unshift(path.basename(current));
+      current = parent;
+    }
+  }
+}
+
+/**
+ * Like isInsideRoot, but a symlink inside the root cannot point outside it.
+ * Use this before touching the disk; isInsideRoot stays the cheap lexical gate.
+ */
+function isInsideRootReal(root, target) {
+  if (!isInsideRoot(root, target)) return false;
+  const realRoot = realPathOfNearest(root);
+  const realTarget = realPathOfNearest(target);
+  return isInsideRoot(realRoot, realTarget);
+}
+
+module.exports = { isInsideRoot, isInsideRootReal, realPathOfNearest };

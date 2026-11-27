@@ -61,7 +61,7 @@ const deleteMatchingFile = (dir, filename) => {
   }
   return false;
 };
-const { isInsideRoot } = require("../src/editor/pathGuard.cjs");
+const { isInsideRootReal } = require("../src/editor/pathGuard.cjs");
 const allowedProjectRoots = new Set();
 
 function rememberProjectRoot(projectPath) {
@@ -72,7 +72,7 @@ function rememberProjectRoot(projectPath) {
 function isAllowedProjectPath(targetPath) {
   if (typeof targetPath !== "string" || !targetPath) return false;
   for (const root of allowedProjectRoots) {
-    if (isInsideRoot(root, targetPath)) return true;
+    if (isInsideRootReal(root, targetPath)) return true;
   }
   return false;
 }

@@ -46,4 +46,33 @@ describe('MenuPerPanelSettings', () => {
     expect(screen.getByRole('switch', { name: 'Show message overlay' })).toBeChecked();
     expect(screen.getByRole('switch', { name: 'Start messages at the bottom' })).toBeChecked();
   });
+
+  it('edits a label and keeps its alignment', () => {
+    const onChange = vi.fn();
+    render(<MenuPerPanelSettings panel={panel('character.txt', { label_title: ['10,20,right,top'] })} onChange={onChange} />);
+    expect(screen.getByLabelText('Character title X')).toHaveValue('10');
+    fireEvent.change(screen.getByLabelText('Character title X'), { target: { value: '30' } });
+    expect(onChange).toHaveBeenCalledWith('label_title', ['30,20,right,top']);
+  });
+
+  it('hides a label without losing its position', () => {
+    const onChange = vi.fn();
+    render(<MenuPerPanelSettings panel={panel('character.txt', { label_title: ['10,20,left,center'] })} onChange={onChange} />);
+    fireEvent.click(screen.getByRole('switch', { name: 'Hide character title' }));
+    expect(onChange).toHaveBeenCalledWith('label_title', ['hidden']);
+  });
+
+  it('edits the name and area of a primary stat', () => {
+    const onChange = vi.fn();
+    render(<MenuPerPanelSettings panel={panel('character.txt', { primary: ['strength,1,2,3,4'] })} onChange={onChange} />);
+    fireEvent.change(screen.getByLabelText('Primary stat area name'), { target: { value: 'dexterity' } });
+    expect(onChange).toHaveBeenCalledWith('primary', ['dexterity,1,2,3,4']);
+  });
+
+  it('edits an equipment set button image', () => {
+    const onChange = vi.fn();
+    render(<MenuPerPanelSettings panel={panel('inventory.txt', { set_previous: ['1,2,images/previous.png'] })} onChange={onChange} />);
+    fireEvent.change(screen.getByLabelText('Previous set button image'), { target: { value: 'images/back.png' } });
+    expect(onChange).toHaveBeenCalledWith('set_previous', ['1,2,images/back.png']);
+  });
 });

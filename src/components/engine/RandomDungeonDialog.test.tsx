@@ -65,4 +65,19 @@ describe('RandomDungeonDialog', () => {
     expect(screen.queryByLabelText('Max doors')).toBeNull();
     expect(screen.getByText('Advanced settings')).toBeTruthy();
   });
+
+  it('keeps the event name when the dungeon is first created', async () => {
+    render(
+      <RandomDungeonDialog
+        open
+        onOpenChange={vi.fn()}
+        projectPath="/proj"
+        flarePath={null}
+        defaultName="Dungeon door"
+      />,
+    );
+
+    await screen.findByText(/Entrance missing/);
+    expect(screen.getByLabelText('Dungeon name')).toHaveValue('Dungeon door');
+  });
 });

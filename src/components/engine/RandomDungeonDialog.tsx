@@ -200,7 +200,7 @@ export default function RandomDungeonDialog({
     if (host.title) setTitle(host.title);
   }, [projectPath]);
 
-  const ensureDungeon = useCallback(async () => {
+  const ensureDungeon = useCallback(async (nameForNew?: string) => {
     const fs = apiFs();
     if (!projectPath || !fs) throw new Error('Open a project first.');
     const root = projectRoot(projectPath);
@@ -213,19 +213,20 @@ export default function RandomDungeonDialog({
       await refreshFromDisk(slug);
       return slug;
     }
+    const dungeonTitle = nameForNew || title || defaultName || 'Dungeon';
     const existing = ((await fs.readDir?.(`${root}/maps`).catch(() => [])) || [])
       .filter((entry) => !entry.isDirectory && entry.name.toLowerCase().endsWith('.txt'))
       .map((entry) => entry.name.replace(/\.txt$/i, ''));
-    const nextSlug = uniqueDungeonSlug(title || defaultName, existing);
+    const nextSlug = uniqueDungeonSlug(dungeonTitle, existing);
     const dest = dungeonPaths(nextSlug);
     const size = { width: roomSize.width, height: roomSize.height };
-    await writeRel(fs, root, dest.openings, buildOpeningsMapText({ ...size, style, title: `${title || 'Dungeon'} openings` }));
+    await writeRel(fs, root, dest.openings, buildOpeningsMapText({ ...size, style, title: `${dungeonTitle} openings` }));
     await writeRel(fs, root, dest.host, buildHostMapText({
       roomWidth: size.width,
       roomHeight: size.height,
       rulesPath: dest.rules,
       style,
-      title: title || 'Dungeon',
+      title: dungeonTitle,
     }));
     await writeRel(fs, root, dest.rules, serializeDungeonRules(buildDungeonRulesFile({
       settings: DEFAULT_DUNGEON_SETTINGS,
@@ -235,7 +236,7 @@ export default function RandomDungeonDialog({
     setSlug(nextSlug);
     setOpeningsPresent(true);
     setRooms([]);
-    onWired?.({ slug: nextSlug, host: dest.host, intermap: intermapForHost(dest.host), title: title || 'Dungeon' });
+    onWired?.({ slug: nextSlug, host: dest.host, intermap: intermapForHost(dest.host), title: dungeonTitle });
     return nextSlug;
   }, [projectPath, slugProp, slug, title, defaultName, roomSize.width, roomSize.height, style, refreshFromDisk, onWired]);
 
@@ -250,7 +251,7 @@ export default function RandomDungeonDialog({
     void (async () => {
       try {
         await loadPool();
-        await ensureDungeon();
+        await ensureDungeon(defaultName);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Could not create the dungeon.');
       } finally {

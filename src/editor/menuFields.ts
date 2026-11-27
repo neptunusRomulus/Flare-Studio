@@ -14,7 +14,12 @@ export type MenuFieldKind =
   | 'rect'
   | 'color'
   | 'select'
-  | 'duration';
+  | 'duration'
+  | 'label'
+  | 'string-point'
+  | 'string-rect'
+  | 'string-label'
+  | 'point-path';
 
 export type MenuFieldOption = { value: string; label: string };
 
@@ -40,6 +45,7 @@ export const MENU_FIELDS: Record<string, MenuField[]> = {
   'confirm.txt': [
     { key: 'close', label: 'Close button', kind: 'point' },
     { key: 'action_list', label: 'Action list position', kind: 'point' },
+    { key: 'label_title', label: 'Title text', kind: 'label' },
   ],
   'devconsole.txt': [
     { key: 'font', label: 'Console font', kind: 'text', placeholder: 'font_regular' },
@@ -53,6 +59,7 @@ export const MENU_FIELDS: Record<string, MenuField[]> = {
     { key: 'bar_fill_size', label: 'Fill size', kind: 'point' },
     { key: 'bar_gfx', label: 'Fill image', kind: 'path', placeholder: 'Fill image' },
     { key: 'timeout', label: 'Hide after', kind: 'duration', hint: 'How long the enemy panel stays after the enemy is gone.' },
+    { key: 'text_pos', label: 'Name and level text', kind: 'label' },
   ],
   'fps.txt': [
     { key: 'position', label: 'Counter position', kind: 'point' },
@@ -61,6 +68,7 @@ export const MENU_FIELDS: Record<string, MenuField[]> = {
   'game_over.txt': [
     { key: 'button_continue', label: 'Continue button', kind: 'point' },
     { key: 'button_exit', label: 'Exit button', kind: 'point' },
+    { key: 'label_title', label: 'Title text', kind: 'label' },
   ],
   'hudlog.txt': [
     { key: 'enable_overlay', label: 'Show message overlay', kind: 'switch', defaultValue: true },
@@ -70,6 +78,7 @@ export const MENU_FIELDS: Record<string, MenuField[]> = {
   'log.txt': [
     { key: 'close', label: 'Close button', kind: 'point' },
     { key: 'tab_area', label: 'Tab area', kind: 'rect' },
+    { key: 'label_title', label: 'Log title', kind: 'label' },
   ],
   'num_picker.txt': [
     { key: 'confirm', label: 'OK button', kind: 'point' },
@@ -77,6 +86,7 @@ export const MENU_FIELDS: Record<string, MenuField[]> = {
     { key: 'decrease', label: 'Decrease button', kind: 'point' },
     { key: 'close', label: 'Close button', kind: 'point' },
     { key: 'input', label: 'Value field', kind: 'point' },
+    { key: 'label_title', label: 'Amount title', kind: 'label' },
   ],
   'powers.txt': [
     { key: 'close', label: 'Close button', kind: 'point' },
@@ -84,11 +94,14 @@ export const MENU_FIELDS: Record<string, MenuField[]> = {
     { key: 'upgrade_button_offset', label: 'Upgrade button offset', kind: 'point' },
     { key: 'tooltip_text_shield', label: 'Shield tooltip text', kind: 'text' },
     { key: 'tooltip_text_heal', label: 'Heal tooltip text', kind: 'text' },
+    { key: 'label_title', label: 'Powers title', kind: 'label' },
+    { key: 'unspent_points', label: 'Unspent points text', kind: 'label' },
   ],
   'region_title.txt': [
     { key: 'hold_duration', label: 'Hold time', kind: 'duration' },
     { key: 'fade_in_duration', label: 'Fade in', kind: 'duration' },
     { key: 'fade_out_duration', label: 'Fade out', kind: 'duration' },
+    { key: 'label_title', label: 'Map name text', kind: 'label' },
   ],
   'character.txt': [
     { key: 'show_resists', label: 'Show resistances', kind: 'switch', defaultValue: true, hint: 'Show resistance stats in the stat list.' },
@@ -99,6 +112,13 @@ export const MENU_FIELDS: Record<string, MenuField[]> = {
     { key: 'statlist_rows', label: 'Stat list rows', kind: 'number', min: 1 },
     { key: 'statlist_scrollbar_offset', label: 'Scrollbar margin', kind: 'number', suffix: 'px', min: 0 },
     { key: 'close', label: 'Close button', kind: 'point' },
+    { key: 'label_title', label: 'Character title', kind: 'label' },
+    { key: 'label_name', label: 'Name text', kind: 'label' },
+    { key: 'label_level', label: 'Level text', kind: 'label' },
+    { key: 'unspent', label: 'Unspent points text', kind: 'label' },
+    { key: 'primary', label: 'Primary stat area', kind: 'string-rect', placeholder: 'e.g. strength' },
+    { key: 'upgrade_primary', label: 'Add point button', kind: 'string-point', placeholder: 'e.g. strength' },
+    { key: 'label_primary', label: 'Primary stat text', kind: 'string-label', placeholder: 'e.g. strength' },
   ],
   'inventory.txt': [
     { key: 'carried_area', label: 'First item slot', kind: 'point' },
@@ -110,6 +130,11 @@ export const MENU_FIELDS: Record<string, MenuField[]> = {
     { key: 'sort_pos', label: 'Sort button', kind: 'point' },
     { key: 'help', label: 'Help area', kind: 'rect' },
     { key: 'close', label: 'Close button', kind: 'point' },
+    { key: 'label_title', label: 'Inventory title', kind: 'label' },
+    { key: 'label_equipment_set', label: 'Equipment set text', kind: 'label' },
+    { key: 'currency', label: 'Currency text', kind: 'label' },
+    { key: 'set_previous', label: 'Previous set button', kind: 'point-path', placeholder: 'Button image' },
+    { key: 'set_next', label: 'Next set button', kind: 'point-path', placeholder: 'Button image' },
   ],
   'vendor.txt': [
     { key: 'slots_area', label: 'First shop slot', kind: 'point' },
@@ -141,6 +166,7 @@ export const MENU_FIELDS: Record<string, MenuField[]> = {
     },
     { key: 'soundfx_craft', label: 'Crafting sound', kind: 'path', placeholder: 'Default' },
     { key: 'close', label: 'Close button', kind: 'point' },
+    { key: 'label_title', label: 'Vendor title', kind: 'label' },
   ],
   'stash.txt': [
     { key: 'slots_area', label: 'First stash slot', kind: 'point' },
@@ -149,6 +175,8 @@ export const MENU_FIELDS: Record<string, MenuField[]> = {
     { key: 'sort_enabled', label: 'Show sort button', kind: 'switch', defaultValue: false },
     { key: 'sort_pos', label: 'Sort button', kind: 'point' },
     { key: 'close', label: 'Close button', kind: 'point' },
+    { key: 'label_title', label: 'Stash title', kind: 'label' },
+    { key: 'currency', label: 'Currency text', kind: 'label' },
   ],
   'talker.txt': [
     { key: 'close', label: 'Close button', kind: 'point' },
@@ -178,6 +206,7 @@ export const MENU_FIELDS: Record<string, MenuField[]> = {
     { key: 'color_ally', label: 'Allies', kind: 'color' },
     { key: 'color_npc', label: 'NPCs', kind: 'color' },
     { key: 'color_teleport', label: 'Teleports', kind: 'color' },
+    { key: 'text_pos', label: 'Map name text', kind: 'label' },
   ],
   'gametitle.txt': [
     { key: 'logo', label: 'Logo image', kind: 'path-rest', placeholder: 'images/menus/logo.png' },
@@ -202,6 +231,7 @@ export const MENU_FIELDS: Record<string, MenuField[]> = {
     { key: 'map', label: 'Map position', kind: 'point' },
     { key: 'loading_label', label: 'Loading text', kind: 'point' },
     { key: 'sprite', label: 'Character preview', kind: 'point' },
+    { key: 'slot_number', label: 'Slot number text', kind: 'label' },
   ],
   'gamenew.txt': [
     { key: 'show_classlist', label: 'Show class list', kind: 'switch', defaultValue: true },

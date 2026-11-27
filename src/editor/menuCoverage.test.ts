@@ -51,19 +51,9 @@ const SCHEMA_ALIASES: Record<string, string> = {
 };
 
 const KNOWN_UNSUPPORTED: Record<string, string[]> = {
-  'character.txt': ['label_title', 'upgrade_primary', 'label_name', 'label_level', 'label_primary', 'primary', 'unspent', 'show_stat'],
-  'inventory.txt': ['set_button', 'set_previous', 'set_next', 'label_equipment_set', 'equipment_slot', 'label_title', 'currency'],
-  'vendor.txt': ['label_title'],
-  'stash.txt': ['label_title', 'currency', 'tab.name', 'tab.is_private'],
-  'minimap.txt': ['text_pos'],
-  'gameload.txt': ['slot_number'],
-  'confirm.txt': ['label_title'],
-  'log.txt': ['label_title'],
-  'num_picker.txt': ['label_title'],
-  'powers.txt': ['label_title', 'unspent_points'],
-  'region_title.txt': ['label_title'],
-  'game_over.txt': ['label_title'],
-  'enemy.txt': ['text_pos'],
+  'character.txt': ['show_stat'],
+  'inventory.txt': ['set_button', 'equipment_slot'],
+  'stash.txt': ['tab.name', 'tab.is_private'],
 };
 
 function menuFiles(entry: SchemaClass): string[] {

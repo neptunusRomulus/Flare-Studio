@@ -49,11 +49,13 @@ Feature detail split out of `AGENTS.md` (2026-11-22). Rules and invariants live 
 - Simple panel keys are described in `src/editor/menuFields.ts`; Action bar and Health/Mana/Experience bars have
   their own section in `src/components/menus/MenuExtraSettings.tsx`. Missing booleans use the engine default
   (`defaultValue`), not `false`. Durations are written with `s`/`ms` as the engine expects.
-- Labels, colour-alpha fields, repeated/nested keys (`slot`, `equipment_slot`, `tab.*`) and the remaining
-  Character/Inventory/Stash fields are preserved but not editable yet; they are listed in
-  `src/editor/menuCoverage.test.ts`. That test compares `src/schema/attribute-reference.json` with the editors,
-  so a new engine key fails until it is exposed or explicitly added to the unsupported list. The schema's
-  `keybinds_bg_color` is the parser's `scrollpane_bg_color`.
+- Labels are edited with X/Y, text alignment and a hide switch; primary-stat buttons and equipment-set buttons
+  have their own name/position/image controls. Colour-alpha fields, repeated/nested keys (`slot`,
+  `equipment_slot`, `tab.*`) and the remaining Character/Inventory/Stash fields are preserved but not editable
+  yet; they are listed in `src/editor/menuCoverage.test.ts`. That test compares
+  `src/schema/attribute-reference.json` with the editors, so a new engine key fails until it is exposed or
+  explicitly added to the unsupported list. The schema's `keybinds_bg_color` is the parser's
+  `scrollpane_bg_color`.
 
 ## World Settings card
 

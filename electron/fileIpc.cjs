@@ -140,7 +140,8 @@ ipcMain.handle("select-tileset-file", async () => {
 // Read an arbitrary image file and return as data URL (for renderer use)
 ipcMain.handle("read-file-dataurl", async (_event, filePath) => {
   try {
-    if (!filePath || !fs.existsSync(filePath)) return null;
+    if (!filePath || !isAllowedProjectPath(filePath)) return null;
+    if (!fs.existsSync(filePath)) return null;
     const ext = (filePath.split(".").pop() || "png").toLowerCase();
     const mime = {
       png: "image/png",

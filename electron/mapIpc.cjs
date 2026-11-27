@@ -48,6 +48,8 @@ function safeFileName(name, fallback) {
 ipcMain.handle("read-session", async (event, projectPath) => {
   try {
     if (!projectPath) return null;
+    rememberProjectRoot(projectPath);
+    if (!isAllowedProjectPath(projectPath)) return null;
     const sessionFile = path.join(projectPath, SESSION_FILENAME);
     if (!fs.existsSync(sessionFile)) return null;
     const content = fs.readFileSync(sessionFile, "utf8");
@@ -83,6 +85,8 @@ const CRASH_BACKUP_DIRNAME = "backup";
 const CRASH_BACKUP_FILENAME = "crash-backup.json";
 
 ipcMain.handle("save-crash-backup", async (_event, projectPath, backupData) => {
+  rememberProjectRoot(projectPath);
+  if (!isAllowedProjectPath(projectPath)) return false;
   try {
     if (!projectPath || !backupData) return false;
 
@@ -101,6 +105,8 @@ ipcMain.handle("save-crash-backup", async (_event, projectPath, backupData) => {
 });
 
 ipcMain.handle("read-crash-backup", async (_event, projectPath) => {
+  rememberProjectRoot(projectPath);
+  if (!isAllowedProjectPath(projectPath)) return null;
   try {
     if (!projectPath) return null;
 
@@ -116,6 +122,8 @@ ipcMain.handle("read-crash-backup", async (_event, projectPath) => {
 });
 
 ipcMain.handle("clear-crash-backup", async (_event, projectPath) => {
+  rememberProjectRoot(projectPath);
+  if (!isAllowedProjectPath(projectPath)) return false;
   try {
     if (!projectPath) return false;
 
@@ -137,6 +145,8 @@ ipcMain.handle(
   async (event, projectPath, filename, content) => {
     try {
       if (!projectPath || !filename || !content) return false;
+      rememberProjectRoot(projectPath);
+    if (!isAllowedProjectPath(projectPath)) return false;
 
       // Ensure npcs folder exists
       const npcsFolder = path.join(projectPath, "npcs");
@@ -274,6 +284,7 @@ ipcMain.handle("read-map-file", async (event, projectPath, filename) => {
       console.warn("read-map-file: rejecting a path, expected a file name:", filename);
       return null;
     }
+    rememberProjectRoot(projectPath);
     if (!isAllowedProjectPath(projectPath)) return null;
     const mapsDir = path.join(projectPath, "maps");
     const full = path.join(mapsDir, filename);
@@ -332,6 +343,8 @@ ipcMain.handle("read-spawn-file", async (_event, projectPath) => {
   try {
     rememberProjectRoot(projectPath);
     if (!projectPath) return null;
+    rememberProjectRoot(projectPath);
+    if (!isAllowedProjectPath(projectPath)) return null;
     const spawnPath = path.join(projectPath, "maps", "spawn.txt");
     if (!fs.existsSync(spawnPath)) return null;
     return fs.readFileSync(spawnPath, "utf8");
@@ -1196,6 +1209,7 @@ ipcMain.handle(
 ipcMain.handle("discover-tileset-images", async (event, projectPath) => {
   try {
     if (!projectPath) return { tilesetImages: {}, tilesets: [] };
+    if (!isAllowedProjectPath(projectPath)) return { tilesetImages: {}, tilesets: [] };
     const tilesetImages = {};
     const tilesets = [];
     const imagesPath = path.join(projectPath, "images");

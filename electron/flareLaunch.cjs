@@ -222,12 +222,25 @@ function isStudioTestPrefix(prefix) {
   return String(prefix || "").endsWith(STUDIO_TEST_SUFFIX);
 }
 
+/**
+ * Flare's save_prefix becomes a directory name under path_user/saves, and the
+ * value comes from a project file (`engine/misc.txt`), so anything that could
+ * leave that folder is replaced: `../..` must not reach the rmSync below.
+ */
+function sanitizeSavePrefix(prefix) {
+  const cleaned = String(prefix || "")
+    .replace(/[^A-Za-z0-9_-]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 64);
+  return cleaned;
+}
+
 /** If a crashed Play left a temporary prefix in misc.txt, strip it back to the project prefix. */
 function stableSavePrefix(prefix) {
-  let base = String(prefix || "");
+  let base = sanitizeSavePrefix(String(prefix || ""));
   if (base.endsWith("_playtest")) base = base.slice(0, -"_playtest".length) || base;
   if (base.endsWith(STUDIO_TEST_SUFFIX)) base = base.slice(0, -STUDIO_TEST_SUFFIX.length) || base;
-  return base || prefix;
+  return base;
 }
 
 function parseAvatarText(text) {
@@ -564,6 +577,7 @@ function linkProjectMod(projectPath, pathUser) {
 
 module.exports = {
   looksLikeFlareExecutable,
+  sanitizeSavePrefix,
   DEFAULT_GAME,
   DEFAULT_MOD_VERSION,
   DEFAULT_ENGINE_MIN,

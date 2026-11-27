@@ -333,6 +333,19 @@ function createWindow() {
     mainWindow.loadFile(path.join(__dirname, "../dist/index.html"));
   }
 
+  // The renderer loads project files (quest text, NPC dialogue) that can contain
+  // links. Navigation would keep the preload, so a remote page would inherit the
+  // whole IPC surface; new windows are refused and navigation must stay in-app.
+  const appOrigin = isDev ? "http://localhost:5173" : "file://";
+  mainWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  mainWindow.webContents.on("will-navigate", (event, url) => {
+    if (!String(url).startsWith(appOrigin)) {
+      console.warn("Blocked navigation out of the app:", url);
+      event.preventDefault();
+    }
+  });
+  mainWindow.webContents.on("will-attach-webview", (event) => event.preventDefault());
+
   mainWindow.on("closed", () => {
     mainWindow = null;
   });

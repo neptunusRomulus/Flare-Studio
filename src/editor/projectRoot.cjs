@@ -61,4 +61,24 @@ function isPlausibleProjectRoot(candidate, io = {}) {
   return entries.some((entry) => String(entry).toLowerCase().endsWith('.json'));
 }
 
-module.exports = { isPlausibleProjectRoot, PROJECT_MARKERS };
+/**
+ * A folder a new project may be created in: it exists, it is a directory, and
+ * it is neither the filesystem root nor the home directory.
+ */
+function isUsableProjectLocation(candidate, io = {}) {
+  const ioFs = io.fs || fs;
+  const ioOs = io.os || os;
+  if (typeof candidate !== 'string' || !candidate.trim()) return false;
+  let resolved;
+  try {
+    resolved = ioFs.realpathSync(candidate);
+    if (!ioFs.statSync(resolved).isDirectory()) return false;
+    if (resolved === path.parse(resolved).root) return false;
+    if (resolved === ioFs.realpathSync(ioOs.homedir())) return false;
+  } catch {
+    return false;
+  }
+  return true;
+}
+
+module.exports = { isPlausibleProjectRoot, isUsableProjectLocation, PROJECT_MARKERS };

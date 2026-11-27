@@ -1,5 +1,7 @@
 "use strict";
 
+const { isUsableProjectLocation } = require("../src/editor/projectRoot.cjs");
+
 /**
  * Project and map IPC: sessions, crash backups, map listing and files, tileset
  * profiles, project create/open/save, export and delete. Registered from
@@ -361,7 +363,16 @@ ipcMain.handle("set-zoom-factor", async (_event, factor) => {
 
 ipcMain.handle("create-map-project", async (event, config) => {
   try {
-    const projectPath = path.join(config.location, config.name);
+    // Both halves come from the renderer: the name must stay a single path
+    // segment and the location must be a real folder (never "/" or $HOME).
+    const projectName = path.basename(String(config.name || ""));
+    if (!projectName || projectName !== String(config.name || "")) {
+      return { success: false, error: "Invalid project name" };
+    }
+    if (!isUsableProjectLocation(config.location)) {
+      return { success: false, error: "Invalid project location" };
+    }
+    const projectPath = path.join(config.location, projectName);
 
     // Create project directory
     if (!fs.existsSync(projectPath)) {
@@ -375,7 +386,7 @@ ipcMain.handle("create-map-project", async (event, config) => {
 
     // Create basic project structure
     const mapData = {
-      name: config.name,
+      name: projectName,
       width: config.width,
       height: config.height,
       tileSize: tile.width,
@@ -387,9 +398,9 @@ ipcMain.handle("create-map-project", async (event, config) => {
     };
 
     // Save map configuration
-    const mapConfigPath = path.join(projectPath, `${config.name}.json`);
+    const mapConfigPath = path.join(projectPath, `${projectName}.json`);
     fs.writeFileSync(mapConfigPath, JSON.stringify(mapData, null, 2));
-    const project = flareAdapter.emptyProject(config.name);
+    const project = flareAdapter.emptyProject(projectName);
     project.tile = tile;
     if (config.projectStart === "template" || config.projectStart === "scratch") {
       project.meta = project.meta || {};

@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { isPlausibleProjectRoot } from './projectRoot.cjs';
+import { isPlausibleProjectRoot, isUsableProjectLocation } from './projectRoot.cjs';
 
 function sandbox() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'flare-root-'));
@@ -39,5 +39,21 @@ describe('isPlausibleProjectRoot', () => {
     expect(isPlausibleProjectRoot(file)).toBe(false);
     expect(isPlausibleProjectRoot('')).toBe(false);
     expect(isPlausibleProjectRoot(null)).toBe(false);
+  });
+});
+
+describe('isUsableProjectLocation', () => {
+  it('accepts a plain existing directory', () => {
+    expect(isUsableProjectLocation(sandbox())).toBe(true);
+  });
+
+  it('rejects the root, the home directory, files and missing paths', () => {
+    expect(isUsableProjectLocation(path.parse(process.cwd()).root)).toBe(false);
+    expect(isUsableProjectLocation(os.homedir())).toBe(false);
+    const root = sandbox();
+    const file = path.join(root, 'x.txt');
+    fs.writeFileSync(file, 'x');
+    expect(isUsableProjectLocation(file)).toBe(false);
+    expect(isUsableProjectLocation(path.join(root, 'missing'))).toBe(false);
   });
 });
